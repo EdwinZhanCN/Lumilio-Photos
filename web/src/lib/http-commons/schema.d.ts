@@ -4,11122 +4,11393 @@
  */
 
 export interface paths {
-    "/api/v1/admin/river/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List jobs with filters
-         * @description Get a paginated list of jobs with optional state, queue, kind, and time range filters
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Job state filter (available,scheduled,running,retryable,completed,cancelled,discarded) */
-                    state?: string;
-                    /** @description Queue name filter */
-                    queue?: string;
-                    /** @description Job kind filter */
-                    kind?: string;
-                    /** @description Number of jobs to return (default: 50, max: 200) */
-                    limit?: number;
-                    /** @description Pagination cursor for next page */
-                    cursor?: string;
-                    /** @description Time range filter (1h, 24h, 30d) - filters by created_at */
-                    time_range?: string;
-                    /** @description Include total count of matching jobs (may be slower) */
-                    include_count?: boolean;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/river/jobs/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get job by ID
-         * @description Get detailed information about a specific job
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Job ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Job not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/river/queues": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List all queues
-         * @description Get a list of all active queues with their metadata
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of queues to return (default: 100) */
-                    limit?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/river/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get job statistics
-         * @description Get aggregated statistics about jobs by state
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent/chat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Chat with Agent
-         * @description Send a query to agent and receive streaming responses via SSE. Manages conversation threads.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Chat request */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["handler.AgentChatRequest"];
-                };
-            };
-            responses: {
-                /** @description SSE stream */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/event-stream": string;
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent/chat/resume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Resume Agent Chat
-         * @description Resume a conversation from an interrupt point (e.g., user confirmation for a tool call)
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Resume request */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["handler.AgentResumeRequest"];
-                };
-            };
-            responses: {
-                /** @description SSE stream */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/event-stream": string;
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent/schemas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Agent Tool DTO Schemas
-         * @description Get all DTO schemas used by agent tools for type reference
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/agent/tools": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Available Tools
-         * @description Get list of all registered agent tools
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/albums": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List albums
-         * @description Retrieve a paginated list of albums for the authenticated user
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Maximum number of results (max 100) */
-                    limit?: number;
-                    /** @description Number of results to skip for pagination */
-                    offset?: number;
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Albums retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to retrieve albums */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Create a new album
-         * @description Create a new album for the authenticated user
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Album creation data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.CreateAlbumRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Album created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to create album */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/albums/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get album by ID
-         * @description Retrieve a specific album by its ID
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Album retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid album ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Album not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        /**
-         * Update album
-         * @description Update an existing album's information
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            /** @description Album update data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAlbumRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Album updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid album ID or request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Album not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to update album */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        /**
-         * Delete album
-         * @description Delete an album by its ID
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Album deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid album ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Album not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to delete album */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/albums/{id}/assets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get assets in album
-         * @description Retrieve all assets in a specific album
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Assets retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid album ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Album not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to retrieve album assets */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/albums/{id}/assets/{assetId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add asset to album
-         * @description Add an asset to a specific album
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                    /** @description Asset ID (UUID format) */
-                    assetId: string;
-                };
-                cookie?: never;
-            };
-            /** @description Asset position in album */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.AddAssetToAlbumRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Asset added to album successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid album ID or asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Album not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to add asset to album */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        /**
-         * Remove asset from album
-         * @description Remove an asset from a specific album
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                    /** @description Asset ID (UUID format) */
-                    assetId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Asset removed from album successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid album ID or asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to remove asset from album */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/albums/{id}/assets/{assetId}/position": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update asset position in album
-         * @description Update the position of an asset within a specific album
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                    /** @description Asset ID (UUID format) */
-                    assetId: string;
-                };
-                cookie?: never;
-            };
-            /** @description New position data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAssetPositionRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Asset position updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid album ID or asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to update asset position */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/albums/{id}/bioclip/rebuild": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Queue BioCLIP for a bio album
-         * @description Queue BioCLIP processing for photo assets in a bio album that do not yet have species predictions.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description BioCLIP jobs queued successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid album or album type */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Album not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description BioCLIP unavailable */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload a single asset
-         * @description Upload a single photo, video, audio file, or document to the system. The file is staged in a repository and queued for processing.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Client-calculated BLAKE3 hash of the file */
-                    "X-Content-Hash"?: string;
-                };
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Asset file to upload | Repository UUID (uses default repository if not provided) */
-            requestBody?: {
-                content: {
-                    "application/x-www-form-urlencoded": Record<string, never> | string;
-                    "multipart/form-data": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Upload successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad request - no file provided or parse error */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get asset by ID
-         * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Include thumbnails */
-                    include_thumbnails?: boolean;
-                    /** @description Include tags */
-                    include_tags?: boolean;
-                    /** @description Include albums */
-                    include_albums?: boolean;
-                    /** @description Include species predictions */
-                    include_species?: boolean;
-                    /** @description Include OCR results */
-                    include_ocr?: boolean;
-                    /** @description Include face recognition */
-                    include_faces?: boolean;
-                };
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Asset details with optional relationships */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        /**
-         * Update asset metadata
-         * @description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Asset metadata */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAssetRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Asset updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid asset ID or request body */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        /**
-         * Delete asset
-         * @description Soft delete an asset by marking it as deleted. The physical file is not removed.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Asset deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid asset ID format */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/albums": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get albums containing asset
-         * @description Retrieve all albums that contain a specific asset
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID (UUID format) */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Albums retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Failed to retrieve asset albums */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/albums/{albumId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add asset to album
-         * @description Associate an asset with a specific album by asset ID and album ID.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                    /**
-                     * @description Album ID
-                     * @example 123
-                     */
-                    albumId: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Asset added to album successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid asset ID or album ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/audio/web": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get web-optimized audio
-         * @description Serve the web-optimized MP3 audio version for an asset by asset ID.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Web-optimized audio file */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "audio/mpeg": Record<string, never>;
-                    };
-                };
-                /** @description Invalid asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "audio/mpeg": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found or not audio */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "audio/mpeg": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "audio/mpeg": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/description": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update asset description
-         * @description Update the description metadata of an asset
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Description data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateDescriptionRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Description updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/exif": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get raw asset EXIF
-         * @description Retrieve the full exiftool JSON object stored for an asset during metadata processing.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Raw EXIF JSON */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset or EXIF not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/like": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update asset like status
-         * @description Update the like/favorite status of a specific asset
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Like data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateLikeRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Like status updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/original": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get original file
-         * @description Serve the original file content for an asset by asset ID. Returns the file as an octet-stream.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Original file content */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/octet-stream": Record<string, never>;
-                    };
-                };
-                /** @description Invalid asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/octet-stream": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/octet-stream": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/octet-stream": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/rating": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update asset rating
-         * @description Update the rating (0-5) of a specific asset
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Rating data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateRatingRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Rating updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/rating-and-like": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update asset rating and like status
-         * @description Update both the rating (0-5) and like/favorite status of a specific asset
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Rating and like data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateRatingAndLikeRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Rating and like status updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/reprocess": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reprocess asset
-         * @description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Reprocessing tasks (optional) */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.ReprocessAssetRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.ReprocessAssetResponseDTO"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: string;
-                        };
-                    };
-                };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: string;
-                        };
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: string;
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/sidecar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get asset edit sidecar
-         * @description Retrieve the non-destructive Studio edit sidecar stored under the asset repository .lumilio directory.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Asset sidecar */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        /**
-         * Update asset edit sidecar
-         * @description Store non-destructive Studio edit data under the asset repository .lumilio directory.
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Sidecar payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.LumilioSidecarV1DTO"];
-                };
-            };
-            responses: {
-                /** @description Asset sidecar saved */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid asset ID or request body */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/stack": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get asset stack
-         * @description Returns the stack (group) that contains the specified asset
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        /**
-         * Remove asset from stack
-         * @description Removes an asset from its stack, making it standalone
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Asset ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/thumbnail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get asset thumbnail
-         * @description Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Thumbnail size */
-                    size?: "small" | "medium" | "large";
-                };
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Thumbnail image file */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/jpeg": Record<string, never>;
-                    };
-                };
-                /** @description Invalid asset ID or size parameter */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/jpeg": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset or thumbnail not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/jpeg": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/jpeg": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/{id}/video/web": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get web-optimized video
-         * @description Serve the web-optimized MP4 video version for an asset by asset ID.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Asset ID (UUID format)
-                     * @example "550e8400-e29b-41d4-a716-446655440000"
-                     */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Web-optimized video file */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "video/mp4": Record<string, never>;
-                    };
-                };
-                /** @description Invalid asset ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "video/mp4": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset not found or not a video */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "video/mp4": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "video/mp4": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Batch upload assets with chunk support
-         * @description Unified batch upload endpoint that supports both small files and chunked large files. Field names should follow format: single_{session_id} for single files or chunk_{session_id}_{index}_{total} for chunks.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Repository UUID (uses default repository if not provided) | Single file upload - use format: single_{session_id} | Chunked file upload - use format: chunk_{session_id}_{index}_{total} */
-            requestBody?: {
-                content: {
-                    "application/x-www-form-urlencoded": string | Record<string, never> | Record<string, never>;
-                    "multipart/form-data": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Batch upload completed */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad request - no files provided or parse error */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/batch/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get upload configuration
-         * @description Get current upload configuration including chunk size and concurrency limits based on system memory
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Upload configuration */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/batch/progress": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get upload progress
-         * @description Get detailed progress information for upload sessions
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Comma-separated session IDs (optional) */
-                    session_ids?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Upload progress details */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Download assets
-         * @description Serve original files for the requested asset IDs as a zip archive.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Asset IDs to download */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.DownloadAssetsRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Zip archive */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/zip": Record<string, never>;
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/zip": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Authentication required */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/zip": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/zip": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Asset or original file not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/zip": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/zip": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/featured": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get featured photos
-         * @description Select a small set of featured photos using deterministic weighted sampling (A-ES) with diversity constraints.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of featured photos to return */
-                    count?: number;
-                    /** @description Max candidate photos considered before selection */
-                    candidate_limit?: number;
-                    /** @description Only consider photos from the last N days (0 disables date cutoff) */
-                    days?: number;
-                    /** @description Deterministic seed (default: current UTC date YYYY-MM-DD) */
-                    seed?: string;
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Featured photos selected successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/filter-options": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get filter options
-         * @description Get available camera models and lenses for filter dropdowns
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Filter options retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/indexing/rebuild": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Queue asset index rebuild
-         * @description Queue a background batch that backfills AI indexing for existing photos.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Reindex request */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RebuildAssetIndexesRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Reindex job queued successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/indexing/repositories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List indexing repositories
-         * @description Return repositories that can be used to scope indexing stats and reindex requests.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Repository options retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/indexing/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get asset indexing stats
-         * @description Return indexing coverage and queued job counts for photo AI tasks.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Indexing stats retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid repository ID */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/liked": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get liked assets
-         * @description Get all assets that have been liked/favorited
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of assets to return */
-                    limit?: number;
-                    /** @description Number of assets to skip */
-                    offset?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Liked assets retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Query assets (unified endpoint)
-         * @description Unified endpoint for listing, filtering, and searching assets. Replaces separate /filter and /search endpoints.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Query parameters */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.AssetQueryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Assets queried successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.QueryAssetsResponse"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Semantic search unavailable */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/map-points": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get photo map points
-         * @description Return lightweight paginated photo records containing only map-related fields (asset ID, filename, times, GPS lat/lon).
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Page size (1-5000) */
-                    limit?: number;
-                    /** @description Page offset */
-                    offset?: number;
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Map points retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/rating/{rating}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get assets by rating
-         * @description Get assets with a specific rating (0-5)
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of assets to return */
-                    limit?: number;
-                    /** @description Number of assets to skip */
-                    offset?: number;
-                };
-                header?: never;
-                path: {
-                    /** @description Rating (0-5) */
-                    rating: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Assets retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Search assets
-         * @description Search assets with optional top results enhancement and filename fallback.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Search parameters */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.SearchAssetsRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Assets searched successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/stacks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create manual stack
-         * @description Manually groups the specified assets into a new stack
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Asset IDs to stack */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.CreateManualStackRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Created */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/types": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get supported asset types
-         * @description Retrieve a list of all supported asset types in the system.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Asset types retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/bootstrap-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get auth bootstrap status
-         * @description Return whether Lumilio is still in first-user bootstrap mode and which role the next registration receives.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Bootstrap status retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Login user
-         * @description Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Login credentials */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.LoginRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Login successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid credentials */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Logout user
-         * @description Revoke the user's refresh token
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Refresh token to revoke */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RefreshTokenRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Logout successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid refresh token */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get current user
-         * @description Get information about the currently authenticated user
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description User information retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/media-token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get media access token
-         * @description Generate a short-lived media token for image/video/audio URL authorization in browser media elements.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Media token issued successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get MFA status
-         * @description Get the authenticated user's MFA status, including TOTP enablement and remaining recovery codes.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description MFA status retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/passkeys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List passkeys
-         * @description List the authenticated user's enrolled passkeys.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Passkeys retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/passkeys/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete passkey
-         * @description Delete one enrolled passkey for the authenticated user.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Passkey ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Passkey deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Passkey not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/passkeys/options": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Begin passkey enrollment
-         * @description Create WebAuthn registration options to add a new passkey to the authenticated account.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Passkey enrollment options created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/passkeys/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify passkey enrollment
-         * @description Verify a passkey enrollment response and attach the new passkey to the authenticated account.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Passkey enrollment verification payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.PasskeyVerifyRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Passkey enrolled successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid or expired challenge */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/recovery-codes/regenerate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Regenerate recovery codes
-         * @description Generate a fresh set of recovery codes for the authenticated user.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Recovery code regeneration payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RegenerateRecoveryCodesRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Recovery codes regenerated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description MFA is not enabled */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized or incorrect password */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/totp/disable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Disable TOTP
-         * @description Disable TOTP MFA and invalidate recovery codes for the authenticated user.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Disable TOTP payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.DisableTOTPRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description TOTP disabled successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description MFA is not enabled */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized or incorrect password */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/totp/enable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enable TOTP
-         * @description Verify a TOTP setup code and enable TOTP MFA for the authenticated user.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description TOTP enable payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.EnableTOTPRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description TOTP enabled successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid setup token or verification code */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/totp/setup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Begin TOTP setup
-         * @description Generate a new TOTP secret and setup token for the authenticated user.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description TOTP setup created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/mfa/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify MFA challenge
-         * @description Verify a pending MFA login challenge with a TOTP code or recovery code.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description MFA verification payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.VerifyMFARequestDTO"];
-                };
-            };
-            responses: {
-                /** @description MFA verification successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid or expired MFA challenge */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/passkeys/login/options": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Begin passkey login
-         * @description Create WebAuthn login options for a username-first passkey login flow.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Username for passkey login */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.PasskeyOptionsRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Passkey login options created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid credentials */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/passkeys/login/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify passkey login
-         * @description Verify a passkey login assertion and issue session tokens.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Passkey login verification payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.PasskeyVerifyRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Passkey login verified successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid credentials */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/passkeys/register/options": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Begin passkey registration
-         * @description Create WebAuthn registration options for a staged registration session.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Registration session */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RegistrationSessionRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Passkey registration options created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid or expired registration session */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/passkeys/register/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify passkey registration
-         * @description Verify a staged registration passkey response, create the user, and issue session tokens.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Passkey registration verification payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RegistrationPasskeyVerifyRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Passkey registration verified successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid or expired passkey registration challenge */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description User already exists */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Refresh access token
-         * @description Generate a new access token using a valid refresh token
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Refresh token */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RefreshTokenRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Token refreshed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid or expired refresh token */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/register/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start user registration
-         * @description Create a staged registration session with username and password before passkey or TOTP enrollment.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Registration data */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RegistrationStartRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Registration session created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description User already exists */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/register/totp/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Complete staged TOTP registration
-         * @description Verify the staged TOTP code, create the user account, and issue session tokens plus recovery codes.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description TOTP verification payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RegistrationTOTPCompleteRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description TOTP registration completed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid or expired registration session */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description User already exists */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/register/totp/setup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Begin staged TOTP setup
-         * @description Generate TOTP setup data for a staged registration session.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Registration session */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RegistrationSessionRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description TOTP setup created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid or expired registration session */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/capabilities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get public runtime capabilities
-         * @description Return a de-sensitized view of backend ML and LLM runtime capabilities without exposing secrets.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Capabilities retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cloud/{provider}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Disconnect cloud provider
-         * @description Remove a cloud provider's configuration and stop any active sync.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Provider name */
-                    provider: "icloud" | "s3";
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Disconnected successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid provider */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cloud/icloud/connect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Connect to iCloud
-         * @description Start iCloud authentication. If 2FA is required, returns needs_2fa=true.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description iCloud credentials */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.ConnectICloudRequest"];
-                };
-            };
-            responses: {
-                /** @description Connection result */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cloud/icloud/verify-2fa": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify iCloud 2FA
-         * @description Submit a two-factor authentication code to complete iCloud login.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description 2FA code */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.VerifyICloud2FARequest"];
-                };
-            };
-            responses: {
-                /** @description 2FA verified successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cloud/providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List cloud providers
-         * @description Get the status of all configured cloud storage providers.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Provider list */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cloud/sync": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Trigger cloud sync
-         * @description Start a sync operation for the specified cloud provider.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Sync configuration */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.TriggerSyncRequest"];
-                };
-            };
-            responses: {
-                /** @description Sync started */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/duplicates/detect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Detect duplicates for a repository
-         * @description Rebuilds the pending duplicate graph for a repository by combining exact-hash and pHash edges.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Repository to scan */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.DetectDuplicatesRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/duplicates/groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List duplicate groups
-         * @description Paginated list of duplicate groups, scoped by repository and status (default pending).
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Repository UUID */
-                    repository_id?: string;
-                    /** @description pending | merged | dismissed (defaults to pending) */
-                    status?: string;
-                    /** @description Page size */
-                    limit?: number;
-                    /** @description Page offset */
-                    offset?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/duplicates/groups/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a duplicate group
-         * @description Returns one duplicate group with all assets and evidence edges.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Duplicate group UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/duplicates/groups/{id}/dismiss": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Dismiss a duplicate group
-         * @description Marks a duplicate group as dismissed without merging any assets.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Duplicate group UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/duplicates/groups/{id}/merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Merge a duplicate group
-         * @description Keeps the chosen asset, unions metadata from duplicates, and soft-deletes the remaining members.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Duplicate group UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Merge configuration */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.MergeDuplicateGroupRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/duplicates/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get duplicate detection summary
-         * @description Returns counts and recoverable space for pending duplicate groups, scoped by optional repository_id.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Repository UUID to scope the summary */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health check
-         * @description Check if the server is healthy
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Server is healthy */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/locations/clusters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get location clusters
-         * @description Return paginated persisted photo location clusters with cached labels when available.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Page size (1-1000) */
-                    limit?: number;
-                    /** @description Page offset */
-                    offset?: number;
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                    /** @description Optional geohash filter */
-                    geohash?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Location clusters retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/locations/rebuild": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Queue location cluster rebuild
-         * @description Queue a location cluster rebuild for all photos or one repository.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Rebuild request */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RebuildLocationClustersRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Location cluster rebuild queued successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request body */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/people": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List people
-         * @description List recognized people for the current repository scope.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                    /** @description Maximum number of results (max 100) */
-                    limit?: number;
-                    /** @description Number of results to skip */
-                    offset?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description People listed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/people/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get person
-         * @description Get a single recognized person by cluster ID.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path: {
-                    /** @description Person ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Person fetched successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Person not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update person
-         * @description Rename a recognized person. Successful updates mark the person as confirmed.
-         */
-        patch: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path: {
-                    /** @description Person ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            /** @description Person update payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdatePersonRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Person updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Person not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/v1/people/{id}/assets/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * List person assets
-         * @description List assets scoped to a specific person while reusing the unified asset query filters.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Person ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            /** @description Asset query parameters */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.AssetQueryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Assets listed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Person not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Semantic search unavailable */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/people/{id}/cover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get person cover
-         * @description Serve the representative face crop image for a recognized person.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path: {
-                    /** @description Person ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Face crop */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/webp": Record<string, never>;
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/webp": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/webp": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Person cover not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/webp": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "image/webp": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/people/rebuild": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rebuild people clusters
-         * @description Rebuild recognized people for the selected repository scope using HDBSCAN over face embeddings.
-         */
-        post: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description People clusters rebuilt successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List repositories
-         * @description Return all registered repositories.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repositories retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Create repository
-         * @description Create a repository folder under the server storage root. If the target folder already contains a .lumiliorepo file, it is registered instead.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Repository name */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.CreateRepositoryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get repository
-         * @description Return a single repository.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        /**
-         * Delete repository
-         * @description Remove a repository from the registry. Does not delete files on disk.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        /**
-         * Update repository
-         * @description Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Fields to update */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateRepositoryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Queue repository scan
-         * @description Queue a manual scan for a repository free workspace.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Scan request */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RepositoryScanRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository scan queued successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List repository scans
-         * @description List recent scan runs for a repository.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Limit */
-                    limit?: number;
-                    /** @description Offset */
-                    offset?: number;
-                };
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository scan runs retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scans/latest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get latest repository scan
-         * @description Return the latest scan run for a repository.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Latest repository scan retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description No scan run found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/stacks/detect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Auto-detect stacks
-         * @description Scans a repository for RAW+JPEG pairs and creates stacks automatically
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/settings/system": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get system settings
-         * @description Return persisted system settings without exposing secret values.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description System settings retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update system settings
-         * @description Update persisted system settings. API keys are write-only and never returned.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description System settings patch */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateSystemSettingsDTO"];
-                };
-            };
-            responses: {
-                /** @description System settings updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/v1/settings/system/validate-llm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Validate LLM settings
-         * @description Validate the persisted LLM configuration by issuing a lightweight test request.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description LLM settings validated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description LLM validation failed */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/species/reference": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get species reference
-         * @description Fetch a species wiki summary and reference image from iNaturalist by scientific name, with optional common name fallback.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /**
-                     * @description Scientific name
-                     * @example "Rucervus duvaucelii"
-                     */
-                    scientific_name?: string;
-                    /**
-                     * @description Common name fallback
-                     * @example "Barasingha"
-                     */
-                    common_name?: string;
-                    /**
-                     * @description iNaturalist locale for localized common names and wiki summaries
-                     * @example "zh"
-                     */
-                    locale?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Species reference retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid query */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Species reference not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/stats/available-years": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get available years
-         * @description Get list of years that have photo data
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/stats/camera-lens": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get camera lens combination stats
-         * @description Get top N camera+lens combinations
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of results to return */
-                    limit?: number;
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/stats/daily-activity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get daily activity heatmap
-         * @description Get daily shooting activity heatmap data for a calendar year or custom date range.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Calendar year (e.g. 2024) */
-                    year?: number;
-                    /** @description Start date in YYYY-MM-DD (must be used with end_date) */
-                    start_date?: string;
-                    /** @description End date in YYYY-MM-DD, inclusive (must be used with start_date) */
-                    end_date?: string;
-                    /** @description Deprecated fallback: number of days to look back (used only when year/start_date/end_date are absent) */
-                    days?: number;
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/stats/focal-length": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get focal length distribution
-         * @description Get distribution of commonly used focal lengths
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/stats/time-distribution": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get time distribution
-         * @description Get shooting time distribution by hour or month
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Distribution type: hourly or monthly */
-                    type?: "hourly" | "monthly";
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal Server Error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List users
-         * @description List users with ownership statistics for administrator management views.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Maximum number of results */
-                    limit?: number;
-                    /** @description Number of results to skip */
-                    offset?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Users retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/users/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update user
-         * @description Update user identity, role, status, and avatar fields as an administrator.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description User ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            /** @description User update payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.AdminUpdateUserRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description User updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description User not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description User already exists */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/v1/users/{id}/reset-access": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reset user access
-         * @description Generate a temporary password and clear passkeys, TOTP, recovery codes, and refresh tokens for a user.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description User ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description User access reset successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description User not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/users/me/password": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Change my password
-         * @description Verify the current password, set a new password, and revoke all refresh tokens for the current user.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Password change payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.ChangePasswordRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Password updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Current password is incorrect */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/v1/users/me/profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update my profile
-         * @description Update the current user's profile fields such as display name and avatar photo.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Profile update payload */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateOwnProfileRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Profile updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        trace?: never;
+  "/api/v1/admin/river/jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List jobs with filters
+     * @description Get a paginated list of jobs with optional state, queue, kind, and time range filters
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Job state filter (available,scheduled,running,retryable,completed,cancelled,discarded) */
+          state?: string;
+          /** @description Queue name filter */
+          queue?: string;
+          /** @description Job kind filter */
+          kind?: string;
+          /** @description Number of jobs to return (default: 50, max: 200) */
+          limit?: number;
+          /** @description Pagination cursor for next page */
+          cursor?: string;
+          /** @description Time range filter (1h, 24h, 30d) - filters by created_at */
+          time_range?: string;
+          /** @description Include total count of matching jobs (may be slower) */
+          include_count?: boolean;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/river/jobs/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get job by ID
+     * @description Get detailed information about a specific job
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Job ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Job not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/river/queues": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List all queues
+     * @description Get a list of all active queues with their metadata
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Number of queues to return (default: 100) */
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/admin/river/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get job statistics
+     * @description Get aggregated statistics about jobs by state
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/agent/chat": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Chat with Agent
+     * @description Send a query to agent and receive streaming responses via SSE. Manages conversation threads.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Chat request */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["handler.AgentChatRequest"];
+        };
+      };
+      responses: {
+        /** @description SSE stream */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/event-stream": string;
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/event-stream": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/event-stream": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/agent/chat/resume": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Resume Agent Chat
+     * @description Resume a conversation from an interrupt point (e.g., user confirmation for a tool call)
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Resume request */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["handler.AgentResumeRequest"];
+        };
+      };
+      responses: {
+        /** @description SSE stream */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/event-stream": string;
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/event-stream": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/event-stream": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/agent/schemas": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Agent Tool DTO Schemas
+     * @description Get all DTO schemas used by agent tools for type reference
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/agent/tools": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Available Tools
+     * @description Get list of all registered agent tools
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/albums": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List albums
+     * @description Retrieve a paginated list of albums for the authenticated user
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Maximum number of results (max 100) */
+          limit?: number;
+          /** @description Number of results to skip for pagination */
+          offset?: number;
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Albums retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to retrieve albums */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    /**
+     * Create a new album
+     * @description Create a new album for the authenticated user
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Album creation data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.CreateAlbumRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Album created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to create album */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/albums/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get album by ID
+     * @description Retrieve a specific album by its ID
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Album retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid album ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Album not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    /**
+     * Update album
+     * @description Update an existing album's information
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Album update data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateAlbumRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Album updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid album ID or request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Album not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to update album */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    /**
+     * Delete album
+     * @description Delete an album by its ID
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Album deleted successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid album ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Album not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to delete album */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/albums/{id}/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get assets in album
+     * @description Retrieve all assets in a specific album
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Assets retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid album ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Album not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to retrieve album assets */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/albums/{id}/assets/{assetId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add asset to album
+     * @description Add an asset to a specific album
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+          /** @description Asset ID (UUID format) */
+          assetId: string;
+        };
+        cookie?: never;
+      };
+      /** @description Asset position in album */
+      requestBody?: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.AddAssetToAlbumRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Asset added to album successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid album ID or asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Album not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to add asset to album */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    /**
+     * Remove asset from album
+     * @description Remove an asset from a specific album
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+          /** @description Asset ID (UUID format) */
+          assetId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Asset removed from album successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid album ID or asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to remove asset from album */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/albums/{id}/assets/{assetId}/position": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update asset position in album
+     * @description Update the position of an asset within a specific album
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+          /** @description Asset ID (UUID format) */
+          assetId: string;
+        };
+        cookie?: never;
+      };
+      /** @description New position data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateAssetPositionRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Asset position updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid album ID or asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to update asset position */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/albums/{id}/bioclip/rebuild": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Queue BioCLIP for a bio album
+     * @description Queue BioCLIP processing for photo assets in a bio album that do not yet have species predictions.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Album ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description BioCLIP jobs queued successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid album or album type */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Album not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description BioCLIP unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Upload a single asset
+     * @description Upload a single photo, video, audio file, or document to the system. The file is staged in a repository and queued for processing.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: {
+          /** @description Client-calculated BLAKE3 hash of the file */
+          "X-Content-Hash"?: string;
+        };
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Asset file to upload | Repository UUID (uses default repository if not provided) */
+      requestBody?: {
+        content: {
+          "application/x-www-form-urlencoded": Record<string, never> | string;
+          "multipart/form-data": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Upload successful */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad request - no file provided or parse error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get asset by ID
+     * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Include thumbnails */
+          include_thumbnails?: boolean;
+          /** @description Include tags */
+          include_tags?: boolean;
+          /** @description Include albums */
+          include_albums?: boolean;
+          /** @description Include species predictions */
+          include_species?: boolean;
+          /** @description Include OCR results */
+          include_ocr?: boolean;
+          /** @description Include face recognition */
+          include_faces?: boolean;
+        };
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Asset details with optional relationships */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    /**
+     * Update asset metadata
+     * @description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Asset metadata */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateAssetRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Asset updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid asset ID or request body */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    /**
+     * Delete asset
+     * @description Soft delete an asset by marking it as deleted. The physical file is not removed.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Asset deleted successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid asset ID format */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/albums": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get albums containing asset
+     * @description Retrieve all albums that contain a specific asset
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID (UUID format) */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Albums retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Failed to retrieve asset albums */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/albums/{albumId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add asset to album
+     * @description Associate an asset with a specific album by asset ID and album ID.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+          /**
+           * @description Album ID
+           * @example 123
+           */
+          albumId: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Asset added to album successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid asset ID or album ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/audio/web": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get web-optimized audio
+     * @description Serve the web-optimized MP3 audio version for an asset by asset ID.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Web-optimized audio file */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "audio/mpeg": Record<string, never>;
+          };
+        };
+        /** @description Invalid asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "audio/mpeg": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found or not audio */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "audio/mpeg": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "audio/mpeg": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/description": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update asset description
+     * @description Update the description metadata of an asset
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Description data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateDescriptionRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Description updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/exif": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get raw asset EXIF
+     * @description Retrieve the full exiftool JSON object stored for an asset during metadata processing.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Raw EXIF JSON */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset or EXIF not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/like": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update asset like status
+     * @description Update the like/favorite status of a specific asset
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Like data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateLikeRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Like status updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/original": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get original file
+     * @description Serve the original file content for an asset by asset ID. Returns the file as an octet-stream.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Original file content */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/octet-stream": Record<string, never>;
+          };
+        };
+        /** @description Invalid asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/octet-stream": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/octet-stream": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/octet-stream": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/rating": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update asset rating
+     * @description Update the rating (0-5) of a specific asset
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Rating data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateRatingRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Rating updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/rating-and-like": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update asset rating and like status
+     * @description Update both the rating (0-5) and like/favorite status of a specific asset
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Rating and like data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateRatingAndLikeRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Rating and like status updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/reprocess": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reprocess asset
+     * @description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Reprocessing tasks (optional) */
+      requestBody?: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.ReprocessAssetRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["dto.ReprocessAssetResponseDTO"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              [key: string]: string;
+            };
+          };
+        };
+        /** @description Not Found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              [key: string]: string;
+            };
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              [key: string]: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/sidecar": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get asset edit sidecar
+     * @description Retrieve the non-destructive Studio edit sidecar stored under the asset repository .lumilio directory.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Asset sidecar */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    /**
+     * Update asset edit sidecar
+     * @description Store non-destructive Studio edit data under the asset repository .lumilio directory.
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Sidecar payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.LumilioSidecarV1DTO"];
+        };
+      };
+      responses: {
+        /** @description Asset sidecar saved */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid asset ID or request body */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/stack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get asset stack
+     * @description Returns the stack (group) that contains the specified asset
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Not Found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /**
+     * Remove asset from stack
+     * @description Removes an asset from its stack, making it standalone
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Asset ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/thumbnail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get asset thumbnail
+     * @description Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Thumbnail size */
+          size?: "small" | "medium" | "large";
+        };
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Thumbnail image file */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/jpeg": Record<string, never>;
+          };
+        };
+        /** @description Invalid asset ID or size parameter */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/jpeg": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset or thumbnail not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/jpeg": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/jpeg": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/{id}/video/web": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get web-optimized video
+     * @description Serve the web-optimized MP4 video version for an asset by asset ID.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /**
+           * @description Asset ID (UUID format)
+           * @example "550e8400-e29b-41d4-a716-446655440000"
+           */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Web-optimized video file */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "video/mp4": Record<string, never>;
+          };
+        };
+        /** @description Invalid asset ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "video/mp4": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset not found or not a video */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "video/mp4": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "video/mp4": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Batch upload assets with chunk support
+     * @description Unified batch upload endpoint that supports both small files and chunked large files. Field names should follow format: single_{session_id} for single files or chunk_{session_id}_{index}_{total} for chunks.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Repository UUID (uses default repository if not provided) | Single file upload - use format: single_{session_id} | Chunked file upload - use format: chunk_{session_id}_{index}_{total} */
+      requestBody?: {
+        content: {
+          "application/x-www-form-urlencoded":
+            | string
+            | Record<string, never>
+            | Record<string, never>;
+          "multipart/form-data": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Batch upload completed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad request - no files provided or parse error */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/batch/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get upload configuration
+     * @description Get current upload configuration including chunk size and concurrency limits based on system memory
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Upload configuration */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/batch/progress": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get upload progress
+     * @description Get detailed progress information for upload sessions
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Comma-separated session IDs (optional) */
+          session_ids?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Upload progress details */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Download assets
+     * @description Serve original files for the requested asset IDs as a zip archive.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Asset IDs to download */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.DownloadAssetsRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Zip archive */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/zip": Record<string, never>;
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/zip": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Authentication required */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/zip": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/zip": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Asset or original file not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/zip": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/zip": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/featured": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get featured photos
+     * @description Select a small set of featured photos using deterministic weighted sampling (A-ES) with diversity constraints.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Number of featured photos to return */
+          count?: number;
+          /** @description Max candidate photos considered before selection */
+          candidate_limit?: number;
+          /** @description Only consider photos from the last N days (0 disables date cutoff) */
+          days?: number;
+          /** @description Deterministic seed (default: current UTC date YYYY-MM-DD) */
+          seed?: string;
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Featured photos selected successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/filter-options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get filter options
+     * @description Get available camera models and lenses for filter dropdowns
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Filter options retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/indexing/rebuild": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Queue asset index rebuild
+     * @description Queue a background batch that backfills AI indexing for existing photos.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Reindex request */
+      requestBody?: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RebuildAssetIndexesRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Reindex job queued successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/indexing/repositories": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List indexing repositories
+     * @description Return repositories that can be used to scope indexing stats and reindex requests.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Repository options retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/indexing/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get asset indexing stats
+     * @description Return indexing coverage and queued job counts for photo AI tasks.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Indexing stats retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid repository ID */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/liked": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get liked assets
+     * @description Get all assets that have been liked/favorited
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Number of assets to return */
+          limit?: number;
+          /** @description Number of assets to skip */
+          offset?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Liked assets retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/list": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Query assets (unified endpoint)
+     * @description Unified endpoint for listing, filtering, and searching assets. Replaces separate /filter and /search endpoints.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Query parameters */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.AssetQueryRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Assets queried successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["dto.QueryAssetsResponse"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Semantic search unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/map-points": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get photo map points
+     * @description Return lightweight paginated photo records containing only map-related fields (asset ID, filename, times, GPS lat/lon).
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Page size (1-5000) */
+          limit?: number;
+          /** @description Page offset */
+          offset?: number;
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Map points retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/rating/{rating}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get assets by rating
+     * @description Get assets with a specific rating (0-5)
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Number of assets to return */
+          limit?: number;
+          /** @description Number of assets to skip */
+          offset?: number;
+        };
+        header?: never;
+        path: {
+          /** @description Rating (0-5) */
+          rating: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Assets retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/search": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Search assets
+     * @description Search assets with optional top results enhancement and filename fallback.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Search parameters */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.SearchAssetsRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Assets searched successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/stacks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create manual stack
+     * @description Manually groups the specified assets into a new stack
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Asset IDs to stack */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.CreateManualStackRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/assets/types": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get supported asset types
+     * @description Retrieve a list of all supported asset types in the system.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Asset types retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/bootstrap-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get auth bootstrap status
+     * @description Return whether Lumilio is still in first-user bootstrap mode and which role the next registration receives.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Bootstrap status retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/login": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Login user
+     * @description Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Login credentials */
+      requestBody: {
+        content: {
+          "application/json": Record<string, never> | components["schemas"]["dto.LoginRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Login successful */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid credentials */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Logout user
+     * @description Revoke the user's refresh token
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Refresh token to revoke */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RefreshTokenRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Logout successful */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid refresh token */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get current user
+     * @description Get information about the currently authenticated user
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description User information retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/media-token": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get media access token
+     * @description Generate a short-lived media token for image/video/audio URL authorization in browser media elements.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Media token issued successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get MFA status
+     * @description Get the authenticated user's MFA status, including TOTP enablement and remaining recovery codes.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description MFA status retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/passkeys": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List passkeys
+     * @description List the authenticated user's enrolled passkeys.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Passkeys retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/passkeys/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete passkey
+     * @description Delete one enrolled passkey for the authenticated user.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Passkey ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Passkey deleted successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Passkey not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/passkeys/options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin passkey enrollment
+     * @description Create WebAuthn registration options to add a new passkey to the authenticated account.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Passkey enrollment options created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/passkeys/verify": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify passkey enrollment
+     * @description Verify a passkey enrollment response and attach the new passkey to the authenticated account.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Passkey enrollment verification payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.PasskeyVerifyRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Passkey enrolled successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid or expired challenge */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/recovery-codes/regenerate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Regenerate recovery codes
+     * @description Generate a fresh set of recovery codes for the authenticated user.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Recovery code regeneration payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RegenerateRecoveryCodesRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Recovery codes regenerated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description MFA is not enabled */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized or incorrect password */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/totp/disable": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Disable TOTP
+     * @description Disable TOTP MFA and invalidate recovery codes for the authenticated user.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Disable TOTP payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.DisableTOTPRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description TOTP disabled successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description MFA is not enabled */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized or incorrect password */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/totp/enable": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Enable TOTP
+     * @description Verify a TOTP setup code and enable TOTP MFA for the authenticated user.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description TOTP enable payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.EnableTOTPRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description TOTP enabled successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid setup token or verification code */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/totp/setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin TOTP setup
+     * @description Generate a new TOTP secret and setup token for the authenticated user.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description TOTP setup created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/mfa/verify": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify MFA challenge
+     * @description Verify a pending MFA login challenge with a TOTP code or recovery code.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description MFA verification payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.VerifyMFARequestDTO"];
+        };
+      };
+      responses: {
+        /** @description MFA verification successful */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid or expired MFA challenge */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/passkeys/login/options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin passkey login
+     * @description Create WebAuthn login options for a username-first passkey login flow.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Username for passkey login */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.PasskeyOptionsRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Passkey login options created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid credentials */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/passkeys/login/verify": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify passkey login
+     * @description Verify a passkey login assertion and issue session tokens.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Passkey login verification payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.PasskeyVerifyRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Passkey login verified successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid credentials */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/passkeys/register/options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin passkey registration
+     * @description Create WebAuthn registration options for a staged registration session.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Registration session */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RegistrationSessionRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Passkey registration options created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid or expired registration session */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/passkeys/register/verify": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify passkey registration
+     * @description Verify a staged registration passkey response, create the user, and issue session tokens.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Passkey registration verification payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RegistrationPasskeyVerifyRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Passkey registration verified successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid or expired passkey registration challenge */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description User already exists */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/refresh": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Refresh access token
+     * @description Generate a new access token using a valid refresh token
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Refresh token */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RefreshTokenRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Token refreshed successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid or expired refresh token */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/register/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start user registration
+     * @description Create a staged registration session with username and password before passkey or TOTP enrollment.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Registration data */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RegistrationStartRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Registration session created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description User already exists */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/register/totp/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Complete staged TOTP registration
+     * @description Verify the staged TOTP code, create the user account, and issue session tokens plus recovery codes.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description TOTP verification payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RegistrationTOTPCompleteRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description TOTP registration completed successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid or expired registration session */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description User already exists */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/register/totp/setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin staged TOTP setup
+     * @description Generate TOTP setup data for a staged registration session.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Registration session */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RegistrationSessionRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description TOTP setup created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid or expired registration session */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/capabilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get public runtime capabilities
+     * @description Return a de-sensitized view of backend ML and LLM runtime capabilities without exposing secrets.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Capabilities retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cloud/{provider}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Disconnect cloud provider
+     * @description Remove a cloud provider's configuration and stop any active sync.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Provider name */
+          provider: "icloud" | "s3";
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Disconnected successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid provider */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cloud/icloud/connect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Connect to iCloud
+     * @description Start iCloud authentication. If 2FA is required, returns needs_2fa=true.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description iCloud credentials */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.ConnectICloudRequest"];
+        };
+      };
+      responses: {
+        /** @description Connection result */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cloud/icloud/verify-2fa": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify iCloud 2FA
+     * @description Submit a two-factor authentication code to complete iCloud login.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description 2FA code */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.VerifyICloud2FARequest"];
+        };
+      };
+      responses: {
+        /** @description 2FA verified successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cloud/providers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List cloud providers
+     * @description Get the status of all configured cloud storage providers.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Provider list */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/cloud/sync": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Trigger cloud sync
+     * @description Start a sync operation for the specified cloud provider.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Sync configuration */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.TriggerSyncRequest"];
+        };
+      };
+      responses: {
+        /** @description Sync started */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/duplicates/detect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Detect duplicates for a repository
+     * @description Rebuilds the pending duplicate graph for a repository by combining exact-hash and pHash edges.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Repository to scan */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.DetectDuplicatesRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/duplicates/groups": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List duplicate groups
+     * @description Paginated list of duplicate groups, scoped by repository and status (default pending).
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Repository UUID */
+          repository_id?: string;
+          /** @description pending | merged | dismissed (defaults to pending) */
+          status?: string;
+          /** @description Page size */
+          limit?: number;
+          /** @description Page offset */
+          offset?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/duplicates/groups/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get a duplicate group
+     * @description Returns one duplicate group with all assets and evidence edges.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Duplicate group UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Not Found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/duplicates/groups/{id}/dismiss": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Dismiss a duplicate group
+     * @description Marks a duplicate group as dismissed without merging any assets.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Duplicate group UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Not Found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/duplicates/groups/{id}/merge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Merge a duplicate group
+     * @description Keeps the chosen asset, unions metadata from duplicates, and soft-deletes the remaining members.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Duplicate group UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Merge configuration */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.MergeDuplicateGroupRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Not Found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Conflict */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/duplicates/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get duplicate detection summary
+     * @description Returns counts and recoverable space for pending duplicate groups, scoped by optional repository_id.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Repository UUID to scope the summary */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health check
+     * @description Check if the server is healthy
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Server is healthy */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/locations/clusters": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get location clusters
+     * @description Return paginated persisted photo location clusters with cached labels when available.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Page size (1-1000) */
+          limit?: number;
+          /** @description Page offset */
+          offset?: number;
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+          /** @description Optional geohash filter */
+          geohash?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Location clusters retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/locations/rebuild": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Queue location cluster rebuild
+     * @description Queue a location cluster rebuild for all photos or one repository.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Rebuild request */
+      requestBody?: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RebuildLocationClustersRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Location cluster rebuild queued successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request body */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/people": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List people
+     * @description List recognized people for the current repository scope.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+          /** @description Maximum number of results (max 100) */
+          limit?: number;
+          /** @description Number of results to skip */
+          offset?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description People listed successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/people/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get person
+     * @description Get a single recognized person by cluster ID.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Person ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Person fetched successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Person not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update person
+     * @description Rename a recognized person. Successful updates mark the person as confirmed.
+     */
+    patch: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Person ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Person update payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdatePersonRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Person updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Person not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/v1/people/{id}/assets/list": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * List person assets
+     * @description List assets scoped to a specific person while reusing the unified asset query filters.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Person ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Asset query parameters */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.AssetQueryRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Assets listed successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Person not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Semantic search unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/people/{id}/cover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get person cover
+     * @description Serve the representative face crop image for a recognized person.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Person ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Face crop */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/webp": Record<string, never>;
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/webp": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/webp": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Person cover not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/webp": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/webp": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/people/rebuild": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rebuild people clusters
+     * @description Rebuild recognized people for the selected repository scope using HDBSCAN over face embeddings.
+     */
+    post: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description People clusters rebuilt successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request parameters */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/repositories": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List repositories
+     * @description Return all registered repositories.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Repositories retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    /**
+     * Create repository
+     * @description Create a repository folder under the server storage root. If the target folder already contains a .lumiliorepo file, it is registered instead.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Repository name */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.CreateRepositoryRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Repository created successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/repositories/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get repository
+     * @description Return a single repository.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Repository UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Repository retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Repository not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /**
+     * Delete repository
+     * @description Remove a repository from the registry. Does not delete files on disk.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Repository UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Repository deleted successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Repository not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /**
+     * Update repository
+     * @description Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Repository UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Fields to update */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateRepositoryRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Repository updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Repository not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/v1/repositories/{id}/scan": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Queue repository scan
+     * @description Queue a manual scan for a repository free workspace.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Repository UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      /** @description Scan request */
+      requestBody?: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.RepositoryScanRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Repository scan queued successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/repositories/{id}/scans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List repository scans
+     * @description List recent scan runs for a repository.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Limit */
+          limit?: number;
+          /** @description Offset */
+          offset?: number;
+        };
+        header?: never;
+        path: {
+          /** @description Repository UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Repository scan runs retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/repositories/{id}/scans/latest": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get latest repository scan
+     * @description Return the latest scan run for a repository.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Repository UUID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Latest repository scan retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description No scan run found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/repositories/{id}/stacks/detect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Auto-detect stacks
+     * @description Scans a repository for RAW+JPEG pairs and creates stacks automatically
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Repository ID */
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/settings/system": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get system settings
+     * @description Return persisted system settings without exposing secret values.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description System settings retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update system settings
+     * @description Update persisted system settings. API keys are write-only and never returned.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description System settings patch */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateSystemSettingsDTO"];
+        };
+      };
+      responses: {
+        /** @description System settings updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/v1/settings/system/validate-llm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Validate LLM settings
+     * @description Validate the persisted LLM configuration by issuing a lightweight test request.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description LLM settings validated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description LLM validation failed */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Initialize the system
+     * @description Run first-run bootstrapping: generate and rotate the database credential, persist the secret, and write system metadata. Refused once the system is already initialized.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Setup payload */
+      requestBody: {
+        content: {
+          "application/json": Record<string, never> | components["schemas"]["dto.SetupRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description System initialized successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description System already initialized */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/setup/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get system setup status
+     * @description Report whether Lumilio has completed first-run initialization. The web frontend routes all traffic to the setup wizard while uninitialized.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Setup status retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/species/reference": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get species reference
+     * @description Fetch a species wiki summary and reference image from iNaturalist by scientific name, with optional common name fallback.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /**
+           * @description Scientific name
+           * @example "Rucervus duvaucelii"
+           */
+          scientific_name?: string;
+          /**
+           * @description Common name fallback
+           * @example "Barasingha"
+           */
+          common_name?: string;
+          /**
+           * @description iNaturalist locale for localized common names and wiki summaries
+           * @example "zh"
+           */
+          locale?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Species reference retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid query */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Species reference not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/stats/available-years": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get available years
+     * @description Get list of years that have photo data
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/stats/camera-lens": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get camera lens combination stats
+     * @description Get top N camera+lens combinations
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Number of results to return */
+          limit?: number;
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/stats/daily-activity": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get daily activity heatmap
+     * @description Get daily shooting activity heatmap data for a calendar year or custom date range.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Calendar year (e.g. 2024) */
+          year?: number;
+          /** @description Start date in YYYY-MM-DD (must be used with end_date) */
+          start_date?: string;
+          /** @description End date in YYYY-MM-DD, inclusive (must be used with start_date) */
+          end_date?: string;
+          /** @description Deprecated fallback: number of days to look back (used only when year/start_date/end_date are absent) */
+          days?: number;
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/stats/focal-length": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get focal length distribution
+     * @description Get distribution of commonly used focal lengths
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/stats/time-distribution": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get time distribution
+     * @description Get shooting time distribution by hour or month
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Distribution type: hourly or monthly */
+          type?: "hourly" | "monthly";
+          /** @description Optional repository UUID filter */
+          repository_id?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Bad Request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/users": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List users
+     * @description List users with ownership statistics for administrator management views.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Maximum number of results */
+          limit?: number;
+          /** @description Number of results to skip */
+          offset?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Users retrieved successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/users/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update user
+     * @description Update user identity, role, status, and avatar fields as an administrator.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description User ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description User update payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.AdminUpdateUserRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description User updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description User not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description User already exists */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/v1/users/{id}/reset-access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reset user access
+     * @description Generate a temporary password and clear passkeys, TOTP, recovery codes, and refresh tokens for a user.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description User ID */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description User access reset successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Forbidden */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description User not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/users/me/password": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Change my password
+     * @description Verify the current password, set a new password, and revoke all refresh tokens for the current user.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Password change payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.ChangePasswordRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Password updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Current password is incorrect */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/v1/users/me/profile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update my profile
+     * @description Update the current user's profile fields such as display name and avatar photo.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Profile update payload */
+      requestBody: {
+        content: {
+          "application/json":
+            | Record<string, never>
+            | components["schemas"]["dto.UpdateOwnProfileRequestDTO"];
+        };
+      };
+      responses: {
+        /** @description Profile updated successfully */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /**
+               * @description Business status code (0 for success, non-zero for errors)
+               * @example 0
+               */
+              code?: number;
+              /** @description Business data, ignore empty values */
+              data?: Record<string, never>;
+              /**
+               * @description Debug error message, ignore empty values
+               * @example error details
+               */
+              error?: string;
+              /**
+               * @description User readable message
+               * @example success
+               */
+              message?: string;
+            } & components["schemas"]["data"];
+          };
+        };
+        /** @description Invalid request data */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Unauthorized */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+        /** @description Internal server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["api.Result"];
+          };
+        };
+      };
     };
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** @description Standard API response wrapper */
-        "api.Result": {
-            /**
-             * @description Business status code (0 for success, non-zero for errors)
-             * @example 0
-             */
-            code?: number;
-            /** @description Business data, ignore empty values */
-            data?: Record<string, never>;
-            /**
-             * @description Debug error message, ignore empty values
-             * @example error details
-             */
-            error?: string;
-            /**
-             * @description User readable message
-             * @example success
-             */
-            message?: string;
-        } & components["schemas"]["data"];
-        /**
-         * @example icloud
-         * @enum {string}
-         */
-        "cloud.ProviderKind": "icloud" | "s3";
-        /**
-         * @example import
-         * @enum {string}
-         */
-        "cloud.SyncMode": "import" | "one_way" | "import" | "one_way";
-        data: {
-            data?: components["schemas"]["dto.ResetAccessResponseDTO"];
-        };
-        /** @enum {string} */
-        "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
-        "dbtypes.AudioSpecificMetadata": {
-            /** @example Album Title */
-            album?: string;
-            /** @example John Doe */
-            artist?: string;
-            /** @example 128000 */
-            bitrate?: number;
-            /** @example 2 */
-            channels?: number;
-            /** @example AAC */
-            codec?: string;
-            /** @example Song Description */
-            description?: string;
-            /** @example Pop */
-            genre?: string;
-            /** @example 44100 */
-            sample_rate?: number;
-            /** @example Song Title */
-            title?: string;
-            /** @example 2023 */
-            year?: number;
-        };
-        "dbtypes.PhotoSpecificMetadata": {
-            camera_model?: string;
-            capture_offset_minutes?: number;
-            content_identifier?: string;
-            description?: string;
-            dimensions?: string;
-            exposure?: number;
-            exposure_time?: string;
-            f_number?: number;
-            focal_length?: number;
-            gps_latitude?: number;
-            gps_longitude?: number;
-            is_raw?: boolean;
-            iso_speed?: number;
-            lens_model?: string;
-            resolution?: string;
-            taken_time?: string;
-        };
-        "dbtypes.SpeciesPredictionMeta": {
-            /** @description 物种标签 */
-            label?: string;
-            /** @description 置信度分数 */
-            score?: number;
-        };
-        "dbtypes.VideoSpecificMetadata": {
-            /** @example 1000000 */
-            bitrate?: number;
-            /** @example Canon EOS 5D Mark IV */
-            camera_model?: string;
-            capture_offset_minutes?: number;
-            /** @example H.264 */
-            codec?: string;
-            content_identifier?: string;
-            /** @example A beautiful sunset over the ocean */
-            description?: string;
-            /** @example 30 */
-            frame_rate?: number;
-            /** @example 37.7749 */
-            gps_latitude?: number;
-            /** @example -122.4194 */
-            gps_longitude?: number;
-            /** @example 2023-01-01T00:00:00Z */
-            recorded_time?: string;
-        };
-        "dto.AddAssetToAlbumRequestDTO": {
-            position?: number;
-        };
-        "dto.AdminUpdateUserRequestDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            avatar_asset_id?: string;
-            /** @example Alex Chen */
-            display_name?: string;
-            /** @example true */
-            is_active?: boolean;
-            /**
-             * @example admin
-             * @enum {string}
-             */
-            role?: "admin" | "user";
-            /** @example alex */
-            username?: string;
-        };
-        "dto.AssetDTO": {
-            asset_id?: string;
-            capture_offset_minutes?: number;
-            deleted_at?: string;
-            duration?: number;
-            file_size?: number;
-            hash?: string;
-            height?: number;
-            is_deleted?: boolean;
-            liked?: boolean;
-            mime_type?: string;
-            original_filename?: string;
-            owner_id?: number;
-            rating?: number;
-            repository_id?: string;
-            species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
-            specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
-            stack?: components["schemas"]["dto.StackPreviewDTO"];
-            status?: number[];
-            storage_path?: string;
-            taken_time?: string;
-            type?: string;
-            upload_time?: string;
-            width?: number;
-        };
-        "dto.AssetExifResponseDTO": {
-            asset_id?: string;
-            exif_raw?: Record<string, never>;
-        };
-        /** @description Unified filter options */
-        "dto.AssetFilterDTO": {
-            /** @example 123 */
-            album_id?: number;
-            /** @example Canon EOS R5 */
-            camera_model?: string;
-            date?: components["schemas"]["dto.DateRangeDTO"];
-            filename?: components["schemas"]["dto.FilenameFilterDTO"];
-            /** @example EF 50mm f/1.8 */
-            lens?: string;
-            /** @example true */
-            liked?: boolean;
-            location?: components["schemas"]["dto.LocationBBoxDTO"];
-            /** @example 123 */
-            owner_id?: number;
-            /** @example 5 */
-            rating?: number;
-            /** @example true */
-            raw?: boolean;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            /**
-             * @example PHOTO
-             * @enum {string}
-             */
-            type?: "PHOTO" | "VIDEO" | "AUDIO";
-            /**
-             * @description Multiple asset types
-             * @example [
-             *       "PHOTO",
-             *       "VIDEO"
-             *     ]
-             */
-            types?: string[];
-        };
-        "dto.AssetIndexingStatsResponseDTO": {
-            /** @example 2400 */
-            photo_total?: number;
-            /** @example 1 */
-            reindex_jobs?: number;
-            tasks?: components["schemas"]["dto.AssetIndexingTaskSetStatsDTO"];
-        };
-        "dto.AssetIndexingTaskSetStatsDTO": {
-            bioclip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
-            clip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
-            face?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
-            ocr?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
-        };
-        "dto.AssetIndexingTaskStatsDTO": {
-            /** @example 1200 */
-            indexed_count?: number;
-            /** @example 12 */
-            queued_jobs?: number;
-            /** @example 2400 */
-            total_count?: number;
-        };
-        "dto.AssetListResponseDTO": {
-            assets?: components["schemas"]["dto.AssetDTO"][];
-            /** @example 20 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-            /** @example 150 */
-            total?: number;
-        };
-        "dto.AssetMapPointDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            asset_id?: string;
-            /** @example 37.7749 */
-            gps_latitude?: number;
-            /** @example -122.4194 */
-            gps_longitude?: number;
-            /** @example IMG_1234.HEIC */
-            original_filename?: string;
-            /** @example 2026-02-09T08:30:00Z */
-            taken_time?: string;
-            /** @example 2026-02-10T12:00:00Z */
-            upload_time?: string;
-        };
-        "dto.AssetMapPointListResponseDTO": {
-            /** @example 1000 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-            points?: components["schemas"]["dto.AssetMapPointDTO"][];
-            /** @example 1500 */
-            total?: number;
-        };
-        "dto.AssetQueryRequestDTO": {
-            filter?: components["schemas"]["dto.AssetFilterDTO"];
-            pagination?: components["schemas"]["dto.PaginationDTO"];
-            /**
-             * @description Search keyword (optional)
-             * @example sunset photo
-             */
-            query?: string;
-            /**
-             * @description "filename" (default) | "semantic"
-             * @example filename
-             * @enum {string}
-             */
-            search_type?: "filename" | "semantic";
-            /**
-             * @example date_captured
-             * @enum {string}
-             */
-            sort_by?: "recently_added" | "date_captured";
-            /**
-             * @example collapsed
-             * @enum {string}
-             */
-            stack_mode?: "collapsed" | "expanded";
-            /** @example America/New_York */
-            viewer_timezone?: string;
-        };
-        "dto.AssetSidecarResponseDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            asset_id?: string;
-            /** @example true */
-            exists?: boolean;
-            sidecar?: components["schemas"]["dto.LumilioSidecarV1DTO"];
-        };
-        "dto.AssetTypesResponseDTO": {
-            types?: components["schemas"]["dbtypes.AssetType"][];
-        };
-        "dto.AuthResponseDTO": {
-            bootstrap_admin?: boolean;
-            expiresAt?: string;
-            mfa_methods?: string[];
-            mfa_token?: string;
-            refreshToken?: string;
-            requires_mfa?: boolean;
-            token?: string;
-            user?: components["schemas"]["dto.UserDTO"];
-        };
-        "dto.AutoDetectStacksResponseDTO": {
-            repository_id?: string;
-            stacks_created?: number;
-        };
-        "dto.BatchUploadResponseDTO": {
-            results?: components["schemas"]["dto.BatchUploadResultDTO"][];
-        };
-        "dto.BatchUploadResultDTO": {
-            content_hash?: string;
-            error?: string;
-            file_name?: string;
-            message?: string;
-            size?: number;
-            status?: string;
-            success?: boolean;
-            task_id?: number;
-        };
-        "dto.BootstrapStatusDTO": {
-            has_users?: boolean;
-            is_bootstrap_mode?: boolean;
-            next_registration_role?: string;
-        };
-        "dto.BrowseItemDTO": {
-            asset?: components["schemas"]["dto.AssetDTO"];
-            /** @example stack:550e8400-e29b-41d4-a716-446655440000 */
-            id?: string;
-            stack?: components["schemas"]["dto.BrowseStackDTO"];
-            /**
-             * @example stack
-             * @enum {string}
-             */
-            type?: "asset" | "stack";
-        };
-        "dto.BrowseStackDTO": {
-            cover_asset?: components["schemas"]["dto.AssetDTO"];
-            /** @example 550e8400-e29b-41d4-a716-446655440001 */
-            cover_asset_id?: string;
-            matched_member_ids?: string[];
-            member_asset_ids?: string[];
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            stack_id?: string;
-            /**
-             * @example live_photo
-             * @enum {string}
-             */
-            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
-            /** @example 3 */
-            stack_size?: number;
-        };
-        "dto.BulkLikeUpdateDTO": {
-            /**
-             * @description Action performed: "like" or "unlike"
-             * @example like
-             * @enum {string}
-             */
-            action?: "like" | "unlike";
-            /**
-             * @description Human-readable description
-             * @example Bulk like: 98/100 successful
-             */
-            description?: string;
-            /**
-             * @description Number of failed updates
-             * @example 2
-             */
-            failed?: number;
-            /**
-             * @description List of asset IDs that failed to update (only present when Failed > 0)
-             * @example [
-             *       "550e8400-e29b-41d4-a716-446655440000",
-             *       "660e8400-e29b-41d4-a716-446655440001"
-             *     ]
-             */
-            failed_asset_ids?: string[];
-            /**
-             * @description The like status that was applied (true = liked, false = unliked)
-             * @example true
-             */
-            liked?: boolean;
-            /**
-             * @description Reference ID for this result (can be used in subsequent tool calls)
-             * @example ref_1234567890
-             */
-            ref_id?: string;
-            /**
-             * @description Number of successfully updated assets
-             * @example 98
-             */
-            success?: number;
-            /**
-             * @description Timestamp when the operation completed
-             * @example 2026-01-18T19:34:00Z
-             */
-            timestamp?: string;
-            /**
-             * @description Total number of assets in the batch
-             * @example 100
-             */
-            total?: number;
-        };
-        "dto.CapabilitiesResponseDTO": {
-            llm?: components["schemas"]["dto.LLMCapabilitiesDTO"];
-            ml?: components["schemas"]["dto.MLCapabilitiesDTO"];
-        };
-        "dto.ChangePasswordRequestDTO": {
-            current_password: string;
-            new_password: string;
-        };
-        "dto.CloudProviderStatusDTO": {
-            /** @example true */
-            connected?: boolean;
-            last_cursor?: string;
-            /** @example icloud */
-            provider?: string;
-            /** @example import */
-            sync_mode?: string;
-            /** @example 42 */
-            synced_file_count?: number;
-        };
-        "dto.ConnectICloudRequest": {
-            /**
-             * @example com
-             * @enum {string}
-             */
-            domain?: "com" | "cn";
-            /** @example app-specific-password */
-            password: string;
-            sync_mode?: components["schemas"]["cloud.SyncMode"];
-            /** @example user@icloud.com */
-            username: string;
-        };
-        "dto.ConnectICloudResponse": {
-            needs_2fa?: boolean;
-        };
-        "dto.CreateAlbumRequestDTO": {
-            album_name: string;
-            /** @enum {string} */
-            album_type?: "default" | "bio";
-            cover_asset_id?: string;
-            description?: string;
-        };
-        "dto.CreateManualStackRequestDTO": {
-            /**
-             * @example [
-             *       "550e8400-e29b-41d4-a716-446655440000",
-             *       "550e8400-e29b-41d4-a716-446655440001"
-             *     ]
-             */
-            asset_ids?: string[];
-        };
-        "dto.CreateRepositoryRequestDTO": {
-            /** @example Family Photos */
-            name: string;
-        };
-        "dto.CreateRepositoryResponseDTO": {
-            repository?: components["schemas"]["dto.RepositoryDTO"];
-        };
-        "dto.DateRangeDTO": {
-            from?: string;
-            to?: string;
-        };
-        "dto.DetectDuplicatesRequestDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id: string;
-        };
-        "dto.DetectDuplicatesResponseDTO": {
-            /** @example 18 */
-            assets_affected?: number;
-            /** @example 4 */
-            exact_groups?: number;
-            /** @example 2026-05-12T08:23:45Z */
-            generated_at?: string;
-            /** @example 7 */
-            groups?: number;
-            /** @example 1 */
-            mixed_groups?: number;
-            /** @example 2 */
-            phash_groups?: number;
-        };
-        "dto.DisableTOTPRequestDTO": {
-            current_password: string;
-        };
-        "dto.DownloadAssetsRequestDTO": {
-            /**
-             * @example [
-             *       "550e8400-e29b-41d4-a716-446655440000",
-             *       "550e8400-e29b-41d4-a716-446655440001"
-             *     ]
-             */
-            asset_ids: string[];
-        };
-        "dto.DuplicateAssetDTO": {
-            asset?: components["schemas"]["dto.AssetDTO"];
-            /** @example 6291456 */
-            file_size?: number;
-            /**
-             * @example keeper
-             * @enum {string}
-             */
-            role?: "keeper" | "duplicate" | "candidate";
-        };
-        "dto.DuplicateEdgeDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            asset_id_a?: string;
-            /** @example 660e8400-e29b-41d4-a716-446655440001 */
-            asset_id_b?: string;
-            /** @example 1 */
-            confidence?: number;
-            /** @example 0 */
-            distance?: number;
-            /**
-             * @example exact
-             * @enum {string}
-             */
-            method?: "exact" | "phash";
-        };
-        "dto.DuplicateGroupDTO": {
-            /** @example 3 */
-            asset_count?: number;
-            assets?: components["schemas"]["dto.DuplicateAssetDTO"][];
-            /** @example 2026-05-12T08:23:45Z */
-            detected_at?: string;
-            /** @example duplicates-v2 */
-            detection_version?: string;
-            edges?: components["schemas"]["dto.DuplicateEdgeDTO"][];
-            /** @example 7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12 */
-            group_id?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            keeper_asset_id?: string;
-            /**
-             * @example mixed
-             * @enum {string}
-             */
-            method?: "exact" | "phash" | "mixed";
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            recommended_keeper_asset_id?: string;
-            /** @example 10485760 */
-            recoverable_bytes?: number;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            /** @example 2026-05-12T08:25:00Z */
-            resolved_at?: string;
-            /**
-             * @example pending
-             * @enum {string}
-             */
-            status?: "pending" | "merged" | "dismissed";
-            /** @example 15728640 */
-            total_size?: number;
-        };
-        "dto.DuplicateSummaryDTO": {
-            /** @example 0 */
-            dismissed_groups?: number;
-            /** @example 2026-05-12T08:23:45Z */
-            last_detected_at?: string;
-            /** @example 2 */
-            merged_groups?: number;
-            /** @example 18 */
-            pending_assets?: number;
-            /** @example 7 */
-            pending_groups?: number;
-            /** @example 11 */
-            recoverable_assets?: number;
-            /** @example 68157440 */
-            recoverable_bytes?: number;
-        };
-        "dto.EnableTOTPRequestDTO": {
-            code: string;
-            setup_token: string;
-        };
-        "dto.FaceClusterRebuildResponseDTO": {
-            algorithm?: string;
-            candidate_faces?: number;
-            clustered_faces?: number;
-            clusters_created?: number;
-            clusters_reused?: number;
-            clusters_total?: number;
-            duration_ms?: number;
-            noise_faces?: number;
-            repository_id?: string;
-        };
-        "dto.FeaturedAssetsResponseDTO": {
-            assets?: components["schemas"]["dto.AssetDTO"][];
-            /** @example 240 */
-            candidate_count?: number;
-            /** @example 8 */
-            count?: number;
-            /** @example 2026-02-10T12:00:00Z */
-            generated_at_time?: string;
-            /** @example 2026-02-10 */
-            seed?: string;
-            /** @example weighted_aes_v1 */
-            strategy?: string;
-        };
-        "dto.FilenameFilterDTO": {
-            /**
-             * @example starts_with
-             * @enum {string}
-             */
-            operator?: "contains" | "matches" | "starts_with" | "ends_with";
-            /** @example IMG_ */
-            value?: string;
-        };
-        "dto.GetAlbumResponseDTO": {
-            album_id?: number;
-            album_name?: string;
-            album_type?: string;
-            asset_count?: number;
-            cover_asset_id?: string;
-            created_at?: string;
-            description?: string;
-            display_cover_asset_id?: string;
-            updated_at?: string;
-            user_id?: number;
-        };
-        "dto.IndexingRepositoryListResponseDTO": {
-            repositories?: components["schemas"]["dto.IndexingRepositoryOptionDTO"][];
-        };
-        "dto.IndexingRepositoryOptionDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            id?: string;
-            /** @example false */
-            is_primary?: boolean;
-            /** @example Photos Library */
-            name?: string;
-            /** @example /Volumes/Media/Photos */
-            path?: string;
-        };
-        "dto.LLMCapabilitiesDTO": {
-            agent_enabled?: boolean;
-            configured?: boolean;
-            /** @example gpt-4.1-mini */
-            model_name?: string;
-            /** @example openai */
-            provider?: string;
-        };
-        "dto.LLMSettingsDTO": {
-            agent_enabled?: boolean;
-            api_key_configured?: boolean;
-            /** @example https://api.openai.com/v1 */
-            base_url?: string;
-            /** @example gpt-4.1-mini */
-            model_name?: string;
-            /** @example openai */
-            provider?: string;
-        };
-        "dto.ListAlbumsResponseDTO": {
-            albums?: components["schemas"]["dto.GetAlbumResponseDTO"][];
-            limit?: number;
-            offset?: number;
-            total?: number;
-        };
-        "dto.ListDuplicateGroupsResponseDTO": {
-            groups?: components["schemas"]["dto.DuplicateGroupDTO"][];
-            /** @example 20 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-            /** @example 7 */
-            total?: number;
-        };
-        "dto.ListPeopleResponseDTO": {
-            limit?: number;
-            offset?: number;
-            people?: components["schemas"]["dto.PersonSummaryDTO"][];
-            total?: number;
-        };
-        "dto.ListProvidersResponse": {
-            providers?: components["schemas"]["dto.CloudProviderStatusDTO"][];
-        };
-        "dto.ListRepositoriesResponseDTO": {
-            repositories?: components["schemas"]["dto.RepositoryDTO"][];
-        };
-        "dto.ListUsersResponseDTO": {
-            limit?: number;
-            offset?: number;
-            total?: number;
-            users?: components["schemas"]["dto.ManagedUserDTO"][];
-        };
-        "dto.LocationBBoxDTO": {
-            /** @example -122.3 */
-            east?: number;
-            /** @example 37.9 */
-            north?: number;
-            /** @example 37.7 */
-            south?: number;
-            /** @example -122.5 */
-            west?: number;
-        };
-        "dto.LocationClusterDTO": {
-            /** @example 37.7749 */
-            centroid_latitude?: number;
-            /** @example -122.4194 */
-            centroid_longitude?: number;
-            /** @example San Francisco */
-            city?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            cluster_id?: string;
-            /** @example United States */
-            country?: string;
-            /** @example resolved */
-            geocode_status?: string;
-            /** @example 2026-02-10T12:00:00Z */
-            geocoded_at?: string;
-            /** @example 9q8yyk8 */
-            geohash?: string;
-            /** @example San Francisco, California, United States */
-            label?: string;
-            /** @example 42 */
-            photo_count?: number;
-            /** @example 7 */
-            precision?: number;
-            /** @example nominatim */
-            provider?: string;
-            /** @example California */
-            region?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-        };
-        "dto.LocationClusterListResponseDTO": {
-            clusters?: components["schemas"]["dto.LocationClusterDTO"][];
-            /** @example 100 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-            /** @example 150 */
-            total?: number;
-        };
-        "dto.LoginRequestDTO": {
-            password: string;
-            username: string;
-        };
-        "dto.LumilioSidecarSourceDTO": {
-            /** @example 1048576 */
-            file_size?: number;
-            /** @example abcd1234567890 */
-            hash?: string;
-            /** @example 4000 */
-            height?: number;
-            /** @example image/jpeg */
-            mime_type?: string;
-            /** @example IMG_0001.jpg */
-            original_filename?: string;
-            /** @example inbox/2026/05/IMG_0001.jpg */
-            storage_path?: string;
-            /** @example 6000 */
-            width?: number;
-        };
-        "dto.LumilioSidecarV1DTO": {
-            adjustments?: components["schemas"]["dto.StudioEditAdjustmentsDTO"];
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            asset_id?: string;
-            source?: components["schemas"]["dto.LumilioSidecarSourceDTO"];
-            /** @example 2026-05-26T10:00:00Z */
-            updated_at?: string;
-            /** @example 1 */
-            version?: number;
-        };
-        "dto.MFAStatusDTO": {
-            available_methods?: string[];
-            passkey_count?: number;
-            recovery_codes_generated_at?: string;
-            recovery_codes_remaining?: number;
-            totp_enabled?: boolean;
-        };
-        "dto.MLCapabilitiesDTO": {
-            /** @example 1 */
-            active_node_count?: number;
-            /** @example 2 */
-            discovered_node_count?: number;
-            tasks?: components["schemas"]["dto.MLTaskSetDTO"];
-        };
-        "dto.MLSettingsDTO": {
-            bioclip_enabled?: boolean;
-            clip_enabled?: boolean;
-            face_enabled?: boolean;
-            ocr_enabled?: boolean;
-        };
-        "dto.MLTaskCapabilityDTO": {
-            available?: boolean;
-            enabled?: boolean;
-        };
-        "dto.MLTaskSetDTO": {
-            bioclip_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            face_recognition?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            semantic_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            semantic_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-        };
-        "dto.ManagedUserDTO": {
-            album_count?: number;
-            asset_count?: number;
-            avatar_asset_id?: string;
-            created_at?: string;
-            display_name?: string;
-            is_active?: boolean;
-            last_login?: string;
-            permissions?: string[];
-            role?: string;
-            updated_at?: string;
-            user_id?: number;
-            username?: string;
-        };
-        "dto.MediaTokenDTO": {
-            expires_at?: string;
-            token?: string;
-        };
-        "dto.MergeDuplicateGroupRequestDTO": {
-            /**
-             * @example [
-             *       "660e8400-e29b-41d4-a716-446655440001"
-             *     ]
-             */
-            duplicate_asset_ids?: string[];
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            keeper_asset_id: string;
-            policy?: components["schemas"]["dto.MergeDuplicatePolicyDTO"];
-        };
-        "dto.MergeDuplicateGroupResponseDTO": {
-            /** @example 7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12 */
-            group_id?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            keeper_asset_id?: string;
-            /**
-             * @example [
-             *       "660e8400-e29b-41d4-a716-446655440001"
-             *     ]
-             */
-            merged_duplicates?: string[];
-            /** @example 10485760 */
-            recovered_bytes?: number;
-        };
-        "dto.MergeDuplicatePolicyDTO": {
-            /** @example true */
-            albums?: boolean;
-            /** @example true */
-            description?: boolean;
-            /**
-             * @description Faces re-parents face_items onto the keeper. Only applied for exact
-             *     duplicate groups (the service enforces this constraint).
-             * @example false
-             */
-            faces?: boolean;
-            /** @example true */
-            liked?: boolean;
-            /** @example true */
-            rating?: boolean;
-            /** @example true */
-            tags?: boolean;
-        };
-        "dto.MessageResponseDTO": {
-            /** @example Operation completed successfully */
-            message?: string;
-        };
-        "dto.OptionsResponseDTO": {
-            camera_models?: string[];
-            lenses?: string[];
-        };
-        /** @description limit, offset */
-        "dto.PaginationDTO": {
-            /** @example 20 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-        };
-        "dto.PasskeyCredentialSummaryDTO": {
-            created_at?: string;
-            label?: string;
-            last_used_at?: string;
-            passkey_id?: number;
-            transports?: string[];
-        };
-        "dto.PasskeyListResponseDTO": {
-            credentials?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"][];
-            total?: number;
-        };
-        "dto.PasskeyOptionsRequestDTO": {
-            username?: string;
-        };
-        "dto.PasskeyOptionsResponseDTO": {
-            challenge_token?: string;
-            options?: unknown;
-        };
-        "dto.PasskeyVerifyRequestDTO": {
-            challenge_token: string;
-            credential: unknown;
-        };
-        "dto.PersonDetailDTO": {
-            asset_count?: number;
-            cover_face_image_path?: string;
-            created_at?: string;
-            is_confirmed?: boolean;
-            member_count?: number;
-            name?: string;
-            person_id?: number;
-            representative_asset_id?: string;
-            updated_at?: string;
-        };
-        "dto.PersonSummaryDTO": {
-            asset_count?: number;
-            cover_face_image_path?: string;
-            created_at?: string;
-            is_confirmed?: boolean;
-            member_count?: number;
-            name?: string;
-            person_id?: number;
-            representative_asset_id?: string;
-            updated_at?: string;
-        };
-        "dto.ProgressSummaryDTO": {
-            active_sessions?: number;
-            completed_files?: number;
-            failed_sessions?: number;
-            overall_progress?: number;
-            total_sessions?: number;
-        };
-        "dto.QueryAssetsResponse": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.QueryAssetsResponseDTO"];
-            error?: string;
-            /** @example success */
-            message?: string;
-        };
-        "dto.QueryAssetsResponseDTO": {
-            items?: components["schemas"]["dto.BrowseItemDTO"][];
-            /** @example 20 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-            /**
-             * @example collapsed
-             * @enum {string}
-             */
-            stack_mode?: "collapsed" | "expanded";
-            /** @example 150 */
-            total_assets?: number;
-            /** @example 120 */
-            total_visible?: number;
-        };
-        "dto.RebuildAlbumBioClipResponseDTO": {
-            /** @example BioCLIP processing queued successfully */
-            message?: string;
-            /** @example 12 */
-            queued_assets?: number;
-            /** @example queued */
-            status?: string;
-        };
-        "dto.RebuildAssetIndexesRequestDTO": {
-            /** @example 200 */
-            limit?: number;
-            /** @example true */
-            missing_only?: boolean;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            /**
-             * @example [
-             *       "clip",
-             *       "ocr"
-             *     ]
-             */
-            tasks?: string[];
-        };
-        "dto.RebuildAssetIndexesResponseDTO": {
-            /** @example 123 */
-            job_id?: number;
-            /** @example 200 */
-            limit?: number;
-            /** @example Index rebuild job queued successfully */
-            message?: string;
-            /** @example true */
-            missing_only?: boolean;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            requested_tasks?: string[];
-            /** @example queued */
-            status?: string;
-        };
-        "dto.RebuildLocationClustersRequestDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-        };
-        "dto.RebuildLocationClustersResponseDTO": {
-            /** @example 123 */
-            job_id?: number;
-            /** @example Location cluster rebuild queued successfully */
-            message?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            /** @example queued */
-            status?: string;
-        };
-        "dto.RecoveryCodesResponseDTO": {
-            generated_at?: string;
-            recovery_codes?: string[];
-            status?: components["schemas"]["dto.MFAStatusDTO"];
-        };
-        "dto.RefreshTokenRequestDTO": {
-            refreshToken: string;
-        };
-        "dto.RegenerateRecoveryCodesRequestDTO": {
-            current_password: string;
-        };
-        "dto.RegistrationPasskeyVerifyRequestDTO": {
-            challenge_token: string;
-            credential: unknown;
-            registration_session_id: string;
-        };
-        "dto.RegistrationSessionRequestDTO": {
-            registration_session_id: string;
-        };
-        "dto.RegistrationStartRequestDTO": {
-            password: string;
-            username: string;
-        };
-        "dto.RegistrationStartResponseDTO": {
-            bootstrap_admin?: boolean;
-            next_registration_role?: string;
-            registration_session_id?: string;
-        };
-        "dto.RegistrationTOTPCompleteRequestDTO": {
-            code: string;
-            registration_session_id: string;
-        };
-        "dto.RegistrationTOTPCompleteResponseDTO": {
-            auth?: components["schemas"]["dto.AuthResponseDTO"];
-            generated_at?: string;
-            recovery_codes?: string[];
-        };
-        "dto.RegistrationTOTPSetupResponseDTO": {
-            account_name?: string;
-            issuer?: string;
-            otpauth_uri?: string;
-            secret?: string;
-        };
-        "dto.RepositoryDTO": {
-            default_owner_id?: number;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            id?: string;
-            /** @example false */
-            is_primary?: boolean;
-            local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
-            /** @example Family Photos */
-            name?: string;
-            /** @example /data/storage/family-photos */
-            path?: string;
-            /** @example date */
-            storage_strategy?: string;
-        };
-        "dto.RepositoryLocalSettings": {
-            /** @example uuid */
-            handle_duplicate_filenames?: string;
-            /** @example true */
-            preserve_original_filename?: boolean;
-        };
-        "dto.RepositoryScanQueuedDTO": {
-            /** @example 12345 */
-            job_id?: number;
-            /** @example manual */
-            mode?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            /** @example queued */
-            status?: string;
-        };
-        "dto.RepositoryScanRequestDTO": {
-            /** @example false */
-            force?: boolean;
-        };
-        "dto.RepositoryScanRunDTO": {
-            /** @example 1 */
-            deleted_count?: number;
-            /** @example 10 */
-            discovered_count?: number;
-            error?: string;
-            finished_at?: string;
-            /** @example manual */
-            mode?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            /** @example edwin */
-            requested_by?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            scan_id?: string;
-            /** @example 4 */
-            skipped_count?: number;
-            started_at?: string;
-            /** @example completed */
-            status?: string;
-            /** @example 2 */
-            updated_count?: number;
-        };
-        "dto.RepositoryScanRunListDTO": {
-            scans?: components["schemas"]["dto.RepositoryScanRunDTO"][];
-        };
-        "dto.ReprocessAssetRequestDTO": {
-            /** @example false */
-            force_full_retry?: boolean;
-            /**
-             * @example [
-             *       "thumbnail_small",
-             *       "thumbnail_medium",
-             *       "transcode_1080p"
-             *     ]
-             */
-            tasks?: string[];
-        };
-        "dto.ReprocessAssetResponseDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            asset_id?: string;
-            /**
-             * @example [
-             *       "thumbnail_small",
-             *       "transcode_1080p"
-             *     ]
-             */
-            failed_tasks?: string[];
-            /** @example Reprocessing job queued successfully */
-            message?: string;
-            /**
-             * @example [
-             *       "thumbnail_small",
-             *       "transcode_1080p"
-             *     ]
-             */
-            retry_tasks?: string[];
-            /** @example queued */
-            status?: string;
-        };
-        "dto.ResetAccessResponseDTO": {
-            cleared_passkeys?: boolean;
-            cleared_totp?: boolean;
-            temporary_password?: string;
-        };
-        "dto.SearchAssetsRequestDTO": {
-            debug?: boolean;
-            /**
-             * @example auto
-             * @enum {string}
-             */
-            enhancement_mode?: "auto" | "off" | "only";
-            filter?: components["schemas"]["dto.AssetFilterDTO"];
-            pagination?: components["schemas"]["dto.PaginationDTO"];
-            /** @example red bird on branch */
-            query?: string;
-            /**
-             * @example date_captured
-             * @enum {string}
-             */
-            sort_by?: "recently_added" | "date_captured";
-            /**
-             * @example collapsed
-             * @enum {string}
-             */
-            stack_mode?: "collapsed" | "expanded";
-            /** @example 200 */
-            top_results_limit?: number;
-            /** @example America/New_York */
-            viewer_timezone?: string;
-        };
-        "dto.SearchAssetsResponseDTO": {
-            /** @example 20 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-            result_items?: components["schemas"]["dto.BrowseItemDTO"][];
-            /** @example 150 */
-            results_total_assets?: number;
-            /** @example 120 */
-            results_total_visible?: number;
-            /**
-             * @example collapsed
-             * @enum {string}
-             */
-            stack_mode?: "collapsed" | "expanded";
-            top_items?: components["schemas"]["dto.BrowseItemDTO"][];
-            top_results_meta?: components["schemas"]["dto.SearchTopResultsMetaDTO"];
-        };
-        "dto.SearchDebugContributionDTO": {
-            rank?: number;
-            raw_score?: number;
-            rrf_score?: number;
-            weight?: number;
-        };
-        "dto.SearchDebugItemDTO": {
-            asset_id?: string;
-            contributions?: {
-                [key: string]: components["schemas"]["dto.SearchDebugContributionDTO"];
-            };
-            score?: number;
-        };
-        "dto.SearchSourceMetaDTO": {
-            candidate_count?: number;
-            duration_ms?: number;
-            error?: string;
-            type?: string;
-            weight?: number;
-        };
-        "dto.SearchTopResultsMetaDTO": {
-            candidate_count?: number;
-            candidate_pool_size?: number;
-            debug?: components["schemas"]["dto.SearchDebugItemDTO"][];
-            degraded?: boolean;
-            enabled?: boolean;
-            /** @example runtime_unavailable */
-            reason?: string;
-            /**
-             * @example [
-             *       "embedding",
-             *       "ocr",
-             *       "place"
-             *     ]
-             */
-            source_types?: string[];
-            sources?: components["schemas"]["dto.SearchSourceMetaDTO"][];
-        };
-        "dto.SessionProgressDTO": {
-            bytes_done?: number;
-            bytes_total?: number;
-            filename?: string;
-            last_activity?: string;
-            progress?: number;
-            received_chunks?: number;
-            session_id?: string;
-            status?: string;
-            total_chunks?: number;
-        };
-        "dto.SpeciesReferenceResponseDTO": {
-            /** @example Barasingha */
-            common_name?: string;
-            /** @example (c) Ramesh Shenai Jr., some rights reserved (CC BY), uploaded by Ramesh Shenai Jr. */
-            image_attribution?: string;
-            /** @example cc-by */
-            image_license?: string;
-            /** @example https://www.inaturalist.org/photos/231650420 */
-            image_source_url?: string;
-            /** @example https://inaturalist-open-data.s3.amazonaws.com/photos/231650420/large.jpeg */
-            image_url?: string;
-            /** @example inaturalist */
-            provider?: string;
-            /** @example Rucervus duvaucelii */
-            query?: string;
-            /** @example https://www.inaturalist.org/taxa/75046 */
-            reference_url?: string;
-            /** @example Rucervus duvaucelii */
-            scientific_name?: string;
-            /** @example 75046 */
-            taxon_id?: number;
-            /** @example The barasingha, also called swamp deer, is a deer species distributed in the Indian subcontinent. */
-            wikipedia_summary?: string;
-            /** @example https://en.wikipedia.org/wiki/Rucervus_duvaucelii */
-            wikipedia_url?: string;
-        };
-        "dto.StackByAssetResponseDTO": {
-            asset_id?: string;
-            stack?: components["schemas"]["dto.StackDTO"];
-        };
-        "dto.StackDTO": {
-            /** @example 3 */
-            member_count?: number;
-            members?: components["schemas"]["dto.StackMemberDTO"][];
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            stack_id?: string;
-            /**
-             * @example live_photo
-             * @enum {string}
-             */
-            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
-        };
-        "dto.StackMemberDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440001 */
-            asset_id?: string;
-            /** @example 0 */
-            position?: number;
-            /**
-             * @description raw_original, jpeg_original, edited_version, alternative
-             * @example raw_original
-             */
-            relation?: string;
-        };
-        /** @description Stack fields (populated when stack mode is enabled) */
-        "dto.StackPreviewDTO": {
-            /**
-             * @description Whether this asset is the cover of its stack
-             * @example true
-             */
-            stack_cover?: boolean;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            stack_id?: string;
-            /**
-             * @example live_photo
-             * @enum {string}
-             */
-            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
-            /**
-             * @description Number of members in the stack
-             * @example 3
-             */
-            stack_size?: number;
-        };
-        "dto.StudioEditAdjustmentsDTO": {
-            /** @example 0 */
-            blacks?: number;
-            /** @example 0 */
-            clarity?: number;
-            /** @example 0 */
-            contrast?: number;
-            crop?: components["schemas"]["dto.StudioEditCropDTO"];
-            /** @example 0 */
-            exposure?: number;
-            /** @example false */
-            flipHorizontal?: boolean;
-            /** @example false */
-            flipVertical?: boolean;
-            /** @example 0 */
-            highlights?: number;
-            /** @example 0 */
-            noiseReduction?: number;
-            /** @example 0 */
-            rotation?: number;
-            /** @example 0 */
-            saturation?: number;
-            /** @example 0 */
-            shadows?: number;
-            /** @example 0 */
-            sharpness?: number;
-            /** @example 0 */
-            temperature?: number;
-            /** @example 0 */
-            tint?: number;
-            /** @example 0 */
-            vibrance?: number;
-            /** @example 0 */
-            whites?: number;
-        };
-        "dto.StudioEditCropDTO": {
-            /** @example 800 */
-            height?: number;
-            /** @example 1000 */
-            width?: number;
-            /** @example 0 */
-            x?: number;
-            /** @example 0 */
-            y?: number;
-        };
-        "dto.SystemSettingsDTO": {
-            llm?: components["schemas"]["dto.LLMSettingsDTO"];
-            ml?: components["schemas"]["dto.MLSettingsDTO"];
-            updated_at?: string;
-            updated_by?: number;
-        };
-        "dto.TOTPSetupResponseDTO": {
-            account_name?: string;
-            issuer?: string;
-            otpauth_uri?: string;
-            secret?: string;
-            setup_token?: string;
-        };
-        "dto.TriggerSyncRequest": {
-            provider: components["schemas"]["cloud.ProviderKind"];
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id: string;
-        };
-        "dto.UpdateAlbumRequestDTO": {
-            album_name?: string;
-            /** @enum {string} */
-            album_type?: "default" | "bio";
-            cover_asset_id?: string;
-            description?: string;
-        };
-        "dto.UpdateAssetPositionRequestDTO": {
-            position: number;
-        };
-        "dto.UpdateAssetRequestDTO": {
-            specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
-        };
-        "dto.UpdateDescriptionRequestDTO": {
-            /** @example A beautiful sunset photo */
-            description?: string;
-        };
-        "dto.UpdateLLMSettingsDTO": {
-            agent_enabled?: boolean;
-            api_key?: string;
-            base_url?: string;
-            model_name?: string;
-            /** @enum {string} */
-            provider?: "ark" | "openai" | "deepseek" | "ollama";
-        };
-        "dto.UpdateLikeRequestDTO": {
-            /** @example true */
-            liked?: boolean;
-        };
-        "dto.UpdateMLSettingsDTO": {
-            bioclip_enabled?: boolean;
-            clip_enabled?: boolean;
-            face_enabled?: boolean;
-            ocr_enabled?: boolean;
-        };
-        "dto.UpdateOwnProfileRequestDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            avatar_asset_id?: string;
-            /** @example Alex Chen */
-            display_name?: string;
-        };
-        "dto.UpdatePersonRequestDTO": {
-            name: string;
-        };
-        "dto.UpdateRatingAndLikeRequestDTO": {
-            /** @example true */
-            liked?: boolean;
-            /** @example 5 */
-            rating?: number;
-        };
-        "dto.UpdateRatingRequestDTO": {
-            /** @example 5 */
-            rating?: number;
-        };
-        "dto.UpdateRepositoryRequestDTO": {
-            default_owner_id?: number;
-            local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
-            /** @example My Photos */
-            name?: string;
-            /** @example flat */
-            storage_strategy?: string;
-        };
-        "dto.UpdateSystemSettingsDTO": {
-            llm?: components["schemas"]["dto.UpdateLLMSettingsDTO"];
-            ml?: components["schemas"]["dto.UpdateMLSettingsDTO"];
-        };
-        "dto.UploadConfigResponseDTO": {
-            chunk_size?: number;
-            max_concurrent?: number;
-            max_in_flight_requests?: number;
-            memory_buffer?: number;
-            merge_concurrency?: number;
-        };
-        "dto.UploadProgressResponseDTO": {
-            sessions?: components["schemas"]["dto.SessionProgressDTO"][];
-            summary?: components["schemas"]["dto.ProgressSummaryDTO"];
-        };
-        "dto.UploadResponseDTO": {
-            /** @example abcd1234567890 */
-            content_hash?: string;
-            /** @example photo.jpg */
-            file_name?: string;
-            /** @example File received and queued for processing */
-            message?: string;
-            /** @example 1048576 */
-            size?: number;
-            /** @example processing */
-            status?: string;
-            /** @example 12345 */
-            task_id?: number;
-        };
-        "dto.UserDTO": {
-            avatar_asset_id?: string;
-            created_at?: string;
-            display_name?: string;
-            is_active?: boolean;
-            last_login?: string;
-            permissions?: string[];
-            role?: string;
-            updated_at?: string;
-            user_id?: number;
-            username?: string;
-        };
-        "dto.ValidateLLMSettingsResponseDTO": {
-            valid?: boolean;
-        };
-        "dto.VerifyICloud2FARequest": {
-            /** @example 123456 */
-            code: string;
-        };
-        "dto.VerifyMFARequestDTO": {
-            code: string;
-            /** @enum {string} */
-            method: "totp" | "recovery_code";
-            mfa_token: string;
-        };
-        "handler.AgentChatRequest": {
-            query: string;
-            thread_id?: string;
-            tool_names?: string[];
-        };
-        "handler.AgentResumeRequest": {
-            targets: {
-                [key: string]: unknown;
-            };
-            thread_id: string;
-        };
-        "handler.AvailableYearsResponse": {
-            years?: number[];
-        };
-        "handler.CameraLensCombination": {
-            camera_model?: string;
-            count?: number;
-            lens_model?: string;
-        };
-        "handler.CameraLensStatsResponse": {
-            data?: components["schemas"]["handler.CameraLensCombination"][];
-            total?: number;
-        };
-        "handler.FocalLengthBucket": {
-            count?: number;
-            focal_length?: number;
-        };
-        "handler.FocalLengthDistributionResponse": {
-            data?: components["schemas"]["handler.FocalLengthBucket"][];
-            total?: number;
-        };
-        "handler.HealthResponse": {
-            /** @example ok */
-            status?: string;
-        };
-        "handler.HeatmapResponse": {
-            data?: components["schemas"]["handler.HeatmapValue"][];
-        };
-        "handler.HeatmapValue": {
-            count?: number;
-            date?: string;
-        };
-        "handler.JobDTO": {
-            args?: unknown;
-            attempt?: number;
-            attempted_at?: string;
-            created_at?: string;
-            errors?: string[];
-            finalized_at?: string;
-            id?: number;
-            kind?: string;
-            max_attempts?: number;
-            metadata?: unknown;
-            priority?: number;
-            queue?: string;
-            scheduled_at?: string;
-            state?: string;
-        };
-        "handler.JobListResponse": {
-            cursor?: string;
-            jobs?: components["schemas"]["handler.JobDTO"][];
-            total_count?: number;
-        };
-        "handler.JobStatsResponse": {
-            available?: number;
-            cancelled?: number;
-            completed?: number;
-            discarded?: number;
-            retryable?: number;
-            running?: number;
-            scheduled?: number;
-        };
-        "handler.QueueStatsDTO": {
-            metadata?: unknown;
-            name?: string;
-            updated_at?: string;
-        };
-        "handler.QueueStatsResponse": {
-            queues?: components["schemas"]["handler.QueueStatsDTO"][];
-        };
-        "handler.TimeBucket": {
-            count?: number;
-            label?: string;
-            value?: number;
-        };
-        "handler.TimeDistributionResponse": {
-            data?: components["schemas"]["handler.TimeBucket"][];
-            type?: string;
-        };
-        "handler.ToolInfoResponse": {
-            desc?: string;
-            extra?: {
-                [key: string]: unknown;
-            };
-            name?: string;
-        };
-        "handler.ToolSchemaResponse": {
-            bulk_like_update_example?: components["schemas"]["dto.BulkLikeUpdateDTO"];
-        };
+  schemas: {
+    /** @description Standard API response wrapper */
+    "api.Result": {
+      /**
+       * @description Business status code (0 for success, non-zero for errors)
+       * @example 0
+       */
+      code?: number;
+      /** @description Business data, ignore empty values */
+      data?: Record<string, never>;
+      /**
+       * @description Debug error message, ignore empty values
+       * @example error details
+       */
+      error?: string;
+      /**
+       * @description User readable message
+       * @example success
+       */
+      message?: string;
+    } & components["schemas"]["data"];
+    /**
+     * @example icloud
+     * @enum {string}
+     */
+    "cloud.ProviderKind": "icloud" | "s3";
+    /**
+     * @example import
+     * @enum {string}
+     */
+    "cloud.SyncMode": "import" | "one_way" | "import" | "one_way";
+    data: {
+      data?: components["schemas"]["dto.ResetAccessResponseDTO"];
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** @enum {string} */
+    "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
+    "dbtypes.AudioSpecificMetadata": {
+      /** @example Album Title */
+      album?: string;
+      /** @example John Doe */
+      artist?: string;
+      /** @example 128000 */
+      bitrate?: number;
+      /** @example 2 */
+      channels?: number;
+      /** @example AAC */
+      codec?: string;
+      /** @example Song Description */
+      description?: string;
+      /** @example Pop */
+      genre?: string;
+      /** @example 44100 */
+      sample_rate?: number;
+      /** @example Song Title */
+      title?: string;
+      /** @example 2023 */
+      year?: number;
+    };
+    "dbtypes.PhotoSpecificMetadata": {
+      camera_model?: string;
+      capture_offset_minutes?: number;
+      content_identifier?: string;
+      description?: string;
+      dimensions?: string;
+      exposure?: number;
+      exposure_time?: string;
+      f_number?: number;
+      focal_length?: number;
+      gps_latitude?: number;
+      gps_longitude?: number;
+      is_raw?: boolean;
+      iso_speed?: number;
+      lens_model?: string;
+      resolution?: string;
+      taken_time?: string;
+    };
+    "dbtypes.SpeciesPredictionMeta": {
+      /** @description 物种标签 */
+      label?: string;
+      /** @description 置信度分数 */
+      score?: number;
+    };
+    "dbtypes.VideoSpecificMetadata": {
+      /** @example 1000000 */
+      bitrate?: number;
+      /** @example Canon EOS 5D Mark IV */
+      camera_model?: string;
+      capture_offset_minutes?: number;
+      /** @example H.264 */
+      codec?: string;
+      content_identifier?: string;
+      /** @example A beautiful sunset over the ocean */
+      description?: string;
+      /** @example 30 */
+      frame_rate?: number;
+      /** @example 37.7749 */
+      gps_latitude?: number;
+      /** @example -122.4194 */
+      gps_longitude?: number;
+      /** @example 2023-01-01T00:00:00Z */
+      recorded_time?: string;
+    };
+    "dto.AddAssetToAlbumRequestDTO": {
+      position?: number;
+    };
+    "dto.AdminUpdateUserRequestDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      avatar_asset_id?: string;
+      /** @example Alex Chen */
+      display_name?: string;
+      /** @example true */
+      is_active?: boolean;
+      /**
+       * @example admin
+       * @enum {string}
+       */
+      role?: "admin" | "user";
+      /** @example alex */
+      username?: string;
+    };
+    "dto.AssetDTO": {
+      asset_id?: string;
+      capture_offset_minutes?: number;
+      deleted_at?: string;
+      duration?: number;
+      file_size?: number;
+      hash?: string;
+      height?: number;
+      is_deleted?: boolean;
+      liked?: boolean;
+      mime_type?: string;
+      original_filename?: string;
+      owner_id?: number;
+      rating?: number;
+      repository_id?: string;
+      species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
+      specific_metadata?:
+        | components["schemas"]["dbtypes.PhotoSpecificMetadata"]
+        | components["schemas"]["dbtypes.VideoSpecificMetadata"]
+        | components["schemas"]["dbtypes.AudioSpecificMetadata"];
+      stack?: components["schemas"]["dto.StackPreviewDTO"];
+      status?: number[];
+      storage_path?: string;
+      taken_time?: string;
+      type?: string;
+      upload_time?: string;
+      width?: number;
+    };
+    "dto.AssetExifResponseDTO": {
+      asset_id?: string;
+      exif_raw?: Record<string, never>;
+    };
+    /** @description Unified filter options */
+    "dto.AssetFilterDTO": {
+      /** @example 123 */
+      album_id?: number;
+      /** @example Canon EOS R5 */
+      camera_model?: string;
+      date?: components["schemas"]["dto.DateRangeDTO"];
+      filename?: components["schemas"]["dto.FilenameFilterDTO"];
+      /** @example EF 50mm f/1.8 */
+      lens?: string;
+      /** @example true */
+      liked?: boolean;
+      location?: components["schemas"]["dto.LocationBBoxDTO"];
+      /** @example 123 */
+      owner_id?: number;
+      /** @example 5 */
+      rating?: number;
+      /** @example true */
+      raw?: boolean;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+      /**
+       * @example PHOTO
+       * @enum {string}
+       */
+      type?: "PHOTO" | "VIDEO" | "AUDIO";
+      /**
+       * @description Multiple asset types
+       * @example [
+       *       "PHOTO",
+       *       "VIDEO"
+       *     ]
+       */
+      types?: string[];
+    };
+    "dto.AssetIndexingStatsResponseDTO": {
+      /** @example 2400 */
+      photo_total?: number;
+      /** @example 1 */
+      reindex_jobs?: number;
+      tasks?: components["schemas"]["dto.AssetIndexingTaskSetStatsDTO"];
+    };
+    "dto.AssetIndexingTaskSetStatsDTO": {
+      bioclip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+      clip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+      face?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+      ocr?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+    };
+    "dto.AssetIndexingTaskStatsDTO": {
+      /** @example 1200 */
+      indexed_count?: number;
+      /** @example 12 */
+      queued_jobs?: number;
+      /** @example 2400 */
+      total_count?: number;
+    };
+    "dto.AssetListResponseDTO": {
+      assets?: components["schemas"]["dto.AssetDTO"][];
+      /** @example 20 */
+      limit?: number;
+      /** @example 0 */
+      offset?: number;
+      /** @example 150 */
+      total?: number;
+    };
+    "dto.AssetMapPointDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      asset_id?: string;
+      /** @example 37.7749 */
+      gps_latitude?: number;
+      /** @example -122.4194 */
+      gps_longitude?: number;
+      /** @example IMG_1234.HEIC */
+      original_filename?: string;
+      /** @example 2026-02-09T08:30:00Z */
+      taken_time?: string;
+      /** @example 2026-02-10T12:00:00Z */
+      upload_time?: string;
+    };
+    "dto.AssetMapPointListResponseDTO": {
+      /** @example 1000 */
+      limit?: number;
+      /** @example 0 */
+      offset?: number;
+      points?: components["schemas"]["dto.AssetMapPointDTO"][];
+      /** @example 1500 */
+      total?: number;
+    };
+    "dto.AssetQueryRequestDTO": {
+      filter?: components["schemas"]["dto.AssetFilterDTO"];
+      pagination?: components["schemas"]["dto.PaginationDTO"];
+      /**
+       * @description Search keyword (optional)
+       * @example sunset photo
+       */
+      query?: string;
+      /**
+       * @description "filename" (default) | "semantic"
+       * @example filename
+       * @enum {string}
+       */
+      search_type?: "filename" | "semantic";
+      /**
+       * @example date_captured
+       * @enum {string}
+       */
+      sort_by?: "recently_added" | "date_captured";
+      /**
+       * @example collapsed
+       * @enum {string}
+       */
+      stack_mode?: "collapsed" | "expanded";
+      /** @example America/New_York */
+      viewer_timezone?: string;
+    };
+    "dto.AssetSidecarResponseDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      asset_id?: string;
+      /** @example true */
+      exists?: boolean;
+      sidecar?: components["schemas"]["dto.LumilioSidecarV1DTO"];
+    };
+    "dto.AssetTypesResponseDTO": {
+      types?: components["schemas"]["dbtypes.AssetType"][];
+    };
+    "dto.AuthResponseDTO": {
+      bootstrap_admin?: boolean;
+      expiresAt?: string;
+      mfa_methods?: string[];
+      mfa_token?: string;
+      refreshToken?: string;
+      requires_mfa?: boolean;
+      token?: string;
+      user?: components["schemas"]["dto.UserDTO"];
+    };
+    "dto.AutoDetectStacksResponseDTO": {
+      repository_id?: string;
+      stacks_created?: number;
+    };
+    "dto.BatchUploadResponseDTO": {
+      results?: components["schemas"]["dto.BatchUploadResultDTO"][];
+    };
+    "dto.BatchUploadResultDTO": {
+      content_hash?: string;
+      error?: string;
+      file_name?: string;
+      message?: string;
+      size?: number;
+      status?: string;
+      success?: boolean;
+      task_id?: number;
+    };
+    "dto.BootstrapStatusDTO": {
+      has_users?: boolean;
+      is_bootstrap_mode?: boolean;
+      next_registration_role?: string;
+    };
+    "dto.BrowseItemDTO": {
+      asset?: components["schemas"]["dto.AssetDTO"];
+      /** @example stack:550e8400-e29b-41d4-a716-446655440000 */
+      id?: string;
+      stack?: components["schemas"]["dto.BrowseStackDTO"];
+      /**
+       * @example stack
+       * @enum {string}
+       */
+      type?: "asset" | "stack";
+    };
+    "dto.BrowseStackDTO": {
+      cover_asset?: components["schemas"]["dto.AssetDTO"];
+      /** @example 550e8400-e29b-41d4-a716-446655440001 */
+      cover_asset_id?: string;
+      matched_member_ids?: string[];
+      member_asset_ids?: string[];
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      stack_id?: string;
+      /**
+       * @example live_photo
+       * @enum {string}
+       */
+      stack_kind?: "raw_jpeg" | "live_photo" | "manual";
+      /** @example 3 */
+      stack_size?: number;
+    };
+    "dto.BulkLikeUpdateDTO": {
+      /**
+       * @description Action performed: "like" or "unlike"
+       * @example like
+       * @enum {string}
+       */
+      action?: "like" | "unlike";
+      /**
+       * @description Human-readable description
+       * @example Bulk like: 98/100 successful
+       */
+      description?: string;
+      /**
+       * @description Number of failed updates
+       * @example 2
+       */
+      failed?: number;
+      /**
+       * @description List of asset IDs that failed to update (only present when Failed > 0)
+       * @example [
+       *       "550e8400-e29b-41d4-a716-446655440000",
+       *       "660e8400-e29b-41d4-a716-446655440001"
+       *     ]
+       */
+      failed_asset_ids?: string[];
+      /**
+       * @description The like status that was applied (true = liked, false = unliked)
+       * @example true
+       */
+      liked?: boolean;
+      /**
+       * @description Reference ID for this result (can be used in subsequent tool calls)
+       * @example ref_1234567890
+       */
+      ref_id?: string;
+      /**
+       * @description Number of successfully updated assets
+       * @example 98
+       */
+      success?: number;
+      /**
+       * @description Timestamp when the operation completed
+       * @example 2026-01-18T19:34:00Z
+       */
+      timestamp?: string;
+      /**
+       * @description Total number of assets in the batch
+       * @example 100
+       */
+      total?: number;
+    };
+    "dto.CapabilitiesResponseDTO": {
+      llm?: components["schemas"]["dto.LLMCapabilitiesDTO"];
+      ml?: components["schemas"]["dto.MLCapabilitiesDTO"];
+    };
+    "dto.ChangePasswordRequestDTO": {
+      current_password: string;
+      new_password: string;
+    };
+    "dto.CloudProviderStatusDTO": {
+      /** @example true */
+      connected?: boolean;
+      last_cursor?: string;
+      /** @example icloud */
+      provider?: string;
+      /** @example import */
+      sync_mode?: string;
+      /** @example 42 */
+      synced_file_count?: number;
+    };
+    "dto.ConnectICloudRequest": {
+      /**
+       * @example com
+       * @enum {string}
+       */
+      domain?: "com" | "cn";
+      /** @example app-specific-password */
+      password: string;
+      sync_mode?: components["schemas"]["cloud.SyncMode"];
+      /** @example user@icloud.com */
+      username: string;
+    };
+    "dto.ConnectICloudResponse": {
+      needs_2fa?: boolean;
+    };
+    "dto.CreateAlbumRequestDTO": {
+      album_name: string;
+      /** @enum {string} */
+      album_type?: "default" | "bio";
+      cover_asset_id?: string;
+      description?: string;
+    };
+    "dto.CreateManualStackRequestDTO": {
+      /**
+       * @example [
+       *       "550e8400-e29b-41d4-a716-446655440000",
+       *       "550e8400-e29b-41d4-a716-446655440001"
+       *     ]
+       */
+      asset_ids?: string[];
+    };
+    "dto.CreateRepositoryRequestDTO": {
+      /** @example Family Photos */
+      name: string;
+    };
+    "dto.CreateRepositoryResponseDTO": {
+      repository?: components["schemas"]["dto.RepositoryDTO"];
+    };
+    "dto.DateRangeDTO": {
+      from?: string;
+      to?: string;
+    };
+    "dto.DetectDuplicatesRequestDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id: string;
+    };
+    "dto.DetectDuplicatesResponseDTO": {
+      /** @example 18 */
+      assets_affected?: number;
+      /** @example 4 */
+      exact_groups?: number;
+      /** @example 2026-05-12T08:23:45Z */
+      generated_at?: string;
+      /** @example 7 */
+      groups?: number;
+      /** @example 1 */
+      mixed_groups?: number;
+      /** @example 2 */
+      phash_groups?: number;
+    };
+    "dto.DisableTOTPRequestDTO": {
+      current_password: string;
+    };
+    "dto.DownloadAssetsRequestDTO": {
+      /**
+       * @example [
+       *       "550e8400-e29b-41d4-a716-446655440000",
+       *       "550e8400-e29b-41d4-a716-446655440001"
+       *     ]
+       */
+      asset_ids: string[];
+    };
+    "dto.DuplicateAssetDTO": {
+      asset?: components["schemas"]["dto.AssetDTO"];
+      /** @example 6291456 */
+      file_size?: number;
+      /**
+       * @example keeper
+       * @enum {string}
+       */
+      role?: "keeper" | "duplicate" | "candidate";
+    };
+    "dto.DuplicateEdgeDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      asset_id_a?: string;
+      /** @example 660e8400-e29b-41d4-a716-446655440001 */
+      asset_id_b?: string;
+      /** @example 1 */
+      confidence?: number;
+      /** @example 0 */
+      distance?: number;
+      /**
+       * @example exact
+       * @enum {string}
+       */
+      method?: "exact" | "phash";
+    };
+    "dto.DuplicateGroupDTO": {
+      /** @example 3 */
+      asset_count?: number;
+      assets?: components["schemas"]["dto.DuplicateAssetDTO"][];
+      /** @example 2026-05-12T08:23:45Z */
+      detected_at?: string;
+      /** @example duplicates-v2 */
+      detection_version?: string;
+      edges?: components["schemas"]["dto.DuplicateEdgeDTO"][];
+      /** @example 7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12 */
+      group_id?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      keeper_asset_id?: string;
+      /**
+       * @example mixed
+       * @enum {string}
+       */
+      method?: "exact" | "phash" | "mixed";
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      recommended_keeper_asset_id?: string;
+      /** @example 10485760 */
+      recoverable_bytes?: number;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+      /** @example 2026-05-12T08:25:00Z */
+      resolved_at?: string;
+      /**
+       * @example pending
+       * @enum {string}
+       */
+      status?: "pending" | "merged" | "dismissed";
+      /** @example 15728640 */
+      total_size?: number;
+    };
+    "dto.DuplicateSummaryDTO": {
+      /** @example 0 */
+      dismissed_groups?: number;
+      /** @example 2026-05-12T08:23:45Z */
+      last_detected_at?: string;
+      /** @example 2 */
+      merged_groups?: number;
+      /** @example 18 */
+      pending_assets?: number;
+      /** @example 7 */
+      pending_groups?: number;
+      /** @example 11 */
+      recoverable_assets?: number;
+      /** @example 68157440 */
+      recoverable_bytes?: number;
+    };
+    "dto.EnableTOTPRequestDTO": {
+      code: string;
+      setup_token: string;
+    };
+    "dto.FaceClusterRebuildResponseDTO": {
+      algorithm?: string;
+      candidate_faces?: number;
+      clustered_faces?: number;
+      clusters_created?: number;
+      clusters_reused?: number;
+      clusters_total?: number;
+      duration_ms?: number;
+      noise_faces?: number;
+      repository_id?: string;
+    };
+    "dto.FeaturedAssetsResponseDTO": {
+      assets?: components["schemas"]["dto.AssetDTO"][];
+      /** @example 240 */
+      candidate_count?: number;
+      /** @example 8 */
+      count?: number;
+      /** @example 2026-02-10T12:00:00Z */
+      generated_at_time?: string;
+      /** @example 2026-02-10 */
+      seed?: string;
+      /** @example weighted_aes_v1 */
+      strategy?: string;
+    };
+    "dto.FilenameFilterDTO": {
+      /**
+       * @example starts_with
+       * @enum {string}
+       */
+      operator?: "contains" | "matches" | "starts_with" | "ends_with";
+      /** @example IMG_ */
+      value?: string;
+    };
+    "dto.GetAlbumResponseDTO": {
+      album_id?: number;
+      album_name?: string;
+      album_type?: string;
+      asset_count?: number;
+      cover_asset_id?: string;
+      created_at?: string;
+      description?: string;
+      display_cover_asset_id?: string;
+      updated_at?: string;
+      user_id?: number;
+    };
+    "dto.IndexingRepositoryListResponseDTO": {
+      repositories?: components["schemas"]["dto.IndexingRepositoryOptionDTO"][];
+    };
+    "dto.IndexingRepositoryOptionDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      id?: string;
+      /** @example false */
+      is_primary?: boolean;
+      /** @example Photos Library */
+      name?: string;
+      /** @example /Volumes/Media/Photos */
+      path?: string;
+    };
+    "dto.LLMCapabilitiesDTO": {
+      agent_enabled?: boolean;
+      configured?: boolean;
+      /** @example gpt-4.1-mini */
+      model_name?: string;
+      /** @example openai */
+      provider?: string;
+    };
+    "dto.LLMSettingsDTO": {
+      agent_enabled?: boolean;
+      api_key_configured?: boolean;
+      /** @example https://api.openai.com/v1 */
+      base_url?: string;
+      /** @example gpt-4.1-mini */
+      model_name?: string;
+      /** @example openai */
+      provider?: string;
+    };
+    "dto.ListAlbumsResponseDTO": {
+      albums?: components["schemas"]["dto.GetAlbumResponseDTO"][];
+      limit?: number;
+      offset?: number;
+      total?: number;
+    };
+    "dto.ListDuplicateGroupsResponseDTO": {
+      groups?: components["schemas"]["dto.DuplicateGroupDTO"][];
+      /** @example 20 */
+      limit?: number;
+      /** @example 0 */
+      offset?: number;
+      /** @example 7 */
+      total?: number;
+    };
+    "dto.ListPeopleResponseDTO": {
+      limit?: number;
+      offset?: number;
+      people?: components["schemas"]["dto.PersonSummaryDTO"][];
+      total?: number;
+    };
+    "dto.ListProvidersResponse": {
+      providers?: components["schemas"]["dto.CloudProviderStatusDTO"][];
+    };
+    "dto.ListRepositoriesResponseDTO": {
+      repositories?: components["schemas"]["dto.RepositoryDTO"][];
+    };
+    "dto.ListUsersResponseDTO": {
+      limit?: number;
+      offset?: number;
+      total?: number;
+      users?: components["schemas"]["dto.ManagedUserDTO"][];
+    };
+    "dto.LocationBBoxDTO": {
+      /** @example -122.3 */
+      east?: number;
+      /** @example 37.9 */
+      north?: number;
+      /** @example 37.7 */
+      south?: number;
+      /** @example -122.5 */
+      west?: number;
+    };
+    "dto.LocationClusterDTO": {
+      /** @example 37.7749 */
+      centroid_latitude?: number;
+      /** @example -122.4194 */
+      centroid_longitude?: number;
+      /** @example San Francisco */
+      city?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      cluster_id?: string;
+      /** @example United States */
+      country?: string;
+      /** @example resolved */
+      geocode_status?: string;
+      /** @example 2026-02-10T12:00:00Z */
+      geocoded_at?: string;
+      /** @example 9q8yyk8 */
+      geohash?: string;
+      /** @example San Francisco, California, United States */
+      label?: string;
+      /** @example 42 */
+      photo_count?: number;
+      /** @example 7 */
+      precision?: number;
+      /** @example nominatim */
+      provider?: string;
+      /** @example California */
+      region?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+    };
+    "dto.LocationClusterListResponseDTO": {
+      clusters?: components["schemas"]["dto.LocationClusterDTO"][];
+      /** @example 100 */
+      limit?: number;
+      /** @example 0 */
+      offset?: number;
+      /** @example 150 */
+      total?: number;
+    };
+    "dto.LoginRequestDTO": {
+      password: string;
+      username: string;
+    };
+    "dto.LumilioSidecarSourceDTO": {
+      /** @example 1048576 */
+      file_size?: number;
+      /** @example abcd1234567890 */
+      hash?: string;
+      /** @example 4000 */
+      height?: number;
+      /** @example image/jpeg */
+      mime_type?: string;
+      /** @example IMG_0001.jpg */
+      original_filename?: string;
+      /** @example inbox/2026/05/IMG_0001.jpg */
+      storage_path?: string;
+      /** @example 6000 */
+      width?: number;
+    };
+    "dto.LumilioSidecarV1DTO": {
+      adjustments?: components["schemas"]["dto.StudioEditAdjustmentsDTO"];
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      asset_id?: string;
+      source?: components["schemas"]["dto.LumilioSidecarSourceDTO"];
+      /** @example 2026-05-26T10:00:00Z */
+      updated_at?: string;
+      /** @example 1 */
+      version?: number;
+    };
+    "dto.MFAStatusDTO": {
+      available_methods?: string[];
+      passkey_count?: number;
+      recovery_codes_generated_at?: string;
+      recovery_codes_remaining?: number;
+      totp_enabled?: boolean;
+    };
+    "dto.MLCapabilitiesDTO": {
+      /** @example 1 */
+      active_node_count?: number;
+      /** @example 2 */
+      discovered_node_count?: number;
+      tasks?: components["schemas"]["dto.MLTaskSetDTO"];
+    };
+    "dto.MLSettingsDTO": {
+      bioclip_enabled?: boolean;
+      clip_enabled?: boolean;
+      face_enabled?: boolean;
+      ocr_enabled?: boolean;
+    };
+    "dto.MLTaskCapabilityDTO": {
+      available?: boolean;
+      enabled?: boolean;
+    };
+    "dto.MLTaskSetDTO": {
+      bioclip_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+      face_recognition?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+      ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+      semantic_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+      semantic_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+    };
+    "dto.ManagedUserDTO": {
+      album_count?: number;
+      asset_count?: number;
+      avatar_asset_id?: string;
+      created_at?: string;
+      display_name?: string;
+      is_active?: boolean;
+      last_login?: string;
+      permissions?: string[];
+      role?: string;
+      updated_at?: string;
+      user_id?: number;
+      username?: string;
+    };
+    "dto.MediaTokenDTO": {
+      expires_at?: string;
+      token?: string;
+    };
+    "dto.MergeDuplicateGroupRequestDTO": {
+      /**
+       * @example [
+       *       "660e8400-e29b-41d4-a716-446655440001"
+       *     ]
+       */
+      duplicate_asset_ids?: string[];
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      keeper_asset_id: string;
+      policy?: components["schemas"]["dto.MergeDuplicatePolicyDTO"];
+    };
+    "dto.MergeDuplicateGroupResponseDTO": {
+      /** @example 7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12 */
+      group_id?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      keeper_asset_id?: string;
+      /**
+       * @example [
+       *       "660e8400-e29b-41d4-a716-446655440001"
+       *     ]
+       */
+      merged_duplicates?: string[];
+      /** @example 10485760 */
+      recovered_bytes?: number;
+    };
+    "dto.MergeDuplicatePolicyDTO": {
+      /** @example true */
+      albums?: boolean;
+      /** @example true */
+      description?: boolean;
+      /**
+       * @description Faces re-parents face_items onto the keeper. Only applied for exact
+       *     duplicate groups (the service enforces this constraint).
+       * @example false
+       */
+      faces?: boolean;
+      /** @example true */
+      liked?: boolean;
+      /** @example true */
+      rating?: boolean;
+      /** @example true */
+      tags?: boolean;
+    };
+    "dto.MessageResponseDTO": {
+      /** @example Operation completed successfully */
+      message?: string;
+    };
+    "dto.OptionsResponseDTO": {
+      camera_models?: string[];
+      lenses?: string[];
+    };
+    /** @description limit, offset */
+    "dto.PaginationDTO": {
+      /** @example 20 */
+      limit?: number;
+      /** @example 0 */
+      offset?: number;
+    };
+    "dto.PasskeyCredentialSummaryDTO": {
+      created_at?: string;
+      label?: string;
+      last_used_at?: string;
+      passkey_id?: number;
+      transports?: string[];
+    };
+    "dto.PasskeyListResponseDTO": {
+      credentials?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"][];
+      total?: number;
+    };
+    "dto.PasskeyOptionsRequestDTO": {
+      username?: string;
+    };
+    "dto.PasskeyOptionsResponseDTO": {
+      challenge_token?: string;
+      options?: unknown;
+    };
+    "dto.PasskeyVerifyRequestDTO": {
+      challenge_token: string;
+      credential: unknown;
+    };
+    "dto.PersonDetailDTO": {
+      asset_count?: number;
+      cover_face_image_path?: string;
+      created_at?: string;
+      is_confirmed?: boolean;
+      member_count?: number;
+      name?: string;
+      person_id?: number;
+      representative_asset_id?: string;
+      updated_at?: string;
+    };
+    "dto.PersonSummaryDTO": {
+      asset_count?: number;
+      cover_face_image_path?: string;
+      created_at?: string;
+      is_confirmed?: boolean;
+      member_count?: number;
+      name?: string;
+      person_id?: number;
+      representative_asset_id?: string;
+      updated_at?: string;
+    };
+    "dto.ProgressSummaryDTO": {
+      active_sessions?: number;
+      completed_files?: number;
+      failed_sessions?: number;
+      overall_progress?: number;
+      total_sessions?: number;
+    };
+    "dto.QueryAssetsResponse": {
+      /** @example 0 */
+      code?: number;
+      data?: components["schemas"]["dto.QueryAssetsResponseDTO"];
+      error?: string;
+      /** @example success */
+      message?: string;
+    };
+    "dto.QueryAssetsResponseDTO": {
+      items?: components["schemas"]["dto.BrowseItemDTO"][];
+      /** @example 20 */
+      limit?: number;
+      /** @example 0 */
+      offset?: number;
+      /**
+       * @example collapsed
+       * @enum {string}
+       */
+      stack_mode?: "collapsed" | "expanded";
+      /** @example 150 */
+      total_assets?: number;
+      /** @example 120 */
+      total_visible?: number;
+    };
+    "dto.RebuildAlbumBioClipResponseDTO": {
+      /** @example BioCLIP processing queued successfully */
+      message?: string;
+      /** @example 12 */
+      queued_assets?: number;
+      /** @example queued */
+      status?: string;
+    };
+    "dto.RebuildAssetIndexesRequestDTO": {
+      /** @example 200 */
+      limit?: number;
+      /** @example true */
+      missing_only?: boolean;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+      /**
+       * @example [
+       *       "clip",
+       *       "ocr"
+       *     ]
+       */
+      tasks?: string[];
+    };
+    "dto.RebuildAssetIndexesResponseDTO": {
+      /** @example 123 */
+      job_id?: number;
+      /** @example 200 */
+      limit?: number;
+      /** @example Index rebuild job queued successfully */
+      message?: string;
+      /** @example true */
+      missing_only?: boolean;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+      requested_tasks?: string[];
+      /** @example queued */
+      status?: string;
+    };
+    "dto.RebuildLocationClustersRequestDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+    };
+    "dto.RebuildLocationClustersResponseDTO": {
+      /** @example 123 */
+      job_id?: number;
+      /** @example Location cluster rebuild queued successfully */
+      message?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+      /** @example queued */
+      status?: string;
+    };
+    "dto.RecoveryCodesResponseDTO": {
+      generated_at?: string;
+      recovery_codes?: string[];
+      status?: components["schemas"]["dto.MFAStatusDTO"];
+    };
+    "dto.RefreshTokenRequestDTO": {
+      refreshToken: string;
+    };
+    "dto.RegenerateRecoveryCodesRequestDTO": {
+      current_password: string;
+    };
+    "dto.RegistrationPasskeyVerifyRequestDTO": {
+      challenge_token: string;
+      credential: unknown;
+      registration_session_id: string;
+    };
+    "dto.RegistrationSessionRequestDTO": {
+      registration_session_id: string;
+    };
+    "dto.RegistrationStartRequestDTO": {
+      password: string;
+      username: string;
+    };
+    "dto.RegistrationStartResponseDTO": {
+      bootstrap_admin?: boolean;
+      next_registration_role?: string;
+      registration_session_id?: string;
+    };
+    "dto.RegistrationTOTPCompleteRequestDTO": {
+      code: string;
+      registration_session_id: string;
+    };
+    "dto.RegistrationTOTPCompleteResponseDTO": {
+      auth?: components["schemas"]["dto.AuthResponseDTO"];
+      generated_at?: string;
+      recovery_codes?: string[];
+    };
+    "dto.RegistrationTOTPSetupResponseDTO": {
+      account_name?: string;
+      issuer?: string;
+      otpauth_uri?: string;
+      secret?: string;
+    };
+    "dto.RepositoryDTO": {
+      default_owner_id?: number;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      id?: string;
+      /** @example false */
+      is_primary?: boolean;
+      local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
+      /** @example Family Photos */
+      name?: string;
+      /** @example /data/storage/family-photos */
+      path?: string;
+      /** @example date */
+      storage_strategy?: string;
+    };
+    "dto.RepositoryLocalSettings": {
+      /** @example uuid */
+      handle_duplicate_filenames?: string;
+      /** @example true */
+      preserve_original_filename?: boolean;
+    };
+    "dto.RepositoryScanQueuedDTO": {
+      /** @example 12345 */
+      job_id?: number;
+      /** @example manual */
+      mode?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+      /** @example queued */
+      status?: string;
+    };
+    "dto.RepositoryScanRequestDTO": {
+      /** @example false */
+      force?: boolean;
+    };
+    "dto.RepositoryScanRunDTO": {
+      /** @example 1 */
+      deleted_count?: number;
+      /** @example 10 */
+      discovered_count?: number;
+      error?: string;
+      finished_at?: string;
+      /** @example manual */
+      mode?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id?: string;
+      /** @example edwin */
+      requested_by?: string;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      scan_id?: string;
+      /** @example 4 */
+      skipped_count?: number;
+      started_at?: string;
+      /** @example completed */
+      status?: string;
+      /** @example 2 */
+      updated_count?: number;
+    };
+    "dto.RepositoryScanRunListDTO": {
+      scans?: components["schemas"]["dto.RepositoryScanRunDTO"][];
+    };
+    "dto.ReprocessAssetRequestDTO": {
+      /** @example false */
+      force_full_retry?: boolean;
+      /**
+       * @example [
+       *       "thumbnail_small",
+       *       "thumbnail_medium",
+       *       "transcode_1080p"
+       *     ]
+       */
+      tasks?: string[];
+    };
+    "dto.ReprocessAssetResponseDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      asset_id?: string;
+      /**
+       * @example [
+       *       "thumbnail_small",
+       *       "transcode_1080p"
+       *     ]
+       */
+      failed_tasks?: string[];
+      /** @example Reprocessing job queued successfully */
+      message?: string;
+      /**
+       * @example [
+       *       "thumbnail_small",
+       *       "transcode_1080p"
+       *     ]
+       */
+      retry_tasks?: string[];
+      /** @example queued */
+      status?: string;
+    };
+    "dto.ResetAccessResponseDTO": {
+      cleared_passkeys?: boolean;
+      cleared_totp?: boolean;
+      temporary_password?: string;
+    };
+    "dto.SearchAssetsRequestDTO": {
+      debug?: boolean;
+      /**
+       * @example auto
+       * @enum {string}
+       */
+      enhancement_mode?: "auto" | "off" | "only";
+      filter?: components["schemas"]["dto.AssetFilterDTO"];
+      pagination?: components["schemas"]["dto.PaginationDTO"];
+      /** @example red bird on branch */
+      query?: string;
+      /**
+       * @example date_captured
+       * @enum {string}
+       */
+      sort_by?: "recently_added" | "date_captured";
+      /**
+       * @example collapsed
+       * @enum {string}
+       */
+      stack_mode?: "collapsed" | "expanded";
+      /** @example 200 */
+      top_results_limit?: number;
+      /** @example America/New_York */
+      viewer_timezone?: string;
+    };
+    "dto.SearchAssetsResponseDTO": {
+      /** @example 20 */
+      limit?: number;
+      /** @example 0 */
+      offset?: number;
+      result_items?: components["schemas"]["dto.BrowseItemDTO"][];
+      /** @example 150 */
+      results_total_assets?: number;
+      /** @example 120 */
+      results_total_visible?: number;
+      /**
+       * @example collapsed
+       * @enum {string}
+       */
+      stack_mode?: "collapsed" | "expanded";
+      top_items?: components["schemas"]["dto.BrowseItemDTO"][];
+      top_results_meta?: components["schemas"]["dto.SearchTopResultsMetaDTO"];
+    };
+    "dto.SearchDebugContributionDTO": {
+      rank?: number;
+      raw_score?: number;
+      rrf_score?: number;
+      weight?: number;
+    };
+    "dto.SearchDebugItemDTO": {
+      asset_id?: string;
+      contributions?: {
+        [key: string]: components["schemas"]["dto.SearchDebugContributionDTO"];
+      };
+      score?: number;
+    };
+    "dto.SearchSourceMetaDTO": {
+      candidate_count?: number;
+      duration_ms?: number;
+      error?: string;
+      type?: string;
+      weight?: number;
+    };
+    "dto.SearchTopResultsMetaDTO": {
+      candidate_count?: number;
+      candidate_pool_size?: number;
+      debug?: components["schemas"]["dto.SearchDebugItemDTO"][];
+      degraded?: boolean;
+      enabled?: boolean;
+      /** @example runtime_unavailable */
+      reason?: string;
+      /**
+       * @example [
+       *       "embedding",
+       *       "ocr",
+       *       "place"
+       *     ]
+       */
+      source_types?: string[];
+      sources?: components["schemas"]["dto.SearchSourceMetaDTO"][];
+    };
+    "dto.SessionProgressDTO": {
+      bytes_done?: number;
+      bytes_total?: number;
+      filename?: string;
+      last_activity?: string;
+      progress?: number;
+      received_chunks?: number;
+      session_id?: string;
+      status?: string;
+      total_chunks?: number;
+    };
+    "dto.SetupRequestDTO": {
+      admin_username?: string;
+      site_name?: string;
+    };
+    "dto.SetupResultDTO": {
+      admin_username?: string;
+      database_user?: string;
+      password_length?: number;
+      site_name?: string;
+    };
+    "dto.SetupStatusDTO": {
+      initialized?: boolean;
+    };
+    "dto.SpeciesReferenceResponseDTO": {
+      /** @example Barasingha */
+      common_name?: string;
+      /** @example (c) Ramesh Shenai Jr., some rights reserved (CC BY), uploaded by Ramesh Shenai Jr. */
+      image_attribution?: string;
+      /** @example cc-by */
+      image_license?: string;
+      /** @example https://www.inaturalist.org/photos/231650420 */
+      image_source_url?: string;
+      /** @example https://inaturalist-open-data.s3.amazonaws.com/photos/231650420/large.jpeg */
+      image_url?: string;
+      /** @example inaturalist */
+      provider?: string;
+      /** @example Rucervus duvaucelii */
+      query?: string;
+      /** @example https://www.inaturalist.org/taxa/75046 */
+      reference_url?: string;
+      /** @example Rucervus duvaucelii */
+      scientific_name?: string;
+      /** @example 75046 */
+      taxon_id?: number;
+      /** @example The barasingha, also called swamp deer, is a deer species distributed in the Indian subcontinent. */
+      wikipedia_summary?: string;
+      /** @example https://en.wikipedia.org/wiki/Rucervus_duvaucelii */
+      wikipedia_url?: string;
+    };
+    "dto.StackByAssetResponseDTO": {
+      asset_id?: string;
+      stack?: components["schemas"]["dto.StackDTO"];
+    };
+    "dto.StackDTO": {
+      /** @example 3 */
+      member_count?: number;
+      members?: components["schemas"]["dto.StackMemberDTO"][];
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      stack_id?: string;
+      /**
+       * @example live_photo
+       * @enum {string}
+       */
+      stack_kind?: "raw_jpeg" | "live_photo" | "manual";
+    };
+    "dto.StackMemberDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440001 */
+      asset_id?: string;
+      /** @example 0 */
+      position?: number;
+      /**
+       * @description raw_original, jpeg_original, edited_version, alternative
+       * @example raw_original
+       */
+      relation?: string;
+    };
+    /** @description Stack fields (populated when stack mode is enabled) */
+    "dto.StackPreviewDTO": {
+      /**
+       * @description Whether this asset is the cover of its stack
+       * @example true
+       */
+      stack_cover?: boolean;
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      stack_id?: string;
+      /**
+       * @example live_photo
+       * @enum {string}
+       */
+      stack_kind?: "raw_jpeg" | "live_photo" | "manual";
+      /**
+       * @description Number of members in the stack
+       * @example 3
+       */
+      stack_size?: number;
+    };
+    "dto.StudioEditAdjustmentsDTO": {
+      /** @example 0 */
+      blacks?: number;
+      /** @example 0 */
+      clarity?: number;
+      /** @example 0 */
+      contrast?: number;
+      crop?: components["schemas"]["dto.StudioEditCropDTO"];
+      /** @example 0 */
+      exposure?: number;
+      /** @example false */
+      flipHorizontal?: boolean;
+      /** @example false */
+      flipVertical?: boolean;
+      /** @example 0 */
+      highlights?: number;
+      /** @example 0 */
+      noiseReduction?: number;
+      /** @example 0 */
+      rotation?: number;
+      /** @example 0 */
+      saturation?: number;
+      /** @example 0 */
+      shadows?: number;
+      /** @example 0 */
+      sharpness?: number;
+      /** @example 0 */
+      temperature?: number;
+      /** @example 0 */
+      tint?: number;
+      /** @example 0 */
+      vibrance?: number;
+      /** @example 0 */
+      whites?: number;
+    };
+    "dto.StudioEditCropDTO": {
+      /** @example 800 */
+      height?: number;
+      /** @example 1000 */
+      width?: number;
+      /** @example 0 */
+      x?: number;
+      /** @example 0 */
+      y?: number;
+    };
+    "dto.SystemSettingsDTO": {
+      llm?: components["schemas"]["dto.LLMSettingsDTO"];
+      ml?: components["schemas"]["dto.MLSettingsDTO"];
+      updated_at?: string;
+      updated_by?: number;
+    };
+    "dto.TOTPSetupResponseDTO": {
+      account_name?: string;
+      issuer?: string;
+      otpauth_uri?: string;
+      secret?: string;
+      setup_token?: string;
+    };
+    "dto.TriggerSyncRequest": {
+      provider: components["schemas"]["cloud.ProviderKind"];
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      repository_id: string;
+    };
+    "dto.UpdateAlbumRequestDTO": {
+      album_name?: string;
+      /** @enum {string} */
+      album_type?: "default" | "bio";
+      cover_asset_id?: string;
+      description?: string;
+    };
+    "dto.UpdateAssetPositionRequestDTO": {
+      position: number;
+    };
+    "dto.UpdateAssetRequestDTO": {
+      specific_metadata?:
+        | components["schemas"]["dbtypes.PhotoSpecificMetadata"]
+        | components["schemas"]["dbtypes.VideoSpecificMetadata"]
+        | components["schemas"]["dbtypes.AudioSpecificMetadata"];
+    };
+    "dto.UpdateDescriptionRequestDTO": {
+      /** @example A beautiful sunset photo */
+      description?: string;
+    };
+    "dto.UpdateLLMSettingsDTO": {
+      agent_enabled?: boolean;
+      api_key?: string;
+      base_url?: string;
+      model_name?: string;
+      /** @enum {string} */
+      provider?: "ark" | "openai" | "deepseek" | "ollama";
+    };
+    "dto.UpdateLikeRequestDTO": {
+      /** @example true */
+      liked?: boolean;
+    };
+    "dto.UpdateMLSettingsDTO": {
+      bioclip_enabled?: boolean;
+      clip_enabled?: boolean;
+      face_enabled?: boolean;
+      ocr_enabled?: boolean;
+    };
+    "dto.UpdateOwnProfileRequestDTO": {
+      /** @example 550e8400-e29b-41d4-a716-446655440000 */
+      avatar_asset_id?: string;
+      /** @example Alex Chen */
+      display_name?: string;
+    };
+    "dto.UpdatePersonRequestDTO": {
+      name: string;
+    };
+    "dto.UpdateRatingAndLikeRequestDTO": {
+      /** @example true */
+      liked?: boolean;
+      /** @example 5 */
+      rating?: number;
+    };
+    "dto.UpdateRatingRequestDTO": {
+      /** @example 5 */
+      rating?: number;
+    };
+    "dto.UpdateRepositoryRequestDTO": {
+      default_owner_id?: number;
+      local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
+      /** @example My Photos */
+      name?: string;
+      /** @example flat */
+      storage_strategy?: string;
+    };
+    "dto.UpdateSystemSettingsDTO": {
+      llm?: components["schemas"]["dto.UpdateLLMSettingsDTO"];
+      ml?: components["schemas"]["dto.UpdateMLSettingsDTO"];
+    };
+    "dto.UploadConfigResponseDTO": {
+      chunk_size?: number;
+      max_concurrent?: number;
+      max_in_flight_requests?: number;
+      memory_buffer?: number;
+      merge_concurrency?: number;
+    };
+    "dto.UploadProgressResponseDTO": {
+      sessions?: components["schemas"]["dto.SessionProgressDTO"][];
+      summary?: components["schemas"]["dto.ProgressSummaryDTO"];
+    };
+    "dto.UploadResponseDTO": {
+      /** @example abcd1234567890 */
+      content_hash?: string;
+      /** @example photo.jpg */
+      file_name?: string;
+      /** @example File received and queued for processing */
+      message?: string;
+      /** @example 1048576 */
+      size?: number;
+      /** @example processing */
+      status?: string;
+      /** @example 12345 */
+      task_id?: number;
+    };
+    "dto.UserDTO": {
+      avatar_asset_id?: string;
+      created_at?: string;
+      display_name?: string;
+      is_active?: boolean;
+      last_login?: string;
+      permissions?: string[];
+      role?: string;
+      updated_at?: string;
+      user_id?: number;
+      username?: string;
+    };
+    "dto.ValidateLLMSettingsResponseDTO": {
+      valid?: boolean;
+    };
+    "dto.VerifyICloud2FARequest": {
+      /** @example 123456 */
+      code: string;
+    };
+    "dto.VerifyMFARequestDTO": {
+      code: string;
+      /** @enum {string} */
+      method: "totp" | "recovery_code";
+      mfa_token: string;
+    };
+    "handler.AgentChatRequest": {
+      query: string;
+      thread_id?: string;
+      tool_names?: string[];
+    };
+    "handler.AgentResumeRequest": {
+      targets: {
+        [key: string]: unknown;
+      };
+      thread_id: string;
+    };
+    "handler.AvailableYearsResponse": {
+      years?: number[];
+    };
+    "handler.CameraLensCombination": {
+      camera_model?: string;
+      count?: number;
+      lens_model?: string;
+    };
+    "handler.CameraLensStatsResponse": {
+      data?: components["schemas"]["handler.CameraLensCombination"][];
+      total?: number;
+    };
+    "handler.FocalLengthBucket": {
+      count?: number;
+      focal_length?: number;
+    };
+    "handler.FocalLengthDistributionResponse": {
+      data?: components["schemas"]["handler.FocalLengthBucket"][];
+      total?: number;
+    };
+    "handler.HealthResponse": {
+      /** @example ok */
+      status?: string;
+    };
+    "handler.HeatmapResponse": {
+      data?: components["schemas"]["handler.HeatmapValue"][];
+    };
+    "handler.HeatmapValue": {
+      count?: number;
+      date?: string;
+    };
+    "handler.JobDTO": {
+      args?: unknown;
+      attempt?: number;
+      attempted_at?: string;
+      created_at?: string;
+      errors?: string[];
+      finalized_at?: string;
+      id?: number;
+      kind?: string;
+      max_attempts?: number;
+      metadata?: unknown;
+      priority?: number;
+      queue?: string;
+      scheduled_at?: string;
+      state?: string;
+    };
+    "handler.JobListResponse": {
+      cursor?: string;
+      jobs?: components["schemas"]["handler.JobDTO"][];
+      total_count?: number;
+    };
+    "handler.JobStatsResponse": {
+      available?: number;
+      cancelled?: number;
+      completed?: number;
+      discarded?: number;
+      retryable?: number;
+      running?: number;
+      scheduled?: number;
+    };
+    "handler.QueueStatsDTO": {
+      metadata?: unknown;
+      name?: string;
+      updated_at?: string;
+    };
+    "handler.QueueStatsResponse": {
+      queues?: components["schemas"]["handler.QueueStatsDTO"][];
+    };
+    "handler.TimeBucket": {
+      count?: number;
+      label?: string;
+      value?: number;
+    };
+    "handler.TimeDistributionResponse": {
+      data?: components["schemas"]["handler.TimeBucket"][];
+      type?: string;
+    };
+    "handler.ToolInfoResponse": {
+      desc?: string;
+      extra?: {
+        [key: string]: unknown;
+      };
+      name?: string;
+    };
+    "handler.ToolSchemaResponse": {
+      bulk_like_update_example?: components["schemas"]["dto.BulkLikeUpdateDTO"];
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;

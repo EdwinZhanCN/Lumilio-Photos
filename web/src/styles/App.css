@@ -1,289 +1,327 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-    themes: all;
+  themes: all;
 }
 
 @plugin "daisyui/theme" {
-    name: "lumilio";
-    default: true;
-    prefersdark: false;
-    color-scheme: light;
-    /*
+  name: "lumilio";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+  /*
     Lumilio Light Theme
     主色规则：
     - 主色淡橙：低到中等饱和度，避免刺眼
     - 灰阶带轻微暖橙色倾向
     - 状态色统一降低饱和度，保证整体品牌调性统一
   */
-    --color-base-100: oklch(98.5% 0.008 72);
-    --color-base-200: oklch(96.2% 0.014 72);
-    --color-base-300: oklch(91.5% 0.022 72);
-    --color-base-content: oklch(25% 0.025 55);
-    --color-primary: oklch(78% 0.115 57);
-    --color-primary-content: oklch(23% 0.045 48);
-    --color-secondary: oklch(70% 0.075 305);
-    --color-secondary-content: oklch(24% 0.035 305);
-    --color-accent: oklch(82% 0.135 78);
-    --color-accent-content: oklch(25% 0.05 65);
-    --color-neutral: oklch(36% 0.026 58);
-    --color-neutral-content: oklch(96% 0.01 72);
-    --color-info: oklch(72% 0.08 225);
-    --color-info-content: oklch(24% 0.035 230);
-    --color-success: oklch(68% 0.105 145);
-    --color-success-content: oklch(22% 0.04 145);
-    --color-warning: oklch(82% 0.13 82);
-    --color-warning-content: oklch(25% 0.05 68);
-    --color-error: oklch(68% 0.13 28);
-    --color-error-content: oklch(98% 0.01 28);
-    /* radius */
-    --radius-selector: 0.7rem;
-    --radius-field: 0.8rem;
-    --radius-box: 1.1rem;
-    /* sizing */
-    --size-selector: 0.25rem;
-    --size-field: 0.25rem;
-    /* border */
-    --border: 1px;
-    /* effects */
-    --depth: 1;
-    --noise: 0;
+  --color-base-100: oklch(98.5% 0.008 72);
+  --color-base-200: oklch(96.2% 0.014 72);
+  --color-base-300: oklch(91.5% 0.022 72);
+  --color-base-content: oklch(25% 0.025 55);
+  --color-primary: oklch(78% 0.115 57);
+  --color-primary-content: oklch(23% 0.045 48);
+  --color-secondary: oklch(70% 0.075 305);
+  --color-secondary-content: oklch(24% 0.035 305);
+  --color-accent: oklch(82% 0.135 78);
+  --color-accent-content: oklch(25% 0.05 65);
+  --color-neutral: oklch(36% 0.026 58);
+  --color-neutral-content: oklch(96% 0.01 72);
+  --color-info: oklch(72% 0.08 225);
+  --color-info-content: oklch(24% 0.035 230);
+  --color-success: oklch(68% 0.105 145);
+  --color-success-content: oklch(22% 0.04 145);
+  --color-warning: oklch(82% 0.13 82);
+  --color-warning-content: oklch(25% 0.05 68);
+  --color-error: oklch(68% 0.13 28);
+  --color-error-content: oklch(98% 0.01 28);
+  /* radius */
+  --radius-selector: 0.7rem;
+  --radius-field: 0.8rem;
+  --radius-box: 1.1rem;
+  /* sizing */
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  /* border */
+  --border: 1px;
+  /* effects */
+  --depth: 1;
+  --noise: 0;
 }
 
 @plugin "daisyui/theme" {
-    name: "lumilio-dark";
-    default: false;
-    prefersdark: true;
-    color-scheme: dark;
-    /*
+  name: "lumilio-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+  /*
     Lumilio Dark Theme
     不是纯黑，而是 warm charcoal。
     这样照片浏览界面不会太刺眼，也更接近专业图库 / 编辑器背景。
   */
-    --color-base-100: oklch(18% 0.012 58);
-    --color-base-200: oklch(22% 0.014 58);
-    --color-base-300: oklch(28% 0.018 58);
-    --color-base-content: oklch(91% 0.015 72);
-    --color-primary: oklch(76% 0.105 57);
-    --color-primary-content: oklch(18% 0.035 48);
-    --color-secondary: oklch(72% 0.07 305);
-    --color-secondary-content: oklch(18% 0.03 305);
-    --color-accent: oklch(80% 0.12 78);
-    --color-accent-content: oklch(18% 0.04 65);
-    --color-neutral: oklch(82% 0.018 62);
-    --color-neutral-content: oklch(18% 0.012 58);
-    --color-info: oklch(74% 0.075 225);
-    --color-info-content: oklch(18% 0.03 230);
-    --color-success: oklch(72% 0.095 145);
-    --color-success-content: oklch(17% 0.035 145);
-    --color-warning: oklch(82% 0.12 82);
-    --color-warning-content: oklch(20% 0.045 68);
-    --color-error: oklch(70% 0.12 28);
-    --color-error-content: oklch(98% 0.01 28);
-    --radius-selector: 0.7rem;
-    --radius-field: 0.8rem;
-    --radius-box: 1.1rem;
-    --size-selector: 0.25rem;
-    --size-field: 0.25rem;
-    --border: 1px;
-    --depth: 1;
-    --noise: 0;
+  --color-base-100: oklch(18% 0.012 58);
+  --color-base-200: oklch(22% 0.014 58);
+  --color-base-300: oklch(28% 0.018 58);
+  --color-base-content: oklch(91% 0.015 72);
+  --color-primary: oklch(76% 0.105 57);
+  --color-primary-content: oklch(18% 0.035 48);
+  --color-secondary: oklch(72% 0.07 305);
+  --color-secondary-content: oklch(18% 0.03 305);
+  --color-accent: oklch(80% 0.12 78);
+  --color-accent-content: oklch(18% 0.04 65);
+  --color-neutral: oklch(82% 0.018 62);
+  --color-neutral-content: oklch(18% 0.012 58);
+  --color-info: oklch(74% 0.075 225);
+  --color-info-content: oklch(18% 0.03 230);
+  --color-success: oklch(72% 0.095 145);
+  --color-success-content: oklch(17% 0.035 145);
+  --color-warning: oklch(82% 0.12 82);
+  --color-warning-content: oklch(20% 0.045 68);
+  --color-error: oklch(70% 0.12 28);
+  --color-error-content: oklch(98% 0.01 28);
+  --radius-selector: 0.7rem;
+  --radius-field: 0.8rem;
+  --radius-box: 1.1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }
-:root:has(
-    :is(
-        .modal-open,
-        .modal:target,
-        .modal-toggle:checked + .modal,
-        .modal[open]
-    )
-) {
-    scrollbar-gutter: auto !important;
+:root:has(:is(.modal-open, .modal:target, .modal-toggle:checked + .modal, .modal[open])) {
+  scrollbar-gutter: auto !important;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-fade-in {
-    animation: fadeIn 0.3s ease-in-out;
+  animation: fadeIn 0.3s ease-in-out;
 }
 
 @keyframes fadeOutY {
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(100%);
-    }
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
 }
 
 .animate-fade-out-y {
-    animation: fadeOutY 0.3s ease-in-out forwards;
+  animation: fadeOutY 0.3s ease-in-out forwards;
 }
 
 @keyframes fadeInY {
-    from {
-        opacity: 0;
-        transform: translateY(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in-y {
-    animation: fadeInY 0.3s ease-in-out;
+  animation: fadeInY 0.3s ease-in-out;
 }
 
 @keyframes fadeOutX {
-    from {
-        opacity: 1;
-        transform: translateX(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateX(100%);
-    }
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
 }
 @keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-    to {
-        opacity: 0;
-    }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .animate-fade-out {
-    animation: fadeOut 0.3s ease-in-out forwards;
+  animation: fadeOut 0.3s ease-in-out forwards;
 }
 
 .animate-fade-out-x {
-    animation: fadeOutX 0.3s ease-in-out forwards;
+  animation: fadeOutX 0.3s ease-in-out forwards;
 }
 
 @keyframes fadeInX {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .animate-fade-in-x {
-    animation: fadeInX 0.3s ease-in-out;
+  animation: fadeInX 0.3s ease-in-out;
 }
 
 /* Search button active / animation styles */
 .search-btn {
-    transition:
-        transform 0.16s ease,
-        background-color 0.16s ease,
-        box-shadow 0.16s ease;
-    will-change: transform;
+  transition:
+    transform 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease;
+  will-change: transform;
 }
 
 .search-btn.btn-active {
-    transform: scale(0.96);
+  transform: scale(0.96);
 }
 
 /* Container that wraps the toggle + input — animation only, do not override component sizing */
 .search-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    opacity: 0;
-    transform: translateX(-6px);
-    transition:
-        opacity 0.24s ease,
-        transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition:
+    opacity 0.24s ease,
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* Visible state fades and slides in */
 .search-controls.visible {
-    opacity: 1;
-    transform: translateX(0);
+  opacity: 1;
+  transform: translateX(0);
 }
 
 /* Hidden state */
 .search-controls.hidden {
-    opacity: 0;
-    transform: translateX(-6px);
+  opacity: 0;
+  transform: translateX(-6px);
 }
 
 /* Input: animation only. Do not set widths or layout that conflict with component classes */
 .search-input {
-    opacity: 0;
-    transform: translateX(-4px);
-    transition:
-        opacity 0.24s ease,
-        transform 0.28s ease;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 0.24s ease,
+    transform 0.28s ease;
 }
 
 /* When visible, reveal input without forcing size */
 .search-controls.visible .search-input {
-    opacity: 1;
-    transform: translateX(0);
+  opacity: 1;
+  transform: translateX(0);
 }
 
 /* Styling for the toggle SVGs: only transition and subtle scale on checked (no color overrides) */
 label.toggle svg {
-    transition: transform 0.22s ease;
+  transition: transform 0.22s ease;
 }
 label.toggle input:checked + svg,
 label.toggle input:checked ~ svg {
-    transform: scale(1.06);
+  transform: scale(1.06);
 }
 
 /* Toggle's shape and layout are provided by the existing component classes; no layout overrides here */
 
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
-    .animate-fade-in,
-    .animate-fade-in-x,
-    .animate-fade-in-y,
-    .animate-fade-out,
-    .animate-fade-out-x,
-    .search-controls,
-    .search-input,
-    .search-btn {
-        transition: none !important;
-        animation: none !important;
-    }
+  .animate-fade-in,
+  .animate-fade-in-x,
+  .animate-fade-in-y,
+  .animate-fade-out,
+  .animate-fade-out-x,
+  .search-controls,
+  .search-input,
+  .search-btn {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 /* Keep fab open when programmatically opened (e.g. has search query) */
 .fab.fab-open > [tabindex]:first-child {
-    pointer-events: none !important;
-    opacity: 0 !important;
-    rotate: 90deg !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  rotate: 90deg !important;
 }
 .fab.fab-open > :nth-child(n + 2) {
-    visibility: visible !important;
-    opacity: 1 !important;
-    --tw-scale-x: 100% !important;
-    --tw-scale-y: 100% !important;
-    --tw-scale-z: 100% !important;
-    scale: 1 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  --tw-scale-x: 100% !important;
+  --tw-scale-y: 100% !important;
+  --tw-scale-z: 100% !important;
+  scale: 1 !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Auth flow motion — mirrors the Lumilio auth design handoff.
+ * Screens rise in softly; the success ring pops with a slight overshoot.
+ * All disabled under prefers-reduced-motion.
+ * ------------------------------------------------------------------------- */
+@keyframes lumilioScreenIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lumilioRingPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.screen-in {
+  animation: lumilioScreenIn 0.38s ease-out both;
+}
+
+.success-ring {
+  animation: lumilioRingPop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-in,
+  .success-ring {
+    animation: none !important;
+  }
 }

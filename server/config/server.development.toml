@@ -67,6 +67,6 @@ hardware_accel = "auto"
 
 [lumen]
 discovery_enabled = true
-discovery_mdns_enabled = false
+discovery_mdns_enabled = true
 discovery_hub_url = ""
 connection_insecure = true

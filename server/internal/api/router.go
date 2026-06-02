@@ -194,9 +194,16 @@ type CloudControllerInterface interface {
 	Disconnect(c *gin.Context)      // DELETE /cloud/:provider
 }
 
+// SetupControllerInterface defines the zero-config first-run setup endpoints.
+type SetupControllerInterface interface {
+	GetSetupStatus(c *gin.Context) // GET  /setup/status
+	Setup(c *gin.Context)          // POST /setup
+}
+
 func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
+	setupController SetupControllerInterface,
 	albumController AlbumControllerInterface,
 	peopleController PeopleControllerInterface,
 	locationController LocationControllerInterface,
@@ -233,6 +240,13 @@ func NewRouter(
 			GinSuccess(c, gin.H{"status": "ok"})
 		})
 		v1.GET("/capabilities", authController.OptionalAuthMiddleware(), capabilitiesController.GetCapabilities)
+
+		// Zero-config first-run setup. Public: the system has no users/secrets yet.
+		setup := v1.Group("/setup")
+		{
+			setup.GET("/status", setupController.GetSetupStatus)
+			setup.POST("", setupController.Setup)
+		}
 
 		settings := v1.Group("/settings")
 		settings.Use(authController.AuthMiddleware(), authController.RequireAdmin())
