@@ -309,7 +309,8 @@ export default function MFAPage(): React.ReactNode {
             defaultValue: "Disable two-factor",
           })}
           sub={t("auth.mfa.disableSubtitle", {
-            defaultValue: "Confirm with your password to turn off 2FA.",
+            defaultValue:
+              "This turns off all MFA — any passkeys on your account will be removed too. Confirm with your password.",
           })}
         />
         {error && <InlineError>{error}</InlineError>}

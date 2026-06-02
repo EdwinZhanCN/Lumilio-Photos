@@ -25,13 +25,13 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 }
 
 // StartRegistration creates a staged registration session.
-// @Summary Start user registration
-// @Description Create a staged registration session with username and password before passkey or TOTP enrollment.
+// @Summary Register a new account
+// @Description Create a new account from a username and password and issue session tokens. MFA (TOTP/passkey) is optional and added afterwards.
 // @Tags auth
 // @Accept json
 // @Produce json
 // @Param request body dto.RegistrationStartRequestDTO true "Registration data"
-// @Success 200 {object} api.Result{data=dto.RegistrationStartResponseDTO} "Registration session created successfully"
+// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Account created successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 409 {object} api.Result "User already exists"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -61,7 +61,7 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToRegistrationStartResponseDTO(response))
+	api.GinSuccess(c, dto.ToAuthResponseDTO(response))
 }
 
 // GetBootstrapStatus reports whether the system is still waiting for its first account.

@@ -339,6 +339,7 @@
       },
       "stepNum": "Step {{n}}",
       "totp": {
+        "skip": "Skip for now",
         "subtitle": "Required for the admin account. Scan and verify to continue.",
         "title": "Add an authenticator app"
       },
@@ -423,14 +424,13 @@
       "finish": "Continue to Lumilio",
       "haveAccount": "Already have an account?",
       "login": "Sign in",
-      "mfaRequiredNotice": "Two-factor authentication is required for every account. You’ll set it up next.",
+      "mfaOptionalNotice": "You can add two-factor authentication next — it’s optional, and you can do it later in settings.",
       "passkeyAction": "Create a passkey",
       "passkeyDescription": "No password to remember. Your passkey stays on this device and can’t be phished.",
       "passkeyHeadline": "Sign in with your face or fingerprint",
       "passkeyStartError": "Failed to start passkey registration.",
       "passkeyStepSubtitle": "Passkeys are the fastest, safest way in. We recommend adding one now.",
       "passkeyStepTitle": "Secure with a passkey",
-      "passkeyUnavailableUseTotp": "Passkeys are unavailable in the current environment. Please continue with an authenticator app.",
       "passkeyVerifyError": "Passkey registration failed.",
       "password": "Password",
       "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
@@ -438,6 +438,7 @@
       "recoverySubtitle": "Your last resort if you lose every other factor.",
       "recoveryTitle": "Save your recovery codes",
       "skipPasskey": "Skip for now, use authenticator only",
+      "skipTotp": "Skip for now",
       "startError": "Failed to start account registration.",
       "stepAccount": "Account",
       "stepAuthenticator": "Authenticator",
@@ -453,7 +454,7 @@
       "username": "Admin username",
       "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
       "usernamePlaceholder": "admin",
-      "verifyAndFinish": "Verify & enable"
+      "verifyAndEnable": "Verify & enable"
     },
     "setup": {
       "error": "Setup failed. Check the server logs and try again.",
@@ -1007,6 +1008,7 @@
         "passkeyCreated": "Created",
         "passkeyDescription": "Use your device's native passkey flow for sign-in.",
         "passkeyLastUsed": "Last used",
+        "passkeyRequiresTotp": "Enable an authenticator app (TOTP) first — a passkey can only be added on top of it.",
         "passkeyTitle": "Passkeys",
         "recoveryCodesTitle": "Recovery codes",
         "recoveryRemaining": "recovery codes remaining",

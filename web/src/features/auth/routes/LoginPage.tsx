@@ -1,12 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  Fingerprint,
-  KeyRound,
-  Smartphone,
-  User,
-} from "lucide-react";
+import { ArrowLeft, Fingerprint, KeyRound, Smartphone, User } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
@@ -65,23 +59,9 @@ function getApiMessage(error: unknown, fallback: string): string {
 
 const LoginPage: React.FC = () => {
   const { t } = useI18n();
-  const {
-    login,
-    verifyMFA,
-    completeAuth,
-    dispatch,
-    isAuthenticated,
-    isLoading,
-    error,
-  } = useAuth();
-  const passkeyOptionsMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/passkeys/login/options",
-  );
-  const passkeyVerifyMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/passkeys/login/verify",
-  );
+  const { login, verifyMFA, completeAuth, dispatch, isAuthenticated, isLoading, error } = useAuth();
+  const passkeyOptionsMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/options");
+  const passkeyVerifyMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/verify");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -99,16 +79,11 @@ const LoginPage: React.FC = () => {
   }, [location.state]);
 
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
-  const displayName =
-    challenge?.user?.display_name || challenge?.user?.username || username;
-  const recoveryCodeAvailable =
-    challenge?.mfaMethods.includes("recovery_code") ?? false;
-  const passkeyBusy =
-    passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
+  const displayName = challenge?.user?.display_name || challenge?.user?.username || username;
+  const recoveryCodeAvailable = challenge?.mfaMethods.includes("recovery_code") ?? false;
+  const passkeyBusy = passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
   const displayError = passkeyError ?? error;
-  const passkeySupportReason = passkeySupport.reasonKey
-    ? t(passkeySupport.reasonKey)
-    : null;
+  const passkeySupportReason = passkeySupport.reasonKey ? t(passkeySupport.reasonKey) : null;
   const usernameValid = username.trim().length >= USERNAME_MIN_LENGTH;
 
   useEffect(() => {
@@ -117,9 +92,7 @@ const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated, isLoading, navigate, redirectTo]);
 
-  const handlePasswordLogin = async (
-    event?: React.FormEvent<HTMLFormElement>,
-  ) => {
+  const handlePasswordLogin = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     setPasskeyError(null);
     try {
@@ -155,13 +128,9 @@ const LoginPage: React.FC = () => {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({
         body: { username },
       });
-      const optionsData = optionsResponse as
-        | ApiResult<PasskeyOptionsResponse>
-        | undefined;
+      const optionsData = optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
       if (!optionsData?.data) {
-        throw new Error(
-          optionsData?.message || t("auth.login.passkeyStartError"),
-        );
+        throw new Error(optionsData?.message || t("auth.login.passkeyStartError"));
       }
 
       const credential = await getPasskeyCredential(optionsData.data.options);
@@ -173,17 +142,13 @@ const LoginPage: React.FC = () => {
       });
       const verifyData = verifyResponse as ApiResult<AuthResponse> | undefined;
       if (!verifyData?.data) {
-        throw new Error(
-          verifyData?.message || t("auth.login.passkeyVerifyError"),
-        );
+        throw new Error(verifyData?.message || t("auth.login.passkeyVerifyError"));
       }
 
       await completeAuth(verifyData.data);
       void navigate(redirectTo, { replace: true });
     } catch (passkeyAuthError) {
-      setPasskeyError(
-        getApiMessage(passkeyAuthError, t("auth.login.passkeyUnavailable")),
-      );
+      setPasskeyError(getApiMessage(passkeyAuthError, t("auth.login.passkeyUnavailable")));
     }
   };
 
@@ -226,8 +191,7 @@ const LoginPage: React.FC = () => {
             sub={
               isRecovery
                 ? t("auth.login.recoveryHint", {
-                    defaultValue:
-                      "Use one of the codes you saved when setting up your account.",
+                    defaultValue: "Use one of the codes you saved when setting up your account.",
                   })
                 : t("auth.login.verifyPrompt", {
                     defaultValue:
@@ -238,9 +202,7 @@ const LoginPage: React.FC = () => {
           />
 
           {displayError && (
-            <InlineError>
-              {t(displayError, { defaultValue: displayError })}
-            </InlineError>
+            <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
           )}
 
           {isRecovery ? (
@@ -301,9 +263,7 @@ const LoginPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setMfaMethod((m) =>
-                    m === "totp" ? "recovery_code" : "totp",
-                  );
+                  setMfaMethod((m) => (m === "totp" ? "recovery_code" : "totp"));
                   setMfaCode("");
                 }}
                 className="font-medium text-base-content/55 hover:text-base-content"
@@ -313,8 +273,7 @@ const LoginPage: React.FC = () => {
                       defaultValue: "Use an authenticator code instead",
                     })
                   : t("auth.login.useRecoveryCodeInstead", {
-                      defaultValue:
-                        "Can’t access your app? Use a recovery code",
+                      defaultValue: "Can’t access your app? Use a recovery code",
                     })}
               </button>
             )}
@@ -346,9 +305,7 @@ const LoginPage: React.FC = () => {
         />
 
         {displayError && (
-          <InlineError>
-            {t(displayError, { defaultValue: displayError })}
-          </InlineError>
+          <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
         )}
 
         <Field
@@ -362,9 +319,7 @@ const LoginPage: React.FC = () => {
               defaultValue: "your-username",
             })}
             value={username}
-            onChange={(e) =>
-              setUsername(normalizeUsernameInput(e.target.value))
-            }
+            onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
             pattern={USERNAME_PATTERN}
             minLength={USERNAME_MIN_LENGTH}
             maxLength={USERNAME_MAX_LENGTH}
@@ -393,15 +348,11 @@ const LoginPage: React.FC = () => {
         )}
 
         <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-base-content/35">
-          <span className="h-px grow bg-base-200" />{" "}
-          {t("common.or", { defaultValue: "or" })}{" "}
+          <span className="h-px grow bg-base-200" /> {t("common.or", { defaultValue: "or" })}{" "}
           <span className="h-px grow bg-base-200" />
         </div>
 
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => void handlePasswordLogin(e)}
-        >
+        <form className="flex flex-col gap-4" onSubmit={(e) => void handlePasswordLogin(e)}>
           <PasswordField
             label={t("auth.login.password", { defaultValue: "Password" })}
             hint={t("auth.register.passwordHint", {

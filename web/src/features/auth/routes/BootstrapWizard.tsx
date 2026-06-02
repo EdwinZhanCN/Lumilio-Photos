@@ -41,15 +41,15 @@ import {
 const STEP_CONFIG: Array<{ key: string; icon: LucideIcon }> = [
   { key: "welcome", icon: Server },
   { key: "admin", icon: UserCog },
-  { key: "passkey", icon: Fingerprint },
   { key: "totp", icon: Smartphone },
+  { key: "passkey", icon: Fingerprint },
   { key: "recovery", icon: KeyRound },
 ];
 
 const FLOW_INDEX: Record<string, number> = {
   credentials: 1,
-  choose: 2,
-  totp: 3,
+  totp: 2,
+  passkey: 3,
   recovery: 4,
 };
 
@@ -65,7 +65,6 @@ const BootstrapWizard: React.FC = () => {
     confirmPassword,
     setConfirmPassword,
     confirmPasswordRef,
-    capabilityMessage,
     totpSetup,
     totpCode,
     setTotpCode,
@@ -74,8 +73,9 @@ const BootstrapWizard: React.FC = () => {
     isBusy,
     handleStartRegistration,
     handleCreatePasskey,
-    handleUseAuthenticatorApp,
+    handleSkipPasskey,
     handleCompleteTotp,
+    handleSkipTotp,
     handleFinish,
   } = useRegistrationFlow();
 
@@ -95,18 +95,18 @@ const BootstrapWizard: React.FC = () => {
       icon: UserCog,
     },
     {
-      key: "passkey",
-      label: t("auth.bootstrap.step.passkey", {
-        defaultValue: "Passkey",
-      }),
-      icon: Fingerprint,
-    },
-    {
       key: "totp",
       label: t("auth.bootstrap.step.totp", {
         defaultValue: "Authenticator",
       }),
       icon: Smartphone,
+    },
+    {
+      key: "passkey",
+      label: t("auth.bootstrap.step.passkey", {
+        defaultValue: "Passkey",
+      }),
+      icon: Fingerprint,
     },
     {
       key: "recovery",
@@ -130,8 +130,7 @@ const BootstrapWizard: React.FC = () => {
         defaultValue: "Secured by default",
       }),
       t("auth.bootstrap.welcome.secureBody", {
-        defaultValue:
-          "Passkey or authenticator app — pick one as the second factor.",
+        defaultValue: "Passkey or authenticator app — pick one as the second factor.",
       }),
     ],
     [
@@ -156,11 +155,7 @@ const BootstrapWizard: React.FC = () => {
 
   return (
     <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
-      <div
-        className="screen-in w-full"
-        style={{ maxWidth: 880 }}
-        key={`bootstrap-${current}`}
-      >
+      <div className="screen-in w-full" style={{ maxWidth: 880 }} key={`bootstrap-${current}`}>
         <div className="overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_44px_-18px_rgba(0,0,0,0.18)] md:grid md:grid-cols-[260px_1fr]">
           {/* sidebar */}
           <aside className="hidden flex-col justify-between border-r border-base-200 bg-base-200/30 p-6 md:flex">
@@ -188,9 +183,7 @@ const BootstrapWizard: React.FC = () => {
           <section className="p-7 sm:p-9">
             {displayError && (
               <div className="mb-5">
-                <InlineError>
-                  {t(displayError, { defaultValue: displayError })}
-                </InlineError>
+                <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
               </div>
             )}
 
@@ -218,14 +211,9 @@ const BootstrapWizard: React.FC = () => {
                       key={title}
                       className="flex items-start gap-3 rounded-xl border border-base-200 px-4 py-3"
                     >
-                      <Icon
-                        size={18}
-                        className="mt-0.5 shrink-0 text-base-content/45"
-                      />
+                      <Icon size={18} className="mt-0.5 shrink-0 text-base-content/45" />
                       <div>
-                        <p className="text-sm font-medium text-base-content">
-                          {title}
-                        </p>
+                        <p className="text-sm font-medium text-base-content">{title}</p>
                         <p className="text-xs text-base-content/55">{body}</p>
                       </div>
                     </div>
@@ -257,14 +245,10 @@ const BootstrapWizard: React.FC = () => {
                     defaultValue: "Create the administrator",
                   })}
                   sub={t("auth.bootstrap.admin.subtitle", {
-                    defaultValue:
-                      "This account can manage the server, libraries, and members.",
+                    defaultValue: "This account can manage the server, libraries, and members.",
                   })}
                 />
-                <form
-                  className="mt-5 flex flex-col gap-4"
-                  onSubmit={handleStartRegistration}
-                >
+                <form className="mt-5 flex flex-col gap-4" onSubmit={handleStartRegistration}>
                   <Field
                     label={t("auth.register.username", {
                       defaultValue: "Admin username",
@@ -280,9 +264,7 @@ const BootstrapWizard: React.FC = () => {
                         defaultValue: "admin",
                       })}
                       value={username}
-                      onChange={(e) =>
-                        setUsername(normalizeUsernameInput(e.target.value))
-                      }
+                      onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
                       pattern={USERNAME_PATTERN}
                       minLength={USERNAME_MIN_LENGTH}
                       maxLength={USERNAME_MAX_LENGTH}
@@ -317,12 +299,7 @@ const BootstrapWizard: React.FC = () => {
                     autoComplete="new-password"
                     inputRef={confirmPasswordRef}
                   />
-                  <Btn
-                    type="submit"
-                    variant="neutral"
-                    loading={isBusy}
-                    className="self-start px-6"
-                  >
+                  <Btn type="submit" variant="neutral" loading={isBusy} className="self-start px-6">
                     {t("auth.bootstrap.admin.submit", {
                       defaultValue: "Create admin & continue",
                     })}
@@ -331,27 +308,58 @@ const BootstrapWizard: React.FC = () => {
               </div>
             )}
 
-            {current === 2 && (
+            {current === 2 && totpSetup && (
+              <div className="max-w-md">
+                <CardHead
+                  icon={Smartphone}
+                  tone="primary"
+                  title={t("auth.bootstrap.totp.title", {
+                    defaultValue: "Add an authenticator app",
+                  })}
+                  sub={t("auth.bootstrap.totp.subtitle", {
+                    defaultValue: "Optional — scan and verify to enable an authenticator code.",
+                  })}
+                />
+                <div className="mt-5 flex flex-col gap-4">
+                  <TotpSetupPanel
+                    otpauthUri={totpSetup.otpauth_uri ?? ""}
+                    secret={totpSetup.secret ?? ""}
+                    code={totpCode}
+                    onCodeChange={setTotpCode}
+                    onVerify={submitTotp}
+                    invalid={Boolean(displayError)}
+                    busy={isBusy}
+                    verifyLabel={t("auth.register.verifyAndEnable", {
+                      defaultValue: "Verify & enable",
+                    })}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSkipTotp}
+                  disabled={isBusy}
+                  className="mt-3 text-sm font-medium text-base-content/45 hover:text-base-content/70"
+                >
+                  {t("auth.bootstrap.totp.skip", {
+                    defaultValue: "Skip for now",
+                  })}
+                </button>
+              </div>
+            )}
+
+            {current === 3 && (
               <div className="max-w-md">
                 <CardHead
                   icon={Fingerprint}
                   tone="primary"
                   title={t("auth.bootstrap.passkey.title", {
-                    defaultValue: "Secure the admin with a passkey",
+                    defaultValue: "Add an admin passkey",
                   })}
                   sub={t("auth.bootstrap.passkey.subtitle", {
-                    defaultValue:
-                      "Strongly recommended — the admin account controls the whole server.",
+                    defaultValue: "Optional — a fast, phishing-resistant way to sign in as admin.",
                   })}
                 />
                 <div className="mt-5 flex flex-col gap-4">
-                  {capabilityMessage && (
-                    <div className="rounded-xl border border-base-200 bg-base-200/60 px-4 py-3 text-sm text-base-content/70">
-                      {t(capabilityMessage, {
-                        defaultValue: capabilityMessage,
-                      })}
-                    </div>
-                  )}
                   <PasskeyAffordance />
                   <Btn
                     variant="primary"
@@ -366,44 +374,14 @@ const BootstrapWizard: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => void handleUseAuthenticatorApp()}
+                  onClick={handleSkipPasskey}
                   disabled={isBusy}
                   className="mt-3 text-sm font-medium text-base-content/45 hover:text-base-content/70"
                 >
                   {t("auth.bootstrap.passkey.skip", {
-                    defaultValue: "Skip — use authenticator only",
+                    defaultValue: "Skip for now",
                   })}
                 </button>
-              </div>
-            )}
-
-            {current === 3 && totpSetup && (
-              <div className="max-w-md">
-                <CardHead
-                  icon={Smartphone}
-                  tone="primary"
-                  title={t("auth.bootstrap.totp.title", {
-                    defaultValue: "Add an authenticator app",
-                  })}
-                  sub={t("auth.bootstrap.totp.subtitle", {
-                    defaultValue:
-                      "Required for the admin account. Scan and verify to continue.",
-                  })}
-                />
-                <div className="mt-5 flex flex-col gap-4">
-                  <TotpSetupPanel
-                    otpauthUri={totpSetup.otpauth_uri ?? ""}
-                    secret={totpSetup.secret ?? ""}
-                    code={totpCode}
-                    onCodeChange={setTotpCode}
-                    onVerify={submitTotp}
-                    invalid={Boolean(displayError)}
-                    busy={isBusy}
-                    verifyLabel={t("auth.register.verifyAndFinish", {
-                      defaultValue: "Verify & enable",
-                    })}
-                  />
-                </div>
               </div>
             )}
 
@@ -416,8 +394,7 @@ const BootstrapWizard: React.FC = () => {
                     defaultValue: "Save admin recovery codes",
                   })}
                   sub={t("auth.bootstrap.recovery.subtitle", {
-                    defaultValue:
-                      "The only way to recover the server if every factor is lost.",
+                    defaultValue: "The only way to recover the server if every factor is lost.",
                   })}
                 />
                 <div className="mt-5 flex flex-col gap-4">
@@ -427,8 +404,7 @@ const BootstrapWizard: React.FC = () => {
                       defaultValue: "Finish & open dashboard",
                     })}
                     checkboxLabel={t("auth.register.recoverySavedConfirm", {
-                      defaultValue:
-                        "I’ve saved my recovery codes somewhere safe",
+                      defaultValue: "I’ve saved my recovery codes somewhere safe",
                     })}
                     onConfirm={handleFinish}
                   />
