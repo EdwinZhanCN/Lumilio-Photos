@@ -334,6 +334,14 @@
         "title": "Save admin recovery codes"
       },
       "sidebarNote": "This wizard appears only once — until the first administrator is created.",
+      "step": {
+        "admin": "Admin account",
+        "passkey": "Passkey",
+        "recovery": "Recovery codes",
+        "totp": "Authenticator",
+        "welcome": "Welcome"
+      },
+      "stepNum": "Step {{n}}",
       "totp": {
         "subtitle": "Required for the admin account. Scan and verify to continue.",
         "title": "Add an authenticator app"
@@ -345,7 +353,7 @@
         "inviteTitle": "Invite others later",
         "localBody": "Everything is stored on this server only.",
         "localTitle": "Your data stays home",
-        "secureBody": "Passkey + authenticator required for the admin.",
+        "secureBody": "Passkey or authenticator app — pick one as the second factor.",
         "secureTitle": "Secured by default",
         "title": "Welcome to Lumilio Photos"
       }
@@ -372,12 +380,12 @@
     "login": {
       "backToSignIn": "Back to sign in",
       "passkeyStartError": "Unable to start passkey sign-in for this account.",
-      "passkeySubmit": "Continue with Passkey",
+      "passkeySubmit": "Sign in with a passkey",
       "passkeyUnavailable": "Passkey sign-in is unavailable for this account on this device.",
       "passkeyVerifyError": "Passkey verification failed.",
       "password": "Password",
       "recoveryCode": "Recovery code",
-      "recoveryHint": "Enter one of your one-time recovery codes.",
+      "recoveryHint": "Use one of the codes you saved when setting up your account.",
       "recoveryTitle": "Enter a recovery code",
       "register": "Create an account",
       "registerPrompt": "New to Lumilio?",
@@ -385,15 +393,15 @@
       "subtitle": "Use a passkey, or your username and password.",
       "title": "Sign in to Lumilio",
       "useAuthenticatorCode": "Use an authenticator code instead",
-      "useRecoveryCode": "Use a recovery code instead",
+      "useRecoveryCode": "Use recovery code",
       "useRecoveryCodeInstead": "Can’t access your app? Use a recovery code",
       "username": "Username",
       "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
-      "usernamePlaceholder": "Enter username",
+      "usernamePlaceholder": "your-username",
       "usernameRequiredForPasskey": "Enter your username to continue with a passkey.",
-      "verifyButton": "Verify and continue",
-      "verifyPrompt": "Continuing as {{name}}",
-      "verifyTitle": "Two-factor verification"
+      "verifyButton": "Verify",
+      "verifyPrompt": "Enter the 6-digit code from your authenticator app for {{name}}.",
+      "verifyTitle": "Two-factor authentication"
     },
     "logout": "Logout",
     "mfa": {
@@ -409,9 +417,9 @@
       "confirmPasswordPlaceholder": "Re-enter password",
       "finish": "Continue to Lumilio",
       "haveAccount": "Already have an account?",
-      "login": "Go to login",
+      "login": "Sign in",
       "mfaRequiredNotice": "Two-factor authentication is required for every account. You’ll set it up next.",
-      "passkeyAction": "Create Passkey",
+      "passkeyAction": "Create a passkey",
       "passkeyDescription": "No password to remember. Your passkey stays on this device and can’t be phished.",
       "passkeyHeadline": "Sign in with your face or fingerprint",
       "passkeyStartError": "Failed to start passkey registration.",
@@ -422,7 +430,7 @@
       "password": "Password",
       "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
       "recoverySavedConfirm": "I’ve saved my recovery codes somewhere safe",
-      "recoverySubtitle": "These one-time codes are the only fallback if you lose access to your authenticator.",
+      "recoverySubtitle": "Your last resort if you lose every other factor.",
       "recoveryTitle": "Save your recovery codes",
       "skipPasskey": "Skip for now, use authenticator only",
       "startError": "Failed to start account registration.",
@@ -435,12 +443,12 @@
       "title": "Create an account",
       "totpSetupCompleteError": "Failed to complete authenticator setup.",
       "totpSetupStartError": "Failed to start authenticator setup.",
-      "totpSubtitle": "Scan the QR code with Duo, 1Password, or any authenticator app, then verify once.",
-      "totpTitle": "Set up Authenticator App",
-      "username": "Username",
+      "totpSubtitle": "Required — scan the code with your authenticator app.",
+      "totpTitle": "Add your authenticator",
+      "username": "Admin username",
       "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
-      "usernamePlaceholder": "Enter username",
-      "verifyAndFinish": "Verify and finish setup"
+      "usernamePlaceholder": "admin",
+      "verifyAndFinish": "Verify & enable"
     },
     "setup": {
       "error": "Setup failed. Check the server logs and try again.",
@@ -1341,15 +1349,15 @@
     },
     "backToStudio": "Back to Studio",
     "develop": {
-      "color": "Color",
+      "color": "studio.develop.color",
       "detail": "Detail",
       "geometry": "Geometry",
-      "hint": "Double-click any slider to reset it.",
-      "light": "Light",
+      "hint": "Double-click to reset",
+      "light": "studio.develop.light",
       "reset": "Reset",
       "resetAll": "Reset all adjustments",
       "rotation": "Rotation",
-      "title": "Development Tools"
+      "title": "Develop"
     },
     "editor": {
       "before": "Before",

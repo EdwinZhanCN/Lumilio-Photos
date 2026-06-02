@@ -257,7 +257,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     default:
       self.postMessage({
         type: "ERROR",
-        error: `Unknown message type: ${type}`,
+        error: `Unknown message type: ${String(type)}`,
       });
       break;
   }

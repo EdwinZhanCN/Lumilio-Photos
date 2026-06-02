@@ -72,7 +72,7 @@ const processExifData = (
         const rest = { ...(rawExif as Record<string, any>) };
         delete rest.data;
         dataToProcess = rest;
-        throw new Error(`Failed to parse EXIF data: ${e}`);
+        throw new Error(`Failed to parse EXIF data: ${String(e)}`);
       }
     } else {
       // It's a regular object without a 'data' property

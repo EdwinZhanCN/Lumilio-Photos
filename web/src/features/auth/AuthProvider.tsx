@@ -1,4 +1,10 @@
-import React, { createContext, useReducer, useEffect, ReactNode, useRef } from "react";
+import React, {
+  createContext,
+  useReducer,
+  useEffect,
+  ReactNode,
+  useRef,
+} from "react";
 import { authReducer, initialState } from "./auth.reducer";
 import {
   ApiResult,
@@ -9,21 +15,37 @@ import {
   MFAMethod,
   User,
 } from "./auth.type.ts";
-import { getToken, getRefreshToken, removeToken, saveToken } from "@/lib/http-commons/auth.ts";
+import {
+  getToken,
+  getRefreshToken,
+  removeToken,
+  saveToken,
+} from "@/lib/http-commons/auth.ts";
 import { $api } from "@/lib/http-commons/queryClient";
-import { ensureMediaToken, getMediaTokenRefreshIntervalMs } from "@/lib/assets/mediaAccess.ts";
+import {
+  ensureMediaToken,
+  getMediaTokenRefreshIntervalMs,
+} from "@/lib/assets/mediaAccess.ts";
 
 interface AuthContextType extends AuthState {
   dispatch: React.Dispatch<AuthAction>;
   login: (username: string, password: string) => Promise<LoginResult>;
-  verifyMFA: (mfaToken: string, code: string, method: MFAMethod) => Promise<void>;
+  verifyMFA: (
+    mfaToken: string,
+    code: string,
+    method: MFAMethod,
+  ) => Promise<void>;
   completeAuth: (response: AuthResponse) => Promise<User>;
   logout: () => void;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined,
+);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const isInitialized = useRef(false);
   const currentUserMutation = $api.useMutation("get", "/api/v1/auth/me");
@@ -85,7 +107,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const refreshRes = await refreshMutation.mutateAsync({
               body: { refreshToken },
             });
-            const refreshData = refreshRes as ApiResult<AuthResponse> | undefined;
+            const refreshData = refreshRes as
+              | ApiResult<AuthResponse>
+              | undefined;
             if (refreshData?.code === 0 && refreshData?.data) {
               await completeAuth(refreshData.data);
               isInitialized.current = true;
@@ -98,17 +122,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 3. Everything failed
         removeToken();
-        dispatch({ type: "AUTH_FAILURE", payload: "auth.errors.sessionExpired" });
+        dispatch({
+          type: "AUTH_FAILURE",
+          payload: "auth.errors.sessionExpired",
+        });
       } catch (error) {
         console.error("Auth initialization failed:", error);
         removeToken();
-        dispatch({ type: "AUTH_FAILURE", payload: "auth.errors.authenticationFailed" });
+        dispatch({
+          type: "AUTH_FAILURE",
+          payload: "auth.errors.authenticationFailed",
+        });
       } finally {
         isInitialized.current = true;
       }
     };
 
-    initAuth();
+    void initAuth();
   }, []);
 
   useEffect(() => {
@@ -126,7 +156,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [state.isAuthenticated]);
 
-  const login = async (username: string, password: string): Promise<LoginResult> => {
+  const login = async (
+    username: string,
+    password: string,
+  ): Promise<LoginResult> => {
     dispatch({ type: "AUTH_START" });
     try {
       const response = await loginMutation.mutateAsync({
@@ -134,7 +167,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       const responseData = response as ApiResult<AuthResponse> | undefined;
       if (responseData?.code === 0 && responseData?.data) {
-        const { requires_mfa, mfa_token, mfa_methods, user } = responseData.data;
+        const { requires_mfa, mfa_token, mfa_methods, user } =
+          responseData.data;
         if (requires_mfa && mfa_token) {
           dispatch({ type: "AUTH_IDLE" });
           return {
@@ -167,7 +201,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const verifyMFA = async (mfaToken: string, code: string, method: MFAMethod) => {
+  const verifyMFA = async (
+    mfaToken: string,
+    code: string,
+    method: MFAMethod,
+  ) => {
     dispatch({ type: "AUTH_START" });
     try {
       const response = await verifyMFAMutation.mutateAsync({
