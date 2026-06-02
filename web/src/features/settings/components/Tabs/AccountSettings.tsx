@@ -22,10 +22,7 @@ import {
   usePasskeys,
   useVerifyPasskeyEnrollment,
 } from "@/features/auth/hooks/usePasskeys.ts";
-import {
-  createPasskeyCredential,
-  getPasskeySupport,
-} from "@/features/auth/lib/webauthn.ts";
+import { createPasskeyCredential, getPasskeySupport } from "@/features/auth/lib/webauthn.ts";
 import {
   DISPLAY_NAME_HINT,
   DISPLAY_NAME_MAX_LENGTH,
@@ -58,10 +55,7 @@ const PERMISSION_KEYS = [
   "manage_own_profile",
 ] as const;
 
-function getPermissionLabel(
-  key: string,
-  t: ReturnType<typeof useI18n>["t"],
-): string {
+function getPermissionLabel(key: string, t: ReturnType<typeof useI18n>["t"]): string {
   const labels: Record<string, string> = {
     manage_users: t("settings.account.permissions.manage_users.label", {
       defaultValue: "Manage Users",
@@ -72,78 +66,45 @@ function getPermissionLabel(
     view_all_assets: t("settings.account.permissions.view_all_assets.label", {
       defaultValue: "View All Assets",
     }),
-    manage_all_assets: t(
-      "settings.account.permissions.manage_all_assets.label",
-      {
-        defaultValue: "Manage All Assets",
-      },
-    ),
+    manage_all_assets: t("settings.account.permissions.manage_all_assets.label", {
+      defaultValue: "Manage All Assets",
+    }),
     view_own_assets: t("settings.account.permissions.view_own_assets.label", {
       defaultValue: "View Own Assets",
     }),
-    manage_own_assets: t(
-      "settings.account.permissions.manage_own_assets.label",
-      {
-        defaultValue: "Manage Own Assets",
-      },
-    ),
-    manage_own_profile: t(
-      "settings.account.permissions.manage_own_profile.label",
-      {
-        defaultValue: "Manage Own Profile",
-      },
-    ),
+    manage_own_assets: t("settings.account.permissions.manage_own_assets.label", {
+      defaultValue: "Manage Own Assets",
+    }),
+    manage_own_profile: t("settings.account.permissions.manage_own_profile.label", {
+      defaultValue: "Manage Own Profile",
+    }),
   };
-  return (
-    labels[key] ??
-    key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-  );
+  return labels[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
 }
 
-function getPermissionDescription(
-  key: string,
-  t: ReturnType<typeof useI18n>["t"],
-): string {
+function getPermissionDescription(key: string, t: ReturnType<typeof useI18n>["t"]): string {
   const descriptions: Record<string, string> = {
     manage_users: t("settings.account.permissions.manage_users.description", {
       defaultValue: "",
     }),
-    manage_settings: t(
-      "settings.account.permissions.manage_settings.description",
-      {
-        defaultValue: "",
-      },
-    ),
-    view_all_assets: t(
-      "settings.account.permissions.view_all_assets.description",
-      {
-        defaultValue: "",
-      },
-    ),
-    manage_all_assets: t(
-      "settings.account.permissions.manage_all_assets.description",
-      {
-        defaultValue: "",
-      },
-    ),
-    view_own_assets: t(
-      "settings.account.permissions.view_own_assets.description",
-      {
-        defaultValue: "",
-      },
-    ),
-    manage_own_assets: t(
-      "settings.account.permissions.manage_own_assets.description",
-      {
-        defaultValue: "",
-      },
-    ),
-    manage_own_profile: t(
-      "settings.account.permissions.manage_own_profile.description",
-      {
-        defaultValue: "",
-      },
-    ),
+    manage_settings: t("settings.account.permissions.manage_settings.description", {
+      defaultValue: "",
+    }),
+    view_all_assets: t("settings.account.permissions.view_all_assets.description", {
+      defaultValue: "",
+    }),
+    manage_all_assets: t("settings.account.permissions.manage_all_assets.description", {
+      defaultValue: "",
+    }),
+    view_own_assets: t("settings.account.permissions.view_own_assets.description", {
+      defaultValue: "",
+    }),
+    manage_own_assets: t("settings.account.permissions.manage_own_assets.description", {
+      defaultValue: "",
+    }),
+    manage_own_profile: t("settings.account.permissions.manage_own_profile.description", {
+      defaultValue: "",
+    }),
   };
   return descriptions[key] ?? "";
 }
@@ -181,18 +142,12 @@ function PermissionsModal({
 
   // Include any permissions the user has that aren't in our known list
   const extraPermissions = useMemo(
-    () =>
-      permissions.filter(
-        (p) => !(PERMISSION_KEYS as readonly string[]).includes(p),
-      ),
+    () => permissions.filter((p) => !(PERMISSION_KEYS as readonly string[]).includes(p)),
     [permissions],
   );
 
   return (
-    <dialog
-      id="permissions_modal"
-      className="modal modal-bottom sm:modal-middle"
-    >
+    <dialog id="permissions_modal" className="modal modal-bottom sm:modal-middle">
       <div className="modal-box max-w-lg">
         <form method="dialog">
           <button className="btn btn-sm btn-circle btn-ghost absolute right-3 top-3">
@@ -207,15 +162,12 @@ function PermissionsModal({
         </h3>
         <p className="mt-1 text-sm text-base-content/70">
           {t("settings.account.permissionsSubtitle", {
-            defaultValue:
-              "Permissions assigned to your account based on your role.",
+            defaultValue: "Permissions assigned to your account based on your role.",
           })}
         </p>
 
         <div className="mt-1 mb-4">
-          <span className="badge badge-primary badge-sm">
-            {role.toUpperCase()}
-          </span>
+          <span className="badge badge-primary badge-sm">{role.toUpperCase()}</span>
         </div>
 
         <div className="divide-y divide-base-200">
@@ -225,9 +177,7 @@ function PermissionsModal({
               <div key={key} className="flex items-center gap-3 py-3">
                 <div
                   className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                    granted
-                      ? "bg-success/15 text-success"
-                      : "bg-base-200 text-base-content/30"
+                    granted ? "bg-success/15 text-success" : "bg-base-200 text-base-content/30"
                   }`}
                 >
                   {granted ? (
@@ -260,9 +210,7 @@ function PermissionsModal({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-base-content">
-                  {perm
-                    .replace(/_/g, " ")
-                    .replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {perm.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                 </div>
                 <div className="text-xs text-base-content/60">
                   {t("settings.account.permissions.customPermission", {
@@ -276,9 +224,7 @@ function PermissionsModal({
 
         <div className="modal-action">
           <form method="dialog">
-            <button className="btn btn-sm">
-              {t("common.close", { defaultValue: "Close" })}
-            </button>
+            <button className="btn btn-sm">{t("common.close", { defaultValue: "Close" })}</button>
           </form>
         </div>
       </div>
@@ -317,9 +263,7 @@ function SecurityLinkCard({
         <div className="flex items-center gap-2.5">
           <span className="font-semibold text-base-content">{title}</span>
           {badge && (
-            <span className={`badge badge-sm ${badgeClass ?? "badge-ghost"}`}>
-              {badge}
-            </span>
+            <span className={`badge badge-sm ${badgeClass ?? "badge-ghost"}`}>{badge}</span>
           )}
         </div>
         <p className="mt-0.5 text-sm text-base-content/70">{description}</p>
@@ -335,6 +279,7 @@ function PasskeysModal({
   passkeySupport,
   passkeyBusy,
   deleteIsPending,
+  totpEnabled,
   onAdd,
   onDelete,
   feedback,
@@ -352,6 +297,7 @@ function PasskeysModal({
   };
   passkeyBusy: boolean;
   deleteIsPending: boolean;
+  totpEnabled: boolean;
   onAdd: () => void;
   onDelete: (id: number) => void;
   feedback: FeedbackState;
@@ -379,8 +325,7 @@ function PasskeysModal({
             </h3>
             <p className="text-sm text-base-content/60">
               {t("settings.account.mfa.enrolledPasskeysHint", {
-                defaultValue:
-                  "Manage the passkey credentials registered to this account.",
+                defaultValue: "Manage the passkey credentials registered to this account.",
               })}
             </p>
           </div>
@@ -432,9 +377,7 @@ function PasskeysModal({
                 className="flex items-center justify-between gap-3 rounded-2xl border border-base-300 bg-base-200/30 px-4 py-3"
               >
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-base-content">
-                    {passkey.label}
-                  </div>
+                  <div className="text-sm font-semibold text-base-content">{passkey.label}</div>
                   <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-base-content/55">
                     <span>
                       {t("settings.account.mfa.passkeyCreated", {
@@ -466,12 +409,22 @@ function PasskeysModal({
           )}
         </div>
 
+        {/* TOTP prerequisite notice */}
+        {passkeySupport.supported && !totpEnabled && (
+          <p className="mt-2 text-xs text-base-content/55">
+            {t("settings.account.mfa.passkeyRequiresTotp", {
+              defaultValue:
+                "Enable an authenticator app (TOTP) first — a passkey can only be added on top of it.",
+            })}
+          </p>
+        )}
+
         {/* Actions */}
         <div className="modal-action">
           <button
             type="button"
             className={`btn btn-primary btn-sm gap-1.5 ${passkeyBusy ? "loading" : ""}`}
-            disabled={!passkeySupport.supported || passkeyBusy}
+            disabled={!passkeySupport.supported || !totpEnabled || passkeyBusy}
             onClick={onAdd}
           >
             <Plus className="size-4" />
@@ -516,9 +469,7 @@ export default function AccountSettings() {
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
 
   const openPasskeysModal = () => {
-    const modal = document.getElementById(
-      "passkeys_modal",
-    ) as HTMLDialogElement | null;
+    const modal = document.getElementById("passkeys_modal") as HTMLDialogElement | null;
     modal?.showModal();
   };
 
@@ -542,8 +493,7 @@ export default function AccountSettings() {
   const mfaStatus = mfaStatusQuery.data?.data;
   const effectiveAvatarAssetId = avatarAssetId || undefined;
   const isDirty =
-    displayName !== (user.display_name ?? "") ||
-    avatarAssetId !== (user.avatar_asset_id ?? "");
+    displayName !== (user.display_name ?? "") || avatarAssetId !== (user.avatar_asset_id ?? "");
   const passkeys = passkeysQuery.passkeys;
   const passkeyBusy =
     beginPasskeyEnrollment.isPending ||
@@ -564,9 +514,7 @@ export default function AccountSettings() {
     });
   };
 
-  const handleProfileSubmit = async (
-    event: React.FormEvent<HTMLFormElement>,
-  ) => {
+  const handleProfileSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setProfileFeedback(null);
 
@@ -611,14 +559,10 @@ export default function AccountSettings() {
         | ApiResult<Schemas["dto.PasskeyOptionsResponseDTO"]>
         | undefined;
       if (!optionsPayload?.data) {
-        throw new Error(
-          optionsPayload?.message || "Failed to start passkey enrollment.",
-        );
+        throw new Error(optionsPayload?.message || "Failed to start passkey enrollment.");
       }
 
-      const credential = await createPasskeyCredential(
-        optionsPayload.data.options,
-      );
+      const credential = await createPasskeyCredential(optionsPayload.data.options);
       await verifyPasskeyEnrollment.mutateAsync({
         body: {
           challenge_token: optionsPayload.data.challenge_token,
@@ -674,9 +618,7 @@ export default function AccountSettings() {
   };
 
   const openPermissionsModal = () => {
-    const modal = document.getElementById(
-      "permissions_modal",
-    ) as HTMLDialogElement | null;
+    const modal = document.getElementById("permissions_modal") as HTMLDialogElement | null;
     modal?.showModal();
   };
 
@@ -713,12 +655,8 @@ export default function AccountSettings() {
 
             {/* Name + username */}
             <div className="space-y-0.5">
-              <div className="text-lg font-semibold text-base-content">
-                {resolvedName}
-              </div>
-              <div className="text-sm text-base-content/60">
-                @{user.username}
-              </div>
+              <div className="text-lg font-semibold text-base-content">{resolvedName}</div>
+              <div className="text-sm text-base-content/60">@{user.username}</div>
             </div>
 
             {/* Role badge + View permissions */}
@@ -931,8 +869,7 @@ export default function AccountSettings() {
         </div>
         <p className="text-sm text-base-content/70">
           {t("settings.account.securityDescription", {
-            defaultValue:
-              "Manage your password, authentication methods, and sign-in factors.",
+            defaultValue: "Manage your password, authentication methods, and sign-in factors.",
           })}
         </p>
       </div>
@@ -946,8 +883,7 @@ export default function AccountSettings() {
             defaultValue: "Password",
           })}
           description={t("settings.account.passwordDescription", {
-            defaultValue:
-              "Change your account password. You will be signed out afterwards.",
+            defaultValue: "Change your account password. You will be signed out afterwards.",
           })}
           onClick={handleChangePassword}
         />
@@ -962,8 +898,7 @@ export default function AccountSettings() {
             mfaStatus?.totp_enabled
               ? `${mfaStatus.recovery_codes_remaining ?? 0} ${t("settings.account.mfa.recoveryRemaining", { defaultValue: "recovery codes remaining" })}`
               : t("settings.account.mfa.notConfigured", {
-                  defaultValue:
-                    "Not configured yet. Secure your account with TOTP.",
+                  defaultValue: "Not configured yet. Secure your account with TOTP.",
                 })
           }
           badge={
@@ -975,11 +910,7 @@ export default function AccountSettings() {
                   defaultValue: "Disabled",
                 })
           }
-          badgeClass={
-            mfaStatus?.totp_enabled
-              ? "badge-success badge-outline"
-              : "badge-ghost"
-          }
+          badgeClass={mfaStatus?.totp_enabled ? "badge-success badge-outline" : "badge-ghost"}
           onClick={handleMFAToggle}
         />
 
@@ -992,8 +923,7 @@ export default function AccountSettings() {
           description={
             passkeySupport.supported
               ? t("settings.account.mfa.passkeyDescription", {
-                  defaultValue:
-                    "Use your device's native passkey flow for sign-in.",
+                  defaultValue: "Use your device's native passkey flow for sign-in.",
                 })
               : passkeySupport.reasonKey
                 ? t(passkeySupport.reasonKey)
@@ -1006,19 +936,13 @@ export default function AccountSettings() {
                   defaultValue: "Not enrolled",
                 })
           }
-          badgeClass={
-            passkeys.length > 0 ? "badge-success badge-outline" : "badge-ghost"
-          }
+          badgeClass={passkeys.length > 0 ? "badge-success badge-outline" : "badge-ghost"}
           onClick={openPasskeysModal}
         />
       </div>
 
       {/* Permissions modal */}
-      <PermissionsModal
-        permissions={user.permissions ?? []}
-        role={user.role ?? "user"}
-        t={t}
-      />
+      <PermissionsModal permissions={user.permissions ?? []} role={user.role ?? "user"} t={t} />
 
       {/* Passkeys modal */}
       <PasskeysModal
@@ -1027,6 +951,7 @@ export default function AccountSettings() {
         passkeySupport={passkeySupport}
         passkeyBusy={passkeyBusy}
         deleteIsPending={deletePasskeyMutation.isPending}
+        totpEnabled={mfaStatus?.totp_enabled ?? false}
         onAdd={() => void handleAddPasskey()}
         onDelete={(id) => void handleDeletePasskey(id)}
         feedback={securityFeedback}

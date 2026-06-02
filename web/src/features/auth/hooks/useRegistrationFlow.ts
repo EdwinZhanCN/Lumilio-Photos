@@ -1,13 +1,5 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type RefObject,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import QRCode from "qrcode";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -17,9 +9,8 @@ import type {
   ApiResult,
   AuthResponse,
   PasskeyOptionsResponse,
-  RegistrationStartResponse,
-  RegistrationTOTPCompleteResponse,
-  RegistrationTOTPSetupResponse,
+  RecoveryCodesResponse,
+  TOTPSetupResponse,
 } from "../auth.type.ts";
 import { createPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
 
@@ -31,15 +22,7 @@ type AuthRedirectState = {
   };
 };
 
-export type RegistrationFlowStep =
-  | "credentials"
-  | "choose"
-  | "totp"
-  | "recovery";
-
-type RegistrationFlow = {
-  sessionId: string;
-};
+export type RegistrationFlowStep = "credentials" | "totp" | "passkey" | "recovery";
 
 type RegistrationFlowState = {
   step: RegistrationFlowStep;
@@ -51,18 +34,18 @@ type RegistrationFlowState = {
   setConfirmPassword: (value: string) => void;
   confirmPasswordRef: RefObject<HTMLInputElement | null>;
   confirmPasswordMessage: string;
-  capabilityMessage: string | null;
-  totpSetup: RegistrationTOTPSetupResponse | null;
+  passkeySupported: boolean;
+  totpSetup: TOTPSetupResponse | null;
   totpCode: string;
   setTotpCode: (value: string) => void;
   recoveryCodes: string[];
-  qrCodeDataURL: string | null;
   displayError: string | null;
   isBusy: boolean;
   handleStartRegistration: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  handleCreatePasskey: () => Promise<void>;
-  handleUseAuthenticatorApp: () => Promise<void>;
   handleCompleteTotp: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  handleSkipTotp: () => void;
+  handleCreatePasskey: () => Promise<void>;
+  handleSkipPasskey: () => void;
   handleFinish: () => void;
 };
 
@@ -81,50 +64,27 @@ function getApiMessage(error: unknown, fallback: string): string {
 export function useRegistrationFlow(): RegistrationFlowState {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const {
-    completeAuth,
-    isAuthenticated,
-    isLoading,
-    error: authError,
-  } = useAuth();
-  const startRegistrationMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/register/start",
-  );
-  const passkeyOptionsMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/passkeys/register/options",
-  );
-  const passkeyVerifyMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/passkeys/register/verify",
-  );
-  const totpSetupMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/register/totp/setup",
-  );
-  const totpCompleteMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/register/totp/complete",
-  );
+  const { completeAuth, isAuthenticated } = useAuth();
+  const registerMutation = $api.useMutation("post", "/api/v1/auth/register/start");
+  const totpSetupMutation = $api.useMutation("post", "/api/v1/auth/mfa/totp/setup");
+  const totpEnableMutation = $api.useMutation("post", "/api/v1/auth/mfa/totp/enable");
+  const passkeyOptionsMutation = $api.useMutation("post", "/api/v1/auth/mfa/passkeys/options");
+  const passkeyVerifyMutation = $api.useMutation("post", "/api/v1/auth/mfa/passkeys/verify");
   const location = useLocation();
   const navigate = useNavigate();
   const confirmPasswordRef = useRef<HTMLInputElement | null>(null);
+  // Set once the account is created so the redirect effect doesn't bounce the
+  // freshly-registered (now authenticated) user out of the optional MFA steps.
+  const startedRef = useRef(false);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [step, setStep] = useState<RegistrationFlowStep>("credentials");
-  const [flow, setFlow] = useState<RegistrationFlow | null>(null);
   const [flowError, setFlowError] = useState<string | null>(null);
-  const [capabilityMessage, setCapabilityMessage] = useState<string | null>(
-    null,
-  );
-  const [totpSetup, setTotpSetup] =
-    useState<RegistrationTOTPSetupResponse | null>(null);
+  const [totpSetup, setTotpSetup] = useState<TOTPSetupResponse | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [qrCodeDataURL, setQrCodeDataURL] = useState<string | null>(null);
 
   const redirectTo = useMemo(() => {
     const from = (location.state as AuthRedirectState | null)?.from;
@@ -133,20 +93,16 @@ export function useRegistrationFlow(): RegistrationFlowState {
   }, [location.state]);
 
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
-  const passkeySupportReason = passkeySupport.reasonKey
-    ? t(passkeySupport.reasonKey)
-    : null;
   const confirmPasswordMessage = t("auth.register.confirmPasswordHint", {
     defaultValue: "Passwords must match exactly.",
   });
-  const displayError = flowError ?? authError;
+  const displayError = flowError;
   const isBusy =
-    isLoading ||
-    startRegistrationMutation.isPending ||
-    passkeyOptionsMutation.isPending ||
-    passkeyVerifyMutation.isPending ||
+    registerMutation.isPending ||
     totpSetupMutation.isPending ||
-    totpCompleteMutation.isPending;
+    totpEnableMutation.isPending ||
+    passkeyOptionsMutation.isPending ||
+    passkeyVerifyMutation.isPending;
 
   useEffect(() => {
     const input = confirmPasswordRef.current;
@@ -161,207 +117,106 @@ export function useRegistrationFlow(): RegistrationFlowState {
   }, [confirmPassword, confirmPasswordMessage, password]);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && step !== "recovery") {
+    // Bounce already-authenticated visitors away — but not the user who just
+    // registered and is now stepping through the optional MFA setup.
+    if (isAuthenticated && !startedRef.current) {
       void navigate(redirectTo, { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate, redirectTo, step]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const otpauthURI = totpSetup?.otpauth_uri;
-    if (!otpauthURI) {
-      setQrCodeDataURL(null);
-      return undefined;
-    }
-
-    QRCode.toDataURL(otpauthURI, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 224,
-      color: {
-        dark: "#111827",
-        light: "#ffffff",
-      },
-    })
-      .then((dataURL: string) => {
-        if (!cancelled) {
-          setQrCodeDataURL(dataURL);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setQrCodeDataURL(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [totpSetup?.otpauth_uri]);
-
-  const startTotpSetup = async (sessionId: string) => {
-    const setupResponse = await totpSetupMutation.mutateAsync({
-      body: {
-        registration_session_id: sessionId,
-      },
-    });
-    const payload = setupResponse as
-      | ApiResult<RegistrationTOTPSetupResponse>
-      | undefined;
-    if (!payload?.data) {
-      throw new Error(
-        payload?.message || t("auth.register.totpSetupStartError"),
-      );
-    }
-
-    setTotpSetup(payload.data);
-    setTotpCode("");
-    setStep("totp");
-  };
+  }, [isAuthenticated, navigate, redirectTo]);
 
   const handleStartRegistration = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFlowError(null);
 
-    if (
-      confirmPasswordRef.current &&
-      !confirmPasswordRef.current.checkValidity()
-    ) {
+    if (confirmPasswordRef.current && !confirmPasswordRef.current.checkValidity()) {
       confirmPasswordRef.current.reportValidity();
       return;
     }
 
     try {
-      const response = await startRegistrationMutation.mutateAsync({
-        body: {
-          username,
-          password,
-        },
+      const response = await registerMutation.mutateAsync({
+        body: { username, password },
       });
-      const payload = response as
-        | ApiResult<RegistrationStartResponse>
-        | undefined;
+      const payload = response as ApiResult<AuthResponse> | undefined;
       if (!payload?.data) {
         throw new Error(payload?.message || t("auth.register.startError"));
       }
 
-      const nextFlow = {
-        sessionId: payload.data.registration_session_id ?? "",
-      };
-      setFlow(nextFlow);
+      // Account exists and is logged in. MFA is offered next but fully optional;
+      // TOTP comes first because a passkey may only be added once TOTP is on.
+      startedRef.current = true;
+      await completeAuth(payload.data);
+      await queryClient.invalidateQueries({ queryKey: bootstrapStatusQueryKey });
 
-      if (passkeySupport.supported) {
-        setCapabilityMessage(null);
-        setStep("choose");
-        return;
+      const setupResponse = await totpSetupMutation.mutateAsync({});
+      const setupPayload = setupResponse as ApiResult<TOTPSetupResponse> | undefined;
+      if (!setupPayload?.data) {
+        throw new Error(setupPayload?.message || t("auth.register.totpSetupStartError"));
       }
-
-      setCapabilityMessage(
-        passkeySupportReason || t("auth.register.passkeyUnavailableUseTotp"),
-      );
-      await startTotpSetup(nextFlow.sessionId);
+      setTotpSetup(setupPayload.data);
+      setTotpCode("");
+      setStep("totp");
     } catch (registrationError) {
-      setFlowError(
-        getApiMessage(registrationError, t("auth.register.startError")),
-      );
-    }
-  };
-
-  const handleCreatePasskey = async () => {
-    if (!flow) return;
-    setFlowError(null);
-
-    try {
-      const optionsResponse = await passkeyOptionsMutation.mutateAsync({
-        body: {
-          registration_session_id: flow.sessionId,
-        },
-      });
-      const optionsData = optionsResponse as
-        | ApiResult<PasskeyOptionsResponse>
-        | undefined;
-      if (!optionsData?.data) {
-        throw new Error(
-          optionsData?.message || t("auth.register.passkeyStartError"),
-        );
-      }
-
-      const credential = await createPasskeyCredential(
-        optionsData.data.options,
-      );
-      const verifyResponse = await passkeyVerifyMutation.mutateAsync({
-        body: {
-          registration_session_id: flow.sessionId,
-          challenge_token: optionsData.data.challenge_token,
-          credential,
-        },
-      });
-      const verifyData = verifyResponse as ApiResult<AuthResponse> | undefined;
-      if (!verifyData?.data) {
-        throw new Error(
-          verifyData?.message || t("auth.register.passkeyVerifyError"),
-        );
-      }
-
-      await completeAuth(verifyData.data);
-      await queryClient.invalidateQueries({
-        queryKey: bootstrapStatusQueryKey,
-      });
-      void navigate(redirectTo, { replace: true });
-    } catch (passkeyError) {
-      setFlowError(
-        getApiMessage(passkeyError, t("auth.register.passkeyVerifyError")),
-      );
-    }
-  };
-
-  const handleUseAuthenticatorApp = async () => {
-    if (!flow) return;
-    setFlowError(null);
-
-    try {
-      await startTotpSetup(flow.sessionId);
-    } catch (totpError) {
-      setFlowError(
-        getApiMessage(totpError, t("auth.register.totpSetupStartError")),
-      );
+      setFlowError(getApiMessage(registrationError, t("auth.register.startError")));
     }
   };
 
   const handleCompleteTotp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!flow) return;
-
+    if (!totpSetup) return;
     setFlowError(null);
 
     try {
-      const response = await totpCompleteMutation.mutateAsync({
+      const response = await totpEnableMutation.mutateAsync({
         body: {
-          registration_session_id: flow.sessionId,
+          setup_token: totpSetup.setup_token,
           code: totpCode,
         },
       });
-      const payload = response as
-        | ApiResult<RegistrationTOTPCompleteResponse>
-        | undefined;
-      if (!payload?.data?.auth) {
-        throw new Error(
-          payload?.message || t("auth.register.totpSetupCompleteError"),
-        );
+      const payload = response as ApiResult<RecoveryCodesResponse> | undefined;
+      if (!payload?.data) {
+        throw new Error(payload?.message || t("auth.register.totpSetupCompleteError"));
       }
 
-      await completeAuth(payload.data.auth);
-      await queryClient.invalidateQueries({
-        queryKey: bootstrapStatusQueryKey,
-      });
       setRecoveryCodes(payload.data.recovery_codes ?? []);
-      setStep("recovery");
+      // TOTP is now enabled, so a passkey may be offered as the next option.
+      setStep(passkeySupport.supported ? "passkey" : "recovery");
     } catch (totpError) {
-      setFlowError(
-        getApiMessage(totpError, t("auth.register.totpSetupCompleteError")),
-      );
+      setTotpCode("");
+      setFlowError(getApiMessage(totpError, t("auth.register.totpSetupCompleteError")));
     }
+  };
+
+  // Skipping TOTP skips all MFA — the account stays password-only.
+  const handleSkipTotp = () => {
+    void navigate(redirectTo, { replace: true });
+  };
+
+  const handleCreatePasskey = async () => {
+    setFlowError(null);
+    try {
+      const optionsResponse = await passkeyOptionsMutation.mutateAsync({});
+      const optionsData = optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
+      if (!optionsData?.data) {
+        throw new Error(optionsData?.message || t("auth.register.passkeyStartError"));
+      }
+
+      const credential = await createPasskeyCredential(optionsData.data.options);
+      await passkeyVerifyMutation.mutateAsync({
+        body: {
+          challenge_token: optionsData.data.challenge_token,
+          credential,
+        },
+      });
+
+      setStep("recovery");
+    } catch (passkeyError) {
+      setFlowError(getApiMessage(passkeyError, t("auth.register.passkeyVerifyError")));
+    }
+  };
+
+  const handleSkipPasskey = () => {
+    setStep("recovery");
   };
 
   const handleFinish = () => {
@@ -378,18 +233,18 @@ export function useRegistrationFlow(): RegistrationFlowState {
     setConfirmPassword,
     confirmPasswordRef,
     confirmPasswordMessage,
-    capabilityMessage,
+    passkeySupported: passkeySupport.supported,
     totpSetup,
     totpCode,
     setTotpCode,
     recoveryCodes,
-    qrCodeDataURL,
     displayError,
     isBusy,
     handleStartRegistration,
-    handleCreatePasskey,
-    handleUseAuthenticatorApp,
     handleCompleteTotp,
+    handleSkipTotp,
+    handleCreatePasskey,
+    handleSkipPasskey,
     handleFinish,
   };
 }
