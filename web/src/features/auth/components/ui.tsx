@@ -634,57 +634,73 @@ export const Stepper: React.FC<{ steps: StepperStep[]; current: number }> = ({
 
 /* --------------------------------------------------- passkey affordance --- */
 
+const PASSKEY_METHODS: Array<[LucideIcon, string, string]> = [
+  [ScanFace, "auth.passkey.affordance.method.face", "Face"],
+  [Fingerprint, "auth.passkey.affordance.method.touch", "Touch"],
+  [KeyRound, "auth.passkey.affordance.method.security_key", "Security key"],
+];
+
 export const PasskeyAffordance: React.FC<{
   created?: boolean;
   headline?: string;
   description?: string;
   activeLabel?: string;
-}> = ({
-  created = false,
-  headline = "Sign in with your face or fingerprint",
-  description = "No password to remember. Your passkey stays on this device and can’t be phished.",
-  activeLabel = "Passkey active",
-}) => (
-  <>
-    <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-base-300 bg-base-200/40 px-5 py-7 text-center">
-      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-base-100 shadow-sm">
+}> = ({ created = false, headline, description, activeLabel }) => {
+  const { t } = useI18n();
+  const resolvedHeadline =
+    headline ??
+    t("auth.register.passkeyHeadline", {
+      defaultValue: "Sign in with your face or fingerprint",
+    });
+  const resolvedDescription =
+    description ??
+    t("auth.register.passkeyDescription", {
+      defaultValue:
+        "No password to remember. Your passkey stays on this device and can’t be phished.",
+    });
+  const resolvedActiveLabel =
+    activeLabel ??
+    t("auth.passkey.affordance.activeLabel", {
+      defaultValue: "Passkey active",
+    });
+
+  return (
+    <>
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-base-300 bg-base-200/40 px-5 py-7 text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-base-100 shadow-sm">
+          {created ? (
+            <Check size={30} className="text-success" />
+          ) : (
+            <Fingerprint size={30} className="text-base-content" />
+          )}
+        </div>
         {created ? (
-          <Check size={30} className="text-success" />
+          <p className="font-medium text-base-content">{resolvedActiveLabel}</p>
         ) : (
-          <Fingerprint size={30} className="text-base-content" />
+          <div className="space-y-1">
+            <p className="font-medium text-base-content">{resolvedHeadline}</p>
+            <p className="text-sm leading-relaxed text-base-content/55">
+              {resolvedDescription}
+            </p>
+          </div>
         )}
       </div>
-      {created ? (
-        <p className="font-medium text-base-content">{activeLabel}</p>
-      ) : (
-        <div className="space-y-1">
-          <p className="font-medium text-base-content">{headline}</p>
-          <p className="text-sm leading-relaxed text-base-content/55">
-            {description}
-          </p>
+      {!created && (
+        <div className="grid grid-cols-3 gap-2">
+          {PASSKEY_METHODS.map(([Icon, key, fallback]) => (
+            <div
+              key={key}
+              className="flex flex-col items-center gap-1.5 rounded-xl border border-base-200 py-3 text-xs text-base-content/55"
+            >
+              <Icon size={18} className="text-base-content/45" />{" "}
+              {t(key, { defaultValue: fallback })}
+            </div>
+          ))}
         </div>
       )}
-    </div>
-    {!created && (
-      <div className="grid grid-cols-3 gap-2">
-        {(
-          [
-            [ScanFace, "Face"],
-            [Fingerprint, "Touch"],
-            [KeyRound, "Security key"],
-          ] as Array<[LucideIcon, string]>
-        ).map(([Icon, t]) => (
-          <div
-            key={t}
-            className="flex flex-col items-center gap-1.5 rounded-xl border border-base-200 py-3 text-xs text-base-content/55"
-          >
-            <Icon size={18} className="text-base-content/45" /> {t}
-          </div>
-        ))}
-      </div>
-    )}
-  </>
-);
+    </>
+  );
+};
 
 /* ------------------------------------------------------ recovery panel --- */
 

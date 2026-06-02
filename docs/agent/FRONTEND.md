@@ -44,6 +44,13 @@ vp lint
 vp test
 ```
 
+For i18n (internationalization), every string literal should be extractable via `i18next-cli`. After changes, run following commands to extract and check translations:
+
+```bash
+vp exec i18next-cli extract
+vp exec i18next-cli status
+```
+
 ## Source Layout
 
 - `src/features/*`: domain features and routes.

@@ -411,6 +411,11 @@
       "pageSubtitle": "Use a TOTP app to manage sign-in verification, recovery codes, and account security from one dedicated page.",
       "pageTitle": "Manage your authenticator setup"
     },
+    "passkey": {
+      "affordance": {
+        "activeLabel": "Passkey active"
+      }
+    },
     "register": {
       "confirmPassword": "Confirm password",
       "confirmPasswordHint": "Passwords must match exactly.",
@@ -1164,50 +1169,6 @@
     },
     "language": "Language",
     "languageAndRegion": "Language & Region",
-    "performance": "Performance",
-    "performanceSettings": {
-      "advancedDescription": "Configure detailed performance parameters.",
-      "advancedTitle": "Advanced controls",
-      "availableMemory": "Available memory",
-      "changesApply": "Changes take effect immediately for new processing operations.",
-      "cpuCores": "CPU cores",
-      "currentProfile": "Current profile",
-      "description": "Configure local processing performance.",
-      "deviceType": "Device type",
-      "deviceTypeValues": {
-        "desktop": "Desktop",
-        "lowEnd": "Low-end",
-        "mobile": "Mobile"
-      },
-      "maxConcurrency": "Max concurrency",
-      "maxConcurrentOperations": "Max concurrent operations",
-      "maxConcurrentOperationsDescription": "Maximum number of heavy processing jobs the browser may run at once.",
-      "prioritizeUserOperations": "Prioritize user operations",
-      "prioritizeUserOperationsDescription": "Prioritize operations related to active user interactions.",
-      "profileDescription": "Select the default profile for concurrency and memory usage.",
-      "profiles": {
-        "adaptive": {
-          "description": "Adjust processing behavior based on detected device capabilities.",
-          "label": "Adaptive"
-        },
-        "balanced": {
-          "description": "Balance processing speed and memory usage.",
-          "label": "Balanced"
-        },
-        "memory_saver": {
-          "description": "Reduce memory usage and processing concurrency.",
-          "label": "Memory Saver"
-        },
-        "speed": {
-          "description": "Increase concurrency to favor processing speed.",
-          "label": "Speed Optimized"
-        }
-      },
-      "profileTitle": "Performance profile",
-      "reset": "Reset to defaults",
-      "respectMemoryLimits": "Respect memory limits",
-      "respectMemoryLimitsDescription": "Reduce processing intensity when available memory is limited."
-    },
     "region": "Region",
     "regionOptions": {
       "china": "China Mainland",
@@ -1252,31 +1213,6 @@
       "workingRepositoryUnavailable": "Repository options are temporarily unavailable."
     },
     "title": "Settings",
-    "upload": "Upload",
-    "uploadSettings": {
-      "advancedDescription": "Configure local upload parameters.",
-      "advancedDisabledHint": "These fields are unavailable while server-managed upload configuration is enabled.",
-      "advancedTitle": "Advanced local overrides",
-      "basicDescription": "Configure upload limits and default behavior.",
-      "basicTitle": "Basic controls",
-      "chunkSize": "Chunk size",
-      "chunkSizeDescription": "Per-file chunk size used by the browser uploader.",
-      "chunkSizeUnit": "MB",
-      "controlModeDescription": "Select the source used for upload chunk size and concurrency.",
-      "controlModeTitle": "Upload tuning source",
-      "description": "Configure upload settings for this browser.",
-      "localMode": "Local overrides",
-      "localModeHint": "Chunk size and concurrency use locally configured values.",
-      "lowPowerMode": "Low power mode",
-      "lowPowerModeDescription": "Use more conservative defaults to reduce CPU and memory usage during uploads.",
-      "maxConcurrentChunks": "Max concurrent chunks",
-      "maxConcurrentChunksDescription": "Number of chunk uploads the browser may run in parallel for each file.",
-      "maxTotalFiles": "Max total files",
-      "maxTotalFilesDescription": "Maximum number of files you can add to one upload batch.",
-      "recommended": "Recommended",
-      "serverMode": "Server managed",
-      "serverModeHint": "Chunk size and concurrency use backend recommendations. Local advanced values remain saved but inactive."
-    },
     "users": {
       "active": "Active",
       "adminOnly": "Only administrators can manage users.",
@@ -1452,12 +1388,10 @@
     "UnifiedUploadSection": {
       "add_files_button": "Add Files",
       "cannot_clear_while_processing": "Cannot clear files while processing",
-      "change_limits_settings_hint": "Change limits in Settings → UI Settings.",
       "clear_button": "Clear",
       "default_upload_target": "Default repository",
       "default_upload_target_hint": "No working library is selected; uploads will use the primary/default repository.",
       "drag_drop_or_click": "Drag & Drop or Click to Upload",
-      "max_files_label": "Max files:",
       "no_files_selected_for_upload": "No files selected for upload",
       "no_valid_files_selected": "No valid files selected",
       "server_chunk_size": "Server chunk size",
@@ -1489,10 +1423,6 @@
       "uploadFailed": "Upload failed"
     },
     "UploadProvider": {
-      "files_exceeded_limit_one": "{{count}} file exceeds the limit.",
-      "files_exceeded_limit_other": "{{count}} files exceed the limit.",
-      "max_files_allowed_one": "Max {{count}} file allowed.",
-      "max_files_allowed_other": "Max {{count}} files allowed.",
       "no_files_selected_for_upload_message": "No files selected for upload",
       "upload_failed_generic": "Upload failed"
     }
