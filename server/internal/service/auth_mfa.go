@@ -219,6 +219,11 @@ func (s *AuthService) DisableTOTP(ctx context.Context, userID int, currentPasswo
 		if err := q.DeleteUserTOTPCredential(ctx, user.UserID); err != nil {
 			return fmt.Errorf("delete totp credential: %w", err)
 		}
+		// Passkeys may only exist alongside TOTP — disabling TOTP disables MFA
+		// entirely, so remove any passkeys to avoid a passkey-without-TOTP state.
+		if err := q.DeleteUserWebAuthnCredentials(ctx, user.UserID); err != nil {
+			return fmt.Errorf("delete passkeys: %w", err)
+		}
 		return nil
 	}); err != nil {
 		return MFAStatus{}, err

@@ -68,6 +68,7 @@ type UserService interface {
 	AdminUpdateUser(ctx context.Context, actorUserID, targetUserID int, input AdminUpdateUserInput) (UserResponse, error)
 	ChangePassword(ctx context.Context, userID int, input ChangePasswordInput) error
 	AdminResetAccess(ctx context.Context, actorUserID, targetUserID int) (ResetAccessResult, error)
+	BreakGlassReset(ctx context.Context, username string) (ResetAccessResult, repo.User, error)
 }
 
 type userService struct {
@@ -357,6 +358,39 @@ func (s *userService) AdminResetAccess(ctx context.Context, actorUserID, targetU
 		return ResetAccessResult{}, fmt.Errorf("get target: %w", err)
 	}
 
+	return s.resetUserAccess(ctx, target)
+}
+
+// BreakGlassReset is an operator-triggered, unauthenticated recovery used when an
+// admin is locked out of every factor and no other admin can help. It issues a
+// temporary password and clears all MFA factors for the target. With no username
+// it targets the oldest active admin. Triggered from a boot flag (see main.go).
+func (s *userService) BreakGlassReset(ctx context.Context, username string) (ResetAccessResult, repo.User, error) {
+	var target repo.User
+	if trimmed := strings.TrimSpace(username); trimmed != "" {
+		found, err := s.queries.GetUserByUsername(ctx, strings.ToLower(trimmed))
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ResetAccessResult{}, repo.User{}, ErrUserNotFound
+			}
+			return ResetAccessResult{}, repo.User{}, fmt.Errorf("get user: %w", err)
+		}
+		target = found
+	} else {
+		admin, err := s.oldestActiveAdmin(ctx)
+		if err != nil {
+			return ResetAccessResult{}, repo.User{}, err
+		}
+		target = admin
+	}
+
+	result, err := s.resetUserAccess(ctx, target)
+	return result, target, err
+}
+
+// resetUserAccess issues a temporary password and clears every MFA factor and
+// active session for the target user.
+func (s *userService) resetUserAccess(ctx context.Context, target repo.User) (ResetAccessResult, error) {
 	temporaryPassword, err := generateTemporaryPassword()
 	if err != nil {
 		return ResetAccessResult{}, fmt.Errorf("generate temporary password: %w", err)
@@ -395,6 +429,32 @@ func (s *userService) AdminResetAccess(ctx context.Context, actorUserID, targetU
 		ClearedPasskeys:   true,
 		ClearedTOTP:       true,
 	}, nil
+}
+
+// oldestActiveAdmin returns the earliest-created active admin account.
+func (s *userService) oldestActiveAdmin(ctx context.Context) (repo.User, error) {
+	users, err := s.queries.ListUsers(ctx, repo.ListUsersParams{Limit: 10000, Offset: 0})
+	if err != nil {
+		return repo.User{}, fmt.Errorf("list users: %w", err)
+	}
+
+	var oldest *repo.User
+	for i := range users {
+		u := users[i]
+		if !IsAdminRole(u.Role) {
+			continue
+		}
+		if u.IsActive == nil || !*u.IsActive {
+			continue
+		}
+		if oldest == nil || u.CreatedAt.Time.Before(oldest.CreatedAt.Time) {
+			oldest = &users[i]
+		}
+	}
+	if oldest == nil {
+		return repo.User{}, ErrUserNotFound
+	}
+	return *oldest, nil
 }
 
 func normalizeOptionalString(value string) *string {

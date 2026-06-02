@@ -4,9 +4,7 @@
  * This client provides type-safe API requests using the generated OpenAPI schema.
  * It handles JWT token management and automatic token refresh.
  */
-import createClient, {
-  type Middleware,
-} from "@/lib/http-commons/openapi-fetch";
+import createClient, { type Middleware } from "@/lib/http-commons/openapi-fetch";
 import type { paths } from "./schema";
 import { getToken, getRefreshToken, saveToken, removeToken } from "./auth.ts";
 
@@ -33,7 +31,6 @@ const authMiddleware: Middleware = {
         url.includes("/auth/login") ||
         url.includes("/auth/register") ||
         url.includes("/auth/passkeys/login") ||
-        url.includes("/auth/passkeys/register") ||
         url.includes("/auth/mfa/verify")
       ) {
         return response;
@@ -42,14 +39,11 @@ const authMiddleware: Middleware = {
       try {
         const refreshToken = getRefreshToken();
         if (refreshToken) {
-          const refreshResponse = await fetch(
-            `${baseUrl}/api/v1/auth/refresh`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ refreshToken }),
-            },
-          );
+          const refreshResponse = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken }),
+          });
 
           if (refreshResponse.ok) {
             const data = await refreshResponse.json();

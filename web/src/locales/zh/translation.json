@@ -339,6 +339,7 @@
       },
       "stepNum": "第{{n}}步",
       "totp": {
+        "skip": "",
         "subtitle": "管理员账户必须启用。请扫描并验证后继续。",
         "title": "添加身份验证器应用"
       },
@@ -423,14 +424,13 @@
       "finish": "继续使用流明集",
       "haveAccount": "已经有账户？",
       "login": "立即登录",
-      "mfaRequiredNotice": "每个账户都需要启用双重验证。下一步将完成安全设置。",
+      "mfaOptionalNotice": "",
       "passkeyAction": "创建 Passkey",
       "passkeyDescription": "无需记住密码。Passkey 保存在此设备上，并可防止钓鱼攻击。",
       "passkeyHeadline": "使用面容、指纹或设备解锁登录",
       "passkeyStartError": "启动 Passkey 注册失败。",
       "passkeyStepSubtitle": "Passkey 是最快也最安全的登录方式。建议现在添加一个。",
       "passkeyStepTitle": "使用 Passkey 保护账户",
-      "passkeyUnavailableUseTotp": "当前环境暂不支持 Passkey，请使用身份验证器应用继续。",
       "passkeyVerifyError": "Passkey 注册失败。",
       "password": "密码",
       "passwordHint": "长度 10-72 位，且至少包含 1 个大写字母、1 个小写字母和 1 个数字。",
@@ -438,6 +438,7 @@
       "recoverySubtitle": "若您失去身份验证器访问权限，这些一次性恢复码是唯一备用方式。",
       "recoveryTitle": "保存恢复码",
       "skipPasskey": "暂时跳过，只使用身份验证器",
+      "skipTotp": "",
       "startError": "启动账户注册失败。",
       "stepAccount": "账户",
       "stepAuthenticator": "身份验证器",
@@ -453,7 +454,7 @@
       "username": "用户名",
       "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
       "usernamePlaceholder": "请输入用户名",
-      "verifyAndFinish": "验证并完成设置"
+      "verifyAndEnable": ""
     },
     "setup": {
       "error": "初始化失败。请检查服务器日志后重试。",
@@ -1006,6 +1007,7 @@
         "passkeyCreated": "创建于",
         "passkeyDescription": "使用设备原生的通行密钥流程进行登录。",
         "passkeyLastUsed": "上次使用",
+        "passkeyRequiresTotp": "",
         "passkeyTitle": "通行密钥",
         "recoveryCodesTitle": "恢复码",
         "recoveryRemaining": "个恢复码剩余",

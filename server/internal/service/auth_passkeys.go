@@ -16,17 +16,13 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	registrationSessionTTL        = 20 * time.Minute
 	passkeyChallengeTTL           = 10 * time.Minute
 	defaultWebAuthnRPDisplayName  = "Lumilio"
-	passkeyTokenPurposeRegister   = "passkey_register"
 	passkeyTokenPurposeLogin      = "passkey_login"
 	passkeyTokenPurposeEnroll     = "passkey_enroll"
 	defaultPasskeyBytes           = 32
@@ -34,22 +30,19 @@ const (
 )
 
 var (
-	ErrInvalidPasskeyChallenge     = errors.New("invalid passkey challenge")
-	ErrExpiredPasskeyChallenge     = errors.New("expired passkey challenge")
-	ErrPasskeyNotConfigured        = errors.New("passkey is not configured")
-	ErrPasskeyCredentialNotFound   = errors.New("passkey credential not found")
-	ErrRegistrationTOTPNotPrepared = errors.New("registration totp is not prepared")
+	ErrInvalidPasskeyChallenge   = errors.New("invalid passkey challenge")
+	ErrExpiredPasskeyChallenge   = errors.New("expired passkey challenge")
+	ErrPasskeyNotConfigured      = errors.New("passkey is not configured")
+	ErrPasskeyCredentialNotFound = errors.New("passkey credential not found")
+	// ErrTOTPRequiredForPasskey enforces the invariant that a passkey can only
+	// exist alongside TOTP — so every passkey account always has a usable
+	// password + TOTP fallback and no factor-less bypass can occur.
+	ErrTOTPRequiredForPasskey = errors.New("totp must be enabled before adding a passkey")
 )
 
 type RegistrationStartRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=50"`
 	Password string `json:"password" binding:"required,min=6"`
-}
-
-type RegistrationStartResponse struct {
-	RegistrationSessionID string `json:"registration_session_id"`
-	BootstrapAdmin        bool   `json:"bootstrap_admin"`
-	NextRegistrationRole  string `json:"next_registration_role"`
 }
 
 type PasskeyOptionsResponse struct {
@@ -148,141 +141,72 @@ func loadWebAuthnRPID() string {
 	return strings.TrimSpace(os.Getenv("WEBAUTHN_RP_ID"))
 }
 
-func (s *AuthService) StartRegistration(ctx context.Context, req RegistrationStartRequest) (RegistrationStartResponse, error) {
+// StartRegistration creates a new account from a username and password and
+// immediately logs it in. MFA (TOTP and/or passkey) is fully optional and is
+// added afterwards via the authenticated enrollment endpoints.
+func (s *AuthService) StartRegistration(ctx context.Context, req RegistrationStartRequest) (*AuthResponse, error) {
 	username, err := normalizeUsername(req.Username)
 	if err != nil {
-		return RegistrationStartResponse{}, err
-	}
-
-	if _, err := s.queries.GetUserByUsername(ctx, username); err == nil {
-		return RegistrationStartResponse{}, ErrUserAlreadyExists
-	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return RegistrationStartResponse{}, fmt.Errorf("check username availability: %w", err)
-	}
-
-	if err := s.queries.DeleteExpiredRegistrationSessions(ctx); err != nil {
-		return RegistrationStartResponse{}, fmt.Errorf("delete expired registration sessions: %w", err)
-	}
-	if err := s.queries.DeleteRegistrationSessionsByUsername(ctx, username); err != nil {
-		return RegistrationStartResponse{}, fmt.Errorf("delete existing registration session: %w", err)
+		return nil, err
 	}
 
 	passwordHash, err := bcryptPassword(req.Password)
 	if err != nil {
-		return RegistrationStartResponse{}, err
-	}
-
-	bootstrapStatus, err := s.GetBootstrapStatus(ctx)
-	if err != nil {
-		return RegistrationStartResponse{}, err
-	}
-
-	expiresAt, err := toTimestamptz(time.Now().Add(registrationSessionTTL))
-	if err != nil {
-		return RegistrationStartResponse{}, err
+		return nil, err
 	}
 
 	userHandle, err := randomOpaqueBytes(defaultPasskeyBytes)
 	if err != nil {
-		return RegistrationStartResponse{}, fmt.Errorf("generate webauthn user handle: %w", err)
+		return nil, fmt.Errorf("generate webauthn user handle: %w", err)
 	}
 
-	session, err := s.queries.CreateRegistrationSession(ctx, repo.CreateRegistrationSessionParams{
-		Username:           username,
-		PasswordHash:       passwordHash,
-		Role:               bootstrapStatus.NextRegistrationRole,
-		WebauthnUserHandle: userHandle,
-		ExpiresAt:          expiresAt,
-	})
-	if err != nil {
-		return RegistrationStartResponse{}, fmt.Errorf("create registration session: %w", err)
-	}
-
-	return RegistrationStartResponse{
-		RegistrationSessionID: uuidFromPG(session.SessionID).String(),
-		BootstrapAdmin:        bootstrapStatus.NextRegistrationRole == string(UserRoleAdmin),
-		NextRegistrationRole:  bootstrapStatus.NextRegistrationRole,
-	}, nil
-}
-
-func (s *AuthService) BeginPasskeyRegistration(ctx context.Context, registrationSessionID string, origin string) (PasskeyOptionsResponse, error) {
-	session, err := s.getActiveRegistrationSession(ctx, registrationSessionID)
-	if err != nil {
-		return PasskeyOptionsResponse{}, err
-	}
-
-	wa, normalizedOrigin, err := s.newWebAuthnForOrigin(origin)
-	if err != nil {
-		return PasskeyOptionsResponse{}, err
-	}
-
-	user := registrationSessionToWebAuthnUser(session)
-	creation, sessionData, err := wa.BeginRegistration(
-		user,
-		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired),
-		webauthn.WithExtensions(map[string]any{"credProps": true}),
+	var (
+		createdUser repo.User
+		finalRole   UserRole
 	)
-	if err != nil {
-		return PasskeyOptionsResponse{}, fmt.Errorf("begin passkey registration: %w", err)
-	}
+	if err := s.withTx(ctx, func(q *repo.Queries) error {
+		if _, err := q.GetUserByUsername(ctx, username); err == nil {
+			return ErrUserAlreadyExists
+		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("check username availability: %w", err)
+		}
 
-	challengeToken, err := s.issuePasskeyChallenge(passkeyChallengeClaims{
-		Purpose:               passkeyTokenPurposeRegister,
-		Origin:                normalizedOrigin,
-		Username:              session.Username,
-		RegistrationSessionID: registrationSessionID,
-		SessionData:           *sessionData,
-	}, passkeyChallengeTTL)
-	if err != nil {
-		return PasskeyOptionsResponse{}, fmt.Errorf("issue passkey challenge: %w", err)
-	}
+		// First account becomes the admin; everyone after is a regular user.
+		role, err := determineRegistrationRole(ctx, q, string(UserRoleAdmin))
+		if err != nil {
+			return err
+		}
+		finalRole = role
 
-	return PasskeyOptionsResponse{
-		Options:        creation,
-		ChallengeToken: challengeToken,
-	}, nil
-}
+		user, err := q.CreateUser(ctx, repo.CreateUserParams{
+			Username:           username,
+			Password:           passwordHash,
+			DisplayName:        username,
+			Role:               string(role),
+			WebauthnUserHandle: userHandle,
+		})
+		if err != nil {
+			return fmt.Errorf("create user: %w", err)
+		}
+		createdUser = user
 
-func (s *AuthService) VerifyPasskeyRegistration(ctx context.Context, registrationSessionID string, challengeToken string, credentialJSON []byte) (*AuthResponse, error) {
-	session, err := s.getActiveRegistrationSession(ctx, registrationSessionID)
-	if err != nil {
+		// Assign primary repository owner on first user creation.
+		ownerID := user.UserID
+		if _, ownerErr := q.SetPrimaryRepositoryOwner(ctx, &ownerID); ownerErr != nil {
+			if !errors.Is(ownerErr, pgx.ErrNoRows) {
+				return fmt.Errorf("set primary repository owner: %w", ownerErr)
+			}
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
-	challenge, err := s.parsePasskeyChallenge(challengeToken, passkeyTokenPurposeRegister)
+	response, err := s.generateAuthResponse(createdUser)
 	if err != nil {
 		return nil, err
 	}
-	if challenge.RegistrationSessionID != registrationSessionID {
-		return nil, ErrInvalidPasskeyChallenge
-	}
-
-	wa, err := s.newWebAuthnForChallenge(challenge)
-	if err != nil {
-		return nil, err
-	}
-
-	parsed, err := protocol.ParseCredentialCreationResponseBytes(credentialJSON)
-	if err != nil {
-		return nil, ErrInvalidPasskeyChallenge
-	}
-
-	credential, err := wa.CreateCredential(registrationSessionToWebAuthnUser(session), challenge.SessionData, parsed)
-	if err != nil {
-		return nil, ErrInvalidPasskeyChallenge
-	}
-
-	user, role, err := s.finalizeRegistrationWithPasskey(ctx, session, credential)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.generateAuthResponse(user)
-	if err != nil {
-		return nil, err
-	}
-	response.BootstrapAdmin = role == UserRoleAdmin
-
+	response.BootstrapAdmin = finalRole == UserRoleAdmin
 	return response, nil
 }
 
@@ -374,6 +298,14 @@ func (s *AuthService) BeginPasskeyEnrollment(ctx context.Context, userID int, or
 		return PasskeyOptionsResponse{}, err
 	}
 
+	// A passkey may only be added once TOTP is enabled, so every passkey account
+	// keeps a password + TOTP fallback.
+	if enabled, err := s.userHasTOTP(ctx, userRecord.UserID); err != nil {
+		return PasskeyOptionsResponse{}, err
+	} else if !enabled {
+		return PasskeyOptionsResponse{}, ErrTOTPRequiredForPasskey
+	}
+
 	passkeys, err := s.queries.ListUserWebAuthnCredentials(ctx, userRecord.UserID)
 	if err != nil {
 		return PasskeyOptionsResponse{}, fmt.Errorf("load passkeys: %w", err)
@@ -424,6 +356,12 @@ func (s *AuthService) VerifyPasskeyEnrollment(ctx context.Context, userID int, c
 	userRecord, err := s.getActiveUserByID(ctx, userID)
 	if err != nil {
 		return PasskeyCredentialSummary{}, err
+	}
+
+	if enabled, err := s.userHasTOTP(ctx, userRecord.UserID); err != nil {
+		return PasskeyCredentialSummary{}, err
+	} else if !enabled {
+		return PasskeyCredentialSummary{}, ErrTOTPRequiredForPasskey
 	}
 
 	passkeys, err := s.queries.ListUserWebAuthnCredentials(ctx, userRecord.UserID)
@@ -498,83 +436,15 @@ func (s *AuthService) DeletePasskey(ctx context.Context, userID int, passkeyID i
 	return nil
 }
 
-func (s *AuthService) getActiveRegistrationSession(ctx context.Context, sessionID string) (repo.RegistrationSession, error) {
-	parsed, err := parseUUIDString(sessionID)
-	if err != nil {
-		return repo.RegistrationSession{}, ErrRegistrationSessionNotFound
-	}
-
-	session, err := s.queries.GetRegistrationSessionByID(ctx, parsed)
-	if err != nil {
+// userHasTOTP reports whether the user has an active TOTP credential.
+func (s *AuthService) userHasTOTP(ctx context.Context, userID int32) (bool, error) {
+	if _, err := s.queries.GetUserTOTPCredential(ctx, userID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return repo.RegistrationSession{}, ErrRegistrationSessionNotFound
+			return false, nil
 		}
-		return repo.RegistrationSession{}, fmt.Errorf("get registration session: %w", err)
+		return false, fmt.Errorf("get totp credential: %w", err)
 	}
-
-	if !session.ExpiresAt.Valid || session.ExpiresAt.Time.Before(time.Now()) {
-		_ = s.queries.DeleteRegistrationSession(ctx, parsed)
-		return repo.RegistrationSession{}, ErrRegistrationSessionExpired
-	}
-
-	return session, nil
-}
-
-func (s *AuthService) finalizeRegistrationWithPasskey(ctx context.Context, session repo.RegistrationSession, credential *webauthn.Credential) (repo.User, UserRole, error) {
-	var (
-		createdUser repo.User
-		finalRole   UserRole
-	)
-
-	if err := s.withTx(ctx, func(q *repo.Queries) error {
-		if _, err := q.GetUserByUsername(ctx, session.Username); err == nil {
-			return ErrUserAlreadyExists
-		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("check username availability: %w", err)
-		}
-
-		role, err := determineRegistrationRole(ctx, q, session.Role)
-		if err != nil {
-			return err
-		}
-		finalRole = role
-
-		user, err := q.CreateUser(ctx, repo.CreateUserParams{
-			Username:           session.Username,
-			Password:           session.PasswordHash,
-			DisplayName:        session.Username,
-			Role:               string(role),
-			WebauthnUserHandle: session.WebauthnUserHandle,
-		})
-		if err != nil {
-			return fmt.Errorf("create user: %w", err)
-		}
-
-		if _, err := q.CreateUserWebAuthnCredential(ctx, credentialToCreateParams(user.UserID, *credential)); err != nil {
-			return fmt.Errorf("create passkey credential: %w", err)
-		}
-
-		if err := q.DeleteRegistrationSession(ctx, session.SessionID); err != nil {
-			return fmt.Errorf("delete registration session: %w", err)
-		}
-
-		createdUser = user
-
-		// Assign primary repository owner on first user creation.
-		ownerID := user.UserID
-		if _, ownerErr := q.SetPrimaryRepositoryOwner(ctx, &ownerID); ownerErr != nil {
-			// Ignore NoRows — primary repo may already have an owner or not exist.
-			if !errors.Is(ownerErr, pgx.ErrNoRows) {
-				return fmt.Errorf("set primary repository owner: %w", ownerErr)
-			}
-		}
-
-		return nil
-	}); err != nil {
-		return repo.User{}, UserRoleUser, err
-	}
-
-	return createdUser, finalRole, nil
+	return true, nil
 }
 
 func (s *AuthService) getUserForPasskey(ctx context.Context, username string) (repo.User, webAuthnUser, error) {
@@ -615,14 +485,6 @@ func determineRegistrationRole(ctx context.Context, q *repo.Queries, desiredRole
 	}
 
 	return UserRoleUser, nil
-}
-
-func registrationSessionToWebAuthnUser(session repo.RegistrationSession) webAuthnUser {
-	return webAuthnUser{
-		id:          cloneByteSlice(session.WebauthnUserHandle),
-		username:    session.Username,
-		displayName: session.Username,
-	}
 }
 
 func userToWebAuthnUser(user repo.User, rows []repo.UserWebauthnCredential) webAuthnUser {
@@ -910,29 +772,6 @@ func (s *AuthService) resolveWebAuthnRPID(origin *url.URL) (string, error) {
 	}
 
 	return host, nil
-}
-
-func parseUUIDString(value string) (pgtype.UUID, error) {
-	parsed, err := uuid.Parse(strings.TrimSpace(value))
-	if err != nil {
-		return pgtype.UUID{}, err
-	}
-	return pgtype.UUID{
-		Bytes: parsed,
-		Valid: true,
-	}, nil
-}
-
-func uuidFromPG(value pgtype.UUID) uuid.UUID {
-	return uuid.UUID(value.Bytes)
-}
-
-func toTimestamptz(value time.Time) (pgtype.Timestamptz, error) {
-	result := pgtype.Timestamptz{}
-	if err := result.Scan(value); err != nil {
-		return pgtype.Timestamptz{}, fmt.Errorf("scan timestamp: %w", err)
-	}
-	return result, nil
 }
 
 func cloneByteSlice(value []byte) []byte {

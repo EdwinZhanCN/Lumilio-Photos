@@ -23,14 +23,12 @@ import (
 )
 
 var (
-	ErrInvalidToken                = errors.New("invalid token")
-	ErrExpiredToken                = errors.New("token has expired")
-	ErrTokenNotFound               = errors.New("token not found")
-	ErrUserNotFound                = errors.New("user not found")
-	ErrInvalidPassword             = errors.New("invalid password")
-	ErrUserAlreadyExists           = errors.New("user already exists")
-	ErrRegistrationSessionNotFound = errors.New("registration session not found")
-	ErrRegistrationSessionExpired  = errors.New("registration session expired")
+	ErrInvalidToken      = errors.New("invalid token")
+	ErrExpiredToken      = errors.New("token has expired")
+	ErrTokenNotFound     = errors.New("token not found")
+	ErrUserNotFound      = errors.New("user not found")
+	ErrInvalidPassword   = errors.New("invalid password")
+	ErrUserAlreadyExists = errors.New("user already exists")
 )
 
 // Request/Response types

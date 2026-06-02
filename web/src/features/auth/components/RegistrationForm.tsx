@@ -36,13 +36,6 @@ type RegistrationFormProps = {
   showLoginLink?: boolean;
 };
 
-const STEP_INDEX: Record<string, number> = {
-  credentials: 0,
-  choose: 1,
-  totp: 2,
-  recovery: 3,
-};
-
 const RegistrationForm: React.FC<RegistrationFormProps> = ({
   credentialTitle,
   credentialSubtitle,
@@ -61,7 +54,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     confirmPassword,
     setConfirmPassword,
     confirmPasswordRef,
-    capabilityMessage,
+    passkeySupported,
     totpSetup,
     totpCode,
     setTotpCode,
@@ -70,18 +63,25 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     isBusy,
     handleStartRegistration,
     handleCreatePasskey,
-    handleUseAuthenticatorApp,
+    handleSkipPasskey,
     handleCompleteTotp,
+    handleSkipTotp,
     handleFinish,
   } = useRegistrationFlow();
 
   const appName = t("app.name", { defaultValue: "Lumilio Photos" });
-  const steps = [
-    t("auth.register.stepAccount", { defaultValue: "Account" }),
-    t("auth.register.stepPasskey", { defaultValue: "Passkey" }),
-    t("auth.register.stepAuthenticator", { defaultValue: "Authenticator" }),
-    t("auth.register.stepRecovery", { defaultValue: "Recovery" }),
-  ];
+  const stepAccount = t("auth.register.stepAccount", { defaultValue: "Account" });
+  const stepAuthenticator = t("auth.register.stepAuthenticator", {
+    defaultValue: "Authenticator",
+  });
+  const stepPasskey = t("auth.register.stepPasskey", { defaultValue: "Passkey" });
+  const stepRecovery = t("auth.register.stepRecovery", { defaultValue: "Recovery" });
+  const steps = passkeySupported
+    ? [stepAccount, stepAuthenticator, stepPasskey, stepRecovery]
+    : [stepAccount, stepAuthenticator, stepRecovery];
+  const stepIndex: Record<string, number> = passkeySupported
+    ? { credentials: 0, totp: 1, passkey: 2, recovery: 3 }
+    : { credentials: 0, totp: 1, recovery: 2 };
 
   const submitTotp = () => {
     void handleCompleteTotp({
@@ -92,7 +92,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   return (
     <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
       <AuthShell width={460} appName={appName}>
-        {step !== "credentials" && <FlowSteps steps={steps} current={STEP_INDEX[step] ?? 0} />}
+        {step !== "credentials" && <FlowSteps steps={steps} current={stepIndex[step] ?? 0} />}
 
         {displayError && (
           <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
@@ -159,9 +159,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               ) : (
                 <div className="flex items-start gap-2 rounded-xl bg-base-200/50 px-3.5 py-2.5 text-xs text-base-content/55">
                   <Info size={14} className="mt-0.5 shrink-0 text-base-content/40" />
-                  {t("auth.register.mfaRequiredNotice", {
+                  {t("auth.register.mfaOptionalNotice", {
                     defaultValue:
-                      "Two-factor authentication is required for every account. You’ll set it up next.",
+                      "You can add two-factor authentication next — it’s optional, and you can do it later in settings.",
                   })}
                 </div>
               )}
@@ -188,24 +188,55 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
           </>
         )}
 
-        {step === "choose" && (
+        {step === "totp" && totpSetup && (
+          <>
+            <CardHead
+              icon={Smartphone}
+              tone="primary"
+              title={t("auth.register.totpTitle", {
+                defaultValue: "Add your authenticator",
+              })}
+              sub={t("auth.register.totpSubtitle", {
+                defaultValue: "Optional — scan the code with your authenticator app.",
+              })}
+            />
+            <TotpSetupPanel
+              otpauthUri={totpSetup.otpauth_uri ?? ""}
+              secret={totpSetup.secret ?? ""}
+              code={totpCode}
+              onCodeChange={setTotpCode}
+              onVerify={submitTotp}
+              invalid={Boolean(displayError)}
+              busy={isBusy}
+              verifyLabel={t("auth.register.verifyAndEnable", {
+                defaultValue: "Verify & enable",
+              })}
+            />
+            <button
+              type="button"
+              onClick={handleSkipTotp}
+              disabled={isBusy}
+              className="text-center text-sm font-medium text-base-content/45 hover:text-base-content/70"
+            >
+              {t("auth.register.skipTotp", {
+                defaultValue: "Skip for now",
+              })}
+            </button>
+          </>
+        )}
+
+        {step === "passkey" && (
           <>
             <CardHead
               icon={Fingerprint}
               tone="primary"
               title={t("auth.register.passkeyStepTitle", {
-                defaultValue: "Secure with a passkey",
+                defaultValue: "Add a passkey",
               })}
               sub={t("auth.register.passkeyStepSubtitle", {
-                defaultValue:
-                  "Passkeys are the fastest, safest way in. We recommend adding one now.",
+                defaultValue: "Optional — the fastest, safest way to sign in next time.",
               })}
             />
-            {capabilityMessage && (
-              <div className="rounded-xl border border-base-200 bg-base-200/60 px-4 py-3 text-sm text-base-content/70">
-                {t(capabilityMessage, { defaultValue: capabilityMessage })}
-              </div>
-            )}
             <PasskeyAffordance
               headline={t("auth.register.passkeyHeadline", {
                 defaultValue: "Sign in with your face or fingerprint",
@@ -227,41 +258,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             </Btn>
             <button
               type="button"
-              onClick={() => void handleUseAuthenticatorApp()}
+              onClick={handleSkipPasskey}
               disabled={isBusy}
               className="text-center text-sm font-medium text-base-content/45 hover:text-base-content/70"
             >
               {t("auth.register.skipPasskey", {
-                defaultValue: "Skip for now, use authenticator only",
+                defaultValue: "Skip for now",
               })}
             </button>
-          </>
-        )}
-
-        {step === "totp" && totpSetup && (
-          <>
-            <CardHead
-              icon={Smartphone}
-              tone="primary"
-              title={t("auth.register.totpTitle", {
-                defaultValue: "Add your authenticator",
-              })}
-              sub={t("auth.register.totpSubtitle", {
-                defaultValue: "Required — scan the code with your authenticator app.",
-              })}
-            />
-            <TotpSetupPanel
-              otpauthUri={totpSetup.otpauth_uri ?? ""}
-              secret={totpSetup.secret ?? ""}
-              code={totpCode}
-              onCodeChange={setTotpCode}
-              onVerify={submitTotp}
-              invalid={Boolean(displayError)}
-              busy={isBusy}
-              verifyLabel={t("auth.register.verifyAndFinish", {
-                defaultValue: "Verify & enable",
-              })}
-            />
           </>
         )}
 

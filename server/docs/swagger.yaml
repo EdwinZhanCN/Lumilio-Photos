@@ -1706,25 +1706,6 @@ components:
       required:
       - current_password
       type: object
-    dto.RegistrationPasskeyVerifyRequestDTO:
-      properties:
-        challenge_token:
-          type: string
-        credential: {}
-        registration_session_id:
-          type: string
-      required:
-      - challenge_token
-      - credential
-      - registration_session_id
-      type: object
-    dto.RegistrationSessionRequestDTO:
-      properties:
-        registration_session_id:
-          type: string
-      required:
-      - registration_session_id
-      type: object
     dto.RegistrationStartRequestDTO:
       properties:
         password:
@@ -1737,48 +1718,6 @@ components:
       required:
       - password
       - username
-      type: object
-    dto.RegistrationStartResponseDTO:
-      properties:
-        bootstrap_admin:
-          type: boolean
-        next_registration_role:
-          type: string
-        registration_session_id:
-          type: string
-      type: object
-    dto.RegistrationTOTPCompleteRequestDTO:
-      properties:
-        code:
-          type: string
-        registration_session_id:
-          type: string
-      required:
-      - code
-      - registration_session_id
-      type: object
-    dto.RegistrationTOTPCompleteResponseDTO:
-      properties:
-        auth:
-          $ref: '#/components/schemas/dto.AuthResponseDTO'
-        generated_at:
-          type: string
-        recovery_codes:
-          items:
-            type: string
-          type: array
-          uniqueItems: false
-      type: object
-    dto.RegistrationTOTPSetupResponseDTO:
-      properties:
-        account_name:
-          type: string
-        issuer:
-          type: string
-        otpauth_uri:
-          type: string
-        secret:
-          type: string
       type: object
     dto.RepositoryCloudStatusDTO:
       properties:
@@ -6722,132 +6661,6 @@ paths:
       summary: Verify passkey login
       tags:
       - auth
-  /api/v1/auth/passkeys/register/options:
-    post:
-      description: Create WebAuthn registration options for a staged registration
-        session.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.RegistrationSessionRequestDTO'
-                description: Registration session
-                summary: request
-        description: Registration session
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: Passkey registration options created successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid or expired registration session
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-      summary: Begin passkey registration
-      tags:
-      - auth
-  /api/v1/auth/passkeys/register/verify:
-    post:
-      description: Verify a staged registration passkey response, create the user,
-        and issue session tokens.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.RegistrationPasskeyVerifyRequestDTO'
-                description: Passkey registration verification payload
-                summary: request
-        description: Passkey registration verification payload
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: Passkey registration verified successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid request data
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid or expired passkey registration challenge
-        "409":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: User already exists
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-      summary: Verify passkey registration
-      tags:
-      - auth
   /api/v1/auth/refresh:
     post:
       description: Generate a new access token using a valid refresh token
@@ -6912,8 +6725,8 @@ paths:
       - auth
   /api/v1/auth/register/start:
     post:
-      description: Create a staged registration session with username and password
-        before passkey or TOTP enrollment.
+      description: Create a new account from a username and password and issue session
+        tokens. MFA (TOTP/passkey) is optional and added afterwards.
       requestBody:
         content:
           application/json:
@@ -6951,7 +6764,7 @@ paths:
                     example: success
                     type: string
                 type: object
-          description: Registration session created successfully
+          description: Account created successfully
         "400":
           content:
             application/json:
@@ -6970,126 +6783,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
-      summary: Start user registration
-      tags:
-      - auth
-  /api/v1/auth/register/totp/complete:
-    post:
-      description: Verify the staged TOTP code, create the user account, and issue
-        session tokens plus recovery codes.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.RegistrationTOTPCompleteRequestDTO'
-                description: TOTP verification payload
-                summary: request
-        description: TOTP verification payload
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: TOTP registration completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid or expired registration session
-        "409":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: User already exists
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-      summary: Complete staged TOTP registration
-      tags:
-      - auth
-  /api/v1/auth/register/totp/setup:
-    post:
-      description: Generate TOTP setup data for a staged registration session.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.RegistrationSessionRequestDTO'
-                description: Registration session
-                summary: request
-        description: Registration session
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: TOTP setup created successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid or expired registration session
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-      summary: Begin staged TOTP setup
+      summary: Register a new account
       tags:
       - auth
   /api/v1/capabilities:
