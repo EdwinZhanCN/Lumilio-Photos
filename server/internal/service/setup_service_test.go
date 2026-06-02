@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"server/config"
 )
@@ -37,8 +36,6 @@ func newTestSetupService(t *testing.T, rotator DBCredentialRotator) (*SetupServi
 		},
 		rotator:    rotator,
 		secretPath: filepath.Join(dir, "secrets", "db_password"),
-		configPath: filepath.Join(dir, "config", "system.toml"),
-		now:        func() time.Time { return time.Unix(1700000000, 0).UTC() },
 	}, dir
 }
 
@@ -54,10 +51,7 @@ func TestSetupService_Initialize_RotatesPersistsAndMarksInitialized(t *testing.T
 		t.Fatal("expected uninitialized system before setup")
 	}
 
-	result, err := svc.Initialize(context.Background(), SetupRequest{
-		SiteName:      "My Library",
-		AdminUsername: "admin",
-	})
+	result, err := svc.Initialize(context.Background(), SetupRequest{})
 	if err != nil {
 		t.Fatalf("initialize: %v", err)
 	}
@@ -95,28 +89,6 @@ func TestSetupService_Initialize_RotatesPersistsAndMarksInitialized(t *testing.T
 		t.Fatal("persisted secret does not match rotated password")
 	}
 
-	// Non-sensitive metadata persisted as TOML, and never the secret.
-	configInfo, err := os.Stat(svc.configPath)
-	if err != nil {
-		t.Fatalf("stat config: %v", err)
-	}
-	if perm := configInfo.Mode().Perm(); perm != 0o600 {
-		t.Fatalf("expected config perms 0600, got %o", perm)
-	}
-	configBytes, err := os.ReadFile(svc.configPath)
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	configText := string(configBytes)
-	for _, want := range []string{"My Library", "admin", "initialized = true", "rotated = true"} {
-		if !strings.Contains(configText, want) {
-			t.Fatalf("system config missing %q:\n%s", want, configText)
-		}
-	}
-	if strings.Contains(configText, rotator.password) {
-		t.Fatal("system config must never contain the database password")
-	}
-
 	// Status flips to initialized; a second setup is refused.
 	status, err = svc.Status(context.Background())
 	if err != nil {
@@ -125,7 +97,7 @@ func TestSetupService_Initialize_RotatesPersistsAndMarksInitialized(t *testing.T
 	if !status.Initialized {
 		t.Fatal("expected initialized system after setup")
 	}
-	if _, err := svc.Initialize(context.Background(), SetupRequest{SiteName: "x"}); !errors.Is(err, ErrSystemAlreadyInitialized) {
+	if _, err := svc.Initialize(context.Background(), SetupRequest{}); !errors.Is(err, ErrSystemAlreadyInitialized) {
 		t.Fatalf("expected ErrSystemAlreadyInitialized, got %v", err)
 	}
 }
@@ -134,15 +106,12 @@ func TestSetupService_Initialize_RotationFailureLeavesSystemUninitialized(t *tes
 	rotator := &fakeRotator{err: errors.New("connection refused")}
 	svc, _ := newTestSetupService(t, rotator)
 
-	if _, err := svc.Initialize(context.Background(), SetupRequest{SiteName: "x"}); err == nil {
+	if _, err := svc.Initialize(context.Background(), SetupRequest{}); err == nil {
 		t.Fatal("expected error when rotation fails")
 	}
 
 	if _, err := os.Stat(svc.secretPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("secret must not be written when rotation fails")
-	}
-	if _, err := os.Stat(svc.configPath); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("system config must not be written when rotation fails")
 	}
 	status, err := svc.Status(context.Background())
 	if err != nil {

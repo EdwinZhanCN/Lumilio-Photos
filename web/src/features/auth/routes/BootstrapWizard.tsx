@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Fingerprint,
   HardDrive,
-  Image as ImageIcon,
   KeyRound,
   Server,
   ShieldCheck,
@@ -16,6 +15,7 @@ import {
 import { useI18n } from "@/lib/i18n.tsx";
 import { useRegistrationFlow } from "../hooks/useRegistrationFlow.ts";
 import {
+  PASSWORD_HINT,
   USERNAME_HINT,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -78,7 +78,7 @@ const BootstrapWizard: React.FC = () => {
     handleFinish,
   } = useRegistrationFlow();
 
-  const appName = t("app.name", { defaultValue: "Lumilio" });
+  const appName = t("app.name", { defaultValue: "Lumilio Photos" });
   const current = welcomed ? (FLOW_INDEX[step] ?? 1) : 0;
   const localizedSteps = STEPPER.map((s) => ({
     ...s,
@@ -236,29 +236,33 @@ const BootstrapWizard: React.FC = () => {
                       required
                     />
                   </Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <PasswordField
-                      label={t("auth.register.password", {
-                        defaultValue: "Password",
-                      })}
-                      value={password}
-                      onChange={setPassword}
-                      meter
-                      autoComplete="new-password"
-                    />
-                    <PasswordField
-                      label={t("auth.register.confirmPassword", {
-                        defaultValue: "Confirm",
-                      })}
-                      value={confirmPassword}
-                      onChange={setConfirmPassword}
-                      placeholder={t("auth.register.confirmPasswordPlaceholder", {
-                        defaultValue: "Re-enter",
-                      })}
-                      autoComplete="new-password"
-                      inputRef={confirmPasswordRef}
-                    />
-                  </div>
+                  <PasswordField
+                    label={t("auth.register.password", {
+                      defaultValue: "Password",
+                    })}
+                    hint={t("auth.register.passwordHint", {
+                      defaultValue: PASSWORD_HINT,
+                    })}
+                    value={password}
+                    onChange={setPassword}
+                    meter
+                    autoComplete="new-password"
+                  />
+                  <PasswordField
+                    label={t("auth.register.confirmPassword", {
+                      defaultValue: "Confirm password",
+                    })}
+                    hint={t("auth.register.confirmPasswordHint", {
+                      defaultValue: "Passwords must match exactly.",
+                    })}
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    placeholder={t("auth.register.confirmPasswordPlaceholder", {
+                      defaultValue: "Re-enter password",
+                    })}
+                    autoComplete="new-password"
+                    inputRef={confirmPasswordRef}
+                  />
                   <Btn type="submit" variant="neutral" loading={isBusy} className="self-start px-6">
                     {t("auth.bootstrap.admin.submit", {
                       defaultValue: "Create admin & continue",
@@ -382,10 +386,6 @@ const BootstrapWizard: React.FC = () => {
               ))}
             </div>
           </section>
-        </div>
-        <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-base-content/40">
-          <ImageIcon size={12} /> {appName} ·{" "}
-          {t("auth.common.selfHosted", { defaultValue: "Self-hosted" })}
         </div>
       </div>
     </div>

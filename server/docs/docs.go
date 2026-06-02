@@ -2949,29 +2949,15 @@ const docTemplate = `{
                 "type": "object"
             },
             "dto.SetupRequestDTO": {
-                "properties": {
-                    "admin_username": {
-                        "type": "string"
-                    },
-                    "site_name": {
-                        "type": "string"
-                    }
-                },
                 "type": "object"
             },
             "dto.SetupResultDTO": {
                 "properties": {
-                    "admin_username": {
-                        "type": "string"
-                    },
                     "database_user": {
                         "type": "string"
                     },
                     "password_length": {
                         "type": "integer"
-                    },
-                    "site_name": {
-                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -13599,7 +13585,7 @@ const docTemplate = `{
         },
         "/api/v1/setup": {
             "post": {
-                "description": "Run first-run bootstrapping: generate and rotate the database credential, persist the secret, and write system metadata. Refused once the system is already initialized.",
+                "description": "Run first-run bootstrapping: generate and rotate the database credential, then persist the secret. Refused once the system is already initialized.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -13611,14 +13597,13 @@ const docTemplate = `{
                                     {
                                         "$ref": "#/components/schemas/dto.SetupRequestDTO",
                                         "summary": "request",
-                                        "description": "Setup payload"
+                                        "description": "Optional empty setup payload"
                                     }
                                 ]
                             }
                         }
                     },
-                    "description": "Setup payload",
-                    "required": true
+                    "description": "Optional empty setup payload"
                 },
                 "responses": {
                     "200": {
@@ -13697,7 +13682,7 @@ const docTemplate = `{
         },
         "/api/v1/setup/status": {
             "get": {
-                "description": "Report whether Lumilio has completed first-run initialization. The web frontend routes all traffic to the setup wizard while uninitialized.",
+                "description": "Report whether Lumilio has rotated the temporary database credential. The web frontend runs setup as a preflight while uninitialized.",
                 "responses": {
                     "200": {
                         "content": {

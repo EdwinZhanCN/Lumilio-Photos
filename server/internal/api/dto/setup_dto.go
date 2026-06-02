@@ -2,21 +2,17 @@ package dto
 
 import "server/internal/service"
 
-// SetupStatusDTO reports whether the system configuration payload exists on disk.
+// SetupStatusDTO reports whether database credential rotation has completed.
 type SetupStatusDTO struct {
 	Initialized bool `json:"initialized"`
 }
 
-// SetupRequestDTO is the first-run setup payload submitted from the web wizard.
-type SetupRequestDTO struct {
-	SiteName      string `json:"site_name"`
-	AdminUsername string `json:"admin_username"`
-}
+// SetupRequestDTO is intentionally empty: first-run setup is a server preflight
+// action that rotates and persists the database credential.
+type SetupRequestDTO struct{}
 
 // SetupResultDTO summarises a completed first-run initialization.
 type SetupResultDTO struct {
-	SiteName       string `json:"site_name"`
-	AdminUsername  string `json:"admin_username"`
 	DatabaseUser   string `json:"database_user"`
 	PasswordLength int    `json:"password_length"`
 }
@@ -30,8 +26,6 @@ func ToSetupStatusDTO(status service.SetupStatus) SetupStatusDTO {
 // values (secret/config paths, the password itself) are intentionally omitted.
 func ToSetupResultDTO(result service.SetupResult) SetupResultDTO {
 	return SetupResultDTO{
-		SiteName:       result.SiteName,
-		AdminUsername:  result.AdminUsername,
 		DatabaseUser:   result.DatabaseUser,
 		PasswordLength: result.PasswordLength,
 	}

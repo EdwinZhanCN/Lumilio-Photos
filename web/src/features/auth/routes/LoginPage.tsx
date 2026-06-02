@@ -13,6 +13,7 @@ import type {
 } from "../auth.type.ts";
 import { getPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
 import {
+  PASSWORD_HINT,
   USERNAME_HINT,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -175,7 +176,7 @@ const LoginPage: React.FC = () => {
     const isRecovery = mfaMethod === "recovery_code";
     return (
       <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
-        <AuthShell appName={t("app.name", { defaultValue: "Lumilio" })}>
+        <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
           <CardHead
             icon={isRecovery ? KeyRound : Smartphone}
             title={
@@ -295,7 +296,7 @@ const LoginPage: React.FC = () => {
   /* ---------------------------------------------------------- login view --- */
   return (
     <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
-      <AuthShell appName={t("app.name", { defaultValue: "Lumilio" })}>
+      <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
         <CardHead
           title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
           sub={t("auth.login.subtitle", {
@@ -354,6 +355,9 @@ const LoginPage: React.FC = () => {
         <form className="flex flex-col gap-4" onSubmit={(e) => void handlePasswordLogin(e)}>
           <PasswordField
             label={t("auth.login.password", { defaultValue: "Password" })}
+            hint={t("auth.register.passwordHint", {
+              defaultValue: PASSWORD_HINT,
+            })}
             value={password}
             onChange={setPassword}
             autoComplete="current-password"

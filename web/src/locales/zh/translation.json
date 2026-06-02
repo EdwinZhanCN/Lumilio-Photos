@@ -1,1474 +1,1492 @@
 {
-    "app": {
-        "name": "流明集"
+  "app": {
+    "name": "流明集"
+  },
+  "assets": {
+    "all": {
+      "asset_not_available": "资源可能在当前视图中不可用。",
+      "end_of_results": "已无更多结果。",
+      "load_error": "加载照片失败。请检查你的网络连接后重试。",
+      "loading_assets": "正在加载资源...",
+      "loading_more_data": "正在加载更多数据以查找资源...",
+      "locating_asset": "正在定位资源...",
+      "title": "资源库",
+      "title_one": "{{count}} 张照片",
+      "title_other": "{{count}} 张照片"
     },
-    "assets": {
-        "all": {
-            "asset_not_available": "资源可能在当前视图中不可用。",
-            "end_of_results": "已无更多结果。",
-            "load_error": "加载照片失败。请检查你的网络连接后重试。",
-            "loading_assets": "正在加载资源...",
-            "loading_more_data": "正在加载更多数据以查找资源...",
-            "locating_asset": "正在定位资源...",
-            "title": "资源库",
-            "title_one": "{{count}} 张照片",
-            "title_other": "{{count}} 张照片"
-        },
-        "assetsPageHeader": {
-            "actions": {
-                "addToAlbum": "添加到相册",
-                "affectsAssets": "已选择 {{selectedCount}} 项，将影响 {{assetCount}} 个资源。",
-                "affectsSelected_one": "已选择 {{count}} 项。",
-                "affectsSelected_other": "已选择 {{count}} 项。",
-                "applyToItems_one": "应用于 {{count}} 个项目",
-                "applyToItems_other": "应用于 {{count}} 个项目",
-                "deleteSelected": "删除所选",
-                "downloadAll": "下载全部",
-                "like": "喜欢",
-                "likedMenu": "已喜欢",
-                "setRating": "设置评分",
-                "title": "操作",
-                "unlike": "取消喜欢",
-                "unrated": "未评分"
-            },
-            "addToAlbumModal": {
-                "itemCount_one": "{{count}} 个项目",
-                "itemCount_other": "{{count}} 个项目",
-                "message_one": "将 {{count}} 个项目添加到相册？",
-                "message_other": "将 {{count}} 个项目添加到相册？",
-                "noAlbumsFound": "未找到相册",
-                "title": "添加到相册"
-            },
-            "bulkConfirm": {
-                "likedTitle": "更新喜欢状态？",
-                "ratingTitle": "设置评分"
-            },
-            "compactMenu": {
-                "actions": "操作",
-                "selectedItems": "已选择项目",
-                "viewSort": "查看 & 排序"
-            },
-            "deleteConfirmModal": {
-                "cancelButton": "取消",
-                "deleteButton": "删除资源",
-                "message_one": "这将删除 {{count}} 个资源。",
-                "message_other": "这将删除 {{count}} 个资源。",
-                "title": "确认删除"
-            },
-            "messages": {
-                "addToAlbumError": "添加到相册失败",
-                "addToAlbumSuccess_one": "已将 {{count}} 个项目添加到相册。",
-                "addToAlbumSuccess_other": "已将 {{count}} 个项目添加到相册。",
-                "bulkActionError": "更新所选资源失败。",
-                "bulkActionSuccess_one": "已更新 {{count}} 个资源。",
-                "bulkActionSuccess_other": "已更新 {{count}} 个资源。",
-                "deleteError": "删除资源失败",
-                "deleteSuccess_one": "已删除 {{count}} 个资源。",
-                "deleteSuccess_other": "已删除 {{count}} 个资源。",
-                "downloadError": "启动下载失败",
-                "downloadStart": "下载已开始",
-                "loadAlbumsError": "加载相册失败"
-            },
-            "moreActions": "更多操作",
-            "scan": {
-                "allQueued_one": "已为 {{count}} 个库添加扫描队列。",
-                "allQueued_other": "已为 {{count}} 个库添加扫描队列。",
-                "currentQueued": "已为 {{name}} 加入扫描队列。",
-                "failed": "加入扫描队列失败。",
-                "label": "扫描当前资源库",
-                "noRepositories": "没有可扫描的资源库。",
-                "title": "扫描 {{scope}}"
-            },
-            "selectionMode": {
-                "enter": "进入选择模式",
-                "exit": "退出选择模式",
-                "label": "选择模式",
-                "selectedCount_one": "已选择 {{count}} 项",
-                "selectedCount_other": "已选择 {{count}} 项"
-            },
-            "sortBy": "按 {{sortBy}} 排序",
-            "sortByOptions": {
-                "dateCaptured": "拍摄时间",
-                "recentlyAdded": "最近添加"
-            }
-        },
-        "audioInfoView": {
-            "audio_badge": "音频",
-            "channels_count_one": "{{count}} 个声道",
-            "channels_count_other": "{{count}} 个声道",
-            "channels_mono": "单声道",
-            "channels_stereo": "立体声",
-            "codec_label": "编码: {{codec}}"
-        },
-        "basicInfo": {
-            "clickToEdit": "点击编辑",
-            "description": "描述",
-            "descriptionPlaceholder": "为这张照片添加描述...",
-            "descriptionUpdated": "描述更新成功",
-            "descriptionUpdateError": "更新描述失败",
-            "errors": {
-                "extractFailed": "提取 EXIF 失败：{{message}}",
-                "noAssetId": "资源 ID 不可用"
-            },
-            "exifNotAvailable": "该照片尚未保存原始 EXIF 数据。",
-            "extracting": "提取中...",
-            "latitude": "纬度",
-            "loadingLocation": "加载位置中...",
-            "location": "位置",
-            "longitude": "经度",
-            "noDescription": "尚未添加描述",
-            "title": "基本信息",
-            "viewExif": "查看 EXIF"
-        },
-        "errorFallback": {
-            "something_went_wrong": "出了些问题"
-        },
-        "filterTool": {
-            "cameraMakeSection": {
-                "loading_options": "正在加载选项…",
-                "select_placeholder": "选择相机品牌",
-                "title": "相机品牌"
-            },
-            "dateSection": {
-                "from": "从",
-                "title": "日期",
-                "to": "到"
-            },
-            "filenameSection": {
-                "contains": "包含",
-                "ends_with": "结尾是",
-                "matches": "匹配",
-                "placeholder": "输入文本...",
-                "starts_with": "开头是",
-                "title": "文件名"
-            },
-            "lensSection": {
-                "loading_options": "正在加载选项…",
-                "select_placeholder": "选择镜头",
-                "title": "镜头"
-            },
-            "likeSection": {
-                "liked": "已喜欢",
-                "title": "喜欢",
-                "unliked": "未喜欢"
-            },
-            "locationSection": {
-                "bbox_coords": "边界框 北:{{north}} 南:{{south}} 东:{{east}} 西:{{west}}",
-                "cancel": "取消",
-                "center_lat": "中心纬度",
-                "center_lon": "中心经度",
-                "close_modal": "关闭",
-                "done": "完成",
-                "east_placeholder": "东",
-                "generate_bbox": "生成边界框",
-                "modal_description": "提供中心点 + 半径以生成边界框，或手动编辑值。",
-                "modal_title": "选择位置",
-                "north_placeholder": "北",
-                "pick_on_map": "在地图上选择",
-                "preview_map": "预览地图",
-                "radius_km": "半径 (公里)",
-                "south_placeholder": "南",
-                "title": "位置",
-                "use_current_location": "使用当前位置",
-                "west_placeholder": "西"
-            },
-            "main": {
-                "active_filters_count_one": "已启用 {{count}} 个筛选器",
-                "active_filters_count_other": "已启用 {{count}} 个筛选器",
-                "apply_button": "应用",
-                "enable_toggle": "启用",
-                "filters_button_title": "筛选器",
-                "filters_header": "筛选器",
-                "reset_button": "重置"
-            },
-            "ratingSection": {
-                "rating_n": "{{n}} 星",
-                "title": "评分",
-                "unrated_short": "U",
-                "unrated_title": "未评分"
-            },
-            "rawSection": {
-                "exclude": "排除",
-                "include": "包含",
-                "title": "RAW"
-            },
-            "sectionShell": {
-                "enable": "启用"
-            },
-            "typeSection": {
-                "photo": "照片",
-                "title": "类型",
-                "video": "视频"
-            }
-        },
-        "fullScreenBasicInfo": {
-            "unknown_asset_type": "未知",
-            "unknown_file": "未知文件",
-            "unknown_type": "未知类型"
-        },
-        "groups": {
-            "allResults": "全部结果",
-            "thisMonth": "本月",
-            "thisWeek": "本周",
-            "today": "今天",
-            "yesterday": "昨天"
-        },
-        "justifiedGallery": {
-            "item_count_one": "{{count}} 个",
-            "item_count_other": "{{count}} 个",
-            "loading_more": "正在加载更多..."
-        },
-        "livePhoto": {
-            "playButton": "播放实况照片"
-        },
-        "mediaThumbnail": {
-            "asset_alt_text": "资源",
-            "asset_aria_label_prefix": "资源",
-            "audio_file_fallback": "音频文件",
-            "audio_sr_only": "音频",
-            "no_preview": "无预览",
-            "unknown_file_fallback": "未知文件",
-            "unknown_mime_fallback": "未知类型",
-            "video_sr_only": "视频"
-        },
-        "mediaViewer": {
-            "asset_alt_text": "资源",
-            "media_not_available": "媒体不可用",
-            "unknown_file": "未知文件",
-            "unknown_type": "未知类型",
-            "video_title": "视频"
-        },
-        "photoInfoView": {
-            "ev_suffix": "EV",
-            "exposure_suffix": "秒",
-            "iso_prefix": "ISO ",
-            "raw_badge": "RAW"
-        },
-        "photos": {
-            "fullscreen": {
-                "fieldGuide": {
-                    "button": "生物图鉴",
-                    "fromINaturalist": "iNaturalist",
-                    "loadError": "加载物种识别结果失败",
-                    "loading": "正在加载物种识别结果",
-                    "noResults": "暂无物种识别结果",
-                    "open": "打开生物图鉴",
-                    "openINaturalist": "在 iNaturalist 打开",
-                    "openWikipedia": "维基百科",
-                    "predictionsCount_one": "{{count}} 条识别结果",
-                    "predictionsCount_other": "{{count}} 条识别结果",
-                    "ranks": {
-                        "class": "纲",
-                        "family": "科",
-                        "genus": "属",
-                        "kingdom": "界",
-                        "order": "目",
-                        "phylum": "门",
-                        "species": "种"
-                    },
-                    "reference": "参考资料",
-                    "referenceError": "暂时没有参考资料",
-                    "taxonomy": "分类阶元",
-                    "topLabels": "Top3 标签"
-                }
-            }
-        },
-        "stackCarousel": {
-            "error": "堆叠资源暂时不可用。",
-            "errorHint": "请稍后重试。",
-            "loading": "正在加载堆叠资源..."
-        },
-        "stackDetail": {
-            "assetFallback": "当前资源",
-            "close": "关闭堆叠详情",
-            "coverBadge": "封面",
-            "currentBadge": "当前",
-            "empty": "此堆叠未返回相关资源。",
-            "error": "此资源的堆叠详情暂时不可用。",
-            "livePhoto": "实况照片",
-            "loading": "正在加载堆叠详情...",
-            "memberCount_one": "堆叠中 {{count}} 个资源",
-            "memberCount_other": "堆叠中 {{count}} 个资源",
-            "openButton_one": "查看堆叠详情",
-            "openButton_other": "查看 {{count}} 个相关资源",
-            "relation": {
-                "alternative": "替代版本",
-                "edited_version": "编辑版",
-                "jpeg_original": "JPEG 原图",
-                "raw_original": "RAW 原图"
-            },
-            "thumbnailAlt": "堆叠成员预览",
-            "title": "堆叠详情"
-        },
-        "videoInfoView": {
-            "codec_label": "编码: {{codec}}",
-            "recording_location": "录制地点",
-            "video_badge": "视频"
+    "assetsPageHeader": {
+      "actions": {
+        "addToAlbum": "添加到相册",
+        "affectsAssets": "已选择 {{selectedCount}} 项，将影响 {{assetCount}} 个资源。",
+        "affectsSelected_one": "已选择 {{count}} 项。",
+        "affectsSelected_other": "已选择 {{count}} 项。",
+        "applyToItems_one": "应用于 {{count}} 个项目",
+        "applyToItems_other": "应用于 {{count}} 个项目",
+        "deleteSelected": "删除所选",
+        "downloadAll": "下载全部",
+        "like": "喜欢",
+        "likedMenu": "已喜欢",
+        "setRating": "设置评分",
+        "title": "操作",
+        "unlike": "取消喜欢",
+        "unrated": "未评分"
+      },
+      "addToAlbumModal": {
+        "itemCount_one": "{{count}} 个项目",
+        "itemCount_other": "{{count}} 个项目",
+        "message_one": "将 {{count}} 个项目添加到相册？",
+        "message_other": "将 {{count}} 个项目添加到相册？",
+        "noAlbumsFound": "未找到相册",
+        "title": "添加到相册"
+      },
+      "bulkConfirm": {
+        "likedTitle": "更新喜欢状态？",
+        "ratingTitle": "设置评分"
+      },
+      "compactMenu": {
+        "actions": "操作",
+        "selectedItems": "已选择项目",
+        "viewSort": "查看 & 排序"
+      },
+      "deleteConfirmModal": {
+        "cancelButton": "取消",
+        "deleteButton": "删除资源",
+        "message_one": "这将删除 {{count}} 个资源。",
+        "message_other": "这将删除 {{count}} 个资源。",
+        "title": "确认删除"
+      },
+      "messages": {
+        "addToAlbumError": "添加到相册失败",
+        "addToAlbumSuccess_one": "已将 {{count}} 个项目添加到相册。",
+        "addToAlbumSuccess_other": "已将 {{count}} 个项目添加到相册。",
+        "bulkActionError": "更新所选资源失败。",
+        "bulkActionSuccess_one": "已更新 {{count}} 个资源。",
+        "bulkActionSuccess_other": "已更新 {{count}} 个资源。",
+        "deleteError": "删除资源失败",
+        "deleteSuccess_one": "已删除 {{count}} 个资源。",
+        "deleteSuccess_other": "已删除 {{count}} 个资源。",
+        "downloadError": "启动下载失败",
+        "downloadStart": "下载已开始",
+        "loadAlbumsError": "加载相册失败"
+      },
+      "moreActions": "更多操作",
+      "scan": {
+        "allQueued_one": "已为 {{count}} 个库添加扫描队列。",
+        "allQueued_other": "已为 {{count}} 个库添加扫描队列。",
+        "currentQueued": "已为 {{name}} 加入扫描队列。",
+        "failed": "加入扫描队列失败。",
+        "label": "扫描当前资源库",
+        "noRepositories": "没有可扫描的资源库。",
+        "title": "扫描 {{scope}}"
+      },
+      "selectionMode": {
+        "enter": "进入选择模式",
+        "exit": "退出选择模式",
+        "label": "选择模式",
+        "selectedCount_one": "已选择 {{count}} 项",
+        "selectedCount_other": "已选择 {{count}} 项"
+      },
+      "sortBy": "按 {{sortBy}} 排序",
+      "sortByOptions": {
+        "dateCaptured": "拍摄时间",
+        "recentlyAdded": "最近添加"
+      }
+    },
+    "audioInfoView": {
+      "audio_badge": "音频",
+      "channels_count_one": "{{count}} 个声道",
+      "channels_count_other": "{{count}} 个声道",
+      "channels_mono": "单声道",
+      "channels_stereo": "立体声",
+      "codec_label": "编码: {{codec}}"
+    },
+    "basicInfo": {
+      "clickToEdit": "点击编辑",
+      "description": "描述",
+      "descriptionPlaceholder": "为这张照片添加描述...",
+      "descriptionUpdated": "描述更新成功",
+      "descriptionUpdateError": "更新描述失败",
+      "errors": {
+        "extractFailed": "提取 EXIF 失败：{{message}}",
+        "noAssetId": "资源 ID 不可用"
+      },
+      "exifNotAvailable": "该照片尚未保存原始 EXIF 数据。",
+      "extracting": "提取中...",
+      "latitude": "纬度",
+      "loadingLocation": "加载位置中...",
+      "location": "位置",
+      "longitude": "经度",
+      "noDescription": "尚未添加描述",
+      "title": "基本信息",
+      "viewExif": "查看 EXIF"
+    },
+    "errorFallback": {
+      "something_went_wrong": "出了些问题"
+    },
+    "filterTool": {
+      "cameraMakeSection": {
+        "loading_options": "正在加载选项…",
+        "select_placeholder": "选择相机品牌",
+        "title": "相机品牌"
+      },
+      "dateSection": {
+        "from": "从",
+        "title": "日期",
+        "to": "到"
+      },
+      "filenameSection": {
+        "contains": "包含",
+        "ends_with": "结尾是",
+        "matches": "匹配",
+        "placeholder": "输入文本...",
+        "starts_with": "开头是",
+        "title": "文件名"
+      },
+      "lensSection": {
+        "loading_options": "正在加载选项…",
+        "select_placeholder": "选择镜头",
+        "title": "镜头"
+      },
+      "likeSection": {
+        "liked": "已喜欢",
+        "title": "喜欢",
+        "unliked": "未喜欢"
+      },
+      "locationSection": {
+        "bbox_coords": "边界框 北:{{north}} 南:{{south}} 东:{{east}} 西:{{west}}",
+        "cancel": "取消",
+        "center_lat": "中心纬度",
+        "center_lon": "中心经度",
+        "close_modal": "关闭",
+        "done": "完成",
+        "east_placeholder": "东",
+        "generate_bbox": "生成边界框",
+        "modal_description": "提供中心点 + 半径以生成边界框，或手动编辑值。",
+        "modal_title": "选择位置",
+        "north_placeholder": "北",
+        "pick_on_map": "在地图上选择",
+        "preview_map": "预览地图",
+        "radius_km": "半径 (公里)",
+        "south_placeholder": "南",
+        "title": "位置",
+        "use_current_location": "使用当前位置",
+        "west_placeholder": "西"
+      },
+      "main": {
+        "active_filters_count_one": "已启用 {{count}} 个筛选器",
+        "active_filters_count_other": "已启用 {{count}} 个筛选器",
+        "apply_button": "应用",
+        "enable_toggle": "启用",
+        "filters_button_title": "筛选器",
+        "filters_header": "筛选器",
+        "reset_button": "重置"
+      },
+      "ratingSection": {
+        "rating_n": "{{n}} 星",
+        "title": "评分",
+        "unrated_short": "U",
+        "unrated_title": "未评分"
+      },
+      "rawSection": {
+        "exclude": "排除",
+        "include": "包含",
+        "title": "RAW"
+      },
+      "sectionShell": {
+        "enable": "启用"
+      },
+      "typeSection": {
+        "photo": "照片",
+        "title": "类型",
+        "video": "视频"
+      }
+    },
+    "fullScreenBasicInfo": {
+      "unknown_asset_type": "未知",
+      "unknown_file": "未知文件",
+      "unknown_type": "未知类型"
+    },
+    "groups": {
+      "allResults": "全部结果",
+      "thisMonth": "本月",
+      "thisWeek": "本周",
+      "today": "今天",
+      "yesterday": "昨天"
+    },
+    "justifiedGallery": {
+      "item_count_one": "{{count}} 个",
+      "item_count_other": "{{count}} 个",
+      "loading_more": "正在加载更多..."
+    },
+    "livePhoto": {
+      "playButton": "播放实况照片"
+    },
+    "mediaThumbnail": {
+      "asset_alt_text": "资源",
+      "asset_aria_label_prefix": "资源",
+      "audio_file_fallback": "音频文件",
+      "audio_sr_only": "音频",
+      "no_preview": "无预览",
+      "unknown_file_fallback": "未知文件",
+      "unknown_mime_fallback": "未知类型",
+      "video_sr_only": "视频"
+    },
+    "mediaViewer": {
+      "asset_alt_text": "资源",
+      "media_not_available": "媒体不可用",
+      "unknown_file": "未知文件",
+      "unknown_type": "未知类型",
+      "video_title": "视频"
+    },
+    "photoInfoView": {
+      "ev_suffix": "EV",
+      "exposure_suffix": "秒",
+      "iso_prefix": "ISO ",
+      "raw_badge": "RAW"
+    },
+    "photos": {
+      "fullscreen": {
+        "fieldGuide": {
+          "button": "生物图鉴",
+          "fromINaturalist": "iNaturalist",
+          "loadError": "加载物种识别结果失败",
+          "loading": "正在加载物种识别结果",
+          "noResults": "暂无物种识别结果",
+          "open": "打开生物图鉴",
+          "openINaturalist": "在 iNaturalist 打开",
+          "openWikipedia": "维基百科",
+          "predictionsCount_one": "{{count}} 条识别结果",
+          "predictionsCount_other": "{{count}} 条识别结果",
+          "ranks": {
+            "class": "纲",
+            "family": "科",
+            "genus": "属",
+            "kingdom": "界",
+            "order": "目",
+            "phylum": "门",
+            "species": "种"
+          },
+          "reference": "参考资料",
+          "referenceError": "暂时没有参考资料",
+          "taxonomy": "分类阶元",
+          "topLabels": "Top3 标签"
         }
+      }
     },
-    "auth": {
-        "bootstrap": {
-            "gate": {
-                "loading": "正在准备初始化...",
-                "statusError": "无法验证初始化状态。"
-            },
-            "landing": {
-                "cta": "创建首个管理员账户",
-                "promptBody": "首个注册账户将成为管理员，并引导您完成 Passkey 或身份验证器设置。",
-                "promptTitle": "需要完成首次初始化",
-                "title": "设置管理员账户"
-            },
-            "mfa": {
-                "subtitle": "请立即完成身份验证器设置，确保首个 Lumilio 管理员账户在继续前已受到保护。",
-                "title": "保护首个管理员账户"
-            },
-            "register": {
-                "promptBody": "Lumilio 将创建首个管理员账户，并要求在完成初始化前启用 Passkey 或身份验证器。",
-                "promptTitle": "您正在注册首个管理员用户",
-                "submit": "以管理员身份继续",
-                "subtitle": "请先创建用户名，然后完成 Passkey 或身份验证器设置，以完成管理员初始化。",
-                "title": "创建首个管理员账户"
-            }
-        },
-        "changePassword": {
-            "backToSettings": "返回设置",
-            "changed": "是否取消本次操作？",
-            "confirmPassword": "确认新密码",
-            "currentPassword": "当前密码",
-            "currentPasswordHint": "请输入当前密码以验证您的身份。",
-            "error": "修改密码失败。",
-            "loading": "正在更新密码…",
-            "mismatch": "两次输入的密码必须完全一致。",
-            "newPassword": "新密码",
-            "newPasswordDivider": "新密码",
-            "pageSubtitle": "修改密码后，您将被安全登出，并需使用新密码重新登录。",
-            "pageTitle": "修改密码",
-            "passwordHint": "长度 10-72 位，且至少包含 1 个大写字母、1 个小写字母和 1 个数字。",
-            "submit": "更新密码"
-        },
-        "common": {
-            "logoAlt": "{{appName}} 标志"
-        },
-        "login": {
-            "authenticatorCode": "身份验证器验证码",
-            "authenticatorCodePlaceholder": "请输入 6 位验证码",
-            "back": "返回",
-            "loading": "登录中…",
-            "passkeyLoading": "正在唤起 Passkey…",
-            "passkeyStartError": "无法为该账户启动 Passkey 登录。",
-            "passkeySubmit": "使用 Passkey 继续",
-            "passkeyUnavailable": "当前设备上该账户暂不可使用 Passkey 登录。",
-            "passkeyVerifyError": "Passkey 验证失败。",
-            "password": "密码",
-            "passwordSubtitle": "若当前设备不便使用 Passkey，可改用密码登录。",
-            "passwordTitle": "请输入密码",
-            "recoveryCode": "恢复码",
-            "recoveryCodePlaceholder": "请输入恢复码",
-            "recoveryHint": "请输入一次性恢复码中的任意一组。",
-            "recoveryValidation": "请输入 8 位恢复码。",
-            "register": "立即注册",
-            "submit": "使用密码继续",
-            "totpHint": "请输入身份验证器应用中的 6 位验证码。",
-            "totpValidation": "请输入 6 位身份验证器验证码。",
-            "useAuthenticatorCode": "改用身份验证器验证码",
-            "usePasswordInstead": "改用密码",
-            "useRecoveryCode": "改用恢复码",
-            "username": "用户名",
-            "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
-            "usernamePlaceholder": "请输入用户名",
-            "usernameTitle": "使用用户名继续",
-            "verifyButton": "验证并继续",
-            "verifying": "验证中…",
-            "verifyPrompt": "当前登录账户：{{name}}",
-            "verifySubtitle": "请使用身份验证器应用或恢复码完成登录验证。",
-            "verifyTitle": "双重验证"
-        },
-        "logout": "退出登录",
-        "mfa": {
-            "backToSettings": "返回设置",
-            "continueToApp": "继续使用应用",
-            "doneHere": "已完成当前操作？",
-            "pageSubtitle": "在同一页面集中管理验证、恢复码及账户安全设置。",
-            "pageTitle": "管理身份验证器设置"
-        },
-        "register": {
-            "confirmPassword": "确认密码",
-            "confirmPasswordHint": "两次输入的密码必须完全一致。",
-            "finish": "继续使用 Lumilio",
-            "loading": "正在准备账户…",
-            "login": "立即登录",
-            "manualKey": "设置密钥",
-            "passkeyAction": "创建 Passkey",
-            "passkeyCardBody": "使用当前设备的原生 Passkey 流程，可获得更高效且更安全的登录体验。",
-            "passkeyCardTitle": "创建 Passkey",
-            "passkeyStartError": "启动 Passkey 注册失败。",
-            "passkeyUnavailableUseTotp": "当前环境暂不支持 Passkey，请使用身份验证器应用继续。",
-            "passkeyVerifyError": "Passkey 注册失败。",
-            "password": "密码",
-            "passwordHint": "长度 10-72 位，且至少包含 1 个大写字母、1 个小写字母和 1 个数字。",
-            "recoveryReadyBody": "继续前，请先将这些恢复码妥善保存。",
-            "recoveryReadyTitle": "账户安全设置已完成",
-            "recoverySubtitle": "若您失去身份验证器访问权限，这些一次性恢复码是唯一备用方式。",
-            "recoveryTitle": "保存恢复码",
-            "securityChoiceSubtitle": "当设备与来源环境支持时，建议优先使用 Passkey。",
-            "securityChoiceTitle": "选择登录方式",
-            "startError": "启动账户注册失败。",
-            "submit": "继续",
-            "subtitle": "请先创建用户名和密码，然后完成账户安全设置。",
-            "title": "创建账户",
-            "totpAction": "使用身份验证器应用",
-            "totpCardBody": "若您更偏好 Duo、1Password、Google Authenticator 或其他应用，请选择 TOTP。",
-            "totpCardTitle": "改用身份验证器应用",
-            "totpQrAlt": "TOTP 设置二维码",
-            "totpSetupCompleteError": "完成身份验证器设置失败。",
-            "totpSetupStartError": "启动身份验证器设置失败。",
-            "totpSubtitle": "请使用 Duo、1Password 或其他身份验证器应用扫描二维码，并完成一次验证码校验。",
-            "totpTitle": "设置身份验证器应用",
-            "username": "用户名",
-            "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
-            "usernamePlaceholder": "请输入用户名",
-            "verifyAndFinish": "验证并完成设置",
-            "verifyCode": "验证码"
-        }
+    "stackCarousel": {
+      "error": "堆叠资源暂时不可用。",
+      "errorHint": "请稍后重试。",
+      "loading": "正在加载堆叠资源..."
     },
-    "bulk": {
-        "updateError": "更新失败",
-        "updateSuccess_one": "已更新 {{count}} 个项目。",
-        "updateSuccess_other": "已更新 {{count}} 个项目。"
+    "stackDetail": {
+      "assetFallback": "当前资源",
+      "close": "关闭堆叠详情",
+      "coverBadge": "封面",
+      "currentBadge": "当前",
+      "empty": "此堆叠未返回相关资源。",
+      "error": "此资源的堆叠详情暂时不可用。",
+      "livePhoto": "实况照片",
+      "loading": "正在加载堆叠详情...",
+      "memberCount_one": "堆叠中 {{count}} 个资源",
+      "memberCount_other": "堆叠中 {{count}} 个资源",
+      "openButton_one": "查看堆叠详情",
+      "openButton_other": "查看 {{count}} 个相关资源",
+      "relation": {
+        "alternative": "替代版本",
+        "edited_version": "编辑版",
+        "jpeg_original": "JPEG 原图",
+        "raw_original": "RAW 原图"
+      },
+      "thumbnailAlt": "堆叠成员预览",
+      "title": "堆叠详情"
     },
-    "collections": {
-        "albumDetails": {
-            "albumCode": "相册 #{{id}}",
-            "bioClip": {
-                "action": "生物图鉴识别",
-                "badge": "生物图鉴",
-                "error": "生物图鉴识别排队失败。",
-                "running": "排队中...",
-                "success_one": "已将 {{count}} 张照片加入识别队列。",
-                "success_other": "已将 {{count}} 张照片加入识别队列。"
-            },
-            "createdAtLabel": "创建于",
-            "fallbackName": "相册",
-            "itemsCount_one": "{{count}} 项",
-            "itemsCount_other": "{{count}} 项",
-            "loadError": "加载相册失败：{{error}}"
-        },
-        "coverAlt": "相册封面图",
-        "coverAltWithName": "相册 {{albumName}} 的封面图",
-        "createModal": {
-            "actions": {
-                "create": "创建相册",
-                "creating": "创建中..."
-            },
-            "coverPicker": {
-                "title": "选择封面照片"
-            },
-            "fields": {
-                "bioAlbum": {
-                    "hint": "为加入此相册的照片启用物种识别。",
-                    "label": "生物图鉴"
-                },
-                "cover": {
-                    "change": "更换封面",
-                    "choose": "选择封面照片",
-                    "label": "相册封面",
-                    "requiredHint": "新建相册时必须选择",
-                    "selectedAlt": "已选封面图"
-                },
-                "description": {
-                    "label": "描述",
-                    "placeholder": "为这个合集添加描述..."
-                },
-                "name": {
-                    "label": "相册名称",
-                    "placeholder": "例如：2024 夏日旅行"
-                }
-            }
-        },
-        "deleteModal": {
-            "confirm": "删除合集",
-            "deleting": "删除中...",
-            "description_one": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
-            "description_other": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
-            "title": "删除相册"
-        },
-        "emptyAlbums": "还没有相册。",
-        "emptyPeople": "还没有识别出人物。",
-        "itemsCount_one": "{{count}} 项",
-        "itemsCount_other": "{{count}} 项",
-        "messages": {
-            "deleteError": "删除相册失败",
-            "deleteSuccess": "相册删除成功",
-            "loadAlbumsError": "加载相册失败：{{message}}",
-            "loadPeopleError": "加载人物失败：{{message}}"
-        },
-        "newAlbum": "新建相册",
-        "places": {
-            "empty": "暂无旅行记录。",
-            "exploreAll": "探索所有地点",
-            "loadError": "加载旅行记录失败：{{error}}",
-            "mapView": "地图",
-            "mapViewTitle": "地点地图"
-        },
-        "sections": {
-            "albums": "相册",
-            "people": "人物",
-            "places": "地点",
-            "utilities": "工具"
-        },
-        "untitled": "未命名相册",
-        "utilities": {
-            "duplicates": {
-                "description": "查找并合并重复的照片",
-                "title": "重复照片"
-            }
-        }
+    "videoInfoView": {
+      "codec_label": "编码: {{codec}}",
+      "recording_location": "录制地点",
+      "video_badge": "视频"
+    }
+  },
+  "auth": {
+    "bootstrap": {
+      "admin": {
+        "submit": "创建管理员并继续",
+        "subtitle": "此账户可管理服务器、资料库和成员。",
+        "title": "创建管理员"
+      },
+      "firstRun": "首次运行设置",
+      "gate": {
+        "loading": "正在准备初始化...",
+        "statusError": "无法验证初始化状态。"
+      },
+      "mfa": {
+        "subtitle": "请立即完成身份验证器设置，确保首个 Lumilio 管理员账户在继续前已受到保护。",
+        "title": "保护首个管理员账户"
+      },
+      "passkey": {
+        "action": "创建管理员 Passkey",
+        "skip": "跳过，改用身份验证器",
+        "subtitle": "强烈建议启用，管理员账户拥有整台服务器的管理权限。",
+        "title": "使用 Passkey 保护管理员"
+      },
+      "recovery": {
+        "cta": "完成并打开仪表盘",
+        "subtitle": "当所有验证方式都丢失时，这是恢复服务器访问的唯一方式。",
+        "title": "保存管理员恢复码"
+      },
+      "sidebarNote": "此向导只会出现一次，直到首个管理员创建完成。",
+      "totp": {
+        "subtitle": "管理员账户必须启用。请扫描并验证后继续。",
+        "title": "添加身份验证器应用"
+      },
+      "welcome": {
+        "body": "服务器已经运行，但还没有管理员。请创建首个管理员账户，并通过双重验证保护它。",
+        "cta": "开始设置",
+        "inviteBody": "设置完成后再邀请家庭成员。",
+        "inviteTitle": "稍后邀请其他人",
+        "localBody": "所有内容只存储在这台服务器上。",
+        "localTitle": "你的数据留在本地",
+        "secureBody": "管理员必须启用 Passkey 和身份验证器。",
+        "secureTitle": "默认安全保护",
+        "title": "欢迎使用流明集"
+      }
+    },
+    "changePassword": {
+      "backToSettings": "返回设置",
+      "changed": "是否取消本次操作？",
+      "confirmPassword": "确认新密码",
+      "currentPassword": "当前密码",
+      "currentPasswordHint": "请输入当前密码以验证您的身份。",
+      "error": "修改密码失败。",
+      "loading": "正在更新密码…",
+      "mismatch": "两次输入的密码必须完全一致。",
+      "newPassword": "新密码",
+      "newPasswordDivider": "新密码",
+      "pageSubtitle": "修改密码后，您将被安全登出，并需使用新密码重新登录。",
+      "pageTitle": "修改密码",
+      "passwordHint": "长度 10-72 位，且至少包含 1 个大写字母、1 个小写字母和 1 个数字。",
+      "submit": "更新密码"
     },
     "common": {
-        "cancel": "取消",
-        "clickToEdit": "点击编辑",
-        "close": "关闭",
-        "confirm": "确认",
-        "copied": "已复制",
-        "copy": "复制",
-        "delete": "删除",
-        "emptyState": {
-            "description": "去管理页面上传资源吧！",
-            "title": "这里还没有内容"
-        },
-        "error": "错误",
-        "loading": "加载中…",
-        "loadMore": "加载更多",
-        "na": "无",
-        "notAvailable": "不可用",
-        "or": "或",
-        "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
-        "remove": "移除",
-        "retry": "重试",
-        "save": "保存",
-        "select": "选择",
-        "selected_one": "已选 {{count}} 项",
-        "selected_other": "已选 {{count}} 项",
-        "uploaded": "上传于",
-        "viewAll": "查看全部"
+      "logoAlt": "{{appName}} 标志"
     },
-    "delete": {
-        "confirm": "删除资源",
-        "confirmMessage": "确定要删除 \"{{filename}}\" 吗？",
-        "confirmTitle": "删除资源",
-        "deleting": "删除中...",
-        "error": "删除资源失败",
-        "softDeleteNote": "这将标记照片为已删除。文件不会被永久删除。",
-        "success": "资源删除成功",
-        "thisAsset": "这张照片"
+    "login": {
+      "backToSignIn": "返回登录",
+      "passkeyStartError": "无法为该账户启动 Passkey 登录。",
+      "passkeySubmit": "使用 Passkey 继续",
+      "passkeyUnavailable": "当前设备上该账户暂不可使用 Passkey 登录。",
+      "passkeyVerifyError": "Passkey 验证失败。",
+      "password": "密码",
+      "recoveryCode": "恢复码",
+      "recoveryHint": "请输入一次性恢复码中的任意一组。",
+      "recoveryTitle": "输入恢复码",
+      "register": "立即注册",
+      "registerPrompt": "还没有账户？",
+      "submit": "使用密码继续",
+      "subtitle": "使用 Passkey，或输入用户名和密码。",
+      "title": "登录流明集",
+      "useAuthenticatorCode": "改用身份验证器验证码",
+      "useRecoveryCode": "改用恢复码",
+      "useRecoveryCodeInstead": "无法访问验证器？使用恢复码",
+      "username": "用户名",
+      "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
+      "usernamePlaceholder": "请输入用户名",
+      "usernameRequiredForPasskey": "请输入用户名以继续使用 Passkey。",
+      "verifyButton": "验证并继续",
+      "verifyPrompt": "当前登录账户：{{name}}",
+      "verifyTitle": "双重验证"
     },
-    "duplicates": {
-        "emptyDescription": "看起来你的资料库里每张照片都是独一无二的。",
-        "emptyTitle": "没有需要处理的重复项",
-        "errors": {
-            "noRepository": "未选择仓库"
-        },
-        "filters": {
-            "dismissed": "已忽略",
-            "merged": "已合并",
-            "pending": "待处理",
-            "status": "状态"
-        },
-        "group": {
-            "candidateLabel": "候选",
-            "dismiss": "不是重复",
-            "dismissedLabel": "已忽略",
-            "dismissError": "标记失败：{{message}}",
-            "dismissing": "处理中...",
-            "dismissSuccess": "已标记为不是重复。",
-            "duplicateLabel": "将移入废纸篓",
-            "keeperLabel": "保留",
-            "membersCount_one": "{{count}} 张照片",
-            "membersCount_other": "{{count}} 张照片",
-            "merge": "合并",
-            "mergeError": "合并失败：{{message}}",
-            "mergeSuccess": "已合并，释放 {{size}}。",
-            "merging": "合并中...",
-            "saveSize": "回收 {{size}}",
-            "totalSize": "共 {{size}}"
-        },
-        "loadError": "加载重复照片失败：{{message}}",
-        "method": {
-            "exact": "完全重复",
-            "mixed": "混合（精确 + 相似）",
-            "phash": "视觉相似"
-        },
-        "noScanYet": "运行一次扫描以查找资料库中的重复照片。",
-        "pageTitle": "重复照片",
-        "scan": "立即扫描",
-        "scanError": "扫描失败：{{message}}",
-        "scanning": "扫描中...",
-        "scanSuccess": "共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
-        "summary": {
-            "lastDetected": "上次扫描",
-            "neverDetected": "尚未扫描",
-            "pendingGroups": "待处理合集",
-            "recoverableAssets": "可回收照片",
-            "recoverableBytes": "可回收空间"
-        },
-        "summaryLoadError": "加载重复照片摘要失败：{{message}}"
+    "logout": "退出登录",
+    "mfa": {
+      "backToSettings": "返回设置",
+      "continueToApp": "继续使用应用",
+      "doneHere": "已完成当前操作？",
+      "pageSubtitle": "在同一页面集中管理验证、恢复码及账户安全设置。",
+      "pageTitle": "管理身份验证器设置"
     },
-    "footer": {
-        "copyright": "© {{year}} Lumilio Photos，由 EdwinZhan 打造"
+    "register": {
+      "confirmPassword": "确认密码",
+      "confirmPasswordHint": "两次输入的密码必须完全一致。",
+      "confirmPasswordPlaceholder": "再次输入密码",
+      "finish": "继续使用流明集",
+      "haveAccount": "已经有账户？",
+      "login": "立即登录",
+      "mfaRequiredNotice": "每个账户都需要启用双重验证。下一步将完成安全设置。",
+      "passkeyAction": "创建 Passkey",
+      "passkeyDescription": "无需记住密码。Passkey 保存在此设备上，并可防止钓鱼攻击。",
+      "passkeyHeadline": "使用面容、指纹或设备解锁登录",
+      "passkeyStartError": "启动 Passkey 注册失败。",
+      "passkeyStepSubtitle": "Passkey 是最快也最安全的登录方式。建议现在添加一个。",
+      "passkeyStepTitle": "使用 Passkey 保护账户",
+      "passkeyUnavailableUseTotp": "当前环境暂不支持 Passkey，请使用身份验证器应用继续。",
+      "passkeyVerifyError": "Passkey 注册失败。",
+      "password": "密码",
+      "passwordHint": "长度 10-72 位，且至少包含 1 个大写字母、1 个小写字母和 1 个数字。",
+      "recoverySavedConfirm": "我已将恢复码保存在安全位置",
+      "recoverySubtitle": "若您失去身份验证器访问权限，这些一次性恢复码是唯一备用方式。",
+      "recoveryTitle": "保存恢复码",
+      "skipPasskey": "暂时跳过，只使用身份验证器",
+      "startError": "启动账户注册失败。",
+      "stepAccount": "账户",
+      "stepAuthenticator": "身份验证器",
+      "stepPasskey": "Passkey",
+      "stepRecovery": "恢复码",
+      "submit": "继续",
+      "subtitle": "请先创建用户名和密码，然后完成账户安全设置。",
+      "title": "创建账户",
+      "totpSetupCompleteError": "完成身份验证器设置失败。",
+      "totpSetupStartError": "启动身份验证器设置失败。",
+      "totpSubtitle": "请使用 Duo、1Password 或其他身份验证器应用扫描二维码，并完成一次验证码校验。",
+      "totpTitle": "设置身份验证器应用",
+      "username": "用户名",
+      "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
+      "usernamePlaceholder": "请输入用户名",
+      "verifyAndFinish": "验证并完成设置"
     },
-    "home": {
-        "errors": {
-            "featuredLoadFailed": "精选资源加载失败：{{message}}",
-            "unknown": "未知错误"
+    "setup": {
+      "error": "初始化失败。请检查服务器日志后重试。",
+      "gate": {
+        "initializing": "正在保护数据库凭证...",
+        "loading": "正在检查系统状态…",
+        "statusError": "无法验证系统状态。"
+      }
+    }
+  },
+  "bulk": {
+    "updateError": "更新失败",
+    "updateSuccess_one": "已更新 {{count}} 个项目。",
+    "updateSuccess_other": "已更新 {{count}} 个项目。"
+  },
+  "collections": {
+    "albumDetails": {
+      "albumCode": "相册 #{{id}}",
+      "bioClip": {
+        "action": "生物图鉴识别",
+        "badge": "生物图鉴",
+        "error": "生物图鉴识别排队失败。",
+        "running": "排队中...",
+        "success_one": "已将 {{count}} 张照片加入识别队列。",
+        "success_other": "已将 {{count}} 张照片加入识别队列。"
+      },
+      "createdAtLabel": "创建于",
+      "fallbackName": "相册",
+      "itemsCount_one": "{{count}} 项",
+      "itemsCount_other": "{{count}} 项",
+      "loadError": "加载相册失败：{{error}}"
+    },
+    "coverAlt": "相册封面图",
+    "coverAltWithName": "相册 {{albumName}} 的封面图",
+    "createModal": {
+      "actions": {
+        "create": "创建相册",
+        "creating": "创建中..."
+      },
+      "coverPicker": {
+        "title": "选择封面照片"
+      },
+      "fields": {
+        "bioAlbum": {
+          "hint": "为加入此相册的照片启用物种识别。",
+          "label": "生物图鉴"
         },
-        "map": {
-            "empty": "暂无带地理位置的照片。",
-            "loadedStatus": "定位照片 {{pointsCount}} 张 / 已加载 {{loadedCount}}",
-            "loadedStatusMore": "（继续加载中）",
-            "loadedStatusTotal": " / 总计 {{totalCount}}",
-            "loading": "正在加载地图数据...",
-            "placesCount_one": "{{count}} 个地点",
-            "placesCount_other": "{{count}} 个地点",
-            "title": "时空轨迹"
+        "cover": {
+          "change": "更换封面",
+          "choose": "选择封面照片",
+          "label": "相册封面",
+          "requiredHint": "新建相册时必须选择",
+          "selectedAlt": "已选封面图"
         },
-        "stats": {
-            "cameraLens": {
-                "empty": "暂无相机镜头数据",
-                "title": "常用相机镜头组合"
-            },
-            "error": "加载统计数据失败：{{error}}",
-            "focalLength": {
-                "empty": "暂无焦距数据",
-                "title": "常用焦段分布"
-            },
-            "heatmap": {
-                "empty": "暂无活跃度数据",
-                "title": "拍摄活跃热力图"
-            },
-            "timeDistribution": {
-                "blue": "蓝调",
-                "golden": "黄金",
-                "sunrise": "日出",
-                "sunset": "日落",
-                "title": "拍摄时段分布"
-            },
-            "unknown": "未知"
+        "description": {
+          "label": "描述",
+          "placeholder": "为这个合集添加描述..."
         },
-        "tabs": {
-            "gallery": "画廊",
-            "stats": "数据统计"
+        "name": {
+          "label": "相册名称",
+          "placeholder": "例如：2024 夏日旅行"
         }
+      }
     },
-    "lumilio": {
-        "agent": {
-            "disabled": "Lumilio Agent 已禁用。请在 设置 > AI 中启用。",
-            "notConfigured": "Lumilio Agent 尚未配置。请在 设置 > AI 中完成 provider、model 与 API key。"
-        },
-        "chat": {
-            "confirmation": {
-                "confirm": "确认",
-                "title": "需要确认"
-            },
-            "empty": "开始与 Lumilio 对话吧！",
-            "openAiSettings": "打开 AI 设置"
-        },
-        "input": {
-            "generating": "正在生成回复...",
-            "placeholderLabel": "占位标签",
-            "placeholderType": "占位",
-            "prompt": "向 Lumilio Agent 提问...（输入 @ 或 /）",
-            "unavailable": "Lumilio Agent 当前不可用。"
-        },
-        "markdown": {
-            "code": {
-                "copied": "已复制",
-                "copy": "复制",
-                "languageFallback": "文本"
-            },
-            "think": {
-                "defaultSummary": "思考过程...",
-                "thinking": "思考中...",
-                "thoughtFor": "思考用时 {{time}} 秒"
-            }
-        },
-        "messages": {
-            "thinking": "思考中..."
-        },
-        "status": {
-            "loading": "加载中 {{status}}"
-        },
-        "tools": {
-            "error": "错误：{{error}}",
-            "eventNotFound": "未找到工具事件。",
-            "openFullView": "打开完整视图",
-            "openMainGallery": "在主图库视图中打开",
-            "resultsTitle": "{{toolName}} 结果",
-            "viewResults": "查看结果"
-        }
+    "deleteModal": {
+      "confirm": "删除合集",
+      "deleting": "删除中...",
+      "description_one": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
+      "description_other": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
+      "title": "删除相册"
     },
-    "manage": {
-        "errorBoundaryMessage": "管理区域加载失败或在操作过程中发生错误。",
-        "errorBoundaryTitle": "管理区域错误！",
-        "pageTitle": "管理资源库",
-        "repositories": {
-            "actionsMenu": "{{name}} 的资源库操作",
-            "assetCount": "资源数量",
-            "createAction": "添加资源库",
-            "createDescription": "在已挂载的存储根目录中创建一个资源库文件夹。",
-            "createFailed": "创建资源库失败。",
-            "createNameHint": "使用简短、容易识别的名称。",
-            "createNameLabel": "资源库名称",
-            "createNamePlaceholder": "家庭照片",
-            "createSubmit": "创建资源库",
-            "createSuccess": "已添加 {{name}}。",
-            "createTitle": "添加资源库",
-            "description": "当前接入的仓库，可用于上传、筛选和文件系统扫描。",
-            "detectStacks": "检测堆叠",
-            "detectStacksCompleted_one": "在 {{name}} 中检测到 {{count}} 个堆叠。",
-            "detectStacksCompleted_other": "在 {{name}} 中检测到 {{count}} 个堆叠。",
-            "detectStacksFailed": "堆叠检测失败。",
-            "duplicateScan": "扫描重复项",
-            "duplicateScanFailed": "重复项扫描失败。",
-            "empty": "暂无可用仓库。",
-            "primaryBadge": "主仓库",
-            "rebuildLocation": "重建位置聚类",
-            "rebuildLocationQueued": "位置聚类重建已加入队列。",
-            "rescanRepository": "重新扫描",
-            "scanAll": "扫描全部资源库",
-            "scanAllQueued_one": "已为 {{count}} 个库添加扫描队列。",
-            "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
-            "scanFailed": "加入扫描队列失败。",
-            "scanQueued": "已为 {{name}} 加入扫描队列。",
-            "title": "资源库",
-            "unavailable": "仓库选项暂时不可用。"
-        }
+    "emptyAlbums": "还没有相册。",
+    "emptyPeople": "还没有识别出人物。",
+    "itemsCount_one": "{{count}} 项",
+    "itemsCount_other": "{{count}} 项",
+    "messages": {
+      "deleteError": "删除相册失败",
+      "deleteSuccess": "相册删除成功",
+      "loadAlbumsError": "加载相册失败：{{message}}",
+      "loadPeopleError": "加载人物失败：{{message}}"
+    },
+    "newAlbum": "新建相册",
+    "places": {
+      "empty": "暂无旅行记录。",
+      "exploreAll": "探索所有地点",
+      "loadError": "加载旅行记录失败：{{error}}",
+      "mapView": "地图",
+      "mapViewTitle": "地点地图"
+    },
+    "sections": {
+      "albums": "相册",
+      "people": "人物",
+      "places": "地点",
+      "utilities": "工具"
+    },
+    "untitled": "未命名相册",
+    "utilities": {
+      "duplicates": {
+        "description": "查找并合并重复的照片",
+        "title": "重复照片"
+      }
+    }
+  },
+  "common": {
+    "cancel": "取消",
+    "clickToEdit": "点击编辑",
+    "close": "关闭",
+    "confirm": "确认",
+    "copied": "已复制",
+    "copy": "复制",
+    "delete": "删除",
+    "emptyState": {
+      "description": "去管理页面上传资源吧！",
+      "title": "这里还没有内容"
+    },
+    "error": "错误",
+    "loading": "加载中…",
+    "loadMore": "加载更多",
+    "na": "无",
+    "notAvailable": "不可用",
+    "or": "或",
+    "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
+    "remove": "移除",
+    "retry": "重试",
+    "save": "保存",
+    "select": "选择",
+    "selected_one": "已选 {{count}} 项",
+    "selected_other": "已选 {{count}} 项",
+    "uploaded": "上传于",
+    "viewAll": "查看全部"
+  },
+  "delete": {
+    "confirm": "删除资源",
+    "confirmMessage": "确定要删除 \"{{filename}}\" 吗？",
+    "confirmTitle": "删除资源",
+    "deleting": "删除中...",
+    "error": "删除资源失败",
+    "softDeleteNote": "这将标记照片为已删除。文件不会被永久删除。",
+    "success": "资源删除成功",
+    "thisAsset": "这张照片"
+  },
+  "duplicates": {
+    "emptyDescription": "看起来你的资料库里每张照片都是独一无二的。",
+    "emptyTitle": "没有需要处理的重复项",
+    "errors": {
+      "noRepository": "未选择仓库"
+    },
+    "filters": {
+      "dismissed": "已忽略",
+      "merged": "已合并",
+      "pending": "待处理",
+      "status": "状态"
+    },
+    "group": {
+      "candidateLabel": "候选",
+      "dismiss": "不是重复",
+      "dismissedLabel": "已忽略",
+      "dismissError": "标记失败：{{message}}",
+      "dismissing": "处理中...",
+      "dismissSuccess": "已标记为不是重复。",
+      "duplicateLabel": "将移入废纸篓",
+      "keeperLabel": "保留",
+      "membersCount_one": "{{count}} 张照片",
+      "membersCount_other": "{{count}} 张照片",
+      "merge": "合并",
+      "mergeError": "合并失败：{{message}}",
+      "mergeSuccess": "已合并，释放 {{size}}。",
+      "merging": "合并中...",
+      "saveSize": "回收 {{size}}",
+      "totalSize": "共 {{size}}"
+    },
+    "loadError": "加载重复照片失败：{{message}}",
+    "method": {
+      "exact": "完全重复",
+      "mixed": "混合（精确 + 相似）",
+      "phash": "视觉相似"
+    },
+    "noScanYet": "运行一次扫描以查找资料库中的重复照片。",
+    "pageTitle": "重复照片",
+    "scan": "立即扫描",
+    "scanError": "扫描失败：{{message}}",
+    "scanning": "扫描中...",
+    "scanSuccess": "共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
+    "summary": {
+      "lastDetected": "上次扫描",
+      "neverDetected": "尚未扫描",
+      "pendingGroups": "待处理合集",
+      "recoverableAssets": "可回收照片",
+      "recoverableBytes": "可回收空间"
+    },
+    "summaryLoadError": "加载重复照片摘要失败：{{message}}"
+  },
+  "footer": {
+    "copyright": "© {{year}} Lumilio Photos，由 EdwinZhan 打造"
+  },
+  "home": {
+    "errors": {
+      "featuredLoadFailed": "精选资源加载失败：{{message}}",
+      "unknown": "未知错误"
     },
     "map": {
-        "noLocationData": "无位置数据"
+      "empty": "暂无带地理位置的照片。",
+      "loadedStatus": "定位照片 {{pointsCount}} 张 / 已加载 {{loadedCount}}",
+      "loadedStatusMore": "（继续加载中）",
+      "loadedStatusTotal": " / 总计 {{totalCount}}",
+      "loading": "正在加载地图数据...",
+      "placesCount_one": "{{count}} 个地点",
+      "placesCount_other": "{{count}} 个地点",
+      "title": "时空轨迹"
     },
-    "monitor": {
-        "adminOnlyDescription": "队列监控与运行时诊断仅对管理员开放。",
-        "adminOnlyTitle": "需要管理员权限",
-        "jobs": {
-            "attempts": "尝试 {{current}}/{{max}} 次",
-            "empty": "当前筛选条件下没有任务",
-            "fetchError": "获取任务失败",
-            "filters": {
-                "allQueues": "全部",
-                "queue": "队列",
-                "state": "状态",
-                "states": {
-                    "all": "全部",
-                    "available": "可执行",
-                    "cancelled": "已取消",
-                    "completed": "已完成",
-                    "discarded": "已丢弃",
-                    "retryable": "可重试",
-                    "running": "运行中",
-                    "scheduled": "已调度"
-                }
-            },
-            "labels": {
-                "created": "创建于",
-                "failed": "失败于",
-                "finished": "结束于",
-                "scheduled": "计划于",
-                "started": "开始于"
-            },
-            "loading": "正在加载任务...",
-            "pagination": {
-                "moreResults": "还有更多结果",
-                "totalJobs_one": "{{count}} 个任务",
-                "totalJobs_other": "{{count}} 个任务"
-            },
-            "timeAgoDays_one": "{{count}} 天前",
-            "timeAgoDays_other": "{{count}} 天前",
-            "timeAgoHours_one": "{{count}} 小时前",
-            "timeAgoHours_other": "{{count}} 小时前",
-            "timeAgoMinutes_one": "{{count}} 分钟前",
-            "timeAgoMinutes_other": "{{count}} 分钟前",
-            "timeAgoSeconds_one": "{{count}} 秒前",
-            "timeAgoSeconds_other": "{{count}} 秒前"
-        },
-        "ml": {
-            "bioAlbumCoverage": "生物图鉴相册覆盖率",
-            "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
-            "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
-            "existingPhotos": "现有照片",
-            "indexedAssets": "已索引",
-            "loadError": "加载 ML 索引统计失败。",
-            "queuedJobs": "队列中",
-            "queuedMlJobs": "待处理 ML 任务",
-            "reindex": "重建索引",
-            "reindexJobs": "待处理重建任务",
-            "reindexModal": {
-                "cancel": "取消",
-                "confirm": "开始重建",
-                "descriptionAll_one": "重新索引全部 {{count}} 个资源。",
-                "descriptionAll_other": "重新索引全部 {{count}} 个资源。",
-                "descriptionMissing_one": "重新索引 {{count}} 个缺失的资源。",
-                "descriptionMissing_other": "重新索引 {{count}} 个缺失的资源。",
-                "existingJobsWarning_one": "已有 {{count}} 个重新索引任务在队列中。",
-                "existingJobsWarning_other": "已有 {{count}} 个重新索引任务在队列中。",
-                "reindexAllCheckbox": "全量重建（而非仅补缺）",
-                "title": "重建索引 — {{task}}"
-            },
-            "remainingAssets": "剩余"
-        },
-        "queues": {
-            "active": "活跃",
-            "activeCount_one": "{{count}} 个活跃队列",
-            "activeCount_other": "{{count}} 个活跃队列",
-            "empty": "暂无活跃队列",
-            "fetchError": "获取队列失败",
-            "idle": "空闲",
-            "loading": "正在加载队列...",
-            "timeAgoHours_one": "{{count}} 小时前",
-            "timeAgoHours_other": "{{count}} 小时前",
-            "timeAgoMinutes_one": "{{count}} 分钟前",
-            "timeAgoMinutes_other": "{{count}} 分钟前",
-            "timeAgoSeconds_one": "{{count}} 秒前",
-            "timeAgoSeconds_other": "{{count}} 秒前"
-        },
-        "sections": {
-            "activeQueues": "活跃队列",
-            "recentJobs": "最近任务"
-        },
-        "stats": {
-            "activeJobs": "活跃任务",
-            "allHealthy": "状态正常",
-            "availableCount_one": "{{count}} 可用",
-            "availableCount_other": "{{count}} 可用",
-            "cancelledCount_one": "{{count}} 已取消",
-            "cancelledCount_other": "{{count}} 已取消",
-            "discardedCount_one": "{{count}} 已丢弃",
-            "discardedCount_other": "{{count}} 已丢弃",
-            "completed": "已完成",
-            "fetchError": "获取队列统计失败",
-            "issues": "异常",
-            "noData": "暂无数据",
-            "noProcessedJobs": "暂无已处理任务",
-            "retryableCount_one": "{{count}} 可重试",
-            "retryableCount_other": "{{count}} 可重试",
-            "runningCount_one": "{{count}} 运行中",
-            "runningCount_other": "{{count}} 运行中",
-            "scheduledCount_one": "{{count}} 已调度",
-            "scheduledCount_other": "{{count}} 已调度",
-            "successRate": "成功率 {{rate}}%"
-        },
-        "subtitles": {
-            "capabilities": "ML 服务发现与 LLM Agent 运行状态",
-            "ml": "ML 索引覆盖率与回填进度",
-            "queue": "实时任务队列监控"
-        },
-        "tabs": {
-            "capabilities": "能力",
-            "ml": "ML",
-            "queue": "队列"
-        },
-        "title": "服务器监控"
+    "stats": {
+      "cameraLens": {
+        "empty": "暂无相机镜头数据",
+        "title": "常用相机镜头组合"
+      },
+      "error": "加载统计数据失败：{{error}}",
+      "focalLength": {
+        "empty": "暂无焦距数据",
+        "title": "常用焦段分布"
+      },
+      "heatmap": {
+        "empty": "暂无活跃度数据",
+        "title": "拍摄活跃热力图"
+      },
+      "timeDistribution": {
+        "blue": "蓝调",
+        "golden": "黄金",
+        "sunrise": "日出",
+        "sunset": "日落",
+        "title": "拍摄时段分布"
+      },
+      "unknown": "未知"
     },
-    "navbar": {
-        "agent": {
-            "label": "Lumilio Agent",
-            "open": "打开 Lumilio Agent"
-        },
-        "notifications": {
-            "clear": "清空消息",
-            "empty": "暂无消息。",
-            "markAllRead": "全部标记为已读",
-            "title": "消息中心"
-        },
-        "repository": {
-            "all": "全部仓库",
-            "label": "工作仓库",
-            "primary": "主仓库",
-            "unavailable": "仓库选项暂时不可用"
-        }
-    },
-    "people": {
-        "details": {
-            "confirmedHint": "这个人物已经确认并命名。",
-            "loadError": "加载人物详情失败：{{error}}",
-            "personCode": "人物 {{id}}",
-            "renamePlaceholder": "为这个人物命名",
-            "save": "保存",
-            "unconfirmedHint": "这个人物还未命名，确认后可以直接填写名字。",
-            "updatedLabel": "更新于"
-        },
-        "membersCount_one": "{{count}} 张脸",
-        "membersCount_other": "{{count}} 张脸",
-        "photosCount_one": "{{count}} 张照片",
-        "photosCount_other": "{{count}} 张照片",
-        "rebuild": {
-            "action": "重建",
-            "error": "重建人物失败：{{message}}",
-            "running": "重建中...",
-            "success": "已从 {{faces}} 张脸重建 {{clusters}} 个人物聚类（噪声 {{noise}}）。"
-        },
-        "unnamed": "未命名"
-    },
-    "rating": {
-        "none": "无评分",
-        "stars_one": "{{count}} 星",
-        "stars_other": "{{count}} 星",
-        "unrated": "未评分",
-        "updateError": "更新评分失败"
-    },
-    "routes": {
-        "collections": "合集",
-        "home": "首页",
-        "portfolio": "作品集",
-        "settings": "设置",
-        "updates": "更新"
-    },
-    "search": {
-        "degraded": "最佳结果暂时不可用，已切换为常规结果。",
-        "error": "搜索暂时不可用，请稍后重试。",
-        "loading": "搜索中...",
-        "results": "结果",
-        "topResults": "最佳结果"
-    },
-    "settings": {
-        "account": {
-            "avatarEmpty": "从资源库中选择一张照片，或留空以显示首字母缩写。",
-            "avatarHint": "使用图片 URL。留空则显示首字母缩写。",
-            "avatarPhoto": "头像照片",
-            "avatarSelected": "已为你的头像选择了一张照片。",
-            "changeAvatar": "更换照片",
-            "chooseAvatar": "选择照片",
-            "displayName": "显示名称",
-            "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
-            "mfa": {
-                "account": "账户",
-                "addPasskey": "添加通行密钥",
-                "addPasskeyPrompt": "添加通行密钥后，即可使用设备的生物识别或安全密钥登录。",
-                "advanced": "高级设置 URI",
-                "authenticatorAppTitle": "身份验证器应用",
-                "beginSetup": "设置身份验证器",
-                "bootstrapOnboarding": "这是 Lumilio 的首个管理员账户。请立即完成身份验证器设置，以确保管理员登录从首次会话起即受到保护。",
-                "bootstrapOnboardingTitle": "首个管理员账户",
-                "confirmDisable": "确认禁用",
-                "confirmRegenerate": "确认重新生成",
-                "currentPassword": "当前密码",
-                "currentPasswordHint": "请输入当前密码以确认此安全变更。",
-                "currentPasswordHintRegenerate": "在生成新恢复码前请先确认身份。",
-                "disableButton": "禁用双重验证",
-                "disabled": "双重验证已禁用。",
-                "disabledBadge": "未启用",
-                "disableError": "禁用双重验证失败。",
-                "disableWarning": "禁用双重验证会降低账户安全性。请使用当前密码确认操作。",
-                "enableButton": "启用双重验证",
-                "enabled": "双重验证已启用。",
-                "enabledBadge": "已启用",
-                "enableError": "启用双重验证失败。",
-                "enabling": "启用中…",
-                "enrolled": "个已注册",
-                "enrolledPasskeys": "通行密钥",
-                "enrolledPasskeysHint": "管理此账户已注册的通行密钥凭证。",
-                "issuer": "签发方",
-                "noPasskeys": "尚未注册通行密钥",
-                "notConfigured": "尚未配置。使用 TOTP 保护你的账户安全。",
-                "notEnrolled": "未注册",
-                "passkeyCreated": "创建于",
-                "passkeyDescription": "使用设备原生的通行密钥流程进行登录。",
-                "passkeyLastUsed": "上次使用",
-                "passkeyTitle": "通行密钥",
-                "qrAlt": "身份验证器设置二维码",
-                "qrCaption": "如无法扫码，仍可使用手动设置密钥。",
-                "qrError": "生成身份验证器二维码失败。",
-                "recoveryCodesHint": "请妥善保管这些一次性恢复码。每个恢复码仅可使用一次。",
-                "recoveryCodesTitle": "恢复码",
-                "recoveryRemaining": "个恢复码剩余",
-                "regenerateButton": "重新生成恢复码",
-                "regenerated": "恢复码已重新生成。",
-                "regenerateError": "重新生成恢复码失败。",
-                "regenerateHint": "重新生成后，现有恢复码将立即失效。",
-                "regenerateTitle": "重新生成恢复码",
-                "remainingCodes_one": "剩余 {{count}} 个恢复码",
-                "remainingCodes_other": "剩余 {{count}} 个恢复码",
-                "setupDescription": "请使用 Duo、1Password、Google Authenticator 或其他兼容 TOTP 的应用。如无法扫码，可手动复制设置信息。",
-                "setupError": "启动身份验证器设置失败。",
-                "setupKey": "手动设置密钥",
-                "setupKeyHint": "若无法扫描二维码，请在身份验证器应用中手动输入此密钥。",
-                "setupTitle": "在身份验证器应用中扫描二维码",
-                "stepOne": "步骤 1",
-                "stepTwo": "使用 6 位验证码完成验证",
-                "stepTwoLabel": "步骤 2",
-                "totpValidation": "请输入身份验证器应用中的 6 位验证码。",
-                "verificationCode": "验证码"
-            },
-            "passwordDescription": "修改你的账户密码。修改后需重新登录。",
-            "passwordTitle": "密码",
-            "permissions": {
-                "customPermission": "自定义权限",
-                "manage_users": {
-                    "label": "管理用户",
-                    "description": "创建、编辑和停用用户账户。"
-                },
-                "manage_settings": {
-                    "label": "管理设置",
-                    "description": "修改全局应用程序设置。"
-                },
-                "view_all_assets": {
-                    "label": "查看所有资源",
-                    "description": "浏览图库中的所有照片和媒体。"
-                },
-                "manage_all_assets": {
-                    "label": "管理所有资源",
-                    "description": "编辑、删除和修改任何资源的元数据。"
-                },
-                "view_own_assets": {
-                    "label": "查看自己的资源",
-                    "description": "浏览自己上传的照片和媒体。"
-                },
-                "manage_own_assets": {
-                    "label": "管理自己的资源",
-                    "description": "编辑、删除和修改自己资源的元数据。"
-                },
-                "manage_own_profile": {
-                    "label": "管理个人资料",
-                    "description": "更新你的显示名称、头像和安全设置。"
-                }
-            },
-            "permissionsSubtitle": "根据你的角色分配给账户的权限。",
-            "permissionsTitle": "账户权限",
-            "profileInfo": "个人信息",
-            "profileInfoHint": "更新你的显示名称和头像。用户名和角色由管理员管理。",
-            "removeAvatar": "移除照片",
-            "role": "角色",
-            "save": "保存资料",
-            "saved": "个人资料已更新。",
-            "saveError": "更新个人资料失败。",
-            "securityDescription": "管理你的密码、认证方式和登录验证因子。",
-            "securityTitle": "安全设置",
-            "title": "账户",
-            "username": "用户名",
-            "viewPermissions": "查看权限"
-        },
-        "ai": "AI",
-        "aiSettings": {
-            "agentDescription": "配置 Agent 使用的服务端 LLM 提供方和凭据。",
-            "agentTitle": "Lumilio Agent",
-            "apiKey": "API Key",
-            "apiKeyConfigured": "已保存 API Key",
-            "apiKeyDescription": "API Key 为只写字段。留空时会保留当前已保存的 Key。",
-            "apiKeyPlaceholder": "输入新的 API Key",
-            "baseUrl": "Base URL",
-            "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
-            "clearStoredKey": "清除已保存的 API Key",
-            "description": "配置智能助手和照片智能能力。",
-            "enabled": "启用 Agent",
-            "loadError": "加载 AI 设置失败。",
-            "mlTitle": "照片智能",
-            "modelName": "模型名称",
-            "provider": "提供方",
-            "providerOptions": {
-                "ark": "Ark",
-                "deepseek": "DeepSeek",
-                "ollama": "Ollama",
-                "openai": "OpenAI",
-                "unset": "未设置"
-            },
-            "saveError": "保存设置失败。",
-            "saveSuccess": "设置已保存。",
-            "taskDescriptions": {
-                "bioclip": "识别植物、动物等生物主题。",
-                "clip": "让照片可以按画面语义被找到。",
-                "face": "检测并归类可识别的人脸。",
-                "ocr": "读取照片画面中的可见文字。"
-            },
-            "taskNames": {
-                "bioclip": "生物图鉴",
-                "clip": "语义搜索",
-                "face": "人脸识别",
-                "ocr": "文字识别"
-            },
-            "validate": "验证连接",
-            "validationError": "LLM 配置验证失败。",
-            "validationSuccess": "LLM 配置验证成功。"
-        },
-        "appearance": "外观",
-        "appearanceSettings": {
-            "compactColumns": {
-                "description": "设置紧凑布局激活时每行显示的资源数量。",
-                "label": "紧凑布局列数"
-            },
-            "description": "配置当前浏览器的语言、主题、地区和资源页默认布局。",
-            "layoutDescription": "设置资源页使用的默认布局。",
-            "layoutOptions": {
-                "compact": {
-                    "description": "使用可调列数的方形网格布局。",
-                    "label": "紧凑"
-                },
-                "full": {
-                    "description": "使用沉浸式的 Justified Layout。",
-                    "label": "舒展"
-                }
-            },
-            "themes": {
-                "activeBadge": "当前模式",
-                "currentMode": "当前模式",
-                "modeNames": {
-                    "light": "亮色",
-                    "dark": "暗色"
-                },
-                "dark": {
-                    "description": "导航栏处于暗色模式时使用。",
-                    "label": "暗色模式主题"
-                },
-                "description": "分别为亮色模式和暗色模式选择 daisyUI 主题。导航栏开关只负责切换模式。",
-                "followSystem": {
-                    "description": "使用操作系统的外观偏好来决定当前是亮色模式还是暗色模式。",
-                    "label": "跟随系统",
-                    "navbarHint": "当前主题模式跟随系统。若要手动切换，请先在设置中关闭该选项。",
-                    "status": "系统当前正在使用{{mode}}。"
-                },
-                "light": {
-                    "description": "导航栏处于亮色模式时使用。",
-                    "label": "亮色模式主题"
-                },
-                "title": "主题配对"
-            }
-        },
-        "assetPage": "资源页面",
-        "cloud": {
-            "title": ""
-        },
-        "language": "语言",
-        "languageAndRegion": "语言和地区",
-        "performance": "性能",
-        "performanceSettings": {
-            "advancedDescription": "配置更细的性能参数。",
-            "advancedTitle": "高级控制",
-            "availableMemory": "可用内存",
-            "changesApply": "更改会立即作用于新的处理任务。",
-            "cpuCores": "CPU 核心数",
-            "currentProfile": "当前预设",
-            "description": "配置本地处理任务的性能策略。",
-            "deviceType": "设备类型",
-            "deviceTypeValues": {
-                "desktop": "桌面端",
-                "lowEnd": "低配",
-                "mobile": "移动端"
-            },
-            "maxConcurrency": "最大并发",
-            "maxConcurrentOperations": "最大并发操作数",
-            "maxConcurrentOperationsDescription": "浏览器同时运行的重处理任务上限。",
-            "prioritizeUserOperations": "优先用户操作",
-            "prioritizeUserOperationsDescription": "优先处理与当前用户交互相关的操作。",
-            "profileDescription": "选择并发和内存使用的默认预设。",
-            "profiles": {
-                "adaptive": {
-                    "description": "根据检测到的设备能力自动调整处理策略。",
-                    "label": "自适应"
-                },
-                "balanced": {
-                    "description": "在处理速度和内存占用之间保持平衡。",
-                    "label": "平衡"
-                },
-                "memory_saver": {
-                    "description": "降低内存占用和处理并发。",
-                    "label": "节省内存"
-                },
-                "speed": {
-                    "description": "提高并发，以优先提升处理速度。",
-                    "label": "优先速度"
-                }
-            },
-            "profileTitle": "性能预设",
-            "reset": "恢复默认",
-            "respectMemoryLimits": "遵守内存限制",
-            "respectMemoryLimitsDescription": "当可用内存受限时，降低处理强度。"
-        },
-        "region": "地区",
-        "regionOptions": {
-            "china": "中国大陆",
-            "other": "其他国家和地区"
-        },
-        "server": "服务器",
-        "serverSettings": {
-            "activeNodes": "活跃节点",
-            "agentEnabled": "Agent 已启用",
-            "available": "可用",
-            "booleanValues": {
-                "false": "否",
-                "true": "是"
-            },
-            "capabilitiesError": "加载能力状态失败。",
-            "configured": "已配置",
-            "disabled": "禁用",
-            "discoveredNodes": "已发现节点",
-            "enabled": "启用",
-            "healthCheckDescription": "控制应用程序检测服务器健康状态的频率。较低的数值会更频繁地更新，但可能增加网络使用量。",
-            "healthCheckInterval": "健康检查间隔",
-            "llmTitle": "LLM Agent",
-            "mlTitle": "ML 服务",
-            "model": "模型",
-            "presets": "预设值：",
-            "provider": "提供方",
-            "refresh": "刷新",
-            "reset": "重置",
-            "taskAvailability": "任务可用性",
-            "taskNames": {
-                "bioClipClassify": "BioCLIP 分类",
-                "clipImageEmbed": "CLIP 图像嵌入",
-                "faceDetectAndEmbed": "人脸检测与嵌入",
-                "ocr": "OCR",
-                "semanticTextEmbed": "CLIP 文本嵌入"
-            },
-            "unavailable": "不可用",
-            "workingRepositoryDescription": "选择支持仓库作用域的页面和操作默认使用哪个仓库。选择全部仓库时保持全局视图。",
-            "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持仓库过滤时都会默认使用这个范围。",
-            "workingRepositoryLabel": "当前应用仓库",
-            "workingRepositoryTitle": "工作仓库",
-            "workingRepositoryUnavailable": "仓库选项暂时不可用。"
-        },
-        "title": "设置",
-        "upload": "上传",
-        "uploadSettings": {
-            "advancedDescription": "配置本地上传参数。",
-            "advancedDisabledHint": "启用后端管理上传配置时，这些字段不可用。",
-            "advancedTitle": "高级本地覆盖",
-            "basicDescription": "配置上传限制和默认行为。",
-            "basicTitle": "基础控制",
-            "chunkSize": "分片大小",
-            "chunkSizeDescription": "浏览器上传器对单个文件使用的分片大小。",
-            "chunkSizeUnit": "MB",
-            "controlModeDescription": "设置上传分片大小和并发参数的来源。",
-            "controlModeTitle": "上传调优来源",
-            "description": "配置当前浏览器的上传设置。",
-            "localMode": "本地覆盖",
-            "localModeHint": "分片大小和并发将使用本地配置值。",
-            "lowPowerMode": "低功耗模式",
-            "lowPowerModeDescription": "使用更保守的默认值，以降低上传期间的 CPU 和内存占用。",
-            "maxConcurrentChunks": "最大并发分片数",
-            "maxConcurrentChunksDescription": "浏览器对每个文件可并行上传的分片数量。",
-            "maxTotalFiles": "单次最多文件数",
-            "maxTotalFilesDescription": "一次上传批次中允许加入的最大文件数量。",
-            "recommended": "推荐",
-            "serverMode": "后端管理",
-            "serverModeHint": "分片大小和并发将使用后端建议值。本地高级值会保留，但不会生效。"
-        },
-        "users": {
-            "active": "活跃",
-            "adminOnly": "只有管理员可以管理用户。",
-            "albumCount_one": "{{count}} 个相册",
-            "albumCount_other": "{{count}} 个相册",
-            "assetCount_one": "{{count}} 个资源",
-            "assetCount_other": "{{count}} 个资源",
-            "avatarAssetIdHint": "选择一张照片资源作为此用户的头像。仅支持照片资源。",
-            "avatarEmpty": "从资源库中选择一张照片，或留空以显示首字母缩写。",
-            "avatarPhoto": "头像照片",
-            "avatarSelected": "已为此用户的头像选择了一张照片。",
-            "changeAvatar": "更换照片",
-            "chooseAvatar": "选择照片",
-            "clearedPasskeys": "通行密钥已清除",
-            "clearedTotp": "身份验证器已清除",
-            "createdAt": "创建时间",
-            "displayName": "显示名称",
-            "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
-            "editHint": "更新此用户的资料、角色和账户状态。",
-            "editTitle": "个人信息",
-            "empty": "请选择一个用户进行编辑。",
-            "inactive": "非活跃",
-            "lastLogin": "最后登录",
-            "loadError": "加载用户列表失败。",
-            "neverLoggedIn": "从未登录",
-            "removeAvatar": "移除照片",
-            "resetAccess": "重置访问权限",
-            "resetAccessError": "重置访问权限失败。",
-            "resetAccessHint": "生成临时密码并清除此用户的所有 MFA 验证因子。",
-            "resetAccessPanelBody": "请通过安全渠道一次性分享此密码。通行密钥、TOTP 和恢复码已被清除。",
-            "resetAccessPanelTitle": "临时密码",
-            "resetAccessSelfHint": "请前往账户设置中的修改密码功能操作你自己的账户。",
-            "resetAccessSuccess": "临时访问凭证已生成，请通过安全渠道一次性分享。",
-            "resetAccessTitle": "重置访问权限",
-            "role": "角色",
-            "save": "保存用户",
-            "saved": "用户信息已更新。",
-            "saveError": "更新用户信息失败。",
-            "status": "状态",
-            "title": "用户管理",
-            "username": "用户名",
-            "usernameHint": "3–32 个字符，以字母开头。允许小写字母、数字、点、下划线和连字符。"
-        }
-    },
-    "sidebar": {
-        "assets": "资源库",
-        "badges": {
-            "new": "新"
-        },
-        "collections": "合集",
-        "home": "首页",
-        "manage": "管理",
-        "portfolio": "作品集",
-        "settings": "设置",
-        "status": {
-            "offline": "离线",
-            "online": "在线"
-        },
-        "studio": "工作室",
-        "updates": "更新"
-    },
-    "studio": {
-        "asset": {
-            "dim": "尺寸",
-            "exif": "拍摄参数 · EXIF",
-            "file": "文件",
-            "name": "名称",
-            "size": "大小",
-            "type": "类型"
-        },
-        "backToStudio": "返回工作室",
-        "develop": {
-            "desc": "颜色调整、裁剪等工具即将上线。",
-            "geometry": "几何",
-            "hint": "双击任意滑块重置",
-            "reset": "重置",
-            "resetAll": "重置所有调整",
-            "rotation": "旋转",
-            "light": "光线",
-            "color": "色彩",
-            "detail": "细节",
-            "title": "显影工具"
-        },
-        "editor": {
-            "before": "原图",
-            "change": "切换照片",
-            "export": "导出",
-            "fit": "适应",
-            "loading": "加载中…",
-            "renderFailed": "渲染失败",
-            "rendering": "正在渲染预览…",
-            "resetAll": "全部重置",
-            "save": "保存",
-            "saved": "已保存",
-            "savedToast": "Sidecar 已保存",
-            "undo": "撤销",
-            "unsaved": "未保存的更改",
-            "upToDate": "已是最新",
-            "waiting": "等待预览"
-        },
-        "exif": {
-            "download": "下载 JSON",
-            "empty": "暂无元数据可显示。",
-            "extracting": "正在提取数据…",
-            "fieldsCount_one": "{{count}} 个字段",
-            "fieldsCount_other": "{{count}} 个字段",
-            "properties": "图像属性",
-            "title": "EXIF 元数据"
-        },
-        "home": {
-            "border": {
-                "body": "为照片添加彩色、磨砂或暗角边框 — 在您的编辑之上应用。",
-                "title": "添加边框"
-            },
-            "clear": "清除",
-            "empty": {
-                "body": "从您的图库中打开一张照片开始编辑。最近的作品会显示在这里。",
-                "title": "暂无最近的编辑"
-            },
-            "openEditor": "打开编辑器",
-            "recent": "最近的编辑",
-            "resume": "继续",
-            "tools": "工具"
-        },
-        "pickPhoto": "选择要编辑的照片",
-        "tagline": "对图库中的照片进行快速、无损的编辑。",
-        "title": "工作室",
-        "tools": {
-            "border": {
-                "apply": "应用边框",
-                "clear": "清除",
-                "done": "边框已应用",
-                "hint": "边框在当前编辑之上叠加新像素。应用后可预览，然后导出。",
-                "modeColored": "彩色",
-                "modeFrosted": "磨砂",
-                "modeVignette": "暗角",
-                "borderWidth": "边框宽度",
-                "color": "颜色",
-                "blur": "模糊",
-                "brightness": "亮度",
-                "cornerRadius": "圆角半径",
-                "strength": "强度"
-            },
-            "title": "工具"
-        }
-    },
-    "upload": {
-        "FileUploadProgress": {
-            "chunked_badge": "分块",
-            "status_completed": "已完成",
-            "status_failed": "失败",
-            "status_pending": "等待中",
-            "status_uploading": "上传中"
-        },
-        "NavbarQueue": {
-            "active_one": "{{count}} 个进行中",
-            "active_other": "{{count}} 个进行中",
-            "backgroundHint": "浏览其他页面时上传仍会继续。",
-            "failed_one": "{{count}} 个失败",
-            "failed_other": "{{count}} 个失败",
-            "openPage": "打开上传页面",
-            "title": "上传队列"
-        },
-        "ProgressIndicator": {
-            "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
-        },
-        "SupportedFormatsModal": {
-            "close_button_aria_label": "关闭",
-            "formats_count_one": "{{count}} 种格式",
-            "formats_count_other": "{{count}} 种格式",
-            "got_it_button": "知道了！",
-            "title": "支持的文件格式"
-        },
-        "UnifiedUploadSection": {
-            "add_files_button": "添加文件",
-            "cannot_clear_while_processing": "处理过程中无法清除文件",
-            "change_limits_settings_hint": "在设置 → 界面设置中更改限制。",
-            "clear_button": "清除",
-            "default_upload_target": "默认资源库",
-            "default_upload_target_hint": "当前未选择具体工作资源库；上传会进入主/默认资源库。",
-            "drag_drop_or_click": "拖拽或点击上传",
-            "max_files_label": "最大文件数：",
-            "no_files_selected_for_upload": "未选择要上传的文件",
-            "no_valid_files_selected": "未选择有效文件",
-            "server_chunk_size": "服务器分块大小",
-            "server_concurrency": "服务器并发数",
-            "server_in_flight": "进行中的请求",
-            "supported_file_types_description": "支持图片、RAW 格式、视频和音频文件",
-            "upload_button": "上传{{countLabel}}",
-            "upload_information_title": "上传信息",
-            "upload_target_default": "默认",
-            "upload_target_from_settings": "来自设置",
-            "upload_target_label": "上传目标",
-            "upload_target_unavailable": "当前选择的资源库暂时不可用。",
-            "uploading_status": "上传中..."
-        },
-        "UploadAssets": {
-            "files_ready_to_upload_one": "{{count}} 个文件准备上传",
-            "files_ready_to_upload_other": "{{count}} 个文件准备上传",
-            "no_files_selected": "未选择文件",
-            "processing_files_one": "正在处理 {{count}} 个文件…",
-            "processing_files_other": "正在处理 {{count}} 个文件…",
-            "supported_formats_button": "支持的格式"
-        },
-        "UploadProcess": {
-            "noResult": "未返回结果",
-            "processFailed": "上传流程失败",
-            "summaryPartial": "上传完成：成功 {{succeeded}} 个，失败 {{failed}} 个。",
-            "summarySuccess_one": "成功上传 {{count}} 个文件。",
-            "summarySuccess_other": "成功上传 {{count}} 个文件。",
-            "uploadFailed": "上传失败"
-        },
-        "UploadProvider": {
-            "files_exceeded_limit_one": "{{count}} 个文件超出限制。",
-            "files_exceeded_limit_other": "{{count}} 个文件超出限制。",
-            "max_files_allowed_one": "最多允许 {{count}} 个文件。",
-            "max_files_allowed_other": "最多允许 {{count}} 个文件。",
-            "no_files_selected_for_upload_message": "未选择要上传的文件",
-            "upload_failed_generic": "上传失败"
-        }
+    "tabs": {
+      "gallery": "画廊",
+      "stats": "数据统计"
     }
+  },
+  "lumilio": {
+    "agent": {
+      "disabled": "Lumilio Agent 已禁用。请在 设置 > AI 中启用。",
+      "notConfigured": "Lumilio Agent 尚未配置。请在 设置 > AI 中完成 provider、model 与 API key。"
+    },
+    "chat": {
+      "confirmation": {
+        "confirm": "确认",
+        "title": "需要确认"
+      },
+      "empty": "开始与 Lumilio 对话吧！",
+      "openAiSettings": "打开 AI 设置"
+    },
+    "input": {
+      "generating": "正在生成回复...",
+      "placeholderLabel": "占位标签",
+      "placeholderType": "占位",
+      "prompt": "向 Lumilio Agent 提问...（输入 @ 或 /）",
+      "unavailable": "Lumilio Agent 当前不可用。"
+    },
+    "markdown": {
+      "code": {
+        "copied": "已复制",
+        "copy": "复制",
+        "languageFallback": "文本"
+      },
+      "think": {
+        "defaultSummary": "思考过程...",
+        "thinking": "思考中...",
+        "thoughtFor": "思考用时 {{time}} 秒"
+      }
+    },
+    "messages": {
+      "thinking": "思考中..."
+    },
+    "status": {
+      "loading": "加载中 {{status}}"
+    },
+    "tools": {
+      "error": "错误：{{error}}",
+      "eventNotFound": "未找到工具事件。",
+      "openFullView": "打开完整视图",
+      "openMainGallery": "在主图库视图中打开",
+      "resultsTitle": "{{toolName}} 结果",
+      "viewResults": "查看结果"
+    }
+  },
+  "manage": {
+    "errorBoundaryMessage": "管理区域加载失败或在操作过程中发生错误。",
+    "errorBoundaryTitle": "管理区域错误！",
+    "pageTitle": "管理资源库",
+    "repositories": {
+      "actionsMenu": "{{name}} 的资源库操作",
+      "assetCount": "资源数量",
+      "createAction": "添加资源库",
+      "createDescription": "在已挂载的存储根目录中创建一个资源库文件夹。",
+      "createFailed": "创建资源库失败。",
+      "createNameHint": "使用简短、容易识别的名称。",
+      "createNameLabel": "资源库名称",
+      "createNamePlaceholder": "家庭照片",
+      "createSubmit": "创建资源库",
+      "createSuccess": "已添加 {{name}}。",
+      "createTitle": "添加资源库",
+      "description": "当前接入的仓库，可用于上传、筛选和文件系统扫描。",
+      "detectStacks": "检测堆叠",
+      "detectStacksCompleted_one": "在 {{name}} 中检测到 {{count}} 个堆叠。",
+      "detectStacksCompleted_other": "在 {{name}} 中检测到 {{count}} 个堆叠。",
+      "detectStacksFailed": "堆叠检测失败。",
+      "duplicateScan": "扫描重复项",
+      "duplicateScanFailed": "重复项扫描失败。",
+      "empty": "暂无可用仓库。",
+      "primaryBadge": "主仓库",
+      "rebuildLocation": "重建位置聚类",
+      "rebuildLocationQueued": "位置聚类重建已加入队列。",
+      "rescanRepository": "重新扫描",
+      "scanAll": "扫描全部资源库",
+      "scanAllQueued_one": "已为 {{count}} 个库添加扫描队列。",
+      "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
+      "scanFailed": "加入扫描队列失败。",
+      "scanQueued": "已为 {{name}} 加入扫描队列。",
+      "title": "资源库",
+      "unavailable": "仓库选项暂时不可用。"
+    }
+  },
+  "map": {
+    "noLocationData": "无位置数据"
+  },
+  "monitor": {
+    "adminOnlyDescription": "队列监控与运行时诊断仅对管理员开放。",
+    "adminOnlyTitle": "需要管理员权限",
+    "jobs": {
+      "attempts": "尝试 {{current}}/{{max}} 次",
+      "empty": "当前筛选条件下没有任务",
+      "fetchError": "获取任务失败",
+      "filters": {
+        "allQueues": "全部",
+        "queue": "队列",
+        "state": "状态",
+        "states": {
+          "all": "全部",
+          "available": "可执行",
+          "cancelled": "已取消",
+          "completed": "已完成",
+          "discarded": "已丢弃",
+          "retryable": "可重试",
+          "running": "运行中",
+          "scheduled": "已调度"
+        }
+      },
+      "labels": {
+        "created": "创建于",
+        "failed": "失败于",
+        "finished": "结束于",
+        "scheduled": "计划于",
+        "started": "开始于"
+      },
+      "loading": "正在加载任务...",
+      "pagination": {
+        "moreResults": "还有更多结果",
+        "totalJobs_one": "{{count}} 个任务",
+        "totalJobs_other": "{{count}} 个任务"
+      },
+      "timeAgoDays_one": "{{count}} 天前",
+      "timeAgoDays_other": "{{count}} 天前",
+      "timeAgoHours_one": "{{count}} 小时前",
+      "timeAgoHours_other": "{{count}} 小时前",
+      "timeAgoMinutes_one": "{{count}} 分钟前",
+      "timeAgoMinutes_other": "{{count}} 分钟前",
+      "timeAgoSeconds_one": "{{count}} 秒前",
+      "timeAgoSeconds_other": "{{count}} 秒前"
+    },
+    "ml": {
+      "bioAlbumCoverage": "生物图鉴相册覆盖率",
+      "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
+      "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
+      "existingPhotos": "现有照片",
+      "indexedAssets": "已索引",
+      "loadError": "加载 ML 索引统计失败。",
+      "queuedJobs": "队列中",
+      "queuedMlJobs": "待处理 ML 任务",
+      "reindex": "重建索引",
+      "reindexJobs": "待处理重建任务",
+      "reindexModal": {
+        "cancel": "取消",
+        "confirm": "开始重建",
+        "descriptionAll_one": "重新索引全部 {{count}} 个资源。",
+        "descriptionAll_other": "重新索引全部 {{count}} 个资源。",
+        "descriptionMissing_one": "重新索引 {{count}} 个缺失的资源。",
+        "descriptionMissing_other": "重新索引 {{count}} 个缺失的资源。",
+        "existingJobsWarning_one": "已有 {{count}} 个重新索引任务在队列中。",
+        "existingJobsWarning_other": "已有 {{count}} 个重新索引任务在队列中。",
+        "reindexAllCheckbox": "全量重建（而非仅补缺）",
+        "title": "重建索引 — {{task}}"
+      },
+      "remainingAssets": "剩余"
+    },
+    "queues": {
+      "active": "活跃",
+      "activeCount_one": "{{count}} 个活跃队列",
+      "activeCount_other": "{{count}} 个活跃队列",
+      "empty": "暂无活跃队列",
+      "fetchError": "获取队列失败",
+      "idle": "空闲",
+      "loading": "正在加载队列...",
+      "timeAgoHours_one": "{{count}} 小时前",
+      "timeAgoHours_other": "{{count}} 小时前",
+      "timeAgoMinutes_one": "{{count}} 分钟前",
+      "timeAgoMinutes_other": "{{count}} 分钟前",
+      "timeAgoSeconds_one": "{{count}} 秒前",
+      "timeAgoSeconds_other": "{{count}} 秒前"
+    },
+    "sections": {
+      "activeQueues": "活跃队列",
+      "recentJobs": "最近任务"
+    },
+    "stats": {
+      "activeJobs": "活跃任务",
+      "allHealthy": "状态正常",
+      "availableCount_one": "{{count}} 可用",
+      "availableCount_other": "{{count}} 可用",
+      "cancelledCount_one": "{{count}} 已取消",
+      "cancelledCount_other": "{{count}} 已取消",
+      "completed": "已完成",
+      "discardedCount_one": "{{count}} 已丢弃",
+      "discardedCount_other": "{{count}} 已丢弃",
+      "fetchError": "获取队列统计失败",
+      "issues": "异常",
+      "noData": "暂无数据",
+      "noProcessedJobs": "暂无已处理任务",
+      "retryableCount_one": "{{count}} 可重试",
+      "retryableCount_other": "{{count}} 可重试",
+      "runningCount_one": "{{count}} 运行中",
+      "runningCount_other": "{{count}} 运行中",
+      "scheduledCount_one": "{{count}} 已调度",
+      "scheduledCount_other": "{{count}} 已调度",
+      "successRate": "成功率 {{rate}}%"
+    },
+    "subtitles": {
+      "capabilities": "ML 服务发现与 LLM Agent 运行状态",
+      "ml": "ML 索引覆盖率与回填进度",
+      "queue": "实时任务队列监控"
+    },
+    "tabs": {
+      "capabilities": "能力",
+      "ml": "ML",
+      "queue": "队列"
+    },
+    "title": "服务器监控"
+  },
+  "navbar": {
+    "agent": {
+      "label": "Lumilio Agent",
+      "open": "打开 Lumilio Agent"
+    },
+    "notifications": {
+      "clear": "清空消息",
+      "empty": "暂无消息。",
+      "markAllRead": "全部标记为已读",
+      "title": "消息中心"
+    },
+    "repository": {
+      "all": "全部仓库",
+      "label": "工作仓库",
+      "primary": "主仓库",
+      "unavailable": "仓库选项暂时不可用"
+    }
+  },
+  "people": {
+    "details": {
+      "confirmedHint": "这个人物已经确认并命名。",
+      "loadError": "加载人物详情失败：{{error}}",
+      "personCode": "人物 {{id}}",
+      "renamePlaceholder": "为这个人物命名",
+      "save": "保存",
+      "unconfirmedHint": "这个人物还未命名，确认后可以直接填写名字。",
+      "updatedLabel": "更新于"
+    },
+    "membersCount_one": "{{count}} 张脸",
+    "membersCount_other": "{{count}} 张脸",
+    "photosCount_one": "{{count}} 张照片",
+    "photosCount_other": "{{count}} 张照片",
+    "rebuild": {
+      "action": "重建",
+      "error": "重建人物失败：{{message}}",
+      "running": "重建中...",
+      "success": "已从 {{faces}} 张脸重建 {{clusters}} 个人物聚类（噪声 {{noise}}）。"
+    },
+    "unnamed": "未命名"
+  },
+  "rating": {
+    "none": "无评分",
+    "stars_one": "{{count}} 星",
+    "stars_other": "{{count}} 星",
+    "unrated": "未评分",
+    "updateError": "更新评分失败"
+  },
+  "routes": {
+    "collections": "合集",
+    "home": "首页",
+    "portfolio": "作品集",
+    "settings": "设置",
+    "updates": "更新"
+  },
+  "search": {
+    "degraded": "最佳结果暂时不可用，已切换为常规结果。",
+    "error": "搜索暂时不可用，请稍后重试。",
+    "loading": "搜索中...",
+    "results": "结果",
+    "topResults": "最佳结果"
+  },
+  "settings": {
+    "account": {
+      "avatarEmpty": "从资源库中选择一张照片，或留空以显示首字母缩写。",
+      "avatarHint": "使用图片 URL。留空则显示首字母缩写。",
+      "avatarPhoto": "头像照片",
+      "avatarSelected": "已为你的头像选择了一张照片。",
+      "changeAvatar": "更换照片",
+      "chooseAvatar": "选择照片",
+      "displayName": "显示名称",
+      "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
+      "mfa": {
+        "account": "账户",
+        "addPasskey": "添加通行密钥",
+        "addPasskeyPrompt": "添加通行密钥后，即可使用设备的生物识别或安全密钥登录。",
+        "advanced": "高级设置 URI",
+        "authenticatorAppTitle": "身份验证器应用",
+        "beginSetup": "设置身份验证器",
+        "bootstrapOnboarding": "这是流明集的首个管理员账户。请立即完成身份验证器设置，以确保管理员登录从首次会话起即受到保护。",
+        "bootstrapOnboardingTitle": "首个管理员账户",
+        "confirmDisable": "确认禁用",
+        "confirmRegenerate": "确认重新生成",
+        "currentPassword": "当前密码",
+        "currentPasswordHint": "请输入当前密码以确认此安全变更。",
+        "currentPasswordHintRegenerate": "在生成新恢复码前请先确认身份。",
+        "disableButton": "禁用双重验证",
+        "disabled": "双重验证已禁用。",
+        "disabledBadge": "未启用",
+        "disableError": "禁用双重验证失败。",
+        "disableWarning": "禁用双重验证会降低账户安全性。请使用当前密码确认操作。",
+        "enableButton": "启用双重验证",
+        "enabled": "双重验证已启用。",
+        "enabledBadge": "已启用",
+        "enableError": "启用双重验证失败。",
+        "enabling": "启用中…",
+        "enrolled": "个已注册",
+        "enrolledPasskeys": "通行密钥",
+        "enrolledPasskeysHint": "管理此账户已注册的通行密钥凭证。",
+        "issuer": "签发方",
+        "noPasskeys": "尚未注册通行密钥",
+        "notConfigured": "尚未配置。使用 TOTP 保护你的账户安全。",
+        "notEnrolled": "未注册",
+        "passkeyCreated": "创建于",
+        "passkeyDescription": "使用设备原生的通行密钥流程进行登录。",
+        "passkeyLastUsed": "上次使用",
+        "passkeyTitle": "通行密钥",
+        "qrAlt": "身份验证器设置二维码",
+        "qrCaption": "如无法扫码，仍可使用手动设置密钥。",
+        "qrError": "生成身份验证器二维码失败。",
+        "recoveryCodesHint": "请妥善保管这些一次性恢复码。每个恢复码仅可使用一次。",
+        "recoveryCodesTitle": "恢复码",
+        "recoveryRemaining": "个恢复码剩余",
+        "regenerateButton": "重新生成恢复码",
+        "regenerated": "恢复码已重新生成。",
+        "regenerateError": "重新生成恢复码失败。",
+        "regenerateHint": "重新生成后，现有恢复码将立即失效。",
+        "regenerateTitle": "重新生成恢复码",
+        "remainingCodes_one": "剩余 {{count}} 个恢复码",
+        "remainingCodes_other": "剩余 {{count}} 个恢复码",
+        "setupDescription": "请使用 Duo、1Password、Google Authenticator 或其他兼容 TOTP 的应用。如无法扫码，可手动复制设置信息。",
+        "setupError": "启动身份验证器设置失败。",
+        "setupKey": "手动设置密钥",
+        "setupKeyHint": "若无法扫描二维码，请在身份验证器应用中手动输入此密钥。",
+        "setupTitle": "在身份验证器应用中扫描二维码",
+        "stepOne": "步骤 1",
+        "stepTwo": "使用 6 位验证码完成验证",
+        "stepTwoLabel": "步骤 2",
+        "verificationCode": "验证码"
+      },
+      "passwordDescription": "修改你的账户密码。修改后需重新登录。",
+      "passwordTitle": "密码",
+      "permissions": {
+        "customPermission": "自定义权限",
+        "manage_all_assets": {
+          "description": "编辑、删除和修改任何资源的元数据。",
+          "label": "管理所有资源"
+        },
+        "manage_own_assets": {
+          "description": "编辑、删除和修改自己资源的元数据。",
+          "label": "管理自己的资源"
+        },
+        "manage_own_profile": {
+          "description": "更新你的显示名称、头像和安全设置。",
+          "label": "管理个人资料"
+        },
+        "manage_settings": {
+          "description": "修改全局应用程序设置。",
+          "label": "管理设置"
+        },
+        "manage_users": {
+          "description": "创建、编辑和停用用户账户。",
+          "label": "管理用户"
+        },
+        "view_all_assets": {
+          "description": "浏览图库中的所有照片和媒体。",
+          "label": "查看所有资源"
+        },
+        "view_own_assets": {
+          "description": "浏览自己上传的照片和媒体。",
+          "label": "查看自己的资源"
+        }
+      },
+      "permissionsSubtitle": "根据你的角色分配给账户的权限。",
+      "permissionsTitle": "账户权限",
+      "profileInfo": "个人信息",
+      "profileInfoHint": "更新你的显示名称和头像。用户名和角色由管理员管理。",
+      "removeAvatar": "移除照片",
+      "role": "角色",
+      "save": "保存资料",
+      "saved": "个人资料已更新。",
+      "saveError": "更新个人资料失败。",
+      "securityDescription": "管理你的密码、认证方式和登录验证因子。",
+      "securityTitle": "安全设置",
+      "title": "账户",
+      "username": "用户名",
+      "viewPermissions": "查看权限"
+    },
+    "ai": "AI",
+    "aiSettings": {
+      "agentDescription": "配置 Agent 使用的服务端 LLM 提供方和凭据。",
+      "agentTitle": "Lumilio Agent",
+      "apiKey": "API Key",
+      "apiKeyConfigured": "已保存 API Key",
+      "apiKeyDescription": "API Key 为只写字段。留空时会保留当前已保存的 Key。",
+      "apiKeyPlaceholder": "输入新的 API Key",
+      "baseUrl": "Base URL",
+      "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
+      "clearStoredKey": "清除已保存的 API Key",
+      "description": "配置智能助手和照片智能能力。",
+      "enabled": "启用 Agent",
+      "loadError": "加载 AI 设置失败。",
+      "mlTitle": "照片智能",
+      "modelName": "模型名称",
+      "provider": "提供方",
+      "providerOptions": {
+        "ark": "Ark",
+        "deepseek": "DeepSeek",
+        "ollama": "Ollama",
+        "openai": "OpenAI",
+        "unset": "未设置"
+      },
+      "saveError": "保存设置失败。",
+      "saveSuccess": "设置已保存。",
+      "taskDescriptions": {
+        "bioclip": "识别植物、动物等生物主题。",
+        "clip": "让照片可以按画面语义被找到。",
+        "face": "检测并归类可识别的人脸。",
+        "ocr": "读取照片画面中的可见文字。"
+      },
+      "taskNames": {
+        "bioclip": "生物图鉴",
+        "clip": "语义搜索",
+        "face": "人脸识别",
+        "ocr": "文字识别"
+      },
+      "validate": "验证连接",
+      "validationError": "LLM 配置验证失败。",
+      "validationSuccess": "LLM 配置验证成功。"
+    },
+    "appearance": "外观",
+    "appearanceSettings": {
+      "compactColumns": {
+        "description": "设置紧凑布局激活时每行显示的资源数量。",
+        "label": "紧凑布局列数"
+      },
+      "description": "配置当前浏览器的语言、主题、地区和资源页默认布局。",
+      "layoutDescription": "设置资源页使用的默认布局。",
+      "layoutOptions": {
+        "compact": {
+          "description": "使用可调列数的方形网格布局。",
+          "label": "紧凑"
+        },
+        "full": {
+          "description": "使用沉浸式的 Justified Layout。",
+          "label": "舒展"
+        }
+      },
+      "themes": {
+        "activeBadge": "当前模式",
+        "currentMode": "当前模式",
+        "dark": {
+          "description": "导航栏处于暗色模式时使用。",
+          "label": "暗色模式主题"
+        },
+        "description": "分别为亮色模式和暗色模式选择 daisyUI 主题。导航栏开关只负责切换模式。",
+        "followSystem": {
+          "description": "使用操作系统的外观偏好来决定当前是亮色模式还是暗色模式。",
+          "label": "跟随系统",
+          "navbarHint": "当前主题模式跟随系统。若要手动切换，请先在设置中关闭该选项。",
+          "status": "系统当前正在使用{{mode}}。"
+        },
+        "light": {
+          "description": "导航栏处于亮色模式时使用。",
+          "label": "亮色模式主题"
+        },
+        "modeNames": {
+          "dark": "暗色",
+          "light": "亮色"
+        },
+        "title": "主题配对"
+      }
+    },
+    "assetPage": "资源页面",
+    "cloud": {
+      "title": "云同步"
+    },
+    "language": "语言",
+    "languageAndRegion": "语言和地区",
+    "performance": "性能",
+    "performanceSettings": {
+      "advancedDescription": "配置更细的性能参数。",
+      "advancedTitle": "高级控制",
+      "availableMemory": "可用内存",
+      "changesApply": "更改会立即作用于新的处理任务。",
+      "cpuCores": "CPU 核心数",
+      "currentProfile": "当前预设",
+      "description": "配置本地处理任务的性能策略。",
+      "deviceType": "设备类型",
+      "deviceTypeValues": {
+        "desktop": "桌面端",
+        "lowEnd": "低配",
+        "mobile": "移动端"
+      },
+      "maxConcurrency": "最大并发",
+      "maxConcurrentOperations": "最大并发操作数",
+      "maxConcurrentOperationsDescription": "浏览器同时运行的重处理任务上限。",
+      "prioritizeUserOperations": "优先用户操作",
+      "prioritizeUserOperationsDescription": "优先处理与当前用户交互相关的操作。",
+      "profileDescription": "选择并发和内存使用的默认预设。",
+      "profiles": {
+        "adaptive": {
+          "description": "根据检测到的设备能力自动调整处理策略。",
+          "label": "自适应"
+        },
+        "balanced": {
+          "description": "在处理速度和内存占用之间保持平衡。",
+          "label": "平衡"
+        },
+        "memory_saver": {
+          "description": "降低内存占用和处理并发。",
+          "label": "节省内存"
+        },
+        "speed": {
+          "description": "提高并发，以优先提升处理速度。",
+          "label": "优先速度"
+        }
+      },
+      "profileTitle": "性能预设",
+      "reset": "恢复默认",
+      "respectMemoryLimits": "遵守内存限制",
+      "respectMemoryLimitsDescription": "当可用内存受限时，降低处理强度。"
+    },
+    "region": "地区",
+    "regionOptions": {
+      "china": "中国大陆",
+      "other": "其他国家和地区"
+    },
+    "server": "服务器",
+    "serverSettings": {
+      "activeNodes": "活跃节点",
+      "agentEnabled": "Agent 已启用",
+      "available": "可用",
+      "booleanValues": {
+        "false": "否",
+        "true": "是"
+      },
+      "capabilitiesError": "加载能力状态失败。",
+      "configured": "已配置",
+      "disabled": "禁用",
+      "discoveredNodes": "已发现节点",
+      "enabled": "启用",
+      "healthCheckDescription": "控制应用程序检测服务器健康状态的频率。较低的数值会更频繁地更新，但可能增加网络使用量。",
+      "healthCheckInterval": "健康检查间隔",
+      "llmTitle": "LLM Agent",
+      "mlTitle": "ML 服务",
+      "model": "模型",
+      "presets": "预设值：",
+      "provider": "提供方",
+      "refresh": "刷新",
+      "reset": "重置",
+      "taskAvailability": "任务可用性",
+      "taskNames": {
+        "bioClipClassify": "BioCLIP 分类",
+        "clipImageEmbed": "CLIP 图像嵌入",
+        "faceDetectAndEmbed": "人脸检测与嵌入",
+        "ocr": "OCR",
+        "semanticTextEmbed": "CLIP 文本嵌入"
+      },
+      "unavailable": "不可用",
+      "workingRepositoryDescription": "选择支持仓库作用域的页面和操作默认使用哪个仓库。选择全部仓库时保持全局视图。",
+      "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持仓库过滤时都会默认使用这个范围。",
+      "workingRepositoryLabel": "当前应用仓库",
+      "workingRepositoryTitle": "工作仓库",
+      "workingRepositoryUnavailable": "仓库选项暂时不可用。"
+    },
+    "title": "设置",
+    "upload": "上传",
+    "uploadSettings": {
+      "advancedDescription": "配置本地上传参数。",
+      "advancedDisabledHint": "启用后端管理上传配置时，这些字段不可用。",
+      "advancedTitle": "高级本地覆盖",
+      "basicDescription": "配置上传限制和默认行为。",
+      "basicTitle": "基础控制",
+      "chunkSize": "分片大小",
+      "chunkSizeDescription": "浏览器上传器对单个文件使用的分片大小。",
+      "chunkSizeUnit": "MB",
+      "controlModeDescription": "设置上传分片大小和并发参数的来源。",
+      "controlModeTitle": "上传调优来源",
+      "description": "配置当前浏览器的上传设置。",
+      "localMode": "本地覆盖",
+      "localModeHint": "分片大小和并发将使用本地配置值。",
+      "lowPowerMode": "低功耗模式",
+      "lowPowerModeDescription": "使用更保守的默认值，以降低上传期间的 CPU 和内存占用。",
+      "maxConcurrentChunks": "最大并发分片数",
+      "maxConcurrentChunksDescription": "浏览器对每个文件可并行上传的分片数量。",
+      "maxTotalFiles": "单次最多文件数",
+      "maxTotalFilesDescription": "一次上传批次中允许加入的最大文件数量。",
+      "recommended": "推荐",
+      "serverMode": "后端管理",
+      "serverModeHint": "分片大小和并发将使用后端建议值。本地高级值会保留，但不会生效。"
+    },
+    "users": {
+      "active": "活跃",
+      "adminOnly": "只有管理员可以管理用户。",
+      "albumCount_one": "{{count}} 个相册",
+      "albumCount_other": "{{count}} 个相册",
+      "assetCount_one": "{{count}} 个资源",
+      "assetCount_other": "{{count}} 个资源",
+      "avatarAssetIdHint": "选择一张照片资源作为此用户的头像。仅支持照片资源。",
+      "avatarEmpty": "从资源库中选择一张照片，或留空以显示首字母缩写。",
+      "avatarPhoto": "头像照片",
+      "avatarSelected": "已为此用户的头像选择了一张照片。",
+      "changeAvatar": "更换照片",
+      "chooseAvatar": "选择照片",
+      "clearedPasskeys": "通行密钥已清除",
+      "clearedTotp": "身份验证器已清除",
+      "createdAt": "创建时间",
+      "displayName": "显示名称",
+      "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
+      "editHint": "更新此用户的资料、角色和账户状态。",
+      "editTitle": "个人信息",
+      "empty": "请选择一个用户进行编辑。",
+      "inactive": "非活跃",
+      "lastLogin": "最后登录",
+      "loadError": "加载用户列表失败。",
+      "neverLoggedIn": "从未登录",
+      "removeAvatar": "移除照片",
+      "resetAccess": "重置访问权限",
+      "resetAccessError": "重置访问权限失败。",
+      "resetAccessHint": "生成临时密码并清除此用户的所有 MFA 验证因子。",
+      "resetAccessPanelBody": "请通过安全渠道一次性分享此密码。通行密钥、TOTP 和恢复码已被清除。",
+      "resetAccessPanelTitle": "临时密码",
+      "resetAccessSelfHint": "请前往账户设置中的修改密码功能操作你自己的账户。",
+      "resetAccessSuccess": "临时访问凭证已生成，请通过安全渠道一次性分享。",
+      "resetAccessTitle": "重置访问权限",
+      "role": "角色",
+      "save": "保存用户",
+      "saved": "用户信息已更新。",
+      "saveError": "更新用户信息失败。",
+      "status": "状态",
+      "title": "用户管理",
+      "username": "用户名",
+      "usernameHint": "3–32 个字符，以字母开头。允许小写字母、数字、点、下划线和连字符。"
+    }
+  },
+  "sidebar": {
+    "assets": "资源库",
+    "badges": {
+      "new": "新"
+    },
+    "collections": "合集",
+    "home": "首页",
+    "manage": "管理",
+    "portfolio": "作品集",
+    "settings": "设置",
+    "status": {
+      "offline": "离线",
+      "online": "在线"
+    },
+    "studio": "工作室",
+    "updates": "更新"
+  },
+  "studio": {
+    "asset": {
+      "dim": "尺寸",
+      "exif": "拍摄参数 · EXIF",
+      "file": "文件",
+      "name": "名称",
+      "size": "大小",
+      "type": "类型"
+    },
+    "backToStudio": "返回工作室",
+    "develop": {
+      "color": "色彩",
+      "detail": "细节",
+      "geometry": "几何",
+      "hint": "双击任意滑块重置",
+      "light": "光线",
+      "reset": "重置",
+      "resetAll": "重置所有调整",
+      "rotation": "旋转",
+      "title": "显影工具"
+    },
+    "editor": {
+      "before": "原图",
+      "change": "切换照片",
+      "export": "导出",
+      "fit": "适应",
+      "loading": "加载中…",
+      "renderFailed": "渲染失败",
+      "rendering": "正在渲染预览…",
+      "resetAll": "全部重置",
+      "save": "保存",
+      "saved": "已保存",
+      "savedToast": "Sidecar 已保存",
+      "undo": "撤销",
+      "unsaved": "未保存的更改",
+      "upToDate": "已是最新",
+      "waiting": "等待预览"
+    },
+    "exif": {
+      "download": "下载 JSON",
+      "empty": "暂无元数据可显示。",
+      "extracting": "正在提取数据…",
+      "fieldsCount_one": "{{count}} 个字段",
+      "fieldsCount_other": "{{count}} 个字段",
+      "properties": "图像属性",
+      "title": "EXIF 元数据"
+    },
+    "home": {
+      "border": {
+        "body": "为照片添加彩色、磨砂或暗角边框 — 在您的编辑之上应用。",
+        "title": "添加边框"
+      },
+      "clear": "清除",
+      "empty": {
+        "body": "从您的图库中打开一张照片开始编辑。最近的作品会显示在这里。",
+        "title": "暂无最近的编辑"
+      },
+      "openEditor": "打开编辑器",
+      "recent": "最近的编辑",
+      "resume": "继续",
+      "tools": "工具"
+    },
+    "pickPhoto": "选择要编辑的照片",
+    "tagline": "对图库中的照片进行快速、无损的编辑。",
+    "title": "工作室",
+    "tools": {
+      "border": {
+        "apply": "应用边框",
+        "blur": "模糊",
+        "borderWidth": "边框宽度",
+        "brightness": "亮度",
+        "clear": "清除",
+        "color": "颜色",
+        "cornerRadius": "圆角半径",
+        "done": "边框已应用",
+        "hint": "边框在当前编辑之上叠加新像素。应用后可预览，然后导出。",
+        "modeColored": "彩色",
+        "modeFrosted": "磨砂",
+        "modeVignette": "暗角",
+        "strength": "强度"
+      },
+      "title": "工具"
+    }
+  },
+  "upload": {
+    "FileUploadProgress": {
+      "chunked_badge": "分块",
+      "status_completed": "已完成",
+      "status_failed": "失败",
+      "status_pending": "等待中",
+      "status_uploading": "上传中"
+    },
+    "NavbarQueue": {
+      "active_one": "{{count}} 个进行中",
+      "active_other": "{{count}} 个进行中",
+      "backgroundHint": "浏览其他页面时上传仍会继续。",
+      "failed_one": "{{count}} 个失败",
+      "failed_other": "{{count}} 个失败",
+      "openPage": "打开上传页面",
+      "title": "上传队列"
+    },
+    "ProgressIndicator": {
+      "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
+    },
+    "SupportedFormatsModal": {
+      "close_button_aria_label": "关闭",
+      "formats_count_one": "{{count}} 种格式",
+      "formats_count_other": "{{count}} 种格式",
+      "got_it_button": "知道了！",
+      "title": "支持的文件格式"
+    },
+    "UnifiedUploadSection": {
+      "add_files_button": "添加文件",
+      "cannot_clear_while_processing": "处理过程中无法清除文件",
+      "change_limits_settings_hint": "在设置 → 界面设置中更改限制。",
+      "clear_button": "清除",
+      "default_upload_target": "默认资源库",
+      "default_upload_target_hint": "当前未选择具体工作资源库；上传会进入主/默认资源库。",
+      "drag_drop_or_click": "拖拽或点击上传",
+      "max_files_label": "最大文件数：",
+      "no_files_selected_for_upload": "未选择要上传的文件",
+      "no_valid_files_selected": "未选择有效文件",
+      "server_chunk_size": "服务器分块大小",
+      "server_concurrency": "服务器并发数",
+      "server_in_flight": "进行中的请求",
+      "supported_file_types_description": "支持图片、RAW 格式、视频和音频文件",
+      "upload_button": "上传{{countLabel}}",
+      "upload_information_title": "上传信息",
+      "upload_target_default": "默认",
+      "upload_target_from_settings": "来自设置",
+      "upload_target_label": "上传目标",
+      "upload_target_unavailable": "当前选择的资源库暂时不可用。",
+      "uploading_status": "上传中..."
+    },
+    "UploadAssets": {
+      "files_ready_to_upload_one": "{{count}} 个文件准备上传",
+      "files_ready_to_upload_other": "{{count}} 个文件准备上传",
+      "no_files_selected": "未选择文件",
+      "processing_files_one": "正在处理 {{count}} 个文件…",
+      "processing_files_other": "正在处理 {{count}} 个文件…",
+      "supported_formats_button": "支持的格式"
+    },
+    "UploadProcess": {
+      "noResult": "未返回结果",
+      "processFailed": "上传流程失败",
+      "summaryPartial": "上传完成：成功 {{succeeded}} 个，失败 {{failed}} 个。",
+      "summarySuccess_one": "成功上传 {{count}} 个文件。",
+      "summarySuccess_other": "成功上传 {{count}} 个文件。",
+      "uploadFailed": "上传失败"
+    },
+    "UploadProvider": {
+      "files_exceeded_limit_one": "{{count}} 个文件超出限制。",
+      "files_exceeded_limit_other": "{{count}} 个文件超出限制。",
+      "max_files_allowed_one": "最多允许 {{count}} 个文件。",
+      "max_files_allowed_other": "最多允许 {{count}} 个文件。",
+      "no_files_selected_for_upload_message": "未选择要上传的文件",
+      "upload_failed_generic": "上传失败"
+    }
+  }
 }
