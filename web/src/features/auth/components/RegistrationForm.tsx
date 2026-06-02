@@ -4,6 +4,7 @@ import { Fingerprint, Info, KeyRound, Smartphone, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useRegistrationFlow } from "../hooks/useRegistrationFlow.ts";
 import {
+  PASSWORD_HINT,
   USERNAME_HINT,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -74,7 +75,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     handleFinish,
   } = useRegistrationFlow();
 
-  const appName = t("app.name", { defaultValue: "Lumilio" });
+  const appName = t("app.name", { defaultValue: "Lumilio Photos" });
   const steps = [
     t("auth.register.stepAccount", { defaultValue: "Account" }),
     t("auth.register.stepPasskey", { defaultValue: "Passkey" }),
@@ -125,6 +126,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
               <PasswordField
                 label={t("auth.register.password", { defaultValue: "Password" })}
+                hint={t("auth.register.passwordHint", {
+                  defaultValue: PASSWORD_HINT,
+                })}
                 value={password}
                 onChange={setPassword}
                 meter
@@ -134,6 +138,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               <PasswordField
                 label={t("auth.register.confirmPassword", {
                   defaultValue: "Confirm password",
+                })}
+                hint={t("auth.register.confirmPasswordHint", {
+                  defaultValue: "Passwords must match exactly.",
                 })}
                 value={confirmPassword}
                 onChange={setConfirmPassword}

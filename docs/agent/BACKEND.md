@@ -37,6 +37,7 @@ Keep in env:
 
 Keep in TOML:
 
+- `[database].password_file` as the path to the rotated local database password
 - logging format and log directory
 - CORS defaults
 - storage strategy and duplicate handling

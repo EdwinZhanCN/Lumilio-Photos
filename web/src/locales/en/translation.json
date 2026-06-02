@@ -1,1474 +1,1492 @@
 {
-    "app": {
-        "name": "Lumilio"
+  "app": {
+    "name": "Lumilio Photos"
+  },
+  "assets": {
+    "all": {
+      "asset_not_available": "Asset may not be available in the current view.",
+      "end_of_results": "No more results.",
+      "load_error": "Failed to load photos. Check your connection and try again.",
+      "loading_assets": "Loading assets...",
+      "loading_more_data": "Loading more data to find the asset...",
+      "locating_asset": "Locating asset...",
+      "title": "Assets",
+      "title_one": "{{count}} photo",
+      "title_other": "{{count}} photos"
     },
-    "assets": {
-        "all": {
-            "asset_not_available": "Asset may not be available in the current view.",
-            "end_of_results": "No more results.",
-            "load_error": "Failed to load photos. Check your connection and try again.",
-            "loading_assets": "Loading assets...",
-            "loading_more_data": "Loading more data to find the asset...",
-            "locating_asset": "Locating asset...",
-            "title": "Assets",
-            "title_one": "{{count}} photo",
-            "title_other": "{{count}} photos"
-        },
-        "assetsPageHeader": {
-            "actions": {
-                "addToAlbum": "Add to Album",
-                "affectsAssets": "{{selectedCount}} selected items will affect {{assetCount}} assets.",
-                "affectsSelected_one": "{{count}} selected items.",
-                "affectsSelected_other": "{{count}} selected items.",
-                "applyToItems_one": "Apply to {{count}} item",
-                "applyToItems_other": "Apply to {{count}} items",
-                "deleteSelected": "Delete Selected",
-                "downloadAll": "Download All",
-                "like": "Liked",
-                "likedMenu": "Liked",
-                "setRating": "Set Rating",
-                "title": "Actions",
-                "unlike": "Unliked",
-                "unrated": "Unrated"
-            },
-            "addToAlbumModal": {
-                "itemCount_one": "{{count}} item",
-                "itemCount_other": "{{count}} items",
-                "message_one": "Add {{count}} item to album?",
-                "message_other": "Add {{count}} items to album?",
-                "noAlbumsFound": "No albums found",
-                "title": "Add to Album"
-            },
-            "bulkConfirm": {
-                "likedTitle": "Update liked status?",
-                "ratingTitle": "Set rating"
-            },
-            "compactMenu": {
-                "actions": "Actions",
-                "selectedItems": "Selected Items",
-                "viewSort": "View & Sort"
-            },
-            "deleteConfirmModal": {
-                "cancelButton": "Cancel",
-                "deleteButton": "Delete Assets",
-                "message_one": "This will delete {{count}} asset.",
-                "message_other": "This will delete {{count}} assets.",
-                "title": "Confirm Deletion"
-            },
-            "messages": {
-                "addToAlbumError": "Failed to add items to album",
-                "addToAlbumSuccess_one": "Added {{count}} item to album.",
-                "addToAlbumSuccess_other": "Added {{count}} items to album.",
-                "bulkActionError": "Failed to update selected assets.",
-                "bulkActionSuccess_one": "Updated {{count}} assets.",
-                "bulkActionSuccess_other": "Updated {{count}} assets.",
-                "deleteError": "Failed to delete assets",
-                "deleteSuccess_one": "Deleted {{count}} asset.",
-                "deleteSuccess_other": "Deleted {{count}} assets.",
-                "downloadError": "Failed to start download",
-                "downloadStart": "Download started",
-                "loadAlbumsError": "Failed to load albums"
-            },
-            "moreActions": "More actions",
-            "scan": {
-                "allQueued_one": "Scan queued for {{count}} library.",
-                "allQueued_other": "Scan queued for {{count}} libraries.",
-                "currentQueued": "Scan queued for {{name}}.",
-                "failed": "Failed to queue scan.",
-                "label": "Scan current library",
-                "noRepositories": "No repositories are available to scan.",
-                "title": "Scan {{scope}}"
-            },
-            "selectionMode": {
-                "enter": "Enter Selection Mode",
-                "exit": "Exit Selection Mode",
-                "label": "Select",
-                "selectedCount_one": "{{count}} selected",
-                "selectedCount_other": "{{count}} selected"
-            },
-            "sortBy": "Sort by {{sortBy}}",
-            "sortByOptions": {
-                "dateCaptured": "Date Captured",
-                "recentlyAdded": "Recently Added"
-            }
-        },
-        "audioInfoView": {
-            "audio_badge": "AUDIO",
-            "channels_count_one": "{{count}} channel",
-            "channels_count_other": "{{count}} channels",
-            "channels_mono": "Mono",
-            "channels_stereo": "Stereo",
-            "codec_label": "Codec: {{codec}}"
-        },
-        "basicInfo": {
-            "clickToEdit": "Click to edit",
-            "description": "Description",
-            "descriptionPlaceholder": "Add a description for this photo...",
-            "descriptionUpdated": "Description updated successfully",
-            "descriptionUpdateError": "Failed to update description",
-            "errors": {
-                "extractFailed": "Failed to extract EXIF: {{message}}",
-                "noAssetId": "Asset ID not available"
-            },
-            "exifNotAvailable": "No raw EXIF is stored for this photo yet.",
-            "extracting": "Extracting...",
-            "latitude": "Lat",
-            "loadingLocation": "Loading location...",
-            "location": "Location",
-            "longitude": "Lng",
-            "noDescription": "No description added yet",
-            "title": "Basic Info",
-            "viewExif": "View EXIF"
-        },
-        "errorFallback": {
-            "something_went_wrong": "Something went wrong"
-        },
-        "filterTool": {
-            "cameraMakeSection": {
-                "loading_options": "Loading options…",
-                "select_placeholder": "Select camera make",
-                "title": "Camera Make"
-            },
-            "dateSection": {
-                "from": "From",
-                "title": "Date",
-                "to": "To"
-            },
-            "filenameSection": {
-                "contains": "Contains",
-                "ends_with": "Ends with",
-                "matches": "Matches",
-                "placeholder": "Enter text...",
-                "starts_with": "Starts with",
-                "title": "Filename"
-            },
-            "lensSection": {
-                "loading_options": "Loading options…",
-                "select_placeholder": "Select lens",
-                "title": "Lens"
-            },
-            "likeSection": {
-                "liked": "Liked",
-                "title": "Like",
-                "unliked": "Unliked"
-            },
-            "locationSection": {
-                "bbox_coords": "BBox N:{{north}} S:{{south}} E:{{east}} W:{{west}}",
-                "cancel": "Cancel",
-                "center_lat": "Center lat",
-                "center_lon": "Center lon",
-                "close_modal": "close",
-                "done": "Done",
-                "east_placeholder": "East",
-                "generate_bbox": "Generate BBox",
-                "modal_description": "Provide a center + radius to generate a bounding box, or manually edit the values.",
-                "modal_title": "Pick location",
-                "north_placeholder": "North",
-                "pick_on_map": "Pick on map",
-                "preview_map": "Preview map",
-                "radius_km": "Radius (km)",
-                "south_placeholder": "South",
-                "title": "Location",
-                "use_current_location": "Use current location",
-                "west_placeholder": "West"
-            },
-            "main": {
-                "active_filters_count_one": "{{count}} filter active",
-                "active_filters_count_other": "{{count}} filters active",
-                "apply_button": "Apply",
-                "enable_toggle": "Enable",
-                "filters_button_title": "Filters",
-                "filters_header": "Filters",
-                "reset_button": "Reset"
-            },
-            "ratingSection": {
-                "rating_n": "Rating {{n}}",
-                "title": "Rating",
-                "unrated_short": "U",
-                "unrated_title": "Unrated"
-            },
-            "rawSection": {
-                "exclude": "Exclude",
-                "include": "Include",
-                "title": "RAW"
-            },
-            "sectionShell": {
-                "enable": "Enable"
-            },
-            "typeSection": {
-                "photo": "Photo",
-                "title": "Type",
-                "video": "Video"
-            }
-        },
-        "fullScreenBasicInfo": {
-            "unknown_asset_type": "Unknown",
-            "unknown_file": "Unknown file",
-            "unknown_type": "Unknown type"
-        },
-        "groups": {
-            "allResults": "All Results",
-            "thisMonth": "This Month",
-            "thisWeek": "This Week",
-            "today": "Today",
-            "yesterday": "Yesterday"
-        },
-        "justifiedGallery": {
-            "item_count_one": "{{count}} item",
-            "item_count_other": "{{count}} items",
-            "loading_more": "Loading more..."
-        },
-        "livePhoto": {
-            "playButton": "Play Live Photo"
-        },
-        "mediaThumbnail": {
-            "asset_alt_text": "Asset",
-            "asset_aria_label_prefix": "Asset",
-            "audio_file_fallback": "Audio file",
-            "audio_sr_only": "Audio",
-            "no_preview": "No preview",
-            "unknown_file_fallback": "Unknown file",
-            "unknown_mime_fallback": "Unknown type",
-            "video_sr_only": "Video"
-        },
-        "mediaViewer": {
-            "asset_alt_text": "Asset",
-            "media_not_available": "Media not available",
-            "unknown_file": "Unknown file",
-            "unknown_type": "Unknown type",
-            "video_title": "Video"
-        },
-        "photoInfoView": {
-            "ev_suffix": "ev",
-            "exposure_suffix": "s",
-            "iso_prefix": "ISO ",
-            "raw_badge": "RAW"
-        },
-        "photos": {
-            "fullscreen": {
-                "fieldGuide": {
-                    "button": "Field Guide",
-                    "fromINaturalist": "iNaturalist",
-                    "loadError": "Failed to load species predictions",
-                    "loading": "Loading species predictions",
-                    "noResults": "No species predictions yet",
-                    "open": "Open field guide",
-                    "openINaturalist": "Open in iNaturalist",
-                    "openWikipedia": "Wikipedia",
-                    "predictionsCount_one": "{{count}} prediction",
-                    "predictionsCount_other": "{{count}} predictions",
-                    "ranks": {
-                        "class": "Class",
-                        "family": "Family",
-                        "genus": "Genus",
-                        "kingdom": "Kingdom",
-                        "order": "Order",
-                        "phylum": "Phylum",
-                        "species": "Species"
-                    },
-                    "reference": "Reference",
-                    "referenceError": "Reference unavailable",
-                    "taxonomy": "Taxonomy",
-                    "topLabels": "Top3 Labels"
-                }
-            }
-        },
-        "stackCarousel": {
-            "error": "Stack assets are temporarily unavailable.",
-            "errorHint": "Try again in a moment.",
-            "loading": "Loading stack assets..."
-        },
-        "stackDetail": {
-            "assetFallback": "Current asset",
-            "close": "Close stack details",
-            "coverBadge": "Cover",
-            "currentBadge": "Current",
-            "empty": "No related assets were returned for this stack.",
-            "error": "Stack details are temporarily unavailable for this asset.",
-            "livePhoto": "Live Photo",
-            "loading": "Loading stack details...",
-            "memberCount_one": "{{count}} asset in stack",
-            "memberCount_other": "{{count}} assets in stack",
-            "openButton_one": "View stack details",
-            "openButton_other": "View {{count}} related assets",
-            "relation": {
-                "alternative": "Alternative",
-                "edited_version": "Edited Version",
-                "jpeg_original": "JPEG Original",
-                "raw_original": "Raw Original"
-            },
-            "thumbnailAlt": "Stack member preview",
-            "title": "Stack details"
-        },
-        "videoInfoView": {
-            "codec_label": "Codec: {{codec}}",
-            "recording_location": "Recording Location",
-            "video_badge": "VIDEO"
+    "assetsPageHeader": {
+      "actions": {
+        "addToAlbum": "Add to Album",
+        "affectsAssets": "{{selectedCount}} selected items will affect {{assetCount}} assets.",
+        "affectsSelected_one": "{{count}} selected items.",
+        "affectsSelected_other": "{{count}} selected items.",
+        "applyToItems_one": "Apply to {{count}} item",
+        "applyToItems_other": "Apply to {{count}} items",
+        "deleteSelected": "Delete Selected",
+        "downloadAll": "Download All",
+        "like": "Liked",
+        "likedMenu": "Liked",
+        "setRating": "Set Rating",
+        "title": "Actions",
+        "unlike": "Unliked",
+        "unrated": "Unrated"
+      },
+      "addToAlbumModal": {
+        "itemCount_one": "{{count}} item",
+        "itemCount_other": "{{count}} items",
+        "message_one": "Add {{count}} item to album?",
+        "message_other": "Add {{count}} items to album?",
+        "noAlbumsFound": "No albums found",
+        "title": "Add to Album"
+      },
+      "bulkConfirm": {
+        "likedTitle": "Update liked status?",
+        "ratingTitle": "Set rating"
+      },
+      "compactMenu": {
+        "actions": "Actions",
+        "selectedItems": "Selected Items",
+        "viewSort": "View & Sort"
+      },
+      "deleteConfirmModal": {
+        "cancelButton": "Cancel",
+        "deleteButton": "Delete Assets",
+        "message_one": "This will delete {{count}} asset.",
+        "message_other": "This will delete {{count}} assets.",
+        "title": "Confirm Deletion"
+      },
+      "messages": {
+        "addToAlbumError": "Failed to add items to album",
+        "addToAlbumSuccess_one": "Added {{count}} item to album.",
+        "addToAlbumSuccess_other": "Added {{count}} items to album.",
+        "bulkActionError": "Failed to update selected assets.",
+        "bulkActionSuccess_one": "Updated {{count}} assets.",
+        "bulkActionSuccess_other": "Updated {{count}} assets.",
+        "deleteError": "Failed to delete assets",
+        "deleteSuccess_one": "Deleted {{count}} asset.",
+        "deleteSuccess_other": "Deleted {{count}} assets.",
+        "downloadError": "Failed to start download",
+        "downloadStart": "Download started",
+        "loadAlbumsError": "Failed to load albums"
+      },
+      "moreActions": "More actions",
+      "scan": {
+        "allQueued_one": "Scan queued for {{count}} library.",
+        "allQueued_other": "Scan queued for {{count}} libraries.",
+        "currentQueued": "Scan queued for {{name}}.",
+        "failed": "Failed to queue scan.",
+        "label": "Scan current library",
+        "noRepositories": "No repositories are available to scan.",
+        "title": "Scan {{scope}}"
+      },
+      "selectionMode": {
+        "enter": "Enter Selection Mode",
+        "exit": "Exit Selection Mode",
+        "label": "Select",
+        "selectedCount_one": "{{count}} selected",
+        "selectedCount_other": "{{count}} selected"
+      },
+      "sortBy": "Sort by {{sortBy}}",
+      "sortByOptions": {
+        "dateCaptured": "Date Captured",
+        "recentlyAdded": "Recently Added"
+      }
+    },
+    "audioInfoView": {
+      "audio_badge": "AUDIO",
+      "channels_count_one": "{{count}} channel",
+      "channels_count_other": "{{count}} channels",
+      "channels_mono": "Mono",
+      "channels_stereo": "Stereo",
+      "codec_label": "Codec: {{codec}}"
+    },
+    "basicInfo": {
+      "clickToEdit": "Click to edit",
+      "description": "Description",
+      "descriptionPlaceholder": "Add a description for this photo...",
+      "descriptionUpdated": "Description updated successfully",
+      "descriptionUpdateError": "Failed to update description",
+      "errors": {
+        "extractFailed": "Failed to extract EXIF: {{message}}",
+        "noAssetId": "Asset ID not available"
+      },
+      "exifNotAvailable": "No raw EXIF is stored for this photo yet.",
+      "extracting": "Extracting...",
+      "latitude": "Lat",
+      "loadingLocation": "Loading location...",
+      "location": "Location",
+      "longitude": "Lng",
+      "noDescription": "No description added yet",
+      "title": "Basic Info",
+      "viewExif": "View EXIF"
+    },
+    "errorFallback": {
+      "something_went_wrong": "Something went wrong"
+    },
+    "filterTool": {
+      "cameraMakeSection": {
+        "loading_options": "Loading options…",
+        "select_placeholder": "Select camera make",
+        "title": "Camera Make"
+      },
+      "dateSection": {
+        "from": "From",
+        "title": "Date",
+        "to": "To"
+      },
+      "filenameSection": {
+        "contains": "Contains",
+        "ends_with": "Ends with",
+        "matches": "Matches",
+        "placeholder": "Enter text...",
+        "starts_with": "Starts with",
+        "title": "Filename"
+      },
+      "lensSection": {
+        "loading_options": "Loading options…",
+        "select_placeholder": "Select lens",
+        "title": "Lens"
+      },
+      "likeSection": {
+        "liked": "Liked",
+        "title": "Like",
+        "unliked": "Unliked"
+      },
+      "locationSection": {
+        "bbox_coords": "BBox N:{{north}} S:{{south}} E:{{east}} W:{{west}}",
+        "cancel": "Cancel",
+        "center_lat": "Center lat",
+        "center_lon": "Center lon",
+        "close_modal": "close",
+        "done": "Done",
+        "east_placeholder": "East",
+        "generate_bbox": "Generate BBox",
+        "modal_description": "Provide a center + radius to generate a bounding box, or manually edit the values.",
+        "modal_title": "Pick location",
+        "north_placeholder": "North",
+        "pick_on_map": "Pick on map",
+        "preview_map": "Preview map",
+        "radius_km": "Radius (km)",
+        "south_placeholder": "South",
+        "title": "Location",
+        "use_current_location": "Use current location",
+        "west_placeholder": "West"
+      },
+      "main": {
+        "active_filters_count_one": "{{count}} filter active",
+        "active_filters_count_other": "{{count}} filters active",
+        "apply_button": "Apply",
+        "enable_toggle": "Enable",
+        "filters_button_title": "Filters",
+        "filters_header": "Filters",
+        "reset_button": "Reset"
+      },
+      "ratingSection": {
+        "rating_n": "Rating {{n}}",
+        "title": "Rating",
+        "unrated_short": "U",
+        "unrated_title": "Unrated"
+      },
+      "rawSection": {
+        "exclude": "Exclude",
+        "include": "Include",
+        "title": "RAW"
+      },
+      "sectionShell": {
+        "enable": "Enable"
+      },
+      "typeSection": {
+        "photo": "Photo",
+        "title": "Type",
+        "video": "Video"
+      }
+    },
+    "fullScreenBasicInfo": {
+      "unknown_asset_type": "Unknown",
+      "unknown_file": "Unknown file",
+      "unknown_type": "Unknown type"
+    },
+    "groups": {
+      "allResults": "All Results",
+      "thisMonth": "This Month",
+      "thisWeek": "This Week",
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "justifiedGallery": {
+      "item_count_one": "{{count}} item",
+      "item_count_other": "{{count}} items",
+      "loading_more": "Loading more..."
+    },
+    "livePhoto": {
+      "playButton": "Play Live Photo"
+    },
+    "mediaThumbnail": {
+      "asset_alt_text": "Asset",
+      "asset_aria_label_prefix": "Asset",
+      "audio_file_fallback": "Audio file",
+      "audio_sr_only": "Audio",
+      "no_preview": "No preview",
+      "unknown_file_fallback": "Unknown file",
+      "unknown_mime_fallback": "Unknown type",
+      "video_sr_only": "Video"
+    },
+    "mediaViewer": {
+      "asset_alt_text": "Asset",
+      "media_not_available": "Media not available",
+      "unknown_file": "Unknown file",
+      "unknown_type": "Unknown type",
+      "video_title": "Video"
+    },
+    "photoInfoView": {
+      "ev_suffix": "ev",
+      "exposure_suffix": "s",
+      "iso_prefix": "ISO ",
+      "raw_badge": "RAW"
+    },
+    "photos": {
+      "fullscreen": {
+        "fieldGuide": {
+          "button": "Field Guide",
+          "fromINaturalist": "iNaturalist",
+          "loadError": "Failed to load species predictions",
+          "loading": "Loading species predictions",
+          "noResults": "No species predictions yet",
+          "open": "Open field guide",
+          "openINaturalist": "Open in iNaturalist",
+          "openWikipedia": "Wikipedia",
+          "predictionsCount_one": "{{count}} prediction",
+          "predictionsCount_other": "{{count}} predictions",
+          "ranks": {
+            "class": "Class",
+            "family": "Family",
+            "genus": "Genus",
+            "kingdom": "Kingdom",
+            "order": "Order",
+            "phylum": "Phylum",
+            "species": "Species"
+          },
+          "reference": "Reference",
+          "referenceError": "Reference unavailable",
+          "taxonomy": "Taxonomy",
+          "topLabels": "Top3 Labels"
         }
+      }
     },
-    "auth": {
-        "bootstrap": {
-            "gate": {
-                "loading": "Preparing setup...",
-                "statusError": "Unable to verify bootstrap status."
-            },
-            "landing": {
-                "cta": "Create the first Admin account",
-                "promptBody": "The first registration becomes Admin and will guide you through passkey or authenticator setup.",
-                "promptTitle": "Initial setup required",
-                "title": "Set up your Admin account"
-            },
-            "mfa": {
-                "subtitle": "Finish TOTP setup now so the first Lumilio Admin account is protected before you continue.",
-                "title": "Protect the first Admin account"
-            },
-            "register": {
-                "promptBody": "Lumilio will create the first Admin account and require passkey or authenticator enrollment before the setup is complete.",
-                "promptTitle": "You're registering the initial Admin user",
-                "submit": "Continue as Admin",
-                "subtitle": "Username first, then passkey or authenticator setup to finish Admin onboarding.",
-                "title": "Create the first Admin account"
-            }
-        },
-        "changePassword": {
-            "backToSettings": "Back to settings",
-            "changed": "Changed your mind?",
-            "confirmPassword": "Confirm new password",
-            "currentPassword": "Current password",
-            "currentPasswordHint": "Enter your existing password to verify your identity.",
-            "error": "Failed to change password.",
-            "loading": "Updating password…",
-            "mismatch": "Passwords must match exactly.",
-            "newPassword": "New password",
-            "newPasswordDivider": "NEW PASSWORD",
-            "pageSubtitle": "After changing your password, you will be signed out and need to log in again with the new password.",
-            "pageTitle": "Change your password",
-            "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
-            "submit": "Update password"
-        },
-        "common": {
-            "logoAlt": "{{appName}} logo"
-        },
-        "login": {
-            "authenticatorCode": "Authenticator code",
-            "authenticatorCodePlaceholder": "Enter 6-digit code",
-            "back": "Back",
-            "loading": "Signing in…",
-            "passkeyLoading": "Opening passkey…",
-            "passkeyStartError": "Unable to start passkey sign-in for this account.",
-            "passkeySubmit": "Continue with Passkey",
-            "passkeyUnavailable": "Passkey sign-in is unavailable for this account on this device.",
-            "passkeyVerifyError": "Passkey verification failed.",
-            "password": "Password",
-            "passwordSubtitle": "Use your password if you prefer not to use a passkey on this device.",
-            "passwordTitle": "Enter your password",
-            "recoveryCode": "Recovery code",
-            "recoveryCodePlaceholder": "Enter recovery code",
-            "recoveryHint": "Enter one of your one-time recovery codes.",
-            "recoveryValidation": "Enter an 8-character recovery code.",
-            "register": "Create an account",
-            "submit": "Continue with password",
-            "totpHint": "Enter the 6-digit code from your authenticator app.",
-            "totpValidation": "Enter a 6-digit authenticator code.",
-            "useAuthenticatorCode": "Use an authenticator code instead",
-            "usePasswordInstead": "Use password instead",
-            "useRecoveryCode": "Use a recovery code instead",
-            "username": "Username",
-            "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
-            "usernamePlaceholder": "Enter username",
-            "usernameTitle": "Continue with your username",
-            "verifyButton": "Verify and continue",
-            "verifying": "Verifying…",
-            "verifyPrompt": "Continuing as {{name}}",
-            "verifySubtitle": "Complete sign in with your authenticator app or a recovery code.",
-            "verifyTitle": "Two-factor verification"
-        },
-        "logout": "Logout",
-        "mfa": {
-            "backToSettings": "Back to settings",
-            "continueToApp": "Continue to Lumilio",
-            "doneHere": "Done with MFA settings?",
-            "pageSubtitle": "Use a TOTP app to manage sign-in verification, recovery codes, and account security from one dedicated page.",
-            "pageTitle": "Manage your authenticator setup"
-        },
-        "register": {
-            "confirmPassword": "Confirm password",
-            "confirmPasswordHint": "Passwords must match exactly.",
-            "finish": "Continue to Lumilio",
-            "loading": "Preparing account...",
-            "login": "Go to login",
-            "manualKey": "Setup key",
-            "passkeyAction": "Create Passkey",
-            "passkeyCardBody": "Use the current device's native passkey flow for the fastest and strongest sign-in.",
-            "passkeyCardTitle": "Create Passkey",
-            "passkeyStartError": "Failed to start passkey registration.",
-            "passkeyUnavailableUseTotp": "Passkeys are unavailable in the current environment. Please continue with an authenticator app.",
-            "passkeyVerifyError": "Passkey registration failed.",
-            "password": "Password",
-            "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
-            "recoveryReadyBody": "Store these recovery codes somewhere safe before continuing.",
-            "recoveryReadyTitle": "Account secured successfully",
-            "recoverySubtitle": "These one-time codes are the only fallback if you lose access to your authenticator.",
-            "recoveryTitle": "Save your recovery codes",
-            "securityChoiceSubtitle": "Passkey is recommended when the current device and origin support it.",
-            "securityChoiceTitle": "Choose your sign-in method",
-            "startError": "Failed to start account registration.",
-            "submit": "Continue",
-            "subtitle": "Create your username and password first, then secure the account.",
-            "title": "Create an account",
-            "totpAction": "Use Authenticator App",
-            "totpCardBody": "Choose TOTP if you prefer Duo, 1Password, Google Authenticator, or another app.",
-            "totpCardTitle": "Use Authenticator App instead",
-            "totpQrAlt": "TOTP setup QR code",
-            "totpSetupCompleteError": "Failed to complete authenticator setup.",
-            "totpSetupStartError": "Failed to start authenticator setup.",
-            "totpSubtitle": "Scan the QR code with Duo, 1Password, or any authenticator app, then verify once.",
-            "totpTitle": "Set up Authenticator App",
-            "username": "Username",
-            "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
-            "usernamePlaceholder": "Enter username",
-            "verifyAndFinish": "Verify and finish setup",
-            "verifyCode": "Verification code"
-        }
+    "stackCarousel": {
+      "error": "Stack assets are temporarily unavailable.",
+      "errorHint": "Try again in a moment.",
+      "loading": "Loading stack assets..."
     },
-    "bulk": {
-        "updateError": "Failed to update items",
-        "updateSuccess_one": "Updated {{count}} item.",
-        "updateSuccess_other": "Updated {{count}} items."
+    "stackDetail": {
+      "assetFallback": "Current asset",
+      "close": "Close stack details",
+      "coverBadge": "Cover",
+      "currentBadge": "Current",
+      "empty": "No related assets were returned for this stack.",
+      "error": "Stack details are temporarily unavailable for this asset.",
+      "livePhoto": "Live Photo",
+      "loading": "Loading stack details...",
+      "memberCount_one": "{{count}} asset in stack",
+      "memberCount_other": "{{count}} assets in stack",
+      "openButton_one": "View stack details",
+      "openButton_other": "View {{count}} related assets",
+      "relation": {
+        "alternative": "Alternative",
+        "edited_version": "Edited Version",
+        "jpeg_original": "JPEG Original",
+        "raw_original": "Raw Original"
+      },
+      "thumbnailAlt": "Stack member preview",
+      "title": "Stack details"
     },
-    "collections": {
-        "albumDetails": {
-            "albumCode": "ALBUM #{{id}}",
-            "bioClip": {
-                "action": "Field guide recognition",
-                "badge": "Field guide",
-                "error": "Failed to queue field guide recognition.",
-                "running": "Queueing...",
-                "success_one": "Queued {{count}} photo for recognition.",
-                "success_other": "Queued {{count}} photos for recognition."
-            },
-            "createdAtLabel": "Created",
-            "fallbackName": "Album",
-            "itemsCount_one": "{{count}} item",
-            "itemsCount_other": "{{count}} items",
-            "loadError": "Failed to load album: {{error}}"
-        },
-        "coverAlt": "Album cover image",
-        "coverAltWithName": "Cover image for album {{albumName}}",
-        "createModal": {
-            "actions": {
-                "create": "Create album",
-                "creating": "Creating..."
-            },
-            "coverPicker": {
-                "title": "Pick a photo"
-            },
-            "fields": {
-                "bioAlbum": {
-                    "hint": "Enable species recognition for photos added to this album.",
-                    "label": "Field guide"
-                },
-                "cover": {
-                    "change": "Change cover",
-                    "choose": "Choose a cover photo",
-                    "label": "Album cover",
-                    "requiredHint": "Required for new albums",
-                    "selectedAlt": "Selected cover image"
-                },
-                "description": {
-                    "label": "Description",
-                    "placeholder": "Describe this collection..."
-                },
-                "name": {
-                    "label": "Album name",
-                    "placeholder": "e.g. Summer Vacation 2024"
-                }
-            }
-        },
-        "deleteModal": {
-            "confirm": "Delete collections",
-            "deleting": "Deleting...",
-            "description_one": "Are you sure you want to delete {{count}} selected album? This only removes the collection. Your photos remain in your library.",
-            "description_other": "Are you sure you want to delete {{count}} selected albums? This only removes the collections. Your photos remain in your library.",
-            "title": "Delete albums"
-        },
-        "emptyAlbums": "No albums yet.",
-        "emptyPeople": "No recognized people yet.",
-        "itemsCount_one": "{{count}} item",
-        "itemsCount_other": "{{count}} items",
-        "messages": {
-            "deleteError": "Failed to delete albums",
-            "deleteSuccess": "Albums deleted successfully",
-            "loadAlbumsError": "Failed to load albums: {{message}}",
-            "loadPeopleError": "Failed to load people: {{message}}"
-        },
-        "newAlbum": "New Album",
-        "places": {
-            "empty": "No trips with location data yet.",
-            "exploreAll": "Explore all locations",
-            "loadError": "Failed to load trip: {{error}}",
-            "mapView": "Map",
-            "mapViewTitle": "Places Map"
-        },
-        "sections": {
-            "albums": "Albums",
-            "people": "People",
-            "places": "Places",
-            "utilities": "Utilities"
-        },
-        "untitled": "Untitled Album",
-        "utilities": {
-            "duplicates": {
-                "description": "Find and merge duplicate photos",
-                "title": "Duplicates"
-            }
-        }
+    "videoInfoView": {
+      "codec_label": "Codec: {{codec}}",
+      "recording_location": "Recording Location",
+      "video_badge": "VIDEO"
+    }
+  },
+  "auth": {
+    "bootstrap": {
+      "admin": {
+        "submit": "Create admin & continue",
+        "subtitle": "This account can manage the server, libraries, and members.",
+        "title": "Create the administrator"
+      },
+      "firstRun": "First-run setup",
+      "gate": {
+        "loading": "Preparing setup...",
+        "statusError": "Unable to verify bootstrap status."
+      },
+      "mfa": {
+        "subtitle": "Finish TOTP setup now so the first Lumilio Admin account is protected before you continue.",
+        "title": "Protect the first Admin account"
+      },
+      "passkey": {
+        "action": "Create admin passkey",
+        "skip": "Skip — use authenticator only",
+        "subtitle": "Strongly recommended — the admin account controls the whole server.",
+        "title": "Secure the admin with a passkey"
+      },
+      "recovery": {
+        "cta": "Finish & open dashboard",
+        "subtitle": "The only way to recover the server if every factor is lost.",
+        "title": "Save admin recovery codes"
+      },
+      "sidebarNote": "This wizard appears only once — until the first administrator is created.",
+      "totp": {
+        "subtitle": "Required for the admin account. Scan and verify to continue.",
+        "title": "Add an authenticator app"
+      },
+      "welcome": {
+        "body": "Your server is up and running, but no administrator exists yet. Let’s create the first admin account and lock it down with two-factor authentication.",
+        "cta": "Begin setup",
+        "inviteBody": "Add household members once setup is complete.",
+        "inviteTitle": "Invite others later",
+        "localBody": "Everything is stored on this server only.",
+        "localTitle": "Your data stays home",
+        "secureBody": "Passkey + authenticator required for the admin.",
+        "secureTitle": "Secured by default",
+        "title": "Welcome to Lumilio Photos"
+      }
+    },
+    "changePassword": {
+      "backToSettings": "Back to settings",
+      "changed": "Changed your mind?",
+      "confirmPassword": "Confirm new password",
+      "currentPassword": "Current password",
+      "currentPasswordHint": "Enter your existing password to verify your identity.",
+      "error": "Failed to change password.",
+      "loading": "Updating password…",
+      "mismatch": "Passwords must match exactly.",
+      "newPassword": "New password",
+      "newPasswordDivider": "NEW PASSWORD",
+      "pageSubtitle": "After changing your password, you will be signed out and need to log in again with the new password.",
+      "pageTitle": "Change your password",
+      "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
+      "submit": "Update password"
     },
     "common": {
-        "cancel": "Cancel",
-        "clickToEdit": "Click to edit",
-        "close": "Close",
-        "confirm": "Confirm",
-        "copied": "Copied",
-        "copy": "Copy",
-        "delete": "Delete",
-        "emptyState": {
-            "description": "Items will appear here when available.",
-            "title": "Nothing here yet"
-        },
-        "error": "Error",
-        "loading": "Loading...",
-        "loadMore": "Load More",
-        "na": "N/A",
-        "notAvailable": "N/A",
-        "or": "OR",
-        "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
-        "remove": "Remove",
-        "retry": "Retry",
-        "save": "Save",
-        "select": "Select",
-        "selected_one": "{{count}} selected",
-        "selected_other": "{{count}} selected",
-        "uploaded": "Uploaded",
-        "viewAll": "View All"
+      "logoAlt": "{{appName}} logo"
     },
-    "delete": {
-        "confirm": "Delete asset",
-        "confirmMessage": "Are you sure you want to delete \"{{filename}}\"?",
-        "confirmTitle": "Delete asset",
-        "deleting": "Deleting...",
-        "error": "Failed to delete asset",
-        "softDeleteNote": "This will mark the photo as deleted. The file will not be permanently removed.",
-        "success": "Asset deleted successfully",
-        "thisAsset": "this photo"
+    "login": {
+      "backToSignIn": "Back to sign in",
+      "passkeyStartError": "Unable to start passkey sign-in for this account.",
+      "passkeySubmit": "Continue with Passkey",
+      "passkeyUnavailable": "Passkey sign-in is unavailable for this account on this device.",
+      "passkeyVerifyError": "Passkey verification failed.",
+      "password": "Password",
+      "recoveryCode": "Recovery code",
+      "recoveryHint": "Enter one of your one-time recovery codes.",
+      "recoveryTitle": "Enter a recovery code",
+      "register": "Create an account",
+      "registerPrompt": "New to Lumilio?",
+      "submit": "Continue with password",
+      "subtitle": "Use a passkey, or your username and password.",
+      "title": "Sign in to Lumilio",
+      "useAuthenticatorCode": "Use an authenticator code instead",
+      "useRecoveryCode": "Use a recovery code instead",
+      "useRecoveryCodeInstead": "Can’t access your app? Use a recovery code",
+      "username": "Username",
+      "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
+      "usernamePlaceholder": "Enter username",
+      "usernameRequiredForPasskey": "Enter your username to continue with a passkey.",
+      "verifyButton": "Verify and continue",
+      "verifyPrompt": "Continuing as {{name}}",
+      "verifyTitle": "Two-factor verification"
     },
-    "duplicates": {
-        "emptyDescription": "Looks like every photo in this library is one of a kind.",
-        "emptyTitle": "No duplicates to review",
-        "errors": {
-            "noRepository": "No repository selected"
-        },
-        "filters": {
-            "dismissed": "Dismissed",
-            "merged": "Merged",
-            "pending": "Pending",
-            "status": "Status"
-        },
-        "group": {
-            "candidateLabel": "Candidate",
-            "dismiss": "Not a duplicate",
-            "dismissedLabel": "Dismissed",
-            "dismissError": "Failed to dismiss: {{message}}",
-            "dismissing": "Dismissing...",
-            "dismissSuccess": "Marked as not a duplicate.",
-            "duplicateLabel": "Will be moved to Trash",
-            "keeperLabel": "Keeping",
-            "membersCount_one": "{{count}} photo",
-            "membersCount_other": "{{count}} photos",
-            "merge": "Merge",
-            "mergeError": "Failed to merge: {{message}}",
-            "mergeSuccess": "Merged. Recovered {{size}}.",
-            "merging": "Merging...",
-            "saveSize": "Recover {{size}}",
-            "totalSize": "Total {{size}}"
-        },
-        "loadError": "Failed to load duplicates: {{message}}",
-        "method": {
-            "exact": "Exact duplicate",
-            "mixed": "Mixed (exact + similar)",
-            "phash": "Visually similar"
-        },
-        "noScanYet": "Run a scan to find duplicate photos across your library.",
-        "pageTitle": "Duplicates",
-        "scan": "Scan",
-        "scanError": "Failed to scan: {{message}}",
-        "scanning": "Scanning...",
-        "scanSuccess": "Found {{groups}} duplicate sets ({{exact}} exact, {{phash}} similar, {{mixed}} mixed)",
-        "summary": {
-            "lastDetected": "Last scan",
-            "neverDetected": "Not scanned yet",
-            "pendingGroups": "Pending sets",
-            "recoverableAssets": "Reclaimable photos",
-            "recoverableBytes": "Reclaimable space"
-        },
-        "summaryLoadError": "Failed to load duplicate summary: {{message}}"
+    "logout": "Logout",
+    "mfa": {
+      "backToSettings": "Back to settings",
+      "continueToApp": "Continue to Lumilio",
+      "doneHere": "Done with MFA settings?",
+      "pageSubtitle": "Use a TOTP app to manage sign-in verification, recovery codes, and account security from one dedicated page.",
+      "pageTitle": "Manage your authenticator setup"
     },
-    "footer": {
-        "copyright": "© {{year}} Lumilio Photos, Brought to you by EdwinZhan"
+    "register": {
+      "confirmPassword": "Confirm password",
+      "confirmPasswordHint": "Passwords must match exactly.",
+      "confirmPasswordPlaceholder": "Re-enter password",
+      "finish": "Continue to Lumilio",
+      "haveAccount": "Already have an account?",
+      "login": "Go to login",
+      "mfaRequiredNotice": "Two-factor authentication is required for every account. You’ll set it up next.",
+      "passkeyAction": "Create Passkey",
+      "passkeyDescription": "No password to remember. Your passkey stays on this device and can’t be phished.",
+      "passkeyHeadline": "Sign in with your face or fingerprint",
+      "passkeyStartError": "Failed to start passkey registration.",
+      "passkeyStepSubtitle": "Passkeys are the fastest, safest way in. We recommend adding one now.",
+      "passkeyStepTitle": "Secure with a passkey",
+      "passkeyUnavailableUseTotp": "Passkeys are unavailable in the current environment. Please continue with an authenticator app.",
+      "passkeyVerifyError": "Passkey registration failed.",
+      "password": "Password",
+      "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
+      "recoverySavedConfirm": "I’ve saved my recovery codes somewhere safe",
+      "recoverySubtitle": "These one-time codes are the only fallback if you lose access to your authenticator.",
+      "recoveryTitle": "Save your recovery codes",
+      "skipPasskey": "Skip for now, use authenticator only",
+      "startError": "Failed to start account registration.",
+      "stepAccount": "Account",
+      "stepAuthenticator": "Authenticator",
+      "stepPasskey": "Passkey",
+      "stepRecovery": "Recovery",
+      "submit": "Continue",
+      "subtitle": "Create your username and password first, then secure the account.",
+      "title": "Create an account",
+      "totpSetupCompleteError": "Failed to complete authenticator setup.",
+      "totpSetupStartError": "Failed to start authenticator setup.",
+      "totpSubtitle": "Scan the QR code with Duo, 1Password, or any authenticator app, then verify once.",
+      "totpTitle": "Set up Authenticator App",
+      "username": "Username",
+      "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
+      "usernamePlaceholder": "Enter username",
+      "verifyAndFinish": "Verify and finish setup"
     },
-    "home": {
-        "errors": {
-            "featuredLoadFailed": "Failed to load featured assets: {{message}}",
-            "unknown": "Unknown error"
+    "setup": {
+      "error": "Setup failed. Check the server logs and try again.",
+      "gate": {
+        "initializing": "Securing database credentials...",
+        "loading": "Checking system status…",
+        "statusError": "Unable to verify system status."
+      }
+    }
+  },
+  "bulk": {
+    "updateError": "Failed to update items",
+    "updateSuccess_one": "Updated {{count}} item.",
+    "updateSuccess_other": "Updated {{count}} items."
+  },
+  "collections": {
+    "albumDetails": {
+      "albumCode": "ALBUM #{{id}}",
+      "bioClip": {
+        "action": "Field guide recognition",
+        "badge": "Field guide",
+        "error": "Failed to queue field guide recognition.",
+        "running": "Queueing...",
+        "success_one": "Queued {{count}} photo for recognition.",
+        "success_other": "Queued {{count}} photos for recognition."
+      },
+      "createdAtLabel": "Created",
+      "fallbackName": "Album",
+      "itemsCount_one": "{{count}} item",
+      "itemsCount_other": "{{count}} items",
+      "loadError": "Failed to load album: {{error}}"
+    },
+    "coverAlt": "Album cover image",
+    "coverAltWithName": "Cover image for album {{albumName}}",
+    "createModal": {
+      "actions": {
+        "create": "Create album",
+        "creating": "Creating..."
+      },
+      "coverPicker": {
+        "title": "Pick a photo"
+      },
+      "fields": {
+        "bioAlbum": {
+          "hint": "Enable species recognition for photos added to this album.",
+          "label": "Field guide"
         },
-        "map": {
-            "empty": "No photos with location data yet.",
-            "loadedStatus": "Located {{pointsCount}} photos / Loaded {{loadedCount}}",
-            "loadedStatusMore": " (loading more)",
-            "loadedStatusTotal": " / Total {{totalCount}}",
-            "loading": "Loading map data...",
-            "placesCount_one": "{{count}} place",
-            "placesCount_other": "{{count}} places",
-            "title": "Spacetime Trail"
+        "cover": {
+          "change": "Change cover",
+          "choose": "Choose a cover photo",
+          "label": "Album cover",
+          "requiredHint": "Required for new albums",
+          "selectedAlt": "Selected cover image"
         },
-        "stats": {
-            "cameraLens": {
-                "empty": "No camera and lens data available",
-                "title": "Popular Camera and Lens Combinations"
-            },
-            "error": "Failed to load statistics: {{error}}",
-            "focalLength": {
-                "empty": "No focal length data available",
-                "title": "Popular Focal Lengths"
-            },
-            "heatmap": {
-                "empty": "No activity data available",
-                "title": "Shooting Activity Heatmap"
-            },
-            "timeDistribution": {
-                "blue": "Blue Hour",
-                "golden": "Golden Hour",
-                "sunrise": "Sunrise",
-                "sunset": "Sunset",
-                "title": "Shooting Time Distribution"
-            },
-            "unknown": "Unknown"
+        "description": {
+          "label": "Description",
+          "placeholder": "Describe this collection..."
         },
-        "tabs": {
-            "gallery": "Gallery",
-            "stats": "Stats"
+        "name": {
+          "label": "Album name",
+          "placeholder": "e.g. Summer Vacation 2024"
         }
+      }
     },
-    "lumilio": {
-        "agent": {
-            "disabled": "Lumilio Agent is disabled. Enable it in Settings > AI.",
-            "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI."
-        },
-        "chat": {
-            "confirmation": {
-                "confirm": "Confirm",
-                "title": "Confirmation required"
-            },
-            "empty": "Start a conversation with Lumilio!",
-            "openAiSettings": "Open AI settings"
-        },
-        "input": {
-            "generating": "Generating response...",
-            "placeholderLabel": "Placeholder label",
-            "placeholderType": "Placeholder",
-            "prompt": "Ask Lumilio Agent... (Type @ or /)",
-            "unavailable": "Lumilio Agent is unavailable."
-        },
-        "markdown": {
-            "code": {
-                "copied": "Copied",
-                "copy": "Copy",
-                "languageFallback": "text"
-            },
-            "think": {
-                "defaultSummary": "Think about this...",
-                "thinking": "Thinking...",
-                "thoughtFor": "Thought for {{time}}s"
-            }
-        },
-        "messages": {
-            "thinking": "Thinking..."
-        },
-        "status": {
-            "loading": "Loading {{status}}"
-        },
-        "tools": {
-            "error": "Error: {{error}}",
-            "eventNotFound": "Tool event not found.",
-            "openFullView": "Open full view",
-            "openMainGallery": "Open in main gallery view",
-            "resultsTitle": "{{toolName}} results",
-            "viewResults": "View results"
-        }
+    "deleteModal": {
+      "confirm": "Delete collections",
+      "deleting": "Deleting...",
+      "description_one": "Are you sure you want to delete {{count}} selected album? This only removes the collection. Your photos remain in your library.",
+      "description_other": "Are you sure you want to delete {{count}} selected albums? This only removes the collections. Your photos remain in your library.",
+      "title": "Delete albums"
     },
-    "manage": {
-        "errorBoundaryMessage": "The manage section failed to load or encountered an error during operation.",
-        "errorBoundaryTitle": "Manage Section Error!",
-        "pageTitle": "Manage Libraries",
-        "repositories": {
-            "actionsMenu": "Library actions for {{name}}",
-            "assetCount": "Assets",
-            "createAction": "Add library",
-            "createDescription": "Create a repository folder inside the mounted storage root.",
-            "createFailed": "Failed to create library.",
-            "createNameHint": "Use a short, recognizable name.",
-            "createNameLabel": "Library name",
-            "createNamePlaceholder": "Family Photos",
-            "createSubmit": "Create library",
-            "createSuccess": "{{name}} was added.",
-            "createTitle": "Add library",
-            "description": "Connected repositories available for upload, filtering, and file-system scans.",
-            "detectStacks": "Detect stacks",
-            "detectStacksCompleted_one": "Detected {{count}} stack for {{name}}.",
-            "detectStacksCompleted_other": "Detected {{count}} stacks for {{name}}.",
-            "detectStacksFailed": "Failed to detect stacks.",
-            "duplicateScan": "Scan for duplicates",
-            "duplicateScanFailed": "Duplicate scan failed.",
-            "empty": "No repositories are available.",
-            "primaryBadge": "Primary",
-            "rebuildLocation": "Rebuild location clusters",
-            "rebuildLocationQueued": "Location cluster rebuild queued.",
-            "rescanRepository": "Rescan",
-            "scanAll": "Scan all libraries",
-            "scanAllQueued_one": "Scan queued for {{count}} library.",
-            "scanAllQueued_other": "Scan queued for {{count}} libraries.",
-            "scanFailed": "Failed to queue scan.",
-            "scanQueued": "Scan queued for {{name}}.",
-            "title": "Libraries",
-            "unavailable": "Repository options are temporarily unavailable."
-        }
+    "emptyAlbums": "No albums yet.",
+    "emptyPeople": "No recognized people yet.",
+    "itemsCount_one": "{{count}} item",
+    "itemsCount_other": "{{count}} items",
+    "messages": {
+      "deleteError": "Failed to delete albums",
+      "deleteSuccess": "Albums deleted successfully",
+      "loadAlbumsError": "Failed to load albums: {{message}}",
+      "loadPeopleError": "Failed to load people: {{message}}"
+    },
+    "newAlbum": "New Album",
+    "places": {
+      "empty": "No trips with location data yet.",
+      "exploreAll": "Explore all locations",
+      "loadError": "Failed to load trip: {{error}}",
+      "mapView": "Map",
+      "mapViewTitle": "Places Map"
+    },
+    "sections": {
+      "albums": "Albums",
+      "people": "People",
+      "places": "Places",
+      "utilities": "Utilities"
+    },
+    "untitled": "Untitled Album",
+    "utilities": {
+      "duplicates": {
+        "description": "Find and merge duplicate photos",
+        "title": "Duplicates"
+      }
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "clickToEdit": "Click to edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "copied": "Copied",
+    "copy": "Copy",
+    "delete": "Delete",
+    "emptyState": {
+      "description": "Items will appear here when available.",
+      "title": "Nothing here yet"
+    },
+    "error": "Error",
+    "loading": "Loading...",
+    "loadMore": "Load More",
+    "na": "N/A",
+    "notAvailable": "N/A",
+    "or": "OR",
+    "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
+    "remove": "Remove",
+    "retry": "Retry",
+    "save": "Save",
+    "select": "Select",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "uploaded": "Uploaded",
+    "viewAll": "View All"
+  },
+  "delete": {
+    "confirm": "Delete asset",
+    "confirmMessage": "Are you sure you want to delete \"{{filename}}\"?",
+    "confirmTitle": "Delete asset",
+    "deleting": "Deleting...",
+    "error": "Failed to delete asset",
+    "softDeleteNote": "This will mark the photo as deleted. The file will not be permanently removed.",
+    "success": "Asset deleted successfully",
+    "thisAsset": "this photo"
+  },
+  "duplicates": {
+    "emptyDescription": "Looks like every photo in this library is one of a kind.",
+    "emptyTitle": "No duplicates to review",
+    "errors": {
+      "noRepository": "No repository selected"
+    },
+    "filters": {
+      "dismissed": "Dismissed",
+      "merged": "Merged",
+      "pending": "Pending",
+      "status": "Status"
+    },
+    "group": {
+      "candidateLabel": "Candidate",
+      "dismiss": "Not a duplicate",
+      "dismissedLabel": "Dismissed",
+      "dismissError": "Failed to dismiss: {{message}}",
+      "dismissing": "Dismissing...",
+      "dismissSuccess": "Marked as not a duplicate.",
+      "duplicateLabel": "Will be moved to Trash",
+      "keeperLabel": "Keeping",
+      "membersCount_one": "{{count}} photo",
+      "membersCount_other": "{{count}} photos",
+      "merge": "Merge",
+      "mergeError": "Failed to merge: {{message}}",
+      "mergeSuccess": "Merged. Recovered {{size}}.",
+      "merging": "Merging...",
+      "saveSize": "Recover {{size}}",
+      "totalSize": "Total {{size}}"
+    },
+    "loadError": "Failed to load duplicates: {{message}}",
+    "method": {
+      "exact": "Exact duplicate",
+      "mixed": "Mixed (exact + similar)",
+      "phash": "Visually similar"
+    },
+    "noScanYet": "Run a scan to find duplicate photos across your library.",
+    "pageTitle": "Duplicates",
+    "scan": "Scan",
+    "scanError": "Failed to scan: {{message}}",
+    "scanning": "Scanning...",
+    "scanSuccess": "Found {{groups}} duplicate sets ({{exact}} exact, {{phash}} similar, {{mixed}} mixed)",
+    "summary": {
+      "lastDetected": "Last scan",
+      "neverDetected": "Not scanned yet",
+      "pendingGroups": "Pending sets",
+      "recoverableAssets": "Reclaimable photos",
+      "recoverableBytes": "Reclaimable space"
+    },
+    "summaryLoadError": "Failed to load duplicate summary: {{message}}"
+  },
+  "footer": {
+    "copyright": "© {{year}} Lumilio Photos, Brought to you by EdwinZhan"
+  },
+  "home": {
+    "errors": {
+      "featuredLoadFailed": "Failed to load featured assets: {{message}}",
+      "unknown": "Unknown error"
     },
     "map": {
-        "noLocationData": "No location data available"
+      "empty": "No photos with location data yet.",
+      "loadedStatus": "Located {{pointsCount}} photos / Loaded {{loadedCount}}",
+      "loadedStatusMore": " (loading more)",
+      "loadedStatusTotal": " / Total {{totalCount}}",
+      "loading": "Loading map data...",
+      "placesCount_one": "{{count}} place",
+      "placesCount_other": "{{count}} places",
+      "title": "Spacetime Trail"
     },
-    "monitor": {
-        "adminOnlyDescription": "Queue monitoring and runtime diagnostics are only available to administrators.",
-        "adminOnlyTitle": "Admin access required",
-        "jobs": {
-            "attempts": "{{current}}/{{max}} attempts",
-            "empty": "No jobs found with current filters",
-            "fetchError": "Failed to fetch jobs",
-            "filters": {
-                "allQueues": "All",
-                "queue": "Queue",
-                "state": "State",
-                "states": {
-                    "all": "All",
-                    "available": "Available",
-                    "cancelled": "Cancelled",
-                    "completed": "Completed",
-                    "discarded": "Discarded",
-                    "retryable": "Retryable",
-                    "running": "Running",
-                    "scheduled": "Scheduled"
-                }
-            },
-            "labels": {
-                "created": "Created",
-                "failed": "Failed",
-                "finished": "Finished",
-                "scheduled": "Scheduled",
-                "started": "Started"
-            },
-            "loading": "Loading jobs...",
-            "pagination": {
-                "moreResults": "More results available",
-                "totalJobs_one": "{{count}} job",
-                "totalJobs_other": "{{count}} jobs"
-            },
-            "timeAgoDays_one": "{{count}} day ago",
-            "timeAgoDays_other": "{{count}} days ago",
-            "timeAgoHours_one": "{{count}} hour ago",
-            "timeAgoHours_other": "{{count}} hours ago",
-            "timeAgoMinutes_one": "{{count}} minute ago",
-            "timeAgoMinutes_other": "{{count}} minutes ago",
-            "timeAgoSeconds_one": "{{count}} second ago",
-            "timeAgoSeconds_other": "{{count}} seconds ago"
-        },
-        "ml": {
-            "bioAlbumCoverage": "Bio album species coverage",
-            "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
-            "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
-            "existingPhotos": "Existing photos",
-            "indexedAssets": "Indexed",
-            "loadError": "Failed to load ML indexing stats.",
-            "queuedJobs": "Queued",
-            "queuedMlJobs": "Queued ML jobs",
-            "reindex": "Reindex",
-            "reindexJobs": "Queued reindex jobs",
-            "reindexModal": {
-                "cancel": "Cancel",
-                "confirm": "Start reindex",
-                "descriptionAll_one": "Reindex all {{count}} asset.",
-                "descriptionAll_other": "Reindex all {{count}} assets.",
-                "descriptionMissing_one": "Reindex {{count}} missing asset.",
-                "descriptionMissing_other": "Reindex {{count}} missing assets.",
-                "existingJobsWarning_one": "{{count}} reindex job already queued.",
-                "existingJobsWarning_other": "{{count}} reindex jobs already queued.",
-                "reindexAllCheckbox": "Reindex all (not just missing)",
-                "title": "Reindex — {{task}}"
-            },
-            "remainingAssets": "Remaining"
-        },
-        "queues": {
-            "active": "Active",
-            "activeCount_one": "{{count}} active queue",
-            "activeCount_other": "{{count}} active queues",
-            "empty": "No active queues found",
-            "fetchError": "Failed to fetch queues",
-            "idle": "Idle",
-            "loading": "Loading queues...",
-            "timeAgoHours_one": "{{count}} hour ago",
-            "timeAgoHours_other": "{{count}} hours ago",
-            "timeAgoMinutes_one": "{{count}} minute ago",
-            "timeAgoMinutes_other": "{{count}} minutes ago",
-            "timeAgoSeconds_one": "{{count}} second ago",
-            "timeAgoSeconds_other": "{{count}} seconds ago"
-        },
-        "sections": {
-            "activeQueues": "Active Queues",
-            "recentJobs": "Recent Jobs"
-        },
-        "stats": {
-            "activeJobs": "Active jobs",
-            "allHealthy": "All healthy",
-            "availableCount_one": "{{count}} available",
-            "availableCount_other": "{{count}} available",
-            "cancelledCount_one": "{{count}} cancelled",
-            "cancelledCount_other": "{{count}} cancelled",
-            "completed": "Completed",
-            "discardedCount_one": "{{count}} discarded",
-            "discardedCount_other": "{{count}} discarded",
-            "fetchError": "Failed to fetch queue stats",
-            "issues": "Issues",
-            "noData": "No data",
-            "noProcessedJobs": "No jobs processed yet",
-            "retryableCount_one": "{{count}} retryable",
-            "retryableCount_other": "{{count}} retryable",
-            "runningCount_one": "{{count}} running",
-            "runningCount_other": "{{count}} running",
-            "scheduledCount_one": "{{count}} scheduled",
-            "scheduledCount_other": "{{count}} scheduled",
-            "successRate": "{{rate}}% success rate"
-        },
-        "subtitles": {
-            "capabilities": "Runtime ML discovery and LLM agent status",
-            "ml": "ML indexing coverage and reindex progress",
-            "queue": "Real-time job queue monitoring"
-        },
-        "tabs": {
-            "capabilities": "Capabilities",
-            "ml": "ML",
-            "queue": "Queue"
-        },
-        "title": "Server Monitor"
+    "stats": {
+      "cameraLens": {
+        "empty": "No camera and lens data available",
+        "title": "Popular Camera and Lens Combinations"
+      },
+      "error": "Failed to load statistics: {{error}}",
+      "focalLength": {
+        "empty": "No focal length data available",
+        "title": "Popular Focal Lengths"
+      },
+      "heatmap": {
+        "empty": "No activity data available",
+        "title": "Shooting Activity Heatmap"
+      },
+      "timeDistribution": {
+        "blue": "Blue Hour",
+        "golden": "Golden Hour",
+        "sunrise": "Sunrise",
+        "sunset": "Sunset",
+        "title": "Shooting Time Distribution"
+      },
+      "unknown": "Unknown"
     },
-    "navbar": {
-        "agent": {
-            "label": "Lumilio Agent",
-            "open": "Open Lumilio Agent"
-        },
-        "notifications": {
-            "clear": "Clear all messages",
-            "empty": "No messages yet.",
-            "markAllRead": "Mark all as read",
-            "title": "Message Center"
-        },
-        "repository": {
-            "all": "All repositories",
-            "label": "Working repository",
-            "primary": "Primary",
-            "unavailable": "Repository options unavailable"
-        }
-    },
-    "people": {
-        "details": {
-            "confirmedHint": "This person has been named and confirmed.",
-            "loadError": "Failed to load person details: {{error}}",
-            "personCode": "PERSON {{id}}",
-            "renamePlaceholder": "Name this person",
-            "save": "Save",
-            "unconfirmedHint": "This person is still unnamed. Give them a name when you are confident.",
-            "updatedLabel": "Updated"
-        },
-        "membersCount_one": "{{count}} face",
-        "membersCount_other": "{{count}} faces",
-        "photosCount_one": "{{count}} photo",
-        "photosCount_other": "{{count}} photos",
-        "rebuild": {
-            "action": "Rebuild",
-            "error": "Failed to rebuild people: {{message}}",
-            "running": "Rebuilding...",
-            "success": "Rebuilt {{clusters}} people clusters from {{faces}} faces ({{noise}} noise)."
-        },
-        "unnamed": "Unnamed"
-    },
-    "rating": {
-        "none": "No rating",
-        "stars_one": "{{count}} star",
-        "stars_other": "{{count}} stars",
-        "unrated": "Unrated",
-        "updateError": "Failed to update rating"
-    },
-    "routes": {
-        "collections": "Collections",
-        "home": "Home",
-        "portfolio": "Portfolio",
-        "settings": "Settings",
-        "updates": "Updates"
-    },
-    "search": {
-        "degraded": "Top results are temporarily unavailable. Showing regular results instead.",
-        "error": "Search is temporarily unavailable. Try again in a moment.",
-        "loading": "Searching...",
-        "results": "Results",
-        "topResults": "Top Results"
-    },
-    "settings": {
-        "account": {
-            "avatarEmpty": "Choose a photo from your library, or leave empty to fall back to initials.",
-            "avatarHint": "Pick a photo asset to use as your avatar. Only photo assets are supported.",
-            "avatarPhoto": "Avatar photo",
-            "avatarSelected": "A photo is selected for your avatar.",
-            "changeAvatar": "Change photo",
-            "chooseAvatar": "Choose photo",
-            "displayName": "Display name",
-            "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
-            "mfa": {
-                "account": "Account",
-                "addPasskey": "Add Passkey",
-                "addPasskeyPrompt": "Add a passkey to sign in with your device's biometrics or security key.",
-                "advanced": "Advanced setup URI",
-                "authenticatorAppTitle": "Authenticator App",
-                "beginSetup": "Set up TOTP",
-                "bootstrapOnboarding": "This is the first Lumilio Admin account. Finish TOTP setup now so your Admin login starts protected from the first session.",
-                "bootstrapOnboardingTitle": "First Admin account",
-                "confirmDisable": "Disable TOTP",
-                "confirmRegenerate": "Generate new recovery codes",
-                "currentPassword": "Current password",
-                "currentPasswordHint": "Confirm with your current password.",
-                "currentPasswordHintRegenerate": "Confirm your identity before generating new codes.",
-                "disableButton": "Disable TOTP",
-                "disabled": "Two-factor authentication has been disabled.",
-                "disabledBadge": "Disabled",
-                "disableError": "Failed to disable TOTP.",
-                "disableWarning": "This will remove two-factor authentication from your account. Confirm with your current password.",
-                "enableButton": "Enable TOTP",
-                "enabled": "Two-factor authentication is now enabled.",
-                "enabledBadge": "Enabled",
-                "enableError": "Failed to enable TOTP.",
-                "enabling": "Enabling…",
-                "enrolled": "enrolled",
-                "enrolledPasskeys": "Passkeys",
-                "enrolledPasskeysHint": "Manage the passkey credentials registered to this account.",
-                "issuer": "Issuer",
-                "noPasskeys": "No passkeys enrolled yet",
-                "notConfigured": "Not configured yet. Secure your account with TOTP.",
-                "notEnrolled": "Not enrolled",
-                "passkeyCreated": "Created",
-                "passkeyDescription": "Use your device's native passkey flow for sign-in.",
-                "passkeyLastUsed": "Last used",
-                "passkeyTitle": "Passkeys",
-                "qrAlt": "TOTP setup QR code",
-                "qrCaption": "If scanning fails, you can still use the manual setup key.",
-                "qrError": "Failed to generate the TOTP QR code.",
-                "recoveryCodesHint": "Store these one-time codes somewhere safe. Each code can be used once if your authenticator app is unavailable.",
-                "recoveryCodesTitle": "Recovery codes",
-                "recoveryRemaining": "recovery codes remaining",
-                "regenerateButton": "Regenerate recovery codes",
-                "regenerated": "Recovery codes regenerated successfully.",
-                "regenerateError": "Failed to regenerate recovery codes.",
-                "regenerateHint": "Generating new recovery codes invalidates every existing one.",
-                "regenerateTitle": "Regenerate recovery codes",
-                "remainingCodes_one": "{{count}} recovery codes remaining",
-                "remainingCodes_other": "{{count}} recovery codes remaining",
-                "setupDescription": "Use Duo, 1Password, Google Authenticator, or another TOTP-compatible app. If scanning fails, copy the setup details manually.",
-                "setupError": "Failed to start TOTP setup.",
-                "setupKey": "Manual setup key",
-                "setupKeyHint": "Enter this key manually in your authenticator app if you can't scan the QR code.",
-                "setupTitle": "Scan the QR code with your authenticator app",
-                "stepOne": "Step 1",
-                "stepTwo": "Verify with a 6-digit code",
-                "stepTwoLabel": "Step 2",
-                "totpValidation": "Enter the current 6-digit code from your app.",
-                "verificationCode": "Verification code"
-            },
-            "passwordDescription": "Change your account password. You will be signed out afterwards.",
-            "passwordTitle": "Password",
-            "permissions": {
-                "customPermission": "Custom permission",
-                "manage_users": {
-                    "label": "Manage Users",
-                    "description": "Create, edit, and deactivate user accounts."
-                },
-                "manage_settings": {
-                    "label": "Manage Settings",
-                    "description": "Modify global application settings."
-                },
-                "view_all_assets": {
-                    "label": "View All Assets",
-                    "description": "Browse all photos and media in the library."
-                },
-                "manage_all_assets": {
-                    "label": "Manage All Assets",
-                    "description": "Edit, delete, and modify metadata for any asset."
-                },
-                "view_own_assets": {
-                    "label": "View Own Assets",
-                    "description": "Browse your own uploaded photos and media."
-                },
-                "manage_own_assets": {
-                    "label": "Manage Own Assets",
-                    "description": "Edit, delete, and modify metadata on your own assets."
-                },
-                "manage_own_profile": {
-                    "label": "Manage Own Profile",
-                    "description": "Update your display name, avatar, and security settings."
-                }
-            },
-            "permissionsSubtitle": "Permissions assigned to your account based on your role.",
-            "permissionsTitle": "Account Permissions",
-            "profileInfo": "Profile Information",
-            "profileInfoHint": "Update your display name and avatar. Username and role are managed by administrators.",
-            "removeAvatar": "Remove photo",
-            "role": "Role",
-            "save": "Save profile",
-            "saved": "Profile updated successfully.",
-            "saveError": "Failed to update profile.",
-            "securityDescription": "Manage your password, authentication methods, and sign-in factors.",
-            "securityTitle": "Security",
-            "title": "Account",
-            "username": "Username",
-            "viewPermissions": "View permissions"
-        },
-        "ai": "AI",
-        "aiSettings": {
-            "agentDescription": "Configure the server-side LLM provider and credentials used by the agent.",
-            "agentTitle": "Lumilio Agent",
-            "apiKey": "API key",
-            "apiKeyConfigured": "Stored API key",
-            "apiKeyDescription": "API keys are write-only. Leaving this field empty keeps the stored key unchanged.",
-            "apiKeyPlaceholder": "Enter a new API key",
-            "baseUrl": "Base URL",
-            "baseUrlDescription": "Optional override for provider-compatible endpoints.",
-            "clearStoredKey": "Clear stored API key",
-            "description": "Configure the assistant and photo intelligence features.",
-            "enabled": "Enable agent",
-            "loadError": "Failed to load AI settings.",
-            "mlTitle": "Photo Intelligence",
-            "modelName": "Model name",
-            "provider": "Provider",
-            "providerOptions": {
-                "ark": "Ark",
-                "deepseek": "DeepSeek",
-                "ollama": "Ollama",
-                "openai": "OpenAI",
-                "unset": "Not set"
-            },
-            "saveError": "Failed to save settings.",
-            "saveSuccess": "Settings saved.",
-            "taskDescriptions": {
-                "bioclip": "Identify plants, animals, and other biological subjects.",
-                "clip": "Find photos by visual meaning, not only filenames.",
-                "face": "Detect and group recognizable faces.",
-                "ocr": "Read visible text inside photos."
-            },
-            "taskNames": {
-                "bioclip": "Field guide",
-                "clip": "Semantic search",
-                "face": "Face recognition",
-                "ocr": "Text recognition"
-            },
-            "validate": "Validate connection",
-            "validationError": "Failed to validate LLM configuration.",
-            "validationSuccess": "LLM configuration validated successfully."
-        },
-        "appearance": "Appearance",
-        "appearanceSettings": {
-            "compactColumns": {
-                "description": "Choose how many assets are shown per row when Compact layout is active.",
-                "label": "Compact columns"
-            },
-            "description": "Configure language, theme, region, and the default asset page layout for this browser.",
-            "layoutDescription": "Set the default layout used on the asset page.",
-            "layoutOptions": {
-                "compact": {
-                    "description": "Square grid layout with adjustable columns.",
-                    "label": "Compact"
-                },
-                "full": {
-                    "description": "Justified layout for immersive browsing.",
-                    "label": "Full"
-                }
-            },
-            "themes": {
-                "activeBadge": "Current mode",
-                "currentMode": "Current mode",
-                "modeNames": {
-                    "light": "Light",
-                    "dark": "Dark"
-                },
-                "dark": {
-                    "description": "Applied when the navbar is in dark mode.",
-                    "label": "Dark mode theme"
-                },
-                "description": "Pick the daisyUI theme used for light and dark mode. The navbar toggle only switches mode.",
-                "followSystem": {
-                    "description": "Use your operating system appearance preference to choose light or dark mode.",
-                    "label": "Follow system",
-                    "navbarHint": "Theme mode follows the system preference. Turn this off in Settings to switch manually.",
-                    "status": "System is currently using {{mode}}."
-                },
-                "light": {
-                    "description": "Applied when the navbar is in light mode.",
-                    "label": "Light mode theme"
-                },
-                "title": "Theme pairing"
-            }
-        },
-        "assetPage": "Asset Page",
-        "cloud": {
-            "title": "Cloud Sync"
-        },
-        "language": "Language",
-        "languageAndRegion": "Language & Region",
-        "performance": "Performance",
-        "performanceSettings": {
-            "advancedDescription": "Configure detailed performance parameters.",
-            "advancedTitle": "Advanced controls",
-            "availableMemory": "Available memory",
-            "changesApply": "Changes take effect immediately for new processing operations.",
-            "cpuCores": "CPU cores",
-            "currentProfile": "Current profile",
-            "description": "Configure local processing performance.",
-            "deviceType": "Device type",
-            "deviceTypeValues": {
-                "desktop": "Desktop",
-                "lowEnd": "Low-end",
-                "mobile": "Mobile"
-            },
-            "maxConcurrency": "Max concurrency",
-            "maxConcurrentOperations": "Max concurrent operations",
-            "maxConcurrentOperationsDescription": "Maximum number of heavy processing jobs the browser may run at once.",
-            "prioritizeUserOperations": "Prioritize user operations",
-            "prioritizeUserOperationsDescription": "Prioritize operations related to active user interactions.",
-            "profileDescription": "Select the default profile for concurrency and memory usage.",
-            "profiles": {
-                "adaptive": {
-                    "description": "Adjust processing behavior based on detected device capabilities.",
-                    "label": "Adaptive"
-                },
-                "balanced": {
-                    "description": "Balance processing speed and memory usage.",
-                    "label": "Balanced"
-                },
-                "memory_saver": {
-                    "description": "Reduce memory usage and processing concurrency.",
-                    "label": "Memory Saver"
-                },
-                "speed": {
-                    "description": "Increase concurrency to favor processing speed.",
-                    "label": "Speed Optimized"
-                }
-            },
-            "profileTitle": "Performance profile",
-            "reset": "Reset to defaults",
-            "respectMemoryLimits": "Respect memory limits",
-            "respectMemoryLimitsDescription": "Reduce processing intensity when available memory is limited."
-        },
-        "region": "Region",
-        "regionOptions": {
-            "china": "China Mainland",
-            "other": "Other country and region"
-        },
-        "server": "Server",
-        "serverSettings": {
-            "activeNodes": "Active nodes",
-            "agentEnabled": "Agent enabled",
-            "available": "Available",
-            "booleanValues": {
-                "false": "No",
-                "true": "Yes"
-            },
-            "capabilitiesError": "Failed to load capabilities.",
-            "configured": "Configured",
-            "disabled": "Disabled",
-            "discoveredNodes": "Discovered nodes",
-            "enabled": "Enabled",
-            "healthCheckDescription": "Control how often the app pings the server for health status. Lower values update more frequently but may increase network usage.",
-            "healthCheckInterval": "Health check interval",
-            "llmTitle": "LLM Agent",
-            "mlTitle": "ML Services",
-            "model": "Model",
-            "presets": "Presets:",
-            "provider": "Provider",
-            "refresh": "Refresh",
-            "reset": "Reset",
-            "taskAvailability": "Task availability",
-            "taskNames": {
-                "bioClipClassify": "BioCLIP classify",
-                "clipImageEmbed": "CLIP image embed",
-                "faceDetectAndEmbed": "Face detect & embed",
-                "ocr": "OCR",
-                "semanticTextEmbed": "CLIP text embed"
-            },
-            "unavailable": "Unavailable",
-            "workingRepositoryDescription": "Choose the default repository scope for repository-aware pages and actions. Select All repositories to keep global views.",
-            "workingRepositoryHint": "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
-            "workingRepositoryLabel": "Current application repository",
-            "workingRepositoryTitle": "Working repository",
-            "workingRepositoryUnavailable": "Repository options are temporarily unavailable."
-        },
-        "title": "Settings",
-        "upload": "Upload",
-        "uploadSettings": {
-            "advancedDescription": "Configure local upload parameters.",
-            "advancedDisabledHint": "These fields are unavailable while server-managed upload configuration is enabled.",
-            "advancedTitle": "Advanced local overrides",
-            "basicDescription": "Configure upload limits and default behavior.",
-            "basicTitle": "Basic controls",
-            "chunkSize": "Chunk size",
-            "chunkSizeDescription": "Per-file chunk size used by the browser uploader.",
-            "chunkSizeUnit": "MB",
-            "controlModeDescription": "Select the source used for upload chunk size and concurrency.",
-            "controlModeTitle": "Upload tuning source",
-            "description": "Configure upload settings for this browser.",
-            "localMode": "Local overrides",
-            "localModeHint": "Chunk size and concurrency use locally configured values.",
-            "lowPowerMode": "Low power mode",
-            "lowPowerModeDescription": "Use more conservative defaults to reduce CPU and memory usage during uploads.",
-            "maxConcurrentChunks": "Max concurrent chunks",
-            "maxConcurrentChunksDescription": "Number of chunk uploads the browser may run in parallel for each file.",
-            "maxTotalFiles": "Max total files",
-            "maxTotalFilesDescription": "Maximum number of files you can add to one upload batch.",
-            "recommended": "Recommended",
-            "serverMode": "Server managed",
-            "serverModeHint": "Chunk size and concurrency use backend recommendations. Local advanced values remain saved but inactive."
-        },
-        "users": {
-            "active": "Active",
-            "adminOnly": "Only administrators can manage users.",
-            "albumCount_one": "{{count}} albums",
-            "albumCount_other": "{{count}} albums",
-            "assetCount_one": "{{count}} assets",
-            "assetCount_other": "{{count}} assets",
-            "avatarAssetIdHint": "Pick a photo asset to use as this user's avatar. Only photo assets are supported.",
-            "avatarEmpty": "Choose a photo from the library, or leave empty to fall back to initials.",
-            "avatarPhoto": "Avatar photo",
-            "avatarSelected": "A photo is selected for this user's avatar.",
-            "changeAvatar": "Change photo",
-            "chooseAvatar": "Choose photo",
-            "clearedPasskeys": "Passkeys cleared",
-            "clearedTotp": "Authenticator App cleared",
-            "createdAt": "Created",
-            "displayName": "Display name",
-            "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
-            "editHint": "Update this user's profile, role, and account status.",
-            "editTitle": "Profile Information",
-            "empty": "Select a user to edit.",
-            "inactive": "Inactive",
-            "lastLogin": "Last login",
-            "loadError": "Failed to load users.",
-            "neverLoggedIn": "Never",
-            "removeAvatar": "Remove photo",
-            "resetAccess": "Reset access",
-            "resetAccessError": "Failed to reset access.",
-            "resetAccessHint": "Generate a temporary password and clear every MFA factor for this user.",
-            "resetAccessPanelBody": "Share this once through a secure channel. Passkeys, TOTP, and recovery codes were cleared.",
-            "resetAccessPanelTitle": "Temporary password",
-            "resetAccessSelfHint": "Use Change password in Account settings for your own account.",
-            "resetAccessSuccess": "Temporary access issued. Share it securely once.",
-            "resetAccessTitle": "Reset access",
-            "role": "Role",
-            "save": "Save user",
-            "saved": "User updated successfully.",
-            "saveError": "Failed to update user.",
-            "status": "Status",
-            "title": "Users",
-            "username": "Username",
-            "usernameHint": "3–32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed."
-        }
-    },
-    "sidebar": {
-        "assets": "Assets",
-        "badges": {
-            "new": "NEW"
-        },
-        "collections": "Collections",
-        "home": "Home",
-        "manage": "Manage",
-        "portfolio": "Portfolio",
-        "settings": "Settings",
-        "status": {
-            "offline": "Offline",
-            "online": "Online"
-        },
-        "studio": "Studio",
-        "updates": "Updates"
-    },
-    "studio": {
-        "asset": {
-            "dim": "Dimensions",
-            "exif": "Capture · EXIF",
-            "file": "File",
-            "name": "Name",
-            "size": "Size",
-            "type": "Type"
-        },
-        "backToStudio": "Back to Studio",
-        "develop": {
-            "desc": "Color adjustments, cropping, and other tools will be available here soon.",
-            "geometry": "Geometry",
-            "hint": "Double-click any slider to reset it.",
-            "reset": "Reset",
-            "resetAll": "Reset all adjustments",
-            "rotation": "Rotation",
-            "light": "Light",
-            "color": "Color",
-            "detail": "Detail",
-            "title": "Development Tools"
-        },
-        "editor": {
-            "before": "Before",
-            "change": "Change Photo",
-            "export": "Export",
-            "fit": "Fit",
-            "loading": "Loading…",
-            "renderFailed": "Render failed",
-            "rendering": "Rendering preview…",
-            "resetAll": "Reset all",
-            "save": "Save",
-            "saved": "Saved",
-            "savedToast": "Sidecar saved",
-            "undo": "Undo",
-            "unsaved": "Unsaved changes",
-            "upToDate": "Up to date",
-            "waiting": "Waiting for preview"
-        },
-        "exif": {
-            "download": "Download JSON",
-            "empty": "No metadata to display.",
-            "extracting": "Extracting data...",
-            "fieldsCount_one": "{{count}} field",
-            "fieldsCount_other": "{{count}} fields",
-            "properties": "Image Properties",
-            "title": "EXIF Metadata"
-        },
-        "home": {
-            "border": {
-                "body": "Frame a photo with colored, frosted, or vignette borders — applied on top of your edits.",
-                "title": "Add a Border"
-            },
-            "clear": "Clear",
-            "empty": {
-                "body": "Open a photo from your library to start editing. Your latest work shows up here.",
-                "title": "No recent edits yet"
-            },
-            "openEditor": "Open editor",
-            "recent": "Recent Edits",
-            "resume": "Resume",
-            "tools": "Tools"
-        },
-        "pickPhoto": "Pick a photo to edit",
-        "tagline": "Quick, non-destructive edits for photos already in your library.",
-        "title": "Studio",
-        "tools": {
-            "border": {
-                "apply": "Apply border",
-                "clear": "Clear",
-                "done": "Border applied",
-                "hint": "Border bakes new pixels on top of your current edit. Apply to preview, then export.",
-                "modeColored": "Colored",
-                "modeFrosted": "Frosted",
-                "modeVignette": "Vignette",
-                "borderWidth": "Border Width",
-                "color": "Color",
-                "blur": "Blur",
-                "brightness": "Brightness",
-                "cornerRadius": "Corner Radius",
-                "strength": "Strength"
-            },
-            "title": "Tools"
-        }
-    },
-    "upload": {
-        "FileUploadProgress": {
-            "chunked_badge": "Chunked",
-            "status_completed": "Completed",
-            "status_failed": "Failed",
-            "status_pending": "Pending",
-            "status_uploading": "Uploading"
-        },
-        "NavbarQueue": {
-            "active_one": "{{count}} active",
-            "active_other": "{{count}} active",
-            "backgroundHint": "Uploads keep running while you browse.",
-            "failed_one": "{{count}} failed",
-            "failed_other": "{{count}} failed",
-            "openPage": "Open upload page",
-            "title": "Upload Queue"
-        },
-        "ProgressIndicator": {
-            "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
-        },
-        "SupportedFormatsModal": {
-            "close_button_aria_label": "Close",
-            "formats_count_one": "{{count}} format",
-            "formats_count_other": "{{count}} formats",
-            "got_it_button": "Got it!",
-            "title": "Supported File Formats"
-        },
-        "UnifiedUploadSection": {
-            "add_files_button": "Add Files",
-            "cannot_clear_while_processing": "Cannot clear files while processing",
-            "change_limits_settings_hint": "Change limits in Settings → UI Settings.",
-            "clear_button": "Clear",
-            "default_upload_target": "Default repository",
-            "default_upload_target_hint": "No working library is selected; uploads will use the primary/default repository.",
-            "drag_drop_or_click": "Drag & Drop or Click to Upload",
-            "max_files_label": "Max files:",
-            "no_files_selected_for_upload": "No files selected for upload",
-            "no_valid_files_selected": "No valid files selected",
-            "server_chunk_size": "Server chunk size",
-            "server_concurrency": "Server concurrency",
-            "server_in_flight": "In-flight requests",
-            "supported_file_types_description": "Supports images, RAW formats, videos, and audio files",
-            "upload_button": "Upload{{countLabel}}",
-            "upload_information_title": "Upload Information",
-            "upload_target_default": "Default",
-            "upload_target_from_settings": "From Settings",
-            "upload_target_label": "Upload target",
-            "upload_target_unavailable": "The selected repository is temporarily unavailable.",
-            "uploading_status": "Uploading..."
-        },
-        "UploadAssets": {
-            "files_ready_to_upload_one": "{{count}} file ready to upload",
-            "files_ready_to_upload_other": "{{count}} files ready to upload",
-            "no_files_selected": "No files selected",
-            "processing_files_one": "Processing {{count}} file...",
-            "processing_files_other": "Processing {{count}} files...",
-            "supported_formats_button": "Supported Formats"
-        },
-        "UploadProcess": {
-            "noResult": "No result returned",
-            "processFailed": "Upload process failed",
-            "summaryPartial": "Upload complete: {{succeeded}} succeeded, {{failed}} failed.",
-            "summarySuccess_one": "Successfully uploaded {{count}} file.",
-            "summarySuccess_other": "Successfully uploaded {{count}} files.",
-            "uploadFailed": "Upload failed"
-        },
-        "UploadProvider": {
-            "files_exceeded_limit_one": "{{count}} file exceeds the limit.",
-            "files_exceeded_limit_other": "{{count}} files exceed the limit.",
-            "max_files_allowed_one": "Max {{count}} file allowed.",
-            "max_files_allowed_other": "Max {{count}} files allowed.",
-            "no_files_selected_for_upload_message": "No files selected for upload",
-            "upload_failed_generic": "Upload failed"
-        }
+    "tabs": {
+      "gallery": "Gallery",
+      "stats": "Stats"
     }
+  },
+  "lumilio": {
+    "agent": {
+      "disabled": "Lumilio Agent is disabled. Enable it in Settings > AI.",
+      "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI."
+    },
+    "chat": {
+      "confirmation": {
+        "confirm": "Confirm",
+        "title": "Confirmation required"
+      },
+      "empty": "Start a conversation with Lumilio!",
+      "openAiSettings": "Open AI settings"
+    },
+    "input": {
+      "generating": "Generating response...",
+      "placeholderLabel": "Placeholder label",
+      "placeholderType": "Placeholder",
+      "prompt": "Ask Lumilio Agent... (Type @ or /)",
+      "unavailable": "Lumilio Agent is unavailable."
+    },
+    "markdown": {
+      "code": {
+        "copied": "Copied",
+        "copy": "Copy",
+        "languageFallback": "text"
+      },
+      "think": {
+        "defaultSummary": "Think about this...",
+        "thinking": "Thinking...",
+        "thoughtFor": "Thought for {{time}}s"
+      }
+    },
+    "messages": {
+      "thinking": "Thinking..."
+    },
+    "status": {
+      "loading": "Loading {{status}}"
+    },
+    "tools": {
+      "error": "Error: {{error}}",
+      "eventNotFound": "Tool event not found.",
+      "openFullView": "Open full view",
+      "openMainGallery": "Open in main gallery view",
+      "resultsTitle": "{{toolName}} results",
+      "viewResults": "View results"
+    }
+  },
+  "manage": {
+    "errorBoundaryMessage": "The manage section failed to load or encountered an error during operation.",
+    "errorBoundaryTitle": "Manage Section Error!",
+    "pageTitle": "Manage Libraries",
+    "repositories": {
+      "actionsMenu": "Library actions for {{name}}",
+      "assetCount": "Assets",
+      "createAction": "Add library",
+      "createDescription": "Create a repository folder inside the mounted storage root.",
+      "createFailed": "Failed to create library.",
+      "createNameHint": "Use a short, recognizable name.",
+      "createNameLabel": "Library name",
+      "createNamePlaceholder": "Family Photos",
+      "createSubmit": "Create library",
+      "createSuccess": "{{name}} was added.",
+      "createTitle": "Add library",
+      "description": "Connected repositories available for upload, filtering, and file-system scans.",
+      "detectStacks": "Detect stacks",
+      "detectStacksCompleted_one": "Detected {{count}} stack for {{name}}.",
+      "detectStacksCompleted_other": "Detected {{count}} stacks for {{name}}.",
+      "detectStacksFailed": "Failed to detect stacks.",
+      "duplicateScan": "Scan for duplicates",
+      "duplicateScanFailed": "Duplicate scan failed.",
+      "empty": "No repositories are available.",
+      "primaryBadge": "Primary",
+      "rebuildLocation": "Rebuild location clusters",
+      "rebuildLocationQueued": "Location cluster rebuild queued.",
+      "rescanRepository": "Rescan",
+      "scanAll": "Scan all libraries",
+      "scanAllQueued_one": "Scan queued for {{count}} library.",
+      "scanAllQueued_other": "Scan queued for {{count}} libraries.",
+      "scanFailed": "Failed to queue scan.",
+      "scanQueued": "Scan queued for {{name}}.",
+      "title": "Libraries",
+      "unavailable": "Repository options are temporarily unavailable."
+    }
+  },
+  "map": {
+    "noLocationData": "No location data available"
+  },
+  "monitor": {
+    "adminOnlyDescription": "Queue monitoring and runtime diagnostics are only available to administrators.",
+    "adminOnlyTitle": "Admin access required",
+    "jobs": {
+      "attempts": "{{current}}/{{max}} attempts",
+      "empty": "No jobs found with current filters",
+      "fetchError": "Failed to fetch jobs",
+      "filters": {
+        "allQueues": "All",
+        "queue": "Queue",
+        "state": "State",
+        "states": {
+          "all": "All",
+          "available": "Available",
+          "cancelled": "Cancelled",
+          "completed": "Completed",
+          "discarded": "Discarded",
+          "retryable": "Retryable",
+          "running": "Running",
+          "scheduled": "Scheduled"
+        }
+      },
+      "labels": {
+        "created": "Created",
+        "failed": "Failed",
+        "finished": "Finished",
+        "scheduled": "Scheduled",
+        "started": "Started"
+      },
+      "loading": "Loading jobs...",
+      "pagination": {
+        "moreResults": "More results available",
+        "totalJobs_one": "{{count}} job",
+        "totalJobs_other": "{{count}} jobs"
+      },
+      "timeAgoDays_one": "{{count}} day ago",
+      "timeAgoDays_other": "{{count}} days ago",
+      "timeAgoHours_one": "{{count}} hour ago",
+      "timeAgoHours_other": "{{count}} hours ago",
+      "timeAgoMinutes_one": "{{count}} minute ago",
+      "timeAgoMinutes_other": "{{count}} minutes ago",
+      "timeAgoSeconds_one": "{{count}} second ago",
+      "timeAgoSeconds_other": "{{count}} seconds ago"
+    },
+    "ml": {
+      "bioAlbumCoverage": "Bio album species coverage",
+      "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
+      "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
+      "existingPhotos": "Existing photos",
+      "indexedAssets": "Indexed",
+      "loadError": "Failed to load ML indexing stats.",
+      "queuedJobs": "Queued",
+      "queuedMlJobs": "Queued ML jobs",
+      "reindex": "Reindex",
+      "reindexJobs": "Queued reindex jobs",
+      "reindexModal": {
+        "cancel": "Cancel",
+        "confirm": "Start reindex",
+        "descriptionAll_one": "Reindex all {{count}} asset.",
+        "descriptionAll_other": "Reindex all {{count}} assets.",
+        "descriptionMissing_one": "Reindex {{count}} missing asset.",
+        "descriptionMissing_other": "Reindex {{count}} missing assets.",
+        "existingJobsWarning_one": "{{count}} reindex job already queued.",
+        "existingJobsWarning_other": "{{count}} reindex jobs already queued.",
+        "reindexAllCheckbox": "Reindex all (not just missing)",
+        "title": "Reindex — {{task}}"
+      },
+      "remainingAssets": "Remaining"
+    },
+    "queues": {
+      "active": "Active",
+      "activeCount_one": "{{count}} active queue",
+      "activeCount_other": "{{count}} active queues",
+      "empty": "No active queues found",
+      "fetchError": "Failed to fetch queues",
+      "idle": "Idle",
+      "loading": "Loading queues...",
+      "timeAgoHours_one": "{{count}} hour ago",
+      "timeAgoHours_other": "{{count}} hours ago",
+      "timeAgoMinutes_one": "{{count}} minute ago",
+      "timeAgoMinutes_other": "{{count}} minutes ago",
+      "timeAgoSeconds_one": "{{count}} second ago",
+      "timeAgoSeconds_other": "{{count}} seconds ago"
+    },
+    "sections": {
+      "activeQueues": "Active Queues",
+      "recentJobs": "Recent Jobs"
+    },
+    "stats": {
+      "activeJobs": "Active jobs",
+      "allHealthy": "All healthy",
+      "availableCount_one": "{{count}} available",
+      "availableCount_other": "{{count}} available",
+      "cancelledCount_one": "{{count}} cancelled",
+      "cancelledCount_other": "{{count}} cancelled",
+      "completed": "Completed",
+      "discardedCount_one": "{{count}} discarded",
+      "discardedCount_other": "{{count}} discarded",
+      "fetchError": "Failed to fetch queue stats",
+      "issues": "Issues",
+      "noData": "No data",
+      "noProcessedJobs": "No jobs processed yet",
+      "retryableCount_one": "{{count}} retryable",
+      "retryableCount_other": "{{count}} retryable",
+      "runningCount_one": "{{count}} running",
+      "runningCount_other": "{{count}} running",
+      "scheduledCount_one": "{{count}} scheduled",
+      "scheduledCount_other": "{{count}} scheduled",
+      "successRate": "{{rate}}% success rate"
+    },
+    "subtitles": {
+      "capabilities": "Runtime ML discovery and LLM agent status",
+      "ml": "ML indexing coverage and reindex progress",
+      "queue": "Real-time job queue monitoring"
+    },
+    "tabs": {
+      "capabilities": "Capabilities",
+      "ml": "ML",
+      "queue": "Queue"
+    },
+    "title": "Server Monitor"
+  },
+  "navbar": {
+    "agent": {
+      "label": "Lumilio Agent",
+      "open": "Open Lumilio Agent"
+    },
+    "notifications": {
+      "clear": "Clear all messages",
+      "empty": "No messages yet.",
+      "markAllRead": "Mark all as read",
+      "title": "Message Center"
+    },
+    "repository": {
+      "all": "All repositories",
+      "label": "Working repository",
+      "primary": "Primary",
+      "unavailable": "Repository options unavailable"
+    }
+  },
+  "people": {
+    "details": {
+      "confirmedHint": "This person has been named and confirmed.",
+      "loadError": "Failed to load person details: {{error}}",
+      "personCode": "PERSON {{id}}",
+      "renamePlaceholder": "Name this person",
+      "save": "Save",
+      "unconfirmedHint": "This person is still unnamed. Give them a name when you are confident.",
+      "updatedLabel": "Updated"
+    },
+    "membersCount_one": "{{count}} face",
+    "membersCount_other": "{{count}} faces",
+    "photosCount_one": "{{count}} photo",
+    "photosCount_other": "{{count}} photos",
+    "rebuild": {
+      "action": "Rebuild",
+      "error": "Failed to rebuild people: {{message}}",
+      "running": "Rebuilding...",
+      "success": "Rebuilt {{clusters}} people clusters from {{faces}} faces ({{noise}} noise)."
+    },
+    "unnamed": "Unnamed"
+  },
+  "rating": {
+    "none": "No rating",
+    "stars_one": "{{count}} star",
+    "stars_other": "{{count}} stars",
+    "unrated": "Unrated",
+    "updateError": "Failed to update rating"
+  },
+  "routes": {
+    "collections": "Collections",
+    "home": "Home",
+    "portfolio": "Portfolio",
+    "settings": "Settings",
+    "updates": "Updates"
+  },
+  "search": {
+    "degraded": "Top results are temporarily unavailable. Showing regular results instead.",
+    "error": "Search is temporarily unavailable. Try again in a moment.",
+    "loading": "Searching...",
+    "results": "Results",
+    "topResults": "Top Results"
+  },
+  "settings": {
+    "account": {
+      "avatarEmpty": "Choose a photo from your library, or leave empty to fall back to initials.",
+      "avatarHint": "Pick a photo asset to use as your avatar. Only photo assets are supported.",
+      "avatarPhoto": "Avatar photo",
+      "avatarSelected": "A photo is selected for your avatar.",
+      "changeAvatar": "Change photo",
+      "chooseAvatar": "Choose photo",
+      "displayName": "Display name",
+      "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
+      "mfa": {
+        "account": "Account",
+        "addPasskey": "Add Passkey",
+        "addPasskeyPrompt": "Add a passkey to sign in with your device's biometrics or security key.",
+        "advanced": "Advanced setup URI",
+        "authenticatorAppTitle": "Authenticator App",
+        "beginSetup": "Set up TOTP",
+        "bootstrapOnboarding": "This is the first Lumilio Admin account. Finish TOTP setup now so your Admin login starts protected from the first session.",
+        "bootstrapOnboardingTitle": "First Admin account",
+        "confirmDisable": "Disable TOTP",
+        "confirmRegenerate": "Generate new recovery codes",
+        "currentPassword": "Current password",
+        "currentPasswordHint": "Confirm with your current password.",
+        "currentPasswordHintRegenerate": "Confirm your identity before generating new codes.",
+        "disableButton": "Disable TOTP",
+        "disabled": "Two-factor authentication has been disabled.",
+        "disabledBadge": "Disabled",
+        "disableError": "Failed to disable TOTP.",
+        "disableWarning": "This will remove two-factor authentication from your account. Confirm with your current password.",
+        "enableButton": "Enable TOTP",
+        "enabled": "Two-factor authentication is now enabled.",
+        "enabledBadge": "Enabled",
+        "enableError": "Failed to enable TOTP.",
+        "enabling": "Enabling…",
+        "enrolled": "enrolled",
+        "enrolledPasskeys": "Passkeys",
+        "enrolledPasskeysHint": "Manage the passkey credentials registered to this account.",
+        "issuer": "Issuer",
+        "noPasskeys": "No passkeys enrolled yet",
+        "notConfigured": "Not configured yet. Secure your account with TOTP.",
+        "notEnrolled": "Not enrolled",
+        "passkeyCreated": "Created",
+        "passkeyDescription": "Use your device's native passkey flow for sign-in.",
+        "passkeyLastUsed": "Last used",
+        "passkeyTitle": "Passkeys",
+        "qrAlt": "TOTP setup QR code",
+        "qrCaption": "If scanning fails, you can still use the manual setup key.",
+        "qrError": "Failed to generate the TOTP QR code.",
+        "recoveryCodesHint": "Store these one-time codes somewhere safe. Each code can be used once if your authenticator app is unavailable.",
+        "recoveryCodesTitle": "Recovery codes",
+        "recoveryRemaining": "recovery codes remaining",
+        "regenerateButton": "Regenerate recovery codes",
+        "regenerated": "Recovery codes regenerated successfully.",
+        "regenerateError": "Failed to regenerate recovery codes.",
+        "regenerateHint": "Generating new recovery codes invalidates every existing one.",
+        "regenerateTitle": "Regenerate recovery codes",
+        "remainingCodes_one": "{{count}} recovery codes remaining",
+        "remainingCodes_other": "{{count}} recovery codes remaining",
+        "setupDescription": "Use Duo, 1Password, Google Authenticator, or another TOTP-compatible app. If scanning fails, copy the setup details manually.",
+        "setupError": "Failed to start TOTP setup.",
+        "setupKey": "Manual setup key",
+        "setupKeyHint": "Enter this key manually in your authenticator app if you can't scan the QR code.",
+        "setupTitle": "Scan the QR code with your authenticator app",
+        "stepOne": "Step 1",
+        "stepTwo": "Verify with a 6-digit code",
+        "stepTwoLabel": "Step 2",
+        "verificationCode": "Verification code"
+      },
+      "passwordDescription": "Change your account password. You will be signed out afterwards.",
+      "passwordTitle": "Password",
+      "permissions": {
+        "customPermission": "Custom permission",
+        "manage_all_assets": {
+          "description": "Edit, delete, and modify metadata for any asset.",
+          "label": "Manage All Assets"
+        },
+        "manage_own_assets": {
+          "description": "Edit, delete, and modify metadata on your own assets.",
+          "label": "Manage Own Assets"
+        },
+        "manage_own_profile": {
+          "description": "Update your display name, avatar, and security settings.",
+          "label": "Manage Own Profile"
+        },
+        "manage_settings": {
+          "description": "Modify global application settings.",
+          "label": "Manage Settings"
+        },
+        "manage_users": {
+          "description": "Create, edit, and deactivate user accounts.",
+          "label": "Manage Users"
+        },
+        "view_all_assets": {
+          "description": "Browse all photos and media in the library.",
+          "label": "View All Assets"
+        },
+        "view_own_assets": {
+          "description": "Browse your own uploaded photos and media.",
+          "label": "View Own Assets"
+        }
+      },
+      "permissionsSubtitle": "Permissions assigned to your account based on your role.",
+      "permissionsTitle": "Account Permissions",
+      "profileInfo": "Profile Information",
+      "profileInfoHint": "Update your display name and avatar. Username and role are managed by administrators.",
+      "removeAvatar": "Remove photo",
+      "role": "Role",
+      "save": "Save profile",
+      "saved": "Profile updated successfully.",
+      "saveError": "Failed to update profile.",
+      "securityDescription": "Manage your password, authentication methods, and sign-in factors.",
+      "securityTitle": "Security",
+      "title": "Account",
+      "username": "Username",
+      "viewPermissions": "View permissions"
+    },
+    "ai": "AI",
+    "aiSettings": {
+      "agentDescription": "Configure the server-side LLM provider and credentials used by the agent.",
+      "agentTitle": "Lumilio Agent",
+      "apiKey": "API key",
+      "apiKeyConfigured": "Stored API key",
+      "apiKeyDescription": "API keys are write-only. Leaving this field empty keeps the stored key unchanged.",
+      "apiKeyPlaceholder": "Enter a new API key",
+      "baseUrl": "Base URL",
+      "baseUrlDescription": "Optional override for provider-compatible endpoints.",
+      "clearStoredKey": "Clear stored API key",
+      "description": "Configure the assistant and photo intelligence features.",
+      "enabled": "Enable agent",
+      "loadError": "Failed to load AI settings.",
+      "mlTitle": "Photo Intelligence",
+      "modelName": "Model name",
+      "provider": "Provider",
+      "providerOptions": {
+        "ark": "Ark",
+        "deepseek": "DeepSeek",
+        "ollama": "Ollama",
+        "openai": "OpenAI",
+        "unset": "Not set"
+      },
+      "saveError": "Failed to save settings.",
+      "saveSuccess": "Settings saved.",
+      "taskDescriptions": {
+        "bioclip": "Identify plants, animals, and other biological subjects.",
+        "clip": "Find photos by visual meaning, not only filenames.",
+        "face": "Detect and group recognizable faces.",
+        "ocr": "Read visible text inside photos."
+      },
+      "taskNames": {
+        "bioclip": "Field guide",
+        "clip": "Semantic search",
+        "face": "Face recognition",
+        "ocr": "Text recognition"
+      },
+      "validate": "Validate connection",
+      "validationError": "Failed to validate LLM configuration.",
+      "validationSuccess": "LLM configuration validated successfully."
+    },
+    "appearance": "Appearance",
+    "appearanceSettings": {
+      "compactColumns": {
+        "description": "Choose how many assets are shown per row when Compact layout is active.",
+        "label": "Compact columns"
+      },
+      "description": "Configure language, theme, region, and the default asset page layout for this browser.",
+      "layoutDescription": "Set the default layout used on the asset page.",
+      "layoutOptions": {
+        "compact": {
+          "description": "Square grid layout with adjustable columns.",
+          "label": "Compact"
+        },
+        "full": {
+          "description": "Justified layout for immersive browsing.",
+          "label": "Full"
+        }
+      },
+      "themes": {
+        "activeBadge": "Current mode",
+        "currentMode": "Current mode",
+        "dark": {
+          "description": "Applied when the navbar is in dark mode.",
+          "label": "Dark mode theme"
+        },
+        "description": "Pick the daisyUI theme used for light and dark mode. The navbar toggle only switches mode.",
+        "followSystem": {
+          "description": "Use your operating system appearance preference to choose light or dark mode.",
+          "label": "Follow system",
+          "navbarHint": "Theme mode follows the system preference. Turn this off in Settings to switch manually.",
+          "status": "System is currently using {{mode}}."
+        },
+        "light": {
+          "description": "Applied when the navbar is in light mode.",
+          "label": "Light mode theme"
+        },
+        "modeNames": {
+          "dark": "Dark",
+          "light": "Light"
+        },
+        "title": "Theme pairing"
+      }
+    },
+    "assetPage": "Asset Page",
+    "cloud": {
+      "title": "Cloud Sync"
+    },
+    "language": "Language",
+    "languageAndRegion": "Language & Region",
+    "performance": "Performance",
+    "performanceSettings": {
+      "advancedDescription": "Configure detailed performance parameters.",
+      "advancedTitle": "Advanced controls",
+      "availableMemory": "Available memory",
+      "changesApply": "Changes take effect immediately for new processing operations.",
+      "cpuCores": "CPU cores",
+      "currentProfile": "Current profile",
+      "description": "Configure local processing performance.",
+      "deviceType": "Device type",
+      "deviceTypeValues": {
+        "desktop": "Desktop",
+        "lowEnd": "Low-end",
+        "mobile": "Mobile"
+      },
+      "maxConcurrency": "Max concurrency",
+      "maxConcurrentOperations": "Max concurrent operations",
+      "maxConcurrentOperationsDescription": "Maximum number of heavy processing jobs the browser may run at once.",
+      "prioritizeUserOperations": "Prioritize user operations",
+      "prioritizeUserOperationsDescription": "Prioritize operations related to active user interactions.",
+      "profileDescription": "Select the default profile for concurrency and memory usage.",
+      "profiles": {
+        "adaptive": {
+          "description": "Adjust processing behavior based on detected device capabilities.",
+          "label": "Adaptive"
+        },
+        "balanced": {
+          "description": "Balance processing speed and memory usage.",
+          "label": "Balanced"
+        },
+        "memory_saver": {
+          "description": "Reduce memory usage and processing concurrency.",
+          "label": "Memory Saver"
+        },
+        "speed": {
+          "description": "Increase concurrency to favor processing speed.",
+          "label": "Speed Optimized"
+        }
+      },
+      "profileTitle": "Performance profile",
+      "reset": "Reset to defaults",
+      "respectMemoryLimits": "Respect memory limits",
+      "respectMemoryLimitsDescription": "Reduce processing intensity when available memory is limited."
+    },
+    "region": "Region",
+    "regionOptions": {
+      "china": "China Mainland",
+      "other": "Other country and region"
+    },
+    "server": "Server",
+    "serverSettings": {
+      "activeNodes": "Active nodes",
+      "agentEnabled": "Agent enabled",
+      "available": "Available",
+      "booleanValues": {
+        "false": "No",
+        "true": "Yes"
+      },
+      "capabilitiesError": "Failed to load capabilities.",
+      "configured": "Configured",
+      "disabled": "Disabled",
+      "discoveredNodes": "Discovered nodes",
+      "enabled": "Enabled",
+      "healthCheckDescription": "Control how often the app pings the server for health status. Lower values update more frequently but may increase network usage.",
+      "healthCheckInterval": "Health check interval",
+      "llmTitle": "LLM Agent",
+      "mlTitle": "ML Services",
+      "model": "Model",
+      "presets": "Presets:",
+      "provider": "Provider",
+      "refresh": "Refresh",
+      "reset": "Reset",
+      "taskAvailability": "Task availability",
+      "taskNames": {
+        "bioClipClassify": "BioCLIP classify",
+        "clipImageEmbed": "CLIP image embed",
+        "faceDetectAndEmbed": "Face detect & embed",
+        "ocr": "OCR",
+        "semanticTextEmbed": "CLIP text embed"
+      },
+      "unavailable": "Unavailable",
+      "workingRepositoryDescription": "Choose the default repository scope for repository-aware pages and actions. Select All repositories to keep global views.",
+      "workingRepositoryHint": "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
+      "workingRepositoryLabel": "Current application repository",
+      "workingRepositoryTitle": "Working repository",
+      "workingRepositoryUnavailable": "Repository options are temporarily unavailable."
+    },
+    "title": "Settings",
+    "upload": "Upload",
+    "uploadSettings": {
+      "advancedDescription": "Configure local upload parameters.",
+      "advancedDisabledHint": "These fields are unavailable while server-managed upload configuration is enabled.",
+      "advancedTitle": "Advanced local overrides",
+      "basicDescription": "Configure upload limits and default behavior.",
+      "basicTitle": "Basic controls",
+      "chunkSize": "Chunk size",
+      "chunkSizeDescription": "Per-file chunk size used by the browser uploader.",
+      "chunkSizeUnit": "MB",
+      "controlModeDescription": "Select the source used for upload chunk size and concurrency.",
+      "controlModeTitle": "Upload tuning source",
+      "description": "Configure upload settings for this browser.",
+      "localMode": "Local overrides",
+      "localModeHint": "Chunk size and concurrency use locally configured values.",
+      "lowPowerMode": "Low power mode",
+      "lowPowerModeDescription": "Use more conservative defaults to reduce CPU and memory usage during uploads.",
+      "maxConcurrentChunks": "Max concurrent chunks",
+      "maxConcurrentChunksDescription": "Number of chunk uploads the browser may run in parallel for each file.",
+      "maxTotalFiles": "Max total files",
+      "maxTotalFilesDescription": "Maximum number of files you can add to one upload batch.",
+      "recommended": "Recommended",
+      "serverMode": "Server managed",
+      "serverModeHint": "Chunk size and concurrency use backend recommendations. Local advanced values remain saved but inactive."
+    },
+    "users": {
+      "active": "Active",
+      "adminOnly": "Only administrators can manage users.",
+      "albumCount_one": "{{count}} albums",
+      "albumCount_other": "{{count}} albums",
+      "assetCount_one": "{{count}} assets",
+      "assetCount_other": "{{count}} assets",
+      "avatarAssetIdHint": "Pick a photo asset to use as this user's avatar. Only photo assets are supported.",
+      "avatarEmpty": "Choose a photo from the library, or leave empty to fall back to initials.",
+      "avatarPhoto": "Avatar photo",
+      "avatarSelected": "A photo is selected for this user's avatar.",
+      "changeAvatar": "Change photo",
+      "chooseAvatar": "Choose photo",
+      "clearedPasskeys": "Passkeys cleared",
+      "clearedTotp": "Authenticator App cleared",
+      "createdAt": "Created",
+      "displayName": "Display name",
+      "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
+      "editHint": "Update this user's profile, role, and account status.",
+      "editTitle": "Profile Information",
+      "empty": "Select a user to edit.",
+      "inactive": "Inactive",
+      "lastLogin": "Last login",
+      "loadError": "Failed to load users.",
+      "neverLoggedIn": "Never",
+      "removeAvatar": "Remove photo",
+      "resetAccess": "Reset access",
+      "resetAccessError": "Failed to reset access.",
+      "resetAccessHint": "Generate a temporary password and clear every MFA factor for this user.",
+      "resetAccessPanelBody": "Share this once through a secure channel. Passkeys, TOTP, and recovery codes were cleared.",
+      "resetAccessPanelTitle": "Temporary password",
+      "resetAccessSelfHint": "Use Change password in Account settings for your own account.",
+      "resetAccessSuccess": "Temporary access issued. Share it securely once.",
+      "resetAccessTitle": "Reset access",
+      "role": "Role",
+      "save": "Save user",
+      "saved": "User updated successfully.",
+      "saveError": "Failed to update user.",
+      "status": "Status",
+      "title": "Users",
+      "username": "Username",
+      "usernameHint": "3–32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed."
+    }
+  },
+  "sidebar": {
+    "assets": "Assets",
+    "badges": {
+      "new": "NEW"
+    },
+    "collections": "Collections",
+    "home": "Home",
+    "manage": "Manage",
+    "portfolio": "Portfolio",
+    "settings": "Settings",
+    "status": {
+      "offline": "Offline",
+      "online": "Online"
+    },
+    "studio": "Studio",
+    "updates": "Updates"
+  },
+  "studio": {
+    "asset": {
+      "dim": "Dimensions",
+      "exif": "Capture · EXIF",
+      "file": "File",
+      "name": "Name",
+      "size": "Size",
+      "type": "Type"
+    },
+    "backToStudio": "Back to Studio",
+    "develop": {
+      "color": "Color",
+      "detail": "Detail",
+      "geometry": "Geometry",
+      "hint": "Double-click any slider to reset it.",
+      "light": "Light",
+      "reset": "Reset",
+      "resetAll": "Reset all adjustments",
+      "rotation": "Rotation",
+      "title": "Development Tools"
+    },
+    "editor": {
+      "before": "Before",
+      "change": "Change Photo",
+      "export": "Export",
+      "fit": "Fit",
+      "loading": "Loading…",
+      "renderFailed": "Render failed",
+      "rendering": "Rendering preview…",
+      "resetAll": "Reset all",
+      "save": "Save",
+      "saved": "Saved",
+      "savedToast": "Sidecar saved",
+      "undo": "Undo",
+      "unsaved": "Unsaved changes",
+      "upToDate": "Up to date",
+      "waiting": "Waiting for preview"
+    },
+    "exif": {
+      "download": "Download JSON",
+      "empty": "No metadata to display.",
+      "extracting": "Extracting data...",
+      "fieldsCount_one": "{{count}} field",
+      "fieldsCount_other": "{{count}} fields",
+      "properties": "Image Properties",
+      "title": "EXIF Metadata"
+    },
+    "home": {
+      "border": {
+        "body": "Frame a photo with colored, frosted, or vignette borders — applied on top of your edits.",
+        "title": "Add a Border"
+      },
+      "clear": "Clear",
+      "empty": {
+        "body": "Open a photo from your library to start editing. Your latest work shows up here.",
+        "title": "No recent edits yet"
+      },
+      "openEditor": "Open editor",
+      "recent": "Recent Edits",
+      "resume": "Resume",
+      "tools": "Tools"
+    },
+    "pickPhoto": "Pick a photo to edit",
+    "tagline": "Quick, non-destructive edits for photos already in your library.",
+    "title": "Studio",
+    "tools": {
+      "border": {
+        "apply": "Apply border",
+        "blur": "Blur",
+        "borderWidth": "Border Width",
+        "brightness": "Brightness",
+        "clear": "Clear",
+        "color": "Color",
+        "cornerRadius": "Corner Radius",
+        "done": "Border applied",
+        "hint": "Border bakes new pixels on top of your current edit. Apply to preview, then export.",
+        "modeColored": "Colored",
+        "modeFrosted": "Frosted",
+        "modeVignette": "Vignette",
+        "strength": "Strength"
+      },
+      "title": "Tools"
+    }
+  },
+  "upload": {
+    "FileUploadProgress": {
+      "chunked_badge": "Chunked",
+      "status_completed": "Completed",
+      "status_failed": "Failed",
+      "status_pending": "Pending",
+      "status_uploading": "Uploading"
+    },
+    "NavbarQueue": {
+      "active_one": "{{count}} active",
+      "active_other": "{{count}} active",
+      "backgroundHint": "Uploads keep running while you browse.",
+      "failed_one": "{{count}} failed",
+      "failed_other": "{{count}} failed",
+      "openPage": "Open upload page",
+      "title": "Upload Queue"
+    },
+    "ProgressIndicator": {
+      "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
+    },
+    "SupportedFormatsModal": {
+      "close_button_aria_label": "Close",
+      "formats_count_one": "{{count}} format",
+      "formats_count_other": "{{count}} formats",
+      "got_it_button": "Got it!",
+      "title": "Supported File Formats"
+    },
+    "UnifiedUploadSection": {
+      "add_files_button": "Add Files",
+      "cannot_clear_while_processing": "Cannot clear files while processing",
+      "change_limits_settings_hint": "Change limits in Settings → UI Settings.",
+      "clear_button": "Clear",
+      "default_upload_target": "Default repository",
+      "default_upload_target_hint": "No working library is selected; uploads will use the primary/default repository.",
+      "drag_drop_or_click": "Drag & Drop or Click to Upload",
+      "max_files_label": "Max files:",
+      "no_files_selected_for_upload": "No files selected for upload",
+      "no_valid_files_selected": "No valid files selected",
+      "server_chunk_size": "Server chunk size",
+      "server_concurrency": "Server concurrency",
+      "server_in_flight": "In-flight requests",
+      "supported_file_types_description": "Supports images, RAW formats, videos, and audio files",
+      "upload_button": "Upload{{countLabel}}",
+      "upload_information_title": "Upload Information",
+      "upload_target_default": "Default",
+      "upload_target_from_settings": "From Settings",
+      "upload_target_label": "Upload target",
+      "upload_target_unavailable": "The selected repository is temporarily unavailable.",
+      "uploading_status": "Uploading..."
+    },
+    "UploadAssets": {
+      "files_ready_to_upload_one": "{{count}} file ready to upload",
+      "files_ready_to_upload_other": "{{count}} files ready to upload",
+      "no_files_selected": "No files selected",
+      "processing_files_one": "Processing {{count}} file...",
+      "processing_files_other": "Processing {{count}} files...",
+      "supported_formats_button": "Supported Formats"
+    },
+    "UploadProcess": {
+      "noResult": "No result returned",
+      "processFailed": "Upload process failed",
+      "summaryPartial": "Upload complete: {{succeeded}} succeeded, {{failed}} failed.",
+      "summarySuccess_one": "Successfully uploaded {{count}} file.",
+      "summarySuccess_other": "Successfully uploaded {{count}} files.",
+      "uploadFailed": "Upload failed"
+    },
+    "UploadProvider": {
+      "files_exceeded_limit_one": "{{count}} file exceeds the limit.",
+      "files_exceeded_limit_other": "{{count}} files exceed the limit.",
+      "max_files_allowed_one": "Max {{count}} file allowed.",
+      "max_files_allowed_other": "Max {{count}} files allowed.",
+      "no_files_selected_for_upload_message": "No files selected for upload",
+      "upload_failed_generic": "Upload failed"
+    }
+  }
 }

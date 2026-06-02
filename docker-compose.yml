@@ -47,16 +47,13 @@ services:
             DB_PORT: 5432
             DB_USER: postgres
             # Temporary bootstrap password used only until first-run setup
-            # rotates the credential. Once LUMILIO_DB_PASSWORD_FILE exists, the
+            # rotates the credential. Once database.password_file exists, the
             # rotated secret on disk takes precedence over this value.
             DB_PASSWORD: postgres
             DB_NAME: lumiliophotos
             DB_SSL: disable
-            # First-run bootstrapping: rotated DB secret (locked to 0600) and the
-            # non-sensitive system metadata payload (TOML) live on a persistent
-            # volume so they survive restarts.
+            # Optional override for server.toml [database].password_file.
             LUMILIO_DB_PASSWORD_FILE: /data/config/secrets/db_password
-            LUMILIO_SYSTEM_CONFIG_FILE: /data/config/system.toml
             ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
             ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
             ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}

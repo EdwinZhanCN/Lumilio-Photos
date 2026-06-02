@@ -120,6 +120,7 @@ host = "db-from-toml"
 port = "5432"
 user = "postgres"
 password = "postgres"
+password_file = "/tmp/lumilio-db-password"
 name = "lumiliophotos"
 ssl = "disable"
 
@@ -171,6 +172,9 @@ hardware_accel = "auto"
 	if cfg.DatabaseConfig.Host != "db-from-toml" {
 		t.Fatalf("expected database host from toml, got %+v", cfg.DatabaseConfig)
 	}
+	if cfg.DatabaseConfig.PasswordFile != "/tmp/lumilio-db-password" {
+		t.Fatalf("expected database password_file from toml, got %+v", cfg.DatabaseConfig)
+	}
 	if cfg.RepositoryScan.Enabled || cfg.RepositoryScan.IntervalSeconds != 120 {
 		t.Fatalf("expected repository scan from toml, got %+v", cfg.RepositoryScan)
 	}
@@ -207,6 +211,7 @@ clip_enabled = false
 	t.Setenv("SERVER_CONFIG_FILE", configFile)
 	t.Setenv("SERVER_PORT", "9999")
 	t.Setenv("DB_HOST", "db-from-env")
+	t.Setenv("DB_PASSWORD_FILE", "/tmp/env-db-password")
 	t.Setenv("STORAGE_PATH", "/env/storage")
 	t.Setenv("REPOSITORY_SCAN_ENABLED", "false")
 	t.Setenv("ML_CLIP_ENABLED", "true")
@@ -221,6 +226,9 @@ clip_enabled = false
 	}
 	if cfg.DatabaseConfig.Host != "db-from-env" {
 		t.Fatalf("expected env database host override, got %s", cfg.DatabaseConfig.Host)
+	}
+	if cfg.DatabaseConfig.PasswordFile != "/tmp/env-db-password" {
+		t.Fatalf("expected env database password file override, got %s", cfg.DatabaseConfig.PasswordFile)
 	}
 	if cfg.StorageConfig.Path != "/env/storage" {
 		t.Fatalf("expected env storage path override, got %s", cfg.StorageConfig.Path)
