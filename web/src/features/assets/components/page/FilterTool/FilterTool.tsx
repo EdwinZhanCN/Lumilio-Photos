@@ -42,10 +42,13 @@ export interface FilterDTO {
   location?: LocationBBox;
 }
 
+export type FilterFieldKey = keyof FilterDTO;
+
 type FilterToolProps = {
   initial?: FilterDTO;
   onChange?: (filters: FilterDTO) => void;
   autoApply?: boolean;
+  lockedFields?: readonly FilterFieldKey[] | Partial<Record<FilterFieldKey, boolean>>;
 
   // Options can be provided directly via props, or fetched via provided functions, or fetched from default endpoints.
   cameraModelOptions?: string[];
@@ -58,11 +61,7 @@ type FilterToolProps = {
    Pure helpers
    ========================= */
 
-function centerToBBox(
-  lat: number,
-  lon: number,
-  radiusKm: number,
-): LocationBBox {
+function centerToBBox(lat: number, lon: number, radiusKm: number): LocationBBox {
   const dLat = radiusKm / 110.574; // degrees
   const dLon = radiusKm / (111.32 * Math.cos((lat * Math.PI) / 180));
   return {
@@ -86,6 +85,83 @@ function toDateInput(val: string): string {
   return val;
 }
 
+function isFieldActive(dto: FilterDTO, field: FilterFieldKey): boolean {
+  switch (field) {
+    case "type":
+      return dto.type === "PHOTO" || dto.type === "VIDEO";
+    case "raw":
+      return typeof dto.raw === "boolean";
+    case "rating":
+      return typeof dto.rating === "number";
+    case "liked":
+      return typeof dto.liked === "boolean";
+    case "filename":
+      return !!dto.filename?.value?.trim();
+    case "date":
+      return !!dto.date && (!!dto.date.from || !!dto.date.to);
+    case "camera_model":
+      return !!dto.camera_model?.trim();
+    case "lens":
+      return !!dto.lens?.trim();
+    case "location":
+      return !!dto.location && !isZeroBBox(dto.location);
+  }
+}
+
+function buildLockedInitialDTO(
+  initial: FilterDTO,
+  lockedFieldSet: ReadonlySet<FilterFieldKey>,
+): FilterDTO {
+  const dto: FilterDTO = {};
+
+  if (lockedFieldSet.has("type") && isFieldActive(initial, "type")) {
+    dto.type = initial.type;
+  }
+  if (lockedFieldSet.has("raw") && isFieldActive(initial, "raw")) {
+    dto.raw = initial.raw;
+  }
+  if (lockedFieldSet.has("rating") && isFieldActive(initial, "rating")) {
+    dto.rating = initial.rating;
+  }
+  if (lockedFieldSet.has("liked") && isFieldActive(initial, "liked")) {
+    dto.liked = initial.liked;
+  }
+  if (lockedFieldSet.has("filename") && isFieldActive(initial, "filename")) {
+    dto.filename = {
+      operator: initial.filename!.operator,
+      value: initial.filename!.value.trim(),
+    };
+  }
+  if (lockedFieldSet.has("date") && isFieldActive(initial, "date")) {
+    dto.date = {
+      from: initial.date!.from,
+      to: initial.date!.to,
+    };
+  }
+  if (lockedFieldSet.has("camera_model") && isFieldActive(initial, "camera_model")) {
+    dto.camera_model = initial.camera_model!.trim();
+  }
+  if (lockedFieldSet.has("lens") && isFieldActive(initial, "lens")) {
+    dto.lens = initial.lens!.trim();
+  }
+  if (lockedFieldSet.has("location") && isFieldActive(initial, "location")) {
+    dto.location = { ...initial.location! };
+  }
+
+  return dto;
+}
+
+function mergeLockedInitialDTO(
+  dto: FilterDTO,
+  initial: FilterDTO,
+  lockedFieldSet: ReadonlySet<FilterFieldKey>,
+): FilterDTO {
+  return {
+    ...dto,
+    ...buildLockedInitialDTO(initial, lockedFieldSet),
+  };
+}
+
 /* =========================
    Small hook: options loading
    ========================= */
@@ -103,20 +179,16 @@ function useFilterOptions({
   fetchCameraModels?: () => Promise<string[]>;
   fetchLenses?: () => Promise<string[]>;
 }) {
-  const [cameraModelItems, setCameraModelItems] = useState<string[]>(
-    cameraModelOptions ?? [],
-  );
+  const [cameraModelItems, setCameraModelItems] = useState<string[]>(cameraModelOptions ?? []);
   const [lensItems, setLensItems] = useState<string[]>(lensOptions ?? []);
   const [isCustomLoading, setIsCustomLoading] = useState<boolean>(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  const needsCameraModels =
-    !cameraModelOptions || cameraModelOptions.length === 0;
+  const needsCameraModels = !cameraModelOptions || cameraModelOptions.length === 0;
   const needsLenses = !lensOptions || lensOptions.length === 0;
   const needsOptions = needsCameraModels || needsLenses;
   const canUseCustomFetchers = !!fetchCameraModels && !!fetchLenses;
-  const shouldFetchDefault =
-    open && !hasLoaded && needsOptions && !canUseCustomFetchers;
+  const shouldFetchDefault = open && !hasLoaded && needsOptions && !canUseCustomFetchers;
 
   const filterOptionsQuery = $api.useQuery(
     "get",
@@ -129,8 +201,7 @@ function useFilterOptions({
   const loadingOptions = isCustomLoading || filterOptionsQuery.isFetching;
 
   useEffect(() => {
-    const shouldFetch =
-      open && !hasLoaded && needsOptions && canUseCustomFetchers;
+    const shouldFetch = open && !hasLoaded && needsOptions && canUseCustomFetchers;
     if (!shouldFetch) return;
 
     let running = true;
@@ -184,12 +255,7 @@ function useFilterOptions({
     }
 
     setHasLoaded(true);
-  }, [
-    shouldFetchDefault,
-    filterOptionsQuery.data,
-    needsCameraModels,
-    needsLenses,
-  ]);
+  }, [shouldFetchDefault, filterOptionsQuery.data, needsCameraModels, needsLenses]);
 
   return { cameraModelItems, lensItems, loadingOptions };
 }
@@ -217,9 +283,7 @@ const SectionShell = memo(function SectionShell({
       <div className="flex items-center justify-between">
         <span className="label-text font-medium">{title}</span>
         <label className="label cursor-pointer p-0 gap-2">
-          <span className="label-text">
-            {t("assets.filterTool.sectionShell.enable")}
-          </span>
+          <span className="label-text">{t("assets.filterTool.sectionShell.enable")}</span>
           <input
             type="checkbox"
             className="toggle toggle-primary toggle-sm"
@@ -447,18 +511,10 @@ const FilenameSection = memo(function FilenameSection({
           value={operator}
           onChange={(e) => onOperatorChange(e.target.value as FilenameOperator)}
         >
-          <option value="contains">
-            {t("assets.filterTool.filenameSection.contains")}
-          </option>
-          <option value="matches">
-            {t("assets.filterTool.filenameSection.matches")}
-          </option>
-          <option value="starts_with">
-            {t("assets.filterTool.filenameSection.starts_with")}
-          </option>
-          <option value="ends_with">
-            {t("assets.filterTool.filenameSection.ends_with")}
-          </option>
+          <option value="contains">{t("assets.filterTool.filenameSection.contains")}</option>
+          <option value="matches">{t("assets.filterTool.filenameSection.matches")}</option>
+          <option value="starts_with">{t("assets.filterTool.filenameSection.starts_with")}</option>
+          <option value="ends_with">{t("assets.filterTool.filenameSection.ends_with")}</option>
         </select>
         <input
           type="text"
@@ -500,9 +556,7 @@ const DateSection = memo(function DateSection({
     >
       <div className="flex flex-col gap-2">
         <label className="input input-bordered input-xs w-full flex items-center gap-2">
-          <span className="text-xs opacity-70 w-8">
-            {t("assets.filterTool.dateSection.from")}
-          </span>
+          <span className="text-xs opacity-70 w-8">{t("assets.filterTool.dateSection.from")}</span>
           <input
             type="date"
             className="grow text-xs"
@@ -512,9 +566,7 @@ const DateSection = memo(function DateSection({
           />
         </label>
         <label className="input input-bordered input-xs w-full flex items-center gap-2">
-          <span className="text-xs opacity-70 w-8">
-            {t("assets.filterTool.dateSection.to")}
-          </span>
+          <span className="text-xs opacity-70 w-8">{t("assets.filterTool.dateSection.to")}</span>
           <input
             type="date"
             className="grow text-xs"
@@ -557,11 +609,7 @@ const LocationSection = memo(function LocationSection({
   }, []);
 
   const computeBBoxFromCenter = useCallback(() => {
-    const newBBox = centerToBBox(
-      locationCenterLat,
-      locationCenterLon,
-      locationRadiusKm,
-    );
+    const newBBox = centerToBBox(locationCenterLat, locationCenterLon, locationRadiusKm);
     onBBoxChange(newBBox);
   }, [locationCenterLat, locationCenterLon, locationRadiusKm, onBBoxChange]);
 
@@ -587,56 +635,40 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t(
-                "assets.filterTool.locationSection.north_placeholder",
-              )}
+              placeholder={t("assets.filterTool.locationSection.north_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.north}
-              onChange={(e) =>
-                onBBoxChange({ ...bbox, north: Number(e.target.value) })
-              }
+              onChange={(e) => onBBoxChange({ ...bbox, north: Number(e.target.value) })}
             />
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t(
-                "assets.filterTool.locationSection.south_placeholder",
-              )}
+              placeholder={t("assets.filterTool.locationSection.south_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.south}
-              onChange={(e) =>
-                onBBoxChange({ ...bbox, south: Number(e.target.value) })
-              }
+              onChange={(e) => onBBoxChange({ ...bbox, south: Number(e.target.value) })}
             />
           </div>
           <div className="flex gap-2">
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t(
-                "assets.filterTool.locationSection.east_placeholder",
-              )}
+              placeholder={t("assets.filterTool.locationSection.east_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.east}
-              onChange={(e) =>
-                onBBoxChange({ ...bbox, east: Number(e.target.value) })
-              }
+              onChange={(e) => onBBoxChange({ ...bbox, east: Number(e.target.value) })}
             />
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t(
-                "assets.filterTool.locationSection.west_placeholder",
-              )}
+              placeholder={t("assets.filterTool.locationSection.west_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.west}
-              onChange={(e) =>
-                onBBoxChange({ ...bbox, west: Number(e.target.value) })
-              }
+              onChange={(e) => onBBoxChange({ ...bbox, west: Number(e.target.value) })}
             />
           </div>
 
@@ -721,11 +753,7 @@ const LocationSection = memo(function LocationSection({
               >
                 {t("assets.filterTool.locationSection.use_current_location")}
               </button>
-              <button
-                type="button"
-                className="btn btn-sm flex-1"
-                onClick={computeBBoxFromCenter}
-              >
+              <button type="button" className="btn btn-sm flex-1" onClick={computeBBoxFromCenter}>
                 {t("assets.filterTool.locationSection.generate_bbox")}
               </button>
             </div>
@@ -772,14 +800,8 @@ const LocationSection = memo(function LocationSection({
               </button>
             </div>
           </div>
-          <form
-            method="dialog"
-            className="modal-backdrop"
-            onClick={() => setMapModalOpen(false)}
-          >
-            <button>
-              {t("assets.filterTool.locationSection.close_modal")}
-            </button>
+          <form method="dialog" className="modal-backdrop" onClick={() => setMapModalOpen(false)}>
+            <button>{t("assets.filterTool.locationSection.close_modal")}</button>
           </form>
         </dialog>
       )}
@@ -818,9 +840,7 @@ const CameraMakeSection = memo(function CameraMakeSection({
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
       >
-        <option value="">
-          {t("assets.filterTool.cameraMakeSection.select_placeholder")}
-        </option>
+        <option value="">{t("assets.filterTool.cameraMakeSection.select_placeholder")}</option>
         {items.map((item) => (
           <option key={item} value={item}>
             {item}
@@ -867,9 +887,7 @@ const LensSection = memo(function LensSection({
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
       >
-        <option value="">
-          {t("assets.filterTool.lensSection.select_placeholder")}
-        </option>
+        <option value="">{t("assets.filterTool.lensSection.select_placeholder")}</option>
         {items.map((item) => (
           <option key={item} value={item}>
             {item}
@@ -893,6 +911,7 @@ export default function FilterTool({
   initial,
   onChange,
   autoApply = true,
+  lockedFields,
   cameraModelOptions,
   lensOptions,
   fetchCameraModels,
@@ -904,10 +923,33 @@ export default function FilterTool({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const initialDTO = useMemo(() => initial ?? {}, [initial]);
   const initialHash = useMemo(() => JSON.stringify(initialDTO), [initialDTO]);
+  const lockedFieldSet = useMemo(() => {
+    if (!lockedFields) return new Set<FilterFieldKey>();
+    if (Array.isArray(lockedFields)) {
+      return new Set<FilterFieldKey>(lockedFields);
+    }
+    return new Set<FilterFieldKey>(
+      (Object.entries(lockedFields) as [FilterFieldKey, boolean | undefined][])
+        .filter(([, locked]) => locked)
+        .map(([field]) => field),
+    );
+  }, [lockedFields]);
+  const lockedFieldsHash = useMemo(
+    () => Array.from(lockedFieldSet).sort().join("|"),
+    [lockedFieldSet],
+  );
+  const isFieldLocked = useCallback(
+    (field: FilterFieldKey) => lockedFieldSet.has(field),
+    [lockedFieldSet],
+  );
+  const hasLockedInitialFilters = useMemo(
+    () => Array.from(lockedFieldSet).some((field) => isFieldActive(initialDTO, field)),
+    [initialDTO, initialHash, lockedFieldSet, lockedFieldsHash],
+  );
 
   // Global filter enable/disable
   const [filterEnabled, setFilterEnabled] = useState<boolean>(
-    Object.keys(initialDTO).length > 0,
+    Object.keys(initialDTO).length > 0 || hasLockedInitialFilters,
   );
 
   // Type
@@ -919,9 +961,7 @@ export default function FilterTool({
   );
 
   // RAW
-  const [rawEnabled, setRawEnabled] = useState<boolean>(
-    typeof initialDTO.raw === "boolean",
-  );
+  const [rawEnabled, setRawEnabled] = useState<boolean>(typeof initialDTO.raw === "boolean");
   const [rawMode, setRawMode] = useState<"include" | "exclude">(
     initialDTO.raw === false ? "exclude" : "include",
   );
@@ -935,37 +975,23 @@ export default function FilterTool({
   );
 
   // Liked: liked/unliked
-  const [likedEnabled, setLikedEnabled] = useState<boolean>(
-    typeof initialDTO.liked === "boolean",
-  );
-  const [likedValue, setLikedValue] = useState<boolean>(
-    initialDTO.liked ?? true,
-  );
+  const [likedEnabled, setLikedEnabled] = useState<boolean>(typeof initialDTO.liked === "boolean");
+  const [likedValue, setLikedValue] = useState<boolean>(initialDTO.liked ?? true);
 
   // Filename: operator + value
-  const [filenameEnabled, setFilenameEnabled] = useState<boolean>(
-    !!initialDTO.filename,
-  );
+  const [filenameEnabled, setFilenameEnabled] = useState<boolean>(!!initialDTO.filename);
   const [filenameOperator, setFilenameOperator] = useState<FilenameOperator>(
     initialDTO.filename?.operator ?? "contains",
   );
-  const [filenameValue, setFilenameValue] = useState<string>(
-    initialDTO.filename?.value ?? "",
-  );
+  const [filenameValue, setFilenameValue] = useState<string>(initialDTO.filename?.value ?? "");
 
   // Date range
   const [dateEnabled, setDateEnabled] = useState<boolean>(!!initialDTO.date);
-  const [dateFrom, setDateFrom] = useState<string>(
-    toDateInput(initialDTO.date?.from ?? ""),
-  );
-  const [dateTo, setDateTo] = useState<string>(
-    toDateInput(initialDTO.date?.to ?? ""),
-  );
+  const [dateFrom, setDateFrom] = useState<string>(toDateInput(initialDTO.date?.from ?? ""));
+  const [dateTo, setDateTo] = useState<string>(toDateInput(initialDTO.date?.to ?? ""));
 
   // Location (BBox)
-  const [locationEnabled, setLocationEnabled] = useState<boolean>(
-    !!initialDTO.location,
-  );
+  const [locationEnabled, setLocationEnabled] = useState<boolean>(!!initialDTO.location);
   const [location, setLocation] = useState<LocationBBox>(
     initialDTO.location ?? {
       north: 0,
@@ -976,19 +1002,15 @@ export default function FilterTool({
   );
 
   // Camera model / Lens
-  const [cameraModelEnabled, setCameraModelEnabled] = useState<boolean>(
-    !!initialDTO.camera_model,
-  );
-  const [cameraModel, setCameraModel] = useState<string>(
-    initialDTO.camera_model ?? "",
-  );
+  const [cameraModelEnabled, setCameraModelEnabled] = useState<boolean>(!!initialDTO.camera_model);
+  const [cameraModel, setCameraModel] = useState<string>(initialDTO.camera_model ?? "");
   const [lensEnabled, setLensEnabled] = useState<boolean>(!!initialDTO.lens);
   const [lens, setLens] = useState<string>(initialDTO.lens ?? "");
 
   useEffect(() => {
     const next = initialDTO;
 
-    setFilterEnabled(Object.keys(next).length > 0);
+    setFilterEnabled(Object.keys(next).length > 0 || hasLockedInitialFilters);
 
     setTypeEnabled(next.type === "PHOTO" || next.type === "VIDEO");
     setTypeValue(next.type === "VIDEO" ? "VIDEO" : "PHOTO");
@@ -1025,7 +1047,7 @@ export default function FilterTool({
 
     setLensEnabled(!!next.lens);
     setLens(next.lens ?? "");
-  }, [initialDTO, initialHash]);
+  }, [hasLockedInitialFilters, initialDTO, initialHash]);
 
   // Options hook
   const { cameraModelItems, lensItems, loadingOptions } = useFilterOptions({
@@ -1037,7 +1059,7 @@ export default function FilterTool({
   });
 
   const enabledCount = useMemo(() => {
-    if (!filterEnabled) return 0;
+    if (!filterEnabled && !hasLockedInitialFilters) return 0;
     let count = 0;
     if (rawEnabled) count++;
     if (typeEnabled) count++;
@@ -1066,37 +1088,41 @@ export default function FilterTool({
     cameraModel,
     lensEnabled,
     lens,
+    hasLockedInitialFilters,
   ]);
 
   // Build DTO from local UI state only when a section is enabled and has valid value.
   // Disabled sections are ignored; for location, ignore zero bounding box to avoid sending empty spatial filters.
   const buildDTO = useCallback((): FilterDTO => {
-    if (!filterEnabled) return {};
+    if (!filterEnabled && !hasLockedInitialFilters) return {};
     const dto: FilterDTO = {};
-    if (typeEnabled) dto.type = typeValue;
-    if (rawEnabled) dto.raw = rawMode === "include";
-    if (ratingEnabled) dto.rating = ratingValue;
-    if (likedEnabled) dto.liked = likedValue;
-    if (filenameEnabled && filenameValue.trim()) {
+    if (filterEnabled && typeEnabled) dto.type = typeValue;
+    if (filterEnabled && rawEnabled) dto.raw = rawMode === "include";
+    if (filterEnabled && ratingEnabled) dto.rating = ratingValue;
+    if (filterEnabled && likedEnabled) dto.liked = likedValue;
+    if (filterEnabled && filenameEnabled && filenameValue.trim()) {
       dto.filename = {
         operator: filenameOperator,
         value: filenameValue.trim(),
       };
     }
-    if (dateEnabled && (dateFrom || dateTo)) {
+    if (filterEnabled && dateEnabled && (dateFrom || dateTo)) {
       dto.date = {
         from: dateFrom || undefined,
         to: dateTo || undefined,
       };
     }
-    if (locationEnabled && !isZeroBBox(location)) {
+    if (filterEnabled && locationEnabled && !isZeroBBox(location)) {
       dto.location = { ...location };
     }
-    if (cameraModelEnabled && cameraModel) dto.camera_model = cameraModel;
-    if (lensEnabled && lens) dto.lens = lens;
-    return dto;
+    if (filterEnabled && cameraModelEnabled && cameraModel) {
+      dto.camera_model = cameraModel;
+    }
+    if (filterEnabled && lensEnabled && lens) dto.lens = lens;
+    return mergeLockedInitialDTO(dto, initialDTO, lockedFieldSet);
   }, [
     filterEnabled,
+    hasLockedInitialFilters,
     typeEnabled,
     typeValue,
     rawEnabled,
@@ -1117,6 +1143,10 @@ export default function FilterTool({
     cameraModel,
     lensEnabled,
     lens,
+    initialDTO,
+    initialHash,
+    lockedFieldSet,
+    lockedFieldsHash,
   ]);
 
   // Use ref to store the latest onChange callback to avoid dependency issues
@@ -1147,56 +1177,75 @@ export default function FilterTool({
   }, []);
 
   const resetAll = useCallback(() => {
-    setFilterEnabled(false);
+    setFilterEnabled(hasLockedInitialFilters);
 
-    setTypeEnabled(false);
-    setTypeValue("PHOTO");
+    setTypeEnabled(isFieldLocked("type") && isFieldActive(initialDTO, "type"));
+    setTypeValue(initialDTO.type === "VIDEO" ? "VIDEO" : "PHOTO");
 
-    setRawEnabled(false);
-    setRawMode("include");
+    setRawEnabled(isFieldLocked("raw") && isFieldActive(initialDTO, "raw"));
+    setRawMode(initialDTO.raw === false ? "exclude" : "include");
 
-    setRatingEnabled(false);
-    setRatingValue(5);
+    setRatingEnabled(isFieldLocked("rating") && isFieldActive(initialDTO, "rating"));
+    setRatingValue(typeof initialDTO.rating === "number" ? initialDTO.rating : 5);
 
-    setLikedEnabled(false);
-    setLikedValue(true);
+    setLikedEnabled(isFieldLocked("liked") && isFieldActive(initialDTO, "liked"));
+    setLikedValue(initialDTO.liked ?? true);
 
-    setFilenameEnabled(false);
-    setFilenameOperator("contains");
-    setFilenameValue("");
+    setFilenameEnabled(isFieldLocked("filename") && isFieldActive(initialDTO, "filename"));
+    setFilenameOperator(initialDTO.filename?.operator ?? "contains");
+    setFilenameValue(initialDTO.filename?.value ?? "");
 
-    setDateEnabled(false);
-    setDateFrom("");
-    setDateTo("");
+    setDateEnabled(isFieldLocked("date") && isFieldActive(initialDTO, "date"));
+    setDateFrom(toDateInput(initialDTO.date?.from ?? ""));
+    setDateTo(toDateInput(initialDTO.date?.to ?? ""));
 
-    setLocationEnabled(false);
-    setLocation({ north: 0, south: 0, east: 0, west: 0 });
+    setLocationEnabled(isFieldLocked("location") && isFieldActive(initialDTO, "location"));
+    setLocation(initialDTO.location ?? { north: 0, south: 0, east: 0, west: 0 });
 
-    setCameraModelEnabled(false);
-    setCameraModel("");
+    setCameraModelEnabled(
+      isFieldLocked("camera_model") && isFieldActive(initialDTO, "camera_model"),
+    );
+    setCameraModel(initialDTO.camera_model ?? "");
 
-    setLensEnabled(false);
-    setLens("");
+    setLensEnabled(isFieldLocked("lens") && isFieldActive(initialDTO, "lens"));
+    setLens(initialDTO.lens ?? "");
 
     if (!autoApply) {
-      onChange?.({});
+      onChange?.(buildLockedInitialDTO(initialDTO, lockedFieldSet));
     }
-  }, [autoApply, onChange]);
+  }, [
+    autoApply,
+    hasLockedInitialFilters,
+    initialDTO,
+    initialHash,
+    isFieldLocked,
+    lockedFieldSet,
+    lockedFieldsHash,
+    onChange,
+  ]);
 
   const applyNow = useCallback(() => {
     onChangeRef.current?.(filterDTO);
     setOpen(false);
   }, [filterDTO]);
 
+  const filtersEnabled = filterEnabled || hasLockedInitialFilters;
+  const typeLocked = isFieldLocked("type");
+  const rawLocked = isFieldLocked("raw");
+  const ratingLocked = isFieldLocked("rating");
+  const likedLocked = isFieldLocked("liked");
+  const filenameLocked = isFieldLocked("filename");
+  const dateLocked = isFieldLocked("date");
+  const locationLocked = isFieldLocked("location");
+  const cameraModelLocked = isFieldLocked("camera_model");
+  const lensLocked = isFieldLocked("lens");
+
   return (
-    <div
-      className={`dropdown dropdown-end ${open ? "dropdown-open" : ""}`}
-      ref={rootRef}
-    >
+    <div className={`dropdown dropdown-end ${open ? "dropdown-open" : ""}`} ref={rootRef}>
       <button
         type="button"
-        className={`btn btn-sm btn-circle btn-soft btn-info ${filterEnabled ? "btn-active" : ""} relative`}
-        aria-pressed={filterEnabled}
+        className={`btn btn-sm btn-circle btn-soft btn-info ${filtersEnabled ? "btn-active" : ""} relative`}
+        aria-pressed={filtersEnabled}
         onClick={() => setOpen((v) => !v)}
         title={t("assets.filterTool.main.filters_button_title")}
       >
@@ -1214,9 +1263,7 @@ export default function FilterTool({
           <div className="p-4 border-b border-base-200 bg-base-100 sticky top-0 z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-bold">
-                  {t("assets.filterTool.main.filters_header")}
-                </span>
+                <span className="font-bold">{t("assets.filterTool.main.filters_header")}</span>
                 {enabledCount > 0 && (
                   <span className="badge badge-primary badge-sm">
                     {t("assets.filterTool.main.active_filters_count", {
@@ -1232,8 +1279,13 @@ export default function FilterTool({
                 <input
                   type="checkbox"
                   className="toggle toggle-primary toggle-sm"
-                  checked={filterEnabled}
-                  onChange={(e) => setFilterEnabled(e.target.checked)}
+                  checked={filtersEnabled}
+                  disabled={hasLockedInitialFilters}
+                  onChange={(e) => {
+                    if (!hasLockedInitialFilters) {
+                      setFilterEnabled(e.target.checked);
+                    }
+                  }}
                 />
               </label>
             </div>
@@ -1243,7 +1295,7 @@ export default function FilterTool({
           <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
             {/* Sections */}
             <TypeSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || typeLocked}
               enabled={typeEnabled}
               onEnabledChange={setTypeEnabled}
               value={typeValue}
@@ -1251,7 +1303,7 @@ export default function FilterTool({
             />
 
             <RawSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || rawLocked}
               enabled={rawEnabled}
               onEnabledChange={setRawEnabled}
               mode={rawMode}
@@ -1259,7 +1311,7 @@ export default function FilterTool({
             />
 
             <RatingSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || ratingLocked}
               enabled={ratingEnabled}
               onEnabledChange={setRatingEnabled}
               value={ratingValue}
@@ -1267,7 +1319,7 @@ export default function FilterTool({
             />
 
             <LikeSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || likedLocked}
               enabled={likedEnabled}
               onEnabledChange={setLikedEnabled}
               value={likedValue}
@@ -1275,7 +1327,7 @@ export default function FilterTool({
             />
 
             <FilenameSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || filenameLocked}
               enabled={filenameEnabled}
               onEnabledChange={setFilenameEnabled}
               operator={filenameOperator}
@@ -1285,7 +1337,7 @@ export default function FilterTool({
             />
 
             <DateSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || dateLocked}
               enabled={dateEnabled}
               onEnabledChange={setDateEnabled}
               from={dateFrom}
@@ -1295,7 +1347,7 @@ export default function FilterTool({
             />
 
             <LocationSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || locationLocked}
               enabled={locationEnabled}
               onEnabledChange={setLocationEnabled}
               bbox={location}
@@ -1303,7 +1355,7 @@ export default function FilterTool({
             />
 
             <CameraMakeSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || cameraModelLocked}
               enabled={cameraModelEnabled}
               onEnabledChange={setCameraModelEnabled}
               value={cameraModel}
@@ -1313,7 +1365,7 @@ export default function FilterTool({
             />
 
             <LensSection
-              filterDisabled={!filterEnabled}
+              filterDisabled={!filtersEnabled || lensLocked}
               enabled={lensEnabled}
               onEnabledChange={setLensEnabled}
               value={lens}
@@ -1329,16 +1381,12 @@ export default function FilterTool({
               type="button"
               className="btn btn-xs btn-ghost text-error"
               onClick={resetAll}
-              disabled={!filterEnabled && enabledCount === 0}
+              disabled={!filtersEnabled && enabledCount === 0}
             >
               {t("assets.filterTool.main.reset_button")}
             </button>
             {!autoApply && (
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={applyNow}
-              >
+              <button type="button" className="btn btn-sm btn-primary" onClick={applyNow}>
                 {t("assets.filterTool.main.apply_button")}
               </button>
             )}

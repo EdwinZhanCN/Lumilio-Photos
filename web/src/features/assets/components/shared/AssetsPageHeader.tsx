@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import FilterTool, {
   FilterDTO,
+  type FilterFieldKey,
 } from "@/features/assets/components/page/FilterTool/FilterTool";
 import {
   mapFilenameModeToDTO,
@@ -61,6 +62,7 @@ interface AssetsPageHeaderProps {
   title?: string;
   icon?: ReactNode;
   browseItems?: BrowseItem[];
+  lockedFilterFields?: readonly FilterFieldKey[];
 }
 
 const AssetsPageHeader = ({
@@ -70,6 +72,7 @@ const AssetsPageHeader = ({
   title,
   icon,
   browseItems,
+  lockedFilterFields,
 }: AssetsPageHeaderProps) => {
   const { t } = useI18n();
   const selection = useSelection();
@@ -561,6 +564,7 @@ const AssetsPageHeader = ({
             initial={inboundDTO}
             onChange={handleFiltersChange}
             autoApply={true}
+            lockedFields={lockedFilterFields}
           />
 
           <button
@@ -832,6 +836,7 @@ const AssetsPageHeader = ({
             initial={inboundDTO}
             onChange={handleFiltersChange}
             autoApply={true}
+            lockedFields={lockedFilterFields}
           />
         </div>
       </PageHeader>
