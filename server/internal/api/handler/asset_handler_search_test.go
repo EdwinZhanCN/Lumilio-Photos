@@ -133,7 +133,7 @@ func TestAssetHandlerSearchAssets_ReturnsDegradedResultsWithout503(t *testing.T)
 						Enabled:     true,
 						Degraded:    true,
 						Reason:      "runtime_unavailable",
-						SourceTypes: []string{"clip"},
+						SourceTypes: []string{"semantic"},
 					},
 					Results:      []repo.Asset{filenameResult},
 					ResultsTotal: 1,
@@ -188,7 +188,7 @@ func TestAssetHandlerSearchAssets_ReturnsTopResultsAndResults(t *testing.T) {
 					TopResults: []repo.Asset{topResult},
 					TopResultsMeta: service.SearchTopResultsMeta{
 						Enabled:     true,
-						SourceTypes: []string{"clip"},
+						SourceTypes: []string{"semantic"},
 					},
 					Results:      []repo.Asset{filenameResult},
 					ResultsTotal: 1,

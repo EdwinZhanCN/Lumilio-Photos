@@ -14,23 +14,23 @@ import (
 	"github.com/riverqueue/river"
 )
 
-// ProcessClipArgs is the job payload.
-type ProcessClipArgs = jobs.ProcessClipArgs
+// ProcessSemanticArgs is the job payload.
+type ProcessSemanticArgs = jobs.ProcessSemanticArgs
 
-// ProcessClipWorker handles CLIP embedding generation for assets
-type ProcessClipWorker struct {
-	river.WorkerDefaults[ProcessClipArgs]
+// ProcessSemanticWorker handles semantic embedding generation for assets
+type ProcessSemanticWorker struct {
+	river.WorkerDefaults[ProcessSemanticArgs]
 	EmbeddingService service.EmbeddingService
 	LumenService     service.LumenService
 	ConfigProvider   MLConfigProvider
 	ImageLoader      MLImageLoader
 }
 
-func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClipArgs]) error {
+func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[ProcessSemanticArgs]) error {
 	args := job.Args
 	assetID := args.AssetID
 
-	enabled, err := isMLTaskEnabled(ctx, w.ConfigProvider, "process_clip")
+	enabled, err := isMLTaskEnabled(ctx, w.ConfigProvider, "process_semantic")
 	if err != nil {
 		return fmt.Errorf("load ml settings: %w", err)
 	}
@@ -52,29 +52,29 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 		return fmt.Errorf("ml image loader unavailable")
 	}
 
-	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeClip, args.PreprocessVersion)
+	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeSemantic, args.PreprocessVersion)
 	if err != nil {
-		return fmt.Errorf("load CLIP image: %w", err)
+		return fmt.Errorf("load semantic image: %w", err)
 	}
 
 	embedding, err := w.LumenService.SemanticImageEmbed(ctx, imageData)
 	if err != nil {
-		return fmt.Errorf("failed to generate CLIP embedding: %w", err)
+		return fmt.Errorf("failed to generate semantic embedding: %w", err)
 	}
 
 	err = w.EmbeddingService.SaveEmbedding(ctx, pgUUID,
-		service.EmbeddingTypeCLIP, embedding.ModelID, embedding.Vector, true)
+		service.EmbeddingTypeSemantic, embedding.ModelID, embedding.Vector, true)
 	if err != nil {
 		return fmt.Errorf("failed to save embedding: %w", err)
 	}
 
-	// Chain SigLIP zero-shot classification now that the embedding exists. This
-	// also doubles as backfill: re-running the CLIP index over the library
+	// Chain zero-shot classification now that the embedding exists. This
+	// also doubles as backfill: re-running the semantic index over the library
 	// reclassifies every asset. Best-effort: a failed enqueue must not force a
 	// costly re-embed, and the next reindex will recover it.
-	if classifyEnabled, cfgErr := isMLTaskEnabled(ctx, w.ConfigProvider, "classify_siglip"); cfgErr == nil && classifyEnabled {
+	if classifyEnabled, cfgErr := isMLTaskEnabled(ctx, w.ConfigProvider, "classify_zeroshot"); cfgErr == nil && classifyEnabled {
 		if client := river.ClientFromContext[pgx.Tx](ctx); client != nil {
-			_, _ = client.Insert(ctx, jobs.ClassifySiglipArgs{AssetID: pgUUID}, &river.InsertOpts{Queue: "classify_siglip"})
+			_, _ = client.Insert(ctx, jobs.ZeroshotClassifyArgs{AssetID: pgUUID}, &river.InsertOpts{Queue: "classify_zeroshot"})
 		}
 	}
 

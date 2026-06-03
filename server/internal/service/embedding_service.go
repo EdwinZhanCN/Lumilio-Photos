@@ -43,9 +43,9 @@ type embeddingService struct {
 type EmbeddingType string
 
 const (
-	EmbeddingTypeCLIP  EmbeddingType = "clip"
-	EmbeddingTypeFace  EmbeddingType = "face"
-	EmbeddingTypePHash EmbeddingType = "phash"
+	EmbeddingTypeSemantic EmbeddingType = "semantic"
+	EmbeddingTypeFace     EmbeddingType = "face"
+	EmbeddingTypePHash    EmbeddingType = "phash"
 )
 
 type EmbeddingInfo struct {
@@ -82,7 +82,7 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		return err
 	}
 
-	if embeddingType == EmbeddingTypeCLIP {
+	if embeddingType == EmbeddingTypeSemantic {
 		defaultSpace, err := e.ensureDefaultSpace(ctx, queries, embeddingType, space)
 		if err != nil {
 			return err

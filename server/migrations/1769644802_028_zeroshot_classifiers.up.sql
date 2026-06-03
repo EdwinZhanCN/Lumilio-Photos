@@ -1,8 +1,8 @@
--- Runtime toggle for the SigLIP zero-shot classification pipeline.
+-- Runtime toggle for the zero-shot classification pipeline.
 ALTER TABLE settings
-ADD COLUMN IF NOT EXISTS ml_siglip_classify_enabled BOOLEAN NOT NULL DEFAULT false;
+ADD COLUMN IF NOT EXISTS ml_zeroshot_classify_enabled BOOLEAN NOT NULL DEFAULT false;
 
--- Allow the dedicated tag source written by the SigLIP classifier.
+-- Allow the dedicated tag source written by the zero-shot classifier.
 ALTER TABLE asset_tags
 DROP CONSTRAINT IF EXISTS asset_tags_source_check;
 
@@ -13,7 +13,7 @@ CHECK (source IN (
     'user',
     'ai',
     'bioclip_classify',
-    'siglip_zeroshot'
+    'zeroshot'
 ));
 
 -- Classifier definitions: a "smart album" recipe expressed as a prompt ensemble.
@@ -41,7 +41,7 @@ CREATE TABLE classifier_definitions (
 CREATE INDEX idx_classifier_definitions_enabled ON classifier_definitions(enabled);
 
 -- Seed preset categories. Prototypes are left NULL and built lazily on first run
--- (against whatever SigLIP model the deployment uses). Thresholds are conservative
+-- (against whatever semantic text model the deployment uses). Thresholds are conservative
 -- defaults on the contrastive score; tune later via the preview endpoint.
 INSERT INTO classifier_definitions (slug, display_name, tag_name, category, positive_prompts, negative_prompts, threshold) VALUES
 (

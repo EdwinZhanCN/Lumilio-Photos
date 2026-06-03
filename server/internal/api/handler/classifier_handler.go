@@ -19,9 +19,9 @@ func NewClassifierHandler(classifierService service.ClassifierService) *Classifi
 	return &ClassifierHandler{classifierService: classifierService}
 }
 
-// PreviewClassifier evaluates an ad-hoc SigLIP zero-shot classifier over the library.
+// PreviewClassifier evaluates an ad-hoc zero-shot classifier over the library.
 // @Summary Preview a zero-shot classifier
-// @Description Embed positive/negative prompts with SigLIP and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the CLIP embedding pipeline and a reachable SigLIP text-embed task.
+// @Description Embed positive/negative prompts with semantic and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.
 // @Tags classifiers
 // @Accept json
 // @Produce json

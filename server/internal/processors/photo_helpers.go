@@ -118,21 +118,21 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 	}
 
 	// Early return if no ML services are enabled by runtime config.
-	if !mlConfig.CLIPEnabled && !mlConfig.OCREnabled && !mlConfig.FaceEnabled {
+	if !mlConfig.SemanticEnabled && !mlConfig.OCREnabled && !mlConfig.FaceEnabled {
 		return nil
 	}
 
-	if mlConfig.CLIPEnabled {
+	if mlConfig.SemanticEnabled {
 		if ap.lumenService == nil || ap.lumenService.IsTaskAvailable("semantic_image_embed") {
-			_, err = ap.queueClient.Insert(ctx, jobs.ProcessClipArgs{
+			_, err = ap.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
 				AssetID:           asset.AssetID,
 				PreprocessVersion: jobs.MLPreprocessVersionV1,
-			}, &river.InsertOpts{Queue: "process_clip"})
+			}, &river.InsertOpts{Queue: "process_semantic"})
 			if err != nil {
-				return fmt.Errorf("enqueue CLIP: %w", err)
+				return fmt.Errorf("enqueue semantic: %w", err)
 			}
-			// SigLIP zero-shot classification is chained off the CLIP worker once
-			// the embedding is written (see ProcessClipWorker), so no separate
+			// zero-shot classification is chained off the semantic worker once
+			// the embedding is written (see ProcessSemanticWorker), so no separate
 			// enqueue is needed here.
 		}
 	}

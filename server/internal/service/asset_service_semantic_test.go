@@ -105,7 +105,7 @@ func (s *semanticTestEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, p
 	return PrimaryEmbedding{}, nil
 }
 
-func TestResolveClipQueryEmbeddingUsesRequestedPath(t *testing.T) {
+func TestResolveSemanticQueryEmbeddingUsesRequestedPath(t *testing.T) {
 	t.Parallel()
 
 	lumen := &semanticTestLumenStub{
@@ -118,9 +118,9 @@ func TestResolveClipQueryEmbeddingUsesRequestedPath(t *testing.T) {
 		embeddingService: &semanticTestEmbeddingStub{},
 	}
 
-	fastEmbedding, err := svc.resolveClipQueryEmbedding(context.Background(), "forest", true)
+	fastEmbedding, err := svc.resolveSemanticQueryEmbedding(context.Background(), "forest", true)
 	if err != nil {
-		t.Fatalf("resolveClipQueryEmbedding fast returned error: %v", err)
+		t.Fatalf("resolveSemanticQueryEmbedding fast returned error: %v", err)
 	}
 	if lumen.fastCalls != 1 || lumen.normalCalls != 0 {
 		t.Fatalf("expected fast path only, got fast=%d normal=%d", lumen.fastCalls, lumen.normalCalls)
@@ -129,9 +129,9 @@ func TestResolveClipQueryEmbeddingUsesRequestedPath(t *testing.T) {
 		t.Fatalf("expected fast embedding dimensions to be preserved, got %d", len(fastEmbedding.Vector))
 	}
 
-	normalEmbedding, err := svc.resolveClipQueryEmbedding(context.Background(), "forest", false)
+	normalEmbedding, err := svc.resolveSemanticQueryEmbedding(context.Background(), "forest", false)
 	if err != nil {
-		t.Fatalf("resolveClipQueryEmbedding normal returned error: %v", err)
+		t.Fatalf("resolveSemanticQueryEmbedding normal returned error: %v", err)
 	}
 	if lumen.fastCalls != 1 || lumen.normalCalls != 1 {
 		t.Fatalf("expected one fast and one normal call, got fast=%d normal=%d", lumen.fastCalls, lumen.normalCalls)

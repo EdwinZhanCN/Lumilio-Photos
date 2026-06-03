@@ -12,11 +12,11 @@ INSERT INTO settings (
     llm_api_key_ciphertext,
     llm_api_key_configured,
     ml_auto,
-    ml_clip_enabled,
+    ml_semantic_enabled,
     ml_bioclip_enabled,
     ml_ocr_enabled,
     ml_face_enabled,
-    ml_siglip_classify_enabled,
+    ml_zeroshot_classify_enabled,
     updated_by
 )
 VALUES (
@@ -43,11 +43,11 @@ ON CONFLICT (id) DO UPDATE SET
     llm_api_key_ciphertext = EXCLUDED.llm_api_key_ciphertext,
     llm_api_key_configured = EXCLUDED.llm_api_key_configured,
     ml_auto = EXCLUDED.ml_auto,
-    ml_clip_enabled = EXCLUDED.ml_clip_enabled,
+    ml_semantic_enabled = EXCLUDED.ml_semantic_enabled,
     ml_bioclip_enabled = EXCLUDED.ml_bioclip_enabled,
     ml_ocr_enabled = EXCLUDED.ml_ocr_enabled,
     ml_face_enabled = EXCLUDED.ml_face_enabled,
-    ml_siglip_classify_enabled = EXCLUDED.ml_siglip_classify_enabled,
+    ml_zeroshot_classify_enabled = EXCLUDED.ml_zeroshot_classify_enabled,
     updated_at = NOW(),
     updated_by = EXCLUDED.updated_by
 RETURNING *;

@@ -10,9 +10,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// AssetTagSourceSiglipZeroshot is the asset_tags.source value for tags written
-// by the SigLIP zero-shot classifier.
-const AssetTagSourceSiglipZeroshot = "siglip_zeroshot"
+// AssetTagSourceZeroshot is the asset_tags.source value for tags written
+// by the zero-shot classifier.
+const AssetTagSourceZeroshot = "zeroshot"
 
 type AIGeneratedTag struct {
 	Name       string
@@ -140,7 +140,7 @@ func normalizeAssetTagSource(source string) string {
 	switch strings.TrimSpace(source) {
 	case "":
 		return ""
-	case "system", "user", "ai", "bioclip_classify", "siglip_zeroshot":
+	case "system", "user", "ai", "bioclip_classify", "zeroshot":
 		return strings.TrimSpace(source)
 	default:
 		return "ai"

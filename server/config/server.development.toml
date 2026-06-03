@@ -42,7 +42,7 @@ user_agent = "Lumilio-Photos/1.0"
 naturalearth_city_radius_meters = 50000
 
 [ml]
-clip_enabled = false
+semantic_enabled = false
 bioclip_enabled = false
 ocr_enabled = false
 face_enabled = false

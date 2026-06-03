@@ -22,11 +22,11 @@ type LLMSettingsDTO struct {
 }
 
 type MLSettingsDTO struct {
-	CLIPEnabled           bool `json:"clip_enabled"`
-	BioCLIPEnabled        bool `json:"bioclip_enabled"`
-	OCREnabled            bool `json:"ocr_enabled"`
-	FaceEnabled           bool `json:"face_enabled"`
-	SiglipClassifyEnabled bool `json:"siglip_classify_enabled"`
+	SemanticEnabled         bool `json:"semantic_enabled"`
+	BioCLIPEnabled      bool `json:"bioclip_enabled"`
+	OCREnabled              bool `json:"ocr_enabled"`
+	FaceEnabled             bool `json:"face_enabled"`
+	ZeroshotClassifyEnabled bool `json:"zeroshot_classify_enabled"`
 }
 
 type UpdateSystemSettingsDTO struct {
@@ -43,11 +43,11 @@ type UpdateLLMSettingsDTO struct {
 }
 
 type UpdateMLSettingsDTO struct {
-	CLIPEnabled           *bool `json:"clip_enabled,omitempty"`
-	BioCLIPEnabled        *bool `json:"bioclip_enabled,omitempty"`
-	OCREnabled            *bool `json:"ocr_enabled,omitempty"`
-	FaceEnabled           *bool `json:"face_enabled,omitempty"`
-	SiglipClassifyEnabled *bool `json:"siglip_classify_enabled,omitempty"`
+	SemanticEnabled         *bool `json:"semantic_enabled,omitempty"`
+	BioCLIPEnabled      *bool `json:"bioclip_enabled,omitempty"`
+	OCREnabled              *bool `json:"ocr_enabled,omitempty"`
+	FaceEnabled             *bool `json:"face_enabled,omitempty"`
+	ZeroshotClassifyEnabled *bool `json:"zeroshot_classify_enabled,omitempty"`
 }
 
 type ValidateLLMSettingsResponseDTO struct {
@@ -64,11 +64,11 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 			APIKeyConfigured: settings.LLM.APIKeyConfigured,
 		},
 		ML: MLSettingsDTO{
-			CLIPEnabled:           settings.ML.CLIPEnabled,
-			BioCLIPEnabled:        settings.ML.BioCLIPEnabled,
-			OCREnabled:            settings.ML.OCREnabled,
-			FaceEnabled:           settings.ML.FaceEnabled,
-			SiglipClassifyEnabled: settings.ML.SiglipClassifyEnabled,
+			SemanticEnabled:         settings.ML.SemanticEnabled,
+			BioCLIPEnabled:      settings.ML.BioCLIPEnabled,
+			OCREnabled:              settings.ML.OCREnabled,
+			FaceEnabled:             settings.ML.FaceEnabled,
+			ZeroshotClassifyEnabled: settings.ML.ZeroshotClassifyEnabled,
 		},
 		UpdatedAt: settings.UpdatedAt,
 		UpdatedBy: settings.UpdatedBy,
@@ -92,11 +92,11 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 
 	if dto.ML != nil {
 		input.ML = &service.UpdateMLSettingsInput{
-			CLIPEnabled:           dto.ML.CLIPEnabled,
-			BioCLIPEnabled:        dto.ML.BioCLIPEnabled,
-			OCREnabled:            dto.ML.OCREnabled,
-			FaceEnabled:           dto.ML.FaceEnabled,
-			SiglipClassifyEnabled: dto.ML.SiglipClassifyEnabled,
+			SemanticEnabled:         dto.ML.SemanticEnabled,
+			BioCLIPEnabled:      dto.ML.BioCLIPEnabled,
+			OCREnabled:              dto.ML.OCREnabled,
+			FaceEnabled:             dto.ML.FaceEnabled,
+			ZeroshotClassifyEnabled: dto.ML.ZeroshotClassifyEnabled,
 		}
 	}
 

@@ -65,12 +65,12 @@ type ClassifierPreviewMatch struct {
 	Score   float64
 }
 
-// ClassifierService runs SigLIP zero-shot classification: it turns prompt
+// ClassifierService runs zero-shot classification: it turns prompt
 // ensembles into cached prototype vectors, scores stored image embeddings
 // against them, and powers a real-time preview over the library.
 type ClassifierService interface {
 	// EnsurePrototypes builds/refreshes cached prototypes for enabled classifiers
-	// against the current SigLIP text model. Best-effort; no-op when ML is down.
+	// against the current semantic text model. Best-effort; no-op when ML is down.
 	EnsurePrototypes(ctx context.Context) error
 	// Classify scores a stored image embedding against enabled classifiers.
 	Classify(ctx context.Context, embedding PrimaryEmbedding) ([]ClassifierHit, error)
@@ -107,7 +107,7 @@ func (s *classifierService) textEmbedReady() bool {
 	return s.lumen != nil && s.lumen.IsTaskAvailable(semanticTextEmbedTask)
 }
 
-// buildPrototype embeds each prompt with SigLIP and ensembles them into a single
+// buildPrototype embeds each prompt with semantic and ensembles them into a single
 // unit prototype vector, returning the shared model id.
 func (s *classifierService) buildPrototype(ctx context.Context, prompts []string) ([]float32, string, error) {
 	if len(prompts) == 0 {
@@ -139,7 +139,7 @@ func (s *classifierService) buildPrototype(ctx context.Context, prompts []string
 
 func (s *classifierService) EnsurePrototypes(ctx context.Context) error {
 	if !s.textEmbedReady() {
-		s.logger.Info("siglip classifier: text embed task unavailable, skipping prototype build")
+		s.logger.Info("zero-shot classifier: text embed task unavailable, skipping prototype build")
 		return nil
 	}
 
@@ -163,22 +163,22 @@ func (s *classifierService) EnsurePrototypes(ctx context.Context) error {
 		}
 		pos, model, err := s.buildPrototype(ctx, def.PositivePrompts)
 		if err != nil {
-			s.logger.Warn("siglip classifier: build positive prototype failed", zap.String("slug", def.Slug), zap.Error(err))
+			s.logger.Warn("zero-shot classifier: build positive prototype failed", zap.String("slug", def.Slug), zap.Error(err))
 			continue
 		}
 		var neg []float32
 		if len(def.NegativePrompts) > 0 {
 			neg, _, err = s.buildPrototype(ctx, def.NegativePrompts)
 			if err != nil {
-				s.logger.Warn("siglip classifier: build negative prototype failed", zap.String("slug", def.Slug), zap.Error(err))
+				s.logger.Warn("zero-shot classifier: build negative prototype failed", zap.String("slug", def.Slug), zap.Error(err))
 				neg = nil
 			}
 		}
 		if err := s.savePrototypes(ctx, def.ID, pos, neg, model); err != nil {
-			s.logger.Warn("siglip classifier: persist prototype failed", zap.String("slug", def.Slug), zap.Error(err))
+			s.logger.Warn("zero-shot classifier: persist prototype failed", zap.String("slug", def.Slug), zap.Error(err))
 			continue
 		}
-		s.logger.Info("siglip classifier: built prototype", zap.String("slug", def.Slug), zap.String("model", model), zap.Int("dim", len(pos)))
+		s.logger.Info("zero-shot classifier: built prototype", zap.String("slug", def.Slug), zap.String("model", model), zap.Int("dim", len(pos)))
 	}
 
 	s.invalidateCache()
@@ -197,8 +197,19 @@ func (s *classifierService) Classify(ctx context.Context, embedding PrimaryEmbed
 
 	hits := make([]ClassifierHit, 0, len(defs))
 	for _, def := range defs {
+		// Cross-model guard: a prototype is only comparable to embeddings produced
+		// by the same model. Matching dimensionality across different models does
+		// not imply a shared vector space, so a mismatched score is meaningless.
+		// This skips stale prototypes after a model switch until they are rebuilt.
+		if def.PrototypeModel != embedding.Model {
+			s.logger.Debug("zero-shot classifier: model mismatch, skipping",
+				zap.String("slug", def.Slug),
+				zap.String("proto_model", def.PrototypeModel),
+				zap.String("asset_model", embedding.Model))
+			continue
+		}
 		if def.PrototypeDimensions != len(embedding.Vector) {
-			s.logger.Debug("siglip classifier: dimension mismatch, skipping",
+			s.logger.Debug("zero-shot classifier: dimension mismatch, skipping",
 				zap.String("slug", def.Slug),
 				zap.Int("proto_dim", def.PrototypeDimensions),
 				zap.Int("asset_dim", len(embedding.Vector)))
@@ -248,7 +259,7 @@ func (s *classifierService) Preview(ctx context.Context, positivePrompts, negati
 		negative = s.backgroundFor(len(positive))
 	}
 
-	space, err := s.embeddings.ResolveDefaultSearchSpace(ctx, EmbeddingTypeCLIP, model, len(positive))
+	space, err := s.embeddings.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, model, len(positive))
 	if err != nil {
 		return nil, err
 	}

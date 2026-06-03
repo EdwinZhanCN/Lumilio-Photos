@@ -113,7 +113,7 @@ func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
 					PhotoTotal:  240,
 					ReindexJobs: 2,
 				}
-				stats.Tasks.Clip = service.AssetIndexingTaskStats{IndexedCount: 120, QueuedJobs: 4, TotalCount: 240}
+				stats.Tasks.Semantic = service.AssetIndexingTaskStats{IndexedCount: 120, QueuedJobs: 4, TotalCount: 240}
 				stats.Tasks.BioCLIP = service.AssetIndexingTaskStats{IndexedCount: 80, QueuedJobs: 5, TotalCount: 90}
 				stats.Tasks.OCR = service.AssetIndexingTaskStats{IndexedCount: 110, QueuedJobs: 3, TotalCount: 240}
 				stats.Tasks.Face = service.AssetIndexingTaskStats{IndexedCount: 60, QueuedJobs: 1, TotalCount: 240}
@@ -138,9 +138,9 @@ func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
 	require.Equal(t, 0, response.Code)
 	require.Equal(t, 240, response.Data.PhotoTotal)
 	require.Equal(t, 2, response.Data.ReindexJobs)
-	require.Equal(t, 120, response.Data.Tasks.Clip.IndexedCount)
-	require.Equal(t, 4, response.Data.Tasks.Clip.QueuedJobs)
-	require.Equal(t, 240, response.Data.Tasks.Clip.TotalCount)
+	require.Equal(t, 120, response.Data.Tasks.Semantic.IndexedCount)
+	require.Equal(t, 4, response.Data.Tasks.Semantic.QueuedJobs)
+	require.Equal(t, 240, response.Data.Tasks.Semantic.TotalCount)
 	require.Equal(t, 80, response.Data.Tasks.BioCLIP.IndexedCount)
 	require.Equal(t, 5, response.Data.Tasks.BioCLIP.QueuedJobs)
 	require.Equal(t, 90, response.Data.Tasks.BioCLIP.TotalCount)
@@ -213,7 +213,7 @@ func TestAssetHandlerRebuildAssetIndexes_QueuesDefaultBatch(t *testing.T) {
 	require.Equal(t, int64(42), response.Data.JobID)
 	require.Equal(t, 200, response.Data.Limit)
 	require.True(t, response.Data.MissingOnly)
-	require.Equal(t, []string{"clip", "ocr"}, response.Data.RequestedTasks)
+	require.Equal(t, []string{"semantic", "ocr"}, response.Data.RequestedTasks)
 }
 
 func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
@@ -222,7 +222,7 @@ func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
 	repositoryID := "550e8400-e29b-41d4-a716-446655440000"
 	requestBody, err := json.Marshal(dto.RebuildAssetIndexesRequestDTO{
 		RepositoryID: repositoryID,
-		Tasks:        []string{" clip ", "OCR"},
+		Tasks:        []string{" semantic ", "OCR"},
 		Limit:        999,
 		MissingOnly:  boolPtr(false),
 	})
@@ -270,14 +270,14 @@ func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
 	require.Equal(t, 500, response.Data.Limit)
 	require.False(t, response.Data.MissingOnly)
 	require.Equal(t, repositoryID, *response.Data.RepositoryID)
-	require.Equal(t, []string{"clip", "ocr"}, response.Data.RequestedTasks)
+	require.Equal(t, []string{"semantic", "ocr"}, response.Data.RequestedTasks)
 }
 
 func TestAssetHandlerRebuildAssetIndexes_RejectsInvalidTask(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	requestBody, err := json.Marshal(dto.RebuildAssetIndexesRequestDTO{
-		Tasks: []string{"clip", "bogus"},
+		Tasks: []string{"semantic", "bogus"},
 	})
 	require.NoError(t, err)
 

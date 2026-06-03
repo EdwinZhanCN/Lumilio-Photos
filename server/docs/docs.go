@@ -445,13 +445,13 @@ const docTemplate = `{
                     "bioclip": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
-                    "clip": {
-                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
-                    },
                     "face": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
                     "ocr": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "semantic": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     }
                 },
@@ -2040,16 +2040,16 @@ const docTemplate = `{
                     "bioclip_enabled": {
                         "type": "boolean"
                     },
-                    "clip_enabled": {
-                        "type": "boolean"
-                    },
                     "face_enabled": {
                         "type": "boolean"
                     },
                     "ocr_enabled": {
                         "type": "boolean"
                     },
-                    "siglip_classify_enabled": {
+                    "semantic_enabled": {
+                        "type": "boolean"
+                    },
+                    "zeroshot_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -2525,7 +2525,7 @@ const docTemplate = `{
                     },
                     "tasks": {
                         "example": [
-                            "clip",
+                            "semantic",
                             "ocr"
                         ],
                         "items": {
@@ -3525,16 +3525,16 @@ const docTemplate = `{
                     "bioclip_enabled": {
                         "type": "boolean"
                     },
-                    "clip_enabled": {
-                        "type": "boolean"
-                    },
                     "face_enabled": {
                         "type": "boolean"
                     },
                     "ocr_enabled": {
                         "type": "boolean"
                     },
-                    "siglip_classify_enabled": {
+                    "semantic_enabled": {
+                        "type": "boolean"
+                    },
+                    "zeroshot_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -10562,7 +10562,7 @@ const docTemplate = `{
         },
         "/api/v1/classifiers/preview": {
             "post": {
-                "description": "Embed positive/negative prompts with SigLIP and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the CLIP embedding pipeline and a reachable SigLIP text-embed task.",
+                "description": "Embed positive/negative prompts with semantic and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.",
                 "requestBody": {
                     "content": {
                         "application/json": {

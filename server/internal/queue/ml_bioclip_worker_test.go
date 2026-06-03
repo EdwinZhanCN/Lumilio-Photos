@@ -34,7 +34,7 @@ func TestProcessBioClipWorkerProcessesSpeciesPredictions(t *testing.T) {
 	speciesSvc := &bioClipWorkerSpeciesStub{}
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
 	worker := &ProcessBioClipWorker{
-		LumenService: &clipWorkerLumenStub{
+		LumenService: &semanticWorkerLumenStub{
 			available: map[string]bool{
 				"bioclip_classify": true,
 			},
@@ -72,7 +72,7 @@ func TestProcessBioClipWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
 	speciesSvc := &bioClipWorkerSpeciesStub{}
 	worker := &ProcessBioClipWorker{
-		LumenService: &clipWorkerLumenStub{
+		LumenService: &semanticWorkerLumenStub{
 			available: map[string]bool{
 				"bioclip_classify": false,
 			},
