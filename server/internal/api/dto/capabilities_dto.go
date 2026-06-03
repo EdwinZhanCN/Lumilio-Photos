@@ -15,11 +15,11 @@ type MLCapabilitiesDTO struct {
 
 // MLTaskSetDTO groups the known ML task capabilities that Lumilio can use.
 type MLTaskSetDTO struct {
-	SemanticImageEmbed     MLTaskCapabilityDTO `json:"semantic_image_embed"`
-	SemanticTextEmbed      MLTaskCapabilityDTO `json:"semantic_text_embed"`
+	SemanticImageEmbed MLTaskCapabilityDTO `json:"semantic_image_embed"`
+	SemanticTextEmbed  MLTaskCapabilityDTO `json:"semantic_text_embed"`
 	BioClipClassify    MLTaskCapabilityDTO `json:"bioclip_classify"`
 	OCR                MLTaskCapabilityDTO `json:"ocr"`
-	FaceRecognition MLTaskCapabilityDTO `json:"face_recognition"`
+	FaceRecognition    MLTaskCapabilityDTO `json:"face_recognition"`
 }
 
 // MLTaskCapabilityDTO represents enablement and real-time availability for a single ML task.

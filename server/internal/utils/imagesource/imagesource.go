@@ -17,10 +17,10 @@ import (
 type Purpose string
 
 const (
-	PurposeClip    Purpose = "clip"
-	PurposeBioClip Purpose = "bioclip"
-	PurposeOCR     Purpose = "ocr"
-	PurposeFace    Purpose = "face"
+	PurposeSemantic Purpose = "semantic"
+	PurposeBioClip  Purpose = "bioclip"
+	PurposeOCR      Purpose = "ocr"
+	PurposeFace     Purpose = "face"
 )
 
 // MLImage is the server-side image tensor payload handed to ML workers. Data is
@@ -118,7 +118,7 @@ func ProcessMLImageTensorBytes(source []byte, purpose Purpose) (*MLImage, error)
 
 func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
 	switch purpose {
-	case PurposeClip, PurposeBioClip:
+	case PurposeSemantic, PurposeBioClip:
 		return imaging.ProcessOptions{
 			Width:     224,
 			Height:    224,

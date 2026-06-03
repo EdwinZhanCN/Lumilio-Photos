@@ -24,7 +24,7 @@ import (
 type AssetIndexingTask string
 
 const (
-	AssetIndexingTaskSemanticImage   AssetIndexingTask = "clip"
+	AssetIndexingTaskSemanticImage   AssetIndexingTask = "semantic"
 	AssetIndexingTaskBioCLIP         AssetIndexingTask = "bioclip"
 	AssetIndexingTaskOCR             AssetIndexingTask = "ocr"
 	AssetIndexingTaskFaceRecognition AssetIndexingTask = "face"
@@ -43,10 +43,10 @@ type AssetIndexingStats struct {
 	PhotoTotal  int64
 	ReindexJobs int64
 	Tasks       struct {
-		Clip    AssetIndexingTaskStats
-		BioCLIP AssetIndexingTaskStats
-		OCR     AssetIndexingTaskStats
-		Face    AssetIndexingTaskStats
+		Semantic AssetIndexingTaskStats
+		BioCLIP  AssetIndexingTaskStats
+		OCR      AssetIndexingTaskStats
+		Face     AssetIndexingTaskStats
 	}
 }
 
@@ -180,16 +180,16 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 	if err != nil {
 		return AssetIndexingStats{}, fmt.Errorf("count photo assets: %w", err)
 	}
-	stats.Tasks.Clip.TotalCount = stats.PhotoTotal
+	stats.Tasks.Semantic.TotalCount = stats.PhotoTotal
 	stats.Tasks.OCR.TotalCount = stats.PhotoTotal
 	stats.Tasks.Face.TotalCount = stats.PhotoTotal
 
-	stats.Tasks.Clip.IndexedCount, err = s.queries.CountPhotoAssetsWithEmbeddingType(ctx, repo.CountPhotoAssetsWithEmbeddingTypeParams{
+	stats.Tasks.Semantic.IndexedCount, err = s.queries.CountPhotoAssetsWithEmbeddingType(ctx, repo.CountPhotoAssetsWithEmbeddingTypeParams{
 		RepositoryID:  repositoryUUID,
-		EmbeddingType: string(EmbeddingTypeCLIP),
+		EmbeddingType: string(EmbeddingTypeSemantic),
 	})
 	if err != nil {
-		return AssetIndexingStats{}, fmt.Errorf("count clip coverage: %w", err)
+		return AssetIndexingStats{}, fmt.Errorf("count semantic coverage: %w", err)
 	}
 
 	stats.Tasks.BioCLIP.TotalCount, err = s.queries.CountBioAlbumPhotoAssets(ctx, repositoryUUID)
@@ -212,7 +212,7 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 		return AssetIndexingStats{}, fmt.Errorf("count face coverage: %w", err)
 	}
 
-	stats.Tasks.Clip.QueuedJobs = s.countPendingQueueJobs(ctx, "process_clip")
+	stats.Tasks.Semantic.QueuedJobs = s.countPendingQueueJobs(ctx, "process_semantic")
 	stats.Tasks.BioCLIP.QueuedJobs = s.countPendingQueueJobs(ctx, "process_bioclip")
 	stats.Tasks.OCR.QueuedJobs = s.countPendingQueueJobs(ctx, "process_ocr")
 	stats.Tasks.Face.QueuedJobs = s.countPendingQueueJobs(ctx, "process_face")
@@ -404,7 +404,7 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 	case AssetIndexingTaskSemanticImage:
 		return s.queries.ListPhotoAssetsMissingEmbeddingType(ctx, repo.ListPhotoAssetsMissingEmbeddingTypeParams{
 			RepositoryID:  repositoryUUID,
-			EmbeddingType: string(EmbeddingTypeCLIP),
+			EmbeddingType: string(EmbeddingTypeSemantic),
 			Limit:         int32(limit),
 			Offset:        0,
 		})
@@ -455,7 +455,7 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 
 	queued := 0
 	if candidate.tasks[AssetIndexingTaskSemanticImage] {
-		if err := s.enqueueClipTask(ctx, candidate.asset.AssetID); err != nil {
+		if err := s.enqueueSemanticTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
 		}
 		queued++
@@ -476,16 +476,16 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 	return queued, nil
 }
 
-func (s *assetIndexingService) enqueueClipTask(
+func (s *assetIndexingService) enqueueSemanticTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
 ) error {
-	_, err := s.queueClient.Insert(ctx, jobs.ProcessClipArgs{
+	_, err := s.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
 		AssetID:           assetID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_clip"})
+	}, &river.InsertOpts{Queue: "process_semantic"})
 	if err != nil {
-		return fmt.Errorf("enqueue CLIP job: %w", err)
+		return fmt.Errorf("enqueue semantic job: %w", err)
 	}
 	return nil
 }
@@ -569,7 +569,7 @@ func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) 
 	for _, task := range tasks {
 		switch task {
 		case AssetIndexingTaskSemanticImage:
-			if cfg.CLIPEnabled {
+			if cfg.SemanticEnabled {
 				enabled = append(enabled, task)
 			}
 		case AssetIndexingTaskBioCLIP:

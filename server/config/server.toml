@@ -41,7 +41,7 @@ language = "en"
 user_agent = "Lumilio-Photos/1.0"
 
 [ml]
-clip_enabled = true
+semantic_enabled = true
 bioclip_enabled = true
 ocr_enabled = true
 face_enabled = true

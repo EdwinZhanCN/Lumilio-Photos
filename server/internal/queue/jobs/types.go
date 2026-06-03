@@ -9,17 +9,17 @@ import (
 	"server/internal/db/dbtypes"
 )
 
-// ProcessClipArgs is the River job payload for CLIP embedding/classification.
+// ProcessSemanticArgs is the River job payload for semantic embedding/classification.
 // Duplicated here (instead of importing processors) to avoid import cycles.
-// Keep this in sync with processors.CLIPPayload.
-type ProcessClipArgs struct {
+// Keep this in sync with processors.SemanticPayload.
+type ProcessSemanticArgs struct {
 	AssetID           pgtype.UUID `json:"assetId"`
 	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
 }
 
-func (ProcessClipArgs) Kind() string { return "process_clip" }
+func (ProcessSemanticArgs) Kind() string { return "process_semantic" }
 
-func (ProcessClipArgs) InsertOpts() river.InsertOpts {
+func (ProcessSemanticArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
 }
 
@@ -27,6 +27,19 @@ const (
 	MLPreprocessVersionV1 = "ml-image-v1"
 	MLProcessMaxAttempts  = 50
 )
+
+// ZeroshotClassifyArgs is the River job payload for zero-shot
+// classification. It scores the asset's already-stored semantic image embedding
+// against classifier prototypes; it does not re-run any ML model.
+type ZeroshotClassifyArgs struct {
+	AssetID pgtype.UUID `json:"assetId"`
+}
+
+func (ZeroshotClassifyArgs) Kind() string { return "classify_zeroshot" }
+
+func (ZeroshotClassifyArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+}
 
 // ProcessBioClipArgs is the River job payload for BioCLIP classification.
 // Duplicated here (instead of importing processors) to avoid import cycles.

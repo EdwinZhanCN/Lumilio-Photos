@@ -46,7 +46,7 @@ func (s stubLumenService) IsTaskAvailable(taskName string) bool {
 	return false
 }
 
-func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.T) {
+func TestCapabilitiesHandlerGetCapabilities_IncludesSemanticCapabilities(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	handler := NewCapabilitiesHandler(
@@ -60,15 +60,15 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 						APIKeyConfigured: true,
 					},
 					ML: service.MLSettings{
-						CLIPEnabled: true,
+						SemanticEnabled: true,
 					},
 				}, nil
 			},
 			getEffectiveMLFn: func(ctx context.Context) (config.MLConfig, error) {
 				return config.MLConfig{
-					CLIPEnabled:    true,
+					SemanticEnabled:    true,
 					BioCLIPEnabled: true,
-					OCREnabled:     true,
+					OCREnabled:         true,
 				}, nil
 			},
 		},

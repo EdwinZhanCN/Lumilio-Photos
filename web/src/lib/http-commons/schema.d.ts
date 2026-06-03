@@ -5749,6 +5749,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/classifiers/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview a zero-shot classifier
+         * @description Embed positive/negative prompts with SigLIP and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the CLIP embedding pipeline and a reachable SigLIP text-embed task.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Prompts and threshold */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.ClassifierPreviewRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Preview matches retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request data */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Classification unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cloud/credentials": {
         parameters: {
             query?: never;
@@ -10051,6 +10149,20 @@ export interface components {
             current_password: string;
             new_password: string;
         };
+        "dto.ClassifierPreviewMatchDTO": {
+            asset_id?: string;
+            score?: number;
+        };
+        "dto.ClassifierPreviewRequestDTO": {
+            limit?: number;
+            negative_prompts?: string[];
+            positive_prompts: string[];
+            threshold?: number;
+        };
+        "dto.ClassifierPreviewResponseDTO": {
+            count?: number;
+            matches?: components["schemas"]["dto.ClassifierPreviewMatchDTO"][];
+        };
         "dto.CloudAuthChallengeDTO": {
             /** @example Enter the code sent to your trusted devices. */
             description?: string;
@@ -10500,6 +10612,7 @@ export interface components {
             clip_enabled?: boolean;
             face_enabled?: boolean;
             ocr_enabled?: boolean;
+            siglip_classify_enabled?: boolean;
         };
         "dto.MLTaskCapabilityDTO": {
             available?: boolean;
@@ -11113,6 +11226,7 @@ export interface components {
             clip_enabled?: boolean;
             face_enabled?: boolean;
             ocr_enabled?: boolean;
+            siglip_classify_enabled?: boolean;
         };
         "dto.UpdateOwnProfileRequestDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */

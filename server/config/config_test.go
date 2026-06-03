@@ -8,27 +8,27 @@ import (
 
 func TestLoadMLConfig_RespectsExplicitFlags(t *testing.T) {
 	t.Setenv("SERVER_ENV", "development")
-	t.Setenv("ML_CLIP_ENABLED", "true")
+	t.Setenv("ML_SEMANTIC_ENABLED", "true")
 	t.Setenv("ML_BIOCLIP_ENABLED", "false")
 	t.Setenv("ML_OCR_ENABLED", "false")
 	t.Setenv("ML_FACE_ENABLED", "false")
 
 	cfg := LoadMLConfig()
 
-	if !cfg.CLIPEnabled {
-		t.Fatalf("expected clip enabled, got %+v", cfg)
+	if !cfg.SemanticEnabled {
+		t.Fatalf("expected semantic enabled, got %+v", cfg)
 	}
 	if cfg.BioCLIPEnabled || cfg.OCREnabled || cfg.FaceEnabled {
-		t.Fatalf("expected non-clip tasks disabled, got %+v", cfg)
+		t.Fatalf("expected non-semantic tasks disabled, got %+v", cfg)
 	}
 }
 
 func TestMLConfig_HasRuntimeDemandReflectsTaskFlags(t *testing.T) {
 	cfg := MLConfig{
-		CLIPEnabled:    false,
+		SemanticEnabled:    false,
 		BioCLIPEnabled: false,
-		OCREnabled:     false,
-		FaceEnabled:    false,
+		OCREnabled:         false,
+		FaceEnabled:        false,
 	}
 
 	if cfg.HasRuntimeDemand() {
@@ -144,7 +144,7 @@ language = "zh"
 user_agent = "Lumilio-Test/1.0"
 
 [ml]
-clip_enabled = true
+semantic_enabled = true
 bioclip_enabled = false
 ocr_enabled = false
 face_enabled = true
@@ -181,7 +181,7 @@ hardware_accel = "auto"
 	if cfg.Geocoding.Provider != "nominatim" || cfg.Geocoding.Language != "zh" {
 		t.Fatalf("expected geocoding from toml, got %+v", cfg.Geocoding)
 	}
-	if !cfg.MLConfig.CLIPEnabled || !cfg.MLConfig.FaceEnabled {
+	if !cfg.MLConfig.SemanticEnabled || !cfg.MLConfig.FaceEnabled {
 		t.Fatalf("expected ml flags from toml, got %+v", cfg.MLConfig)
 	}
 }
@@ -206,7 +206,7 @@ max_concurrent_repos = 1
 batch_size = 500
 
 [ml]
-clip_enabled = false
+semantic_enabled = false
 `)
 	t.Setenv("SERVER_CONFIG_FILE", configFile)
 	t.Setenv("SERVER_PORT", "9999")
@@ -214,7 +214,7 @@ clip_enabled = false
 	t.Setenv("DB_PASSWORD_FILE", "/tmp/env-db-password")
 	t.Setenv("STORAGE_PATH", "/env/storage")
 	t.Setenv("REPOSITORY_SCAN_ENABLED", "false")
-	t.Setenv("ML_CLIP_ENABLED", "true")
+	t.Setenv("ML_SEMANTIC_ENABLED", "true")
 
 	cfg, err := LoadAppConfigWithError()
 	if err != nil {
@@ -236,7 +236,7 @@ clip_enabled = false
 	if cfg.RepositoryScan.Enabled {
 		t.Fatalf("expected env repository scan override, got %+v", cfg.RepositoryScan)
 	}
-	if !cfg.MLConfig.CLIPEnabled {
+	if !cfg.MLConfig.SemanticEnabled {
 		t.Fatalf("expected env ML override, got %+v", cfg.MLConfig)
 	}
 }

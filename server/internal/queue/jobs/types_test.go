@@ -9,10 +9,10 @@ import (
 
 func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
 	tests := map[string]any{
-		"clip":    &ProcessClipArgs{},
-		"bioclip": &ProcessBioClipArgs{},
-		"ocr":     &ProcessOcrArgs{},
-		"face":    &ProcessFaceArgs{},
+		"semantic": &ProcessSemanticArgs{},
+		"bioclip":  &ProcessBioClipArgs{},
+		"ocr":      &ProcessOcrArgs{},
+		"face":     &ProcessFaceArgs{},
 	}
 
 	for name, args := range tests {
@@ -42,10 +42,10 @@ func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
 
 func TestMLProcessArgsInsertOpts(t *testing.T) {
 	tests := map[string]river.InsertOpts{
-		"clip":    ProcessClipArgs{}.InsertOpts(),
-		"bioclip": ProcessBioClipArgs{}.InsertOpts(),
-		"ocr":     ProcessOcrArgs{}.InsertOpts(),
-		"face":    ProcessFaceArgs{}.InsertOpts(),
+		"semantic": ProcessSemanticArgs{}.InsertOpts(),
+		"bioclip":  ProcessBioClipArgs{}.InsertOpts(),
+		"ocr":      ProcessOcrArgs{}.InsertOpts(),
+		"face":     ProcessFaceArgs{}.InsertOpts(),
 	}
 
 	for name, opts := range tests {

@@ -152,6 +152,10 @@ type SettingsControllerInterface interface {
 	ValidateLLMSettings(c *gin.Context)
 }
 
+type ClassifierControllerInterface interface {
+	PreviewClassifier(c *gin.Context)
+}
+
 type UserControllerInterface interface {
 	UpdateMyProfile(c *gin.Context)
 	ChangeMyPassword(c *gin.Context)
@@ -213,6 +217,7 @@ func NewRouter(
 	agentController AgentControllerInterface,
 	capabilitiesController CapabilitiesControllerInterface,
 	settingsController SettingsControllerInterface,
+	classifierController ClassifierControllerInterface,
 	userController UserControllerInterface,
 	repositoryScanController RepositoryScanControllerInterface,
 	duplicateController DuplicateControllerInterface,
@@ -254,6 +259,12 @@ func NewRouter(
 			settings.GET("/system", settingsController.GetSystemSettings)
 			settings.PATCH("/system", settingsController.UpdateSystemSettings)
 			settings.POST("/system/validate-llm", settingsController.ValidateLLMSettings)
+		}
+
+		classifiers := v1.Group("/classifiers")
+		classifiers.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		{
+			classifiers.POST("/preview", classifierController.PreviewClassifier)
 		}
 
 		// Authentication routes

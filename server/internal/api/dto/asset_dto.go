@@ -38,7 +38,7 @@ type ReprocessAssetResponseDTO struct {
 
 type RebuildAssetIndexesRequestDTO struct {
 	RepositoryID string   `json:"repository_id,omitempty" binding:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Tasks        []string `json:"tasks,omitempty" example:"clip,ocr"`
+	Tasks        []string `json:"tasks,omitempty" example:"semantic,ocr"`
 	Limit        int      `json:"limit,omitempty" minimum:"1" maximum:"500" example:"200"`
 	MissingOnly  *bool    `json:"missing_only,omitempty" example:"true"`
 }
@@ -71,10 +71,10 @@ type AssetIndexingTaskStatsDTO struct {
 }
 
 type AssetIndexingTaskSetStatsDTO struct {
-	Clip    AssetIndexingTaskStatsDTO `json:"clip"`
-	BioCLIP AssetIndexingTaskStatsDTO `json:"bioclip"`
-	OCR     AssetIndexingTaskStatsDTO `json:"ocr"`
-	Face    AssetIndexingTaskStatsDTO `json:"face"`
+	Semantic AssetIndexingTaskStatsDTO `json:"semantic"`
+	BioCLIP  AssetIndexingTaskStatsDTO `json:"bioclip"`
+	OCR      AssetIndexingTaskStatsDTO `json:"ocr"`
+	Face     AssetIndexingTaskStatsDTO `json:"face"`
 }
 
 type AssetIndexingStatsResponseDTO struct {

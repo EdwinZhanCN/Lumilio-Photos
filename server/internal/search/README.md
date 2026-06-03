@@ -4,7 +4,7 @@
 
 ## Retrievers
 
-- `embedding`: resolves the default CLIP search space, embeds the text query through Lumen, and retrieves nearest primary asset embeddings with pgvector.
+- `embedding`: resolves the default semantic search space, embeds the text query through Lumen, and retrieves nearest primary asset embeddings with pgvector.
 - `ocr`: searches `ocr_text_items.search_vector` with `plainto_tsquery('simple', query)` and ranks assets by `ts_rank_cd`.
 - `place`: searches `location_clusters.search_vector`, joins through `location_cluster_assets`, and ranks assets by `ts_rank_cd`.
 
