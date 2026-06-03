@@ -138,10 +138,10 @@ max_concurrent_repos = 2
 batch_size = 250
 
 [geocoding]
-provider = "naturalearth"
+provider = "nominatim"
+nominatim_endpoint = "https://example.invalid/reverse"
 language = "zh"
 user_agent = "Lumilio-Test/1.0"
-naturalearth_city_radius_meters = 25000
 
 [ml]
 clip_enabled = true
@@ -178,7 +178,7 @@ hardware_accel = "auto"
 	if cfg.RepositoryScan.Enabled || cfg.RepositoryScan.IntervalSeconds != 120 {
 		t.Fatalf("expected repository scan from toml, got %+v", cfg.RepositoryScan)
 	}
-	if cfg.Geocoding.Provider != "naturalearth" || cfg.Geocoding.Language != "zh" {
+	if cfg.Geocoding.Provider != "nominatim" || cfg.Geocoding.Language != "zh" {
 		t.Fatalf("expected geocoding from toml, got %+v", cfg.Geocoding)
 	}
 	if !cfg.MLConfig.CLIPEnabled || !cfg.MLConfig.FaceEnabled {

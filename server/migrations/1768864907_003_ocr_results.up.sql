@@ -39,11 +39,6 @@ CREATE INDEX ocr_text_items_text_length_idx ON ocr_text_items(text_length);
 CREATE INDEX ocr_text_items_fulltext_idx ON ocr_text_items
 USING GIN (to_tsvector('simple', text_content));
 
--- GIS index (if spatial queries are needed, install PostGIS extension)
--- CREATE EXTENSION IF NOT EXISTS postgis;
--- CREATE INDEX ocr_text_items_bbox_idx ON ocr_text_items
--- USING GIST (ST_EnvelopeFromJSON(bounding_box));
-
 -- Update timestamp trigger
 CREATE OR REPLACE FUNCTION update_ocr_updated_at()
 RETURNS TRIGGER AS $$

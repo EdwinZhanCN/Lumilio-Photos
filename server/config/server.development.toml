@@ -39,7 +39,6 @@ provider = "disabled"
 nominatim_endpoint = ""
 language = "en"
 user_agent = "Lumilio-Photos/1.0"
-naturalearth_city_radius_meters = 50000
 
 [ml]
 clip_enabled = false

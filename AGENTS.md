@@ -26,6 +26,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 ## Usage Rules
 
 - Use root `make` targets for daily work: `make setup`, `make dev`, `make server-dev`, `make web-dev`, `make test`, `make dto`.
+- If you are in a sandbox without host environment, like cloud/container, use `make setup` to set up the local dev environment. Do not use your own cli tooling if possible.
 - Backend quality gate: `make server-test` or `cd server && go test ./...`.
 - Frontend quality gate: `make web-test` or `cd web && vp check --no-fmt --no-lint && vp lint && vp test`.
 - API contracts are OpenAPI-first. Do not hand-edit `web/src/lib/http-commons/schema.d.ts`; change backend annotations and run `make dto`.

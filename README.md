@@ -78,12 +78,6 @@ Access:
 
 Open the repo in a Dev Container (`.devcontainer/`). Compose starts PostgreSQL (`5433`) and the dev image; run `make dev` inside the container for API (`6680`) and Vite (`6657`).
 
-Optional Natural Earth import:
-
-```bash
-cd .devcontainer && docker compose --profile geodata run --rm naturalearth-import
-```
-
 ### Make Commands
 
 ```bash

@@ -32,11 +32,34 @@ func TestNormalizedGPSRejectsInvalidCoordinates(t *testing.T) {
 	require.Nil(t, gotLng)
 }
 
+func TestGeohashesForGPSKeepsValidCoordinates(t *testing.T) {
+	lat := 37.7749
+	lng := -122.4194
+
+	got5, got7 := geohashesForGPS(&lat, &lng)
+
+	require.NotNil(t, got5)
+	require.NotNil(t, got7)
+	require.Equal(t, "9q8yy", *got5)
+	require.Equal(t, "9q8yyk8", *got7)
+}
+
+func TestGeohashesForGPSRejectsInvalidCoordinates(t *testing.T) {
+	lat := 91.0
+	lng := 120.0
+	normalizedLat, normalizedLng := normalizedGPS(&lat, &lng)
+
+	got5, got7 := geohashesForGPS(normalizedLat, normalizedLng)
+
+	require.Nil(t, got5)
+	require.Nil(t, got7)
+}
+
 func TestReverseGeocoderDefaultsToDisabled(t *testing.T) {
 	t.Setenv("GEOCODING_PROVIDER", "")
 	t.Setenv("GEOCODING_NOMINATIM_ENDPOINT", "")
 
-	geocoder := newReverseGeocoderFromEnv(nil)
+	geocoder := newReverseGeocoderFromEnv()
 
 	require.Equal(t, geocoderProviderDisabled, geocoder.Provider())
 	_, err := geocoder.Reverse(context.Background(), 0, 0)
@@ -60,7 +83,7 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	t.Setenv("GEOCODING_LANGUAGE", "en")
 	t.Setenv("GEOCODING_USER_AGENT", "Lumilio-Test/1.0")
 
-	geocoder := newReverseGeocoderFromEnv(nil)
+	geocoder := newReverseGeocoderFromEnv()
 	result, err := geocoder.Reverse(context.Background(), 0, 0)
 
 	require.NoError(t, err)
@@ -70,15 +93,4 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	require.NotNil(t, result.Country)
 	require.Equal(t, "Ocean", *result.Country)
 	require.NotEmpty(t, result.RawResponse)
-}
-
-func TestNaturalEarthNameColumnsPreferLanguage(t *testing.T) {
-	require.Equal(t,
-		[]string{"name_zh", "name", "name_en"},
-		naturalEarthNameColumns("zh-CN", "name", "name_en"),
-	)
-	require.Equal(t,
-		[]string{"name_en", "name", "admin"},
-		naturalEarthNameColumns("en", "name", "admin"),
-	)
 }
