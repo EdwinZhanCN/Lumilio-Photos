@@ -10,19 +10,19 @@ import (
 	"server/internal/utils/imaging"
 )
 
-func TestProcessMLImageTensorFromReaderClipReturns224RGB(t *testing.T) {
+func TestProcessMLImageTensorFromReaderSemanticReturns224RGB(t *testing.T) {
 	imaging.StartVips()
 
-	out, err := ProcessMLImageTensorFromReader(bytes.NewReader(synthJPEG(t, 1200, 800)), PurposeClip)
+	out, err := ProcessMLImageTensorFromReader(bytes.NewReader(synthJPEG(t, 1200, 800)), PurposeSemantic)
 	if err != nil {
 		t.Fatalf("ProcessMLImageTensorFromReader: %v", err)
 	}
 
 	if out.Width != 224 || out.Height != 224 || out.Channels != 3 {
-		t.Fatalf("clip tensor shape = %dx%dx%d, want 224x224x3", out.Width, out.Height, out.Channels)
+		t.Fatalf("semantic tensor shape = %dx%dx%d, want 224x224x3", out.Width, out.Height, out.Channels)
 	}
 	if len(out.Data) != 224*224*3 {
-		t.Fatalf("clip tensor len = %d, want %d", len(out.Data), 224*224*3)
+		t.Fatalf("semantic tensor len = %d, want %d", len(out.Data), 224*224*3)
 	}
 }
 

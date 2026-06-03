@@ -71,11 +71,11 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 			ActiveNodeCount:     activeNodeCount,
 			Tasks: dto.MLTaskSetDTO{
 				SemanticImageEmbed: dto.MLTaskCapabilityDTO{
-					Enabled:   effectiveMLConfig.CLIPEnabled,
+					Enabled:   effectiveMLConfig.SemanticEnabled,
 					Available: taskAvailability["semantic_image_embed"],
 				},
 				SemanticTextEmbed: dto.MLTaskCapabilityDTO{
-					Enabled:   effectiveMLConfig.CLIPEnabled,
+					Enabled:   effectiveMLConfig.SemanticEnabled,
 					Available: taskAvailability["semantic_text_embed"],
 				},
 				BioClipClassify: dto.MLTaskCapabilityDTO{

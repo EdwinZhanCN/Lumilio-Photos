@@ -69,7 +69,7 @@ type BrowseQueryResult struct {
 	StackMode    string
 }
 
-// SearchBrowseResult combines optional CLIP "top results" with the main filename-based browse listing.
+// SearchBrowseResult combines optional semantic "top results" with the main filename-based browse listing.
 // TopResults may overlap Results; callers typically dedupe by BrowseItem.ID (see filterOutBrowseItemsByID).
 type SearchBrowseResult struct {
 	TopResults          []BrowseItem
@@ -142,7 +142,7 @@ func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsP
 	}, nil
 }
 
-// SearchBrowseItems runs hybrid search: optional CLIP-enhanced TopResults plus filename QueryBrowseItems as Results,
+// SearchBrowseItems runs hybrid search: optional semantic-enhanced TopResults plus filename QueryBrowseItems as Results,
 // respecting EnhancementMode (off / auto / only). Duplicate IDs between sections are removed from Results and totals adjusted.
 func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAssetsParams) (SearchBrowseResult, error) {
 	params = normalizeSearchAssetsParams(params)
@@ -223,12 +223,12 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 }
 
 func (s *assetService) queryCollapsedSemanticBrowseItems(ctx context.Context, params QueryAssetsParams) (BrowseQueryResult, error) {
-	embeddingResult, err := s.resolveClipQueryEmbedding(ctx, params.Query, false)
+	embeddingResult, err := s.resolveSemanticQueryEmbedding(ctx, params.Query, false)
 	if err != nil {
 		return BrowseQueryResult{}, err
 	}
 
-	space, err := s.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeCLIP, embeddingResult.ModelID, len(embeddingResult.Vector))
+	space, err := s.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, embeddingResult.ModelID, len(embeddingResult.Vector))
 	if err != nil {
 		return BrowseQueryResult{}, err
 	}
@@ -320,12 +320,12 @@ func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, p
 	), nil
 }
 
-// searchBrowseItemsClipTopResults fetches vector-ranked assets under a short timeout,
+// searchBrowseItemsSemanticTopResults fetches vector-ranked assets under a short timeout,
 // then applies stack collapse when not expanded. Marks meta degraded on timeout/vector errors or collapse failure.
-func (s *assetService) searchBrowseItemsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
+func (s *assetService) searchBrowseItemsSemanticTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
 	meta := SearchTopResultsMeta{
 		Enabled:     true,
-		SourceTypes: []string{"clip"},
+		SourceTypes: []string{"semantic"},
 	}
 
 	searchCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
@@ -364,7 +364,7 @@ func (s *assetService) searchBrowseItemsClipTopResults(ctx context.Context, para
 }
 
 func (s *assetService) searchBrowseItemsAggregateTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
-	assets, meta := s.runSearchAssetsClipTopResults(ctx, params)
+	assets, meta := s.runSearchAssetsSemanticTopResults(ctx, params)
 	if params.StackMode == StackModeExpanded {
 		items := assetsToBrowseItems(assets)
 		if len(items) > params.TopResultsLimit {
@@ -388,7 +388,7 @@ func (s *assetService) searchBrowseItemsAggregateTopResults(ctx context.Context,
 	return items, meta
 }
 
-// TOP_RESULTS_FALLBACK_LIMIT is the default CLIP top-result cap when the client does not specify one.
+// TOP_RESULTS_FALLBACK_LIMIT is the default semantic top-result cap when the client does not specify one.
 const TOP_RESULTS_FALLBACK_LIMIT = 200
 
 // assetsToBrowseItems maps plain asset rows to browse items without stack merging (expanded / pre-collapsed paths).

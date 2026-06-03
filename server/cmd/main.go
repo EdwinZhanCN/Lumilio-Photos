@@ -146,7 +146,7 @@ func main() {
 	if currentMLConfig.HasRuntimeDemand() {
 		appLogger.Info("ML task processing enabled",
 			zap.String("operation", "settings.ml"),
-			zap.Bool("clip_enabled", currentMLConfig.CLIPEnabled),
+			zap.Bool("semantic_enabled", currentMLConfig.SemanticEnabled),
 			zap.Bool("bioclip_enabled", currentMLConfig.BioCLIPEnabled),
 			zap.Bool("ocr_enabled", currentMLConfig.OCREnabled),
 			zap.Bool("face_enabled", currentMLConfig.FaceEnabled),
@@ -351,13 +351,13 @@ func initMLServices(
 	ocrService := service.NewOCRService(queries)
 	imageLoader := queue.NewDBMLImageLoader(queries)
 
-	river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
+	river.AddWorker[queue.ProcessSemanticArgs](workers, &queue.ProcessSemanticWorker{
 		LumenService:     lumenService,
 		EmbeddingService: embeddingService,
 		ConfigProvider:   settingsService,
 		ImageLoader:      imageLoader,
 	})
-	appLogger.Info("CLIP service and worker registered", zap.String("operation", "ml.init"))
+	appLogger.Info("semantic service and worker registered", zap.String("operation", "ml.init"))
 
 	river.AddWorker[queue.ProcessBioClipArgs](workers, &queue.ProcessBioClipWorker{
 		LumenService:   lumenService,
@@ -385,15 +385,15 @@ func initMLServices(
 
 	aiTagService := service.NewAIGeneratedTagService(queries)
 	classifierService := service.NewClassifierService(pgxPool, lumenService, embeddingService, appLogger.Named("classifier"))
-	river.AddWorker[queue.ClassifySiglipArgs](workers, &queue.ClassifySiglipWorker{
+	river.AddWorker[queue.ZeroshotClassifyArgs](workers, &queue.ZeroshotClassifyWorker{
 		EmbeddingService:  embeddingService,
 		ClassifierService: classifierService,
 		AITagService:      aiTagService,
 		ConfigProvider:    settingsService,
 	})
-	appLogger.Info("SigLIP classifier service and worker registered", zap.String("operation", "ml.init"))
+	appLogger.Info("zero-shot classifier service and worker registered", zap.String("operation", "ml.init"))
 
-	// Build classifier prototypes in the background once the SigLIP text-embed
+	// Build classifier prototypes in the background once the semantic text-embed
 	// task is reachable, so startup never blocks on ML node availability.
 	go buildClassifierPrototypes(lumenService, classifierService, appLogger.Named("classifier"))
 
@@ -401,9 +401,9 @@ func initMLServices(
 	return lumenService, embeddingService, classifierService, nil
 }
 
-// buildClassifierPrototypes waits (bounded) for the SigLIP text-embed task to
+// buildClassifierPrototypes waits (bounded) for the semantic text-embed task to
 // become available, then builds/refreshes classifier prototypes. It is a no-op
-// when SigLIP classification is disabled (no enabled definitions are scored).
+// when semantic classification is disabled (no enabled definitions are scored).
 func buildClassifierPrototypes(lumenService service.LumenService, classifierService service.ClassifierService, logger *zap.Logger) {
 	for i := 0; i < 30; i++ {
 		if lumenService != nil && lumenService.IsTaskAvailable("semantic_text_embed") {

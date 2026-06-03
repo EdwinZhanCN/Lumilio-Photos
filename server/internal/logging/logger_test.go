@@ -57,7 +57,7 @@ func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
 	defer runtime.Sync()
 
 	riverLogger := runtime.RiverLogger()
-	riverLogger.Warn("river warning", slog.String("job_kind", "process_clip"), slog.Int64("job_id", 42))
+	riverLogger.Warn("river warning", slog.String("job_kind", "process_semantic"), slog.Int64("job_id", 42))
 
 	require.NoError(t, runtime.Sync())
 
@@ -66,7 +66,7 @@ func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
 	errorText := string(errorBytes)
 	assert.Contains(t, errorText, "river warning")
 	assert.Contains(t, errorText, "\"component\":\"river\"")
-	assert.Contains(t, errorText, "\"job_kind\":\"process_clip\"")
+	assert.Contains(t, errorText, "\"job_kind\":\"process_semantic\"")
 	assert.Contains(t, errorText, "\"job_id\":42")
 }
 

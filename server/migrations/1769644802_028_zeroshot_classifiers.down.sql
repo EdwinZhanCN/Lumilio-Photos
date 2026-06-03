@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS classifier_definitions;
 
 UPDATE asset_tags
 SET source = 'ai'
-WHERE source = 'siglip_zeroshot';
+WHERE source = 'zeroshot';
 
 ALTER TABLE asset_tags
 DROP CONSTRAINT IF EXISTS asset_tags_source_check;
@@ -17,4 +17,4 @@ CHECK (source IN (
 ));
 
 ALTER TABLE settings
-DROP COLUMN IF EXISTS ml_siglip_classify_enabled;
+DROP COLUMN IF EXISTS ml_zeroshot_classify_enabled;

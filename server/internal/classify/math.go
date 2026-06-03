@@ -1,4 +1,4 @@
-// Package classify holds the pure, dependency-free math for SigLIP zero-shot
+// Package classify holds the pure, dependency-free math for zero-shot
 // classification: prompt-ensemble prototypes, contrastive scoring against
 // L2-normalized embeddings, and confidence calibration. Keeping it free of DB,
 // ML, and imaging (libvips) dependencies makes it cheap to unit-test and safe to
@@ -11,7 +11,7 @@ import (
 )
 
 // ConfidenceGain controls how sharply the contrastive score maps to a [0,1]
-// confidence around the threshold. SigLIP cosine scores are uncalibrated and
+// confidence around the threshold. semantic cosine scores are uncalibrated and
 // live in a narrow range, so a relatively high gain spreads the confidence
 // across the useful score band. Confidence == 0.5 exactly at the threshold.
 const ConfidenceGain = 12.0

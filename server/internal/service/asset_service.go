@@ -202,14 +202,14 @@ type PhotoMapPoint struct {
 }
 
 type assetService struct {
-	queries                      *repo.Queries
-	pool                         *pgxpool.Pool
-	lumen                        LumenService
-	repoManager                  *storage.RepositoryManager
-	embeddingService             EmbeddingService
-	aggregateSearch              aggregatesearch.Service
-	queryAssetsUnifiedFn         func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
-	searchAssetsClipTopResultsFn func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta)
+	queries                          *repo.Queries
+	pool                             *pgxpool.Pool
+	lumen                            LumenService
+	repoManager                      *storage.RepositoryManager
+	embeddingService                 EmbeddingService
+	aggregateSearch                  aggregatesearch.Service
+	queryAssetsUnifiedFn             func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
+	searchAssetsSemanticTopResultsFn func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta)
 }
 
 func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *storage.RepositoryManager, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
@@ -228,7 +228,7 @@ func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *sto
 		aggregatesearch.NewEmbeddingRetriever(
 			pool,
 			func(ctx context.Context, query string, fast bool) (aggregatesearch.QueryEmbedding, error) {
-				embedding, err := svc.resolveClipQueryEmbedding(ctx, query, fast)
+				embedding, err := svc.resolveSemanticQueryEmbedding(ctx, query, fast)
 				if err != nil {
 					return aggregatesearch.QueryEmbedding{}, err
 				}
@@ -241,7 +241,7 @@ func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *sto
 				if svc.embeddingService == nil {
 					return repo.EmbeddingSpace{}, fmt.Errorf("%w: embedding service not available", ErrSemanticSearchUnavailable)
 				}
-				return svc.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeCLIP, model, dimensions)
+				return svc.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, model, dimensions)
 			},
 			1.0,
 		),
@@ -1288,9 +1288,9 @@ func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAs
 	return s.queryAssetsUnified(ctx, params)
 }
 
-func (s *assetService) runSearchAssetsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
-	if s.searchAssetsClipTopResultsFn != nil {
-		return s.searchAssetsClipTopResultsFn(ctx, params)
+func (s *assetService) runSearchAssetsSemanticTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
+	if s.searchAssetsSemanticTopResultsFn != nil {
+		return s.searchAssetsSemanticTopResultsFn(ctx, params)
 	}
 	return s.searchAssetsAggregateTopResults(ctx, params)
 }
@@ -1311,7 +1311,7 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 	topResultsEnabled := query != "" && params.EnhancementMode != SearchEnhancementModeOff
 
 	if topResultsEnabled {
-		topResults, meta := s.runSearchAssetsClipTopResults(ctx, params)
+		topResults, meta := s.runSearchAssetsSemanticTopResults(ctx, params)
 		result.TopResults = topResults
 		result.TopResultsMeta = meta
 		if params.EnhancementMode == SearchEnhancementModeOnly && meta.Reason == "all_retrievers_failed" {
@@ -1388,10 +1388,10 @@ func (s *assetService) queryAssetsAggregate(ctx context.Context, params QueryAss
 	return response.Assets, int64(response.TotalCandidates), nil
 }
 
-func (s *assetService) searchAssetsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
+func (s *assetService) searchAssetsSemanticTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
 	meta := SearchTopResultsMeta{
 		Enabled:     true,
-		SourceTypes: []string{"clip"},
+		SourceTypes: []string{"semantic"},
 	}
 
 	searchCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
@@ -1658,7 +1658,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 }
 
 func (s *assetService) queryAssetsVectorTopResults(ctx context.Context, params QueryAssetsParams, limit int) ([]repo.Asset, error) {
-	embeddingResult, err := s.resolveClipQueryEmbedding(ctx, params.Query, true)
+	embeddingResult, err := s.resolveSemanticQueryEmbedding(ctx, params.Query, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1672,7 +1672,7 @@ func (s *assetService) queryAssetsVectorTopResults(ctx context.Context, params Q
 }
 
 func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
-	embeddingResult, err := s.resolveClipQueryEmbedding(ctx, params.Query, false)
+	embeddingResult, err := s.resolveSemanticQueryEmbedding(ctx, params.Query, false)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1680,7 +1680,7 @@ func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssets
 	return s.searchAssetsInResolvedSpace(ctx, params, embeddingResult.ModelID, embeddingResult.Vector, params.Limit, params.Offset, true)
 }
 
-func (s *assetService) resolveClipQueryEmbedding(ctx context.Context, query string, fast bool) (*types.EmbeddingV1, error) {
+func (s *assetService) resolveSemanticQueryEmbedding(ctx context.Context, query string, fast bool) (*types.EmbeddingV1, error) {
 	if s.lumen == nil {
 		return nil, fmt.Errorf("%w: lumen service not available", ErrSemanticSearchUnavailable)
 	}
@@ -1707,7 +1707,7 @@ func (s *assetService) resolveClipQueryEmbedding(ctx context.Context, query stri
 }
 
 func (s *assetService) searchAssetsInResolvedSpace(ctx context.Context, params QueryAssetsParams, model string, vector []float32, limit, offset int, includeCount bool) ([]repo.Asset, int64, error) {
-	space, err := s.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeCLIP, model, len(vector))
+	space, err := s.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, model, len(vector))
 	if err != nil {
 		return nil, 0, err
 	}

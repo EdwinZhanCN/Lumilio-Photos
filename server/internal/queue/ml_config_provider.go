@@ -21,16 +21,16 @@ func isMLTaskEnabled(ctx context.Context, provider MLConfigProvider, queueName s
 	}
 
 	switch queueName {
-	case "process_clip":
-		return cfg.CLIPEnabled, nil
+	case "process_semantic":
+		return cfg.SemanticEnabled, nil
 	case "process_bioclip":
 		return cfg.BioCLIPEnabled, nil
 	case "process_ocr":
 		return cfg.OCREnabled, nil
 	case "process_face":
 		return cfg.FaceEnabled, nil
-	case "classify_siglip":
-		return cfg.SiglipClassifyEnabled, nil
+	case "classify_zeroshot":
+		return cfg.ZeroshotClassifyEnabled, nil
 	default:
 		return false, nil
 	}

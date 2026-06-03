@@ -79,7 +79,7 @@ services:
             SERVER_PORT: "6680"
             STORAGE_PATH: /workspace/server/data/storage
 
-            ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
+            ML_SEMANTIC_ENABLED: ${ML_SEMANTIC_ENABLED:-false}
             ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
             ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
             ML_FACE_ENABLED: ${ML_FACE_ENABLED:-false}
