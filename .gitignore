@@ -46,8 +46,9 @@ MANIFEST
 # Production
 *.env
 
-# Develpoment
+# Development
 *.development
+server/config/server.local.toml
 
 # IDE specific files
 .idea/

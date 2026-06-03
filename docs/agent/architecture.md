@@ -5,9 +5,9 @@ This is the compact system map for agents. Keep details here stable and useful; 
 ## Runtime Shape
 
 - `docker-compose.yml` runs PostgreSQL, the Go server, and the Caddy-served web app.
-- `server/config/server.toml` is the production/container runtime default.
-- `server/config/server.development.toml` is the local development runtime default.
-- Env variables are for bootstrap, secrets, deployment wiring, and machine-specific overrides.
+- `server/config/server.example.toml` is the tracked template for runtime configuration.
+- `server/config/server.local.toml` is ignored local runtime configuration; `make setup` creates it from the example if missing.
+- `SERVER_ENV` selects runtime mode; env variables are for bootstrap, secrets, deployment wiring, and machine-specific overrides.
 
 ## Backend
 

@@ -1,0 +1,195 @@
+# Lumilio Photos server configuration template.
+#
+# `make setup` copies this file to `server.local.toml` when the local file does
+# not exist. Edit `server.local.toml`; keep this example generic and safe.
+#
+# Runtime mode is usually selected with SERVER_ENV instead of TOML:
+#   SERVER_ENV=development SERVER_CONFIG_FILE=config/server.local.toml go run ./cmd
+#
+# Optional environment override names are noted below for deployment wiring and
+# secrets. Env overrides are applied after TOML is parsed.
+
+# Optional. If omitted, SERVER_ENV decides the mode. Use "development" locally
+# and "production" for packaged/container deployments.
+# environment = "development"
+
+[server]
+# HTTP listen port. Env override: SERVER_PORT.
+port = "6680"
+
+# Process log level for server-facing logs. Values: debug, info, warn, error.
+# Env override: SERVER_LOG_LEVEL.
+log_level = "debug"
+
+# Browser origins allowed by CORS. Add your Wails/dev web origin here if it
+# differs from the Vite defaults.
+# Env override: SERVER_CORS_ALLOWED_ORIGINS as a comma-separated list.
+cors_allowed_origins = ["http://localhost:6657", "https://localhost:6657"]
+
+[logging]
+# Main logging level. Usually mirrors server.log_level.
+# Env override: LOG_LEVEL.
+level = "debug"
+
+# Directory for log files. Docker overrides this to /app/logs.
+# Env override: LOG_DIR.
+dir = "logs"
+
+# Values: console, json. Use console for local development and json for Docker.
+# Env overrides: LOG_FORMAT_CONSOLE, LOG_FORMAT_FILE.
+console_format = "console"
+file_format = "json"
+
+# Set a non-empty value to emit verbose repository audit traces.
+# Env override: REPO_AUDIT_VERBOSE.
+repository_audit_verbose = ""
+
+[database]
+# PostgreSQL connection settings. Local dev compose exposes the database on
+# localhost:5433; Docker runtime overrides host/port to db:5432.
+# Env overrides: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_SSL.
+host = "localhost"
+port = "5433"
+user = "postgres"
+
+# Temporary bootstrap password. First-run setup rotates the PostgreSQL role
+# password and writes the generated secret to password_file.
+password = "postgres"
+
+# Rotated PostgreSQL password file. When present and non-empty, this file wins
+# over database.password and DB_PASSWORD.
+# Env overrides: DB_PASSWORD_FILE or LUMILIO_DB_PASSWORD_FILE.
+password_file = "./data/storage/.secrets/db_password"
+
+name = "lumiliophotos"
+
+# Values commonly used with pgx: disable, prefer, require, verify-ca,
+# verify-full. Local Docker/dev should use disable.
+ssl = "disable"
+
+[storage]
+# Storage root. The primary repository lives at `<path>/primary`.
+# Env override: STORAGE_PATH.
+path = "./data/storage"
+
+# Initial repository storage strategy. Values: date, flat, cas.
+# date: inbox/YYYY/MM/file; flat: inbox/file; cas: inbox/aa/bb/cc/hash.ext.
+# Env override: STORAGE_STRATEGY.
+strategy = "date"
+
+# Preserve the original filename where possible.
+# Env override: STORAGE_PRESERVE_FILENAME.
+preserve_filename = true
+
+# How to handle filename collisions. Values: rename, uuid, overwrite.
+# Env override: STORAGE_DUPLICATE_HANDLING.
+duplicate_handling = "rename"
+
+[repository_scan]
+# Periodically scan repositories for filesystem changes. This is useful for
+# server deployments, but noisy during local development.
+# Env override: REPOSITORY_SCAN_ENABLED.
+enabled = false
+
+# Scan cadence and batching. Env overrides:
+# REPOSITORY_SCAN_INTERVAL_SECONDS, REPOSITORY_SCAN_SETTLE_SECONDS,
+# REPOSITORY_SCAN_MAX_CONCURRENT_REPOS, REPOSITORY_SCAN_BATCH_SIZE.
+interval_seconds = 300
+settle_seconds = 5
+max_concurrent_repos = 1
+batch_size = 500
+
+[geocoding]
+# Reverse geocoding provider for location cluster labels. Values:
+# disabled, nominatim.
+# Env override: GEOCODING_PROVIDER.
+provider = "disabled"
+
+# Used only when provider = "nominatim". Public OSM's endpoint is acceptable for
+# light personal testing; for a public app or heavier use, configure your own
+# Nominatim instance or a compliant provider endpoint.
+# Env override: GEOCODING_NOMINATIM_ENDPOINT.
+nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
+
+# Preferred language for returned place names, for example: en, zh, zh-CN.
+# Env override: GEOCODING_LANGUAGE.
+language = "zh" # zh, en, fr, etc.
+
+# Public Nominatim requires a useful User-Agent. For distributed builds, prefer
+# a value that identifies the app and gives users a way to configure/contact.
+# Env override: GEOCODING_USER_AGENT.
+user_agent = "Lumilio-Photos/1.0"
+
+[ml]
+# Enable local ML processing workers. Keep disabled for lightweight local
+# development unless the runtime dependencies and models are available.
+# Env overrides: ML_CLIP_ENABLED, ML_BIOCLIP_ENABLED, ML_OCR_ENABLED,
+# ML_FACE_ENABLED.
+clip_enabled = false
+bioclip_enabled = false
+ocr_enabled = false
+face_enabled = false
+
+[llm]
+# Agent runtime switch. Leave false unless an LLM provider is configured.
+# Env override: LLM_AGENT_ENABLED.
+agent_enabled = false
+
+# Values: ark, openai, deepseek, ollama. Empty defaults to ark internally.
+# Env override: LLM_PROVIDER.
+provider = ""
+
+# Prefer setting API keys through env or a secret manager. This field exists for
+# local-only experiments in server.local.toml.
+# Env override: LLM_API_KEY.
+api_key = ""
+
+# Provider model name, for example "gpt-4.1-mini" or "qwen3:latest".
+# Env override: LLM_MODEL_NAME.
+model_name = ""
+
+# Optional provider base URL. Required for ollama.
+# Env override: LLM_BASE_URL.
+base_url = ""
+
+[auth]
+# File path to the app root secret. This is not the PostgreSQL password.
+# It is used to derive JWT, MFA, media URL, and credential-encryption keys.
+# Env override: LUMILIO_SECRET_KEY.
+secret_key_path = "./data/storage/.secrets/lumilio_secret_key"
+
+# Go duration strings. Env overrides: ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL,
+# MEDIA_TOKEN_TTL.
+access_token_ttl = "15m"
+refresh_token_ttl = "168h"
+media_token_ttl = "10m"
+
+# WebAuthn/passkey relying party settings. For localhost development, leaving
+# rp_id/origins empty lets the runtime derive safe defaults. For a real domain,
+# set rp_id to the domain and origins to the exact browser origins.
+# Env overrides: WEBAUTHN_RP_NAME, WEBAUTHN_RP_ID, WEBAUTHN_RP_ORIGINS.
+webauthn_rp_name = "Lumilio Photos"
+webauthn_rp_id = ""
+webauthn_rp_origins = []
+
+[transcode]
+# Video transcoding acceleration. Values: auto, vaapi, nvenc, qsv, none.
+# Docker images default to auto; local development can use none for simplicity.
+# Env override: TRANSCODE_HW_ACCEL.
+hardware_accel = "auto"
+
+[lumen]
+# Lumen discovery is used for local ML service discovery.
+# Env overrides: LUMEN_DISCOVERY_ENABLED, LUMEN_DISCOVERY_MDNS_ENABLED,
+# LUMEN_DISCOVERY_HUB_URL, LUMEN_CONNECTION_INSECURE.
+discovery_enabled = true
+
+# mDNS is useful on desktop/local networks; disable in Docker if host networking
+# is not available or if a hub URL is used instead.
+discovery_mdns_enabled = true
+
+# Optional Lumen hub URL. Docker commonly uses http://host.docker.internal:5866.
+discovery_hub_url = ""
+
+# Allow insecure local development connections. Disable when using trusted TLS.
+connection_insecure = true

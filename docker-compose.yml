@@ -40,7 +40,7 @@ services:
             db:
                 condition: service_healthy
         environment:
-            SERVER_CONFIG_FILE: /app/config/server.toml
+            SERVER_CONFIG_FILE: /app/config/server.local.toml
             SERVER_PORT: 6680
             SERVER_ENV: production
             DB_HOST: db
@@ -52,7 +52,7 @@ services:
             DB_PASSWORD: postgres
             DB_NAME: lumiliophotos
             DB_SSL: disable
-            # Optional override for server.toml [database].password_file.
+            # Optional override for server.local.toml [database].password_file.
             # Lives under the mounted storage volume so it persists alongside
             # the user's media and survives container/volume recreation.
             LUMILIO_DB_PASSWORD_FILE: /data/storage/.secrets/db_password

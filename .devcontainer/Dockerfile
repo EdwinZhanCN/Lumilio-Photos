@@ -186,8 +186,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh \
     && rm -rf /usr/local/cargo/registry /usr/local/cargo/git
 
-# Go CLI tools (river, swag) are installed in postCreateCommand via
-# `make setup` so they land on the mounted /root/go volume instead of
+# Go CLI tools are installed in postCreateCommand via `make setup` so
+# they land on the mounted /root/go volume instead of
 # bloating the image layer.
 
 # ---------------------------------------------------------------

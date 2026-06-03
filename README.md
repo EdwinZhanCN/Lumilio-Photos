@@ -102,7 +102,8 @@ make db
 
 # Terminal 2: Server
 cd server
-SERVER_ENV=development SERVER_CONFIG_FILE=config/server.development.toml go run ./cmd
+cp -n config/server.example.toml config/server.local.toml
+SERVER_ENV=development SERVER_CONFIG_FILE=config/server.local.toml go run ./cmd
 
 # Terminal 3: Web
 cd web

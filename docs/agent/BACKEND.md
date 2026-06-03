@@ -6,8 +6,8 @@ This document describes the current Go backend as implemented in `server/`.
 
 - Main process: `server/cmd/main.go`.
 - Config package: `server/config`.
-- Production config file: `server/config/server.toml`.
-- Development config file: `server/config/server.development.toml`.
+- Tracked config template: `server/config/server.example.toml`.
+- Ignored local config file: `server/config/server.local.toml`.
 - Docker image: `server/Dockerfile`.
 - Database image: `server/db.Dockerfile`.
 
@@ -23,7 +23,7 @@ Startup order in `cmd/main.go`:
 
 ## Configuration Boundary
 
-Runtime defaults belong in TOML. Env is for bootstrap, secrets, deployment wiring, and machine-specific overrides.
+Runtime defaults belong in `server/config/server.example.toml`; local runtime choices belong in the ignored `server/config/server.local.toml`. Env is for bootstrap, secrets, deployment wiring, and machine-specific overrides.
 
 Keep in env:
 

@@ -404,7 +404,7 @@ type LocationCluster struct {
 	GeocodedAt        pgtype.Timestamptz `db:"geocoded_at" json:"geocoded_at"`
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	SearchVector      interface{}        `db:"search_vector" json:"search_vector"`
+	SearchVector      string             `db:"search_vector" json:"search_vector"`
 }
 
 type LocationClusterAsset struct {
@@ -440,7 +440,7 @@ type OcrTextItem struct {
 	// Approximate area of text region, can be used to filter larger text
 	AreaPixels   *float32           `db:"area_pixels" json:"area_pixels"`
 	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	SearchVector interface{}        `db:"search_vector" json:"search_vector"`
+	SearchVector string             `db:"search_vector" json:"search_vector"`
 }
 
 type RefreshToken struct {

@@ -14,6 +14,10 @@ sql:
               emit_prepared_queries: false
               emit_pointers_for_null_types: true
               overrides:
+                  - column: "location_clusters.search_vector"
+                    go_type: "string"
+                  - column: "ocr_text_items.search_vector"
+                    go_type: "string"
                   - column: "SearchNearestAssets.distance"
                     go_type: "float64"
                   - column: "GetAssetWithThumbnails.thumbnails"
