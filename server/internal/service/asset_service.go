@@ -14,6 +14,7 @@ import (
 	"server/internal/db/repo"
 	aggregatesearch "server/internal/search"
 	"server/internal/storage"
+	"server/internal/utils/geohash"
 	"strings"
 	"time"
 
@@ -530,6 +531,8 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 	var captureOffsetMinutes *int16
 	var gpsLatitude *float64
 	var gpsLongitude *float64
+	var gpsGeohash5 *string
+	var gpsGeohash7 *string
 	assetType := dbtypes.AssetType(asset.Type)
 
 	switch assetType {
@@ -549,6 +552,7 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 		// Audio doesn't have taken time
 		takenTime = nil
 	}
+	gpsGeohash5, gpsGeohash7 = geohashesForGPS(gpsLatitude, gpsLongitude)
 
 	// Use the new query that updates both metadata and taken_time
 	var takenTimeParam pgtype.Timestamptz
@@ -567,6 +571,8 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 		CaptureOffsetMinutes: captureOffsetMinutes,
 		GpsLatitude:          gpsLatitude,
 		GpsLongitude:         gpsLongitude,
+		GpsGeohash5:          gpsGeohash5,
+		GpsGeohash7:          gpsGeohash7,
 	}
 
 	return s.queries.UpdateAssetMetadataWithTakenTime(ctx, params)
@@ -585,6 +591,18 @@ func normalizedGPS(latitude, longitude *float64) (*float64, *float64) {
 		return nil, nil
 	}
 	return &lat, &lng
+}
+
+func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
+	if latitude == nil || longitude == nil {
+		return nil, nil
+	}
+	hash5, ok5 := geohash.Encode(*latitude, *longitude, 5)
+	hash7, ok7 := geohash.Encode(*latitude, *longitude, 7)
+	if !ok5 || !ok7 {
+		return nil, nil
+	}
+	return &hash5, &hash7
 }
 
 // DeleteAsset marks an asset as deleted, and move the asset to the trash folder

@@ -3,16 +3,10 @@
 FROM pgvector/pgvector:pg16
 
 LABEL org.opencontainers.image.title="lumilio-dev-db" \
-      org.opencontainers.image.description="Development PostgreSQL 16 + pgvector + PostGIS image for Lumilio Photos aggregate search"
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    postgresql-16-postgis-3 \
-    postgresql-16-postgis-3-scripts \
-  && rm -rf /var/lib/apt/lists/*
+      org.opencontainers.image.description="Development PostgreSQL 16 + pgvector image for Lumilio Photos aggregate search"
 
 # Extensions are created by migrations. This image only guarantees that
-# vector, pg_trgm, and PostGIS extension control files are available.
+# vector and pg_trgm extension control files are available.
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD \
   pg_isready -U "$${POSTGRES_USER:-postgres}" -d "$${POSTGRES_DB:-lumiliophotos}" || exit 1

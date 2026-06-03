@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,12 +20,10 @@ import (
 )
 
 const (
-	geocoderProviderDisabled            = "disabled"
-	geocoderProviderNominatim           = "nominatim"
-	geocoderProviderNaturalEarth        = "naturalearth"
-	defaultGeocodeLanguage              = "en"
-	defaultGeocodeLimit                 = 500
-	defaultNaturalEarthCityRadiusMeters = 50000
+	geocoderProviderDisabled  = "disabled"
+	geocoderProviderNominatim = "nominatim"
+	defaultGeocodeLanguage    = "en"
+	defaultGeocodeLimit       = 500
 )
 
 type LocationService interface {
@@ -84,7 +81,7 @@ func NewLocationService(queries *repo.Queries, pool *pgxpool.Pool) LocationServi
 	return &locationService{
 		queries:  queries,
 		pool:     pool,
-		geocoder: newReverseGeocoderFromEnv(pool),
+		geocoder: newReverseGeocoderFromEnv(),
 	}
 }
 
@@ -309,28 +306,11 @@ type nominatimGeocoder struct {
 	httpClient *http.Client
 }
 
-type naturalEarthGeocoder struct {
-	pool             *pgxpool.Pool
-	language         string
-	cityRadiusMeters int
-}
-
-func newReverseGeocoderFromEnv(pool *pgxpool.Pool) ReverseGeocoder {
+func newReverseGeocoderFromEnv() ReverseGeocoder {
 	provider := strings.ToLower(strings.TrimSpace(os.Getenv("GEOCODING_PROVIDER")))
 	endpoint := strings.TrimSpace(os.Getenv("GEOCODING_NOMINATIM_ENDPOINT"))
 	if provider == "" && endpoint != "" {
 		provider = geocoderProviderNominatim
-	}
-	if provider == geocoderProviderNaturalEarth && pool != nil {
-		language := strings.TrimSpace(os.Getenv("GEOCODING_LANGUAGE"))
-		if language == "" {
-			language = defaultGeocodeLanguage
-		}
-		return &naturalEarthGeocoder{
-			pool:             pool,
-			language:         language,
-			cityRadiusMeters: naturalEarthCityRadiusFromEnv(),
-		}
 	}
 	if provider != geocoderProviderNominatim || endpoint == "" {
 		return disabledGeocoder{}
@@ -349,18 +329,6 @@ func newReverseGeocoderFromEnv(pool *pgxpool.Pool) ReverseGeocoder {
 		userAgent:  userAgent,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
-}
-
-func naturalEarthCityRadiusFromEnv() int {
-	raw := strings.TrimSpace(os.Getenv("GEOCODING_NATURALEARTH_CITY_RADIUS_METERS"))
-	if raw == "" {
-		return defaultNaturalEarthCityRadiusMeters
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value <= 0 {
-		return defaultNaturalEarthCityRadiusMeters
-	}
-	return value
 }
 
 func (g *nominatimGeocoder) Provider() string { return geocoderProviderNominatim }
@@ -423,127 +391,6 @@ func (g *nominatimGeocoder) Reverse(ctx context.Context, latitude, longitude flo
 		City:        emptyStringToNil(city),
 		RawResponse: body,
 	}, nil
-}
-
-func (g *naturalEarthGeocoder) Provider() string { return geocoderProviderNaturalEarth }
-func (g *naturalEarthGeocoder) Language() string { return g.language }
-
-func (g *naturalEarthGeocoder) Reverse(ctx context.Context, latitude, longitude float64) (ReverseGeocodeResult, error) {
-	if g.pool == nil {
-		return ReverseGeocodeResult{}, fmt.Errorf("natural earth geocoder has no database pool")
-	}
-
-	nameCountry := naturalEarthNameExpr("a0", g.language, "name", "name_en", "name_zh", "name_long", "admin")
-	nameRegion := naturalEarthNameExpr("a1", g.language, "name", "name_en", "name_zh", "region", "admin")
-	nameCity := naturalEarthNameExpr("pp", g.language, "name", "nameascii")
-	query := fmt.Sprintf(`
-WITH point AS (
-  SELECT ST_SetSRID(ST_MakePoint($2::float8, $1::float8), 4326) AS geom
-),
-country AS (
-  SELECT %s AS country
-  FROM public.natural_earth_admin0 a0, point p
-  WHERE ST_Covers(a0.geom, p.geom)
-  ORDER BY ST_Area(a0.geom::geography) ASC
-  LIMIT 1
-),
-region AS (
-  SELECT %s AS region
-  FROM public.natural_earth_admin1 a1, point p
-  WHERE ST_Covers(a1.geom, p.geom)
-  ORDER BY ST_Area(a1.geom::geography) ASC
-  LIMIT 1
-),
-city AS (
-  SELECT
-    %s AS city,
-    ST_Distance(pp.geom::geography, p.geom::geography) AS distance_m
-  FROM public.natural_earth_populated_places pp, point p
-  WHERE pp.geom IS NOT NULL
-  ORDER BY pp.geom <-> p.geom
-  LIMIT 1
-)
-SELECT
-  country.country,
-  region.region,
-  CASE WHEN city.distance_m <= $3::integer THEN city.city ELSE NULL END AS city
-FROM point
-LEFT JOIN country ON TRUE
-LEFT JOIN region ON TRUE
-LEFT JOIN city ON TRUE
-`, nameCountry, nameRegion, nameCity)
-
-	var country, region, city *string
-	if err := g.pool.QueryRow(ctx, query, latitude, longitude, g.cityRadiusMeters).Scan(&country, &region, &city); err != nil {
-		return ReverseGeocodeResult{}, fmt.Errorf("query natural earth location: %w", err)
-	}
-
-	parts := make([]string, 0, 3)
-	seenParts := make(map[string]bool, 3)
-	for _, value := range []*string{city, region, country} {
-		if value == nil {
-			continue
-		}
-		part := strings.TrimSpace(*value)
-		partKey := strings.ToLower(part)
-		if part != "" && !seenParts[partKey] {
-			seenParts[partKey] = true
-			parts = append(parts, part)
-		}
-	}
-	label := strings.Join(parts, ", ")
-
-	raw, _ := json.Marshal(map[string]any{
-		"provider":           geocoderProviderNaturalEarth,
-		"latitude":           latitude,
-		"longitude":          longitude,
-		"city_radius_meters": g.cityRadiusMeters,
-		"country":            country,
-		"region":             region,
-		"city":               city,
-		"label":              label,
-	})
-
-	return ReverseGeocodeResult{
-		Label:       emptyStringToNil(label),
-		Country:     country,
-		Region:      region,
-		City:        city,
-		RawResponse: raw,
-	}, nil
-}
-
-func naturalEarthNameExpr(alias, language string, columns ...string) string {
-	ordered := naturalEarthNameColumns(language, columns...)
-	parts := make([]string, 0, len(ordered))
-	for _, column := range ordered {
-		parts = append(parts, fmt.Sprintf("NULLIF(to_jsonb(%s)->>'%s', '')", alias, column))
-	}
-	return "COALESCE(" + strings.Join(parts, ", ") + ")"
-}
-
-func naturalEarthNameColumns(language string, columns ...string) []string {
-	seen := make(map[string]bool, len(columns)+2)
-	ordered := make([]string, 0, len(columns)+2)
-	add := func(column string) {
-		column = strings.TrimSpace(column)
-		if column == "" || seen[column] {
-			return
-		}
-		seen[column] = true
-		ordered = append(ordered, column)
-	}
-
-	lang := strings.ToLower(strings.TrimSpace(language))
-	if strings.HasPrefix(lang, "zh") {
-		add("name_zh")
-	} else if strings.HasPrefix(lang, "en") {
-		add("name_en")
-	}
-	for _, column := range columns {
-		add(column)
-	}
-	return ordered
 }
 
 func firstNonEmpty(values ...string) string {

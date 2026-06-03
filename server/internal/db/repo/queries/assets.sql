@@ -68,13 +68,13 @@ SET specific_metadata = sqlc.arg('specific_metadata'),
     gps_geohash_5 = CASE
         WHEN sqlc.narg('gps_latitude')::float8 BETWEEN -90 AND 90
          AND sqlc.narg('gps_longitude')::float8 BETWEEN -180 AND 180
-        THEN ST_GeoHash(ST_SetSRID(ST_MakePoint(sqlc.narg('gps_longitude')::float8, sqlc.narg('gps_latitude')::float8), 4326), 5)
+        THEN sqlc.narg('gps_geohash_5')::text
         ELSE NULL
     END,
     gps_geohash_7 = CASE
         WHEN sqlc.narg('gps_latitude')::float8 BETWEEN -90 AND 90
          AND sqlc.narg('gps_longitude')::float8 BETWEEN -180 AND 180
-        THEN ST_GeoHash(ST_SetSRID(ST_MakePoint(sqlc.narg('gps_longitude')::float8, sqlc.narg('gps_latitude')::float8), 4326), 7)
+        THEN sqlc.narg('gps_geohash_7')::text
         ELSE NULL
     END
 WHERE asset_id = sqlc.arg('asset_id');

@@ -3317,16 +3317,16 @@ SET specific_metadata = $1,
     gps_geohash_5 = CASE
         WHEN $5::float8 BETWEEN -90 AND 90
          AND $6::float8 BETWEEN -180 AND 180
-        THEN ST_GeoHash(ST_SetSRID(ST_MakePoint($6::float8, $5::float8), 4326), 5)
+        THEN $7::text
         ELSE NULL
     END,
     gps_geohash_7 = CASE
         WHEN $5::float8 BETWEEN -90 AND 90
          AND $6::float8 BETWEEN -180 AND 180
-        THEN ST_GeoHash(ST_SetSRID(ST_MakePoint($6::float8, $5::float8), 4326), 7)
+        THEN $8::text
         ELSE NULL
     END
-WHERE asset_id = $7
+WHERE asset_id = $9
 `
 
 type UpdateAssetMetadataWithTakenTimeParams struct {
@@ -3336,6 +3336,8 @@ type UpdateAssetMetadataWithTakenTimeParams struct {
 	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
 	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
 	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
 	AssetID              pgtype.UUID              `db:"asset_id" json:"asset_id"`
 }
 
@@ -3347,6 +3349,8 @@ func (q *Queries) UpdateAssetMetadataWithTakenTime(ctx context.Context, arg Upda
 		arg.CaptureOffsetMinutes,
 		arg.GpsLatitude,
 		arg.GpsLongitude,
+		arg.GpsGeohash5,
+		arg.GpsGeohash7,
 		arg.AssetID,
 	)
 	return err

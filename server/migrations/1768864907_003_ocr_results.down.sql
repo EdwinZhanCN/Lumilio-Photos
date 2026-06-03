@@ -12,4 +12,3 @@ DROP INDEX IF EXISTS ocr_results_model_id_idx;
 DROP INDEX IF EXISTS ocr_results_asset_id_idx;
 DROP TABLE IF EXISTS ocr_text_items CASCADE;
 DROP TABLE IF EXISTS ocr_results CASCADE;
-DROP EXTENSION IF EXISTS postgis CASCADE;

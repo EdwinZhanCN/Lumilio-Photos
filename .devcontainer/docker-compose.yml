@@ -1,4 +1,4 @@
-# Dev container compose: infrastructure (db, optional geodata) + devcontainer.
+# Dev container compose: infrastructure (db) + devcontainer.
 # API and Vite run inside the devcontainer via `make dev` (not as compose services).
 
 name: lumilio-photos-devcontainer
@@ -29,26 +29,6 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
-    naturalearth-import:
-        build:
-            context: ..
-            dockerfile: server/geodata.Dockerfile
-        image: lumilio-geodata-import:latest
-        profiles:
-            - geodata
-        depends_on:
-            db:
-                condition: service_healthy
-        environment:
-            PGHOST: db
-            PGPORT: 5432
-            PGDATABASE: lumiliophotos
-            PGUSER: postgres
-            PGPASSWORD: postgres
-        volumes:
-            - naturalearth_data:/data/naturalearth
-        command: ["/bin/bash", "/import-natural-earth.sh"]
-
     devcontainer:
         network_mode: "host"
         build:
@@ -95,7 +75,6 @@ services:
 
 volumes:
     db_data:
-    naturalearth_data:
     go-mod-cache:
     pnpm-store:
     cargo-cache:

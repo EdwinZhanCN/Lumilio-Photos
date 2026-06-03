@@ -115,11 +115,10 @@ type RepositoryScanConfig struct {
 }
 
 type GeocodingConfig struct {
-	Provider                     string `toml:"provider"`
-	NominatimEndpoint            string `toml:"nominatim_endpoint"`
-	Language                     string `toml:"language"`
-	UserAgent                    string `toml:"user_agent"`
-	NaturalEarthCityRadiusMeters int    `toml:"naturalearth_city_radius_meters"`
+	Provider          string `toml:"provider"`
+	NominatimEndpoint string `toml:"nominatim_endpoint"`
+	Language          string `toml:"language"`
+	UserAgent         string `toml:"user_agent"`
 }
 
 type AuthConfig struct {
@@ -340,10 +339,9 @@ func defaultAppConfig() AppConfig {
 			BatchSize:          500,
 		},
 		Geocoding: GeocodingConfig{
-			Provider:                     "disabled",
-			Language:                     "en",
-			UserAgent:                    "Lumilio-Photos/1.0",
-			NaturalEarthCityRadiusMeters: 50000,
+			Provider:  "disabled",
+			Language:  "en",
+			UserAgent: "Lumilio-Photos/1.0",
 		},
 		MLConfig: mlDefaults,
 		Auth: AuthConfig{
@@ -524,9 +522,6 @@ func applyEnvOverrides(cfg *AppConfig) {
 	if value := envString("GEOCODING_USER_AGENT"); value != "" {
 		cfg.Geocoding.UserAgent = value
 	}
-	if value, ok := envPositiveInt("GEOCODING_NATURALEARTH_CITY_RADIUS_METERS"); ok {
-		cfg.Geocoding.NaturalEarthCityRadiusMeters = value
-	}
 
 	if value, ok := envBool("ML_CLIP_ENABLED"); ok {
 		cfg.MLConfig.CLIPEnabled = value
@@ -633,7 +628,6 @@ func ApplyRuntimeEnvDefaults(cfg AppConfig) {
 	setEnvDefault("GEOCODING_NOMINATIM_ENDPOINT", cfg.Geocoding.NominatimEndpoint)
 	setEnvDefault("GEOCODING_LANGUAGE", cfg.Geocoding.Language)
 	setEnvDefault("GEOCODING_USER_AGENT", cfg.Geocoding.UserAgent)
-	setEnvDefault("GEOCODING_NATURALEARTH_CITY_RADIUS_METERS", strconv.Itoa(cfg.Geocoding.NaturalEarthCityRadiusMeters))
 
 	setEnvDefault("ML_CLIP_ENABLED", strconv.FormatBool(cfg.MLConfig.CLIPEnabled))
 	setEnvDefault("ML_BIOCLIP_ENABLED", strconv.FormatBool(cfg.MLConfig.BioCLIPEnabled))

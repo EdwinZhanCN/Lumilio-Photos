@@ -1,5 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS postgis;
-
 ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS gps_latitude DOUBLE PRECISION,
 ADD COLUMN IF NOT EXISTS gps_longitude DOUBLE PRECISION,
@@ -13,35 +11,6 @@ CHECK (gps_latitude IS NULL OR gps_latitude BETWEEN -90 AND 90);
 ALTER TABLE assets
 ADD CONSTRAINT chk_assets_gps_longitude_range
 CHECK (gps_longitude IS NULL OR gps_longitude BETWEEN -180 AND 180);
-
-UPDATE assets
-SET
-    gps_latitude = (specific_metadata->>'gps_latitude')::DOUBLE PRECISION,
-    gps_longitude = (specific_metadata->>'gps_longitude')::DOUBLE PRECISION,
-    gps_geohash_5 = ST_GeoHash(
-        ST_SetSRID(
-            ST_MakePoint(
-                (specific_metadata->>'gps_longitude')::DOUBLE PRECISION,
-                (specific_metadata->>'gps_latitude')::DOUBLE PRECISION
-            ),
-            4326
-        ),
-        5
-    ),
-    gps_geohash_7 = ST_GeoHash(
-        ST_SetSRID(
-            ST_MakePoint(
-                (specific_metadata->>'gps_longitude')::DOUBLE PRECISION,
-                (specific_metadata->>'gps_latitude')::DOUBLE PRECISION
-            ),
-            4326
-        ),
-        7
-    )
-WHERE jsonb_typeof(specific_metadata->'gps_latitude') = 'number'
-  AND jsonb_typeof(specific_metadata->'gps_longitude') = 'number'
-  AND (specific_metadata->>'gps_latitude')::DOUBLE PRECISION BETWEEN -90 AND 90
-  AND (specific_metadata->>'gps_longitude')::DOUBLE PRECISION BETWEEN -180 AND 180;
 
 CREATE INDEX IF NOT EXISTS idx_assets_gps_lat_lng
 ON assets(gps_latitude, gps_longitude)
