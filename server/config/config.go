@@ -91,14 +91,15 @@ func (c LLMConfig) IsConfigured() bool {
 }
 
 type MLConfig struct {
-	CLIPEnabled    bool `toml:"clip_enabled"`
-	BioCLIPEnabled bool `toml:"bioclip_enabled"`
-	OCREnabled     bool `toml:"ocr_enabled"`
-	FaceEnabled    bool `toml:"face_enabled"`
+	SemanticEnabled         bool `toml:"semantic_enabled"`
+	BioCLIPEnabled      bool `toml:"bioclip_enabled"`
+	OCREnabled              bool `toml:"ocr_enabled"`
+	FaceEnabled             bool `toml:"face_enabled"`
+	ZeroshotClassifyEnabled bool `toml:"zeroshot_classify_enabled"`
 }
 
 func (c MLConfig) HasManualTasksEnabled() bool {
-	return c.CLIPEnabled || c.BioCLIPEnabled || c.OCREnabled || c.FaceEnabled
+	return c.SemanticEnabled || c.BioCLIPEnabled || c.OCREnabled || c.FaceEnabled || c.ZeroshotClassifyEnabled
 }
 
 func (c MLConfig) HasRuntimeDemand() bool {
@@ -293,7 +294,7 @@ func defaultAppConfig() AppConfig {
 
 	dbHost := "db"
 	logLevel := "info"
-	mlDefaults := MLConfig{CLIPEnabled: true, BioCLIPEnabled: true, OCREnabled: true, FaceEnabled: true}
+	mlDefaults := MLConfig{SemanticEnabled: true, BioCLIPEnabled: true, OCREnabled: true, FaceEnabled: true}
 	if environment == "development" {
 		dbHost = "localhost"
 		logLevel = "debug"
@@ -523,8 +524,8 @@ func applyEnvOverrides(cfg *AppConfig) {
 		cfg.Geocoding.UserAgent = value
 	}
 
-	if value, ok := envBool("ML_CLIP_ENABLED"); ok {
-		cfg.MLConfig.CLIPEnabled = value
+	if value, ok := envBool("ML_SEMANTIC_ENABLED"); ok {
+		cfg.MLConfig.SemanticEnabled = value
 	}
 	if value, ok := envBool("ML_BIOCLIP_ENABLED"); ok {
 		cfg.MLConfig.BioCLIPEnabled = value
@@ -534,6 +535,9 @@ func applyEnvOverrides(cfg *AppConfig) {
 	}
 	if value, ok := envBool("ML_FACE_ENABLED"); ok {
 		cfg.MLConfig.FaceEnabled = value
+	}
+	if value, ok := envBool("ML_ZEROSHOT_CLASSIFY_ENABLED"); ok {
+		cfg.MLConfig.ZeroshotClassifyEnabled = value
 	}
 
 	if value, ok := envBool("LLM_AGENT_ENABLED"); ok {
@@ -629,10 +633,11 @@ func ApplyRuntimeEnvDefaults(cfg AppConfig) {
 	setEnvDefault("GEOCODING_LANGUAGE", cfg.Geocoding.Language)
 	setEnvDefault("GEOCODING_USER_AGENT", cfg.Geocoding.UserAgent)
 
-	setEnvDefault("ML_CLIP_ENABLED", strconv.FormatBool(cfg.MLConfig.CLIPEnabled))
+	setEnvDefault("ML_SEMANTIC_ENABLED", strconv.FormatBool(cfg.MLConfig.SemanticEnabled))
 	setEnvDefault("ML_BIOCLIP_ENABLED", strconv.FormatBool(cfg.MLConfig.BioCLIPEnabled))
 	setEnvDefault("ML_OCR_ENABLED", strconv.FormatBool(cfg.MLConfig.OCREnabled))
 	setEnvDefault("ML_FACE_ENABLED", strconv.FormatBool(cfg.MLConfig.FaceEnabled))
+	setEnvDefault("ML_ZEROSHOT_CLASSIFY_ENABLED", strconv.FormatBool(cfg.MLConfig.ZeroshotClassifyEnabled))
 
 	setEnvDefault("LLM_AGENT_ENABLED", strconv.FormatBool(cfg.LLMConfig.AgentEnabled))
 	setEnvDefault("LLM_PROVIDER", cfg.LLMConfig.Provider)

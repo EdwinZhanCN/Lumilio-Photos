@@ -28,7 +28,7 @@ flowchart LR
   LC[RebuildLocationClustersWorker\nmedia_location_worker.go]
 
   %% ML pipeline
-  CLIP[ProcessClipWorker\nml_clip_worker.go]
+  SEM[ProcessSemanticWorker\nml_semantic_worker.go]
   BIO[ProcessBioClipWorker\nml_bioclip_worker.go]
   OCR[ProcessOcrWorker\nml_ocr_worker.go]
   FACE[ProcessFaceWorker\nml_face_worker.go]
@@ -53,7 +53,7 @@ flowchart LR
 
   %% Thumbnail fan-out
   T -->|photo only: pHash fallback| PH
-  T -->|photo only| CLIP
+  T -->|photo only| SEM
   T -->|photo only| BIO
   T -->|photo only| OCR
   T -->|photo only| FACE
@@ -63,7 +63,7 @@ flowchart LR
   AR -.->|thumbnail_asset| T
   AR -.->|transcode_asset| X
   AR -.->|process_phash| PH
-  AR -.->|process_clip| CLIP
+  AR -.->|process_semantic| SEM
   AR -.->|process_bioclip| BIO
   AR -.->|process_ocr| OCR
   AR -.->|process_face| FACE
@@ -84,7 +84,7 @@ flowchart LR
   - Video metadata can trigger `LivePhotoMatchWorker` when `content_identifier` exists.
 - `ThumbnailWorker` is the image enrichment fan-out:
   - Photos can trigger `ProcessPHashWorker` when thumbnail generation falls back.
-  - Photos can also trigger CLIP, OCR, and Face workers when the ML settings enable them.
+  - Photos can also trigger semantic, OCR, and Face workers when the ML settings enable them.
   - BioCLIP is album-scoped: adding photos to `bio` albums or manually rebuilding a bio album enqueues `ProcessBioClipWorker`.
 - `AssetRetryWorker` is a dispatcher. It does not depend on a single downstream worker; instead, it can re-enqueue any task based on the retry request.
 

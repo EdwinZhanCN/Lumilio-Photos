@@ -1602,10 +1602,10 @@ func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndex
 		PhotoTotal:  int(stats.PhotoTotal),
 		ReindexJobs: int(stats.ReindexJobs),
 		Tasks: dto.AssetIndexingTaskSetStatsDTO{
-			Clip: dto.AssetIndexingTaskStatsDTO{
-				IndexedCount: int(stats.Tasks.Clip.IndexedCount),
-				QueuedJobs:   int(stats.Tasks.Clip.QueuedJobs),
-				TotalCount:   int(stats.Tasks.Clip.TotalCount),
+			Semantic: dto.AssetIndexingTaskStatsDTO{
+				IndexedCount: int(stats.Tasks.Semantic.IndexedCount),
+				QueuedJobs:   int(stats.Tasks.Semantic.QueuedJobs),
+				TotalCount:   int(stats.Tasks.Semantic.TotalCount),
 			},
 			BioCLIP: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.BioCLIP.IndexedCount),
@@ -3410,13 +3410,13 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	// Validate requested tasks (using queue names as canonical task identifiers)
 	if len(req.Tasks) > 0 {
 		validQueues := map[string]bool{
-			"metadata_asset":  true,
-			"thumbnail_asset": true,
-			"transcode_asset": true,
-			"process_clip":    true,
-			"process_bioclip": true,
-			"process_ocr":     true,
-			"process_face":    true,
+			"metadata_asset":   true,
+			"thumbnail_asset":  true,
+			"transcode_asset":  true,
+			"process_semantic": true,
+			"process_bioclip":  true,
+			"process_ocr":      true,
+			"process_face":     true,
 		}
 
 		for _, task := range req.Tasks {

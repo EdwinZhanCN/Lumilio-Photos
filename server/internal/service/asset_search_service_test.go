@@ -39,12 +39,12 @@ func TestAssetServiceSearchAssets_PreservesTopResultsAndDedupesResults(t *testin
 			require.Equal(t, "red bird", params.Query)
 			return []repo.Asset{shared, filenameOnly}, 2, nil
 		},
-		searchAssetsClipTopResultsFn: func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
+		searchAssetsSemanticTopResultsFn: func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
 			require.Equal(t, SearchEnhancementModeAuto, params.EnhancementMode)
 			require.Equal(t, "red bird", params.Query)
 			return []repo.Asset{topOnly, shared}, SearchTopResultsMeta{
 				Enabled:     true,
-				SourceTypes: []string{"clip"},
+				SourceTypes: []string{"semantic"},
 			}
 		},
 	}
@@ -62,7 +62,7 @@ func TestAssetServiceSearchAssets_PreservesTopResultsAndDedupesResults(t *testin
 	require.Equal(t, int64(1), result.ResultsTotal)
 	require.Equal(t, SearchTopResultsMeta{
 		Enabled:     true,
-		SourceTypes: []string{"clip"},
+		SourceTypes: []string{"semantic"},
 	}, result.TopResultsMeta)
 }
 
@@ -73,12 +73,12 @@ func TestAssetServiceSearchAssets_DegradesToFilenameResults(t *testing.T) {
 		queryAssetsUnifiedFn: func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
 			return []repo.Asset{filenameOnly}, 1, nil
 		},
-		searchAssetsClipTopResultsFn: func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
+		searchAssetsSemanticTopResultsFn: func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
 			return []repo.Asset{}, SearchTopResultsMeta{
 				Enabled:     true,
 				Degraded:    true,
 				Reason:      "runtime_unavailable",
-				SourceTypes: []string{"clip"},
+				SourceTypes: []string{"semantic"},
 			}
 		},
 	}
@@ -98,6 +98,6 @@ func TestAssetServiceSearchAssets_DegradesToFilenameResults(t *testing.T) {
 		Enabled:     true,
 		Degraded:    true,
 		Reason:      "runtime_unavailable",
-		SourceTypes: []string{"clip"},
+		SourceTypes: []string{"semantic"},
 	}, result.TopResultsMeta)
 }

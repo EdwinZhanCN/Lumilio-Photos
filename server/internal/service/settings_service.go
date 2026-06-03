@@ -52,10 +52,11 @@ func (s LLMSettings) IsConfigured() bool {
 }
 
 type MLSettings struct {
-	CLIPEnabled    bool
-	BioCLIPEnabled bool
-	OCREnabled     bool
-	FaceEnabled    bool
+	SemanticEnabled         bool
+	BioCLIPEnabled      bool
+	OCREnabled              bool
+	FaceEnabled             bool
+	ZeroshotClassifyEnabled bool
 }
 
 type UpdateSystemSettingsInput struct {
@@ -73,10 +74,11 @@ type UpdateLLMSettingsInput struct {
 }
 
 type UpdateMLSettingsInput struct {
-	CLIPEnabled    *bool
-	BioCLIPEnabled *bool
-	OCREnabled     *bool
-	FaceEnabled    *bool
+	SemanticEnabled         *bool
+	BioCLIPEnabled      *bool
+	OCREnabled              *bool
+	FaceEnabled             *bool
+	ZeroshotClassifyEnabled *bool
 }
 
 type SettingsService interface {
@@ -132,18 +134,19 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 	}
 
 	params := repo.UpsertSettingsParams{
-		LlmAgentEnabled:     row.LlmAgentEnabled,
-		LlmProvider:         normalizeStoredLLMProvider(row.LlmProvider),
-		LlmModelName:        strings.TrimSpace(row.LlmModelName),
-		LlmBaseUrl:          strings.TrimSpace(row.LlmBaseUrl),
-		LlmApiKeyCiphertext: cloneBytes(row.LlmApiKeyCiphertext),
-		LlmApiKeyConfigured: row.LlmApiKeyConfigured,
-		MlAuto:              row.MlAuto,
-		MlClipEnabled:       row.MlClipEnabled,
-		MlBioclipEnabled:    row.MlBioclipEnabled,
-		MlOcrEnabled:        row.MlOcrEnabled,
-		MlFaceEnabled:       row.MlFaceEnabled,
-		UpdatedBy:           input.UpdatedBy,
+		LlmAgentEnabled:           row.LlmAgentEnabled,
+		LlmProvider:               normalizeStoredLLMProvider(row.LlmProvider),
+		LlmModelName:              strings.TrimSpace(row.LlmModelName),
+		LlmBaseUrl:                strings.TrimSpace(row.LlmBaseUrl),
+		LlmApiKeyCiphertext:       cloneBytes(row.LlmApiKeyCiphertext),
+		LlmApiKeyConfigured:       row.LlmApiKeyConfigured,
+		MlAuto:                    row.MlAuto,
+		MlSemanticEnabled:         row.MlSemanticEnabled,
+		MlBioclipEnabled:          row.MlBioclipEnabled,
+		MlOcrEnabled:              row.MlOcrEnabled,
+		MlFaceEnabled:             row.MlFaceEnabled,
+		MlZeroshotClassifyEnabled: row.MlZeroshotClassifyEnabled,
+		UpdatedBy:                 input.UpdatedBy,
 	}
 
 	if input.LLM != nil {
@@ -176,8 +179,8 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 	}
 
 	if input.ML != nil {
-		if input.ML.CLIPEnabled != nil {
-			params.MlClipEnabled = *input.ML.CLIPEnabled
+		if input.ML.SemanticEnabled != nil {
+			params.MlSemanticEnabled = *input.ML.SemanticEnabled
 		}
 		if input.ML.BioCLIPEnabled != nil {
 			params.MlBioclipEnabled = *input.ML.BioCLIPEnabled
@@ -187,6 +190,9 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		}
 		if input.ML.FaceEnabled != nil {
 			params.MlFaceEnabled = *input.ML.FaceEnabled
+		}
+		if input.ML.ZeroshotClassifyEnabled != nil {
+			params.MlZeroshotClassifyEnabled = *input.ML.ZeroshotClassifyEnabled
 		}
 	}
 
@@ -228,10 +234,11 @@ func (s *settingsService) GetMLConfig(ctx context.Context) (config.MLConfig, err
 	}
 
 	return config.MLConfig{
-		CLIPEnabled:    row.MlClipEnabled,
-		BioCLIPEnabled: row.MlBioclipEnabled,
-		OCREnabled:     row.MlOcrEnabled,
-		FaceEnabled:    row.MlFaceEnabled,
+		SemanticEnabled:         row.MlSemanticEnabled,
+		BioCLIPEnabled:      row.MlBioclipEnabled,
+		OCREnabled:              row.MlOcrEnabled,
+		FaceEnabled:             row.MlFaceEnabled,
+		ZeroshotClassifyEnabled: row.MlZeroshotClassifyEnabled,
 	}, nil
 }
 
@@ -260,16 +267,17 @@ func (s *settingsService) seedFromEnv(ctx context.Context) error {
 	mlCfg := config.LoadMLConfig()
 
 	params := repo.UpsertSettingsParams{
-		LlmAgentEnabled:     llmCfg.AgentEnabled,
-		LlmProvider:         normalizeStoredLLMProvider(llmCfg.Provider),
-		LlmModelName:        strings.TrimSpace(llmCfg.ModelName),
-		LlmBaseUrl:          strings.TrimSpace(llmCfg.BaseURL),
-		LlmApiKeyConfigured: strings.TrimSpace(llmCfg.APIKey) != "",
-		MlAuto:              "disable",
-		MlClipEnabled:       mlCfg.CLIPEnabled,
-		MlBioclipEnabled:    mlCfg.BioCLIPEnabled,
-		MlOcrEnabled:        mlCfg.OCREnabled,
-		MlFaceEnabled:       mlCfg.FaceEnabled,
+		LlmAgentEnabled:           llmCfg.AgentEnabled,
+		LlmProvider:               normalizeStoredLLMProvider(llmCfg.Provider),
+		LlmModelName:              strings.TrimSpace(llmCfg.ModelName),
+		LlmBaseUrl:                strings.TrimSpace(llmCfg.BaseURL),
+		LlmApiKeyConfigured:       strings.TrimSpace(llmCfg.APIKey) != "",
+		MlAuto:                    "disable",
+		MlSemanticEnabled:         mlCfg.SemanticEnabled,
+		MlBioclipEnabled:          mlCfg.BioCLIPEnabled,
+		MlOcrEnabled:              mlCfg.OCREnabled,
+		MlFaceEnabled:             mlCfg.FaceEnabled,
+		MlZeroshotClassifyEnabled: mlCfg.ZeroshotClassifyEnabled,
 	}
 
 	if params.LlmApiKeyConfigured {
@@ -315,10 +323,11 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 			APIKeyConfigured: row.LlmApiKeyConfigured,
 		},
 		ML: MLSettings{
-			CLIPEnabled:    row.MlClipEnabled,
-			BioCLIPEnabled: row.MlBioclipEnabled,
-			OCREnabled:     row.MlOcrEnabled,
-			FaceEnabled:    row.MlFaceEnabled,
+			SemanticEnabled:         row.MlSemanticEnabled,
+			BioCLIPEnabled:      row.MlBioclipEnabled,
+			OCREnabled:              row.MlOcrEnabled,
+			FaceEnabled:             row.MlFaceEnabled,
+			ZeroshotClassifyEnabled: row.MlZeroshotClassifyEnabled,
 		},
 		UpdatedAt: updatedAt,
 		UpdatedBy: row.UpdatedBy,

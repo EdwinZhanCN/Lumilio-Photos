@@ -445,13 +445,13 @@ const docTemplate = `{
                     "bioclip": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
-                    "clip": {
-                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
-                    },
                     "face": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
                     "ocr": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "semantic": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     }
                 },
@@ -878,6 +878,61 @@ const docTemplate = `{
                     "current_password",
                     "new_password"
                 ],
+                "type": "object"
+            },
+            "dto.ClassifierPreviewMatchDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "score": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ClassifierPreviewRequestDTO": {
+                "properties": {
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "negative_prompts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "positive_prompts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "threshold": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "positive_prompts"
+                ],
+                "type": "object"
+            },
+            "dto.ClassifierPreviewResponseDTO": {
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "matches": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.ClassifierPreviewMatchDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
                 "type": "object"
             },
             "dto.CloudAuthChallengeDTO": {
@@ -1985,13 +2040,16 @@ const docTemplate = `{
                     "bioclip_enabled": {
                         "type": "boolean"
                     },
-                    "clip_enabled": {
-                        "type": "boolean"
-                    },
                     "face_enabled": {
                         "type": "boolean"
                     },
                     "ocr_enabled": {
+                        "type": "boolean"
+                    },
+                    "semantic_enabled": {
+                        "type": "boolean"
+                    },
+                    "zeroshot_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -2467,7 +2525,7 @@ const docTemplate = `{
                     },
                     "tasks": {
                         "example": [
-                            "clip",
+                            "semantic",
                             "ocr"
                         ],
                         "items": {
@@ -3467,13 +3525,16 @@ const docTemplate = `{
                     "bioclip_enabled": {
                         "type": "boolean"
                     },
-                    "clip_enabled": {
-                        "type": "boolean"
-                    },
                     "face_enabled": {
                         "type": "boolean"
                     },
                     "ocr_enabled": {
+                        "type": "boolean"
+                    },
+                    "semantic_enabled": {
+                        "type": "boolean"
+                    },
+                    "zeroshot_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -10496,6 +10557,119 @@ const docTemplate = `{
                 "summary": "Get public runtime capabilities",
                 "tags": [
                     "capabilities"
+                ]
+            }
+        },
+        "/api/v1/classifiers/preview": {
+            "post": {
+                "description": "Embed positive/negative prompts with semantic and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ClassifierPreviewRequestDTO",
+                                        "summary": "request",
+                                        "description": "Prompts and threshold"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Prompts and threshold",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Preview matches retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Classification unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Preview a zero-shot classifier",
+                "tags": [
+                    "classifiers"
                 ]
             }
         },

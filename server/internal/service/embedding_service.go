@@ -23,6 +23,16 @@ type EmbeddingService interface {
 	GetAssetEmbeddingInfo(ctx context.Context, assetID pgtype.UUID) (map[EmbeddingType]EmbeddingInfo, error)
 	DeleteEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) error
 	ResolveDefaultSearchSpace(ctx context.Context, embeddingType EmbeddingType, model string, dimensions int) (repo.EmbeddingSpace, error)
+	GetPrimaryEmbeddingVector(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error)
+}
+
+// PrimaryEmbedding is the decoded primary embedding for an asset/type, returned
+// as a plain []float32 so callers (e.g. the classification worker) need no
+// pgvector import.
+type PrimaryEmbedding struct {
+	Vector     []float32
+	Model      string
+	Dimensions int
 }
 
 type embeddingService struct {
@@ -33,9 +43,9 @@ type embeddingService struct {
 type EmbeddingType string
 
 const (
-	EmbeddingTypeCLIP  EmbeddingType = "clip"
-	EmbeddingTypeFace  EmbeddingType = "face"
-	EmbeddingTypePHash EmbeddingType = "phash"
+	EmbeddingTypeSemantic EmbeddingType = "semantic"
+	EmbeddingTypeFace     EmbeddingType = "face"
+	EmbeddingTypePHash    EmbeddingType = "phash"
 )
 
 type EmbeddingInfo struct {
@@ -72,7 +82,7 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		return err
 	}
 
-	if embeddingType == EmbeddingTypeCLIP {
+	if embeddingType == EmbeddingTypeSemantic {
 		defaultSpace, err := e.ensureDefaultSpace(ctx, queries, embeddingType, space)
 		if err != nil {
 			return err
@@ -179,6 +189,24 @@ func (e *embeddingService) GetPrimaryEmbedding(ctx context.Context, assetID pgty
 		return repo.Embedding{}, err
 	}
 	return mapPrimaryEmbeddingRow(row), nil
+}
+
+// GetPrimaryEmbeddingVector returns the asset's primary embedding for a type as
+// a decoded []float32 (plus model/dimensions). Reuses the existing
+// GetPrimaryEmbedding query; the worker never re-runs the ML model.
+func (e *embeddingService) GetPrimaryEmbeddingVector(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error) {
+	row, err := e.GetPrimaryEmbedding(ctx, assetID, embeddingType)
+	if err != nil {
+		return PrimaryEmbedding{}, err
+	}
+	if row.Vector == nil {
+		return PrimaryEmbedding{}, fmt.Errorf("primary %s embedding has no vector", embeddingType)
+	}
+	return PrimaryEmbedding{
+		Vector:     row.Vector.Slice(),
+		Model:      row.EmbeddingModel,
+		Dimensions: int(row.EmbeddingDimensions),
+	}, nil
 }
 
 // GetEmbeddingByType retrieves best embedding for a type (primary first, then latest).

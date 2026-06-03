@@ -56,7 +56,7 @@ services:
             # Lives under the mounted storage volume so it persists alongside
             # the user's media and survives container/volume recreation.
             LUMILIO_DB_PASSWORD_FILE: /data/storage/.secrets/db_password
-            ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
+            ML_SEMANTIC_ENABLED: ${ML_SEMANTIC_ENABLED:-false}
             ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
             ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
             ML_FACE_ENABLED: ${ML_FACE_ENABLED:-false}

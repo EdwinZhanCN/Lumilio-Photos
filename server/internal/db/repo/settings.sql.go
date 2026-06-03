@@ -10,7 +10,7 @@ import (
 )
 
 const getSettings = `-- name: GetSettings :one
-SELECT id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_clip_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled FROM settings
+SELECT id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled, ml_zeroshot_classify_enabled FROM settings
 WHERE id = 1
 `
 
@@ -26,7 +26,7 @@ func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
 		&i.LlmApiKeyCiphertext,
 		&i.LlmApiKeyConfigured,
 		&i.MlAuto,
-		&i.MlClipEnabled,
+		&i.MlSemanticEnabled,
 		&i.MlOcrEnabled,
 		&i.MlCaptionEnabled,
 		&i.MlFaceEnabled,
@@ -34,6 +34,7 @@ func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
 		&i.UpdatedAt,
 		&i.UpdatedBy,
 		&i.MlBioclipEnabled,
+		&i.MlZeroshotClassifyEnabled,
 	)
 	return i, err
 }
@@ -48,10 +49,11 @@ INSERT INTO settings (
     llm_api_key_ciphertext,
     llm_api_key_configured,
     ml_auto,
-    ml_clip_enabled,
+    ml_semantic_enabled,
     ml_bioclip_enabled,
     ml_ocr_enabled,
     ml_face_enabled,
+    ml_zeroshot_classify_enabled,
     updated_by
 )
 VALUES (
@@ -67,7 +69,8 @@ VALUES (
     $9,
     $10,
     $11,
-    $12
+    $12,
+    $13
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -77,28 +80,30 @@ ON CONFLICT (id) DO UPDATE SET
     llm_api_key_ciphertext = EXCLUDED.llm_api_key_ciphertext,
     llm_api_key_configured = EXCLUDED.llm_api_key_configured,
     ml_auto = EXCLUDED.ml_auto,
-    ml_clip_enabled = EXCLUDED.ml_clip_enabled,
+    ml_semantic_enabled = EXCLUDED.ml_semantic_enabled,
     ml_bioclip_enabled = EXCLUDED.ml_bioclip_enabled,
     ml_ocr_enabled = EXCLUDED.ml_ocr_enabled,
     ml_face_enabled = EXCLUDED.ml_face_enabled,
+    ml_zeroshot_classify_enabled = EXCLUDED.ml_zeroshot_classify_enabled,
     updated_at = NOW(),
     updated_by = EXCLUDED.updated_by
-RETURNING id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_clip_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled
+RETURNING id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled, ml_zeroshot_classify_enabled
 `
 
 type UpsertSettingsParams struct {
-	LlmAgentEnabled     bool   `db:"llm_agent_enabled" json:"llm_agent_enabled"`
-	LlmProvider         string `db:"llm_provider" json:"llm_provider"`
-	LlmModelName        string `db:"llm_model_name" json:"llm_model_name"`
-	LlmBaseUrl          string `db:"llm_base_url" json:"llm_base_url"`
-	LlmApiKeyCiphertext []byte `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
-	LlmApiKeyConfigured bool   `db:"llm_api_key_configured" json:"llm_api_key_configured"`
-	MlAuto              string `db:"ml_auto" json:"ml_auto"`
-	MlClipEnabled       bool   `db:"ml_clip_enabled" json:"ml_clip_enabled"`
-	MlBioclipEnabled    bool   `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
-	MlOcrEnabled        bool   `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
-	MlFaceEnabled       bool   `db:"ml_face_enabled" json:"ml_face_enabled"`
-	UpdatedBy           *int32 `db:"updated_by" json:"updated_by"`
+	LlmAgentEnabled           bool   `db:"llm_agent_enabled" json:"llm_agent_enabled"`
+	LlmProvider               string `db:"llm_provider" json:"llm_provider"`
+	LlmModelName              string `db:"llm_model_name" json:"llm_model_name"`
+	LlmBaseUrl                string `db:"llm_base_url" json:"llm_base_url"`
+	LlmApiKeyCiphertext       []byte `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
+	LlmApiKeyConfigured       bool   `db:"llm_api_key_configured" json:"llm_api_key_configured"`
+	MlAuto                    string `db:"ml_auto" json:"ml_auto"`
+	MlSemanticEnabled         bool   `db:"ml_semantic_enabled" json:"ml_semantic_enabled"`
+	MlBioclipEnabled          bool   `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
+	MlOcrEnabled              bool   `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
+	MlFaceEnabled             bool   `db:"ml_face_enabled" json:"ml_face_enabled"`
+	MlZeroshotClassifyEnabled bool   `db:"ml_zeroshot_classify_enabled" json:"ml_zeroshot_classify_enabled"`
+	UpdatedBy                 *int32 `db:"updated_by" json:"updated_by"`
 }
 
 func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error) {
@@ -110,10 +115,11 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		arg.LlmApiKeyCiphertext,
 		arg.LlmApiKeyConfigured,
 		arg.MlAuto,
-		arg.MlClipEnabled,
+		arg.MlSemanticEnabled,
 		arg.MlBioclipEnabled,
 		arg.MlOcrEnabled,
 		arg.MlFaceEnabled,
+		arg.MlZeroshotClassifyEnabled,
 		arg.UpdatedBy,
 	)
 	var i Setting
@@ -126,7 +132,7 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		&i.LlmApiKeyCiphertext,
 		&i.LlmApiKeyConfigured,
 		&i.MlAuto,
-		&i.MlClipEnabled,
+		&i.MlSemanticEnabled,
 		&i.MlOcrEnabled,
 		&i.MlCaptionEnabled,
 		&i.MlFaceEnabled,
@@ -134,6 +140,7 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		&i.UpdatedAt,
 		&i.UpdatedBy,
 		&i.MlBioclipEnabled,
+		&i.MlZeroshotClassifyEnabled,
 	)
 	return i, err
 }

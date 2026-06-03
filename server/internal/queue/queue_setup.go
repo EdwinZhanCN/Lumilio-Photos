@@ -57,10 +57,11 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers, logger *slog.Logger) (*ri
 		"scan_repository":           {MaxWorkers: 1},
 		"detect_stacks":             {MaxWorkers: 1},
 		"match_live_photo":          {MaxWorkers: 2},
-		"process_clip":              {MaxWorkers: 2},
+		"process_semantic":          {MaxWorkers: 2},
 		"process_bioclip":           {MaxWorkers: 1},
 		"process_ocr":               {MaxWorkers: 2},
 		"process_face":              {MaxWorkers: 1},
+		"classify_zeroshot":         {MaxWorkers: 2},
 		"process_phash":             {MaxWorkers: phashWorkers},
 	}
 

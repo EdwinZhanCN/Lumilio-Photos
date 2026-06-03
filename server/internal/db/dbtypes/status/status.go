@@ -163,7 +163,7 @@ func (s AssetStatus) GetFailedTasksByCategory() map[string][]string {
 		"metadata":       {"metadata_asset", "extract_exif", "extract_metadata"},
 		"thumbnails":     {"thumbnail_asset", "generate_thumbnails", "save_thumbnails"},
 		"transcoding":    {"transcode_asset", "transcode_video", "transcode_audio", "generate_web_version"},
-		"ai_processing":  {"process_clip", "process_bioclip", "process_ocr", "process_face", "clip_processing"},
+		"ai_processing":  {"process_semantic", "process_bioclip", "process_ocr", "process_face", "semantic_processing"},
 		"raw_processing": {"raw_processing"},
 	}
 
