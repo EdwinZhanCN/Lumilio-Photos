@@ -100,6 +100,10 @@ func (s *clipWorkerEmbeddingStub) DeleteEmbedding(context.Context, pgtype.UUID, 
 	panic("not implemented")
 }
 
+func (s *clipWorkerEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, pgtype.UUID, service.EmbeddingType) (service.PrimaryEmbedding, error) {
+	panic("not implemented")
+}
+
 type clipWorkerTagStub struct {
 	tags    []service.AIGeneratedTag
 	sources []string

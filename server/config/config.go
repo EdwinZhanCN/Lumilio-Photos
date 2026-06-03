@@ -91,14 +91,15 @@ func (c LLMConfig) IsConfigured() bool {
 }
 
 type MLConfig struct {
-	CLIPEnabled    bool `toml:"clip_enabled"`
-	BioCLIPEnabled bool `toml:"bioclip_enabled"`
-	OCREnabled     bool `toml:"ocr_enabled"`
-	FaceEnabled    bool `toml:"face_enabled"`
+	CLIPEnabled           bool `toml:"clip_enabled"`
+	BioCLIPEnabled        bool `toml:"bioclip_enabled"`
+	OCREnabled            bool `toml:"ocr_enabled"`
+	FaceEnabled           bool `toml:"face_enabled"`
+	SiglipClassifyEnabled bool `toml:"siglip_classify_enabled"`
 }
 
 func (c MLConfig) HasManualTasksEnabled() bool {
-	return c.CLIPEnabled || c.BioCLIPEnabled || c.OCREnabled || c.FaceEnabled
+	return c.CLIPEnabled || c.BioCLIPEnabled || c.OCREnabled || c.FaceEnabled || c.SiglipClassifyEnabled
 }
 
 func (c MLConfig) HasRuntimeDemand() bool {
@@ -540,6 +541,9 @@ func applyEnvOverrides(cfg *AppConfig) {
 	if value, ok := envBool("ML_FACE_ENABLED"); ok {
 		cfg.MLConfig.FaceEnabled = value
 	}
+	if value, ok := envBool("ML_SIGLIP_CLASSIFY_ENABLED"); ok {
+		cfg.MLConfig.SiglipClassifyEnabled = value
+	}
 
 	if value, ok := envBool("LLM_AGENT_ENABLED"); ok {
 		cfg.LLMConfig.AgentEnabled = value
@@ -639,6 +643,7 @@ func ApplyRuntimeEnvDefaults(cfg AppConfig) {
 	setEnvDefault("ML_BIOCLIP_ENABLED", strconv.FormatBool(cfg.MLConfig.BioCLIPEnabled))
 	setEnvDefault("ML_OCR_ENABLED", strconv.FormatBool(cfg.MLConfig.OCREnabled))
 	setEnvDefault("ML_FACE_ENABLED", strconv.FormatBool(cfg.MLConfig.FaceEnabled))
+	setEnvDefault("ML_SIGLIP_CLASSIFY_ENABLED", strconv.FormatBool(cfg.MLConfig.SiglipClassifyEnabled))
 
 	setEnvDefault("LLM_AGENT_ENABLED", strconv.FormatBool(cfg.LLMConfig.AgentEnabled))
 	setEnvDefault("LLM_PROVIDER", cfg.LLMConfig.Provider)

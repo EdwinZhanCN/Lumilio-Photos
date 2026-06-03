@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
@@ -172,7 +173,7 @@ func main() {
 	}
 	faceService := service.NewFaceService(queries, repoManager, pgxPool)
 
-	lumenService, embeddingService, err := initMLServices(ctx, pgxPool, queries, workers, appLogger, lumenLogger, settingsService, faceService)
+	lumenService, embeddingService, classifierService, err := initMLServices(ctx, pgxPool, queries, workers, appLogger, lumenLogger, settingsService, faceService)
 	if err != nil {
 		appLogger.Fatal("failed to initialize ML services", zap.String("operation", "ml.init"), zap.Error(err))
 	}
@@ -261,6 +262,7 @@ func main() {
 	agentController := handler.NewAgentHandler(agentService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService)
+	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
 	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appLogger.Named("cloud_sync"))
 	// Reconcile import runs left "running"/"queued" by a previous crash/restart
@@ -293,6 +295,7 @@ func main() {
 		agentController,
 		capabilitiesController,
 		settingsController,
+		classifierController,
 		userController,
 		repositoryScanController,
 		duplicateController,
@@ -324,22 +327,22 @@ func initMLServices(
 	lumenLogger *zap.Logger,
 	settingsService service.SettingsService,
 	faceService service.FaceService,
-) (service.LumenService, service.EmbeddingService, error) {
+) (service.LumenService, service.EmbeddingService, service.ClassifierService, error) {
 	appLogger.Info("initializing ML services", zap.String("operation", "ml.init"))
 
 	lumenCfg, err := lumenconfig.LoadConfig("")
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load lumen sdk config: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load lumen sdk config: %w", err)
 	}
 
 	lumenService, err := service.NewLumenService(lumenCfg, lumenLogger)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	err = lumenService.Start(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	appLogger.Info("lumen service initialized", zap.String("operation", "ml.init"))
 
@@ -380,8 +383,39 @@ func initMLServices(
 	})
 	appLogger.Info("face service and worker registered", zap.String("operation", "ml.init"))
 
+	aiTagService := service.NewAIGeneratedTagService(queries)
+	classifierService := service.NewClassifierService(pgxPool, lumenService, embeddingService, appLogger.Named("classifier"))
+	river.AddWorker[queue.ClassifySiglipArgs](workers, &queue.ClassifySiglipWorker{
+		EmbeddingService:  embeddingService,
+		ClassifierService: classifierService,
+		AITagService:      aiTagService,
+		ConfigProvider:    settingsService,
+	})
+	appLogger.Info("SigLIP classifier service and worker registered", zap.String("operation", "ml.init"))
+
+	// Build classifier prototypes in the background once the SigLIP text-embed
+	// task is reachable, so startup never blocks on ML node availability.
+	go buildClassifierPrototypes(lumenService, classifierService, appLogger.Named("classifier"))
+
 	appLogger.Info("ML services initialization complete", zap.String("operation", "ml.init"))
-	return lumenService, embeddingService, nil
+	return lumenService, embeddingService, classifierService, nil
+}
+
+// buildClassifierPrototypes waits (bounded) for the SigLIP text-embed task to
+// become available, then builds/refreshes classifier prototypes. It is a no-op
+// when SigLIP classification is disabled (no enabled definitions are scored).
+func buildClassifierPrototypes(lumenService service.LumenService, classifierService service.ClassifierService, logger *zap.Logger) {
+	for i := 0; i < 30; i++ {
+		if lumenService != nil && lumenService.IsTaskAvailable("semantic_text_embed") {
+			break
+		}
+		time.Sleep(10 * time.Second)
+	}
+	buildCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := classifierService.EnsurePrototypes(buildCtx); err != nil {
+		logger.Warn("failed to build classifier prototypes", zap.Error(err))
+	}
 }
 
 func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap.Logger, storageConfig config.StorageConfig) error {

@@ -29,6 +29,8 @@ func isMLTaskEnabled(ctx context.Context, provider MLConfigProvider, queueName s
 		return cfg.OCREnabled, nil
 	case "process_face":
 		return cfg.FaceEnabled, nil
+	case "classify_siglip":
+		return cfg.SiglipClassifyEnabled, nil
 	default:
 		return false, nil
 	}

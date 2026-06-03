@@ -51,6 +51,10 @@ func (s *pHashEmbeddingStub) ResolveDefaultSearchSpace(context.Context, service.
 	panic("not implemented")
 }
 
+func (s *pHashEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, pgtype.UUID, service.EmbeddingType) (service.PrimaryEmbedding, error) {
+	panic("not implemented")
+}
+
 type thumbnailAssetServiceStub struct {
 	service.AssetService
 

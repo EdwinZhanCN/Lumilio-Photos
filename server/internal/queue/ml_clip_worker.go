@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
@@ -65,6 +66,16 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 		service.EmbeddingTypeCLIP, embedding.ModelID, embedding.Vector, true)
 	if err != nil {
 		return fmt.Errorf("failed to save embedding: %w", err)
+	}
+
+	// Chain SigLIP zero-shot classification now that the embedding exists. This
+	// also doubles as backfill: re-running the CLIP index over the library
+	// reclassifies every asset. Best-effort: a failed enqueue must not force a
+	// costly re-embed, and the next reindex will recover it.
+	if classifyEnabled, cfgErr := isMLTaskEnabled(ctx, w.ConfigProvider, "classify_siglip"); cfgErr == nil && classifyEnabled {
+		if client := river.ClientFromContext[pgx.Tx](ctx); client != nil {
+			_, _ = client.Insert(ctx, jobs.ClassifySiglipArgs{AssetID: pgUUID}, &river.InsertOpts{Queue: "classify_siglip"})
+		}
 	}
 
 	return nil

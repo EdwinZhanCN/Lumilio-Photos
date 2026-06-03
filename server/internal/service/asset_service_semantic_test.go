@@ -101,6 +101,10 @@ func (s *semanticTestEmbeddingStub) ResolveDefaultSearchSpace(ctx context.Contex
 	return s.resolveFn(ctx, embeddingType, model, dimensions)
 }
 
+func (s *semanticTestEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, pgtype.UUID, EmbeddingType) (PrimaryEmbedding, error) {
+	return PrimaryEmbedding{}, nil
+}
+
 func TestResolveClipQueryEmbeddingUsesRequestedPath(t *testing.T) {
 	t.Parallel()
 

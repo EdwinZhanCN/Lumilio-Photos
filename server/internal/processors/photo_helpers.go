@@ -131,6 +131,9 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 			if err != nil {
 				return fmt.Errorf("enqueue CLIP: %w", err)
 			}
+			// SigLIP zero-shot classification is chained off the CLIP worker once
+			// the embedding is written (see ProcessClipWorker), so no separate
+			// enqueue is needed here.
 		}
 	}
 

@@ -10,6 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// AssetTagSourceSiglipZeroshot is the asset_tags.source value for tags written
+// by the SigLIP zero-shot classifier.
+const AssetTagSourceSiglipZeroshot = "siglip_zeroshot"
+
 type AIGeneratedTag struct {
 	Name       string
 	Confidence float32
@@ -136,7 +140,7 @@ func normalizeAssetTagSource(source string) string {
 	switch strings.TrimSpace(source) {
 	case "":
 		return ""
-	case "system", "user", "ai", "bioclip_classify":
+	case "system", "user", "ai", "bioclip_classify", "siglip_zeroshot":
 		return strings.TrimSpace(source)
 	default:
 		return "ai"
