@@ -2,6 +2,8 @@ SHELL := /bin/sh
 
 WEB_DIR := web
 SERVER_DIR := server
+SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/server.example.toml
+SERVER_CONFIG_LOCAL := $(SERVER_DIR)/config/server.local.toml
 
 GO := go
 VP := vp
@@ -37,17 +39,15 @@ DB_PASSWORD ?= postgres
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
 .PHONY: setup dev server-dev web-dev test server-test web-test dto db db-reset clean \
-	.server-env .web-env
+	.server-config .server-env .web-env
 
-setup:
+setup: .server-config
 	@echo "==> Installing Go dependencies"
 	cd $(SERVER_DIR) && $(GO) mod download
 	@echo "==> Installing web dependencies"
 	cd $(WEB_DIR) && $(VP) install
 	@echo "==> Ensuring wasm-pack is installed"
 	@command -v wasm-pack >/dev/null 2>&1 || { curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh; }
-	@echo "==> Ensuring river CLI is installed"
-	@command -v river >/dev/null 2>&1 || { cd $(SERVER_DIR) && $(GO) install github.com/riverqueue/river/cmd/river@v0.24.0; }
 	@echo "==> Ensuring swag CLI is installed"
 	@command -v swag >/dev/null 2>&1 || { $(GO) install github.com/swaggo/swag/v2/cmd/swag@v2.0.0-rc5; }
 	@echo "==> Setup complete"
@@ -60,7 +60,7 @@ dev: db
 	@echo "==> Starting server and web"
 	$(MAKE) -j2 server-dev web-dev
 
-server-dev: .server-env
+server-dev: .server-config .server-env
 	@echo "==> Starting server"
 	cd $(SERVER_DIR) && SERVER_ENV=development $(GO) run ./cmd
 
@@ -93,27 +93,31 @@ clean:
 	rm -f $(WEB_DIR)/.env.development
 	rm -rf $(SERVER_DIR)/data
 
+.server-config:
+	@if [ ! -f "$(SERVER_CONFIG_LOCAL)" ]; then \
+		echo "==> Creating $(SERVER_CONFIG_LOCAL) from $(SERVER_CONFIG_EXAMPLE)"; \
+		cp "$(SERVER_CONFIG_EXAMPLE)" "$(SERVER_CONFIG_LOCAL)"; \
+	fi
+
 .server-env:
 	@mkdir -p $(SERVER_DIR)/data/storage/primary
-	@if [ ! -f $(SERVER_DIR)/.env.development ]; then \
-		echo "==> Creating $(SERVER_DIR)/.env.development"; \
-		printf '%s\n' \
-		"SERVER_ENV=development" \
-		"SERVER_CONFIG_FILE=config/server.development.toml" \
-		"SERVER_PORT=6680" \
-		"" \
-		"DB_HOST=$(DB_HOST)" \
-		"DB_PORT=$(DB_PORT)" \
-		"DB_USER=$(DB_USER)" \
-		"DB_PASSWORD=$(DB_PASSWORD)" \
-		"DB_NAME=$(DB_NAME)" \
-		"DB_SSL=disable" \
-		"" \
-		"STORAGE_PATH=./data/storage" \
-		"" \
-		"LUMILIO_SECRET_KEY=./data/storage/.secrets/lumilio_secret_key" \
-		> $(SERVER_DIR)/.env.development; \
-	fi
+	@echo "==> Writing $(SERVER_DIR)/.env.development"
+	@printf '%s\n' \
+	"SERVER_ENV=development" \
+	"SERVER_CONFIG_FILE=config/server.local.toml" \
+	"SERVER_PORT=6680" \
+	"" \
+	"DB_HOST=$(DB_HOST)" \
+	"DB_PORT=$(DB_PORT)" \
+	"DB_USER=$(DB_USER)" \
+	"DB_PASSWORD=$(DB_PASSWORD)" \
+	"DB_NAME=$(DB_NAME)" \
+	"DB_SSL=disable" \
+	"" \
+	"STORAGE_PATH=./data/storage" \
+	"" \
+	"LUMILIO_SECRET_KEY=./data/storage/.secrets/lumilio_secret_key" \
+	> $(SERVER_DIR)/.env.development
 
 .web-env:
 	@printf '%s\n' \

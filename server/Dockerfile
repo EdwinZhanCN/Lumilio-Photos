@@ -25,9 +25,6 @@ RUN go mod download
 # Copy source
 COPY server/. .
 
-# CLI used by runtime migrations (river)
-RUN go install github.com/riverqueue/river/cmd/river@v0.24.0
-
 # Build API binary
 RUN go build -o /out/server ./cmd
 
@@ -57,9 +54,30 @@ RUN set -eux; \
     fi; \
     rm -rf /var/lib/apt/lists/*
 
-ENV SERVER_CONFIG_FILE=/app/config/server.toml \
+ENV SERVER_CONFIG_FILE=/app/config/server.local.toml \
     SERVER_PORT=6680 \
     SERVER_ENV=production \
+    SERVER_LOG_LEVEL=info \
+    LOG_LEVEL=info \
+    LOG_DIR=/app/logs \
+    LOG_FORMAT_CONSOLE=json \
+    LOG_FORMAT_FILE=json \
+    DB_HOST=db \
+    DB_PORT=5432 \
+    DB_USER=postgres \
+    DB_PASSWORD=postgres \
+    DB_NAME=lumiliophotos \
+    DB_SSL=disable \
+    LUMILIO_DB_PASSWORD_FILE=/data/storage/.secrets/db_password \
+    STORAGE_PATH=/data/storage \
+    REPOSITORY_SCAN_ENABLED=true \
+    ML_CLIP_ENABLED=true \
+    ML_BIOCLIP_ENABLED=true \
+    ML_OCR_ENABLED=true \
+    ML_FACE_ENABLED=true \
+    LUMILIO_SECRET_KEY=/data/storage/.secrets/lumilio_secret_key \
+    LUMEN_DISCOVERY_MDNS_ENABLED=false \
+    LUMEN_DISCOVERY_HUB_URL=http://host.docker.internal:5866 \
     PATH="/usr/local/bin:${PATH}"
 
 ARG APP_UID=10001
@@ -73,9 +91,9 @@ RUN groupadd --gid ${APP_GID} app \
 
 # App artifacts
 COPY --from=builder /out/server /usr/local/bin/server
-COPY --from=builder /go/bin/river /usr/local/bin/river
 COPY --from=builder /app/migrations ./migrations
-COPY server/config/server.toml ./config/server.toml
+COPY server/config/server.example.toml ./config/server.example.toml
+COPY server/config/server.example.toml ./config/server.local.toml
 
 # Prepare storage path
 RUN mkdir -p /data/storage/primary && chown -R app:app /data /app

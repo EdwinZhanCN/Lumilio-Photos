@@ -241,6 +241,53 @@ semantic_enabled = false
 	}
 }
 
+func TestLoadAppConfigWithError_LoadsExampleTOML(t *testing.T) {
+	t.Setenv("SERVER_CONFIG_FILE", "server.example.toml")
+	t.Setenv("SERVER_ENV", "development")
+
+	cfg, err := LoadAppConfigWithError()
+	if err != nil {
+		t.Fatalf("expected example config to load: %v", err)
+	}
+
+	if cfg.ServerConfig.Port != "6680" {
+		t.Fatalf("expected example server port, got %s", cfg.ServerConfig.Port)
+	}
+	if cfg.DatabaseConfig.DBName != "lumiliophotos" {
+		t.Fatalf("expected example database name, got %s", cfg.DatabaseConfig.DBName)
+	}
+	if cfg.Auth.SecretKeyPath == "" {
+		t.Fatalf("expected example auth secret path")
+	}
+}
+
+func TestConfigFilePathPrefersLocalConfig(t *testing.T) {
+	t.Setenv("SERVER_CONFIG_FILE", "")
+	tmpDir := t.TempDir()
+	t.Chdir(tmpDir)
+
+	configDir := filepath.Join(tmpDir, "config")
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatalf("create config dir: %v", err)
+	}
+	localPath := filepath.Join(configDir, "server.local.toml")
+	if err := os.WriteFile(localPath, []byte("[server]\nport = \"6680\"\n"), 0o600); err != nil {
+		t.Fatalf("write local config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "server.development.toml"), []byte("[server]\nport = \"7777\"\n"), 0o600); err != nil {
+		t.Fatalf("write legacy config: %v", err)
+	}
+
+	path, explicit := configFilePath("development")
+
+	if explicit {
+		t.Fatalf("expected discovered config, got explicit")
+	}
+	if path != filepath.Join("config", "server.local.toml") {
+		t.Fatalf("expected local config path, got %s", path)
+	}
+}
+
 func writeTestConfig(t *testing.T, content string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "server.toml")

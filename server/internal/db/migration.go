@@ -1,13 +1,11 @@
 package db
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"server/config"
 	"strings"
@@ -15,7 +13,10 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	mgpg "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 )
 
 // MigrationConfig holds configuration for running migrations.
@@ -113,43 +114,44 @@ func (m *MigrationConfig) migrateUp(ctx context.Context, workDir string) error {
 	return nil
 }
 
-// runRiverMigrations executes River's CLI migration command (if available).
+// runRiverMigrations applies River queue schema migrations through River's Go API.
 func (m *MigrationConfig) runRiverMigrations(ctx context.Context) error {
-	databaseURL := m.buildURL()
-	cmd := exec.CommandContext(ctx, "river", "migrate-up", "--database-url", databaseURL)
+	pool, err := pgxpool.New(ctx, m.buildURL())
+	if err != nil {
+		return fmt.Errorf("river migration pool: %w", err)
+	}
+	defer pool.Close()
 
-	var out, errb bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errb
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("river migration db ping: %w", err)
+	}
+
+	migrator, err := rivermigrate.New(riverpgxv5.New(pool), &rivermigrate.Config{
+		Schema: "public",
+	})
+	if err != nil {
+		return fmt.Errorf("river migrator init: %w", err)
+	}
 
 	log.Printf("🌊 Running River migrations...")
-	err := cmd.Run()
-
-	stdout := strings.TrimSpace(out.String())
-	stderr := strings.TrimSpace(errb.String())
-	if stdout != "" {
-		log.Println(stdout)
-	}
+	result, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
 	if err != nil {
-		if stderr != "" {
-			return fmt.Errorf("river migrate-up failed: %w\n%s", err, stderr)
-		}
-		return fmt.Errorf("river migrate-up failed: %w", err)
+		return fmt.Errorf("river migrations failed: %w", err)
 	}
-	if stderr != "" {
-		log.Println(stderr)
+	if len(result.Versions) == 0 {
+		log.Printf("ℹ️ River schema is up-to-date.")
+		return nil
 	}
+
+	for _, version := range result.Versions {
+		log.Printf("River migration applied: version=%d name=%s duration=%s", version.Version, version.Name, version.Duration)
+	}
+	log.Printf("✅ River migrations applied successfully.")
 	return nil
 }
 
 // RunMigrations applies DB migrations using golang-migrate and then applies River migrations.
 func (m *MigrationConfig) RunMigrations(ctx context.Context) error {
-	// Verify River CLI exists before starting (we still run DB migrations even if River is missing?).
-	// Here, we choose to fail early to keep both systems in sync on startup.
-	if err := checkRiverAvailable(ctx); err != nil {
-		return fmt.Errorf("River CLI not available: %w", err)
-	}
-
 	workDir := resolveWorkDir()
 
 	// Apply DB migrations (up).
@@ -170,13 +172,4 @@ func (m *MigrationConfig) RunMigrations(ctx context.Context) error {
 func AutoMigrate(ctx context.Context, dbConfig config.DatabaseConfig) error {
 	m := NewMigrationConfig(dbConfig)
 	return m.RunMigrations(ctx)
-}
-
-// checkRiverAvailable ensures the River CLI is available.
-func checkRiverAvailable(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "river", "--version")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("river not found in PATH")
-	}
-	return nil
 }

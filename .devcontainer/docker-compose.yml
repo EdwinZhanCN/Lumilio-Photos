@@ -55,7 +55,7 @@ services:
             CARGO_HOME: /usr/local/cargo
 
             SERVER_ENV: development
-            SERVER_CONFIG_FILE: /workspace/server/config/server.development.toml
+            SERVER_CONFIG_FILE: /workspace/server/config/server.local.toml
             SERVER_PORT: "6680"
             STORAGE_PATH: /workspace/server/data/storage
 

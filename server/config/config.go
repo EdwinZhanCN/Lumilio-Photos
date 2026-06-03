@@ -415,11 +415,9 @@ func configFilePath(environment string) (string, bool) {
 	}
 
 	candidates := []string{
-		filepath.Join("config", "server."+environment+".toml"),
-		filepath.Join("config", "server.toml"),
-		filepath.Join("server", "config", "server."+environment+".toml"),
-		filepath.Join("server", "config", "server.toml"),
-		filepath.Join("/app", "config", "server.toml"),
+		filepath.Join("config", "server.local.toml"),
+		filepath.Join("server", "config", "server.local.toml"),
+		filepath.Join("/app", "config", "server.local.toml"),
 	}
 	for _, candidate := range candidates {
 		if _, err := os.Stat(candidate); err == nil {
