@@ -340,7 +340,7 @@
       "stepNum": "Step {{n}}",
       "totp": {
         "skip": "Skip for now",
-        "subtitle": "Required for the admin account. Scan and verify to continue.",
+        "subtitle": "Optional — scan and verify to enable an authenticator app.",
         "title": "Add an authenticator app"
       },
       "welcome": {

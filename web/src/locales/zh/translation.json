@@ -339,8 +339,8 @@
       },
       "stepNum": "第{{n}}步",
       "totp": {
-        "skip": "",
-        "subtitle": "管理员账户必须启用。请扫描并验证后继续。",
+        "skip": "暂时跳过",
+        "subtitle": "可选 — 扫描并验证以启用验证器",
         "title": "添加身份验证器应用"
       },
       "welcome": {
@@ -424,7 +424,7 @@
       "finish": "继续使用流明集",
       "haveAccount": "已经有账户？",
       "login": "立即登录",
-      "mfaOptionalNotice": "",
+      "mfaOptionalNotice": "接下来可以添加双重验证 — 它是可选的，你也可以稍后在设置中开启。",
       "passkeyAction": "创建 Passkey",
       "passkeyDescription": "无需记住密码。Passkey 保存在此设备上，并可防止钓鱼攻击。",
       "passkeyHeadline": "使用面容、指纹或设备解锁登录",
@@ -438,7 +438,7 @@
       "recoverySubtitle": "若您失去身份验证器访问权限，这些一次性恢复码是唯一备用方式。",
       "recoveryTitle": "保存恢复码",
       "skipPasskey": "暂时跳过，只使用身份验证器",
-      "skipTotp": "",
+      "skipTotp": "暂时跳过",
       "startError": "启动账户注册失败。",
       "stepAccount": "账户",
       "stepAuthenticator": "身份验证器",
@@ -454,7 +454,7 @@
       "username": "用户名",
       "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
       "usernamePlaceholder": "请输入用户名",
-      "verifyAndEnable": ""
+      "verifyAndEnable": "验证并启用"
     },
     "setup": {
       "error": "初始化失败。请检查服务器日志后重试。",
@@ -1012,7 +1012,7 @@
         "passkeyCreated": "创建于",
         "passkeyDescription": "使用设备原生的通行密钥流程进行登录。",
         "passkeyLastUsed": "上次使用",
-        "passkeyRequiresTotp": "",
+        "passkeyRequiresTotp": "请先启用身份验证器应用（TOTP）— 通行密钥只能在其基础上添加。",
         "passkeyTitle": "通行密钥",
         "recoveryCodesTitle": "恢复码",
         "recoveryRemaining": "个恢复码剩余",

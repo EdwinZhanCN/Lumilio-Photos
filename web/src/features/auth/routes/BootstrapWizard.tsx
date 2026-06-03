@@ -317,7 +317,7 @@ const BootstrapWizard: React.FC = () => {
                     defaultValue: "Add an authenticator app",
                   })}
                   sub={t("auth.bootstrap.totp.subtitle", {
-                    defaultValue: "Optional — scan and verify to enable an authenticator code.",
+                    defaultValue: "Optional — scan and verify to enable an authenticator app.",
                   })}
                 />
                 <div className="mt-5 flex flex-col gap-4">

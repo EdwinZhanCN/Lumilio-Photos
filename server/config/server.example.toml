@@ -123,9 +123,9 @@ user_agent = "Lumilio-Photos/1.0"
 [ml]
 # Enable local ML processing workers. Keep disabled for lightweight local
 # development unless the runtime dependencies and models are available.
-# Env overrides: ML_CLIP_ENABLED, ML_BIOCLIP_ENABLED, ML_OCR_ENABLED,
+# Env overrides: ML_SEMANTIC_ENABLED, ML_BIOCLIP_ENABLED, ML_OCR_ENABLED,
 # ML_FACE_ENABLED.
-clip_enabled = false
+semantic_enabled = false
 bioclip_enabled = false
 ocr_enabled = false
 face_enabled = false

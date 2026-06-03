@@ -2,6 +2,7 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useBootstrapStatus } from "../hooks/useBootstrapStatus.ts";
+import { useAuth } from "../hooks/useAuth.ts";
 
 const BOOTSTRAP_PATH = "/bootstrap";
 
@@ -12,6 +13,7 @@ const BootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const { t } = useI18n();
   const location = useLocation();
   const bootstrapQuery = useBootstrapStatus();
+  const { isAuthenticated } = useAuth();
   const isBootstrapMode = bootstrapQuery.data?.data?.is_bootstrap_mode ?? false;
   const isBootstrapRoute = isBootstrapPath(location.pathname);
 
@@ -57,7 +59,11 @@ const BootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     return <Navigate to={BOOTSTRAP_PATH} replace />;
   }
 
-  if (!isBootstrapMode && isBootstrapRoute) {
+  // Once the first admin is created, bootstrap mode flips to false — but the
+  // freshly-registered user is still authenticated and stepping through the
+  // optional MFA onboarding on /bootstrap. Keep them here until they finish;
+  // only bounce unauthenticated visitors who land on /bootstrap after setup.
+  if (!isBootstrapMode && isBootstrapRoute && !isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
