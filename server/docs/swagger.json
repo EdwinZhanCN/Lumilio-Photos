@@ -873,6 +873,61 @@
                 ],
                 "type": "object"
             },
+            "dto.ClassifierPreviewMatchDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "score": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ClassifierPreviewRequestDTO": {
+                "properties": {
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "negative_prompts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "positive_prompts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "threshold": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "positive_prompts"
+                ],
+                "type": "object"
+            },
+            "dto.ClassifierPreviewResponseDTO": {
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "matches": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.ClassifierPreviewMatchDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.CloudAuthChallengeDTO": {
                 "properties": {
                     "description": {
@@ -1985,6 +2040,9 @@
                         "type": "boolean"
                     },
                     "ocr_enabled": {
+                        "type": "boolean"
+                    },
+                    "siglip_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -3467,6 +3525,9 @@
                         "type": "boolean"
                     },
                     "ocr_enabled": {
+                        "type": "boolean"
+                    },
+                    "siglip_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -10489,6 +10550,119 @@
                 "summary": "Get public runtime capabilities",
                 "tags": [
                     "capabilities"
+                ]
+            }
+        },
+        "/api/v1/classifiers/preview": {
+            "post": {
+                "description": "Embed positive/negative prompts with SigLIP and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the CLIP embedding pipeline and a reachable SigLIP text-embed task.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ClassifierPreviewRequestDTO",
+                                        "summary": "request",
+                                        "description": "Prompts and threshold"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Prompts and threshold",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Preview matches retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Classification unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Preview a zero-shot classifier",
+                "tags": [
+                    "classifiers"
                 ]
             }
         },

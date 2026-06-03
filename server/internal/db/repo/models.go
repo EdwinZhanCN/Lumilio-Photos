@@ -180,6 +180,25 @@ type AssetTag struct {
 	Source     string         `db:"source" json:"source"`
 }
 
+type ClassifierDefinition struct {
+	ID                  int32              `db:"id" json:"id"`
+	Slug                string             `db:"slug" json:"slug"`
+	DisplayName         string             `db:"display_name" json:"display_name"`
+	TagName             string             `db:"tag_name" json:"tag_name"`
+	Category            string             `db:"category" json:"category"`
+	PositivePrompts     []string           `db:"positive_prompts" json:"positive_prompts"`
+	NegativePrompts     []string           `db:"negative_prompts" json:"negative_prompts"`
+	Threshold           float32            `db:"threshold" json:"threshold"`
+	Enabled             bool               `db:"enabled" json:"enabled"`
+	PositivePrototype   *pgvector.Vector   `db:"positive_prototype" json:"positive_prototype"`
+	NegativePrototype   *pgvector.Vector   `db:"negative_prototype" json:"negative_prototype"`
+	PrototypeModel      *string            `db:"prototype_model" json:"prototype_model"`
+	PrototypeDimensions *int32             `db:"prototype_dimensions" json:"prototype_dimensions"`
+	PrototypeBuiltAt    pgtype.Timestamptz `db:"prototype_built_at" json:"prototype_built_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type CloudCredential struct {
 	CredentialID     pgtype.UUID        `db:"credential_id" json:"credential_id"`
 	Provider         string             `db:"provider" json:"provider"`
@@ -497,22 +516,23 @@ type ReverseGeocodeCache struct {
 }
 
 type Setting struct {
-	ID                  int32              `db:"id" json:"id"`
-	LlmAgentEnabled     bool               `db:"llm_agent_enabled" json:"llm_agent_enabled"`
-	LlmProvider         string             `db:"llm_provider" json:"llm_provider"`
-	LlmModelName        string             `db:"llm_model_name" json:"llm_model_name"`
-	LlmBaseUrl          string             `db:"llm_base_url" json:"llm_base_url"`
-	LlmApiKeyCiphertext []byte             `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
-	LlmApiKeyConfigured bool               `db:"llm_api_key_configured" json:"llm_api_key_configured"`
-	MlAuto              string             `db:"ml_auto" json:"ml_auto"`
-	MlClipEnabled       bool               `db:"ml_clip_enabled" json:"ml_clip_enabled"`
-	MlOcrEnabled        bool               `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
-	MlCaptionEnabled    bool               `db:"ml_caption_enabled" json:"ml_caption_enabled"`
-	MlFaceEnabled       bool               `db:"ml_face_enabled" json:"ml_face_enabled"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UpdatedBy           *int32             `db:"updated_by" json:"updated_by"`
-	MlBioclipEnabled    bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
+	ID                      int32              `db:"id" json:"id"`
+	LlmAgentEnabled         bool               `db:"llm_agent_enabled" json:"llm_agent_enabled"`
+	LlmProvider             string             `db:"llm_provider" json:"llm_provider"`
+	LlmModelName            string             `db:"llm_model_name" json:"llm_model_name"`
+	LlmBaseUrl              string             `db:"llm_base_url" json:"llm_base_url"`
+	LlmApiKeyCiphertext     []byte             `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
+	LlmApiKeyConfigured     bool               `db:"llm_api_key_configured" json:"llm_api_key_configured"`
+	MlAuto                  string             `db:"ml_auto" json:"ml_auto"`
+	MlClipEnabled           bool               `db:"ml_clip_enabled" json:"ml_clip_enabled"`
+	MlOcrEnabled            bool               `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
+	MlCaptionEnabled        bool               `db:"ml_caption_enabled" json:"ml_caption_enabled"`
+	MlFaceEnabled           bool               `db:"ml_face_enabled" json:"ml_face_enabled"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy               *int32             `db:"updated_by" json:"updated_by"`
+	MlBioclipEnabled        bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
+	MlSiglipClassifyEnabled bool               `db:"ml_siglip_classify_enabled" json:"ml_siglip_classify_enabled"`
 }
 
 type SpeciesPrediction struct {

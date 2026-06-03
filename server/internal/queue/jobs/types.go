@@ -28,6 +28,19 @@ const (
 	MLProcessMaxAttempts  = 50
 )
 
+// ClassifySiglipArgs is the River job payload for SigLIP zero-shot
+// classification. It scores the asset's already-stored CLIP image embedding
+// against classifier prototypes; it does not re-run any ML model.
+type ClassifySiglipArgs struct {
+	AssetID pgtype.UUID `json:"assetId"`
+}
+
+func (ClassifySiglipArgs) Kind() string { return "classify_siglip" }
+
+func (ClassifySiglipArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+}
+
 // ProcessBioClipArgs is the River job payload for BioCLIP classification.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessBioClipArgs struct {

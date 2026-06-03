@@ -22,10 +22,11 @@ type LLMSettingsDTO struct {
 }
 
 type MLSettingsDTO struct {
-	CLIPEnabled    bool `json:"clip_enabled"`
-	BioCLIPEnabled bool `json:"bioclip_enabled"`
-	OCREnabled  bool `json:"ocr_enabled"`
-	FaceEnabled bool `json:"face_enabled"`
+	CLIPEnabled           bool `json:"clip_enabled"`
+	BioCLIPEnabled        bool `json:"bioclip_enabled"`
+	OCREnabled            bool `json:"ocr_enabled"`
+	FaceEnabled           bool `json:"face_enabled"`
+	SiglipClassifyEnabled bool `json:"siglip_classify_enabled"`
 }
 
 type UpdateSystemSettingsDTO struct {
@@ -42,10 +43,11 @@ type UpdateLLMSettingsDTO struct {
 }
 
 type UpdateMLSettingsDTO struct {
-	CLIPEnabled    *bool `json:"clip_enabled,omitempty"`
-	BioCLIPEnabled *bool `json:"bioclip_enabled,omitempty"`
-	OCREnabled  *bool `json:"ocr_enabled,omitempty"`
-	FaceEnabled *bool `json:"face_enabled,omitempty"`
+	CLIPEnabled           *bool `json:"clip_enabled,omitempty"`
+	BioCLIPEnabled        *bool `json:"bioclip_enabled,omitempty"`
+	OCREnabled            *bool `json:"ocr_enabled,omitempty"`
+	FaceEnabled           *bool `json:"face_enabled,omitempty"`
+	SiglipClassifyEnabled *bool `json:"siglip_classify_enabled,omitempty"`
 }
 
 type ValidateLLMSettingsResponseDTO struct {
@@ -62,10 +64,11 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 			APIKeyConfigured: settings.LLM.APIKeyConfigured,
 		},
 		ML: MLSettingsDTO{
-			CLIPEnabled:    settings.ML.CLIPEnabled,
-			BioCLIPEnabled: settings.ML.BioCLIPEnabled,
-			OCREnabled:  settings.ML.OCREnabled,
-			FaceEnabled: settings.ML.FaceEnabled,
+			CLIPEnabled:           settings.ML.CLIPEnabled,
+			BioCLIPEnabled:        settings.ML.BioCLIPEnabled,
+			OCREnabled:            settings.ML.OCREnabled,
+			FaceEnabled:           settings.ML.FaceEnabled,
+			SiglipClassifyEnabled: settings.ML.SiglipClassifyEnabled,
 		},
 		UpdatedAt: settings.UpdatedAt,
 		UpdatedBy: settings.UpdatedBy,
@@ -89,10 +92,11 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 
 	if dto.ML != nil {
 		input.ML = &service.UpdateMLSettingsInput{
-			CLIPEnabled:    dto.ML.CLIPEnabled,
-			BioCLIPEnabled: dto.ML.BioCLIPEnabled,
-			OCREnabled:  dto.ML.OCREnabled,
-			FaceEnabled: dto.ML.FaceEnabled,
+			CLIPEnabled:           dto.ML.CLIPEnabled,
+			BioCLIPEnabled:        dto.ML.BioCLIPEnabled,
+			OCREnabled:            dto.ML.OCREnabled,
+			FaceEnabled:           dto.ML.FaceEnabled,
+			SiglipClassifyEnabled: dto.ML.SiglipClassifyEnabled,
 		}
 	}
 
