@@ -503,7 +503,12 @@ Build from source in GitHub Actions for full control:
     curl -O https://ftp.postgresql.org/pub/source/v16.9/postgresql-16.9.tar.bz2
     tar xf postgresql-16.9.tar.bz2
     cd postgresql-16.9
-    ./configure --prefix=$PWD/../pg-dist --without-readline --without-zlib
+    ./configure \
+      --prefix=$PWD/../pg-dist \
+      --without-readline \
+      --without-zlib \
+      --without-icu \
+      --without-openssl
     make -j$(nproc) && make install
     cd ../pgvector
     make PG_CONFIG=../pg-dist/bin/pg_config install
