@@ -19,6 +19,11 @@
 #   desktop/scripts/build-macos.sh [arm64|amd64] [--dmg]
 set -euo pipefail
 
+# Homebrew's libraw_r.pc emits `-Xpreprocessor`, which Go's cgo flag allowlist
+# rejects. Allow it so the libraw binding (server/internal/utils/raw) builds.
+export CGO_LDFLAGS_ALLOW="-Xpreprocessor"
+export CGO_CFLAGS_ALLOW="-Xpreprocessor"
+
 ARCH="${1:-arm64}"
 MAKE_DMG="false"
 for arg in "$@"; do

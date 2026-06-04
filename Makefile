@@ -16,6 +16,14 @@ GO := go
 VP := vp
 DOCKER := docker
 
+# Homebrew's libraw_r.pc emits `-Xpreprocessor -fopenmp`, which Go's cgo flag
+# allowlist rejects ("invalid flag in pkg-config --libs: -Xpreprocessor"). Allow
+# it so cgo can build the libraw binding (server/internal/utils/raw) and anything
+# that imports it. Exported so every Go target (server-*, desktop-*) inherits it.
+# Harmless on Linux/CI where the flag isn't present.
+export CGO_LDFLAGS_ALLOW := -Xpreprocessor
+export CGO_CFLAGS_ALLOW := -Xpreprocessor
+
 API_URL ?= http://localhost:6680
 VITE_API_URL ?= $(API_URL)
 
