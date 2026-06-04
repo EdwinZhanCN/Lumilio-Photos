@@ -22,6 +22,9 @@ type DB struct {
 
 // New creates a new database connection with the given configuration
 func New(cfg config.DatabaseConfig) (*DB, error) {
+	// A Unix-socket directory host (desktop runtime) cannot be expressed in a
+	// URL-form DSN, so use the keyword/value form there. TCP hosts keep the
+	// existing URL form unchanged.
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		cfg.User,
 		cfg.Password,
@@ -30,6 +33,9 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 		cfg.DBName,
 		cfg.SSL,
 	)
+	if isSocketHost(cfg.Host) {
+		dsn = socketDSN(cfg, nil)
+	}
 
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {

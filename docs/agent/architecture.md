@@ -11,7 +11,8 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 ## Backend
 
-- `server/cmd/main.go`: process startup, config load, logging, migrations, queue workers, router, repository bootstrap.
+- `server/cmd/main.go`: thin entrypoint (signal handling) that calls `server/app`.
+- `server/app`: process bootstrap — config load, logging, migrations, queue workers, router, repository bootstrap, and graceful shutdown via `Run(ctx)`. Imported by the CLI and, in-process, by the desktop supervisor.
 - `server/config`: TOML/env config boundary.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS.
 - `server/internal/api/handler`: HTTP request/response layer.
