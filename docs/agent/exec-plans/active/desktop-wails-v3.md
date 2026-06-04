@@ -2,7 +2,13 @@
 
 **Goal**: Ship a macOS desktop app that bundles a private PostgreSQL 16 runtime, manages its lifecycle, and reuses the existing Go API server and React UI over HTTP/OpenAPI.
 
-**Status**: Planning
+**Status**: In progress — code complete for the server prerequisites, the
+desktop supervisor (PG lifecycle, config/secret generation, single-instance
+lock, storage-path persistence), and the Wails v3 app shell. The whole desktop
+module compiles (Wails webview + server tree via cgo) and the PostgreSQL
+lifecycle has a passing real smoke test. Remaining work is ops: bundling the
+native binaries (PG/pgvector, ffmpeg, exiftool, libvips), signing, and the DMG
+release. See "Implementation Notes" at the end.
 
 ---
 
@@ -23,14 +29,33 @@ Wails v3 app
 
 Single binary. Desktop supervisor imports server packages directly via Go workspace, no subprocess.
 
-## macOS Signing (No Apple Developer Account)
+## macOS Distribution & Signing (No Apple Developer Account)
 
-| Channel | Signing | User Friction |
+**Channel: a single ad-hoc-signed DMG** from GitHub Releases. Homebrew Cask was
+considered and dropped: Homebrew quarantines casks by default
+(`cask/installer.rb` `quarantine: true`; `--no-quarantine` is an opt-in the cask
+file cannot set), so an ad-hoc app installed via `brew install --cask` hits the
+*same* Gatekeeper wall as a DMG — the cask added a tap + per-release `sha256`
+maintenance for zero UX benefit.
+
+| Channel | Signing | First-launch friction |
 |---|---|---|
-| **Homebrew Cask** (primary) | None needed | `brew install --cask lumilio-photos` |
-| **GitHub Releases DMG** (secondary) | Ad-hoc (`codesign -s -`, free) | Right-click → Open once |
+| **GitHub Releases DMG** | Ad-hoc (`codesign -s -`, free) | One-time **System Settings → Privacy & Security → Open Anyway** |
 
-First-launch quarantine cleanup for bundled PG binaries:
+- **Ad-hoc signing is still required** — not for Gatekeeper, but because Apple
+  Silicon refuses to execute unsigned binaries, and because `dylibbundler`'s
+  install-name rewrites invalidate the bundled dylib signatures (they must be
+  re-signed). The DMG container itself is not signed.
+- **Friction is unavoidable without notarization.** On macOS 15 the old
+  right-click → Open no longer bypasses Gatekeeper for ad-hoc apps; the user must
+  use "Open Anyway" in Privacy & Security once (it persists afterward).
+- **Notarization is the only zero-friction path** and is a clean future upgrade:
+  the same DMG channel, plus a Developer-ID signature + `notarytool` step once an
+  Apple Developer account ($99/yr) is available. No rework.
+
+First-launch quarantine cleanup for bundled PG binaries (separate concern — this
+de-quarantines the app's *own* sub-binaries so it can exec them; it does NOT
+bypass the main app's Gatekeeper gate, which the OS checks before our code runs):
 
 ```go
 // quarantine_darwin.go (build tag: darwin)
@@ -484,51 +509,140 @@ Build from source in GitHub Actions for full control:
     make PG_CONFIG=../pg-dist/bin/pg_config install
 ```
 
-### App Build
+### App Build (.app + DMG)
+
+The app is built with plain `go build` (not `wails3 build`) because the UI is
+served by the in-process Go server, not Wails' asset server — so packaging is
+just the binary + bundled runtime + the libvips dylib tree, assembled and
+ad-hoc-signed by `desktop/scripts/build-macos.sh`:
 
 ```bash
-cd desktop
-wails3 build -platform darwin/arm64
-codesign --force --deep -s - "build/bin/Lumilio Photos.app"
-hdiutil create -volname "Lumilio Photos" \
-  -srcfolder "build/bin/Lumilio Photos.app" \
-  -ov -format UDZO "Lumilio-Photos-arm64.dmg"
+brew install vips dylibbundler create-dmg   # build-time deps
+# stage native binaries + web build (see desktop/resources/README.md), then:
+desktop/scripts/build-macos.sh arm64 --dmg   # → desktop/build/Lumilio-Photos-arm64.dmg
 ```
 
-### Homebrew Cask Formula
+The `--dmg` step uses `create-dmg` to produce the classic "drag onto Applications"
+window (Applications symlink + positioned icons; optional `packaging/dmg/
+background.png` for the arrow artwork). It falls back to a plain DMG — still with
+an Applications symlink — if `create-dmg` is absent or has no GUI session.
 
-```ruby
-cask "lumilio-photos" do
-  version "1.0.0"
-  sha256 "..."
-  url "https://github.com/EdwinZhanCN/Lumilio-Photos/releases/download/v#{version}/Lumilio-Photos-#{arch}.dmg"
-  name "Lumilio Photos"
-  homepage "https://github.com/EdwinZhanCN/Lumilio-Photos"
-  app "Lumilio Photos.app"
-  zap trash: "~/Library/Application Support/Lumilio Photos"
-end
-```
+Ship separate arm64 and amd64 DMGs (a universal binary nearly doubles the size).
+A GitHub Actions release job can run the same script per arch and attach the DMGs
+to the release.
 
 ## Validation
 
-- [ ] `supervisor/postgres.go`: initdb → start → pg_isready → createdb → stop cycle works
-- [ ] Quarantine cleanup: PG binaries execute after first-launch xattr strip
-- [ ] Crash recovery: kill -9 postgres, next launch recovers cleanly
-- [ ] Socket path: works with long usernames (or falls back to /tmp)
-- [ ] Shutdown ordering: API server drains before PG stops
-- [ ] Ad-hoc signed DMG: right-click → Open works on clean macOS
-- [ ] Homebrew cask: install/uninstall/zap work
+- [x] `supervisor/postgres.go`: initdb → start → pg_isready → createdb → stop cycle works — covered by `TestPostgresLifecycleSmoke` (real PostgreSQL, passing)
+- [~] Quarantine cleanup: implemented (`stripQuarantine`, run every launch on darwin, non-fatal) — runtime-verify on a built bundle
+- [~] Crash recovery: implemented (`HandleStaleState` via `pg_ctl status` exit code) — add a kill -9 test
+- [x] Socket path: works with long usernames (or falls back to /tmp) — `TestSocketDirFallbackOnLongPath`
+- [x] Shutdown ordering: server drains (ctx cancel + `srv.Shutdown`/queue `Stop`) then `pg_ctl stop` then lock release — exercised by `TestDesktopRuntimeE2E`
+- [x] API server + SPA reachable at `localhost:6680` (PG → embedded migrations → in-process API → SPA `/`, `/api/v1/health`, SPA fallback) — `TestDesktopRuntimeE2E`
+- [ ] Ad-hoc signed DMG: app launches on clean macOS after the one-time "Open Anyway" (Privacy & Security); verify on macOS 15+
 - [ ] PG upgrade: 16→17 dump/restore path (manual test when relevant)
-- [ ] Webview origin is `http://localhost:6680` (not 127.0.0.1, not custom scheme)
-- [ ] Passkey registration succeeds in the desktop webview (or spike documents the WKWebView limitation + chosen fallback)
-- [ ] libvips dylib tree bundled via dylibbundler, @rpath resolves, all dylibs ad-hoc signed
+- [x] UI origin is `http://localhost:6680` (not 127.0.0.1, not a custom scheme) — opened in the default browser via `app.Browser.OpenURL`; no embedded webview
+- [~] Passkeys: now run in the real browser (which surfaces the platform authenticator at the `localhost` RP without an Apple entitlement); the WKWebView spike is no longer needed — verify Touch ID registration in Safari/Chrome once the SPA is bundled
+- [ ] libvips dylib tree bundled via dylibbundler, @rpath resolves, all dylibs ad-hoc signed — scripted in `desktop/scripts/build-macos.sh` (needs build host)
 - [ ] RAW decode works (confirms libraw delegate rode along with libvips)
-- [ ] exiftool + ffmpeg resolve from bundled `Resources/` paths (EXIFTOOL_PATH/FFMPEG_PATH), web/docker still use PATH
-- [ ] Storage picker: first-run choice persists to desktop-settings.json, survives relaunch, default path works without picker
-- [ ] Storage on external drive: unmounted-at-startup shows friendly dialog (no crash), PG still starts (secrets/data are local)
+- [~] exiftool + ffmpeg (+ ffprobe) resolve from bundled `Resources/` paths, web/docker still use PATH — config/env overrides implemented and unit-tested; runtime-verify with staged binaries
+- [~] Storage picker: first-run choice persists to desktop-settings.json, survives relaunch, default path works without picker — persistence implemented + tested; native picker UI is phase 2
+- [~] Storage on external drive: unmounted-at-startup falls back to default without crashing (secrets/data are local) — implemented (`storageReachable` + warning); friendly dialog UI is phase 2
+
+Legend: [x] verified, [~] implemented (not yet runtime-verified end to end), [ ] not started.
 
 ## Risk Notes
 
 - **Wails v3 maturity**: Still in alpha. Architecture intentionally avoids deep Wails binding dependency (UI stays on HTTP), so API changes have limited blast radius.
 - **App bundle size**: PG 16 + pgvector ≈ 40-60MB per arch. Total app ≈ 100-150MB. Acceptable for a photo management app.
 - **First launch time**: initdb + migrations ≈ 5-10s. Needs a splash/progress screen, not a blank window.
+
+## Implementation Notes (as built)
+
+What landed on `feature/desktop-wails`, and where it deliberately diverges from
+the plan above.
+
+### Server prerequisites
+- **Bootstrap extraction**: `server/cmd/main.go` was reduced to a thin signal
+  handler; all wiring moved to a new `server/app` package as `app.Run(ctx)
+  error`. `Run` now does a real graceful shutdown (HTTP `srv.Shutdown` + River
+  `queueClient.Stop` on ctx cancel, then deferred cleanups), and converts the
+  former `appLogger.Fatal` startup calls into returned errors so the in-process
+  desktop host is not killed by `os.Exit`. The swag general-info annotations
+  stay in `cmd/main.go` because `make dto` runs `swag init -g cmd/main.go`. The
+  `initPrimaryStorage`/`resolvePrimaryStoragePaths` tests moved with the code to
+  `server/app`.
+- **External tool paths**: added `[tools]` (`exiftool_path`, `ffmpeg_path`,
+  `ffprobe_path`) to `server/config` with `EXIFTOOL_PATH`/`FFMPEG_PATH`/
+  `FFPROBE_PATH` env overrides; empty = resolve via PATH (web/docker unchanged).
+  The plan named only `FFMPEG_PATH`, but `ffprobe` is also hardcoded
+  (`processors/video_helpers.go`, `audio_helpers.go`), so `FFPROBE_PATH` was
+  added. Call sites in `exif` + `processors` now use `config.ExifToolPath()` /
+  `FFmpegPath()` / `FFprobePath()`.
+- **DB socket DSN fix (not anticipated by the plan)**: `db.New` and
+  `migration.buildURL` built URL-form DSNs, which cannot carry a Unix-socket
+  *directory* host (slashes + spaces, e.g. `…/Application Support/…/run`). Added
+  `server/internal/db/dsn.go` (`socketDSN`) which emits libpq keyword/value form
+  for socket hosts; TCP hosts keep the exact original URL form. This is required
+  for the desktop's socket-only PostgreSQL.
+
+### Desktop module
+- **Module wiring**: `desktop` is its own module using `replace server =>
+  ../server`. `go.work` is gitignored in this repo, so the replace directive
+  (committed) is the load-bearing wiring — the plan's `go.work` snippet would not
+  have been committed.
+- **Quarantine**: stripped on **every** launch (idempotent, non-fatal), not just
+  first run, so an app update that re-quarantines the bundled binaries does not
+  block exec.
+- **`[ml]` keys**: the generated `server.local.toml` uses the real config keys
+  (`semantic_enabled`, `bioclip_enabled`, …); the plan's `clip_enabled` was
+  stale.
+- **Wails build tooling**: Wails v3 uses a `Taskfile.yml`, not `wails.json`.
+  Because the UI is server-served (not Wails assets), the app builds with plain
+  `go build`; bundling/signing is handled by `desktop/scripts/build-macos.sh`
+  rather than `wails3 build`.
+- **Storage unreachable**: the supervisor falls back to the default library and
+  records a warning instead of crashing; the native "please reconnect the drive"
+  dialog + re-pick is phase 2.
+
+### Verification done in-repo
+- `go build ./...` + `go vet ./...` clean for both `server` and `desktop`
+  (desktop links the Wails webview and the libvips tree via cgo on macOS).
+- New unit tests: tool-path resolution + TOML→env bridge (`server/config`),
+  socket DSN parsing incl. spaces (`server/internal/db`), generated-config
+  invariants / settings round-trip / secret idempotency / socket fallback
+  (`desktop/supervisor`).
+- `TestPostgresLifecycleSmoke` runs the real initdb→start→pg_isready→createdb→
+  stop cycle (auto-skips without a local PostgreSQL).
+
+### Architecture change — system tray + browser (supersedes the webview window)
+
+The desktop app no longer embeds a webview. It is a **menubar/system-tray
+controller** that boots the runtime and opens the UI in the user's **default
+browser** at `http://localhost:6680` (Plex/Syncthing/Postgres.app pattern).
+
+- **Why:** a real browser surfaces platform passkeys at the `localhost` RP, so
+  the WKWebView "open risk" above is moot — embedded WKWebView would have needed
+  an Apple Associated-Domains entitlement (paid account) to do the same.
+- **Wails usage:** kept, but only `application.SystemTray` (menu: status line,
+  "Open Lumilio Photos", Quit) with `Mac.ActivationPolicy = Accessory` (menubar
+  app, no dock/window). Auto-opens the browser on launch via `app.Browser.OpenURL`.
+- **Serving the SPA (new requirement the plan assumed):** the Go API server was
+  API-only; it now optionally serves the SPA when `server.web_root` is set
+  (`api.RegisterSPA`, NoRoute + index.html fallback, never shadowing `/api` or
+  `/swagger`). Empty = API-only (docker/web unchanged, Caddy still serves there).
+  The desktop supervisor points `web_root` at the bundled web build; the build
+  script builds (`vp build`) and stages `web/dist` into `Resources/web`.
+- **Embedded migrations (desktop-blocking fix):** `AutoMigrate` loaded migrations
+  via a CWD-relative `file://` source, which fails in a packaged app (no repo,
+  CWD `/`, files not shipped). Migrations are now embedded (`server/migrations`
+  `embed.FS`) and applied via golang-migrate's `iofs` source — CWD-independent,
+  nothing to ship; docker/dev benefit too.
+- **PostgreSQL `max_connections`:** raised 10 → 50 (+ shared_buffers 32→64MB).
+  The plan's 10 caused transient `too many clients` at startup (API pool sized to
+  CPU count + River per-queue producers + reserved superuser connections).
+
+**End-to-end verified** (`TestDesktopRuntimeE2E`, opt-in `LUMILIO_E2E=1` against a
+local PostgreSQL+pgvector): supervisor → PG → embedded migrations (app + River) →
+in-process API → SPA served at `localhost:6680` (`/`, `/api/v1/health`, and SPA
+fallback all 200) → graceful drain → PG stop → lock release.
