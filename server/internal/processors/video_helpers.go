@@ -167,7 +167,7 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_%d_%s.mp4", approxHeight, filepath.Base(inputPath)))
 
 	args := buildTranscodeArgs(inputPath, outputPath, scaleFilter, approxWidth, approxHeight, cfg)
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, config.FFmpegPath(), args...)
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ffmpeg transcode failed: %w", err)
@@ -301,7 +301,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 		outputPath,
 	)
 
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, config.FFmpegPath(), args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -342,7 +342,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 
 // getVideoInfo probes the video using ffprobe to collect dimensions, codec, format, and duration.
 func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
-	cmd := exec.Command("ffprobe",
+	cmd := exec.Command(config.FFprobePath(),
 		"-v", "quiet",
 		"-print_format", "json",
 		"-show_format",

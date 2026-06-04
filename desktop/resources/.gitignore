@@ -1,0 +1,5 @@
+# Bundled native binaries are large and platform-specific; they are staged by CI
+# (or manually) before packaging and must not be committed. Keep only the docs.
+*
+!.gitignore
+!README.md

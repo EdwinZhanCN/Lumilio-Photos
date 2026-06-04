@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"server/config"
 	"server/internal/db/dbtypes"
 	"sync"
 	"time"
@@ -219,7 +220,7 @@ func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader,
 	args := e.buildExifToolArgs(tags)
 
 	// Create and configure command
-	cmd := exec.CommandContext(ctxWithTimeout, "exiftool", args...)
+	cmd := exec.CommandContext(ctxWithTimeout, config.ExifToolPath(), args...)
 
 	// Set up pipes
 	stdin, stdout, stderr, err := e.setupPipes(cmd)

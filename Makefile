@@ -2,8 +2,15 @@ SHELL := /bin/sh
 
 WEB_DIR := web
 SERVER_DIR := server
+DESKTOP_DIR := desktop
 SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/server.example.toml
 SERVER_CONFIG_LOCAL := $(SERVER_DIR)/config/server.local.toml
+
+# PostgreSQL bin directory used when running the desktop app in development. The
+# packaged app ships its own PostgreSQL; for local `make desktop-dev` point this
+# at a locally installed PostgreSQL (override on the command line as needed,
+# e.g. `make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@14/bin`).
+PG_BIN_DIR ?= /opt/homebrew/opt/postgresql@16/bin
 
 GO := go
 VP := vp
@@ -39,6 +46,7 @@ DB_PASSWORD ?= postgres
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
 .PHONY: setup dev server-dev web-dev test server-test web-test dto db db-reset clean \
+	desktop-dev desktop-build desktop-test \
 	.server-config .server-env .web-env
 
 setup: .server-config
@@ -75,6 +83,22 @@ server-test:
 
 web-test:
 	cd $(WEB_DIR) && $(VP) check --no-fmt --no-lint && $(VP) lint && $(VP) test
+
+desktop-dev:
+	@echo "==> Running desktop app (dev). PG_BIN_DIR=$(PG_BIN_DIR)"
+	@echo "    Serving the SPA from $(CURDIR)/$(WEB_DIR)/dist (run 'cd web && vp build' first)."
+	cd $(DESKTOP_DIR) && \
+		LUMILIO_PG_BIN_DIR=$(PG_BIN_DIR) \
+		LUMILIO_WEB_ROOT=$(CURDIR)/$(WEB_DIR)/dist \
+		$(GO) run .
+
+desktop-test:
+	@echo "==> Testing desktop module (PostgreSQL lifecycle test skips if no PG)"
+	cd $(DESKTOP_DIR) && $(GO) test ./...
+
+desktop-build:
+	@echo "==> Building macOS desktop app bundle"
+	$(DESKTOP_DIR)/scripts/build-macos.sh
 
 dto:
 	@echo "==> Generating OpenAPI spec and TypeScript types"
