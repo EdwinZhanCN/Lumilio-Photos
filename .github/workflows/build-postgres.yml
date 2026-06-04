@@ -20,9 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14 # Apple Silicon
+          - runner: macos-15 # Apple Silicon
             platform: darwin-arm64
-          - runner: macos-13 # Intel
+          - runner: macos-15-intel # Intel
             platform: darwin-amd64
     runs-on: ${{ matrix.runner }}
     steps:
