@@ -111,10 +111,12 @@ func (p *Processor) ProcessRAWFromPath(ctx context.Context, fullPath, filename s
 		return result, result.Error
 	}
 
+	rotate := p.rawDisplayRotation(fullPath)
+
 	if preview, err := p.librawProcessor.ExtractEmbeddedWithLibRawPath(ctx, fullPath); err == nil && len(preview) > 0 {
 		valid, err := p.detector.IsPreviewAcceptable(preview, p.options.MinPreviewWidth, p.options.MinPreviewHeight)
 		if err == nil && valid {
-			preview, err = p.normalizeEmbeddedPreview(preview)
+			preview, err = p.normalizeEmbeddedPreview(preview, rotate)
 			if err != nil {
 				log.Printf("LibRaw embedded preview normalization failed, falling back to other strategies: %v", err)
 			} else {
@@ -137,7 +139,7 @@ func (p *Processor) ProcessRAWFromPath(ctx context.Context, fullPath, filename s
 
 	switch strategy {
 	case StrategyEmbeddedPreview:
-		previewData, err = p.processEmbeddedPreviewFromPath(fullPath, detection)
+		previewData, err = p.processEmbeddedPreviewFromPath(fullPath, detection, rotate)
 		if err != nil {
 			log.Printf("Embedded preview failed, falling back to full render: %v", err)
 			previewData, err = p.processFullRenderFromPath(ctx, fullPath)
@@ -199,12 +201,14 @@ func (p *Processor) ProcessRAW(ctx context.Context, reader io.ReadSeeker, filena
 		return result, result.Error
 	}
 
-	// Try fast embedded preview via LibRaw first (more modern, better camera support)
+	// Try fast embedded preview via LibRaw first (more modern, better camera support).
+	// Display rotation is applied only on the path-based ProcessRAWFromPath (the
+	// production entry point); this reader-based variant leaves it to AutoRotate.
 	if preview, err := p.librawProcessor.ExtractEmbeddedWithLibRaw(ctx, rawData, filename); err == nil && len(preview) > 0 {
 		// Validate preview quality and completeness
 		valid, err := p.detector.IsPreviewAcceptable(preview, p.options.MinPreviewWidth, p.options.MinPreviewHeight)
 		if err == nil && valid {
-			preview, err = p.normalizeEmbeddedPreview(preview)
+			preview, err = p.normalizeEmbeddedPreview(preview, vips.Angle0)
 			if err != nil {
 				log.Printf("LibRaw embedded preview normalization failed, falling back to other strategies: %v", err)
 			} else {
@@ -299,7 +303,7 @@ func (p *Processor) processEmbeddedPreview(rawData []byte, detection *DetectionR
 		return nil, fmt.Errorf("embedded preview does not meet quality requirements")
 	}
 
-	processed, err := p.normalizeEmbeddedPreview(previewData)
+	processed, err := p.normalizeEmbeddedPreview(previewData, vips.Angle0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to normalize embedded preview: %w", err)
 	}
@@ -307,7 +311,7 @@ func (p *Processor) processEmbeddedPreview(rawData []byte, detection *DetectionR
 	return processed, nil
 }
 
-func (p *Processor) processEmbeddedPreviewFromPath(fullPath string, detection *DetectionResult) ([]byte, error) {
+func (p *Processor) processEmbeddedPreviewFromPath(fullPath string, detection *DetectionResult, rotate vips.Angle) ([]byte, error) {
 	file, err := os.Open(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("open RAW file: %w", err)
@@ -328,7 +332,7 @@ func (p *Processor) processEmbeddedPreviewFromPath(fullPath string, detection *D
 		return nil, fmt.Errorf("embedded preview does not meet quality requirements")
 	}
 
-	processed, err := p.normalizeEmbeddedPreview(previewData)
+	processed, err := p.normalizeEmbeddedPreview(previewData, rotate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to normalize embedded preview: %w", err)
 	}
@@ -336,8 +340,39 @@ func (p *Processor) processEmbeddedPreviewFromPath(fullPath string, detection *D
 	return processed, nil
 }
 
-func (p *Processor) normalizeEmbeddedPreview(previewData []byte) ([]byte, error) {
-	if p.options.Quality >= 100 && p.options.OutputFormat == 0 {
+// rawFlipToAngle maps libraw's dcraw-style flip code to the clockwise rotation
+// needed to bring a sensor-orientation preview to display orientation.
+func rawFlipToAngle(flip int) vips.Angle {
+	switch flip {
+	case 3:
+		return vips.Angle180
+	case 5:
+		return vips.Angle270 // EXIF 8 / "Rotate 270 CW"
+	case 6:
+		return vips.Angle90 // EXIF 6 / "Rotate 90 CW"
+	default:
+		return vips.Angle0
+	}
+}
+
+// rawDisplayRotation reads the camera orientation from libraw and returns the
+// rotation to bake into the embedded preview. Best-effort: if libraw can't read
+// the flip, no rotation is applied rather than failing the whole thumbnail.
+func (p *Processor) rawDisplayRotation(fullPath string) vips.Angle {
+	flip, err := p.librawProcessor.RawFlipPath(fullPath)
+	if err != nil {
+		log.Printf("RAW flip unavailable for %s; leaving preview unrotated: %v", fullPath, err)
+		return vips.Angle0
+	}
+	return rawFlipToAngle(flip)
+}
+
+// normalizeEmbeddedPreview re-encodes the embedded preview into the configured
+// output format and bakes in the display rotation. The embedded JPEG is stored
+// in sensor orientation with no EXIF orientation of its own, so the rotation
+// (derived from the RAW container via libraw) must be applied explicitly here.
+func (p *Processor) normalizeEmbeddedPreview(previewData []byte, rotate vips.Angle) ([]byte, error) {
+	if rotate == vips.Angle0 && p.options.Quality >= 100 && p.options.OutputFormat == 0 {
 		return previewData, nil
 	}
 
@@ -346,6 +381,7 @@ func (p *Processor) normalizeEmbeddedPreview(previewData []byte) ([]byte, error)
 		Quality:       p.options.Quality,
 		StripMetadata: true,
 		NoProfile:     true,
+		Rotate:        rotate,
 	})
 	if err != nil {
 		return nil, err
@@ -357,39 +393,47 @@ func (p *Processor) normalizeEmbeddedPreview(previewData []byte) ([]byte, error)
 	return processed, nil
 }
 
-// processFullRender performs full RAW decoding using LibRaw
-func (p *Processor) processFullRender(ctx context.Context, rawData []byte, filename string) ([]byte, error) {
-	// Create a timeout context
-	timeoutCtx, cancel := context.WithTimeout(ctx, p.options.FullRenderTimeout)
-	defer cancel()
-
-	// Use LibRaw for full RAW rendering
-	previewData, err := p.librawProcessor.ProcessWithLibRaw(timeoutCtx, rawData, filename)
+// encodeFullRender normalizes the libraw TIFF render into the configured output
+// format (JPEG by default) so the result is compact and consistent with the
+// embedded-preview path. libvips only decodes the TIFF here (a loader present on
+// every platform); the RAW decode itself is done by libraw, so this works
+// regardless of the libvips build's RAW loader support.
+func (p *Processor) encodeFullRender(tiff []byte) ([]byte, error) {
+	if len(tiff) == 0 {
+		return nil, fmt.Errorf("libraw full render produced no output")
+	}
+	encoded, err := imaging.ProcessImageBytes(tiff, imaging.ProcessOptions{
+		Format:        p.options.OutputFormat,
+		Quality:       p.options.Quality,
+		StripMetadata: true,
+		NoProfile:     true,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("LibRaw processing failed: %w", err)
+		return nil, fmt.Errorf("encode full render: %w", err)
 	}
-
-	if len(previewData) == 0 {
-		return nil, fmt.Errorf("LibRaw produced no output")
+	if len(encoded) == 0 {
+		return nil, fmt.Errorf("full render encode produced no output")
 	}
-
-	return previewData, nil
+	return encoded, nil
 }
 
-func (p *Processor) processFullRenderFromPath(ctx context.Context, fullPath string) ([]byte, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, p.options.FullRenderTimeout)
-	defer cancel()
-
-	previewData, err := p.librawProcessor.ProcessFileWithLibRaw(timeoutCtx, fullPath)
+// processFullRender fully decodes RAW bytes via libraw (returning a TIFF) and
+// re-encodes it. Used only when no acceptable embedded preview is available.
+func (p *Processor) processFullRender(_ context.Context, rawData []byte, filename string) ([]byte, error) {
+	tiff, err := p.librawProcessor.RenderToTIFF(rawData, filename)
 	if err != nil {
-		return nil, fmt.Errorf("LibRaw processing failed: %w", err)
+		return nil, fmt.Errorf("libraw full render failed: %w", err)
 	}
+	return p.encodeFullRender(tiff)
+}
 
-	if len(previewData) == 0 {
-		return nil, fmt.Errorf("LibRaw produced no output")
+// processFullRenderFromPath is the on-disk counterpart of processFullRender.
+func (p *Processor) processFullRenderFromPath(_ context.Context, fullPath string) ([]byte, error) {
+	tiff, err := p.librawProcessor.RenderToTIFFPath(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("libraw full render failed: %w", err)
 	}
-
-	return previewData, nil
+	return p.encodeFullRender(tiff)
 }
 
 func (p *Processor) populatePreviewDimensions(result *ProcessingResult, previewData []byte) {
