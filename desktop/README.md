@@ -70,7 +70,8 @@ LUMILIO_E2E=1 LUMILIO_PG_BIN_DIR=/opt/homebrew/opt/postgresql@14/bin \
 
 ```sh
 brew install vips dylibbundler create-dmg      # build-time deps
-# stage native binaries (see desktop/resources/README.md), then:
+desktop/scripts/fetch-resources.sh             # ffmpeg/ffprobe/exiftool (pinned + sha256)
+# also stage PostgreSQL 16 + pgvector into resources/postgres/16/<platform>/ (from source), then:
 make desktop-build                             # → desktop/build/Lumilio Photos.app
 desktop/scripts/build-macos.sh arm64 --dmg     # also produce a DMG
 ```
