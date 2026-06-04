@@ -50,11 +50,9 @@ jobs:
           make -j"$(sysctl -n hw.ncpu)"
           make install
           # Contrib extensions the schema requires (core `make install` omits
-          # contrib): pgcrypto (CREATE EXTENSION pgcrypto in the first migration)
-          # and pg_trgm (trigram filename search). Build only these two to avoid
-          # contrib modules that need extra deps. pgcrypto builds without
-          # OpenSSL using its internal implementations when configured above.
-          make -C contrib/pgcrypto install
+          # contrib): pg_trgm (trigram filename search). pgcrypto is deliberately
+          # omitted because PostgreSQL 16 provides gen_random_uuid() in core, and
+          # pgcrypto itself requires OpenSSL.
           make -C contrib/pg_trgm install
 
       - name: Build pgvector ${{ inputs.pgvector_version }}
