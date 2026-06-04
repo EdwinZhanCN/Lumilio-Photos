@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"log"
 	"strings"
@@ -11,6 +12,9 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
+
+//go:embed assets/lumilio-photos-tray.png
+var trayIcon []byte
 
 // desktopApp is a menubar (system tray) controller: it starts the private
 // database + API server via the supervisor and exposes "Open in browser" + a
@@ -50,7 +54,8 @@ func (d *desktopApp) run() error {
 	})
 
 	d.tray = d.app.SystemTray.New()
-	d.tray.SetLabel("Lumilio")
+	d.tray.SetTemplateIcon(trayIcon)
+	d.tray.SetTooltip("Lumilio Photos")
 	d.refreshMenu()
 
 	// Boot the runtime once the app's event loop is running.

@@ -100,6 +100,11 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("resolve resources dir: %w", err)
 	}
+	if vipsHome := bundledVipsHome(resources); vipsHome != "" && os.Getenv("VIPSHOME") == "" {
+		if err := os.Setenv("VIPSHOME", vipsHome); err != nil {
+			return fmt.Errorf("set VIPSHOME: %w", err)
+		}
+	}
 
 	// Strip Gatekeeper quarantine from bundled resources so exec of the PG
 	// binaries is not blocked. Done every launch (idempotent, non-fatal) so it
@@ -160,6 +165,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	if err := WriteServerConfig(paths.ServerConfigFile(), ServerConfigParams{
 		Port:          serverPort,
 		WebRoot:       bundledWebRoot(resources),
+		LogDir:        paths.Logs,
 		StoragePath:   storagePath,
 		SocketDir:     paths.SocketDir(),
 		PGPort:        pgPort,
