@@ -26,6 +26,13 @@ log_level = "debug"
 # Env override: SERVER_CORS_ALLOWED_ORIGINS as a comma-separated list.
 cors_allowed_origins = ["http://localhost:6657", "https://localhost:6657"]
 
+# Optional: serve the built web SPA from this directory (with index.html
+# fallback for client-side routes). Empty = API only, which is the docker/web
+# default where a separate static server (Caddy) hosts the bundle. The desktop
+# build sets this to the bundled web build so the app is reachable in a browser.
+# Env override: SERVER_WEB_ROOT.
+# web_root = ""
+
 [logging]
 # Main logging level. Usually mirrors server.log_level.
 # Env override: LOG_LEVEL.
@@ -193,3 +200,13 @@ discovery_hub_url = ""
 
 # Allow insecure local development connections. Disable when using trusted TLS.
 connection_insecure = true
+
+[tools]
+# Absolute paths to the external media tools the server shells out to. Leave
+# empty to resolve the bare command name via PATH (the default for web/docker,
+# where these are installed system-wide). The desktop build sets these to
+# binaries shipped inside the app bundle, which has no system PATH.
+# Env overrides: EXIFTOOL_PATH, FFMPEG_PATH, FFPROBE_PATH.
+exiftool_path = ""
+ffmpeg_path = ""
+ffprobe_path = ""

@@ -37,12 +37,19 @@ type AppConfig struct {
 	Auth           AuthConfig
 	Transcode      TranscodeConfig
 	Lumen          LumenConfig
+	Tools          ToolsConfig
 }
 
 type ServerConfig struct {
 	Port               string   `toml:"port"`
 	LogLevel           string   `toml:"log_level"`
 	CORSAllowedOrigins []string `toml:"cors_allowed_origins"`
+	// WebRoot, when set, makes the API server also serve the SPA bundle from
+	// this directory (with index.html fallback). Empty = API-only, which is the
+	// docker/web default (a separate static server hosts the bundle there). The
+	// desktop build points this at the bundled web build so localhost:6680 serves
+	// the full app. Env override: SERVER_WEB_ROOT.
+	WebRoot string `toml:"web_root"`
 }
 
 type LoggingConfig struct {
@@ -92,7 +99,7 @@ func (c LLMConfig) IsConfigured() bool {
 
 type MLConfig struct {
 	SemanticEnabled         bool `toml:"semantic_enabled"`
-	BioCLIPEnabled      bool `toml:"bioclip_enabled"`
+	BioCLIPEnabled          bool `toml:"bioclip_enabled"`
 	OCREnabled              bool `toml:"ocr_enabled"`
 	FaceEnabled             bool `toml:"face_enabled"`
 	ZeroshotClassifyEnabled bool `toml:"zeroshot_classify_enabled"`
@@ -158,6 +165,7 @@ type tomlConfig struct {
 	Auth           AuthConfig           `toml:"auth"`
 	Transcode      TranscodeConfig      `toml:"transcode"`
 	Lumen          LumenConfig          `toml:"lumen"`
+	Tools          ToolsConfig          `toml:"tools"`
 }
 
 // LoadTranscodeConfig returns transcoding configuration.
@@ -388,6 +396,7 @@ func loadTOMLConfig(cfg *AppConfig) error {
 	fileCfg.Auth = cfg.Auth
 	fileCfg.Transcode = cfg.Transcode
 	fileCfg.Lumen = cfg.Lumen
+	fileCfg.Tools = cfg.Tools
 
 	if err := toml.Unmarshal(data, &fileCfg); err != nil {
 		return fmt.Errorf("parse server config %s: %w", path, err)
@@ -405,6 +414,7 @@ func loadTOMLConfig(cfg *AppConfig) error {
 	cfg.Auth = fileCfg.Auth
 	cfg.Transcode = fileCfg.Transcode
 	cfg.Lumen = fileCfg.Lumen
+	cfg.Tools = fileCfg.Tools
 
 	return nil
 }
@@ -440,6 +450,9 @@ func applyEnvOverrides(cfg *AppConfig) {
 	}
 	if value := envString("SERVER_CORS_ALLOWED_ORIGINS"); value != "" {
 		cfg.ServerConfig.CORSAllowedOrigins = splitCSV(value)
+	}
+	if value := envString("SERVER_WEB_ROOT"); value != "" {
+		cfg.ServerConfig.WebRoot = value
 	}
 
 	if value := envString("LOG_LEVEL"); value != "" {
@@ -583,6 +596,16 @@ func applyEnvOverrides(cfg *AppConfig) {
 		cfg.Transcode.HardwareAccel = strings.ToLower(value)
 	}
 
+	if value := envString("EXIFTOOL_PATH"); value != "" {
+		cfg.Tools.ExifToolPath = value
+	}
+	if value := envString("FFMPEG_PATH"); value != "" {
+		cfg.Tools.FFmpegPath = value
+	}
+	if value := envString("FFPROBE_PATH"); value != "" {
+		cfg.Tools.FFprobePath = value
+	}
+
 	if value, ok := envBool("LUMEN_DISCOVERY_ENABLED"); ok {
 		cfg.Lumen.DiscoveryEnabled = value
 	}
@@ -602,6 +625,7 @@ func ApplyRuntimeEnvDefaults(cfg AppConfig) {
 	setEnvDefault("SERVER_PORT", cfg.ServerConfig.Port)
 	setEnvDefault("SERVER_LOG_LEVEL", cfg.ServerConfig.LogLevel)
 	setEnvDefault("SERVER_CORS_ALLOWED_ORIGINS", strings.Join(cfg.ServerConfig.CORSAllowedOrigins, ","))
+	setEnvDefault("SERVER_WEB_ROOT", cfg.ServerConfig.WebRoot)
 	setEnvDefault("LOG_LEVEL", cfg.LoggingConfig.Level)
 	setEnvDefault("LOG_DIR", cfg.LoggingConfig.LogDir)
 	setEnvDefault("LOG_FORMAT_CONSOLE", cfg.LoggingConfig.ConsoleFormat)
@@ -652,6 +676,13 @@ func ApplyRuntimeEnvDefaults(cfg AppConfig) {
 	setEnvDefault("WEBAUTHN_RP_ORIGINS", strings.Join(cfg.Auth.WebAuthnRPOrigins, ","))
 
 	setEnvDefault("TRANSCODE_HW_ACCEL", cfg.Transcode.HardwareAccel)
+
+	// External media tool overrides. Empty values are skipped by setEnvDefault,
+	// so the bare command name (resolved via PATH) remains the default.
+	setEnvDefault("EXIFTOOL_PATH", cfg.Tools.ExifToolPath)
+	setEnvDefault("FFMPEG_PATH", cfg.Tools.FFmpegPath)
+	setEnvDefault("FFPROBE_PATH", cfg.Tools.FFprobePath)
+
 	setEnvDefault("LUMEN_DISCOVERY_ENABLED", strconv.FormatBool(cfg.Lumen.DiscoveryEnabled))
 	setEnvDefault("LUMEN_DISCOVERY_MDNS_ENABLED", strconv.FormatBool(cfg.Lumen.DiscoveryMDNSEnabled))
 	setEnvDefault("LUMEN_DISCOVERY_HUB_URL", cfg.Lumen.DiscoveryHubURL)

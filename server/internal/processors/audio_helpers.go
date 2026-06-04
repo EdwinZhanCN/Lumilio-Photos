@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/utils/exif"
@@ -106,7 +107,7 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 		targetBitrate = "128k"
 	}
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+	cmd := exec.CommandContext(ctx, config.FFmpegPath(),
 		"-i", inputPath,
 		"-c:a", "libmp3lame",
 		"-b:a", targetBitrate,
@@ -156,7 +157,7 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID))
 	defer os.Remove(outputPath)
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+	cmd := exec.CommandContext(ctx, config.FFmpegPath(),
 		"-i", audioPath,
 		"-filter_complex", "showwavespic=s=1200x200:colors=0x3b82f6[v]",
 		"-map", "[v]",
@@ -186,7 +187,7 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 
 // getAudioInfo probes the audio using ffprobe to collect duration, bitrate, codec, and format.
 func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
-	cmd := exec.Command("ffprobe",
+	cmd := exec.Command(config.FFprobePath(),
 		"-v", "quiet",
 		"-print_format", "json",
 		"-show_format",
