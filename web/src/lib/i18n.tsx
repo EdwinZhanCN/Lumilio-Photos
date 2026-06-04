@@ -1,12 +1,9 @@
 import React, { PropsWithChildren, Suspense } from "react";
 import i18n, { i18n as I18NextInstance } from "i18next";
-import {
-  I18nextProvider,
-  initReactI18next,
-  useTranslation,
-} from "react-i18next";
+import { I18nextProvider, initReactI18next, useTranslation } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-import HttpBackend from "i18next-http-backend";
+import enTranslation from "@/locales/en/translation.json";
+import zhTranslation from "@/locales/zh/translation.json";
 
 export const SUPPORTED_LANGUAGES = ["en", "zh"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -15,15 +12,11 @@ function initI18n(instance: I18NextInstance) {
   if (instance.isInitialized) return instance;
 
   instance
-    .use(HttpBackend)
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
       // Enable debug in dev only
-      debug:
-        typeof import.meta !== "undefined"
-          ? Boolean(import.meta.env?.DEV)
-          : false,
+      debug: typeof import.meta !== "undefined" ? Boolean(import.meta.env?.DEV) : false,
 
       // Fallback and supported languages
       fallbackLng: "en",
@@ -32,24 +25,17 @@ function initI18n(instance: I18NextInstance) {
       // Namespaces (single default namespace "translation")
       ns: ["translation"],
       defaultNS: "translation",
+      resources: {
+        en: { translation: enTranslation },
+        zh: { translation: zhTranslation },
+      },
 
       // Only load language part (e.g., "en-US" -> "en")
       load: "languageOnly",
 
-      // Backend configuration: serve from src/locales
-      backend: {
-        loadPath: "/src/locales/{{lng}}/translation.json",
-      },
-
       // Language detection strategy
       detection: {
-        order: [
-          "querystring",
-          "localStorage",
-          "navigator",
-          "htmlTag",
-          "cookie",
-        ],
+        order: ["querystring", "localStorage", "navigator", "htmlTag", "cookie"],
         lookupQuerystring: "lng",
         caches: ["localStorage"],
       },
@@ -107,9 +93,7 @@ export function changeLanguage(lng: SupportedLanguage) {
  */
 export function getCurrentLanguage(): SupportedLanguage {
   // resolvedLanguage is more accurate after initialization
-  const lng = (i18n.resolvedLanguage ||
-    i18n.language ||
-    "en") as SupportedLanguage;
+  const lng = (i18n.resolvedLanguage || i18n.language || "en") as SupportedLanguage;
   return SUPPORTED_LANGUAGES.includes(lng) ? lng : "en";
 }
 
