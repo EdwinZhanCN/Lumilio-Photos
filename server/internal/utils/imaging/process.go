@@ -53,6 +53,11 @@ type ProcessOptions struct {
 	// AutoRotate applies EXIF orientation during load. Only supported for
 	// JPEG and TIFF sources; should be false for WebP and re-encoded images.
 	AutoRotate bool
+	// Rotate bakes a fixed clockwise rotation into the output, applied after
+	// load/AutoRotate. Used for sources whose orientation is not carried in the
+	// pixel data's own metadata (e.g. RAW embedded previews, where the rotation
+	// lives in the RAW container). Angle0 (the zero value) is a no-op.
+	Rotate vips.Angle
 }
 
 // thumbnailImportParams builds an ImportParams for the thumbnail load path.
@@ -164,6 +169,12 @@ func processImageRefFromBytes(buf []byte, opts ProcessOptions) (*vips.ImageRef, 
 				img.Close()
 				return nil, fmt.Errorf("autorotate: %w", err)
 			}
+		}
+	}
+	if opts.Rotate != vips.Angle0 {
+		if err := img.Rotate(opts.Rotate); err != nil {
+			img.Close()
+			return nil, fmt.Errorf("rotate: %w", err)
 		}
 	}
 	if opts.PadWidth > 0 && opts.PadHeight > 0 {

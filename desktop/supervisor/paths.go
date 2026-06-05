@@ -36,6 +36,7 @@ type Paths struct {
 	PGData     string // PostgreSQL data directory (initdb target)
 	PGRun      string // preferred Unix socket directory
 	PGLogs     string // PostgreSQL log directory
+	Logs       string // API/application log directory
 	Secrets    string // db_password + lumilio_secret_key
 	Config     string // generated server.local.toml + desktop-settings.json
 	Backups    string // pg_dump auto-backups (upgrades)
@@ -57,6 +58,7 @@ func NewPaths() (*Paths, error) {
 		PGData:     filepath.Join(pgVersionDir, "data"),
 		PGRun:      filepath.Join(pgVersionDir, "run"),
 		PGLogs:     filepath.Join(pgVersionDir, "logs"),
+		Logs:       filepath.Join(root, "logs"),
 		Secrets:    filepath.Join(root, "secrets"),
 		Config:     filepath.Join(root, "config"),
 		Backups:    filepath.Join(root, "backups"),
@@ -78,7 +80,7 @@ func resolveAppDataRoot() (string, error) {
 // EnsureDirs creates the full app-data directory tree. The media library is
 // created separately once its (possibly user-chosen) location is resolved.
 func (p *Paths) EnsureDirs() error {
-	for _, dir := range []string{p.AppData, p.PGData, p.PGRun, p.PGLogs, p.Secrets, p.Config, p.Backups} {
+	for _, dir := range []string{p.AppData, p.PGData, p.PGRun, p.PGLogs, p.Logs, p.Secrets, p.Config, p.Backups} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}

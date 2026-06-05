@@ -32,6 +32,7 @@ func TestWriteServerConfigInvariants(t *testing.T) {
 	params := ServerConfigParams{
 		Port:          "6680",
 		WebRoot:       "/bundle/web",
+		LogDir:        "/Users/me/Library/Application Support/Lumilio Photos/logs",
 		StoragePath:   "/Volumes/Photos/Lumilio Library",
 		SocketDir:     "/Users/me/Library/Application Support/Lumilio Photos/postgres/16/run",
 		PGPort:        "5487",
@@ -57,6 +58,7 @@ func TestWriteServerConfigInvariants(t *testing.T) {
 		`webauthn_rp_origins = ["http://localhost:6680"]`,
 		`port = "6680"`,
 		`web_root = "/bundle/web"`,
+		`dir = "/Users/me/Library/Application Support/Lumilio Photos/logs"`,
 		`path = "/Volumes/Photos/Lumilio Library"`,
 		`host = "/Users/me/Library/Application Support/Lumilio Photos/postgres/16/run"`,
 		`exiftool_path = "/bundle/exiftool"`,

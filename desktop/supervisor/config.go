@@ -75,6 +75,7 @@ func ensureSecret(path string) error {
 type ServerConfigParams struct {
 	Port          string
 	WebRoot       string // empty → API only (no SPA served)
+	LogDir        string
 	StoragePath   string
 	SocketDir     string
 	PGPort        string
@@ -102,6 +103,12 @@ port = %s
 log_level = "info"
 cors_allowed_origins = ["http://localhost:6657"]
 web_root = %s
+
+[logging]
+level = "info"
+dir = %s
+console_format = "console"
+file_format = "json"
 
 [database]
 host = %s
@@ -137,6 +144,7 @@ ffprobe_path = %s
 `,
 		tomlString(p.Port),
 		tomlString(p.WebRoot),
+		tomlString(p.LogDir),
 		tomlString(p.SocketDir),
 		tomlString(p.PGPort),
 		tomlString(p.DBUser),

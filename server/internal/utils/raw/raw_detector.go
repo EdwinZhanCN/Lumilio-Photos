@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"path/filepath"
 	"server/internal/utils/file"
 	"strings"
@@ -32,13 +33,16 @@ const (
 )
 
 // RAWMagicBytes contains magic bytes for different RAW formats
+// RAWMagicBytes are best-effort header signatures used to corroborate the
+// extension-based format guess. They are advisory only: detection never rejects
+// a file on a magic-byte mismatch (libraw does the authoritative decoding), so a
+// missing or loose entry is safe.
+// Only formats with a genuinely distinctive header signature are listed. TIFF
+// container RAWs (NEF, DNG, ARW, PEF, SRW, RW2) have no format-unique magic and
+// vary in endianness, so they are intentionally absent and detected by extension.
 var RAWMagicBytes = map[RAWFormat][]byte{
 	FormatCR2: []byte("CR\x02\x00"),
-	FormatCR3: []byte("CR\x03\x00"),
-	FormatNEF: []byte("FUJIFILMCCD-RAW"),
-	FormatDNG: []byte("DNG "),
 	FormatORF: []byte("OLYMP\x00"),
-	FormatRW2: []byte("RW2"),
 	FormatRAF: []byte("FUJIFILMCCD-RAW"),
 	FormatX3F: []byte("FOVb"),
 }
@@ -118,18 +122,13 @@ func (d *Detector) DetectRAW(reader io.Reader, filename string) (*DetectionResul
 	}
 	headerBytes = headerBytes[:n]
 
-	// Verify with magic bytes if available
-	if magicBytes, exists := RAWMagicBytes[result.Format]; exists {
-		if !bytes.Contains(headerBytes, magicBytes) {
-			// Extension suggests RAW but magic bytes don't match
-			// Still consider it RAW (some formats have variations)
-			result.IsRAW = true
-		} else {
-			result.IsRAW = true
-		}
-	} else {
-		// No magic bytes defined, trust the extension
-		result.IsRAW = true
+	// The extension already matched a known RAW format, so treat it as RAW.
+	// When we have a signature for this format we cross-check the header, but a
+	// mismatch is never fatal: RAW containers vary by camera and libraw does the
+	// authoritative decode downstream.
+	result.IsRAW = true
+	if magicBytes, exists := RAWMagicBytes[result.Format]; exists && !bytes.Contains(headerBytes, magicBytes) {
+		log.Printf("RAW header signature mismatch for %s (%s); trusting extension", filename, result.Format)
 	}
 
 	if result.IsRAW {
