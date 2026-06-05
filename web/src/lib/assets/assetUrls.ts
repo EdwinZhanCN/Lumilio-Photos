@@ -23,6 +23,31 @@ export const assetUrls = {
     return withMediaToken(`${baseURL}/api/v1/assets/download`);
   },
 
+  /**
+   * Server-side re-encode/download endpoint. The backend (libvips) transcodes
+   * the original to the requested format/size and streams it as an attachment.
+   */
+  getExportUrl(
+    id: string,
+    params: {
+      format: "jpeg" | "png" | "webp" | "avif";
+      quality?: number; // 1-100
+      maxWidth?: number;
+      maxHeight?: number;
+      filename?: string; // base name, without extension
+    },
+  ): string {
+    const search = new URLSearchParams();
+    search.set("format", params.format);
+    if (params.quality != null) search.set("quality", String(params.quality));
+    if (params.maxWidth != null) search.set("max_width", String(params.maxWidth));
+    if (params.maxHeight != null) search.set("max_height", String(params.maxHeight));
+    if (params.filename) search.set("filename", params.filename);
+    return withMediaToken(
+      `${baseURL}/api/v1/assets/${id}/export?${search.toString()}`,
+    );
+  },
+
   getThumbnailUrl(
     id: string,
     size: "small" | "medium" | "large" = "small",

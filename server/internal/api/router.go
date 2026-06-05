@@ -17,6 +17,7 @@ type AssetControllerInterface interface {
 	GetAssetSidecar(c *gin.Context)
 	UpdateAssetSidecar(c *gin.Context)
 	GetOriginalFile(c *gin.Context)
+	ExportAsset(c *gin.Context) // GET /assets/:id/export - Re-encode original to jpeg/png/webp/avif
 	DownloadAssets(c *gin.Context)
 	GetWebVideo(c *gin.Context)
 	GetWebAudio(c *gin.Context)
@@ -354,6 +355,7 @@ func NewRouter(
 			assets.PUT("/:id/sidecar", assetController.UpdateAssetSidecar)
 			assets.GET("/:id/original", assetController.GetOriginalFile)
 			assets.HEAD("/:id/original", assetController.GetOriginalFile)
+			assets.GET("/:id/export", assetController.ExportAsset)
 			assets.GET("/:id/video/web", assetController.GetWebVideo)
 			assets.HEAD("/:id/video/web", assetController.GetWebVideo)
 			assets.GET("/:id/audio/web", assetController.GetWebAudio)

@@ -19,7 +19,7 @@ const Assets = () => {
       )}
     >
       <AssetsProvider scopeId="assets:main" persist>
-        <WorkerProvider preload={["export"]}>
+        <WorkerProvider>
           <AssetsGalleryPage />
         </WorkerProvider>
       </AssetsProvider>

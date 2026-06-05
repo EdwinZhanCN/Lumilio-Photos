@@ -504,7 +504,11 @@ export const CopyButton: React.FC<{
   label?: string;
   copiedLabel?: string;
   variant?: "chip" | "block";
-}> = ({ text, label = "Copy", copiedLabel = "Copied", variant = "chip" }) => {
+}> = ({ text, label, copiedLabel, variant = "chip" }) => {
+  const { t } = useI18n();
+  const resolvedLabel = label ?? t("common.copy", { defaultValue: "Copy" });
+  const resolvedCopiedLabel =
+    copiedLabel ?? t("common.copied", { defaultValue: "Copied" });
   const [done, setDone] = useState(false);
   const copy = () => {
     void navigator.clipboard?.writeText(text).catch(() => undefined);
@@ -519,7 +523,7 @@ export const CopyButton: React.FC<{
         className="btn btn-outline h-11 min-h-11 w-full gap-2 rounded-xl border-base-300 font-medium normal-case text-base-content hover:bg-base-200"
       >
         {done ? <Check size={16} /> : <Copy size={16} />}{" "}
-        {done ? copiedLabel : label}
+        {done ? resolvedCopiedLabel : resolvedLabel}
       </button>
     );
   }
@@ -530,7 +534,7 @@ export const CopyButton: React.FC<{
       className="btn btn-ghost btn-sm gap-1.5 rounded-lg text-base-content/60 hover:text-base-content"
     >
       {done ? <Check size={14} /> : <Copy size={14} />}{" "}
-      {done ? copiedLabel : label}
+      {done ? resolvedCopiedLabel : resolvedLabel}
     </button>
   );
 };
@@ -711,14 +715,22 @@ export const RecoveryCodesPanel: React.FC<{
   checkboxLabel?: string;
   onConfirm: () => void;
   busy?: boolean;
-}> = ({
-  codes,
-  confirmLabel = "Continue",
-  warning = "Each code works once. Store them somewhere safe — they’re the only way back in if you lose your passkey and authenticator.",
-  checkboxLabel = "I’ve saved my recovery codes somewhere safe",
-  onConfirm,
-  busy,
-}) => {
+}> = ({ codes, confirmLabel, warning, checkboxLabel, onConfirm, busy }) => {
+  const { t } = useI18n();
+  const resolvedConfirmLabel =
+    confirmLabel ??
+    t("auth.bootstrap.recovery.continue", { defaultValue: "Continue" });
+  const resolvedWarning =
+    warning ??
+    t("auth.bootstrap.recovery.warning", {
+      defaultValue:
+        "Each code works once. Store them somewhere safe — they’re the only way back in if you lose your passkey and authenticator.",
+    });
+  const resolvedCheckboxLabel =
+    checkboxLabel ??
+    t("auth.bootstrap.recovery.savedConfirm", {
+      defaultValue: "I’ve saved my recovery codes somewhere safe",
+    });
   const [saved, setSaved] = useState(false);
   const [pulled, setPulled] = useState(false);
   const download = () => {
@@ -745,7 +757,7 @@ export const RecoveryCodesPanel: React.FC<{
     <>
       <div className="flex items-start gap-2.5 rounded-xl bg-warning/10 px-4 py-3 text-sm text-base-content/75">
         <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warning" />
-        <span>{warning}</span>
+        <span>{resolvedWarning}</span>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-2xl border border-base-200 bg-base-200/40 p-5 font-mono text-[0.92rem] tabular-nums text-base-content">
         {codes.map((c, i) => (
@@ -764,12 +776,20 @@ export const RecoveryCodesPanel: React.FC<{
           className="btn btn-outline h-11 min-h-11 flex-1 gap-2 rounded-xl border-base-300 font-medium normal-case text-base-content hover:bg-base-200"
         >
           {pulled ? <Check size={16} /> : <Download size={16} />}{" "}
-          {pulled ? "Downloaded" : "Download"}
+          {pulled
+            ? t("auth.bootstrap.recovery.downloaded", {
+                defaultValue: "Downloaded",
+              })
+            : t("auth.bootstrap.recovery.download", {
+                defaultValue: "Download",
+              })}
         </button>
         <div className="flex-1">
           <CopyButton
             text={codes.join("\n")}
-            label="Copy all"
+            label={t("auth.bootstrap.recovery.copyAll", {
+              defaultValue: "Copy all",
+            })}
             variant="block"
           />
         </div>
@@ -781,7 +801,9 @@ export const RecoveryCodesPanel: React.FC<{
           checked={saved}
           onChange={(e) => setSaved(e.target.checked)}
         />
-        <span className="text-sm text-base-content/80">{checkboxLabel}</span>
+        <span className="text-sm text-base-content/80">
+          {resolvedCheckboxLabel}
+        </span>
       </label>
       <Btn
         variant="primary"
@@ -790,7 +812,7 @@ export const RecoveryCodesPanel: React.FC<{
         loading={busy}
         onClick={onConfirm}
       >
-        {confirmLabel}
+        {resolvedConfirmLabel}
       </Btn>
     </>
   );
@@ -818,17 +840,38 @@ export const TotpSetupPanel: React.FC<{
   invalid,
   busy,
   errorMessage,
-  verifyLabel = "Verify & enable",
+  verifyLabel,
   steps,
 }) => {
+  const { t } = useI18n();
   const [reveal, setReveal] = useState(false);
   const copy = {
-    open: steps?.open ?? "Open your authenticator app",
+    open:
+      steps?.open ??
+      t("auth.bootstrap.totp.setup.openApp", {
+        defaultValue: "Open your authenticator app",
+      }),
     openSub:
-      steps?.openSub ?? "Google Authenticator, 1Password, Authy, or similar.",
-    scan: steps?.scan ?? "Scan this QR code",
-    enter: steps?.enter ?? "Enter the 6-digit code",
+      steps?.openSub ??
+      t("auth.bootstrap.totp.setup.openAppSub", {
+        defaultValue: "Google Authenticator, 1Password, Authy, or similar.",
+      }),
+    scan:
+      steps?.scan ??
+      t("auth.bootstrap.totp.setup.scanQr", {
+        defaultValue: "Scan this QR code",
+      }),
+    enter:
+      steps?.enter ??
+      t("auth.bootstrap.totp.setup.enterCode", {
+        defaultValue: "Enter the 6-digit code",
+      }),
   };
+  const resolvedVerifyLabel =
+    verifyLabel ??
+    t("auth.bootstrap.totp.setup.verifyButton", {
+      defaultValue: "Verify & enable",
+    });
   const stepNum = (n: number) => (
     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-base-200 text-xs font-semibold text-base-content/70">
       {n}
@@ -855,7 +898,13 @@ export const TotpSetupPanel: React.FC<{
                 onClick={() => setReveal((r) => !r)}
                 className="text-xs font-medium text-base-content/45 underline-offset-2 hover:underline"
               >
-                {reveal ? "Hide setup key" : "Can’t scan? Enter key manually"}
+                {reveal
+                  ? t("auth.bootstrap.totp.setup.hideKey", {
+                      defaultValue: "Hide setup key",
+                    })
+                  : t("auth.bootstrap.totp.setup.showKey", {
+                      defaultValue: "Can’t scan? Enter key manually",
+                    })}
               </button>
               {reveal && (
                 <div className="flex items-center gap-1 rounded-lg border border-base-200 bg-base-200/50 py-1 pl-3 pr-1">
@@ -895,7 +944,7 @@ export const TotpSetupPanel: React.FC<{
         onClick={onVerify}
         disabled={code.length < 6}
       >
-        {verifyLabel}
+        {resolvedVerifyLabel}
       </Btn>
     </>
   );

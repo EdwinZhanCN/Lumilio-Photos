@@ -504,7 +504,7 @@ export default function AccountSettings() {
 
   const handleMFAToggle = () => {
     const search = mfaStatus?.totp_enabled ? "?action=disable" : "?mfa=setup";
-    navigate(`/mfa${search}`, {
+    void navigate(`/mfa${search}`, {
       state: {
         from: {
           pathname: "/settings",
@@ -607,7 +607,7 @@ export default function AccountSettings() {
   };
 
   const handleChangePassword = () => {
-    navigate("/change-password", {
+    void navigate("/change-password", {
       state: {
         from: {
           pathname: "/settings",

@@ -641,7 +641,7 @@ const AssetsPageHeader = ({
                     type="button"
                     className="text-info"
                     onClick={() => {
-                      handleAddToAlbumClick();
+                      void handleAddToAlbumClick();
                       handleDropdownItemClick();
                     }}
                   >
@@ -653,7 +653,7 @@ const AssetsPageHeader = ({
                   <button
                     type="button"
                     onClick={() => {
-                      handleDownloadAll();
+                      void handleDownloadAll();
                       handleDropdownItemClick();
                     }}
                   >
@@ -756,7 +756,7 @@ const AssetsPageHeader = ({
             <li>
               <button
                 onClick={() => {
-                  handleScanCurrentLibrary();
+                  void handleScanCurrentLibrary();
                   handleDropdownItemClick();
                 }}
                 disabled={isScanning || repositories.length === 0}
@@ -791,7 +791,7 @@ const AssetsPageHeader = ({
                       <li>
                         <button
                           onClick={() => {
-                            handleAddToAlbumClick();
+                            void handleAddToAlbumClick();
                             handleDropdownItemClick();
                           }}
                         >
@@ -802,7 +802,7 @@ const AssetsPageHeader = ({
                       <li>
                         <button
                           onClick={() => {
-                            handleDownloadAll();
+                            void handleDownloadAll();
                             handleDropdownItemClick();
                           }}
                         >

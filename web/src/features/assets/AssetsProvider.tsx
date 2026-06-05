@@ -332,7 +332,7 @@ export const AssetsProvider = ({
     });
 
     if (routeState?.assetsInitialFilter) {
-      navigate(`${location.pathname}${location.search}`, {
+      void navigate(`${location.pathname}${location.search}`, {
         replace: true,
         state: null,
       });
@@ -414,7 +414,7 @@ export const AssetsProvider = ({
       const path = basePath || "/assets";
 
       const query = currentParams?.toString();
-      navigate(`${path}/${assetId}${query ? `?${query}` : ""}`);
+      void navigate(`${path}/${assetId}${query ? `?${query}` : ""}`);
     },
     [basePath, navigate, searchParams, syncUrl],
   );
@@ -424,7 +424,7 @@ export const AssetsProvider = ({
     const path = basePath || "/assets";
 
     const query = currentParams?.toString();
-    navigate(`${path}${query ? `?${query}` : ""}`);
+    void navigate(`${path}${query ? `?${query}` : ""}`);
   }, [basePath, navigate, searchParams, syncUrl]);
 
   const contextValue = useMemo<AssetsNavigationContextValue>(

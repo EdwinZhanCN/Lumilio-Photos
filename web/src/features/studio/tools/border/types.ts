@@ -1,4 +1,18 @@
-export type BorderMode = "COLORED" | "FROSTED" | "VIGNETTE";
+export type BorderMode =
+  | "COLORED"
+  | "FROSTED"
+  | "VIGNETTE"
+  | "FROSTED_INFO"
+  | "INFO_STRIP";
+
+/** Modes that are driven by EXIF metadata + a brand logo. */
+export const EXIF_BORDER_MODES = ["FROSTED_INFO", "INFO_STRIP"] as const;
+
+export function isExifBorderMode(
+  mode: BorderMode,
+): mode is "FROSTED_INFO" | "INFO_STRIP" {
+  return mode === "FROSTED_INFO" || mode === "INFO_STRIP";
+}
 
 export type BorderParams = {
   mode: BorderMode;
@@ -29,7 +43,13 @@ function toNumber(value: unknown, fallback: number): number {
 }
 
 function toMode(value: unknown): BorderMode {
-  if (value === "FROSTED" || value === "VIGNETTE" || value === "COLORED") {
+  if (
+    value === "FROSTED" ||
+    value === "VIGNETTE" ||
+    value === "COLORED" ||
+    value === "FROSTED_INFO" ||
+    value === "INFO_STRIP"
+  ) {
     return value;
   }
   return DEFAULT_PARAMS.mode;

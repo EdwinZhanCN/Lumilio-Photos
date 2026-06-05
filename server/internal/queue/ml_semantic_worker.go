@@ -73,7 +73,7 @@ func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[Process
 	// reclassifies every asset. Best-effort: a failed enqueue must not force a
 	// costly re-embed, and the next reindex will recover it.
 	if classifyEnabled, cfgErr := isMLTaskEnabled(ctx, w.ConfigProvider, "classify_zeroshot"); cfgErr == nil && classifyEnabled {
-		if client := river.ClientFromContext[pgx.Tx](ctx); client != nil {
+		if client, clientErr := river.ClientFromContextSafely[pgx.Tx](ctx); clientErr == nil {
 			_, _ = client.Insert(ctx, jobs.ZeroshotClassifyArgs{AssetID: pgUUID}, &river.InsertOpts{Queue: "classify_zeroshot"})
 		}
 	}

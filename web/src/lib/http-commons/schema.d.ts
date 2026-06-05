@@ -2040,6 +2040,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export asset
+         * @description Re-encode an asset's original file to JPEG, PNG, WebP, or AVIF with optional max dimensions and quality, and stream it back as a download.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Output format (jpeg, png, webp, avif) */
+                    format: string;
+                    /** @description Quality 1-100 for lossy formats */
+                    quality?: number;
+                    /** @description Maximum output width in pixels */
+                    max_width?: number;
+                    /** @description Maximum output height in pixels */
+                    max_height?: number;
+                    /** @description Base download filename (without extension) */
+                    filename?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Encoded image */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/avif": Record<string, never>;
+                        "image/jpeg": Record<string, never>;
+                        "image/png": Record<string, never>;
+                        "image/webp": Record<string, never>;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/avif": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/png": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Authentication required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/avif": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/png": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/avif": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/png": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Asset or original file not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/avif": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/png": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Source image could not be encoded */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/avif": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/png": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/avif": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/png": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/{id}/like": {
         parameters: {
             query?: never;
@@ -5760,7 +5888,7 @@ export interface paths {
         put?: never;
         /**
          * Preview a zero-shot classifier
-         * @description Embed positive/negative prompts with SigLIP and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the CLIP embedding pipeline and a reachable SigLIP text-embed task.
+         * @description Embed positive/negative prompts with semantic and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.
          */
         post: {
             parameters: {
@@ -9950,9 +10078,9 @@ export interface components {
         };
         "dto.AssetIndexingTaskSetStatsDTO": {
             bioclip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
-            clip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             face?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             ocr?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+            semantic?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
         };
         "dto.AssetIndexingTaskStatsDTO": {
             /** @example 1200 */
@@ -10609,10 +10737,10 @@ export interface components {
         };
         "dto.MLSettingsDTO": {
             bioclip_enabled?: boolean;
-            clip_enabled?: boolean;
             face_enabled?: boolean;
             ocr_enabled?: boolean;
-            siglip_classify_enabled?: boolean;
+            semantic_enabled?: boolean;
+            zeroshot_classify_enabled?: boolean;
         };
         "dto.MLTaskCapabilityDTO": {
             available?: boolean;
@@ -10799,7 +10927,7 @@ export interface components {
             repository_id?: string;
             /**
              * @example [
-             *       "clip",
+             *       "semantic",
              *       "ocr"
              *     ]
              */
@@ -11223,10 +11351,10 @@ export interface components {
         };
         "dto.UpdateMLSettingsDTO": {
             bioclip_enabled?: boolean;
-            clip_enabled?: boolean;
             face_enabled?: boolean;
             ocr_enabled?: boolean;
-            siglip_classify_enabled?: boolean;
+            semantic_enabled?: boolean;
+            zeroshot_classify_enabled?: boolean;
         };
         "dto.UpdateOwnProfileRequestDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */

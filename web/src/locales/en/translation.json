@@ -325,9 +325,15 @@
         "title": "Secure the admin with a passkey"
       },
       "recovery": {
+        "continue": "Continue",
+        "copyAll": "Copy all",
         "cta": "Finish & open dashboard",
+        "download": "Download",
+        "downloaded": "Downloaded",
+        "savedConfirm": "I’ve saved my recovery codes somewhere safe",
         "subtitle": "The only way to recover the server if every factor is lost.",
-        "title": "Save admin recovery codes"
+        "title": "Save admin recovery codes",
+        "warning": "Each code works once. Store them somewhere safe — they’re the only way back in if you lose your passkey and authenticator."
       },
       "sidebarNote": "This wizard appears only once — until the first administrator is created.",
       "step": {
@@ -339,6 +345,15 @@
       },
       "stepNum": "Step {{n}}",
       "totp": {
+        "setup": {
+          "enterCode": "Enter the 6-digit code",
+          "hideKey": "Hide setup key",
+          "openApp": "Open your authenticator app",
+          "openAppSub": "Google Authenticator, 1Password, Authy, or similar.",
+          "scanQr": "Scan this QR code",
+          "showKey": "Can’t scan? Enter key manually",
+          "verifyButton": "Verify & enable"
+        },
         "skip": "Skip for now",
         "subtitle": "Optional — scan and verify to enable an authenticator app.",
         "title": "Add an authenticator app"
@@ -756,12 +771,12 @@
       "cloudCredentialsHintLink": "Settings",
       "cloudCredentialsHintPrefix": "Need an account?",
       "cloudCredentialsHintSuffix": ".",
-      "createAction": "Add library",
-      "createFailed": "Failed to create library.",
       "cloudImportCreatePartial": "Library created, but cloud import did not start: {{error}}",
       "cloudImportCreateSuccess": "Library created. Cloud import has started for {{name}}.",
       "cloudImportFailed": "Failed to start cloud import.",
       "cloudImportStarted": "Cloud import started for {{name}}.",
+      "createAction": "Add library",
+      "createFailed": "Failed to create library.",
       "createNameLabel": "Library name",
       "createNamePlaceholder": "Family Photos",
       "createSubmit": "Create library",
@@ -775,6 +790,7 @@
       "duplicateScan": "Scan for duplicates",
       "duplicateScanFailed": "Duplicate scan failed.",
       "empty": "No repositories are available.",
+      "importFromCloud": "Import from cloud",
       "noCloudCredentials": "No connected credentials",
       "primaryBadge": "Primary",
       "rebuildLocation": "Rebuild location clusters",
@@ -787,7 +803,6 @@
       "scanQueued": "Scan queued for {{name}}.",
       "selectCloudCredential": "Select credential",
       "sourceCloud": "Cloud",
-      "importFromCloud": "Import from cloud",
       "sourceLabel": "Source",
       "sourceLocal": "Local",
       "title": "Libraries",
@@ -1099,15 +1114,15 @@
       "saveSuccess": "Settings saved.",
       "taskDescriptions": {
         "bioclip": "Identify plants, animals, and other biological subjects.",
-        "clip": "Find photos by visual meaning, not only filenames.",
         "face": "Detect and group recognizable faces.",
-        "ocr": "Read visible text inside photos."
+        "ocr": "Read visible text inside photos.",
+        "semantic": "Find photos by visual meaning, not only filenames."
       },
       "taskNames": {
         "bioclip": "Field guide",
-        "clip": "Semantic search",
         "face": "Face recognition",
-        "ocr": "Text recognition"
+        "ocr": "Text recognition",
+        "semantic": "Semantic search"
       },
       "validate": "Validate connection",
       "validationError": "Failed to validate LLM configuration.",
@@ -1379,14 +1394,20 @@
         "apply": "Apply border",
         "blur": "Blur",
         "borderWidth": "Border Width",
+        "brandLogo": "{{brand}} (logo)",
+        "brandText": "{{brand}} (text)",
         "brightness": "Brightness",
         "clear": "Clear",
         "color": "Color",
         "cornerRadius": "Corner Radius",
         "done": "Border applied",
+        "exifAuto": "Auto-filled from EXIF",
+        "exifMissing": "This style needs camera EXIF (model + at least one of focal length, aperture, shutter, ISO). It's unavailable for this photo.",
         "hint": "Border bakes new pixels on top of your current edit. Apply to preview, then export.",
         "modeColored": "Colored",
         "modeFrosted": "Frosted",
+        "modeFrostedInfo": "Frosted Info",
+        "modeInfoStrip": "Info Strip",
         "modeVignette": "Vignette",
         "strength": "Strength"
       },
@@ -1414,6 +1435,10 @@
       "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
     },
     "SupportedFormatsModal": {
+      "category_audio": "Audio",
+      "category_photos": "Photos",
+      "category_raw_formats": "RAW Formats",
+      "category_videos": "Videos",
       "close_button_aria_label": "Close",
       "formats_count_one": "{{count}} format",
       "formats_count_other": "{{count}} formats",

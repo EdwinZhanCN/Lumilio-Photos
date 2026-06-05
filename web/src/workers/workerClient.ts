@@ -17,13 +17,7 @@ import type {
   LayoutResult,
 } from "@/lib/layout/justifiedLayout";
 
-export type WorkerType =
-  | "thumbnail"
-  | "hash"
-  | "export"
-  | "exif"
-  | "justified"
-  | "tool";
+export type WorkerType = "hash" | "justified" | "tool";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
@@ -37,10 +31,7 @@ export interface SingleHashResult {
 }
 
 export class AppWorkerClient {
-  private generateThumbnailworker: Worker | null = null;
   private hashWorkers: Worker[] = [];
-  private exportWorker: Worker | null = null;
-  private extractExifWorker: Worker | null = null;
   private justifiedLayoutWorker: Worker | null = null;
   private toolWorker: Worker | null = null;
   private justifiedInitPromise: Promise<void> | null = null;
@@ -62,15 +53,6 @@ export class AppWorkerClient {
 
   private getOrInitializeWorker(type: WorkerType, index: number = 0): Worker {
     switch (type) {
-      case "thumbnail":
-        if (!this.generateThumbnailworker) {
-          this.generateThumbnailworker = new Worker(
-            new URL("./thumbnail.worker.ts", import.meta.url),
-            { type: "module" },
-          );
-        }
-        return this.generateThumbnailworker;
-
       case "hash":
         if (!this.hashWorkers[index]) {
           this.hashWorkers[index] = new Worker(
@@ -79,24 +61,6 @@ export class AppWorkerClient {
           );
         }
         return this.hashWorkers[index];
-
-      case "export":
-        if (!this.exportWorker) {
-          this.exportWorker = new Worker(
-            new URL("./export.worker.ts", import.meta.url),
-            { type: "module" },
-          );
-        }
-        return this.exportWorker;
-
-      case "exif":
-        if (!this.extractExifWorker) {
-          this.extractExifWorker = new Worker(
-            new URL("./exif.worker.ts", import.meta.url),
-            { type: "module" },
-          );
-        }
-        return this.extractExifWorker;
 
       case "justified":
         if (!this.justifiedLayoutWorker) {
@@ -224,54 +188,6 @@ export class AppWorkerClient {
         payload: { requestId, groups, config },
       });
     });
-  }
-
-  // --- Thumbnail Generation ---
-  async generateThumbnail(data: {
-    files: FileList | File[];
-    batchIndex: number;
-    startIndex: number;
-  }): Promise<{ batchIndex: number; results: any[]; status: string }> {
-    const worker = this.getOrInitializeWorker("thumbnail");
-
-    return new Promise((resolve, reject) => {
-      const handler = (e: MessageEvent) => {
-        switch (e.data.type) {
-          case "BATCH_COMPLETE":
-            resolve({
-              batchIndex: e.data.payload.batchIndex,
-              results: e.data.payload.results,
-              status: "complete",
-            });
-            worker.removeEventListener("message", handler);
-            break;
-          case "ERROR": {
-            const error = new Error(e.data.payload.error);
-            error.name = e.data.payload.errorName;
-            error.stack = e.data.payload.errorStack;
-            worker.removeEventListener("message", handler);
-            reject(error);
-            break;
-          }
-          case "PROGRESS":
-            this.eventTarget.dispatchEvent(
-              new CustomEvent("progress", { detail: e.data.payload }),
-            );
-            break;
-        }
-      };
-      worker.addEventListener("message", handler);
-      worker.postMessage({
-        type: "GENERATE_THUMBNAIL",
-        data,
-      });
-    });
-  }
-
-  abortGenerateThumbnail() {
-    if (this.generateThumbnailworker) {
-      this.generateThumbnailworker.postMessage({ type: "ABORT" });
-    }
   }
 
   // --- Hash Generation (Worker Pool) ---
@@ -475,120 +391,12 @@ export class AppWorkerClient {
     }
   }
 
-  // --- Image Export ---
-  async exportImage(
-    imageUrl: string,
-    options: {
-      format: "jpeg" | "png" | "webp" | "original";
-      quality: number;
-      maxWidth?: number;
-      maxHeight?: number;
-      filename?: string;
-    },
-  ): Promise<{
-    status: "complete" | "error";
-    blob?: Blob;
-    filename?: string;
-    error?: string;
-  }> {
-    const worker = this.getOrInitializeWorker("export");
-
-    return new Promise((resolve) => {
-      const handleMessage = (event: MessageEvent) => {
-        const { type, result, error, payload } = event.data;
-        if (type === "EXPORT_COMPLETE") {
-          worker.removeEventListener("message", handleMessage);
-          resolve({
-            status: "complete",
-            blob: result.blob,
-            filename: result.filename,
-          });
-        } else if (type === "ERROR") {
-          worker.removeEventListener("message", handleMessage);
-          resolve({ status: "error", error: error || "Export failed" });
-        } else if (type === "PROGRESS") {
-          this.eventTarget.dispatchEvent(
-            new CustomEvent("progress", {
-              detail: { processed: payload?.processed || 0 },
-            }),
-          );
-        }
-      };
-      worker.addEventListener("message", handleMessage);
-      worker.postMessage({
-        type: "EXPORT_IMAGE",
-        data: { imageUrl, options },
-      });
-    });
-  }
-
-  abortExportImage() {
-    if (this.exportWorker) {
-      this.exportWorker.postMessage({ type: "ABORT" });
-    }
-  }
-
-  // --- EXIF Extraction ---
-  async extractExif(files: FileList | File[]): Promise<{
-    exifResults: Array<{ index: number; exifData: Record<string, any> }>;
-    status: string;
-  }> {
-    const worker = this.getOrInitializeWorker("exif");
-
-    return new Promise((resolve, reject) => {
-      const handler = (e: MessageEvent) => {
-        switch (e.data.type) {
-          case "EXIF_COMPLETE":
-            worker.removeEventListener("message", handler);
-            resolve({
-              exifResults: e.data.payload.results,
-              status: "complete",
-            });
-            break;
-          case "ERROR":
-            worker.removeEventListener("message", handler);
-            reject(new Error(e.data.payload.error));
-            break;
-          case "PROGRESS":
-            this.eventTarget.dispatchEvent(
-              new CustomEvent("progress", { detail: e.data.payload }),
-            );
-            break;
-        }
-      };
-      worker.addEventListener("message", handler);
-      const filesArray = Array.isArray(files) ? files : Array.from(files);
-      worker.postMessage({
-        type: "EXTRACT_EXIF",
-        data: { files: filesArray },
-      });
-    });
-  }
-
-  abortExtractExif() {
-    if (this.extractExifWorker) {
-      this.extractExifWorker.postMessage({ type: "ABORT" });
-    }
-  }
-
   // --- Lifecycle Management ---
   terminateAllWorkers(): void {
-    if (this.generateThumbnailworker) {
-      this.generateThumbnailworker.terminate();
-      this.generateThumbnailworker = null;
-    }
     this.hashWorkers.forEach((w) => {
       if (w) w.terminate();
     });
     this.hashWorkers = [];
-    if (this.exportWorker) {
-      this.exportWorker.terminate();
-      this.exportWorker = null;
-    }
-    if (this.extractExifWorker) {
-      this.extractExifWorker.terminate();
-      this.extractExifWorker = null;
-    }
     if (this.justifiedLayoutWorker) {
       this.justifiedLayoutWorker.terminate();
       this.justifiedLayoutWorker = null;

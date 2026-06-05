@@ -325,9 +325,15 @@
         "title": "使用 Passkey 保护管理员"
       },
       "recovery": {
+        "continue": "继续",
+        "copyAll": "复制全部",
         "cta": "完成并打开仪表盘",
+        "download": "下载",
+        "downloaded": "已下载",
+        "savedConfirm": "我已将恢复码保存在安全位置",
         "subtitle": "当所有验证方式都丢失时，这是恢复服务器访问的唯一方式。",
-        "title": "保存管理员恢复码"
+        "title": "保存管理员恢复码",
+        "warning": "每个恢复码只能使用一次。请将其保存在安全的地方——如果你丢失了 Passkey 和身份验证器，这是恢复访问的唯一方式。"
       },
       "sidebarNote": "此向导只会出现一次，直到首个管理员创建完成。",
       "step": {
@@ -339,6 +345,15 @@
       },
       "stepNum": "第{{n}}步",
       "totp": {
+        "setup": {
+          "enterCode": "输入 6 位验证码",
+          "hideKey": "隐藏设置密钥",
+          "openApp": "打开你的身份验证器应用",
+          "openAppSub": "Google Authenticator、1Password、Authy 或其他类似应用。",
+          "scanQr": "扫描二维码",
+          "showKey": "无法扫描？手动输入密钥",
+          "verifyButton": "验证并启用"
+        },
         "skip": "暂时跳过",
         "subtitle": "可选 — 扫描并验证以启用验证器",
         "title": "添加身份验证器应用"
@@ -755,12 +770,12 @@
       "cloudCredentialsHintLink": "设置",
       "cloudCredentialsHintPrefix": "需要账号？前往",
       "cloudCredentialsHintSuffix": "。",
-      "createAction": "添加资源库",
-      "createFailed": "创建资源库失败。",
       "cloudImportCreatePartial": "资源库已创建，但云导入未启动：{{error}}",
       "cloudImportCreateSuccess": "资源库已创建，已为 {{name}} 启动云导入。",
       "cloudImportFailed": "启动云导入失败。",
       "cloudImportStarted": "已为 {{name}} 启动云导入。",
+      "createAction": "添加资源库",
+      "createFailed": "创建资源库失败。",
       "createNameLabel": "资源库名称",
       "createNamePlaceholder": "家庭照片",
       "createSubmit": "创建资源库",
@@ -774,6 +789,7 @@
       "duplicateScan": "扫描重复项",
       "duplicateScanFailed": "重复项扫描失败。",
       "empty": "暂无可用仓库。",
+      "importFromCloud": "从云端导入",
       "noCloudCredentials": "没有已连接凭证",
       "primaryBadge": "主仓库",
       "rebuildLocation": "重建位置聚类",
@@ -786,7 +802,6 @@
       "scanQueued": "已为 {{name}} 加入扫描队列。",
       "selectCloudCredential": "选择凭证",
       "sourceCloud": "云导入",
-      "importFromCloud": "从云端导入",
       "sourceLabel": "来源",
       "sourceLocal": "本地",
       "title": "资源库",
@@ -1098,15 +1113,15 @@
       "saveSuccess": "设置已保存。",
       "taskDescriptions": {
         "bioclip": "识别植物、动物等生物主题。",
-        "clip": "让照片可以按画面语义被找到。",
         "face": "检测并归类可识别的人脸。",
-        "ocr": "读取照片画面中的可见文字。"
+        "ocr": "读取照片画面中的可见文字。",
+        "semantic": "让照片可以按画面语义被找到。"
       },
       "taskNames": {
         "bioclip": "生物图鉴",
-        "clip": "语义搜索",
         "face": "人脸识别",
-        "ocr": "文字识别"
+        "ocr": "文字识别",
+        "semantic": "语义搜索"
       },
       "validate": "验证连接",
       "validationError": "LLM 配置验证失败。",
@@ -1377,14 +1392,20 @@
         "apply": "应用边框",
         "blur": "模糊",
         "borderWidth": "边框宽度",
+        "brandLogo": "{{brand}}（徽标）",
+        "brandText": "{{brand}}（文字）",
         "brightness": "亮度",
         "clear": "清除",
         "color": "颜色",
         "cornerRadius": "圆角半径",
         "done": "边框已应用",
+        "exifAuto": "已从 EXIF 自动填充",
+        "exifMissing": "此样式需要相机 EXIF（型号，以及焦距 / 光圈 / 快门 / ISO 至少一项），此照片不可用。",
         "hint": "边框在当前编辑之上叠加新像素。应用后可预览，然后导出。",
         "modeColored": "彩色",
         "modeFrosted": "磨砂",
+        "modeFrostedInfo": "磨砂信息",
+        "modeInfoStrip": "信息栏",
         "modeVignette": "暗角",
         "strength": "强度"
       },
@@ -1412,6 +1433,10 @@
       "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
     },
     "SupportedFormatsModal": {
+      "category_audio": "音频",
+      "category_photos": "照片",
+      "category_raw_formats": "RAW 格式",
+      "category_videos": "视频",
       "close_button_aria_label": "关闭",
       "formats_count_one": "{{count}} 种格式",
       "formats_count_other": "{{count}} 种格式",

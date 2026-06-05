@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"strings"
 
 	"github.com/davidbyttow/govips/v2/vips"
 )
@@ -304,9 +305,78 @@ func encode(img *vips.ImageRef, opts ProcessOptions) ([]byte, error) {
 		}
 		return out, nil
 
+	case vips.ImageTypeAVIF:
+		params := vips.NewAvifExportParams()
+		if opts.Quality > 0 {
+			params.Quality = opts.Quality
+		}
+		params.StripMetadata = opts.StripMetadata
+		out, _, err := img.ExportAvif(params)
+		if err != nil {
+			return nil, fmt.Errorf("export avif: %w", err)
+		}
+		return out, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported output format: %v", format)
 	}
+}
+
+// exportFormat maps a user-facing format name to its vips type, MIME type, and
+// file extension.
+type exportFormat struct {
+	vt   vips.ImageType
+	mime string
+	ext  string
+}
+
+var exportFormats = map[string]exportFormat{
+	"jpeg": {vips.ImageTypeJPEG, "image/jpeg", "jpg"},
+	"jpg":  {vips.ImageTypeJPEG, "image/jpeg", "jpg"},
+	"png":  {vips.ImageTypePNG, "image/png", "png"},
+	"webp": {vips.ImageTypeWEBP, "image/webp", "webp"},
+	"avif": {vips.ImageTypeAVIF, "image/avif", "avif"},
+}
+
+// ExportParams describes a user-facing export/transcode request.
+type ExportParams struct {
+	// Format is the output format name: jpeg, png, webp, or avif.
+	Format string
+	// Quality is the lossy encoder quality (1-100). 0 lets the encoder pick.
+	Quality int
+	// MaxWidth and MaxHeight bound the output size (aspect preserved, never
+	// upscaled). 0 keeps the source dimensions.
+	MaxWidth  int
+	MaxHeight int
+}
+
+// IsSupportedExportFormat reports whether name is an exportable format.
+func IsSupportedExportFormat(name string) bool {
+	_, ok := exportFormats[strings.ToLower(strings.TrimSpace(name))]
+	return ok
+}
+
+// ExportImageBytes re-encodes a source image to the requested format/size for a
+// user-facing download. Orientation is baked in for sources that carry EXIF
+// orientation (JPEG/TIFF); metadata and the ICC profile are preserved.
+//
+// Returns the encoded bytes, the MIME type, and the canonical file extension.
+func ExportImageBytes(buf []byte, p ExportParams) (data []byte, mime string, ext string, err error) {
+	f, ok := exportFormats[strings.ToLower(strings.TrimSpace(p.Format))]
+	if !ok {
+		return nil, "", "", fmt.Errorf("unsupported export format: %q", p.Format)
+	}
+	out, err := ProcessImageBytes(buf, ProcessOptions{
+		Width:      p.MaxWidth,
+		Height:     p.MaxHeight,
+		Format:     f.vt,
+		Quality:    p.Quality,
+		AutoRotate: shouldAutoRotate(buf),
+	})
+	if err != nil {
+		return nil, "", "", err
+	}
+	return out, f.mime, f.ext, nil
 }
 
 func exportRGB(img *vips.ImageRef) (*RGBImage, error) {

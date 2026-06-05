@@ -12,7 +12,7 @@ describe("retry task asset type support", () => {
     expect(isRetryTaskSupportedForAssetType("thumbnail_asset", "PHOTO")).toBe(
       true,
     );
-    expect(isRetryTaskSupportedForAssetType("process_clip", "PHOTO")).toBe(
+    expect(isRetryTaskSupportedForAssetType("process_semantic", "PHOTO")).toBe(
       true,
     );
     expect(isRetryTaskSupportedForAssetType("transcode_asset", "PHOTO")).toBe(

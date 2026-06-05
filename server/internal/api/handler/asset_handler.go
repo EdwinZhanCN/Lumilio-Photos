@@ -23,6 +23,8 @@ import (
 	"server/internal/storage"
 	filevalidator "server/internal/utils/file"
 	"server/internal/utils/hash"
+	"server/internal/utils/imagesource"
+	"server/internal/utils/imaging"
 	"server/internal/utils/memory"
 	"server/internal/utils/upload"
 	"strconv"
@@ -1062,6 +1064,129 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 
 	// Serve the file
 	c.File(fullPath)
+}
+
+// clampedIntQuery parses an integer query parameter, returning def when absent
+// or invalid, and clamping the result to [min, max].
+func clampedIntQuery(c *gin.Context, key string, def, min, max int) int {
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return def
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return def
+	}
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+// ExportAsset re-encodes an asset's original file to a requested format and size.
+// @Summary Export asset
+// @Description Re-encode an asset's original file to JPEG, PNG, WebP, or AVIF with optional max dimensions and quality, and stream it back as a download.
+// @Tags assets
+// @Produce image/jpeg,image/png,image/webp,image/avif
+// @Param id path string true "Asset ID"
+// @Param format query string true "Output format (jpeg, png, webp, avif)"
+// @Param quality query int false "Quality 1-100 for lossy formats"
+// @Param max_width query int false "Maximum output width in pixels"
+// @Param max_height query int false "Maximum output height in pixels"
+// @Param filename query string false "Base download filename (without extension)"
+// @Success 200 {file} file "Encoded image"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 401 {object} api.Result "Authentication required"
+// @Failure 403 {object} api.Result "Forbidden"
+// @Failure 404 {object} api.Result "Asset or original file not found"
+// @Failure 422 {object} api.Result "Source image could not be encoded"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id}/export [get]
+func (h *AssetHandler) ExportAsset(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	format := strings.ToLower(strings.TrimSpace(c.Query("format")))
+	if !imaging.IsSupportedExportFormat(format) {
+		api.GinBadRequest(c, fmt.Errorf("unsupported export format %q", format), "Unsupported export format")
+		return
+	}
+
+	asset, ok := h.getAuthorizedAssetForMedia(c, id, "Authentication required to export this file", "You don't have permission to export this file")
+	if !ok {
+		return
+	}
+
+	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Original file not found")
+		return
+	}
+
+	repository, err := h.getRepositoryForAsset(ctx, asset)
+	if err != nil {
+		log.Printf("Failed to resolve repository for export: %v", err)
+		api.GinInternalError(c, err, "Failed to access repository")
+		return
+	}
+	fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
+
+	if _, statErr := os.Stat(fullPath); os.IsNotExist(statErr) {
+		api.GinNotFound(c, statErr, "Original file not found")
+		return
+	}
+
+	// OpenPhoto yields a libvips-decodable source for any photo: RAW files are
+	// resolved to their embedded preview (full render as fallback), non-RAW files
+	// are opened directly. This is what lets the export endpoint handle RAW.
+	reader, err := imagesource.OpenPhoto(ctx, fullPath, asset.OriginalFilename)
+	if err != nil {
+		log.Printf("Failed to open source for export of asset %s: %v", id, err)
+		api.GinError(c, http.StatusUnprocessableEntity, err, http.StatusUnprocessableEntity,
+			"Failed to decode the source image for export")
+		return
+	}
+	defer reader.Close()
+
+	buf, err := io.ReadAll(reader)
+	if err != nil {
+		log.Printf("Failed to read source for export of asset %s: %v", id, err)
+		api.GinInternalError(c, err, "Failed to read source image")
+		return
+	}
+
+	out, mime, ext, err := imaging.ExportImageBytes(buf, imaging.ExportParams{
+		Format:    format,
+		Quality:   clampedIntQuery(c, "quality", 0, 1, 100),
+		MaxWidth:  clampedIntQuery(c, "max_width", 0, 0, 60000),
+		MaxHeight: clampedIntQuery(c, "max_height", 0, 0, 60000),
+	})
+	if err != nil {
+		log.Printf("Failed to export asset %s as %s: %v", id, format, err)
+		api.GinError(c, http.StatusUnprocessableEntity, err, http.StatusUnprocessableEntity,
+			"Failed to encode export; the source image may be unsupported")
+		return
+	}
+
+	base := strings.TrimSuffix(asset.OriginalFilename, filepath.Ext(asset.OriginalFilename))
+	if q := strings.TrimSpace(c.Query("filename")); q != "" {
+		base = q
+	}
+	if strings.TrimSpace(base) == "" {
+		base = "export"
+	}
+
+	c.Header("Cache-Control", "private, max-age=0")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", base+"."+ext))
+	c.Data(http.StatusOK, mime, out)
 }
 
 // DownloadAssets serves multiple original files as a zip archive.

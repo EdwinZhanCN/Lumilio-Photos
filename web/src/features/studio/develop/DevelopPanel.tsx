@@ -20,6 +20,7 @@ import {
   isGroupModified,
   type AdjustmentKey,
 } from "@/features/studio/editor/developConfig";
+import type { BorderExifSummary } from "@/features/studio/tools/border/BorderPanel";
 import { SectionHeader } from "./SectionHeader";
 import { SliderRow } from "./SliderRow";
 import { BorderToolSection } from "./BorderToolSection";
@@ -41,6 +42,7 @@ type DevelopPanelProps = {
   onClearBorder: () => void;
   isApplyingBorder: boolean;
   hasBorderResult: boolean;
+  borderExifSummary?: BorderExifSummary;
 };
 
 type GroupId = "geometry" | "light" | "color" | "detail" | "tools";
@@ -88,6 +90,7 @@ export function DevelopPanel({
   onClearBorder,
   isApplyingBorder,
   hasBorderResult,
+  borderExifSummary,
 }: DevelopPanelProps): React.JSX.Element {
   const { t } = useI18n();
   const [openMap, setOpenMap] = useState<Record<GroupId, boolean>>({
@@ -243,6 +246,7 @@ export function DevelopPanel({
           isApplying={isApplyingBorder}
           hasResult={hasBorderResult}
           disabled={disabled}
+          exifSummary={borderExifSummary}
         />
 
         <div className="h-4" />

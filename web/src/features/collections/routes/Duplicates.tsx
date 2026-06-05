@@ -480,7 +480,7 @@ function DuplicatesContent() {
                   message:
                     groupQuery.error instanceof Error
                       ? groupQuery.error.message
-                      : String(groupQuery.error ?? ""),
+                      : (JSON.stringify(groupQuery.error ?? "") ?? ""),
                 })}
               </span>
             </div>

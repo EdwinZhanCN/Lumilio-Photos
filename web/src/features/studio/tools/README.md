@@ -1,20 +1,29 @@
 # Studio Tools
 
-Built-in image processing tools for Studio. Each tool is a self-contained module with a UI panel, a runner function, and optional WASM acceleration.
+Built-in image processing tools for Studio. Each tool is a self-contained module with a UI panel and a runner function. The border tool renders entirely on an OffscreenCanvas in the worker (no wasm).
 
 ## Architecture
 
 ```
 studio/tools/
 ├── types.ts                  # Shared tool contracts
-├── border/                   # Border tool
+├── border/                   # Border tool (5 modes)
 │   ├── index.ts              # Public API
-│   ├── types.ts              # BorderParams, normalizeParams
-│   ├── BorderPanel.tsx        # React UI panel
-│   ├── borderRunner.ts       # Processing logic (WASM + canvas fallback)
-│   └── vendor/               # wasm-bindgen output (JS glue + .wasm)
+│   ├── types.ts              # BorderParams, normalizeParams, modes
+│   ├── BorderPanel.tsx       # React UI panel
+│   ├── borderRunner.ts       # Orchestration (routes modes to renderers)
+│   ├── canvasUtils.ts        # Shared worker-safe OffscreenCanvas helpers
+│   ├── basicBorders.ts       # COLORED / VIGNETTE / FROSTED renderers
+│   ├── exifBorderRenderer.ts # FROSTED_INFO / INFO_STRIP renderers
+│   ├── exifInfo.ts           # EXIF extraction/formatting (pure, worker-safe)
+│   └── logoAssets.ts         # Brand match + SVG->ImageBitmap (MAIN THREAD only)
 └── <next-tool>/              # Future tools follow the same shape
 ```
+
+Worker boundary: `tool.worker.ts` -> `borderRunner.ts` may only import worker-safe
+modules (`types`, `canvasUtils`, `basicBorders`, `exifBorderRenderer`, `exifInfo`).
+`logoAssets.ts`, `BorderPanel.tsx`, and the `index.ts` barrel use the DOM and must
+stay on the main thread.
 
 Tools run off the main thread in `web/src/workers/tool.worker.ts`. The main thread communicates via `AppWorkerClient` (`web/src/workers/workerClient.ts`).
 
@@ -27,8 +36,7 @@ studio/tools/my-tool/
 ├── index.ts
 ├── types.ts
 ├── MyToolPanel.tsx
-├── myToolRunner.ts
-└── vendor/            # optional, for WASM artifacts
+└── myToolRunner.ts
 ```
 
 ### 2. Define params and runner

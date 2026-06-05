@@ -75,7 +75,7 @@ const PersonAssetsContent = () => {
       if (index < 0) {
         if (hasMore && !isLoading && !isLoadingMore) {
           setIsLocatingAsset(true);
-          fetchMore();
+          void fetchMore();
         }
       } else {
         setIsLocatingAsset(false);
@@ -94,7 +94,7 @@ const PersonAssetsContent = () => {
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoadingMore) {
-      fetchMore();
+      void fetchMore();
     }
   }, [hasMore, isLoadingMore, fetchMore]);
 
@@ -294,7 +294,7 @@ const PersonDetails = () => {
   const { personId } = useParams<{ personId: string }>();
 
   return (
-    <WorkerProvider preload={["exif", "export"]}>
+    <WorkerProvider>
       <AssetsProvider
         key={`person:${personId}`}
         scopeId={`person:${personId}`}

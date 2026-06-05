@@ -33,6 +33,29 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
     }
   };
 
+  const getCategoryLabel = (category: string): string => {
+    switch (category) {
+      case "Photos":
+        return t("upload.SupportedFormatsModal.category_photos", {
+          defaultValue: "Photos",
+        });
+      case "RAW Formats":
+        return t("upload.SupportedFormatsModal.category_raw_formats", {
+          defaultValue: "RAW Formats",
+        });
+      case "Videos":
+        return t("upload.SupportedFormatsModal.category_videos", {
+          defaultValue: "Videos",
+        });
+      case "Audio":
+        return t("upload.SupportedFormatsModal.category_audio", {
+          defaultValue: "Audio",
+        });
+      default:
+        return category;
+    }
+  };
+
   const getCategoryColor = (category: string) => {
     switch (category) {
       case "Photos":
@@ -89,9 +112,7 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
                         {getCategoryIcon(group.category)}
                       </div>
                       <h4 className="font-semibold text-lg">
-                        {t(
-                          `upload.SupportedFormatsModal.category_${group.category.toLowerCase().replace(/ /g, "_")}`,
-                        )}
+                        {getCategoryLabel(group.category)}
                       </h4>
                       <div
                         className={`badge ${getCategoryColor(group.category)} badge-sm`}
