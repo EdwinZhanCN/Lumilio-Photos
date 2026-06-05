@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"server/app"
+	"server/config"
 )
 
 // @title Lumilio-Photos API
@@ -35,7 +36,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := app.Run(ctx); err != nil {
+	config.LoadEnvironment()
+	appConfig, err := config.LoadAppConfigWithError()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load server configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := app.Run(ctx, appConfig); err != nil {
 		fmt.Fprintf(os.Stderr, "server exited with error: %v\n", err)
 		os.Exit(1)
 	}

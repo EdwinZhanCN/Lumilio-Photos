@@ -249,10 +249,10 @@ func DBPasswordFilePath() string {
 // boots this file is the authoritative credential, superseding the temporary
 // bootstrap password supplied through env or TOML.
 func ResolveDBPasswordFilePath(dbConfig DatabaseConfig) string {
-	if v := strings.TrimSpace(os.Getenv("LUMILIO_DB_PASSWORD_FILE")); v != "" {
+	if v := strings.TrimSpace(dbConfig.PasswordFile); v != "" {
 		return v
 	}
-	if v := strings.TrimSpace(dbConfig.PasswordFile); v != "" {
+	if v := strings.TrimSpace(os.Getenv("LUMILIO_DB_PASSWORD_FILE")); v != "" {
 		return v
 	}
 	return DBPasswordFilePath()
@@ -295,11 +295,14 @@ func LoadRepositoryScanConfig() RepositoryScanConfig {
 }
 
 func defaultAppConfig() AppConfig {
-	environment := strings.ToLower(strings.TrimSpace(os.Getenv("SERVER_ENV")))
+	return defaultAppConfigForEnvironment(os.Getenv("SERVER_ENV"))
+}
+
+func defaultAppConfigForEnvironment(environment string) AppConfig {
+	environment = strings.ToLower(strings.TrimSpace(environment))
 	if environment == "" {
 		environment = "production"
 	}
-
 	dbHost := "db"
 	logLevel := "info"
 	mlDefaults := MLConfig{SemanticEnabled: true, BioCLIPEnabled: true, OCREnabled: true, FaceEnabled: true}

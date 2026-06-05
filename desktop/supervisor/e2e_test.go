@@ -55,7 +55,7 @@ func TestDesktopRuntimeE2E(t *testing.T) {
 
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	// 1. API reachable at localhost:6680 (the browser/webview target).
+	// 1. API reachable at localhost:6680 (the browser target).
 	if body, code := httpGet(t, client, sup.ServerURL()+"/api/v1/health"); code != 200 || !strings.Contains(body, "ok") {
 		t.Errorf("GET /api/v1/health = %d %q, want 200 containing ok", code, body)
 	}

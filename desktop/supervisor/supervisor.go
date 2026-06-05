@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"server/app"
+	serverconfig "server/config"
 )
 
 const (
@@ -66,9 +67,9 @@ func New(opts Options) *Supervisor {
 	return &Supervisor{logf: logf}
 }
 
-// ServerURL is the address the webview must navigate to. It is localhost (not
-// 127.0.0.1, not a custom scheme) because WebAuthn/passkeys require localhost as
-// the relying-party origin in the desktop webview.
+// ServerURL is the address the desktop host opens in the user's browser. It is
+// localhost (not 127.0.0.1, not a custom scheme) because WebAuthn/passkeys
+// require localhost as the relying-party origin.
 func (s *Supervisor) ServerURL() string {
 	return "http://localhost:" + serverPort
 }
@@ -162,7 +163,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := WriteServerConfig(paths.ServerConfigFile(), ServerConfigParams{
+	appConfig, err := serverconfig.NewDesktopConfig(serverconfig.DesktopParams{
 		Port:          serverPort,
 		WebRoot:       bundledWebRoot(resources),
 		LogDir:        paths.Logs,
@@ -176,13 +177,12 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		ExifToolPath:  bundledExifTool(resources),
 		FFmpegPath:    bundledFFmpeg(resources),
 		FFprobePath:   bundledFFprobe(resources),
-	}); err != nil {
-		return err
+	})
+	if err != nil {
+		return fmt.Errorf("build desktop server config: %w", err)
 	}
-
-	// app.Run discovers the generated config via SERVER_CONFIG_FILE.
-	if err := os.Setenv("SERVER_CONFIG_FILE", paths.ServerConfigFile()); err != nil {
-		return fmt.Errorf("set SERVER_CONFIG_FILE: %w", err)
+	if err := serverconfig.WriteGeneratedTOML(paths.ServerConfigFile(), appConfig); err != nil {
+		s.logf("write generated server config debug copy (non-fatal): %v", err)
 	}
 
 	// Run the API server in-process. It blocks until srvCtx is cancelled (Stop)
@@ -190,7 +190,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	srvCtx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	s.serverErr = make(chan error, 1)
-	go func() { s.serverErr <- app.Run(srvCtx) }()
+	go func() { s.serverErr <- app.Run(srvCtx, appConfig) }()
 
 	if err := s.waitForServer(ctx); err != nil {
 		return err

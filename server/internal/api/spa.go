@@ -14,7 +14,7 @@ import (
 // resolve. When webRoot is empty it is a no-op, preserving the API-only behavior
 // docker/web rely on (a separate static server hosts the bundle there). The
 // desktop build points webRoot at the bundled web build so http://localhost:6680
-// serves the full app in the system browser and the in-app webview alike.
+// serves the full app in the system browser.
 //
 // Requests under /api and /swagger never fall back to the SPA, so their normal
 // 404 semantics are preserved.

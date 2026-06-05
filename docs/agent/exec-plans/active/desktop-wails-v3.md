@@ -3,9 +3,9 @@
 **Goal**: Ship a macOS desktop app that bundles a private PostgreSQL 16 runtime, manages its lifecycle, and reuses the existing Go API server and React UI over HTTP/OpenAPI.
 
 **Status**: In progress — code complete for the server prerequisites, the
-desktop supervisor (PG lifecycle, config/secret generation, single-instance
+desktop supervisor (PG lifecycle, typed config/secret generation, single-instance
 lock, storage-path persistence), and the Wails v3 app shell. The whole desktop
-module compiles (Wails webview + server tree via cgo) and the PostgreSQL
+module compiles (Wails shell + server tree via cgo) and the PostgreSQL
 lifecycle has a passing real smoke test. Remaining work is ops: bundling the
 native binaries (PG/pgvector, ffmpeg, exiftool, libvips), signing, and the DMG
 release. See "Implementation Notes" at the end.
@@ -19,7 +19,8 @@ Wails v3 app
   → Go desktop supervisor
       → 管理私有 PostgreSQL 16 runtime
       → initdb / start / stop / health check
-      → 生成 server.local.toml
+      → 构造 typed server config
+      → 写出 server.local.toml debug copy
       → 跑 Lumilio migrations + River migrations (Go API)
       → 启动现有 Go API server (in-process)
       → 管理 mDNS ML discovery
@@ -73,7 +74,7 @@ desktop/                              # New top-level directory
 ├── supervisor/
 │   ├── supervisor.go                 # Orchestrator: startup/shutdown sequence
 │   ├── postgres.go                   # initdb / pg_ctl / pg_isready / createdb
-│   ├── config.go                     # Generates server.local.toml for desktop
+│   ├── config.go                     # Desktop settings + secret helpers
 │   ├── lock.go                       # flock single-instance guard
 │   ├── paths.go                      # OS-specific app data paths
 │   └── quarantine_darwin.go          # xattr cleanup (build-tagged)
@@ -116,7 +117,7 @@ use (
 │   ├── db_password
 │   └── lumilio_secret_key
 ├── config/
-│   ├── server.local.toml            # Generated runtime config (rewritten every launch)
+│   ├── server.local.toml            # Generated debug copy (rewritten every launch)
 │   └── desktop-settings.json        # Persisted user choices (NOT rewritten) — e.g. storage_path
 └── backups/                          # pg_dump auto-backups
 
@@ -148,7 +149,7 @@ See "User-Selectable Storage Path" below.
     Read <appdata>/config/desktop-settings.json → storage_path
     [First run · no setting yet] Onboarding: default <appdata>/storage,
       offer native directory picker to relocate; persist choice to
-      desktop-settings.json (NOT to server.local.toml — that gets rewritten)
+      desktop-settings.json (NOT to server.local.toml — that is debug-only)
     [Subsequent] Use persisted storage_path
     Verify reachable (external drive may be unmounted) → friendly dialog +
       "use default location" escape if not; never crash
@@ -207,12 +208,7 @@ See "User-Selectable Storage Path" below.
 12. createdb (idempotent)
     Connect to postgres db, CREATE DATABASE IF NOT EXISTS lumiliophotos
 
-13. Run migrations
-    Reuse server/internal/db.AutoMigrate()
-    → golang-migrate (app migrations)
-    → rivermigrate Go API (River schema)
-
-14. Generate server.local.toml
+13. Build typed server config via server/config.NewDesktopConfig
     [server]
     port = "6680"
     log_level = "info"
@@ -247,11 +243,17 @@ See "User-Selectable Storage Path" below.
     discovery_mdns_enabled = true        # Desktop default: mDNS on
     discovery_hub_url = ""
 
-15. Start API server (in-process)
-    Import server bootstrap, pass config path
+14. Write <appdata>/config/server.local.toml debug copy
+    This file is for inspection only. It is not reloaded to boot the runtime.
 
-16. Wails ready → open UI window
-    Webview MUST navigate to http://localhost:6680
+15. Start API server runtime (in-process)
+    Import server/app and call app.Run(ctx, cfg)
+    → golang-migrate (app migrations)
+    → rivermigrate Go API (River schema)
+    → API + queue + ML + SPA serving
+
+16. Wails ready → open the user's browser
+    Browser MUST navigate to http://localhost:6680
     (NOT 127.0.0.1, NOT a Wails custom scheme — see WebAuthn constraints)
 ```
 
@@ -331,8 +333,8 @@ convention — the split is intentional and load-bearing.
 
 ### Persistence
 
-The user's storage choice must survive across launches, but `server.local.toml` is
-regenerated every launch (startup step 14), so it cannot be the source of truth.
+The user's storage choice must survive across launches, but `server.local.toml`
+is only a regenerated debug copy, so it cannot be the source of truth.
 
 ```
 <appdata>/config/desktop-settings.json   # { "storage_path": "/Volumes/Photos/Lumilio" }
@@ -341,7 +343,7 @@ regenerated every launch (startup step 14), so it cannot be the source of truth.
 - **First run**: onboarding defaults to `<appdata>/storage`; offer a native
   directory picker (`application.OpenFileDialog().CanChooseDirectories(true)`,
   native — not webui) to relocate. Persist the result to `desktop-settings.json`.
-- **Subsequent runs**: read `desktop-settings.json`, inject into the generated toml.
+- **Subsequent runs**: read `desktop-settings.json`, inject into typed desktop config.
 
 Don't force the picker — defaulting reduces first-launch friction; most users keep
 the default. Surface "choose another location" as an option, not a gate.
@@ -451,14 +453,14 @@ The desktop webview MUST navigate to `http://localhost:6680`.
 - Do NOT serve the React bundle via Wails' asset server. Let the Go API server
   serve the SPA and point the webview at it over HTTP.
 
-**Constraint 2 — Pin RP ID/origin in `server.local.toml`.**
+**Constraint 2 — Pin RP ID/origin in the desktop typed config.**
 ```
 [auth]
 webauthn_rp_id = "localhost"
 webauthn_rp_origins = ["http://localhost:6680"]
 ```
 Functionally equivalent to leaving `webauthn_rp_id` empty (host derivation yields
-`localhost` anyway), but pinning it acts as an assertion: if the webview origin is
+`localhost` anyway), but pinning it acts as an assertion: if the browser origin is
 ever misconfigured, registration fails loudly with
 `origin host X does not match configured rp id localhost` instead of silently
 registering a passkey under the wrong RP that can't be found at next login.
@@ -484,8 +486,8 @@ security keys may still work; worst case is password + TOTP, which is sufficient
 
 ## Existing Code Changes Needed
 
-1. **`server/cmd/main.go`**: Extract bootstrap logic into a callable function so desktop supervisor can import and invoke it (currently only `func main()`).
-2. **`server/config/config.go`**: Already supports absolute paths via `SERVER_CONFIG_FILE` env var — sufficient for desktop mode.
+1. **`server/cmd/main.go`**: Keep as a thin CLI host that loads normal TOML/env config and calls the shared runtime.
+2. **`server/config/config.go`**: Own the single config schema plus `NewDesktopConfig`; desktop writes a TOML debug copy but passes typed `AppConfig` to runtime.
 3. **`server/internal/db/migration.go`**: `AutoMigrate()` already standalone — reuse directly.
 4. **`server/internal/utils/exif/*` + transcode**: Add optional `EXIFTOOL_PATH` / `FFMPEG_PATH` config/env overrides (empty = resolve via PATH, preserving web/docker). Replace hardcoded `exec.Command("exiftool", ...)` with the resolved path. See "Native Dependencies Bundling → Track B".
 5. **`Makefile`**: Add `desktop-dev` and `desktop-build` targets.
@@ -569,14 +571,18 @@ the plan above.
 
 ### Server prerequisites
 - **Bootstrap extraction**: `server/cmd/main.go` was reduced to a thin signal
-  handler; all wiring moved to a new `server/app` package as `app.Run(ctx)
-  error`. `Run` now does a real graceful shutdown (HTTP `srv.Shutdown` + River
+  handler/config loader; all wiring moved to a new `server/app` package as
+  `app.Run(ctx, cfg) error`. `Run` now does a real graceful shutdown (HTTP `srv.Shutdown` + River
   `queueClient.Stop` on ctx cancel, then deferred cleanups), and converts the
   former `appLogger.Fatal` startup calls into returned errors so the in-process
   desktop host is not killed by `os.Exit`. The swag general-info annotations
   stay in `cmd/main.go` because `make dto` runs `swag init -g cmd/main.go`. The
   `initPrimaryStorage`/`resolvePrimaryStoragePaths` tests moved with the code to
   `server/app`.
+- **Config ownership**: `server/config` now builds the desktop runtime config
+  with `NewDesktopConfig`. The desktop supervisor no longer boots through
+  `SERVER_CONFIG_FILE`; it writes `config/server.local.toml` only as a debug copy
+  and passes typed `AppConfig` directly to `server/app`.
 - **External tool paths**: added `[tools]` (`exiftool_path`, `ffmpeg_path`,
   `ffprobe_path`) to `server/config` with `EXIFTOOL_PATH`/`FFMPEG_PATH`/
   `FFPROBE_PATH` env overrides; empty = resolve via PATH (web/docker unchanged).
@@ -599,9 +605,9 @@ the plan above.
 - **Quarantine**: stripped on **every** launch (idempotent, non-fatal), not just
   first run, so an app update that re-quarantines the bundled binaries does not
   block exec.
-- **`[ml]` keys**: the generated `server.local.toml` uses the real config keys
-  (`semantic_enabled`, `bioclip_enabled`, …); the plan's `clip_enabled` was
-  stale.
+- **`[ml]` keys**: the typed desktop config and generated debug TOML use the real
+  config keys (`semantic_enabled`, `bioclip_enabled`, …); the plan's
+  `clip_enabled` was stale.
 - **Wails build tooling**: Wails v3 uses a `Taskfile.yml`, not `wails.json`.
   Because the UI is server-served (not Wails assets), the app builds with plain
   `go build`; bundling/signing is handled by `desktop/scripts/build-macos.sh`
