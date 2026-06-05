@@ -21,7 +21,7 @@ type AIFormState = {
     clearStoredKey: boolean;
   };
   ml: {
-    clipEnabled: boolean;
+    semanticEnabled: boolean;
     bioclipEnabled: boolean;
     ocrEnabled: boolean;
     faceEnabled: boolean;
@@ -44,7 +44,7 @@ function createFormState(settings: SystemSettings): AIFormState {
       clearStoredKey: false,
     },
     ml: {
-      clipEnabled: settings.ml.clipEnabled,
+      semanticEnabled: settings.ml.semanticEnabled,
       bioclipEnabled: settings.ml.bioclipEnabled,
       ocrEnabled: settings.ml.ocrEnabled,
       faceEnabled: settings.ml.faceEnabled,
@@ -60,7 +60,7 @@ function buildPayload(form: AIFormState): UpdateSystemSettingsPayload {
       base_url: form.llm.baseURL.trim(),
     },
     ml: {
-      clip_enabled: form.ml.clipEnabled,
+      semantic_enabled: form.ml.semanticEnabled,
       bioclip_enabled: form.ml.bioclipEnabled,
       ocr_enabled: form.ml.ocrEnabled,
       face_enabled: form.ml.faceEnabled,
@@ -123,7 +123,7 @@ export default function AISettings() {
     settings?.llm.modelName,
     settings?.llm.baseURL,
     settings?.llm.apiKeyConfigured,
-    settings?.ml.clipEnabled,
+    settings?.ml.semanticEnabled,
     settings?.ml.bioclipEnabled,
     settings?.ml.ocrEnabled,
     settings?.ml.faceEnabled,
@@ -141,7 +141,7 @@ export default function AISettings() {
       form.llm.baseURL !== settings.llm.baseURL ||
       form.llm.apiKey.trim().length > 0 ||
       form.llm.clearStoredKey ||
-      form.ml.clipEnabled !== settings.ml.clipEnabled ||
+      form.ml.semanticEnabled !== settings.ml.semanticEnabled ||
       form.ml.bioclipEnabled !== settings.ml.bioclipEnabled ||
       form.ml.ocrEnabled !== settings.ml.ocrEnabled ||
       form.ml.faceEnabled !== settings.ml.faceEnabled
@@ -152,9 +152,9 @@ export default function AISettings() {
 
   const mlTasks = [
     {
-      key: "clipEnabled",
-      label: t("settings.aiSettings.taskNames.clip"),
-      description: t("settings.aiSettings.taskDescriptions.clip"),
+      key: "semanticEnabled",
+      label: t("settings.aiSettings.taskNames.semantic"),
+      description: t("settings.aiSettings.taskDescriptions.semantic"),
     },
     {
       key: "bioclipEnabled",

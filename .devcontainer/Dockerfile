@@ -147,9 +147,9 @@ EOF
 RUN chsh -s /usr/bin/zsh root
 
 # ---------------------------------------------------------------
-# Node.js 23.x + Vite+ CLI (matches web/.nvmrc)
+# Node.js 24.x LTS + Vite+ CLI (aligns with `vp env`)
 # ---------------------------------------------------------------
-ARG NODE_VERSION=23.11.1
+ARG NODE_VERSION=24.16.0
 
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \

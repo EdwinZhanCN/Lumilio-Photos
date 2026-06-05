@@ -70,7 +70,7 @@ export function AssetsGalleryPage() {
 
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
+      void fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
@@ -200,7 +200,7 @@ export function AssetsGalleryPage() {
       }
       setIsLocatingAsset(true);
       if (hasNextPage && !isFetching && !isFetchingNextPage) {
-        fetchNextPage();
+        void fetchNextPage();
         return;
       }
       if (!hasNextPage && !isFetching && !isFetchingNextPage) {

@@ -27,7 +27,7 @@ export type AssetIndexingStats = {
   photoTotal: number;
   reindexJobs: number;
   tasks: {
-    clip: AssetIndexingTaskStats;
+    semantic: AssetIndexingTaskStats;
     bioclip: AssetIndexingTaskStats;
     ocr: AssetIndexingTaskStats;
     face: AssetIndexingTaskStats;
@@ -81,7 +81,7 @@ function normalizeAssetIndexingStats(
     photoTotal,
     reindexJobs: data.reindex_jobs ?? 0,
     tasks: {
-      clip: normalizeTaskStats(data.tasks?.clip, photoTotal),
+      semantic: normalizeTaskStats(data.tasks?.semantic, photoTotal),
       bioclip: normalizeTaskStats(data.tasks?.bioclip, photoTotal),
       ocr: normalizeTaskStats(data.tasks?.ocr, photoTotal),
       face: normalizeTaskStats(data.tasks?.face, photoTotal),

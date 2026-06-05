@@ -232,7 +232,7 @@ export function usePhotoStats(
 
   useEffect(() => {
     if (autoFetch) {
-      fetchAllStats();
+      void fetchAllStats();
     }
   }, [autoFetch, fetchAllStats]);
 

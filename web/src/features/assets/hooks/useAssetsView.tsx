@@ -362,7 +362,7 @@ export const useAssetsViewQuery = (
     query.error instanceof Error
       ? query.error.message
       : query.error
-        ? String(query.error)
+        ? (JSON.stringify(query.error) ?? "Unknown error")
         : null;
 
   return {
@@ -571,7 +571,7 @@ export const usePhotoSearchView = (
     query.error instanceof Error
       ? query.error.message
       : query.error
-        ? String(query.error)
+        ? (JSON.stringify(query.error) ?? "Unknown error")
         : null;
 
   if (queryText.length === 0) {

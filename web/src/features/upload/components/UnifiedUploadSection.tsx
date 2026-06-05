@@ -216,7 +216,7 @@ function UnifiedUploadSection(): React.JSX.Element {
         accept={getAcceptString()}
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
           if (e.target.files) {
-            handleFiles(e.target.files);
+            void handleFiles(e.target.files);
             e.target.value = "";
           }
         }}

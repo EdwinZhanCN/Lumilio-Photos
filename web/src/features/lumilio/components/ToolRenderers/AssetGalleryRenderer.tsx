@@ -30,7 +30,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
   const handleOpenMainView = useCallback(() => {
     if (!filterDTO) return;
 
-    navigate("/assets", {
+    void navigate("/assets", {
       state: {
         assetsInitialFilter: filterDTO,
       },
@@ -82,7 +82,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
               className="flex-1 overflow-y-auto relative bg-base-100"
               id="agent-gallery-container"
             >
-              <WorkerProvider preload={["exif", "export"]}>
+              <WorkerProvider>
                 <AssetsProvider
                   key={`lumilio-result:${event.tool.executionId}`}
                   scopeId={`lumilio-result:${event.tool.executionId}`}
@@ -145,7 +145,7 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoadingMore) {
-      fetchMore();
+      void fetchMore();
     }
   }, [hasMore, isLoadingMore, fetchMore]);
 

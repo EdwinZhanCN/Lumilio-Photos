@@ -186,7 +186,7 @@ function NavBar() {
                     type="button"
                     onClick={() => {
                       logout();
-                      navigate("/login", { replace: true });
+                      void navigate("/login", { replace: true });
                     }}
                   >
                     {t("auth.logout", { defaultValue: "Logout" })}

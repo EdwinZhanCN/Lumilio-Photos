@@ -47,7 +47,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   // 当选择年份改变时重新获取热力图数据
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
-    refetchHeatmap(year);
+    void refetchHeatmap(year);
   };
 
   // Transform focal length data to percentage format

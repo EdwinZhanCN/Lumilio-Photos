@@ -173,7 +173,7 @@ export function TaskMonitor() {
     };
 
     // Initial fetch
-    fetchJobs();
+    void fetchJobs();
 
     // Poll every 5 seconds (slower since we have pagination now)
     const interval = setInterval(fetchJobs, 5000);

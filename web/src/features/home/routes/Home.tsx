@@ -155,7 +155,7 @@ function Home() {
             ) : undefined
           }
           onPointClick={(assetId) => {
-            navigate(`/assets/${assetId}`);
+            void navigate(`/assets/${assetId}`);
           }}
           className="mx-4 mb-8"
         />

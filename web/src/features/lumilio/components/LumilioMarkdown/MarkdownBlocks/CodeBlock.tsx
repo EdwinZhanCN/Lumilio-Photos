@@ -25,7 +25,13 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
   const [isDark, setIsDark] = useState(false);
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "";
-  const code = String(children).replace(/\n$/, "");
+  const code = React.Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") return String(child);
+      return "";
+    })
+    .join("")
+    .replace(/\n$/, "");
 
   // Detect theme changes
   useEffect(() => {

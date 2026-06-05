@@ -110,7 +110,7 @@ const AlbumAssetsContent = () => {
       if (index < 0) {
         if (hasMore && !isLoading && !isLoadingMore) {
           setIsLocatingAsset(true);
-          fetchMore();
+          void fetchMore();
         }
       } else {
         setIsLocatingAsset(false);
@@ -129,7 +129,7 @@ const AlbumAssetsContent = () => {
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoadingMore) {
-      fetchMore();
+      void fetchMore();
     }
   }, [hasMore, isLoadingMore, fetchMore]);
 
@@ -363,7 +363,7 @@ const AlbumDetails = () => {
   const { albumId } = useParams<{ albumId: string }>();
 
   return (
-    <WorkerProvider preload={["exif", "export"]}>
+    <WorkerProvider>
       <AssetsProvider
         key={`album:${albumId}`}
         scopeId={`album:${albumId}`}

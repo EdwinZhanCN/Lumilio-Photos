@@ -1,7 +1,12 @@
 import React from "react";
 import { Frame, Loader2, Wand2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { BorderPanel } from "@/features/studio/tools/border";
+import {
+  BorderPanel,
+  isExifBorderMode,
+  normalizeParams,
+} from "@/features/studio/tools/border";
+import type { BorderExifSummary } from "@/features/studio/tools/border/BorderPanel";
 import { SectionHeader } from "./SectionHeader";
 
 type BorderToolSectionProps = {
@@ -14,6 +19,7 @@ type BorderToolSectionProps = {
   isApplying: boolean;
   hasResult: boolean;
   disabled?: boolean;
+  exifSummary?: BorderExifSummary;
 };
 
 /**
@@ -31,8 +37,15 @@ export function BorderToolSection({
   isApplying,
   hasResult,
   disabled = false,
+  exifSummary,
 }: BorderToolSectionProps): React.JSX.Element {
   const { t } = useI18n();
+
+  // EXIF-driven modes can't be applied without sufficient EXIF on the asset.
+  const mode = normalizeParams(value).mode;
+  const exifBlocked =
+    isExifBorderMode(mode) && !(exifSummary?.available ?? false);
+  const applyDisabled = disabled || isApplying || exifBlocked;
 
   return (
     <div className="border-b border-base-300 last:border-0">
@@ -52,14 +65,19 @@ export function BorderToolSection({
             })}
           </p>
 
-          <BorderPanel value={value} onChange={onChange} disabled={disabled || isApplying} />
+          <BorderPanel
+            value={value}
+            onChange={onChange}
+            disabled={disabled || isApplying}
+            exifSummary={exifSummary}
+          />
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               className="btn btn-primary btn-sm flex-1 gap-1.5"
               onClick={onApply}
-              disabled={disabled || isApplying}
+              disabled={applyDisabled}
             >
               {isApplying ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

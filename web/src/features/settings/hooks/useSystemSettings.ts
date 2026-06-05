@@ -20,7 +20,7 @@ export type SystemSettings = {
     apiKeyConfigured: boolean;
   };
   ml: {
-    clipEnabled: boolean;
+    semanticEnabled: boolean;
     bioclipEnabled: boolean;
     ocrEnabled: boolean;
     faceEnabled: boolean;
@@ -60,7 +60,7 @@ function normalizeSystemSettings(
       apiKeyConfigured: Boolean(data.llm?.api_key_configured),
     },
     ml: {
-      clipEnabled: Boolean(data.ml?.clip_enabled),
+      semanticEnabled: Boolean(data.ml?.semantic_enabled),
       bioclipEnabled: Boolean(data.ml?.bioclip_enabled),
       ocrEnabled: Boolean(data.ml?.ocr_enabled),
       faceEnabled: Boolean(data.ml?.face_enabled),

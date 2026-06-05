@@ -207,7 +207,7 @@ export function usePersonAssetsView(
     query.error instanceof Error
       ? query.error.message
       : query.error
-        ? String(query.error)
+        ? (JSON.stringify(query.error) ?? "Unknown error")
         : null;
 
   const fetchMore = useCallback(async () => {

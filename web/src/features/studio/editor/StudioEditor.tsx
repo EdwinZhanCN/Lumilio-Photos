@@ -14,7 +14,17 @@ import { useWorker } from "@/contexts/WorkerProvider";
 import {
   DEFAULT_PARAMS as BORDER_DEFAULT_PARAMS,
   normalizeParams as normalizeBorderParams,
+  isExifBorderMode,
+  extractBorderExif,
+  hasSufficientExif,
+  cameraLabel as borderCameraLabel,
+  matchBrandKey,
+  brandDisplayName,
+  rasterizeBrandLogo,
+  type BorderExif,
+  type BrandKey,
 } from "@/features/studio/tools/border";
+import type { BorderExifSummary } from "@/features/studio/tools/border/BorderPanel";
 import {
   DEFAULT_STUDIO_ADJUSTMENTS,
   normalizeStudioAdjustments,
@@ -60,6 +70,22 @@ const apiClient = client as typeof client & {
   PUT: (url: string, init?: unknown) => Promise<{ data?: unknown; error?: unknown }>;
 };
 
+function getStudioSourceUrl(asset: Asset, assetId: string): string {
+  return assetUrls.getExportUrl(assetId, {
+    format: "jpeg",
+    quality: 95,
+    maxWidth: 4096,
+    maxHeight: 4096,
+    filename: (asset.original_filename ?? "studio-source").replace(/\.[^.]+$/, ""),
+  });
+}
+
+function getAssetDimension(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : fallback;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers (ported from the original Edit MVP route)
 // ---------------------------------------------------------------------------
@@ -104,7 +130,9 @@ function getExifValue(exif: Record<string, unknown>, keys: string[]): string | u
     const value = exif[key];
     if (value === null || value === undefined || value === "") continue;
     if (Array.isArray(value)) return value.join(", ");
-    return String(value);
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    return JSON.stringify(value) ?? "";
   }
   return undefined;
 }
@@ -125,6 +153,21 @@ function filterExifRows(exif: Record<string, unknown> | null): AssetExifRow[] {
     return value ? [{ label, value }] : [];
   });
 }
+
+function buildBorderExifSummary(exif: BorderExif): BorderExifSummary {
+  const matchedKey = matchBrandKey(exif.make, exif.model);
+  return {
+    available: hasSufficientExif(exif),
+    cameraLabel: borderCameraLabel(exif),
+    brandText: brandDisplayName(exif.make, matchedKey),
+    hasLogo: Boolean(matchedKey),
+  };
+}
+
+const EMPTY_BORDER_EXIF_SUMMARY: BorderExifSummary = {
+  available: false,
+  hasLogo: false,
+};
 
 function createSidecar(asset: Asset, adjustments: StudioEditAdjustments): LumilioSidecarV1 {
   return {
@@ -264,6 +307,28 @@ export function StudioEditor({
   const [borderResultUrl, setBorderResultUrl] = useState<string | null>(null);
   const [borderResultFileName, setBorderResultFileName] = useState<string | null>(null);
   const [isApplyingBorder, setIsApplyingBorder] = useState(false);
+  // EXIF-driven border data (auto-matched from the asset; not user-editable).
+  const borderExifRef = useRef<BorderExif>({});
+  const logoBitmapCacheRef = useRef<Map<BrandKey, ImageBitmap | null>>(new Map());
+  const [borderExifSummary, setBorderExifSummary] = useState<BorderExifSummary>(
+    EMPTY_BORDER_EXIF_SUMMARY,
+  );
+
+  const clearLogoCache = useCallback(() => {
+    logoBitmapCacheRef.current.forEach((bitmap) => bitmap?.close?.());
+    logoBitmapCacheRef.current.clear();
+  }, []);
+
+  const getLogoBitmap = useCallback(
+    async (key: BrandKey): Promise<ImageBitmap | null> => {
+      const cache = logoBitmapCacheRef.current;
+      if (cache.has(key)) return cache.get(key) ?? null;
+      const bitmap = await rasterizeBrandLogo(key);
+      cache.set(key, bitmap);
+      return bitmap;
+    },
+    [],
+  );
 
   const currentSignature = useMemo(() => JSON.stringify(adjustments), [adjustments]);
   const isDirty = currentSignature !== lastSavedSignatureRef.current;
@@ -452,6 +517,9 @@ export function StudioEditor({
       setExifRows([]);
       setImageSize(null);
       clearBorderResult();
+      borderExifRef.current = {};
+      clearLogoCache();
+      setBorderExifSummary(EMPTY_BORDER_EXIF_SUMMARY);
 
       try {
         const assetResponse = await client.GET("/api/v1/assets/{id}", {
@@ -469,17 +537,35 @@ export function StudioEditor({
         );
 
         const [imageResponse, exifResponse] = await Promise.all([
-          fetch(assetUrls.getOriginalFileUrl(assetId)),
+          fetch(getStudioSourceUrl(loadedAsset, assetId)),
           client
             .GET("/api/v1/assets/{id}/exif", { params: { path: { id: assetId } } })
             .catch(() => null),
         ]);
 
         if (!imageResponse.ok) {
-          throw new Error(`Failed to load original image (${imageResponse.status})`);
+          throw new Error(`Failed to load Studio source image (${imageResponse.status})`);
         }
 
         const imageBlob = await imageResponse.blob();
+        if (cancelled) return;
+
+        skipNextRenderRef.current = true;
+        setAsset(loadedAsset);
+        setAdjustments(nextAdjustments);
+        setHistory([]);
+        lastSavedSignatureRef.current = JSON.stringify(nextAdjustments);
+
+        let decoded: Awaited<ReturnType<typeof decodeBlobToImageData>>;
+        try {
+          decoded = await decodeBlobToImageData(imageBlob, 4096);
+        } catch (decodeError) {
+          throw new Error(
+            decodeError instanceof Error
+              ? `The exported source image cannot be decoded. ${decodeError.message}`
+              : "The exported source image cannot be decoded.",
+          );
+        }
         if (cancelled) return;
 
         const originalUrl = URL.createObjectURL(imageBlob);
@@ -489,12 +575,6 @@ export function StudioEditor({
           return originalUrl;
         });
 
-        skipNextRenderRef.current = true;
-        setAsset(loadedAsset);
-        setAdjustments(nextAdjustments);
-        setHistory([]);
-        lastSavedSignatureRef.current = JSON.stringify(nextAdjustments);
-
         const initialPreviewUrl = URL.createObjectURL(imageBlob);
         setPreviewUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
@@ -502,12 +582,12 @@ export function StudioEditor({
           return initialPreviewUrl;
         });
 
-        const decoded = await decodeBlobToImageData(imageBlob, 4096);
-        if (cancelled) return;
+        const originalWidth = getAssetDimension(loadedAsset.width, decoded.originalWidth);
+        const originalHeight = getAssetDimension(loadedAsset.height, decoded.originalHeight);
         sourceImageDataRef.current = decoded.imageData;
         sourceOriginalSizeRef.current = {
-          width: decoded.originalWidth,
-          height: decoded.originalHeight,
+          width: originalWidth,
+          height: originalHeight,
         };
         workerHasSourceRef.current = false;
 
@@ -515,8 +595,8 @@ export function StudioEditor({
           "LOAD_IMAGE_DATA",
           {
             imageData: cloneImageData(decoded.imageData),
-            originalWidth: decoded.originalWidth,
-            originalHeight: decoded.originalHeight,
+            originalWidth,
+            originalHeight,
             adjustments: toPhotometricAdjustments(nextAdjustments),
             previewMaxSize: 1800,
           },
@@ -535,6 +615,10 @@ export function StudioEditor({
           ? unwrapData(exifResponse.data, isExifResponse)?.exif_raw ?? null
           : null;
         setExifRows(filterExifRows(exif));
+
+        const borderExif = extractBorderExif(exif);
+        borderExifRef.current = borderExif;
+        setBorderExifSummary(buildBorderExifSummary(borderExif));
 
         onActivity?.({
           assetId,
@@ -603,6 +687,8 @@ export function StudioEditor({
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       if (originalPreviewUrlRef.current) URL.revokeObjectURL(originalPreviewUrlRef.current);
       if (borderResultUrlRef.current) URL.revokeObjectURL(borderResultUrlRef.current);
+      logoBitmapCacheRef.current.forEach((bitmap) => bitmap?.close?.());
+      logoBitmapCacheRef.current.clear();
     };
   }, []);
 
@@ -687,11 +773,34 @@ export function StudioEditor({
         type: "image/png",
       });
 
-      // 2) Run the border tool on top of the developed image.
+      // 2) Build params; EXIF-driven modes carry auto-matched EXIF + brand logo.
+      const baseParams = normalizeBorderParams(borderParams);
+      let applyParams: Record<string, unknown> = { ...baseParams };
+      if (isExifBorderMode(baseParams.mode)) {
+        const borderExif = borderExifRef.current;
+        if (!hasSufficientExif(borderExif)) {
+          throw new Error(
+            t("studio.tools.border.exifMissing", {
+              defaultValue:
+                "This style needs camera EXIF (model + at least one of focal length, aperture, shutter, ISO). It's unavailable for this photo.",
+            }),
+          );
+        }
+        const matchedKey = matchBrandKey(borderExif.make, borderExif.model);
+        const brandText = brandDisplayName(borderExif.make, matchedKey);
+        // The Info Strip prefers a rendered logo; Frosted Info always uses text.
+        const logo =
+          baseParams.mode === "INFO_STRIP" && matchedKey
+            ? await getLogoBitmap(matchedKey)
+            : null;
+        applyParams = { ...applyParams, exif: borderExif, brandText, logo };
+      }
+
+      // 3) Run the border tool on top of the developed image.
       const result = await workerClient.runTool(
         "border",
         developedFile,
-        normalizeBorderParams(borderParams),
+        applyParams,
       );
 
       const url = URL.createObjectURL(result.blob);
@@ -710,7 +819,16 @@ export function StudioEditor({
     } finally {
       setIsApplyingBorder(false);
     }
-  }, [adjustments, asset, borderParams, callWorker, showMessage, t, workerClient]);
+  }, [
+    adjustments,
+    asset,
+    borderParams,
+    callWorker,
+    getLogoBitmap,
+    showMessage,
+    t,
+    workerClient,
+  ]);
 
   const fileName = asset?.original_filename ?? t("studio.editor.loading", { defaultValue: "Loading…" });
   const displaySource = borderResultUrl ?? previewUrl;
@@ -783,6 +901,7 @@ export function StudioEditor({
           onClearBorder={clearBorderResult}
           isApplyingBorder={isApplyingBorder}
           hasBorderResult={Boolean(borderResultUrl)}
+          borderExifSummary={borderExifSummary}
         />
       </div>
     </div>

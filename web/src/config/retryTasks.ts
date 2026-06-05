@@ -43,8 +43,8 @@ export const RETRY_TASK_OPTIONS: RetryTaskOption[] = [
     supportedAssetTypes: ["VIDEO", "AUDIO"],
   },
   {
-    key: "process_clip",
-    label: "CLIP Embedding",
+    key: "process_semantic",
+    label: "Semantic Embedding",
     description: "Generate AI embeddings for semantic search",
     category: "ml",
     supportedAssetTypes: ["PHOTO"],

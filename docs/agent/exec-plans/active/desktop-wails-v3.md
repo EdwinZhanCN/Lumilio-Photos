@@ -230,7 +230,7 @@ See "User-Selectable Storage Path" below.
     path = "<storage_path>"              # from step 3a (default <appdata>/storage)
 
     [ml]
-    clip_enabled = true
+    semantic_enabled = true
     bioclip_enabled = true
     ocr_enabled = true
     face_enabled = true

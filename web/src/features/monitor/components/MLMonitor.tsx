@@ -21,13 +21,13 @@ function formatCoveragePercent(coverage: number): string {
   return `${Math.round(coverage * 100)}%`;
 }
 
-const ML_TASK_KEYS = ["clip", "ocr", "face"] as const;
+const ML_TASK_KEYS = ["semantic", "ocr", "face"] as const;
 type MLTaskKey = (typeof ML_TASK_KEYS)[number];
 
 function getTaskLabel(t: (key: string) => string, key: MLTaskKey) {
   switch (key) {
-    case "clip":
-      return t("settings.aiSettings.taskNames.clip");
+    case "semantic":
+      return t("settings.aiSettings.taskNames.semantic");
     case "ocr":
       return t("settings.aiSettings.taskNames.ocr");
     case "face":

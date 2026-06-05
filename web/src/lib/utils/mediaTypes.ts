@@ -66,10 +66,12 @@ export const isRawPhoto = (asset: Asset): boolean => {
 };
 
 /**
- * Browser-side export conversion is only available for non-RAW photo assets.
+ * Whether server-side export/transcode is available for an asset. Any photo
+ * qualifies — including RAW, which the backend decodes via libraw — while video
+ * and audio are not image-exportable.
  */
-export const isBrowserExportSupported = (asset: Asset): boolean => {
-  return isPhoto(asset) && !isRawPhoto(asset);
+export const isExportSupported = (asset: Asset): boolean => {
+  return isPhoto(asset);
 };
 
 /**

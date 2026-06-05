@@ -53,7 +53,7 @@ function AlbumsContent() {
       return;
     }
 
-    navigate(`/collections/${album.id}`);
+    void navigate(`/collections/${album.id}`);
   };
 
   const confirmDelete = async () => {

@@ -1,5 +1,5 @@
 # Build React app stage
-FROM node:23.11.1-bookworm-slim as build
+FROM node:24.16.0-trixie-slim as build
 
 # Install Vite+ and keep pnpm available for package-manager delegation.
 RUN corepack enable \

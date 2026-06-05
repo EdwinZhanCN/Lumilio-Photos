@@ -53,7 +53,8 @@ export enum ProcessingPriority {
 
 // Default configurations for different operation types
 const DEFAULT_CONFIGS: Record<string, BatchSizingConfig> = {
-  thumbnail: {
+  // Fallback config used for any operation type without a specific entry.
+  default: {
     minBatchSize: 2,
     maxBatchSize: 20,
     targetProcessingTimeMs: 3000,
@@ -159,7 +160,7 @@ export class SmartBatchSizer {
     totalItems: number,
     priority: ProcessingPriority = ProcessingPriority.NORMAL,
   ): number {
-    const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.thumbnail;
+    const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.default;
     const history = this.metricsHistory.get(operationType) || [];
 
     let batchSize =
@@ -239,7 +240,7 @@ export class SmartBatchSizer {
    * Gets initial batch size based on device capabilities
    */
   private getInitialBatchSize(operationType: string): number {
-    const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.thumbnail;
+    const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.default;
     const { isLowEndDevice, isMobile, maxConcurrency } =
       this.deviceCapabilities;
 
@@ -311,7 +312,7 @@ export class SmartBatchSizer {
     batchSize: number,
     operationType: string,
   ): number {
-    const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.thumbnail;
+    const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.default;
 
     // Apply the fixed adaptive memory constraint
     const memoryMultiplier = ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER;

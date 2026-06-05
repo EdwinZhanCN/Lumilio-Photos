@@ -21,9 +21,9 @@ import {
   getRetryTasksByCategoryForAssetType,
   isRetryTaskSupportedForAssetType,
 } from "@/config/retryTasks";
-import { isBrowserExportSupported } from "@/lib/utils/mediaTypes";
+import { isExportSupported } from "@/lib/utils/mediaTypes";
 
-type ExportFormat = "png" | "jpeg" | "webp";
+type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
 interface ExportModalProps {
   asset?: Asset;
@@ -73,7 +73,7 @@ export default function ExportModal({
   }, [asset?.asset_id]);
 
   const canAct = !!asset && !isExporting;
-  const canBrowserExport = !!asset && isBrowserExportSupported(asset);
+  const canExport = !!asset && isExportSupported(asset);
   const retryTasksByCategory = useMemo(
     () => getRetryTasksByCategoryForAssetType(asset?.type),
     [asset?.type],
@@ -136,7 +136,12 @@ export default function ExportModal({
       case "webp":
         return {
           format: "webp",
-          quality: 1,
+          quality: 0.8,
+        };
+      case "avif":
+        return {
+          format: "avif",
+          quality: 0.55,
         };
       default:
         return { format: "png", quality: 1 };
@@ -144,7 +149,7 @@ export default function ExportModal({
   }, [format]);
 
   const handleExport = useCallback(async () => {
-    if (!asset || !canBrowserExport) return;
+    if (!asset || !canExport) return;
     const options = buildExportOptions();
     if (onExport) {
       await onExport(asset, options);
@@ -156,7 +161,7 @@ export default function ExportModal({
       "export_modal",
     ) as HTMLDialogElement | null;
     modal?.close();
-  }, [asset, canBrowserExport, buildExportOptions, exportImage, onExport]);
+  }, [asset, canExport, buildExportOptions, exportImage, onExport]);
 
   const handleRetry = useCallback(async () => {
     if (
@@ -222,7 +227,7 @@ export default function ExportModal({
               className="btn btn-soft btn-circle"
               disabled
               onClick={() => {
-                if (asset && onAddToAlbum) onAddToAlbum(asset);
+                if (asset && onAddToAlbum) void onAddToAlbum(asset);
               }}
             >
               <BookPlus />
@@ -238,7 +243,7 @@ export default function ExportModal({
               className="btn btn-soft btn-circle"
               disabled
               onClick={() => {
-                if (asset && onCopyShareLink) onCopyShareLink(asset);
+                if (asset && onCopyShareLink) void onCopyShareLink(asset);
               }}
             >
               <Link />
@@ -284,7 +289,7 @@ export default function ExportModal({
           </div>
         </div>
 
-        {canBrowserExport && (
+        {canExport && (
           <fieldset className="fieldset">
             <legend className="fieldset-legend">Export Format</legend>
             <select
@@ -295,7 +300,8 @@ export default function ExportModal({
             >
               <option value="png">PNG</option>
               <option value="jpeg">JPEG (80%)</option>
-              <option value="webp">WebP</option>
+              <option value="webp">WebP (80%)</option>
+              <option value="avif">AVIF</option>
             </select>
             <span className="label">Optional</span>
             <button
@@ -317,10 +323,10 @@ export default function ExportModal({
           </fieldset>
         )}
 
-        {asset && !canBrowserExport && (
+        {asset && !canExport && (
           <div className="mt-3 text-sm opacity-70">
-            Export conversion is unavailable for RAW, video, and audio assets.
-            You can still download the original file.
+            Export conversion is unavailable for video and audio assets. You can
+            still download the original file.
           </div>
         )}
 

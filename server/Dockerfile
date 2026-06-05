@@ -3,7 +3,7 @@
 ############################################
 # Builder
 ############################################
-FROM golang:1.25.0-bookworm AS builder
+FROM golang:1.25.0-trixie AS builder
 
 ENV CGO_ENABLED=1 \
     GO111MODULE=on
@@ -31,11 +31,18 @@ RUN go build -o /out/server ./cmd
 ############################################
 # Runtime
 ############################################
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 
 ARG TARGETARCH
 
-# Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime
+# Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime.
+#
+# On trixie, libheif uses a plugin architecture: each codec ships as a separate
+# package that --no-install-recommends would otherwise skip. We pin them so image
+# encode/decode is guaranteed — libheif-plugin-aomenc (AV1 ENCODE) powers the AVIF
+# path of the /assets/{id}/export endpoint; aomdec + libde265 cover reading
+# AVIF/HEIC sources. libvips-tools (rather than the versioned libvips42* package)
+# lets apt resolve the correct runtime soname across Debian releases.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -43,9 +50,13 @@ RUN set -eux; \
         curl \
         ffmpeg \
         exiftool \
-        libvips42 \
-        libraw20 \
-        tzdata; \
+        tzdata \
+        libvips-tools \
+        libheif1 \
+        libheif-plugin-aomenc \
+        libheif-plugin-aomdec \
+        libheif-plugin-libde265 \
+        libraw23; \
     if [ "${TARGETARCH}" = "amd64" ]; then \
         apt-get install -y --no-install-recommends \
             intel-media-va-driver \
@@ -53,6 +64,15 @@ RUN set -eux; \
             libva2; \
     fi; \
     rm -rf /var/lib/apt/lists/*
+
+# Fail the build loudly if AVIF (AV1) encode is unavailable, rather than silently
+# returning HTTP 422 from the export endpoint at runtime. Uses the vips CLI from
+# libvips-tools; heifsave defaults to AV1 compression for a .avif target.
+RUN set -eux; \
+    vips black /tmp/avif-probe.v 16 16; \
+    vips heifsave /tmp/avif-probe.v /tmp/avif-probe.avif; \
+    test -s /tmp/avif-probe.avif; \
+    rm -f /tmp/avif-probe.v /tmp/avif-probe.avif
 
 ENV SERVER_CONFIG_FILE=/app/config/server.local.toml \
     SERVER_PORT=6680 \

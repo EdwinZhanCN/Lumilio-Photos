@@ -7861,6 +7861,244 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/{id}/export": {
+            "get": {
+                "description": "Re-encode an asset's original file to JPEG, PNG, WebP, or AVIF with optional max dimensions and quality, and stream it back as a download.",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Output format (jpeg, png, webp, avif)",
+                        "in": "query",
+                        "name": "format",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Quality 1-100 for lossy formats",
+                        "in": "query",
+                        "name": "quality",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Maximum output width in pixels",
+                        "in": "query",
+                        "name": "max_width",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Maximum output height in pixels",
+                        "in": "query",
+                        "name": "max_height",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Base download filename (without extension)",
+                        "in": "query",
+                        "name": "filename",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "image/avif": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            },
+                            "image/jpeg": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Encoded image"
+                    },
+                    "400": {
+                        "content": {
+                            "image/avif": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "image/avif": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Authentication required"
+                    },
+                    "403": {
+                        "content": {
+                            "image/avif": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "image/avif": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset or original file not found"
+                    },
+                    "422": {
+                        "content": {
+                            "image/avif": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Source image could not be encoded"
+                    },
+                    "500": {
+                        "content": {
+                            "image/avif": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Export asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/{id}/like": {
             "put": {
                 "description": "Update the like/favorite status of a specific asset",
