@@ -62,6 +62,17 @@ func bundledFFprobe(resources string) string {
 	return resolveToolPath(filepath.Join(resources, "ffmpeg", "ffprobe"))
 }
 
+// bundledVipsHome returns the bundle-local libvips prefix if dynamic modules
+// were staged there. libvips searches $VIPSHOME/lib/vips-modules-<major>.<minor>
+// during Startup(), so this must be set before the in-process API server starts.
+func bundledVipsHome(resources string) string {
+	matches, err := filepath.Glob(filepath.Join(resources, "lib", "vips-modules-*"))
+	if err != nil || len(matches) == 0 {
+		return ""
+	}
+	return resources
+}
+
 // bundledWebRoot returns the bundled web SPA directory if it contains an
 // index.html, else "" (server runs API-only). LUMILIO_WEB_ROOT overrides it for
 // development, where the build is at <repo>/web/dist rather than in the bundle.

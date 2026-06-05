@@ -45,6 +45,8 @@ PLATFORM="darwin-$GOARCH"
 APP_NAME="Lumilio Photos"
 BUNDLE_ID="com.edwinzhan.lumilio-photos"
 VERSION="${LUMILIO_VERSION:-0.0.0}"
+APP_ICON_NAME="AppIcon"
+APP_ICON="$DESKTOP_DIR/packaging/icons/$APP_ICON_NAME.icns"
 
 BUILD_DIR="$DESKTOP_DIR/build"
 APP="$BUILD_DIR/$APP_NAME.app"
@@ -75,6 +77,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleExecutable</key><string>lumilio-photos</string>
   <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
+  <key>CFBundleIconFile</key><string>$APP_ICON_NAME</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
@@ -83,6 +86,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+echo "==> Staging app icon"
+if [ ! -f "$APP_ICON" ]; then
+  echo "    ERROR: missing $APP_ICON" >&2
+  exit 1
+fi
+cp "$APP_ICON" "$RES_DIR/$APP_ICON_NAME.icns"
 
 echo "==> Staging bundled runtime resources"
 stage() { # src dest
@@ -100,15 +110,18 @@ stage "$RESOURCES_SRC/exiftool"               "$RES_DIR/exiftool"
 
 echo "==> Staging web SPA"
 WEB_DIST="$ROOT/web/dist"
-if [ ! -d "$WEB_DIST" ] && command -v vp >/dev/null 2>&1; then
-  echo "    building web frontend (vp build)"
-  ( cd "$ROOT/web" && vp build )
+if ! command -v vp >/dev/null 2>&1; then
+  echo "    ERROR: vp not found; install Vite+ tooling or run make setup before desktop-build." >&2
+  exit 1
 fi
+echo "    building web frontend (vp build)"
+( cd "$ROOT/web" && vp build )
 if [ -d "$WEB_DIST" ]; then
   mkdir -p "$RES_DIR/web"
   cp -R "$WEB_DIST/." "$RES_DIR/web/"
 else
-  echo "    WARNING: $WEB_DIST not found; app will run API-only (no UI). Run 'cd web && vp build'." >&2
+  echo "    ERROR: $WEB_DIST not found after vp build." >&2
+  exit 1
 fi
 
 echo "==> Bundling libvips dylib tree (dylibbundler)"
@@ -121,11 +134,210 @@ else
   echo "    WARNING: dylibbundler not installed; skipping (run: brew install dylibbundler)" >&2
 fi
 
+echo "==> Staging libvips dynamic modules"
+find_vips_modules_dir() {
+  local prefix dir
+  if command -v pkg-config >/dev/null 2>&1; then
+    prefix="$(pkg-config --variable=prefix vips 2>/dev/null || true)"
+    if [ -n "$prefix" ]; then
+      for dir in "$prefix"/lib/vips-modules-*; do
+        if [ -d "$dir" ]; then
+          printf '%s\n' "$dir"
+          return 0
+        fi
+      done
+    fi
+  fi
+  if command -v brew >/dev/null 2>&1; then
+    prefix="$(brew --prefix vips 2>/dev/null || true)"
+    if [ -n "$prefix" ]; then
+      for dir in "$prefix"/lib/vips-modules-*; do
+        if [ -d "$dir" ]; then
+          printf '%s\n' "$dir"
+          return 0
+        fi
+      done
+    fi
+  fi
+  return 1
+}
+VIPS_MODULES_SRC="$(find_vips_modules_dir || true)"
+if [ -n "$VIPS_MODULES_SRC" ]; then
+  VIPS_MODULES_DEST="$RES_DIR/lib/$(basename "$VIPS_MODULES_SRC")"
+  mkdir -p "$VIPS_MODULES_DEST"
+  # Stage only the dynamic libvips modules we actually need:
+  #   vips-heif.dylib   -> HEIC/HEIF/AVIF load (iPhone photos)
+  #   vips-magick.dylib -> BMP and other long-tail raster formats libvips has no
+  #                        native loader for (decoded via ImageMagick).
+  # Poppler/OpenSlide are intentionally skipped. The dylib-closure pass below
+  # walks $RES_DIR/lib too, so each staged module's dependency tree (e.g.
+  # libMagickCore) is pulled into Frameworks/ and its load paths rewritten.
+  for mod in vips-heif vips-magick; do
+    if [ -f "$VIPS_MODULES_SRC/$mod.dylib" ]; then
+      cp "$VIPS_MODULES_SRC/$mod.dylib" "$VIPS_MODULES_DEST/$mod.dylib"
+    else
+      echo "    WARNING: $mod.dylib not found in $VIPS_MODULES_SRC" >&2
+    fi
+  done
+else
+  echo "    WARNING: libvips modules not found; HEIC/AVIF/BMP plugin loaders may be unavailable" >&2
+fi
+
+echo "==> Completing bundled dylib closure"
+# dylibbundler can rewrite a dependency to the bundle path without copying every
+# indirect dylib. Walk the resulting Frameworks tree and pull in any missing
+# Homebrew dylibs by basename, then rewrite absolute Homebrew references to
+# loader-relative paths. This is intentionally conservative: system dylibs stay
+# system dylibs.
+BREW_PREFIXES=()
+if command -v brew >/dev/null 2>&1; then
+  BREW_PREFIXES+=("$(brew --prefix)")
+fi
+BREW_PREFIXES+=("/opt/homebrew" "/usr/local")
+
+find_homebrew_dylib() { # basename
+  local name="$1" prefix candidate
+  for prefix in "${BREW_PREFIXES[@]}"; do
+    [ -n "$prefix" ] || continue
+    for candidate in "$prefix/lib/$name" "$prefix"/Cellar/*/*/lib/"$name"; do
+      if [ -f "$candidate" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
+ensure_framework_dylib() { # basename
+  local name="$1" src dest
+  dest="$FRAMEWORKS_DIR/$name"
+  [ -f "$dest" ] && return 1
+  src="$(find_homebrew_dylib "$name" || true)"
+  if [ -z "$src" ]; then
+    echo "    WARNING: could not find Homebrew dylib $name" >&2
+    return 1
+  fi
+  echo "    adding $name"
+  cp -L "$src" "$dest"
+  chmod 755 "$dest" 2>/dev/null || true
+  install_name_tool -id "@rpath/$name" "$dest" 2>/dev/null || true
+  return 0
+}
+
+rel_ref_for() { # file basename
+  case "$1" in
+    "$EXE")
+      printf '@rpath/%s\n' "$2"
+      return
+      ;;
+  esac
+  local dir sub prefix
+  dir="$(dirname "$1")"
+  case "$dir" in
+    "$RES_DIR"/lib/vips-modules-*)
+      printf '@loader_path/../../../Frameworks/%s\n' "$2"
+      return
+      ;;
+  esac
+  prefix="@loader_path"
+  if [ "$dir" != "$FRAMEWORKS_DIR" ]; then
+    sub="${dir#$FRAMEWORKS_DIR/}"
+    while [ -n "$sub" ] && [ "$sub" != "$dir" ]; do
+      prefix="$prefix/.."
+      case "$sub" in
+        */*) sub="${sub%/*}" ;;
+        *) sub="" ;;
+      esac
+    done
+  fi
+  printf '%s/%s\n' "$prefix" "$2"
+}
+
+delete_bundle_rpaths() { # file
+  local f="$1" rpath
+  for rpath in "@executable_path/../Frameworks/" "@executable_path/../Frameworks"; do
+    while otool -l "$f" | grep -F "path $rpath " >/dev/null 2>&1; do
+      install_name_tool -delete_rpath "$rpath" "$f" 2>/dev/null || break
+    done
+  done
+}
+
+closure_targets() {
+  printf '%s\n' "$EXE"
+  if [ -d "$FRAMEWORKS_DIR" ]; then
+    find "$FRAMEWORKS_DIR" -type f -name "*.dylib"
+  fi
+  if [ -d "$RES_DIR/lib" ]; then
+    find "$RES_DIR/lib" -type f -name "*.dylib"
+  fi
+}
+
+rewrite_one_dylib_refs() { # file
+  local f="$1" ref base newref changed=1
+  case "$f" in
+    *.dylib)
+      delete_bundle_rpaths "$f"
+      install_name_tool -id "@rpath/$(basename "$f")" "$f" 2>/dev/null || true
+      ;;
+  esac
+  while IFS= read -r ref; do
+    base="$(basename "$ref")"
+    case "$ref" in
+      /opt/homebrew/*|/usr/local/*)
+        ensure_framework_dylib "$base" && changed=0
+        newref="$(rel_ref_for "$f" "$base")"
+        if install_name_tool -change "$ref" "$newref" "$f" 2>/dev/null; then
+          changed=0
+        fi
+        ;;
+      @executable_path/../Frameworks/*.dylib|@rpath/*.dylib|@loader_path/*.dylib)
+        if [ ! -f "$FRAMEWORKS_DIR/$base" ]; then
+          ensure_framework_dylib "$base" && changed=0
+        fi
+        newref="$(rel_ref_for "$f" "$base")"
+        if [ "$ref" != "$newref" ] && install_name_tool -change "$ref" "$newref" "$f" 2>/dev/null; then
+          changed=0
+        fi
+        ;;
+    esac
+  done < <(otool -L "$f" | awk 'NR>1 {print $1}')
+  return "$changed"
+}
+
+for _ in 1 2 3 4 5 6 7 8; do
+  changed="false"
+  while IFS= read -r dylib; do
+    rewrite_one_dylib_refs "$dylib" && changed="true"
+  done < <(closure_targets)
+  [ "$changed" = "false" ] && break
+done
+
+missing_dylibs="false"
+while IFS= read -r f; do
+  while IFS= read -r ref; do
+    case "$ref" in
+      @executable_path/../Frameworks/*.dylib|@rpath/*.dylib|@loader_path/*.dylib|@loader_path/*/*.dylib|@loader_path/*/*/*.dylib|@loader_path/*/*/*/*.dylib)
+        base="$(basename "$ref")"
+        if [ ! -f "$FRAMEWORKS_DIR/$base" ]; then
+          echo "    ERROR: missing bundled dylib $base referenced by $f" >&2
+          missing_dylibs="true"
+        fi
+        ;;
+    esac
+  done < <(otool -L "$f" | awk 'NR>1 {print $1}')
+done < <(closure_targets)
+if [ "$missing_dylibs" = "true" ]; then
+  exit 1
+fi
+
 echo "==> Ad-hoc signing (free, no Apple Developer account)"
 # install_name rewrites invalidate signatures, so re-sign every dylib first.
-if [ -d "$FRAMEWORKS_DIR" ]; then
-  find "$FRAMEWORKS_DIR" -type f -name "*.dylib" -exec codesign --force -s - {} \; 2>/dev/null || true
-fi
+while IFS= read -r dylib; do
+  [ "$dylib" = "$EXE" ] && continue
+  chmod 755 "$dylib" 2>/dev/null || true
+  codesign --force -s - "$dylib" 2>/dev/null || true
+done < <(closure_targets)
 # Sign bundled executables too, then the whole bundle.
 find "$RES_DIR" -type f -perm +111 -exec codesign --force -s - {} \; 2>/dev/null || true
 codesign --force --deep -s - "$APP"

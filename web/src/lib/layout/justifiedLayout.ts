@@ -1,5 +1,4 @@
 import type { Asset } from "@/lib/http-commons";
-import { isPhotoMetadata } from "@/lib/http-commons";
 
 export interface LayoutPosition {
   top: number;
@@ -42,18 +41,11 @@ export const createResponsiveConfig = (containerWidth: number): LayoutConfig => 
 };
 
 export const assetToLayoutBox = (asset: Asset): LayoutBox => {
-  let { width, height } = asset;
-
-  if (!width || !height) {
-    const metadata = asset.specific_metadata;
-    if (isPhotoMetadata(asset.type, metadata) && metadata.dimensions) {
-      const match = metadata.dimensions.match(/(\d+)(?:×|x)(\d+)/i);
-      if (match) {
-        width = parseInt(match[1], 10);
-        height = parseInt(match[2], 10);
-      }
-    }
-  }
+  // Layout uses the asset's own width/height, which the backend already
+  // orientation-corrects. We intentionally do not fall back to
+  // specific_metadata.dimensions: it is not a reliable source of truth and
+  // reading it risked undefined-access errors. Missing dimensions default to 3:2.
+  const { width, height } = asset;
 
   return {
     width: width || 3,
