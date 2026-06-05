@@ -46,11 +46,22 @@ import (
 // in docs/agent/exec-plans/active/desktop-wails-v3.md.
 const shutdownTimeout = 10 * time.Second
 
-// Run boots the API server and blocks until ctx is cancelled (e.g. SIGINT/
-// SIGTERM for the CLI, or the desktop supervisor cancelling on app quit), then
-// performs a graceful shutdown. It returns a non-nil error only on a fatal
-// startup failure or an unexpected server error; a clean shutdown returns nil.
-func Run(ctx context.Context) error {
+// Run boots the API server from an already-resolved configuration and blocks
+// until ctx is cancelled (e.g. SIGINT/SIGTERM for the CLI, or the desktop
+// supervisor cancelling on app quit), then performs a graceful shutdown. It
+// returns a non-nil error only on a fatal startup failure or an unexpected
+// server error; a clean shutdown returns nil.
+func Run(ctx context.Context, appConfig config.AppConfig) error {
+	config.ApplyRuntimeEnvDefaults(appConfig)
+	dbConfig := appConfig.DatabaseConfig
+
+	return run(ctx, appConfig, dbConfig)
+}
+
+// RunFromEnvironment is a compatibility helper for hosts that still want the
+// legacy behavior of loading .env/TOML/env inside the app package. New hosts
+// should load config themselves and call Run with a typed AppConfig.
+func RunFromEnvironment(ctx context.Context) error {
 	config.LoadEnvironment()
 
 	appConfig, err := config.LoadAppConfigWithError()
@@ -60,6 +71,10 @@ func Run(ctx context.Context) error {
 	config.ApplyRuntimeEnvDefaults(appConfig)
 	dbConfig := appConfig.DatabaseConfig
 
+	return run(ctx, appConfig, dbConfig)
+}
+
+func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.DatabaseConfig) error {
 	logRuntime, err := logging.NewLogger(logging.Config{
 		Level:         appConfig.LoggingConfig.Level,
 		LogDir:        appConfig.LoggingConfig.LogDir,

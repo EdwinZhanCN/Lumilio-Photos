@@ -38,7 +38,7 @@ type Paths struct {
 	PGLogs     string // PostgreSQL log directory
 	Logs       string // API/application log directory
 	Secrets    string // db_password + lumilio_secret_key
-	Config     string // generated server.local.toml + desktop-settings.json
+	Config     string // generated debug config + desktop-settings.json
 	Backups    string // pg_dump auto-backups (upgrades)
 	DefaultLib string // default media library location (<appdata>/storage)
 }
@@ -97,14 +97,15 @@ func (p *Paths) DesktopSettingsFile() string {
 	return filepath.Join(p.Config, "desktop-settings.json")
 }
 
-// ServerConfigFile is the generated server.local.toml. It is rewritten on every
-// launch, so it must never be the source of truth for persisted user choices.
+// ServerConfigFile is the generated server.local.toml debug copy. It is
+// rewritten on every launch and is not used as the runtime config input, so it
+// must never be the source of truth for persisted user choices.
 func (p *Paths) ServerConfigFile() string {
 	return filepath.Join(p.Config, "server.local.toml")
 }
 
 // DBPasswordFile holds the generated PostgreSQL password (referenced by the
-// server config's password_file).
+// typed server config's password_file).
 func (p *Paths) DBPasswordFile() string { return filepath.Join(p.Secrets, "db_password") }
 
 // SecretKeyFile holds the app root secret used to derive JWT/MFA/media keys.

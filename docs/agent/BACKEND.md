@@ -13,17 +13,24 @@ This document describes the current Go backend as implemented in `server/`.
 
 Startup order in `cmd/main.go`:
 
-1. Load TOML config, then apply env overrides.
-2. Initialize logging.
-3. Start libvips runtime.
-4. Run database migrations.
-5. Open PostgreSQL pool and generated query layer.
-6. Initialize settings, repository storage, River queues, ML services, processors, handlers, and router.
-7. Start the HTTP server on `server.port`.
+1. Load `.env`, then TOML config, then apply env overrides.
+2. Pass the resolved `config.AppConfig` to `server/app.Run(ctx, cfg)`.
+3. Initialize logging.
+4. Start libvips runtime.
+5. Run database migrations.
+6. Open PostgreSQL pool and generated query layer.
+7. Initialize settings, repository storage, River queues, ML services, processors, handlers, and router.
+8. Start the HTTP server on `server.port`.
 
 ## Configuration Boundary
 
 Runtime defaults belong in `server/config/server.example.toml`; local runtime choices belong in the ignored `server/config/server.local.toml`. Env is for bootstrap, secrets, deployment wiring, and machine-specific overrides.
+
+Desktop is a host wrapper, not a second server bootstrap: the supervisor prepares
+private PostgreSQL, app-data paths, secrets, bundled media tools, and the SPA
+root, then calls `config.NewDesktopConfig` and `app.Run(ctx, cfg)`. The generated
+desktop `server.local.toml` under app data is a debug copy only and is not used
+as the runtime input.
 
 Keep in env:
 

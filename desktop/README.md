@@ -12,8 +12,10 @@ Wails v3 system tray (menubar app, no webview)
   → "Open Lumilio Photos" opens the default browser at http://localhost:6680
 desktop/supervisor
   → manages a private PostgreSQL 16 (initdb / pg_ctl / pg_isready / createdb)
-  → generates server.local.toml + secrets under the app-data dir
-  → runs server/app.Run(ctx) in-process (migrations + API + queue + ML)
+  → generates secrets under the app-data dir
+  → builds typed server config through server/config.NewDesktopConfig(...)
+  → writes config/server.local.toml as a debug copy only
+  → runs server/app.Run(ctx, cfg) in-process (migrations + API + queue + ML)
   → the Go API server also serves the React SPA at localhost:6680 (server.web_root)
 ```
 
@@ -45,6 +47,8 @@ make desktop-test
 App data (always local, never on the user's relocatable media drive):
 `~/Library/Application Support/Lumilio Photos/` — `postgres/`, `secrets/`,
 `config/`, `backups/`, `lumilio.lock`. Override the root with `LUMILIO_APP_DATA`.
+`config/server.local.toml` is a generated debug copy of the typed runtime config;
+desktop does not boot by reloading it.
 
 Useful env overrides (development):
 
@@ -99,10 +103,10 @@ needs a paid Apple Developer account — a clean future upgrade to the same DMG.
 
 ## Status / remaining work
 
-Implemented: supervisor (PG lifecycle, config/secrets generation, single-instance
-lock, storage-path persistence, quarantine cleanup), embedded migrations,
-in-process server boot, the Go server serving the SPA, the Wails system-tray
-controller with auto-open browser, and dev/build tooling. Verified end to end
+Implemented: supervisor (PG lifecycle, typed config/secrets generation,
+single-instance lock, storage-path persistence, quarantine cleanup), embedded
+migrations, in-process server boot, the Go server serving the SPA, the Wails
+system-tray controller with auto-open browser, and dev/build tooling. Verified end to end
 against a real PostgreSQL (`TestDesktopRuntimeE2E`): PG → migrations → API → SPA
 at `localhost:6680`.
 
