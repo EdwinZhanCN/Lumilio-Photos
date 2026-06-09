@@ -400,6 +400,14 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
+                    "tag_name": {
+                        "example": "document",
+                        "type": "string"
+                    },
+                    "tag_source": {
+                        "example": "zeroshot",
+                        "type": "string"
+                    },
                     "type": {
                         "enum": [
                             "PHOTO",
@@ -2539,6 +2547,13 @@ const docTemplate = `{
             },
             "dto.RebuildAssetIndexesResponseDTO": {
                 "properties": {
+                    "disabled_tasks": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "job_id": {
                         "example": 123,
                         "type": "integer"

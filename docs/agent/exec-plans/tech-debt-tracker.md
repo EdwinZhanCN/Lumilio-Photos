@@ -21,9 +21,3 @@ Keep this list short. Each item should have a concrete owner path and a reason i
     registration works in Safari/Chrome against `localhost` once the SPA ships.
   - **Phase 2 UI**: native storage-location picker + "reconnect external drive"
     dialog (supervisor currently persists/falls back but has no picker UI).
-- **`zeroshot_classify_enabled` ML flag has no UI.** The backend exposes a settable
-  `zeroshot_classify_enabled` flag (`semantic`/`zeroshot` rename is otherwise fully
-  synced across backend, frontend, compose, TOML, and migration
-  `029_neutral_semantic_naming`). The AI settings UI
-  (`web/src/features/settings/components/Tabs/AISettings.tsx`) does not surface a
-  toggle for it yet — add one if the zero-shot classifier should be user-configurable.

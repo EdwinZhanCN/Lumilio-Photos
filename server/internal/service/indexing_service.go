@@ -60,6 +60,7 @@ type ReindexAssetsInput struct {
 type ReindexAssetsJobResult struct {
 	JobID        int64
 	Requested    []AssetIndexingTask
+	Disabled     []AssetIndexingTask
 	Limit        int
 	MissingOnly  bool
 	RepositoryID *string
@@ -232,9 +233,26 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 		return ReindexAssetsJobResult{}, errors.New("no valid indexing tasks requested")
 	}
 
+	effectiveConfig, err := s.settingsService.GetEffectiveMLConfig(ctx)
+	if err != nil {
+		return ReindexAssetsJobResult{}, fmt.Errorf("load ML settings: %w", err)
+	}
+
+	enabledTasks := filterEnabledIndexingTasks(requestedTasks, effectiveConfig)
+	disabledTasks := computeDisabledIndexingTasks(requestedTasks, enabledTasks)
+
+	if len(enabledTasks) == 0 {
+		return ReindexAssetsJobResult{
+			Disabled:     disabledTasks,
+			Limit:        input.Limit,
+			MissingOnly:  input.MissingOnly,
+			RepositoryID: input.RepositoryID,
+		}, nil
+	}
+
 	jobResult, err := s.queueClient.Insert(ctx, jobs.ReindexAssetsArgs{
 		RepositoryID: input.RepositoryID,
-		Tasks:        indexingTasksToStrings(requestedTasks),
+		Tasks:        indexingTasksToStrings(enabledTasks),
 		Limit:        input.Limit,
 		MissingOnly:  input.MissingOnly,
 	}, &river.InsertOpts{Queue: "reindex_assets"})
@@ -244,7 +262,8 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 
 	return ReindexAssetsJobResult{
 		JobID:        jobResult.Job.ID,
-		Requested:    requestedTasks,
+		Requested:    enabledTasks,
+		Disabled:     disabledTasks,
 		Limit:        input.Limit,
 		MissingOnly:  input.MissingOnly,
 		RepositoryID: input.RepositoryID,
@@ -561,6 +580,20 @@ func (s *assetIndexingService) audit(repositoryID *string, repoPath string) logg
 		return s.auditProvider.ForPath(repoPath)
 	}
 	return s.auditProvider.ForPath(repository.Path)
+}
+
+func computeDisabledIndexingTasks(requested, enabled []AssetIndexingTask) []AssetIndexingTask {
+	enabledSet := make(map[AssetIndexingTask]bool, len(enabled))
+	for _, t := range enabled {
+		enabledSet[t] = true
+	}
+	disabled := make([]AssetIndexingTask, 0, len(requested))
+	for _, t := range requested {
+		if !enabledSet[t] {
+			disabled = append(disabled, t)
+		}
+	}
+	return disabled
 }
 
 func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) []AssetIndexingTask {

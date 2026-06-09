@@ -25,6 +25,10 @@ type ProcessOcrWorker struct {
 	ImageLoader    MLImageLoader
 }
 
+func (w *ProcessOcrWorker) Timeout(job *river.Job[ProcessOcrArgs]) time.Duration {
+	return 3 * time.Minute
+}
+
 func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrArgs]) error {
 	args := job.Args
 	assetID := args.AssetID

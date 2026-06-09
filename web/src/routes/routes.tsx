@@ -11,6 +11,7 @@ import MapView from "@/features/collections/routes/MapView";
 import TripDetails from "@/features/collections/routes/TripDetails";
 import People from "@/features/collections/routes/People";
 import Duplicates from "@/features/collections/routes/Duplicates";
+import UtilityClassifierAlbum from "@/features/collections/routes/UtilityClassifierAlbum";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import { AssetsProvider } from "@/features/assets";
@@ -94,6 +95,14 @@ export const appRoutes = [
   {
     path: "/collections/utilities/duplicates",
     element: <Duplicates />,
+  },
+  {
+    path: "/collections/utilities/:classifierSlug",
+    element: <UtilityClassifierAlbum />,
+  },
+  {
+    path: "/collections/utilities/:classifierSlug/:assetId",
+    element: <UtilityClassifierAlbum />,
   },
   {
     path: "/collections/:albumId",

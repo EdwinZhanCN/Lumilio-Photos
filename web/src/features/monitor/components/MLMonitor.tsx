@@ -10,8 +10,10 @@ import {
 import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
+  extractRebuildResponseData,
 } from "@/features/settings/hooks/useAssetIndexing";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useMessage } from "@/hooks/util-hooks/useMessage";
 
 interface MLMonitorProps {
   localRepoId?: string;
@@ -37,6 +39,7 @@ function getTaskLabel(t: (key: string) => string, key: MLTaskKey) {
 
 export function MLMonitor({ localRepoId }: MLMonitorProps) {
   const { t } = useI18n();
+  const showMessage = useMessage();
   const statsQuery = useAssetIndexingStats(localRepoId);
   const stats = statsQuery.stats;
   const rebuildMutation = useRebuildAssetIndexes();
@@ -327,8 +330,8 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
               </button>
               <button
                 className="btn btn-primary btn-sm"
-                onClick={() => {
-                  rebuildMutation.mutate({
+                onClick={async () => {
+                  const result = await rebuildMutation.mutateAsync({
                     body: {
                       repository_id: localRepoId || undefined,
                       tasks: [reindexModal.taskKey],
@@ -337,6 +340,20 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                   });
                   setReindexModal(null);
                   setReindexAll(false);
+
+                  const data = extractRebuildResponseData(result);
+                  const disabled = data?.disabled_tasks;
+                  if (disabled && disabled.length > 0) {
+                    const taskNames = disabled
+                      .map((key) => getTaskLabel(t, key as MLTaskKey))
+                      .join(", ");
+                    showMessage(
+                      "info",
+                      t("monitor.ml.reindexModal.disabledTasksWarning", {
+                        tasks: taskNames,
+                      }),
+                    );
+                  }
                 }}
               >
                 {t("monitor.ml.reindexModal.confirm")}

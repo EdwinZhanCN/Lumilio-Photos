@@ -34,6 +34,8 @@ type Filter struct {
 	Liked            *bool
 	CameraModel      *string
 	LensModel        *string
+	TagName          *string
+	TagSource        *string
 	LocationNorth    *float64
 	LocationSouth    *float64
 	LocationEast     *float64

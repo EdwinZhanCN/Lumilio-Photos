@@ -30,7 +30,7 @@ func isMLTaskEnabled(ctx context.Context, provider MLConfigProvider, queueName s
 	case "process_face":
 		return cfg.FaceEnabled, nil
 	case "classify_zeroshot":
-		return cfg.ZeroshotClassifyEnabled, nil
+		return cfg.SemanticEnabled, nil
 	default:
 		return false, nil
 	}

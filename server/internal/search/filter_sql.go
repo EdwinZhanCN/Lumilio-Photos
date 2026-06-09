@@ -49,6 +49,21 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 			  AND aa.album_id = %s
 		)`, a, albumPlaceholder))
 	}
+	if filter.TagName != nil {
+		tagNamePlaceholder := builder.addArg(*filter.TagName)
+		tagSourceCondition := ""
+		if filter.TagSource != nil {
+			tagSourcePlaceholder := builder.addArg(*filter.TagSource)
+			tagSourceCondition = fmt.Sprintf("\n			  AND at.source = %s", tagSourcePlaceholder)
+		}
+		conditions = append(conditions, fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM asset_tags at
+			JOIN tags t ON t.tag_id = at.tag_id
+			WHERE at.asset_id = %s.asset_id
+			  AND t.tag_name = %s%s
+		)`, a, tagNamePlaceholder, tagSourceCondition))
+	}
 	if filter.FilenameValue != nil {
 		filenamePlaceholder := builder.addArg(*filter.FilenameValue)
 		switch {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"server/config"
@@ -112,6 +113,46 @@ func (s *Scanner) EnqueueManualScan(ctx context.Context, repositoryID string, re
 
 func (s *Scanner) EnqueuePeriodicScan(ctx context.Context, repositoryID string) (EnqueueResult, error) {
 	return s.enqueueScan(ctx, repositoryID, jobs.RepositoryScanModePeriodic, "", false)
+}
+
+// EnqueueAllPeriodicScans lists all active repositories and enqueues a
+// periodic scan job for each, respecting MaxConcurrentRepos concurrency.
+func (s *Scanner) EnqueueAllPeriodicScans(ctx context.Context) {
+	repositories, err := s.queries.ListActiveRepositories(ctx)
+	if err != nil {
+		s.logger.Warn("failed to list active repositories for scan",
+			zap.String("operation", "repository_scan.enqueue_all"),
+			zap.Error(err),
+		)
+		return
+	}
+
+	sem := make(chan struct{}, s.cfg.MaxConcurrentRepos)
+	var wg sync.WaitGroup
+	for _, repository := range repositories {
+		repository := repository
+		if !repository.RepoID.Valid {
+			continue
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if _, err := s.EnqueuePeriodicScan(ctx, repository.RepoID.String()); err != nil {
+				s.logger.Warn("failed to enqueue periodic repository scan",
+					zap.String("operation", "repository_scan.enqueue"),
+					zap.String("repository_id", repository.RepoID.String()),
+					zap.Error(err),
+				)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func (s *Scanner) enqueueScan(ctx context.Context, repositoryID string, mode string, requestedBy string, force bool) (EnqueueResult, error) {

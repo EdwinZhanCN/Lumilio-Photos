@@ -26,6 +26,10 @@ type ProcessSemanticWorker struct {
 	ImageLoader      MLImageLoader
 }
 
+func (w *ProcessSemanticWorker) Timeout(job *river.Job[ProcessSemanticArgs]) time.Duration {
+	return 3 * time.Minute
+}
+
 func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[ProcessSemanticArgs]) error {
 	args := job.Args
 	assetID := args.AssetID

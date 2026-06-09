@@ -25,6 +25,10 @@ type ProcessFaceWorker struct {
 	ImageLoader    MLImageLoader
 }
 
+func (w *ProcessFaceWorker) Timeout(job *river.Job[ProcessFaceArgs]) time.Duration {
+	return 3 * time.Minute
+}
+
 func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFaceArgs]) error {
 	args := job.Args
 	assetID := args.AssetID

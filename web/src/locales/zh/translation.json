@@ -567,6 +567,20 @@
     },
     "untitled": "未命名相册",
     "utilities": {
+      "classifiers": {
+        "documents": {
+          "description": "0 样本文档识别",
+          "title": "文档"
+        },
+        "illustration": {
+          "description": "插画、绘画和图像作品",
+          "title": "插画"
+        },
+        "receipts": {
+          "description": "收据、账单和发票",
+          "title": "收据"
+        }
+      },
       "duplicates": {
         "description": "查找并合并重复的照片",
         "title": "重复照片"
@@ -873,6 +887,7 @@
         "descriptionAll_other": "重新索引全部 {{count}} 个资源。",
         "descriptionMissing_one": "重新索引 {{count}} 个缺失的资源。",
         "descriptionMissing_other": "重新索引 {{count}} 个缺失的资源。",
+        "disabledTasksWarning": "以下任务在 ML 设置中被禁用：{{tasks}}",
         "existingJobsWarning_one": "已有 {{count}} 个重新索引任务在队列中。",
         "existingJobsWarning_other": "已有 {{count}} 个重新索引任务在队列中。",
         "reindexAllCheckbox": "全量重建（而非仅补缺）",
@@ -1115,13 +1130,13 @@
         "bioclip": "识别植物、动物等生物主题。",
         "face": "检测并归类可识别的人脸。",
         "ocr": "读取照片画面中的可见文字。",
-        "semantic": "让照片可以按画面语义被找到。"
+        "semantic": "分析画面语义，用于相似检索和 0 样本识别。"
       },
       "taskNames": {
         "bioclip": "生物图鉴",
         "face": "人脸识别",
         "ocr": "文字识别",
-        "semantic": "语义搜索"
+        "semantic": "语义分析"
       },
       "validate": "验证连接",
       "validationError": "LLM 配置验证失败。",
