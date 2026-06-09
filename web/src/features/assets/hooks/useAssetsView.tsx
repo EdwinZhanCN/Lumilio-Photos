@@ -618,7 +618,7 @@ export const useCurrentAssetsSearchView = (
   const uiSortBy = useSortBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const filtersState = useFilterState();
-  const { sortBy, pageSize, ...viewOptions } = options;
+  const { sortBy, pageSize, baseFilter, viewKey, ...viewOptions } = options;
   const rawScopedFilter = useMemo(
     () =>
       selectFiltersEnabled({ filters: filtersState } as any)
@@ -626,20 +626,28 @@ export const useCurrentAssetsSearchView = (
         : {},
     [filtersState],
   );
+  const scopedFilter = useMemo(
+    () => ({
+      ...rawScopedFilter,
+      ...baseFilter,
+    }),
+    [baseFilter, rawScopedFilter],
+  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
       types: DEFAULT_ASSET_TYPES,
-      filter: rawScopedFilter,
+      filter: scopedFilter,
       sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
+      key: viewKey,
       search: searchQuery.trim()
         ? {
             query: searchQuery.trim(),
           }
         : undefined,
     }),
-    [rawScopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
+    [scopedFilter, uiSortBy, searchQuery, sortBy, pageSize, viewKey],
   );
 
   const enabled = searchQuery.trim().length > 0;
@@ -660,7 +668,7 @@ export const useCurrentAssetsView = (
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const filtersState = useFilterState();
 
-  const { sortBy, pageSize, ...viewOptions } = options;
+  const { sortBy, pageSize, baseFilter, viewKey, ...viewOptions } = options;
   const rawScopedFilter = useMemo(
     () =>
       selectFiltersEnabled({ filters: filtersState } as any)
@@ -668,20 +676,28 @@ export const useCurrentAssetsView = (
         : {},
     [filtersState],
   );
+  const scopedFilter = useMemo(
+    () => ({
+      ...rawScopedFilter,
+      ...baseFilter,
+    }),
+    [baseFilter, rawScopedFilter],
+  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
       types: DEFAULT_ASSET_TYPES,
-      filter: rawScopedFilter,
+      filter: scopedFilter,
       sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
+      key: viewKey,
       search: searchQuery.trim()
         ? {
             query: searchQuery.trim(),
           }
         : undefined,
     }),
-    [rawScopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
+    [scopedFilter, uiSortBy, searchQuery, sortBy, pageSize, viewKey],
   );
 
   const standardView = useAssetsView(definition, {

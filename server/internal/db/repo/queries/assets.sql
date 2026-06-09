@@ -528,6 +528,17 @@ WITH page_ids AS MATERIALIZED (
           AND aa.album_id = sqlc.narg('album_id')
       )
     )
+    AND (
+      sqlc.narg('tag_name')::text IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM asset_tags at
+        JOIN tags t ON t.tag_id = at.tag_id
+        WHERE at.asset_id = a.asset_id
+          AND t.tag_name = sqlc.narg('tag_name')
+          AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
+      )
+    )
     AND (sqlc.narg('filename_val')::text IS NULL OR
       CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
         WHEN 'matches' THEN a.original_filename ILIKE sqlc.narg('filename_val')
@@ -620,6 +631,17 @@ WHERE a.is_deleted = false
         AND aa.album_id = sqlc.narg('album_id')
     )
   )
+  AND (
+    sqlc.narg('tag_name')::text IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM asset_tags at
+      JOIN tags t ON t.tag_id = at.tag_id
+      WHERE at.asset_id = a.asset_id
+        AND t.tag_name = sqlc.narg('tag_name')
+        AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
+    )
+  )
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
       WHEN 'matches' THEN a.original_filename ILIKE sqlc.narg('filename_val')
@@ -706,6 +728,17 @@ WITH filtered AS MATERIALIZED (
         FROM album_assets aa
         WHERE aa.asset_id = a.asset_id
           AND aa.album_id = sqlc.narg('album_id')
+      )
+    )
+    AND (
+      sqlc.narg('tag_name')::text IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM asset_tags at
+        JOIN tags t ON t.tag_id = at.tag_id
+        WHERE at.asset_id = a.asset_id
+          AND t.tag_name = sqlc.narg('tag_name')
+          AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
       )
     )
     AND (sqlc.narg('filename_val')::text IS NULL OR
@@ -852,6 +885,17 @@ WITH filtered AS MATERIALIZED (
         FROM album_assets aa
         WHERE aa.asset_id = a.asset_id
           AND aa.album_id = sqlc.narg('album_id')
+      )
+    )
+    AND (
+      sqlc.narg('tag_name')::text IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM asset_tags at
+        JOIN tags t ON t.tag_id = at.tag_id
+        WHERE at.asset_id = a.asset_id
+          AND t.tag_name = sqlc.narg('tag_name')
+          AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
       )
     )
     AND (sqlc.narg('filename_val')::text IS NULL OR

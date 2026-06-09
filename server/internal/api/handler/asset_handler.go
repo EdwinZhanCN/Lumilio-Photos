@@ -97,9 +97,6 @@ func NewAssetHandler(
 		uploadLimiter:   uploadLimiter,
 	}
 
-	// Start background cleanup tasks
-	go handler.startBackgroundCleanupTasks()
-
 	return handler
 }
 
@@ -1867,6 +1864,8 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		Liked:            filter.Liked,
 		CameraModel:      filter.CameraModel,
 		LensModel:        filter.Lens,
+		TagName:          filter.TagName,
+		TagSource:        filter.TagSource,
 		LocationNorth:    locationNorth,
 		LocationSouth:    locationSouth,
 		LocationEast:     locationEast,
@@ -2302,11 +2301,24 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 		requestedTasks = append(requestedTasks, string(task))
 	}
 
+	disabledTasks := make([]string, 0, len(result.Disabled))
+	for _, task := range result.Disabled {
+		disabledTasks = append(disabledTasks, string(task))
+	}
+
+	status := "queued"
+	message := "Index rebuild job queued successfully"
+	if result.JobID == 0 && len(result.Requested) == 0 {
+		status = "skipped"
+		message = "All requested indexing tasks are disabled in ML settings"
+	}
+
 	api.GinSuccess(c, dto.RebuildAssetIndexesResponseDTO{
-		Status:         "queued",
-		Message:        "Index rebuild job queued successfully",
+		Status:         status,
+		Message:        message,
 		JobID:          result.JobID,
 		RequestedTasks: requestedTasks,
+		DisabledTasks:  disabledTasks,
 		Limit:          result.Limit,
 		MissingOnly:    result.MissingOnly,
 		RepositoryID:   result.RepositoryID,
@@ -2865,31 +2877,29 @@ func (h *AssetHandler) cleanupExpiredSessions() {
 	}
 }
 
-// startBackgroundCleanupTasks starts all background cleanup tasks
-func (h *AssetHandler) startBackgroundCleanupTasks() {
-	// Run session cleanup every 5 minutes
-	sessionTicker := time.NewTicker(5 * time.Minute)
-	defer sessionTicker.Stop()
-
-	// Run orphaned chunk cleanup every 30 minutes
-	orphanedChunkTicker := time.NewTicker(30 * time.Minute)
-	defer orphanedChunkTicker.Stop()
-
-	log.Println("Starting background cleanup tasks")
-
-	// First cleanup run immediately for both tasks
+// StartCleanupTasks starts background cleanup goroutines that respect ctx
+// cancellation for graceful shutdown. Call from app.go after construction.
+func (h *AssetHandler) StartCleanupTasks(ctx context.Context) {
 	h.cleanupExpiredSessions()
 	h.cleanupOrphanedChunks()
 
-	// Main loop for cleanup tasks
-	for {
-		select {
-		case <-sessionTicker.C:
-			h.cleanupExpiredSessions()
-		case <-orphanedChunkTicker.C:
-			h.cleanupOrphanedChunks()
+	go func() {
+		sessionTicker := time.NewTicker(5 * time.Minute)
+		defer sessionTicker.Stop()
+		orphanedChunkTicker := time.NewTicker(30 * time.Minute)
+		defer orphanedChunkTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-sessionTicker.C:
+				h.cleanupExpiredSessions()
+			case <-orphanedChunkTicker.C:
+				h.cleanupOrphanedChunks()
+			}
 		}
-	}
+	}()
 }
 
 // cleanupOrphanedChunks removes orphaned chunk files that aren't associated with any active session

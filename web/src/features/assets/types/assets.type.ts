@@ -213,4 +213,6 @@ export interface ViewDefinitionOptions {
   autoFetch?: boolean;
   disabled?: boolean;
   withGroups?: boolean;
+  baseFilter?: AssetFilter;
+  viewKey?: string;
 }

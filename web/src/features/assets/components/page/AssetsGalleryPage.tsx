@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
@@ -25,8 +25,24 @@ import type { AssetGalleryProps } from "./gallery.types";
 import {
   findBrowseItemIndexByAssetId,
 } from "@/features/assets/utils/browseItems";
+import type { AssetFilter } from "@/features/assets/types/assets.type";
+import type { FilterFieldKey } from "@/features/assets/components/page/FilterTool/FilterTool";
 
-export function AssetsGalleryPage() {
+type AssetsGalleryPageProps = {
+  title?: string;
+  icon?: ReactNode;
+  baseFilter?: AssetFilter;
+  lockedFilterFields?: readonly FilterFieldKey[];
+  viewKey?: string;
+};
+
+export function AssetsGalleryPage({
+  title,
+  icon,
+  baseFilter,
+  lockedFilterFields,
+  viewKey,
+}: AssetsGalleryPageProps = {}) {
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { t } = useI18n();
@@ -57,10 +73,14 @@ export function AssetsGalleryPage() {
   } = useCurrentAssetsView({
     withGroups: true,
     sortBy,
+    baseFilter,
+    viewKey,
   });
   const photoSearchView = useCurrentAssetsSearchView({
     withGroups: false,
     sortBy,
+    baseFilter,
+    viewKey: viewKey ? `${viewKey}:search` : undefined,
   });
   const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(
     null,
@@ -276,7 +296,10 @@ export function AssetsGalleryPage() {
         sortBy={sortBy}
         onSortByChange={setSortBy}
         onFiltersChange={() => {}}
+        title={title}
+        icon={icon}
         browseItems={activeBrowseItems}
+        lockedFilterFields={lockedFilterFields}
       />
 
       {isSearchActive ? (

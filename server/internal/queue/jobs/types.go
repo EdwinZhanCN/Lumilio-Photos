@@ -260,3 +260,16 @@ type TranscodeArgs struct {
 }
 
 func (TranscodeArgs) Kind() string { return "transcode_asset" }
+
+// ScheduleRepositoryScansArgs is a periodic trigger that lists all active
+// repositories and enqueues a ScanRepositoryArgs job for each one.
+type ScheduleRepositoryScansArgs struct{}
+
+func (ScheduleRepositoryScansArgs) Kind() string { return "schedule_repository_scans" }
+
+func (ScheduleRepositoryScansArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue:      "scan_repository",
+		UniqueOpts: river.UniqueOpts{ByPeriod: 1 * time.Minute},
+	}
+}

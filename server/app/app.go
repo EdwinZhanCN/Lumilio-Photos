@@ -27,6 +27,7 @@ import (
 	"server/internal/logging"
 	"server/internal/processors"
 	"server/internal/queue"
+	"server/internal/queue/jobs"
 	"server/internal/service"
 	"server/internal/sourcing"
 	"server/internal/storage"
@@ -233,6 +234,9 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		Queries:          queries,
 		EmbeddingService: embeddingService,
 	})
+	river.AddWorker[queue.ScheduleRepositoryScansArgs](workers, &queue.ScheduleRepositoryScansWorker{
+		EnqueueAll: repositoryScanner.EnqueueAllPeriodicScans,
+	})
 
 	// River's Start runs the client in a background goroutine until Stop is
 	// called; it returns once startup completes. context.Background is used (not
@@ -243,14 +247,22 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	}
 	appLogger.Info("queues initialized successfully", zap.String("operation", "queue.init"))
 
-	repositoryScanScheduler := scanner.NewScheduler(repositoryScanner, scannerLogger)
-	if err := repositoryScanScheduler.Start(ctx); err != nil {
-		return fmt.Errorf("start repository scan scheduler: %w", err)
+	// --- Periodic Jobs (River PeriodicJobs) ---
+	// Must be registered after Start() — the periodic job enqueuer is
+	// initialized during Start.
+	if appConfig.RepositoryScan.Enabled {
+		queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
+			river.PeriodicInterval(time.Duration(appConfig.RepositoryScan.IntervalSeconds)*time.Second),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.ScheduleRepositoryScansArgs{}, nil
+			},
+			&river.PeriodicJobOpts{ID: "repository_scan", RunOnStart: true},
+		))
 	}
-	defer repositoryScanScheduler.Stop()
 
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
+	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService)
 	setupController := handler.NewSetupHandler(service.NewSetupService(dbConfig))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)

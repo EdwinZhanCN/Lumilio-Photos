@@ -48,6 +48,7 @@ type RebuildAssetIndexesResponseDTO struct {
 	Message        string   `json:"message" example:"Index rebuild job queued successfully"`
 	JobID          int64    `json:"job_id" example:"123"`
 	RequestedTasks []string `json:"requested_tasks"`
+	DisabledTasks  []string `json:"disabled_tasks,omitempty"`
 	Limit          int      `json:"limit" example:"200"`
 	MissingOnly    bool     `json:"missing_only" example:"true"`
 	RepositoryID   *string  `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
@@ -494,6 +495,8 @@ type AssetFilterDTO struct {
 	CameraModel  *string            `json:"camera_model,omitempty" example:"Canon EOS R5"`
 	Lens         *string            `json:"lens,omitempty" example:"EF 50mm f/1.8"`
 	Location     *LocationBBoxDTO   `json:"location,omitempty"`
+	TagName      *string            `json:"tag_name,omitempty" example:"document"`
+	TagSource    *string            `json:"tag_source,omitempty" example:"zeroshot"`
 }
 
 // FilterAssetsRequestDTO represents the request structure for filtering assets

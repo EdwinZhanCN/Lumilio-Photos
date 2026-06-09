@@ -122,6 +122,8 @@ type QueryAssetsParams struct {
 	Liked            *bool
 	CameraModel      *string
 	LensModel        *string
+	TagName          *string
+	TagSource        *string
 	LocationNorth    *float64
 	LocationSouth    *float64
 	LocationEast     *float64
@@ -1511,6 +1513,8 @@ func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filte
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
 		LensModel:        params.LensModel,
+		TagName:          params.TagName,
+		TagSource:        params.TagSource,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1631,6 +1635,8 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
 		LensModel:        params.LensModel,
+		TagName:          params.TagName,
+		TagSource:        params.TagSource,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1658,6 +1664,8 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
 		LensModel:        params.LensModel,
+		TagName:          params.TagName,
+		TagSource:        params.TagSource,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1863,6 +1871,21 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 			WHERE aa.asset_id = a.asset_id
 			  AND aa.album_id = %s
 		)`, albumPlaceholder))
+	}
+	if params.TagName != nil {
+		tagNamePlaceholder := builder.addArg(*params.TagName)
+		tagSourceCondition := ""
+		if params.TagSource != nil {
+			tagSourcePlaceholder := builder.addArg(*params.TagSource)
+			tagSourceCondition = fmt.Sprintf("\n			  AND at.source = %s", tagSourcePlaceholder)
+		}
+		conditions = append(conditions, fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM asset_tags at
+			JOIN tags t ON t.tag_id = at.tag_id
+			WHERE at.asset_id = a.asset_id
+			  AND t.tag_name = %s%s
+		)`, tagNamePlaceholder, tagSourceCondition))
 	}
 	if params.FilenameValue != nil {
 		filenamePlaceholder := builder.addArg(*params.FilenameValue)

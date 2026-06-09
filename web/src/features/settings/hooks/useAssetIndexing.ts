@@ -13,6 +13,8 @@ type AssetIndexingStatsResponseDTO =
   Schemas["dto.AssetIndexingStatsResponseDTO"];
 export type RebuildAssetIndexesPayload =
   Schemas["dto.RebuildAssetIndexesRequestDTO"];
+export type RebuildAssetIndexesResponse =
+  Schemas["dto.RebuildAssetIndexesResponseDTO"];
 
 type AssetIndexingTaskStatsDTO = Schemas["dto.AssetIndexingTaskStatsDTO"];
 
@@ -147,4 +149,13 @@ export function useRebuildAssetIndexes() {
       });
     },
   });
+}
+
+export function extractRebuildResponseData(
+  raw: unknown,
+): RebuildAssetIndexesResponse | undefined {
+  if (raw && typeof raw === "object" && "data" in raw) {
+    return (raw as { data?: RebuildAssetIndexesResponse }).data;
+  }
+  return undefined;
 }

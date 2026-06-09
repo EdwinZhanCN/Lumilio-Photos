@@ -567,6 +567,20 @@
     },
     "untitled": "Untitled Album",
     "utilities": {
+      "classifiers": {
+        "documents": {
+          "description": "Zero-shot document matches",
+          "title": "Documents"
+        },
+        "illustration": {
+          "description": "Artwork and drawn images",
+          "title": "Illustration"
+        },
+        "receipts": {
+          "description": "Receipts, bills, and invoices",
+          "title": "Receipts"
+        }
+      },
       "duplicates": {
         "description": "Find and merge duplicate photos",
         "title": "Duplicates"
@@ -874,6 +888,7 @@
         "descriptionAll_other": "Reindex all {{count}} assets.",
         "descriptionMissing_one": "Reindex {{count}} missing asset.",
         "descriptionMissing_other": "Reindex {{count}} missing assets.",
+        "disabledTasksWarning": "Some tasks were disabled in ML settings: {{tasks}}",
         "existingJobsWarning_one": "{{count}} reindex job already queued.",
         "existingJobsWarning_other": "{{count}} reindex jobs already queued.",
         "reindexAllCheckbox": "Reindex all (not just missing)",
@@ -1116,13 +1131,13 @@
         "bioclip": "Identify plants, animals, and other biological subjects.",
         "face": "Detect and group recognizable faces.",
         "ocr": "Read visible text inside photos.",
-        "semantic": "Find photos by visual meaning, not only filenames."
+        "semantic": "Analyze visual meaning for similarity retrieval and zero-shot recognition."
       },
       "taskNames": {
         "bioclip": "Field guide",
         "face": "Face recognition",
         "ocr": "Text recognition",
-        "semantic": "Semantic search"
+        "semantic": "Semantic analysis"
       },
       "validate": "Validate connection",
       "validationError": "Failed to validate LLM configuration.",

@@ -10055,6 +10055,10 @@ export interface components {
             raw?: boolean;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
+            /** @example document */
+            tag_name?: string;
+            /** @example zeroshot */
+            tag_source?: string;
             /**
              * @example PHOTO
              * @enum {string}
@@ -10934,6 +10938,7 @@ export interface components {
             tasks?: string[];
         };
         "dto.RebuildAssetIndexesResponseDTO": {
+            disabled_tasks?: string[];
             /** @example 123 */
             job_id?: number;
             /** @example 200 */

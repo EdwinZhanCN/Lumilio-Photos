@@ -31,6 +31,10 @@ type speciesPredictionSaver interface {
 	SaveSpeciesPredictions(ctx context.Context, assetID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
 }
 
+func (w *ProcessBioClipWorker) Timeout(job *river.Job[ProcessBioClipArgs]) time.Duration {
+	return 3 * time.Minute
+}
+
 func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessBioClipArgs]) error {
 	args := job.Args
 	assetID := args.AssetID

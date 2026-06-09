@@ -80,8 +80,9 @@ func (s *lumenService) IsTaskAvailable(taskName string) bool {
 // ---- Inference methods ----
 
 func (s *lumenService) SemanticTextEmbed(ctx context.Context, text []byte) (*types.EmbeddingV1, error) {
+	// The service is set to be empty
 	req := types.NewInferRequest("semantic_text_embed").
-		ForSemanticTextEmbed(string(text), types.ServiceSigLIP).
+		ForSemanticTextEmbed(string(text)).
 		Build()
 
 	resp, err := s.lumenClient.Infer(ctx, req)
@@ -101,8 +102,9 @@ func (s *lumenService) SemanticTextEmbedFast(ctx context.Context, text []byte) (
 }
 
 func (s *lumenService) SemanticImageEmbed(ctx context.Context, imageData *imagesource.MLImage) (*types.EmbeddingV1, error) {
+	// The service is set to be empty
 	req := types.NewInferRequest("semantic_image_embed").
-		ForSemanticImageEmbed(imageData.EncodedSource, "image/webp", types.ServiceSigLIP).
+		ForSemanticImageEmbed(imageData.EncodedSource, "image/webp").
 		Build()
 
 	resp, err := s.lumenClient.Infer(ctx, req)
