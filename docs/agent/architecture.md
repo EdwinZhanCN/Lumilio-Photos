@@ -13,13 +13,14 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 - `server/cmd/main.go`: thin entrypoint (signal handling + normal TOML/env config load) that calls `server/app`.
 - `server/app`: the only server runtime — logging, migrations, queue workers, router, repository bootstrap, SPA serving, and graceful shutdown via `Run(ctx, cfg)`. Imported by the CLI and, in-process, by the desktop supervisor.
-- `server/config`: single config schema/defaults boundary, including normal TOML/env loading and `NewDesktopConfig` for the desktop host. Desktop may write a generated TOML debug copy, but runtime uses typed config.
+- `server/config`: single config schema/defaults boundary, including normal TOML/env loading, external tool paths, and `NewDesktopConfig` for the desktop host. Desktop may write a generated TOML debug copy, but runtime uses typed config.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS.
 - `server/internal/api/handler`: HTTP request/response layer.
-- `server/internal/service`: business logic, auth, settings, indexing, search, ML adapters.
+- `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
 - `server/internal/processors`: ingest, metadata, thumbnail, transcode pipeline.
 - `server/internal/queue`: River jobs and workers.
 - `server/internal/storage`: repository layout, staging, scanner, repository config.
+- `server/internal/sourcing`: unified ingest materialization for upload, scan, and cloud flows.
 - `server/internal/db` and `server/migrations`: database runtime and schema changes.
 
 ## Frontend
@@ -28,7 +29,8 @@ This is the compact system map for agents. Keep details here stable and useful; 
 - `web/src/lib/http-commons`: generated OpenAPI types and typed API client.
 - `web/src/contexts`: cross-cutting app state.
 - `web/src/components`: reusable UI components.
-- `web/src/wasm` and workers: compute-heavy browser paths.
+- `web/src/wasm` and `web/src/workers`: checked-in `blake3`/`studio` browser bundles and worker entry points for compute-heavy paths.
+- `wasm/*`: Rust source crates for `blake3-wasm`, `studio-wasm`, `thumbnail-wasm`, and `export-wasm`.
 
 ## Contracts
 
