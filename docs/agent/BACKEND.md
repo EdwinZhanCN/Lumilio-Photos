@@ -50,10 +50,11 @@ Keep in TOML:
 - storage strategy and duplicate handling
 - repository scan cadence
 - geocoding defaults
-- ML task defaults
+- ML task defaults, including zero-shot classification
 - auth token TTLs and WebAuthn defaults
 - transcoding mode
 - Lumen discovery defaults
+- external tool paths under `[tools]` for `exiftool`, `ffmpeg`, and `ffprobe`
 
 `config.ApplyRuntimeEnvDefaults` exists to keep older package-level `os.Getenv` reads working after TOML is parsed. Prefer passing typed config into new code.
 
@@ -62,12 +63,15 @@ Keep in TOML:
 - `internal/api/router.go`: Gin route tree, CORS, auth boundaries.
 - `internal/api/handler`: HTTP handlers and request/response wiring.
 - `internal/api/dto`: API DTO types.
-- `internal/service`: business services for auth, assets, settings, search, locations, faces, species, indexing, duplicate detection, and Lumen/LLM integration.
+- `internal/service`: business services for auth, assets, settings, search, locations, faces, species, indexing, duplicate detection, cloud import, and Lumen/LLM/classifier integration.
 - `internal/processors`: ingest, metadata, thumbnail, transcode, retry, and asset processing tasks.
 - `internal/queue`: River queue setup and worker implementations.
 - `internal/db`: database connection, migrations, generated sqlc repo layer.
 - `internal/storage`: repository manager, staging manager, repository config, scanner.
 - `internal/cloud`: cloud ingest and sync providers.
+- `internal/sourcing`: unified ingest materialization for upload, repository scans, and cloud sync.
+- `internal/classify`: classifier support code shared by API/service paths.
+- `internal/logging`: zap logger setup, stdlib bridge, and repository audit helpers.
 - `internal/agent`: agent service and tools.
 - `internal/utils`: media, hashing, raw, exif, upload, imaging, and support utilities.
 
@@ -107,6 +111,7 @@ Do not hand-edit generated OpenAPI or frontend schema artifacts.
 River workers are registered in `cmd/main.go` and implemented in `internal/queue`. The processing pipeline uses services and processors for:
 
 - asset ingest and discovery
+- cloud import materialization
 - metadata extraction
 - thumbnail generation
 - video/audio transcoding
@@ -114,13 +119,13 @@ River workers are registered in `cmd/main.go` and implemented in `internal/queue
 - repository scans
 - stack and live photo analysis
 - perceptual hashing
-- ML tasks through Lumen
+- ML tasks through Lumen, including BioCLIP, OCR, face, semantic indexing, and zero-shot classifier tagging
 
 ## ML, Lumen, And LLM
 
-Lumen config is loaded by the Lumen SDK during `initMLServices`. ML feature switches are stored in settings and seeded from config on first initialization.
+Lumen config is loaded by the Lumen SDK during `initMLServices`. ML feature switches are stored in settings and seeded from config on first initialization, including the zero-shot classifier toggle.
 
-LLM settings are represented by `config.LLMConfig`, persisted through the settings service, and validated through `internal/llm`.
+LLM settings are represented by `config.LLMConfig`, persisted through the settings service, and validated through `internal/llm`. Zero-shot classifier preview is exposed through `/api/v1/classifiers/preview` and backed by the classifier service.
 
 The app should remain useful when ML/LLM features are disabled.
 
