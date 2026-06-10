@@ -119,10 +119,15 @@ Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll
 - `/collections/albums`
 - `/collections/map`
 - `/collections/places/:tripId`
+- `/collections/places/:tripId/:assetId`
 - `/collections/people`
 - `/collections/utilities/duplicates`
 - `/collections/utilities/:classifierSlug`
+- `/collections/utilities/:classifierSlug/:assetId`
+- `/collections/:albumId`
+- `/collections/:albumId/:assetId`
 - `/people/:personId`
+- `/people/:personId/:assetId`
 - `/manage`
 - `/studio`
 - `/server-monitor`
