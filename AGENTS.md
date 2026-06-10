@@ -7,7 +7,7 @@ This file is the short entry point for humans and coding agents working in Lumil
 - `server/`: Go API service. Entrypoint is `server/cmd/main.go` (thin); the bootstrap lives in `server/app` (`app.Run(ctx)`); application config is `server/config`; business logic lives in `server/internal/*`; migrations live in `server/migrations`.
 - `web/`: React 19 + TypeScript frontend on Vite+. Feature code lives under `web/src/features/*`; shared pieces live in `web/src/lib`, `web/src/components`, and `web/src/contexts`.
 - `desktop/`: Wails v3 macOS app (separate Go module, `replace server => ../server`). Bundles a private PostgreSQL and runs `server/app` in-process; the React UI is served over HTTP at `localhost:6680`. See `desktop/README.md`.
-- `wasm/`: Rust WebAssembly crates used by the web and plugin flows.
+- `wasm/`: Rust WebAssembly crates for browser-side hashing/export/studio/thumbnail flows; checked-in JS/WASM bundles live under `web/src/wasm`.
 - `docs/`: product/user documentation site. Internal harness docs only belong in `docs/agent/`.
 
 The system is local-first: preserve original media, keep repository/storage semantics explicit, make ML/AI optional, and prefer boring configuration that boots cleanly in Docker and local dev.
@@ -27,6 +27,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 ## Usage Rules
 
 - Use root `make` targets for daily work: `make setup`, `make dev`, `make server-dev`, `make web-dev`, `make test`, `make dto`.
+- Desktop-specific targets: `make desktop-dev`, `make desktop-test`, `make desktop-build`.
 - If you are in a sandbox without host environment, like cloud/container, use `make setup` to set up the local dev environment. Do not use your own cli tooling if possible.
 - Backend quality gate: `make server-test` or `cd server && go test ./...`.
 - Frontend quality gate: `make web-test` or `cd web && vp check --no-fmt --no-lint && vp lint && vp test`.

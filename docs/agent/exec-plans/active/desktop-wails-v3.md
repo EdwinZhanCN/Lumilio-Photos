@@ -77,7 +77,8 @@ desktop/                              # New top-level directory
 │   ├── config.go                     # Desktop settings + secret helpers
 │   ├── lock.go                       # flock single-instance guard
 │   ├── paths.go                      # OS-specific app data paths
-│   └── quarantine_darwin.go          # xattr cleanup (build-tagged)
+│   ├── quarantine_darwin.go          # xattr cleanup (build-tagged)
+│   └── resources.go                  # Bundled resource resolution / dev overrides
 ├── resources/
 │   └── postgres/16/
 │       ├── darwin-arm64/             # Apple Silicon
@@ -86,7 +87,6 @@ desktop/                              # New top-level directory
 │       │   ├── lib/
 │       │   └── share/postgresql/
 │       └── darwin-amd64/             # Intel (if supported)
-└── wails.json
 ```
 
 **No `bin/river`** in resources — River migrations already use Go API (`rivermigrate`).
@@ -94,14 +94,13 @@ desktop/                              # New top-level directory
 ### Go Module Structure
 
 ```
-# Root go.work
-go 1.24
-
-use (
-    ./server
-    ./desktop
-)
+desktop/go.mod
+  require server
+  replace server => ../server
 ```
+
+`go.work` is intentionally not committed here; the `replace` directive is the
+load-bearing local/CI wiring.
 
 ## Runtime Data Directory
 
@@ -371,7 +370,7 @@ bundle. They split into two integration models with very different bundling work
 |---|---|---|---|
 | **libvips** | cgo compile-time link (`govips/v2`) | `internal/utils/imaging/process.go` | dylib tree in `Contents/Frameworks/` |
 | **libraw** | NOT called directly — libvips' RAW load delegate | (Dockerfile note) | comes free with libvips tree |
-| **exiftool** | subprocess, hardcoded to PATH | `internal/utils/exif/extract.go:222` | standalone dist in `Resources/` |
+| **exiftool** | subprocess, hardcoded to PATH | `internal/utils/exif/extract.go:222` | script + `lib/` staged in `Resources/` |
 | **ffmpeg** | subprocess (transcode) | — | static binary in `Resources/` |
 
 ### Track A — libvips + libraw + dependency tree (linked libs)
@@ -407,8 +406,9 @@ and `internal/utils/exif/utils.go` hardcode `exec.Command(ctx, "exiftool", ...)`
 and `LookPath("exiftool")` against system PATH. Desktop has no system exiftool, so
 the path must become configurable.
 
-- **exiftool**: ship the official macOS standalone build (bundles its own Perl, no
-  system Perl dependency) under `Resources/exiftool/`. ~6MB.
+- **exiftool**: ship the official Perl distribution (`exiftool` script +
+  adjacent `lib/`) under `Resources/exiftool/`. It currently relies on macOS's
+  system Perl at runtime. ~7MB.
 - **ffmpeg**: ship a static build (BtbN / evermeet.cx macOS build) under
   `Resources/ffmpeg/`. ~70-80MB with full codecs. VideoToolbox HW transcode works
   in static builds.
