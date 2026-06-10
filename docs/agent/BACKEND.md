@@ -11,11 +11,11 @@ This document describes the current Go backend as implemented in `server/`.
 - Docker image: `server/Dockerfile`.
 - Database image: `server/db.Dockerfile`.
 
-Startup order in `cmd/main.go`:
+Bootstrap flow:
 
 1. Load `.env`, then TOML config, then apply env overrides.
 2. Pass the resolved `config.AppConfig` to `server/app.Run(ctx, cfg)`.
-3. Initialize logging.
+3. Inside `server/app.Run`, initialize logging.
 4. Start libvips runtime.
 5. Run database migrations.
 6. Open PostgreSQL pool and generated query layer.
@@ -108,7 +108,7 @@ Do not hand-edit generated OpenAPI or frontend schema artifacts.
 
 ## Queues And Processing
 
-River workers are registered in `cmd/main.go` and implemented in `internal/queue`. The processing pipeline uses services and processors for:
+River worker counts and queue config live in `internal/queue/queue_setup.go`. Worker registration happens in `server/app/app.go`, and the implementations live in `internal/queue`. The processing pipeline uses services and processors for:
 
 - asset ingest and discovery
 - cloud import materialization
