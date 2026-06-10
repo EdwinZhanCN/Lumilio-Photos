@@ -64,7 +64,7 @@ vp exec i18next-cli status
 - `src/wasm`: checked-in generated/bundled WASM support code.
 - `src/workers`: browser worker entry points and worker tests.
 
-Current feature areas include assets, auth, collections, home, Lumilio chat, manage/upload, monitor, people, settings, studio, updates, and users.
+Current feature areas include assets, auth, collections, home, Lumilio chat, manage, monitor, people, portfolio, settings, studio, upload, updates, and users.
 
 ## API Contract
 
@@ -114,16 +114,21 @@ Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll
 
 - `/`
 - `/assets`
+- `/assets/:assetId`
 - `/collections`
 - `/collections/albums`
 - `/collections/map`
+- `/collections/places/:tripId`
 - `/collections/people`
 - `/collections/utilities/duplicates`
+- `/collections/utilities/:classifierSlug`
 - `/people/:personId`
 - `/manage`
 - `/studio`
 - `/server-monitor`
 - `/lumilio`
+
+Legacy compatibility routes also redirect `/upload-photos` to `/manage`.
 
 ## Browser Runtime
 
