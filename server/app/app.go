@@ -18,6 +18,8 @@ import (
 	"server/config"
 	"server/docs" // Import docs for swaggo
 	"server/internal/agent/core"
+	"server/internal/agent/pins"
+	"server/internal/agent/ref"
 	"server/internal/agent/tools"
 	"server/internal/api"
 	"server/internal/api/handler"
@@ -205,13 +207,17 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// temporary password and clear all MFA factors, printing the password once.
 	runBreakGlassIfRequested(ctx, userService, appLogger)
 
-	// Initialize Agent Service
-	agentService := core.NewAgentService(queries, settingsService)
+	// Initialize Agent Service. The ref store is shared between the agent
+	// tool chain and the hydration API handler; its janitor bounds memory
+	// for abandoned sessions.
+	refStore := ref.NewMemoryStore(ref.DefaultTTL, ref.DefaultMaxRefsPerScope)
+	go refStore.RunJanitor(ctx, 10*time.Minute)
+	agentService := core.NewAgentService(queries, settingsService, refStore, assetService)
+	agentPins := pins.NewService(queries, refStore, assetService)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
 	// Register agent tools
-	tools.RegisterFilterAsset()
-	tools.RegisterBulkLikeTool()
+	tools.RegisterAll()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
 	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
@@ -272,7 +278,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	userController := handler.NewUserHandler(userService)
 	queueController := handler.NewQueueHandler(queueClient, pgxPool)
 	statsController := handler.NewStatsHandler(queries)
-	agentController := handler.NewAgentHandler(agentService)
+	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService)
 	classifierController := handler.NewClassifierHandler(classifierService)

@@ -732,12 +732,21 @@
       "disabled": "Lumilio Agent is disabled. Enable it in Settings > AI.",
       "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI."
     },
+    "board": {
+      "empty": "Nothing pinned yet. Ask Lumilio for photos in the chat, then pin the result to keep it here.",
+      "remove": "Remove from board",
+      "unknownWidget": "Unknown widget type: {{type}}",
+      "untitled": "Untitled"
+    },
     "chat": {
       "confirmation": {
+        "approved": "Confirmed",
         "confirm": "Confirm",
+        "rejected": "Cancelled",
         "title": "Confirmation required"
       },
       "empty": "Start a conversation with Lumilio!",
+      "newConversation": "New conversation",
       "openAiSettings": "Open AI settings"
     },
     "input": {
@@ -754,7 +763,6 @@
         "languageFallback": "text"
       },
       "think": {
-        "defaultSummary": "Think about this...",
         "thinking": "Thinking...",
         "thoughtFor": "Thought for {{time}}s"
       }
@@ -765,13 +773,22 @@
     "status": {
       "loading": "Loading {{status}}"
     },
+    "tabs": {
+      "board": "Board",
+      "chat": "Chat"
+    },
     "tools": {
-      "error": "Error: {{error}}",
-      "eventNotFound": "Tool event not found.",
-      "openFullView": "Open full view",
-      "openMainGallery": "Open in main gallery view",
-      "resultsTitle": "{{toolName}} results",
-      "viewResults": "View results"
+      "emptyResult": "No matching photos",
+      "resultSet": "Result set"
+    },
+    "widgets": {
+      "pin": "Pin to board",
+      "pinned": "Pinned to board",
+      "pinUnavailable": "This widget's photos are unavailable.",
+      "refExpired": "These results have expired. Ask Lumilio to run the search again.",
+      "resultsTitle": "Photos from Lumilio",
+      "viewAll_one": "View all {{count}} photos",
+      "viewAll_other": "View all {{count}} photos"
     }
   },
   "manage": {
@@ -1004,10 +1021,10 @@
     "updates": "Updates"
   },
   "search": {
-    "degraded": "Top results are temporarily unavailable. Showing regular results instead.",
     "error": "Search is temporarily unavailable. Try again in a moment.",
     "loading": "Searching...",
     "results": "Results",
+    "semanticUnavailable": "Semantic search is temporarily unavailable; results may be less complete.",
     "topResults": "Top Results"
   },
   "settings": {

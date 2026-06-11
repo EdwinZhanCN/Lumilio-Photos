@@ -3,18 +3,24 @@ package core
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
+	"server/internal/agent/ref"
 	"server/internal/db/repo"
+	"server/internal/search"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
+	"github.com/google/uuid"
 )
 
-// SideChannelEvent represents an event sent to the frontend through the side channel.
-// It carries structured execution state and side-effect data without passing through the LLM.
+// SideChannelEvent is the control-plane→frontend event envelope. It carries
+// tool lifecycle state and ref handles only — asset data never rides the
+// side channel; the frontend hydrates refs over the hydration API (INV-1).
 type SideChannelEvent struct {
-	// Event type identifier
+	// Type is "tool_execution" for lifecycle updates or "widget_show" for
+	// explicit show-terminal render requests.
 	Type string `json:"type"`
 
 	// Event timestamp (Unix milliseconds)
@@ -26,32 +32,28 @@ type SideChannelEvent struct {
 	// Execution status and lifecycle
 	Execution ExecutionInfo `json:"execution"`
 
-	// Structured data payload for frontend consumption. Rendering is only one possible use.
+	// Ref handle and rendering hints; never inline asset data.
 	Data *DataPayload `json:"data,omitempty"`
-
-	// Extra type-specific information
-	Extra *ExtraInfo `json:"extra,omitempty"`
-
-	// Optional metadata
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
+
+const (
+	EventTypeToolExecution = "tool_execution"
+	EventTypeWidgetShow    = "widget_show"
+)
 
 // ToolIdentity identifies the tool instance
 type ToolIdentity struct {
-	Name              string `json:"name"`                        // Tool identifier (e.g., "filter_assets")
-	ExecutionID       string `json:"executionId"`                 // Unique ID for this execution
-	ParentExecutionID string `json:"parentExecutionId,omitempty"` // Parent execution ID for chained calls
+	Name        string `json:"name"`        // Tool identifier (e.g., "filter_assets")
+	ExecutionID string `json:"executionId"` // Unique ID for this execution
 }
 
 // ExecutionStatus represents the current execution state
 type ExecutionStatus string
 
 const (
-	ExecutionStatusPending   ExecutionStatus = "pending"
-	ExecutionStatusRunning   ExecutionStatus = "running"
-	ExecutionStatusSuccess   ExecutionStatus = "success"
-	ExecutionStatusError     ExecutionStatus = "error"
-	ExecutionStatusCancelled ExecutionStatus = "cancelled"
+	ExecutionStatusRunning ExecutionStatus = "running"
+	ExecutionStatusSuccess ExecutionStatus = "success"
+	ExecutionStatusError   ExecutionStatus = "error"
 )
 
 // ExecutionInfo tracks tool execution lifecycle
@@ -63,67 +65,57 @@ type ExecutionInfo struct {
 	Duration   int64           `json:"duration,omitempty"`   // Execution duration in milliseconds
 }
 
-// ErrorInfo captures structured error information
+// ErrorInfo mirrors ref.Error for the frontend.
 type ErrorInfo struct {
-	Code    string      `json:"code"`              // Error code for programmatic handling
-	Message string      `json:"message"`           // Human-readable error message
-	Details interface{} `json:"details,omitempty"` // Additional error context
+	Code    string `json:"code"`           // ref.Code value
+	Message string `json:"message"`        // Human-readable error message
+	Hint    string `json:"hint,omitempty"` // Recovery hint
 }
 
-// DataPayload contains structured data for frontend consumption, with optional rendering hints.
+// DataPayload references a ref and how to render it. The frontend fetches
+// the actual assets from GET /api/v1/agent/refs/{id}/assets.
 type DataPayload struct {
-	RefID       string           `json:"refId"`                  // Reference ID for this data
-	PayloadType string           `json:"payload_type,omitempty"` // DTO type name (e.g., "AssetDTO[]")
-	Payload     interface{}      `json:"payload,omitempty"`      // Actual DTO data
-	Rendering   *RenderingConfig `json:"rendering,omitempty"`    // Rendering configuration
+	RefID  string         `json:"refId"`
+	Count  int            `json:"count"`
+	Widget string         `json:"widget,omitempty"` // e.g. WidgetAssetGrid
+	Params map[string]any `json:"params,omitempty"`
 }
 
-// RenderingConfig defines optional frontend rendering hints for the payload.
-type RenderingConfig struct {
-	Component ComponentType `json:"component"` // Component type
-	Config    interface{}   `json:"config,omitempty"`
+// WidgetAssetGrid is the only widget type in Phase 1.
+const WidgetAssetGrid = "asset_grid"
+
+// RetrieverSearch is the single-retriever search surface the producer tools
+// wrap: the retriever's own ranking becomes the ref snapshot order (no RRF
+// fusion). The semantic channel is a set retrieval — a per-query calibrated
+// cutoff decides membership, not a fixed TopK. Implemented by
+// service.AssetService.
+type RetrieverSearch interface {
+	SearchAssetIDsSemantic(ctx context.Context, query string, strictness search.SetStrictness, maxResults int) ([]uuid.UUID, search.SetMeta, error)
+	SearchAssetIDsOCR(ctx context.Context, query string, maxResults int) ([]uuid.UUID, error)
 }
 
-// ComponentType represents available frontend components
-type ComponentType string
-
-const (
-	ComponentJustifiedGallery ComponentType = "justified_gallery"
-	// ComponentDataTable    ComponentType = "data_table"
-	// ComponentChart        ComponentType = "chart"
-	// ComponentCustom       ComponentType = "custom"
-)
-
-type JustifiedGalleryConfig struct {
-	SortBy string `json:"sortBy"` // "date_captured" | "recently_added"
-}
-
-// ExtraInfo provides tool-specific extension data
-type ExtraInfo struct {
-	ExtraType string      `json:"extra_type"` // OpenAPI DTO type name (e.g., "FilterAssetsRequestDTO")
-	Data      interface{} `json:"data"`       // Extra data structure
-}
-
-// FilterConfirmationInfo is the information sent to the user when a tool interrupt occurs
-type FilterConfirmationInfo struct {
-	Count          int    `json:"count"`
-	ConfirmationID string `json:"confirmationId"` // Used on resume to identify the confirmation
-	Message        string `json:"message"`
-}
-
-// FilterInterruptState is the state saved during a tool interrupt
-type FilterInterruptState struct {
-	RefID       string `json:"ref_id"`
-	Count       int    `json:"count"`
-	ExecutionID string `json:"execution_id"`
-	StartTime   int64  `json:"start_time"`
-}
-
-// ToolDependencies Defines the dependencies like database queries that tool execution needs
+// ToolDependencies carries the per-request state injected into tool
+// factories: DB access, the side channel, the ref store and the scope that
+// pins every created ref to (user, thread) (INV-4).
 type ToolDependencies struct {
-	Queries          *repo.Queries
-	SideChannel      chan<- *SideChannelEvent // SideChannel sends structured side-channel data to the frontend, bypassing the LLM
-	ReferenceManager *ReferenceManager        // ReferenceManager stores and manages tool outputs across session
+	Queries     *repo.Queries
+	SideChannel chan<- *SideChannelEvent
+	RefStore    ref.Store
+	Search      RetrieverSearch
+	UserID      int32
+	ThreadID    string
+}
+
+// Scope returns the ref scope for this request.
+func (d *ToolDependencies) Scope() ref.Scope {
+	return ref.Scope{UserID: d.UserID, ThreadID: d.ThreadID}
+}
+
+// Send emits a side channel event if the channel is attached.
+func (d *ToolDependencies) Send(event *SideChannelEvent) {
+	if d.SideChannel != nil {
+		d.SideChannel <- event
+	}
 }
 
 type ToolFactory func(ctx context.Context, deps *ToolDependencies) (tool.BaseTool, error)
@@ -157,26 +149,26 @@ func (r *ToolRegistry) Register(info *schema.ToolInfo, factory ToolFactory) {
 	r.infos[info.Name] = info
 }
 
-// GetTools 根据工具名称列表获取工具实例
-// 关键点：这里接收 deps，并在创建工具时注入，实现了请求级别的隔离
-//
-// 自动包装：如果 deps.InputExtractor 存在，所有工具都会被 ToolWrapper 包装，
-// 以实现 Reference[T] 的自动解析功能
-func (r *ToolRegistry) GetTools(ctx context.Context, toolNames []string, deps *ToolDependencies) ([]tool.BaseTool, error) {
+// GetAllTools instantiates every registered tool with the request-scoped
+// dependencies, in deterministic name order. The agent always runs with the
+// full toolset so checkpoint resume sees an identical configuration.
+func (r *ToolRegistry) GetAllTools(ctx context.Context, deps *ToolDependencies) ([]tool.BaseTool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var tools []tool.BaseTool
-	for _, name := range toolNames {
-		if factory, ok := r.factories[name]; ok {
-			t, err := factory(ctx, deps)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create tool %s: %w", name, err)
-			}
+	names := make([]string, 0, len(r.factories))
+	for name := range r.factories {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 
-			tools = append(tools, t)
-
+	tools := make([]tool.BaseTool, 0, len(names))
+	for _, name := range names {
+		t, err := r.factories[name](ctx, deps)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tool %s: %w", name, err)
 		}
+		tools = append(tools, t)
 	}
 	return tools, nil
 }

@@ -10,7 +10,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidbyttow/govips/v2 v2.18.0
-	github.com/edwinzhancn/lumen-sdk v1.2.6
+	github.com/edwinzhancn/lumen-sdk v1.2.7
 )
 
 require (
@@ -20,7 +20,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/uuid v1.6.0
-	github.com/jinzhu/copier v0.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/riverqueue/river v0.24.0
@@ -149,5 +148,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/edwinzhancn/lumen-sdk => /Volumes/CodeBase/Projects/Lumen-SDK

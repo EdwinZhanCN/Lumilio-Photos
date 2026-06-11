@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -144,29 +143,60 @@ func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsP
 
 // SearchBrowseItems runs hybrid search: optional semantic-enhanced TopResults plus filename QueryBrowseItems as Results,
 // respecting EnhancementMode (off / auto / only). Duplicate IDs between sections are removed from Results and totals adjusted.
+// SearchBrowseItems is the browse-tier face of the unified search pipeline
+// (see asset_search_fused.go). One fused set: Results is the whole set under
+// the presentation sort, Best Results (TopResults) is its confidence-ordered
+// Top-N subset. Both tiers are flat — search results are not stack-collapsed
+// (matches Apple Photos, and collapse would reorder the relevance set),
+// keeping Best Results a literal subset of Results.
 func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAssetsParams) (SearchBrowseResult, error) {
 	params = normalizeSearchAssetsParams(params)
 	params.StackMode = normalizeStackMode(params.StackMode)
 
 	result := SearchBrowseResult{
-		TopResults: []BrowseItem{},
-		TopResultsMeta: SearchTopResultsMeta{
-			Enabled:     false,
-			SourceTypes: []string{},
-		},
-		Results:   []BrowseItem{},
-		StackMode: params.StackMode,
+		TopResults:     []BrowseItem{},
+		TopResultsMeta: SearchTopResultsMeta{Enabled: false, SourceTypes: []string{}},
+		Results:        []BrowseItem{},
+		StackMode:      params.StackMode,
 	}
 
 	query := strings.TrimSpace(params.Query)
-	topResultsEnabled := query != "" && params.EnhancementMode != SearchEnhancementModeOff
+	enhanced := query != "" && params.EnhancementMode != SearchEnhancementModeOff
 
-	if topResultsEnabled {
-		topItems, meta := s.searchBrowseItemsAggregateTopResults(ctx, params)
-		result.TopResults = topItems
-		result.TopResultsMeta = meta
-		if params.EnhancementMode == SearchEnhancementModeOnly && meta.Reason == "all_retrievers_failed" {
+	if enhanced {
+		if fused, ok := s.runSearchAssetsFusedSet(ctx, params); ok {
+			result.TopResultsMeta = fused.meta()
+			ids := fused.ids()
+
+			// Best Results exists only when the set exceeds the showcase size.
+			if len(ids) >= params.TopResultsLimit {
+				topAssets, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit])
+				if err != nil {
+					return SearchBrowseResult{}, err
+				}
+				result.TopResults = assetsToBrowseItems(topAssets)
+			}
+
+			if params.EnhancementMode != SearchEnhancementModeOnly {
+				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset)
+				if err != nil {
+					return SearchBrowseResult{}, err
+				}
+				result.Results = assetsToBrowseItems(page)
+				result.ResultsTotalVisible = int64(len(ids))
+				result.ResultsTotalAssets = int64(len(ids))
+			}
+			return result, nil
+		}
+
+		if params.EnhancementMode == SearchEnhancementModeOnly {
 			return SearchBrowseResult{}, fmt.Errorf("aggregate search failed")
+		}
+		result.TopResultsMeta = SearchTopResultsMeta{
+			Enabled:     true,
+			Degraded:    true,
+			Reason:      semanticUnavailableReason,
+			SourceTypes: []string{},
 		}
 	}
 
@@ -179,43 +209,17 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 		if err != nil {
 			return SearchBrowseResult{}, err
 		}
-
-		filteredResults, removedVisible, removedAssets := filterOutBrowseItemsByID(
-			browseResult.Items,
-			result.TopResults,
-		)
-		if removedVisible > 0 {
-			browseResult.TotalVisible = subtractBrowseCount(
-				browseResult.TotalVisible,
-				int64(removedVisible),
-			)
-		}
-		if removedAssets > 0 {
-			browseResult.TotalAssets = subtractBrowseCount(
-				browseResult.TotalAssets,
-				int64(removedAssets),
-			)
-		}
-
-		result.Results = filteredResults
+		result.Results = browseResult.Items
 		result.ResultsTotalVisible = browseResult.TotalVisible
 		result.ResultsTotalAssets = browseResult.TotalAssets
 	}
 
-	if !topResultsEnabled {
+	if !enhanced {
 		switch {
 		case params.EnhancementMode == SearchEnhancementModeOff:
-			result.TopResultsMeta = SearchTopResultsMeta{
-				Enabled:     false,
-				Reason:      "disabled",
-				SourceTypes: []string{},
-			}
+			result.TopResultsMeta = SearchTopResultsMeta{Enabled: false, Reason: "disabled", SourceTypes: []string{}}
 		case query == "":
-			result.TopResultsMeta = SearchTopResultsMeta{
-				Enabled:     false,
-				Reason:      "empty_query",
-				SourceTypes: []string{},
-			}
+			result.TopResultsMeta = SearchTopResultsMeta{Enabled: false, Reason: "empty_query", SourceTypes: []string{}}
 		}
 	}
 
@@ -322,77 +326,6 @@ func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, p
 	), nil
 }
 
-// searchBrowseItemsSemanticTopResults fetches vector-ranked assets under a short timeout,
-// then applies stack collapse when not expanded. Marks meta degraded on timeout/vector errors or collapse failure.
-func (s *assetService) searchBrowseItemsSemanticTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
-	meta := SearchTopResultsMeta{
-		Enabled:     true,
-		SourceTypes: []string{"semantic"},
-	}
-
-	searchCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
-	defer cancel()
-
-	requestedLimit := params.TopResultsLimit
-	if requestedLimit <= 0 {
-		requestedLimit = TOP_RESULTS_FALLBACK_LIMIT
-	}
-
-	assets, err := s.queryAssetsVectorTopResults(searchCtx, params.QueryAssetsParams, requestedLimit)
-	if err != nil {
-		meta.Degraded = true
-		meta.Reason = classifySearchEnhancementError(err, searchCtx)
-		return []BrowseItem{}, meta
-	}
-
-	if params.StackMode == StackModeExpanded {
-		items := assetsToBrowseItems(assets)
-		if len(items) > requestedLimit {
-			items = items[:requestedLimit]
-		}
-		return items, meta
-	}
-
-	items, err := s.collapseAssetsToBrowseItems(searchCtx, assets)
-	if err != nil {
-		meta.Degraded = true
-		meta.Reason = "collapse_failed"
-		return []BrowseItem{}, meta
-	}
-	if len(items) > requestedLimit {
-		items = items[:requestedLimit]
-	}
-	return items, meta
-}
-
-func (s *assetService) searchBrowseItemsAggregateTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
-	assets, meta := s.runSearchAssetsSemanticTopResults(ctx, params)
-	if params.StackMode == StackModeExpanded {
-		items := assetsToBrowseItems(assets)
-		if len(items) > params.TopResultsLimit {
-			items = items[:params.TopResultsLimit]
-		}
-		return items, meta
-	}
-
-	searchCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
-	defer cancel()
-
-	items, err := s.collapseAssetsToBrowseItems(searchCtx, assets)
-	if err != nil {
-		meta.Degraded = true
-		meta.Reason = "collapse_failed"
-		return []BrowseItem{}, meta
-	}
-	if len(items) > params.TopResultsLimit {
-		items = items[:params.TopResultsLimit]
-	}
-	return items, meta
-}
-
-// TOP_RESULTS_FALLBACK_LIMIT is the default semantic top-result cap when the client does not specify one.
-const TOP_RESULTS_FALLBACK_LIMIT = 200
-
 // assetsToBrowseItems maps plain asset rows to browse items without stack merging (expanded / pre-collapsed paths).
 func assetsToBrowseItems(assets []repo.Asset) []BrowseItem {
 	items := make([]BrowseItem, 0, len(assets))
@@ -448,39 +381,6 @@ func browseItemsFromCollapsedRows(rows []repo.GetCollapsedBrowseItemsUnifiedRow)
 	return items, nil
 }
 
-// filterOutBrowseItemsByID drops items whose BrowseItem.ID appears in excluded.
-// It returns the filtered slice plus removed visible-row and matched-asset counts.
-func filterOutBrowseItemsByID(items []BrowseItem, excluded []BrowseItem) ([]BrowseItem, int, int) {
-	if len(items) == 0 || len(excluded) == 0 {
-		return items, 0, 0
-	}
-
-	excludedIDs := make(map[string]struct{}, len(excluded))
-	for _, item := range excluded {
-		excludedIDs[item.ID] = struct{}{}
-	}
-
-	filtered := make([]BrowseItem, 0, len(items))
-	removedVisible := 0
-	removedAssets := 0
-	for _, item := range items {
-		if _, found := excludedIDs[item.ID]; found {
-			removedVisible++
-			removedAssets += browseItemMatchedAssetCount(item)
-			continue
-		}
-		filtered = append(filtered, item)
-	}
-	return filtered, removedVisible, removedAssets
-}
-
-func browseItemMatchedAssetCount(item BrowseItem) int {
-	if item.Type == "stack" && item.Stack != nil && len(item.Stack.MatchedMemberIDs) > 0 {
-		return len(item.Stack.MatchedMemberIDs)
-	}
-	return 1
-}
-
 func browseQueryResultFromItems(items []BrowseItem, totalAssets int64, stackMode string, limit, offset int) BrowseQueryResult {
 	return BrowseQueryResult{
 		Items:        pageBrowseItems(items, limit, offset),
@@ -509,16 +409,6 @@ func pageBrowseItems(items []BrowseItem, limit, offset int) []BrowseItem {
 	page := make([]BrowseItem, end-offset)
 	copy(page, items[offset:end])
 	return page
-}
-
-func subtractBrowseCount(total int64, removed int64) int64 {
-	if removed <= 0 {
-		return total
-	}
-	if total <= removed {
-		return 0
-	}
-	return total - removed
 }
 
 // collapseAssetsToBrowseItems groups vector- or list-ranked assets into stack rows: each stack emits once in input order,
