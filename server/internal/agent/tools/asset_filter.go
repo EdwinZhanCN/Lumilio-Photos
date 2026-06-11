@@ -3,177 +3,204 @@ package tools
 import (
 	"context"
 	"fmt"
-	"server/internal/agent/core"
-	"server/internal/api/dto"
+	"sort"
+	"strings"
 	"time"
+
+	"server/internal/agent/core"
+	"server/internal/agent/ref"
+	"server/internal/db/repo"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// AssetFilterInput defines how the LLM calls this tool
+// AssetFilterInput defines how the LLM calls filter_assets.
 type AssetFilterInput struct {
 	DateFrom string `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
 	DateTo   string `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
-	Type     string `json:"type,omitempty" jsonschema:"description=Asset type (PHOTO | VIDEO | AUDIO)"`
-	Filename string `json:"filename,omitempty" jsonschema:"description=Filename pattern to search for"`
+	Type     string `json:"type,omitempty" jsonschema:"enum=PHOTO,enum=VIDEO,enum=AUDIO,description=Asset type"`
+	Filename string `json:"filename,omitempty" jsonschema:"description=Filename substring to search for"`
 	Raw      *bool  `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
-	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by rating (0-5)"`
+	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by exact rating (0-5)"`
 	Liked    *bool  `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
+	Place    string `json:"place,omitempty" jsonschema:"description=Place name to match against the library's location clusters (e.g. Kyoto, Tokyo Tower)"`
 }
 
-// AssetFilterOutput tool execution result
-type AssetFilterOutput struct {
-	Message  string              `json:"message" jsonschema:"description=A human-readable message describing the outcome."`
-	Filter   *dto.AssetFilterDTO `json:"filter,omitempty" jsonschema:"description=The applied filter configuration."`
-	RefID    string              `json:"ref_id,omitempty" jsonschema:"description=A reference ID for the stored filter configuration."`
-	Duration int64               `json:"duration_ms,omitempty" jsonschema:"description=The duration of the tool execution in milliseconds."`
-}
-
-func RegisterFilterAsset() {
+// RegisterFilterAssets registers the filter_assets producer: metadata
+// conditions in, ref out. The matching asset ids are materialized eagerly as
+// an ordered snapshot (capture time desc); only the receipt reaches the LLM.
+func RegisterFilterAssets() {
 	info := &schema.ToolInfo{
 		Name: "filter_assets",
-		Desc: "Constructs a filter configuration for assets. You should set Type per user request correctly. Use this to help the user view specific assets. " +
-			"Returns a ref_id that can be used by other tools (like bulk_like_assets) to act on these criteria.",
+		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked). " +
+			"Returns a ref: a handle for the matching set. Pass the ref to other tools " +
+			"(combine, describe, show, bulk_like_assets) to work with the set.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		t, err := utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *AssetFilterInput) (*AssetFilterOutput, error) {
-			startTime := time.Now()
-			executionID := fmt.Sprintf("%d", startTime.UnixNano())
+		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *AssetFilterInput) (*RefToolOutput, error) {
+			start := time.Now()
+			execID := newExecutionID()
+			sendRunning(deps, info.Name, execID, "Filtering assets...", input)
 
-			sendPendingEvent(ctx, deps, executionID, startTime, input)
-			sendRunningEvent(ctx, deps, executionID, "Configuring asset filter...")
-
-			// Build the DTO directly from input
-			filterDTO := buildFilterDTO(input)
-
-			// Store the filter DTO in ReferenceManager
-			refID := ""
-			if deps.ReferenceManager != nil {
-				// We store the DTO itself, not the assets.
-				refID = deps.ReferenceManager.Store(ctx, filterDTO, core.ReferenceDescriptor{
-					SourceTool:  "filter_assets",
-					Kind:        "asset_filter",
-					Description: "Asset Filter Configuration",
-				})
+			params, refErr := buildFilterParams(input)
+			if refErr != nil {
+				sendError(deps, info.Name, execID, start, refErr)
+				return errorOutput(refErr), nil
 			}
 
-			// Send the filter configuration to the frontend via side channel
-			sendFilterSuccessEvent(ctx, deps, executionID, startTime.UnixMilli(), input, filterDTO, refID)
+			rows, err := deps.Queries.GetAssetIDsUnified(ctx, *params)
+			if err != nil {
+				refErr := ref.Internal("asset filter query")
+				sendError(deps, info.Name, execID, start, refErr)
+				return errorOutput(refErr), nil
+			}
 
-			duration := time.Since(startTime).Milliseconds()
+			truncated := len(rows) > ref.MaxSnapshotSize
+			if truncated {
+				rows = rows[:ref.MaxSnapshotSize]
+			}
 
-			return &AssetFilterOutput{
-				Message: fmt.Sprintf("Filter applied. RefID: %s. "+
-					"Guide the user to view the results in the gallery by clicking the button below.", refID),
-				Filter:   &filterDTO,
-				RefID:    refID,
-				Duration: duration,
-			}, nil
+			snapshot := fromPgUUIDs(rows)
+			summary := filterSummary(input, len(snapshot), truncated)
+			r := deps.RefStore.Create(
+				deps.Scope(),
+				ref.Plan{Op: info.Name, Params: filterPlanParams(input)},
+				filterHint(input),
+				summary,
+				snapshot,
+				truncated,
+			)
+			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: r.ID, Count: r.Count()})
+			return receiptOutput(r, summary), nil
 		})
-		if err != nil {
-			return nil, err
-		}
-		return t, nil
 	})
 }
 
-// --- Helper Functions ---
+func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams, *ref.Error) {
+	// Fetch one row past the cap so truncation is detectable.
+	params := repo.GetAssetIDsUnifiedParams{Limit: ref.MaxSnapshotSize + 1}
 
-func buildFilterDTO(input *AssetFilterInput) dto.AssetFilterDTO {
-	filter := dto.AssetFilterDTO{}
-
-	// Date Range
-	if input.DateFrom != "" || input.DateTo != "" {
-		dateRange := &dto.DateRangeDTO{}
-		if input.DateFrom != "" {
-			if t, err := time.Parse("2006-01-02", input.DateFrom); err == nil {
-				dateRange.From = &t
-			}
+	if input.DateFrom != "" {
+		t, err := time.Parse("2006-01-02", input.DateFrom)
+		if err != nil {
+			return nil, ref.InvalidArgument(fmt.Sprintf("date_from %q is not YYYY-MM-DD", input.DateFrom))
 		}
-		if input.DateTo != "" {
-			if t, err := time.Parse("2006-01-02", input.DateTo); err == nil {
-				dateRange.To = &t
-			}
-		}
-		filter.Date = dateRange
+		params.DateFrom = pgtype.Timestamptz{Time: t, Valid: true}
 	}
-
-	// Type
+	if input.DateTo != "" {
+		t, err := time.Parse("2006-01-02", input.DateTo)
+		if err != nil {
+			return nil, ref.InvalidArgument(fmt.Sprintf("date_to %q is not YYYY-MM-DD", input.DateTo))
+		}
+		// Inclusive end of day.
+		t = t.Add(24*time.Hour - time.Nanosecond)
+		params.DateTo = pgtype.Timestamptz{Time: t, Valid: true}
+	}
 	if input.Type != "" {
-		filter.Type = &input.Type
-	}
-
-	// Filename
-	if input.Filename != "" {
-		filter.Filename = &dto.FilenameFilterDTO{
-			Value:    input.Filename,
-			Operator: "contains",
+		assetType := strings.ToUpper(strings.TrimSpace(input.Type))
+		switch assetType {
+		case "PHOTO", "VIDEO", "AUDIO":
+			params.AssetType = &assetType
+		default:
+			return nil, ref.InvalidArgument(fmt.Sprintf("type %q is not one of PHOTO, VIDEO, AUDIO", input.Type))
 		}
 	}
-
-	// Boolean/Int flags
+	if input.Filename != "" {
+		operator := "contains"
+		params.FilenameVal = &input.Filename
+		params.FilenameOperator = &operator
+	}
 	if input.Raw != nil {
-		filter.RAW = input.Raw
+		params.IsRaw = input.Raw
 	}
 	if input.Rating != nil {
-		filter.Rating = input.Rating
+		if *input.Rating < 0 || *input.Rating > 5 {
+			return nil, ref.InvalidArgument(fmt.Sprintf("rating %d is out of range 0-5", *input.Rating))
+		}
+		rating := int32(*input.Rating)
+		params.Rating = &rating
 	}
 	if input.Liked != nil {
-		filter.Liked = input.Liked
+		params.Liked = input.Liked
 	}
-
-	return filter
+	if input.Place != "" {
+		params.Place = &input.Place
+	}
+	return &params, nil
 }
 
-func sendPendingEvent(ctx context.Context, deps *core.ToolDependencies, execID string, startTime time.Time, input *AssetFilterInput) {
-	if deps.SideChannel == nil {
-		return
-	}
-	deps.SideChannel <- &core.SideChannelEvent{
-		Type:      "tool_execution",
-		Timestamp: startTime.UnixMilli(),
-		Tool:      core.ToolIdentity{Name: "filter_assets", ExecutionID: execID},
-		Execution: core.ExecutionInfo{Status: core.ExecutionStatusPending, Message: "Preparing filter configuration...", Parameters: input},
-	}
-}
-
-func sendRunningEvent(ctx context.Context, deps *core.ToolDependencies, execID string, message string) {
-	if deps.SideChannel == nil {
-		return
-	}
-	deps.SideChannel <- &core.SideChannelEvent{
-		Type:      "tool_execution",
-		Timestamp: time.Now().UnixMilli(),
-		Tool:      core.ToolIdentity{Name: "filter_assets", ExecutionID: execID},
-		Execution: core.ExecutionInfo{Status: core.ExecutionStatusRunning, Message: message},
+// filterHint derives the ref id mnemonic from the most distinctive condition.
+func filterHint(input *AssetFilterInput) string {
+	switch {
+	case input.Place != "":
+		return input.Place
+	case input.Filename != "":
+		return input.Filename
+	case input.DateFrom != "" && len(input.DateFrom) >= 4:
+		return input.DateFrom[:4]
+	case input.Type != "":
+		return strings.ToLower(input.Type)
+	case input.Liked != nil && *input.Liked:
+		return "liked"
+	default:
+		return "filter"
 	}
 }
 
-func sendFilterSuccessEvent(ctx context.Context, deps *core.ToolDependencies, execID string, startTimeMs int64, input *AssetFilterInput, filterDTO dto.AssetFilterDTO, refID string) {
-	if deps.SideChannel == nil {
-		return
+func filterPlanParams(input *AssetFilterInput) map[string]string {
+	params := map[string]string{}
+	if input.DateFrom != "" {
+		params["date_from"] = input.DateFrom
 	}
-	deps.SideChannel <- &core.SideChannelEvent{
-		Type:      "tool_execution",
-		Timestamp: time.Now().UnixMilli(),
-		Tool:      core.ToolIdentity{Name: "filter_assets", ExecutionID: execID},
-		Execution: core.ExecutionInfo{
-			Status:     core.ExecutionStatusSuccess,
-			Message:    "Filter applied successfully",
-			Duration:   time.Now().UnixMilli() - startTimeMs,
-			Parameters: input,
-		},
-		Data: &core.DataPayload{
-			RefID:       refID,
-			PayloadType: "AssetFilterDTO",
-			Payload:     filterDTO,
-			Rendering: &core.RenderingConfig{
-				Component: core.ComponentJustifiedGallery,
-				Config:    &core.JustifiedGalleryConfig{SortBy: "date_captured"},
-			},
-		},
+	if input.DateTo != "" {
+		params["date_to"] = input.DateTo
 	}
+	if input.Type != "" {
+		params["type"] = input.Type
+	}
+	if input.Filename != "" {
+		params["filename"] = input.Filename
+	}
+	if input.Raw != nil {
+		params["raw"] = fmt.Sprintf("%t", *input.Raw)
+	}
+	if input.Rating != nil {
+		params["rating"] = fmt.Sprintf("%d", *input.Rating)
+	}
+	if input.Liked != nil {
+		params["liked"] = fmt.Sprintf("%t", *input.Liked)
+	}
+	if input.Place != "" {
+		params["place"] = input.Place
+	}
+	return params
+}
+
+func filterSummary(input *AssetFilterInput, count int, truncated bool) string {
+	params := filterPlanParams(input)
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	conditions := make([]string, 0, len(keys))
+	for _, key := range keys {
+		conditions = append(conditions, key+"="+params[key])
+	}
+	clause := strings.Join(conditions, ", ")
+	if clause == "" {
+		clause = "no conditions"
+	}
+	summary := fmt.Sprintf("filter(%s) → %d assets", clause, count)
+	if count == 0 {
+		summary += " (empty set)"
+	}
+	if truncated {
+		summary += fmt.Sprintf(" (truncated at %d)", ref.MaxSnapshotSize)
+	}
+	return summary
 }

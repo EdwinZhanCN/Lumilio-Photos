@@ -155,9 +155,9 @@ export function AssetsGalleryPage({
           <div className="px-4">
             <div className="alert alert-info border border-info/20 bg-info/10 text-info-content">
               <span>
-                {t("search.degraded", {
+                {t("search.semanticUnavailable", {
                   defaultValue:
-                    "Top results are temporarily unavailable. Showing regular results instead.",
+                    "Semantic search is temporarily unavailable; results may be less complete.",
                 })}
               </span>
             </div>

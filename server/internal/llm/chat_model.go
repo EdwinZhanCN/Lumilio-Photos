@@ -23,6 +23,14 @@ const (
 )
 
 func NewChatModel(ctx context.Context, cfg config.LLMConfig) (model.ToolCallingChatModel, error) {
+	inner, err := newProviderChatModel(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return maybeWrapAudit(inner), nil
+}
+
+func newProviderChatModel(ctx context.Context, cfg config.LLMConfig) (model.ToolCallingChatModel, error) {
 	provider := cfg.EffectiveProvider()
 	modelName := strings.TrimSpace(cfg.ModelName)
 	baseURL := strings.TrimSpace(cfg.BaseURL)

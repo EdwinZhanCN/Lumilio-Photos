@@ -492,6 +492,91 @@ WHERE is_deleted = false
 -- These queries consolidate List, Filter, and Search operations with shared WHERE logic
 -- ============================================================================
 
+-- name: GetAssetIDsUnified :many
+-- Agent ref materialization: same filter semantics as GetAssetsUnified but
+-- returns ordered asset ids only (capture time desc). The limit is the ref
+-- snapshot cap; callers detect truncation by requesting cap+1.
+SELECT a.asset_id
+FROM assets a
+WHERE a.is_deleted = false
+  AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
+  AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
+  AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (
+    sqlc.narg('tag_name')::text IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM asset_tags at
+      JOIN tags t ON t.tag_id = at.tag_id
+      WHERE at.asset_id = a.asset_id
+        AND t.tag_name = sqlc.narg('tag_name')
+        AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
+    )
+  )
+  AND (
+    sqlc.narg('person_id')::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = sqlc.narg('person_id')
+        AND fi_person.asset_id = a.asset_id
+    )
+  )
+  AND (
+    sqlc.narg('album_id')::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = sqlc.narg('album_id')
+    )
+  )
+  AND (sqlc.narg('filename_val')::text IS NULL OR
+    CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
+      WHEN 'matches' THEN a.original_filename ILIKE sqlc.narg('filename_val')
+      WHEN 'starts_with' THEN a.original_filename ILIKE sqlc.narg('filename_val') || '%'
+      WHEN 'ends_with' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val')
+      ELSE a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
+    END
+  )
+  AND (sqlc.narg('date_from')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
+  AND (sqlc.narg('date_to')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
+  AND (sqlc.narg('is_raw')::boolean IS NULL OR
+    CASE
+      WHEN sqlc.narg('is_raw') = true THEN a.specific_metadata->>'is_raw' = 'true'
+      ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND (sqlc.narg('rating')::integer IS NULL OR
+    CASE
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL OR a.rating = 0
+      ELSE a.rating = sqlc.narg('rating')
+    END
+  )
+  AND (sqlc.narg('liked')::boolean IS NULL OR
+    CASE
+      WHEN sqlc.narg('liked') = false THEN a.liked IS NULL OR a.liked = false
+      ELSE a.liked = true
+    END
+  )
+  AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
+  AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
+  AND (
+    sqlc.narg('place')::text IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM location_cluster_assets lca
+      JOIN location_clusters lc ON lc.cluster_id = lca.cluster_id
+      WHERE lca.asset_id = a.asset_id
+        AND lc.search_vector @@ plainto_tsquery('simple', sqlc.narg('place'))
+    )
+  )
+ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+LIMIT sqlc.arg('limit');
+
 -- name: GetAssetsUnified :many
 -- Handles: listing, filename search, and all filtering
 -- Use this for most queries unless semantic search is needed

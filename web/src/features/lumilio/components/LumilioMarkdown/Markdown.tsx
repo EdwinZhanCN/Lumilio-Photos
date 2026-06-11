@@ -5,13 +5,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { CodeBlock, Img, Link, ThinkBlock } from "./MarkdownBlocks";
-import { MarkdownToolBlock } from "./MarkdownBlocks/ToolBlock.tsx";
-
-interface CustomComponents extends Partial<Components> {
-  "lumilio-tool"?: React.ComponentType<any>;
-  [key: string]: any; // 允许任意其他字符串键
-}
+import { CodeBlock, Img, Link } from "./MarkdownBlocks";
 
 // Create a custom sanitize schema that allows KaTeX elements
 const mathSafeSchema = {
@@ -49,7 +43,6 @@ const mathSafeSchema = {
     mtd: [],
     mtext: [],
     mspace: ["width"],
-    "lumilio-tool": ["id", "data-id", "className", "style"],
   },
   tagNames: [
     ...(defaultSchema.tagNames || []),
@@ -72,17 +65,14 @@ const mathSafeSchema = {
     "mtd",
     "mtext",
     "mspace",
-    "lumilio-tool",
   ],
 };
 
-const components: CustomComponents = {
+const components: Partial<Components> = {
   code: CodeBlock,
   img: Img,
   a: Link,
-  details: ThinkBlock,
-  "lumilio-tool": MarkdownToolBlock,
-  p: (props: any) => <div {...props} />,
+  p: (props) => <div {...props} />,
 };
 
 export const Markdown = ({
