@@ -33,7 +33,8 @@ type CreateAlbumOutput struct {
 // AlbumConfirmationInfo is the user-facing interrupt payload: the preview
 // the frontend renders before the user approves the album creation.
 type AlbumConfirmationInfo struct {
-	Message string `json:"message"`
+	Action  string `json:"action"`
+	Message string `json:"message,omitempty"`
 	Title   string `json:"title"`
 	RefID   string `json:"ref_id"`
 	Count   int    `json:"count"`
@@ -106,10 +107,10 @@ func RegisterCreateAlbum() {
 
 			return nil, compose.StatefulInterrupt(ctx,
 				&AlbumConfirmationInfo{
-					Message: fmt.Sprintf("Create album %q with %d photos?", input.Title, r.Count()),
-					Title:   input.Title,
-					RefID:   r.ID,
-					Count:   r.Count(),
+					Action: "create_album",
+					Title:  input.Title,
+					RefID:  r.ID,
+					Count:  r.Count(),
 				},
 				&albumInterruptState{RefID: r.ID, Title: input.Title, Count: r.Count()},
 			)

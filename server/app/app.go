@@ -320,6 +320,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		duplicateController,
 		cloudController,
 		handler.RequireLLMAgentEnabled(settingsService),
+		appLogger.Named("http"),
 	)
 
 	// Add Swagger documentation endpoint

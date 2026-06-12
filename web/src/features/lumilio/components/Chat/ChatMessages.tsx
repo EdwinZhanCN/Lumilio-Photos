@@ -14,12 +14,19 @@ interface ChatMessagesProps {
   isGenerating: boolean;
 }
 
-function BlockView({ block }: { block: Block }) {
+function BlockView({
+  block,
+  isAnimating = false,
+}: {
+  block: Block;
+  isAnimating?: boolean;
+}) {
   switch (block.kind) {
     case "text":
       return (
         <Markdown
           content={block.markdown}
+          isAnimating={isAnimating}
           className="text-base leading-relaxed text-base-content"
         />
       );
@@ -91,7 +98,7 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
-      {messages.map((message) => {
+      {messages.map((message, messageIndex) => {
         if (message.role === "user") {
           const text = message.blocks
             .map((block) => (block.kind === "text" ? block.markdown : ""))
@@ -105,10 +112,16 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
           );
         }
 
+        const isLastMessage = messageIndex === messages.length - 1;
+
         return (
           <div key={message.id} className="w-full">
             {message.blocks.map((block) => (
-              <BlockView key={block.id} block={block} />
+              <BlockView
+                key={block.id}
+                block={block}
+                isAnimating={isGenerating && isLastMessage}
+              />
             ))}
           </div>
         );

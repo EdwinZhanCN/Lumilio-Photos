@@ -41,6 +41,10 @@ const testProjects = [
 ];
 
 export default defineConfig({
+  define: {
+    "process.env.DRAGGABLE_DEBUG": "false",
+  },
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
