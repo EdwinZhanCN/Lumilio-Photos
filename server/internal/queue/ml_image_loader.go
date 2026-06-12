@@ -29,9 +29,14 @@ func NewDBMLImageLoader(queries *repo.Queries) *DBMLImageLoader {
 func mlThumbnailSize(purpose imagesource.Purpose) string {
 	switch purpose {
 	case imagesource.PurposeOCR, imagesource.PurposeFace:
+		// Detection quality depends on input resolution; medium (800px)
+		// balances that against PP-OCR/SCRFD inference latency.
 		return "medium"
 	default:
-		return "large"
+		// Semantic/BioCLIP encoders consume 224x224 tensors, so the medium
+		// thumbnail already carries ~3.5x the target resolution; decoding the
+		// large (1920px) variant costs ~4x more CPU for no embedding gain.
+		return "medium"
 	}
 }
 
