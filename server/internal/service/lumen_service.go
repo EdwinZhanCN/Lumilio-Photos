@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/client"
 	"github.com/edwinzhancn/lumen-sdk/pkg/config"
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
+	pb "github.com/edwinzhancn/lumen-sdk/proto"
 	"go.uber.org/zap"
 
 	"server/internal/utils/imagesource"
@@ -77,6 +79,44 @@ func (s *lumenService) IsTaskAvailable(taskName string) bool {
 	return false
 }
 
+func (s *lumenService) tensorImageRequest(ctx context.Context, taskName string, imageData *imagesource.MLImage) (*pb.InferRequest, bool) {
+	if imageData == nil {
+		return nil, false
+	}
+	contract, serviceName, ok := s.lumenClient.FindTaskContract(taskName)
+	if !ok || !contract.HasTensorPath() {
+		return nil, false
+	}
+	preprocessID := contract.TensorPreprocessID()
+	preprocessor, ok := types.DefaultTensorPreprocessorRegistry().Lookup(preprocessID)
+	if !ok {
+		return nil, false
+	}
+	tensor, err := preprocessor.Preprocess(ctx, types.ImageInput{
+		Encoded:     imageData.EncodedSource,
+		PayloadMIME: "image/webp",
+		Data:        imageData.Data,
+		Width:       imageData.Width,
+		Height:      imageData.Height,
+		Channels:    imageData.Channels,
+		Layout:      imageData.Layout,
+		DType:       imageData.DType,
+		ColorSpace:  imageData.ColorSpace,
+	})
+	if err != nil {
+		s.logger.Debug("tensor preprocessor unavailable; falling back to raw Lumen path",
+			zap.String("task", taskName),
+			zap.String("preprocess_id", preprocessID),
+			zap.Error(err),
+		)
+		return nil, false
+	}
+	return types.NewInferRequest(taskName).
+		ForTensorInput(tensor.Payload, tensor.PayloadMIME, tensor.Descriptor).
+		WithService(serviceName).
+		Build(), true
+}
+
 // ---- Inference methods ----
 
 func (s *lumenService) SemanticTextEmbed(ctx context.Context, text []byte) (*types.EmbeddingV1, error) {
@@ -102,10 +142,12 @@ func (s *lumenService) SemanticTextEmbedFast(ctx context.Context, text []byte) (
 }
 
 func (s *lumenService) SemanticImageEmbed(ctx context.Context, imageData *imagesource.MLImage) (*types.EmbeddingV1, error) {
-	// The service is set to be empty
-	req := types.NewInferRequest("semantic_image_embed").
-		ForSemanticImageEmbed(imageData.EncodedSource, "image/webp").
-		Build()
+	req, ok := s.tensorImageRequest(ctx, types.TaskSemanticImageEmbed, imageData)
+	if !ok {
+		req = types.NewInferRequest(types.TaskSemanticImageEmbed).
+			ForSemanticImageEmbed(imageData.EncodedSource, "image/webp").
+			Build()
+	}
 
 	resp, err := s.lumenClient.Infer(ctx, req)
 	if err != nil {
@@ -120,9 +162,16 @@ func (s *lumenService) SemanticImageEmbed(ctx context.Context, imageData *images
 }
 
 func (s *lumenService) BioClipClassify(ctx context.Context, imageData *imagesource.MLImage, topK int) ([]types.Label, error) {
-	req := types.NewInferRequest("bioclip_classify").
-		ForBioCLIPClassify(imageData.EncodedSource, "image/webp", topK).
-		Build()
+	req, ok := s.tensorImageRequest(ctx, types.TaskBioCLIPClassify, imageData)
+	if ok {
+		if topK > 0 {
+			req.Meta[types.MetaTopK] = strconv.Itoa(topK)
+		}
+	} else {
+		req = types.NewInferRequest(types.TaskBioCLIPClassify).
+			ForBioCLIPClassify(imageData.EncodedSource, "image/webp", topK).
+			Build()
+	}
 
 	resp, err := s.lumenClient.Infer(ctx, req)
 	if err != nil {
@@ -138,7 +187,7 @@ func (s *lumenService) BioClipClassify(ctx context.Context, imageData *imagesour
 }
 
 func (s *lumenService) FaceRecognition(ctx context.Context, imageData *imagesource.MLImage) (*types.FaceV1, error) {
-	req := types.NewInferRequest("face_recognition").
+	req := types.NewInferRequest(types.TaskFaceRecognition).
 		ForFaceRecognitionRaw(imageData.EncodedSource, "image/webp").
 		Build()
 
@@ -155,7 +204,7 @@ func (s *lumenService) FaceRecognition(ctx context.Context, imageData *imagesour
 }
 
 func (s *lumenService) OCR(ctx context.Context, imageData *imagesource.MLImage) (*types.OCRV1, error) {
-	req := types.NewInferRequest("ocr").
+	req := types.NewInferRequest(types.TaskOCR).
 		ForOCRRaw(imageData.EncodedSource, "image/webp").
 		Build()
 
