@@ -3,7 +3,7 @@ module server
 go 1.25.0
 
 require (
-	github.com/cloudwego/eino v0.7.21
+	github.com/cloudwego/eino v0.9.6
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.63
 	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.2
 	github.com/cloudwego/eino-ext/components/model/ollama v0.1.8
@@ -110,8 +110,8 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/bytedance/sonic v1.14.1 // indirect
-	github.com/bytedance/sonic/loader v0.3.0 // indirect
+	github.com/bytedance/sonic v1.15.0 // indirect
+	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.10 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect

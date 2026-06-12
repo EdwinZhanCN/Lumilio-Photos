@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { streamAgent } from "../api/agentStream";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, TokenUsageInfo } from "../types";
 import {
   applyChunk,
   applyInterrupt,
@@ -20,6 +20,8 @@ interface LumilioChatStore {
   /** Set while an interrupt awaits the user's confirm/cancel. */
   awaitingConfirmation: boolean;
   connectionError: string | null;
+  /** Last model call's token accounting; promptTokens ≈ current context size. */
+  usage: TokenUsageInfo | null;
 
   sendMessage: (query: string) => Promise<void>;
   confirmInterrupt: (interruptId: string, approved: boolean) => Promise<void>;
@@ -31,8 +33,13 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
     onSessionInfo: (threadId: string) => set({ threadId }),
     onChunk: (chunk: { output?: string; reasoning?: string }) =>
       set((state) => ({ messages: applyChunk(state.messages, chunk) })),
-    onSideEvent: (event: Parameters<typeof applySideEvent>[1]) =>
-      set((state) => ({ messages: applySideEvent(state.messages, event) })),
+    onSideEvent: (event: Parameters<typeof applySideEvent>[1]) => {
+      if (event.type === "token_usage") {
+        if (event.usage) set({ usage: event.usage });
+        return;
+      }
+      set((state) => ({ messages: applySideEvent(state.messages, event) }));
+    },
     onInterrupt: (interrupt: Parameters<typeof applyInterrupt>[1]) =>
       set((state) => ({
         messages: applyInterrupt(state.messages, interrupt),
@@ -58,6 +65,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
     isGenerating: false,
     awaitingConfirmation: false,
     connectionError: null,
+    usage: null,
 
     sendMessage: async (query: string) => {
       const trimmed = query.trim();
@@ -115,6 +123,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         isGenerating: false,
         awaitingConfirmation: false,
         connectionError: null,
+        usage: null,
       }),
   };
 });

@@ -759,7 +759,9 @@
       "replyCount_one": "{{count}} 条回复",
       "replyCount_other": "{{count}} 条回复",
       "subtitle": "驱动看板",
-      "title": "Lumilio Agent"
+      "title": "Lumilio Agent",
+      "tokens": "tokens",
+      "usageHint": "上次模型调用：{{prompt}} 上下文 + {{completion}} 输出 tokens"
     },
     "input": {
       "prompt": "向 Lumilio Agent 提问...",
@@ -767,11 +769,6 @@
       "unavailable": "Lumilio Agent 当前不可用。"
     },
     "markdown": {
-      "code": {
-        "copied": "已复制",
-        "copy": "复制",
-        "languageFallback": "文本"
-      },
       "think": {
         "thinking": "思考中...",
         "thoughtFor": "思考用时 {{time}} 秒"

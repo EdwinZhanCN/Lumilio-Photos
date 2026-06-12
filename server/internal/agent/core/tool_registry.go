@@ -34,12 +34,24 @@ type SideChannelEvent struct {
 
 	// Ref handle and rendering hints; never inline asset data.
 	Data *DataPayload `json:"data,omitempty"`
+
+	// Usage carries token accounting for token_usage events.
+	Usage *TokenUsageInfo `json:"usage,omitempty"`
 }
 
 const (
 	EventTypeToolExecution = "tool_execution"
 	EventTypeWidgetShow    = "widget_show"
+	EventTypeTokenUsage    = "token_usage"
 )
+
+// TokenUsageInfo reports the last model call's token accounting; prompt
+// tokens are effectively the current context size of the conversation.
+type TokenUsageInfo struct {
+	PromptTokens     int `json:"promptTokens"`
+	CompletionTokens int `json:"completionTokens"`
+	TotalTokens      int `json:"totalTokens"`
+}
 
 // ToolIdentity identifies the tool instance
 type ToolIdentity struct {

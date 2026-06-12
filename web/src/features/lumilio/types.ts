@@ -34,7 +34,7 @@ export type ToolStatus = "running" | "success" | "error";
 
 /** Control-plane event emitted by tool executions through the side channel. */
 export interface SideChannelEvent {
-  type: "tool_execution" | "widget_show";
+  type: "tool_execution" | "widget_show" | "token_usage";
   timestamp: number;
   tool: { name: string; executionId: string };
   execution: {
@@ -45,6 +45,15 @@ export interface SideChannelEvent {
     duration?: number;
   };
   data?: RefPayload;
+  usage?: TokenUsageInfo;
+}
+
+/** Token accounting of the last model call; prompt tokens are effectively
+ * the conversation's current context size. */
+export interface TokenUsageInfo {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
 }
 
 /** Streamed agent message chunk (assistant text and/or reasoning). */
