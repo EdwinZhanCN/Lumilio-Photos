@@ -439,6 +439,36 @@ zh/en 别名层 + 词条原型向量 text-text 高阈值匹配兜底；agent 加
 ③tags 作为第四个 retriever 进聚合（自带阈值，同 OCR/place）；④逐词条阈值自动
 初始化（库内分数分布 z-score）+ preview 微调。届时逐查询校准退居长尾兜底。
 
+## 9d. ADR：不做 Chat History 产品；会话内多轮 + 上下文管理 ✅（2026-06-12 完成）
+
+**决策**：不把对话历史做成产品（无会话列表、无 transcript 回放）。理由：① Agent 的定位是
+媒体库回忆编排器，"Personal Agent 了解用户"的知识来源是**库本身**（人物/地点/facets/未来
+词表），对话日志是又稀又噪的二手货——Personal Agent 路线不依赖 chat history；② 会话的
+持久产物是 **pins**，不是日志。将来若要导出对话，markdown 导出即可，与本决策不冲突。
+
+**但多轮对话是刚需且此前是坏的**：v0.7.21 的 `runner.Query(WithCheckPointID)` 中 checkpoint
+只服务 interrupt/resume，**每轮都是全新会话**，模型看不到前轮（ref ledger 恰好掩盖了这点）。
+
+实现（eino **0.7.21 → 0.9.6** 升级，零编译破坏）：
+
+- **ConversationStore**（`core/conversation.go`）：内存 (user, thread) 作用域消息历史，
+  TTL 2h + janitor——与 RefStore 同构的"工作记忆"哲学，transcript 随会话死亡。
+  读取时消毒：剔除 system 消息（Instruction 含 ledger 每轮重建）、剔除悬空 assistant
+  tool-call 尾巴（被放弃的 interrupt 否则会让 provider 拒绝下一请求）。
+- **多轮**：`AskAgent` 改为 `runner.Run(ctx, history + 新用户消息)`；
+- **sessionMiddleware**（`AfterAgent` 钩子）：把 run 结束时的 `state.Messages` 覆盖写回
+  store——覆盖语义使 **summarization 压缩后历史同步瘦身**；同时提取末次模型调用的
+  `TokenUsage` 发 side channel。
+- **summarization middleware**（adk v0.9.6 自带）：上下文超 `summarizeTriggerTokens`
+  （60k，保守值，待提为 settings 旋钮）自动压缩；ref 句柄天然在压缩中存活（ledger 不在
+  消息里）。
+- **token 用量显示**：新 side channel 事件 `token_usage`（prompt/completion/total），
+  ChatDock 副标题显示紧凑用量（如 `12.5k tokens`），悬停见 prompt/output 拆分；
+  promptTokens ≈ 当前上下文大小，用户可以看着它涨。
+
+后续旋钮（未做）：`summarize_trigger_tokens` / `max_output_tokens` 进 LLM settings；
+checkpoint 表的 TTL/GC 治理（决定不做 history 产品后 transcript 不应无限沉淀）。
+
 ## 10. Open Questions（更新后）
 
 1. ~~describe FacetSummary 的精确 schema~~ → 已定 v1（§5.6）；直方图分桶粒度（月/年切换阈值）实现时可调。

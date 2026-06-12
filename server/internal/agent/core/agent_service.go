@@ -12,6 +12,7 @@ import (
 	"server/internal/llm"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/adk/middlewares/summarization"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
@@ -39,9 +40,10 @@ type agentService struct {
 	store          *PostgresStore
 	refStore       ref.Store
 	search         RetrieverSearch
+	conversations  *ConversationStore
 }
 
-func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider, refStore ref.Store, search RetrieverSearch) AgentService {
+func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider, refStore ref.Store, search RetrieverSearch, conversations *ConversationStore) AgentService {
 	return &agentService{
 		queries:        queries,
 		registry:       GetRegistry(),
@@ -49,6 +51,7 @@ func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider, re
 		store:          NewPostgresStore(queries),
 		refStore:       refStore,
 		search:         search,
+		conversations:  conversations,
 	}
 }
 
@@ -87,6 +90,40 @@ func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID st
 		return nil, fmt.Errorf("failed to create chat model: %w", err)
 	}
 
+	// Summarization compacts the conversation in place once it crosses the
+	// token budget; the session middleware then writes the (possibly
+	// compacted) state back to the conversation store, so long threads stay
+	// bounded without losing the recent exchange. Ref handles survive
+	// compaction by construction — the ledger is rebuilt into the
+	// instruction every turn from the ref store, not from messages.
+	summarizer, err := summarization.New(ctx, &summarization.Config{
+		Model:   chatModel,
+		Trigger: &summarization.TriggerCondition{ContextTokens: summarizeTriggerTokens},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create summarization middleware: %w", err)
+	}
+
+	session := &sessionMiddleware{
+		store:    s.conversations,
+		userID:   userID,
+		threadID: threadID,
+		onUsage: func(usage *schema.TokenUsage) {
+			if sideChannel == nil || usage == nil {
+				return
+			}
+			deps.Send(&SideChannelEvent{
+				Type:      EventTypeTokenUsage,
+				Timestamp: time.Now().UnixMilli(),
+				Usage: &TokenUsageInfo{
+					PromptTokens:     usage.PromptTokens,
+					CompletionTokens: usage.CompletionTokens,
+					TotalTokens:      usage.TotalTokens,
+				},
+			})
+		},
+	}
+
 	t := time.Now()
 	today := fmt.Sprintf("%s, %s", t.Weekday().String(), t.Format("2006-01-02"))
 	ledger := s.refStore.List(ref.Scope{UserID: userID, ThreadID: threadID})
@@ -102,9 +139,15 @@ func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID st
 					Tools: tools,
 				},
 			},
+			Handlers: []adk.ChatModelAgentMiddleware{summarizer, session},
 		},
 	)
 }
+
+// summarizeTriggerTokens is the context budget before the conversation is
+// compacted. Conservative relative to common local-model windows; promote to
+// an LLM settings knob when per-deployment tuning is needed.
+const summarizeTriggerTokens = 60000
 
 // buildInstruction states the ref discipline the model must follow: act
 // through refs, verify counts, never recite internal ids or asset data.
@@ -160,8 +203,11 @@ func (s *agentService) AskAgent(ctx context.Context, userID int32, threadID, que
 		CheckPointStore: s.store, // 注入 Store，开启自动存档
 	})
 
-	// 执行时绑定 threadID (即 CheckPointID)
-	return runner.Query(ctx, query, adk.WithCheckPointID(threadID))
+	// Multi-turn: replay the thread's history plus the new user message.
+	// Query() would start a blank conversation every turn — the model would
+	// never see prior exchanges. History comes back via sessionMiddleware.
+	messages := append(s.conversations.Messages(userID, threadID), schema.UserMessage(query))
+	return runner.Run(ctx, messages, adk.WithCheckPointID(threadID))
 }
 
 func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error) {

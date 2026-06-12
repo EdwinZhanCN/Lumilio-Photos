@@ -212,7 +212,9 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// for abandoned sessions.
 	refStore := ref.NewMemoryStore(ref.DefaultTTL, ref.DefaultMaxRefsPerScope)
 	go refStore.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, settingsService, refStore, assetService)
+	conversations := core.NewConversationStore(core.DefaultConversationTTL)
+	go conversations.RunJanitor(ctx, 10*time.Minute)
+	agentService := core.NewAgentService(queries, settingsService, refStore, assetService, conversations)
 	agentPins := pins.NewService(queries, refStore, assetService)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 

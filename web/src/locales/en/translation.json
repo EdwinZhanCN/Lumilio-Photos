@@ -760,7 +760,9 @@
       "replyCount_one": "{{count}} reply",
       "replyCount_other": "{{count}} replies",
       "subtitle": "drives the board",
-      "title": "Lumilio Agent"
+      "title": "Lumilio Agent",
+      "tokens": "tokens",
+      "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens"
     },
     "input": {
       "prompt": "Ask Lumilio Agent...",
@@ -768,11 +770,6 @@
       "unavailable": "Lumilio Agent is unavailable."
     },
     "markdown": {
-      "code": {
-        "copied": "Copied",
-        "copy": "Copy",
-        "languageFallback": "text"
-      },
       "think": {
         "thinking": "Thinking...",
         "thoughtFor": "Thought for {{time}}s"

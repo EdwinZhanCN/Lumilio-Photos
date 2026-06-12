@@ -7,12 +7,19 @@ import { useLumilioChatStore } from "../../state/chatStore";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 
+/** Compact token formatting: 856 → "856", 12480 → "12.5k". */
+function formatTokens(count: number): string {
+  if (count < 1000) return String(count);
+  return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+}
+
 export function ChatDock() {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
   const messages = useLumilioChatStore((s) => s.messages);
   const isGenerating = useLumilioChatStore((s) => s.isGenerating);
   const connectionError = useLumilioChatStore((s) => s.connectionError);
+  const usage = useLumilioChatStore((s) => s.usage);
   const sendMessage = useLumilioChatStore((s) => s.sendMessage);
   const newConversation = useLumilioChatStore((s) => s.newConversation);
   const { capabilities } = useCapabilities(5000);
@@ -33,7 +40,7 @@ export function ChatDock() {
   );
   const handleSubmit = useCallback(
     (value: string) => {
-      setCollapsed(true);
+      setCollapsed(false);
       void sendMessage(value);
     },
     [sendMessage],
@@ -72,8 +79,20 @@ export function ChatDock() {
                 {isGenerating
                   ? t("lumilio.dock.busy", "Working")
                   : t("lumilio.dock.ready", "Ready")}
-                <span aria-hidden="true"> · </span>
-                {t("lumilio.dock.subtitle", "drives the board")}
+                {usage && (
+                  <span
+                    title={t("lumilio.dock.usageHint", {
+                      defaultValue:
+                        "Last model call: {{prompt}} context + {{completion}} output tokens",
+                      prompt: usage.promptTokens,
+                      completion: usage.completionTokens,
+                    })}
+                  >
+                    <span aria-hidden="true"> · </span>
+                    {formatTokens(usage.totalTokens)}{" "}
+                    {t("lumilio.dock.tokens", "tokens")}
+                  </span>
+                )}
               </span>
             </div>
           </div>
