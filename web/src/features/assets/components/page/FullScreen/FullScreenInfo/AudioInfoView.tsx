@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
+import { formatCaptureTime } from "@/lib/utils/formatters";
 import type { Asset, AudioSpecificMetadata } from "@/lib/http-commons";
 import { isAudioMetadata } from "@/lib/http-commons";
 
@@ -41,11 +42,10 @@ export default function AudioInfoView({
   const fmt = (v: any, fallback = "-") =>
     v === undefined || v === null || v === "" ? fallback : v;
 
-  // Basic info
-  const uploadTime = asset?.upload_time
-    ? new Date(asset.upload_time).toLocaleString()
-    : undefined;
-  const uploadDisplay = fmt(uploadTime);
+  // Basic info — audio has no taken_time; display upload_time in browser locale.
+  const uploadDisplay = asset?.upload_time
+    ? formatCaptureTime(asset.upload_time)
+    : "-";
   const mimeDisplay = fmt(asset?.mime_type);
   const filename = fmt(asset?.original_filename);
 
@@ -139,7 +139,9 @@ export default function AudioInfoView({
               <h1 className="font-sans font-bold">
                 {t("assets.basicInfo.title")}
               </h1>
-              <div className="badge badge-soft badge-warning">{t("assets.audioInfoView.audio_badge")}</div>
+              <div className="badge badge-soft badge-warning">
+                {t("assets.audioInfoView.audio_badge")}
+              </div>
             </div>
             <div className="flex gap-1">
               <button className="btn btn-circle btn-xs" disabled>
@@ -177,9 +179,15 @@ export default function AudioInfoView({
             {(title !== "-" || artist !== "-" || album !== "-") && (
               <div className="rounded bg-base-300 overflow-hidden">
                 <div className="px-3 py-2 space-y-1">
-                  {title !== "-" && <p className="text-sm font-bold leading-tight">{title}</p>}
-                  {artist !== "-" && <p className="text-xs font-medium">{artist}</p>}
-                  {album !== "-" && <p className="text-xs opacity-70">{album}</p>}
+                  {title !== "-" && (
+                    <p className="text-sm font-bold leading-tight">{title}</p>
+                  )}
+                  {artist !== "-" && (
+                    <p className="text-xs font-medium">{artist}</p>
+                  )}
+                  {album !== "-" && (
+                    <p className="text-xs opacity-70">{album}</p>
+                  )}
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] opacity-60 uppercase tracking-wider">
                     {genre !== "-" && <span>{genre}</span>}
                     {year !== "-" && <span>{year}</span>}
@@ -191,7 +199,9 @@ export default function AudioInfoView({
             {/* Audio Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">
               <div className="px-3 py-2 space-y-1">
-                <p className="text-xs opacity-70">{t("assets.audioInfoView.codec_label", { codec })}</p>
+                <p className="text-xs opacity-70">
+                  {t("assets.audioInfoView.codec_label", { codec })}
+                </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
                   <span>{duration}</span>
                   <span>{sizeM}</span>
