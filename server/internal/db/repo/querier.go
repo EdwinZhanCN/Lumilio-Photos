@@ -17,6 +17,22 @@ type Querier interface {
 	AddStackMember(ctx context.Context, arg AddStackMemberParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
 	AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error)
+	AgentFacetCameraCounts(ctx context.Context, arg AgentFacetCameraCountsParams) ([]AgentFacetCameraCountsRow, error)
+	// Facet aggregates over a ref snapshot (agent describe tool / hydration API).
+	// Every query takes the materialized asset id array; results feed
+	// ref.FacetSummary. User-content strings (labels, names, camera models) are
+	// sanitized in Go before reaching the LLM — never here.
+	AgentFacetOverview(ctx context.Context, assetIds []pgtype.UUID) (AgentFacetOverviewRow, error)
+	AgentFacetRatingDist(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetRatingDistRow, error)
+	// granularity is 'month' or 'year'; bucket labels are YYYY-MM or YYYY.
+	AgentFacetTimeHistogram(ctx context.Context, arg AgentFacetTimeHistogramParams) ([]AgentFacetTimeHistogramRow, error)
+	AgentFacetTopPeople(ctx context.Context, arg AgentFacetTopPeopleParams) ([]AgentFacetTopPeopleRow, error)
+	AgentFacetTopPlaces(ctx context.Context, arg AgentFacetTopPlacesParams) ([]AgentFacetTopPlacesRow, error)
+	AgentFacetTypeCounts(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetTypeCountsRow, error)
+	// lookup_people entity resolver: named face clusters matching a name query.
+	AgentLookupPeople(ctx context.Context, arg AgentLookupPeopleParams) ([]AgentLookupPeopleRow, error)
+	// peek observer: minimal per-asset fields; snapshot order restored in Go.
+	AgentPeekAssets(ctx context.Context, assetIds []pgtype.UUID) ([]AgentPeekAssetsRow, error)
 	// Applies merged rating/liked/description on top of the existing keeper values.
 	// Rating uses MAX, liked is OR'd, description is set only when keeper currently
 	// has no description (or the field is empty).
@@ -58,6 +74,7 @@ type Querier interface {
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) (int64, error)
 	CountRunningRepositoryScanRuns(ctx context.Context, arg CountRunningRepositoryScanRunsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) (AgentPin, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
 	CreateCloudCredential(ctx context.Context, arg CreateCloudCredentialParams) (CloudCredential, error)
@@ -80,6 +97,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserRecoveryCode(ctx context.Context, arg CreateUserRecoveryCodeParams) error
 	CreateUserWebAuthnCredential(ctx context.Context, arg CreateUserWebAuthnCredentialParams) (UserWebauthnCredential, error)
+	DeleteAgentPin(ctx context.Context, arg DeleteAgentPinParams) error
 	DeleteAlbum(ctx context.Context, albumID int32) error
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
@@ -125,6 +143,7 @@ type Querier interface {
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
 	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID pgtype.UUID) (RepositoryCloudBinding, error)
+	GetAgentPin(ctx context.Context, arg GetAgentPinParams) (AgentPin, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
@@ -140,6 +159,19 @@ type Querier interface {
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error)
 	GetAssetExifRaw(ctx context.Context, assetID pgtype.UUID) (json.RawMessage, error)
+	// Queries backing the Phase 2 agent tools (producers, transformers,
+	// observers). All ANY(asset_ids) queries operate on ref snapshots.
+	// search_people producer: assets containing at least one of the given people
+	// (union semantics; the agent intersects refs for "both people" requests).
+	GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByPersonIDsParams) ([]pgtype.UUID, error)
+	// ============================================================================
+	// UNIFIED QUERY API
+	// These queries consolidate List, Filter, and Search operations with shared WHERE logic
+	// ============================================================================
+	// Agent ref materialization: same filter semantics as GetAssetsUnified but
+	// returns ordered asset ids only (capture time desc). The limit is the ref
+	// snapshot cap; callers detect truncation by requesting cap+1.
+	GetAssetIDsUnified(ctx context.Context, arg GetAssetIDsUnifiedParams) ([]pgtype.UUID, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
@@ -158,10 +190,6 @@ type Querier interface {
 	GetAssetsByStatusAndRepository(ctx context.Context, arg GetAssetsByStatusAndRepositoryParams) ([]Asset, error)
 	GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error)
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
-	// ============================================================================
-	// UNIFIED QUERY API
-	// These queries consolidate List, Filter, and Search operations with shared WHERE logic
-	// ============================================================================
 	// Handles: listing, filename search, and all filtering
 	// Use this for most queries unless semantic search is needed
 	GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error)
@@ -285,6 +313,7 @@ type Querier interface {
 	InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error
 	InsertLocationClustersForScope(ctx context.Context, arg InsertLocationClustersForScopeParams) ([]LocationCluster, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
+	ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
 	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
 	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
@@ -333,6 +362,13 @@ type Querier interface {
 	MergeFaceClustersForDuplicate(ctx context.Context, arg MergeFaceClustersForDuplicateParams) error
 	MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error)
 	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
+	// rank(by=quality) ascending, using the featured-selector heuristic
+	// (rating, liked, resolution); callers reverse for descending order.
+	RankAssetIDsByQuality(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
+	// rank(by=time) ascending; callers reverse for descending order.
+	RankAssetIDsByTime(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
+	// "recently added" presentation order, ascending; callers reverse for newest first.
+	RankAssetIDsByUploadTime(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
 	RemoveStackMember(ctx context.Context, assetID pgtype.UUID) error
@@ -352,6 +388,7 @@ type Querier interface {
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
 	SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error)
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
+	UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLayoutParams) error
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error

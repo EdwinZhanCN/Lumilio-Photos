@@ -731,29 +731,45 @@
       "disabled": "Lumilio Agent 已禁用。请在 设置 > AI 中启用。",
       "notConfigured": "Lumilio Agent 尚未配置。请在 设置 > AI 中完成 provider、model 与 API key。"
     },
+    "board": {
+      "empty": "还没有固定任何内容。在底部 dock 里让 Lumilio 找照片，然后把结果固定到这个看板。",
+      "remove": "从看板移除",
+      "unknownWidget": "未知的小组件类型：{{type}}",
+      "untitled": "未命名"
+    },
     "chat": {
       "confirmation": {
+        "approved": "已确认",
         "confirm": "确认",
+        "createAlbum_one": "创建相册「{{title}}」并加入 {{count}} 张照片？",
+        "createAlbum_other": "创建相册「{{title}}」并加入 {{count}} 张照片？",
+        "rejected": "已取消",
         "title": "需要确认"
       },
       "empty": "开始与 Lumilio 对话吧！",
+      "newConversation": "新对话",
       "openAiSettings": "打开 AI 设置"
     },
+    "dock": {
+      "busy": "处理中",
+      "collapse": "折叠对话",
+      "conversation": "对话",
+      "expand": "展开对话",
+      "ready": "就绪",
+      "replyCount_one": "{{count}} 条回复",
+      "replyCount_other": "{{count}} 条回复",
+      "subtitle": "驱动看板",
+      "title": "Lumilio Agent",
+      "tokens": "tokens",
+      "usageHint": "上次模型调用：{{prompt}} 上下文 + {{completion}} 输出 tokens"
+    },
     "input": {
-      "generating": "正在生成回复...",
-      "placeholderLabel": "占位标签",
-      "placeholderType": "占位",
-      "prompt": "向 Lumilio Agent 提问...（输入 @ 或 /）",
+      "prompt": "向 Lumilio Agent 提问...",
+      "send": "发送",
       "unavailable": "Lumilio Agent 当前不可用。"
     },
     "markdown": {
-      "code": {
-        "copied": "已复制",
-        "copy": "复制",
-        "languageFallback": "文本"
-      },
       "think": {
-        "defaultSummary": "思考过程...",
         "thinking": "思考中...",
         "thoughtFor": "思考用时 {{time}} 秒"
       }
@@ -761,16 +777,17 @@
     "messages": {
       "thinking": "思考中..."
     },
-    "status": {
-      "loading": "加载中 {{status}}"
-    },
     "tools": {
-      "error": "错误：{{error}}",
-      "eventNotFound": "未找到工具事件。",
-      "openFullView": "打开完整视图",
-      "openMainGallery": "在主图库视图中打开",
-      "resultsTitle": "{{toolName}} 结果",
-      "viewResults": "查看结果"
+      "emptyResult": "没有匹配的照片",
+      "resultSet": "结果集"
+    },
+    "widgets": {
+      "pin": "固定到看板",
+      "pinned": "已固定到看板",
+      "pinUnavailable": "该小组件的照片暂不可用。",
+      "refExpired": "这些结果已过期，请让 Lumilio 重新查询。",
+      "resultsTitle": "来自 Lumilio 的照片",
+      "viewAll_other": "查看全部 {{count}} 张照片"
     }
   },
   "manage": {
@@ -1003,10 +1020,10 @@
     "updates": "更新"
   },
   "search": {
-    "degraded": "最佳结果暂时不可用，已切换为常规结果。",
     "error": "搜索暂时不可用，请稍后重试。",
     "loading": "搜索中...",
     "results": "结果",
+    "semanticUnavailable": "语义搜索暂不可用，结果可能不完整。",
     "topResults": "最佳结果"
   },
   "settings": {

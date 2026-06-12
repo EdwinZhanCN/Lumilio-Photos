@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // AssetControllerInterface defines the interface for asset controllers
@@ -136,10 +138,16 @@ type StatsControllerInterface interface {
 
 // AgentControllerInterface defines the interface for agent controllers
 type AgentControllerInterface interface {
-	Chat(c *gin.Context)           // POST /agent/chat - Chat with agent via SSE
-	ResumeChat(c *gin.Context)     // POST /agent/chat/resume - Resume an interrupted agent execution
-	GetTools(c *gin.Context)       // GET /agent/tools - Get available tools
-	GetToolSchemas(c *gin.Context) // GET /agent/schemas - Get tool DTO schemas
+	Chat(c *gin.Context)            // POST /agent/chat - Chat with agent via SSE
+	ResumeChat(c *gin.Context)      // POST /agent/chat/resume - Resume an interrupted agent execution
+	GetTools(c *gin.Context)        // GET /agent/tools - Get available tools
+	GetRef(c *gin.Context)          // GET /agent/refs/:id - Get ref metadata with facets
+	GetRefAssets(c *gin.Context)    // GET /agent/refs/:id/assets - Hydrate a ref page in snapshot order
+	CreatePin(c *gin.Context)       // POST /agent/pins - Pin a ref as a durable board widget
+	ListPins(c *gin.Context)        // GET /agent/pins - List board widgets
+	GetPinAssets(c *gin.Context)    // GET /agent/pins/:id/assets - Hydrate a pinned widget
+	UpdatePinLayout(c *gin.Context) // PATCH /agent/pins/layout - Persist board layout
+	DeletePin(c *gin.Context)       // DELETE /agent/pins/:id - Remove a board widget
 }
 
 // CapabilitiesControllerInterface defines the interface for public system capability controllers.
@@ -224,8 +232,11 @@ func NewRouter(
 	duplicateController DuplicateControllerInterface,
 	cloudController CloudControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
+	logger *zap.Logger,
 ) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(requestErrorLogger(logger))
 	allowedOrigins := loadAllowedCORSOrigins()
 
 	// Add CORS middleware
@@ -459,18 +470,59 @@ func NewRouter(
 			stats.GET("/available-years", statsController.GetAvailableYears)
 		}
 
-		// Agent routes - with optional authentication
+		// Agent routes - authentication required: refs are scoped to the
+		// requesting user (INV-4), so an anonymous agent session is meaningless.
 		agent := v1.Group("/agent")
-		agent.Use(agentAvailabilityMiddleware, authController.OptionalAuthMiddleware())
+		agent.Use(agentAvailabilityMiddleware, authController.AuthMiddleware())
 		{
 			agent.POST("/chat", agentController.Chat)
 			agent.POST("/chat/resume", agentController.ResumeChat)
 			agent.GET("/tools", agentController.GetTools)
-			agent.GET("/schemas", agentController.GetToolSchemas)
+			agent.GET("/refs/:id", agentController.GetRef)
+			agent.GET("/refs/:id/assets", agentController.GetRefAssets)
+			agent.POST("/pins", agentController.CreatePin)
+			agent.GET("/pins", agentController.ListPins)
+			agent.GET("/pins/:id/assets", agentController.GetPinAssets)
+			agent.PATCH("/pins/layout", agentController.UpdatePinLayout)
+			agent.DELETE("/pins/:id", agentController.DeletePin)
 		}
 	}
 
 	return r
+}
+
+func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		status := c.Writer.Status()
+		if status < http.StatusBadRequest {
+			return
+		}
+
+		fields := []zap.Field{
+			zap.String("operation", "http.request"),
+			zap.Int("status", status),
+			zap.String("method", c.Request.Method),
+			zap.String("path", c.FullPath()),
+			zap.String("raw_path", c.Request.URL.Path),
+			zap.Duration("latency", time.Since(start)),
+			zap.String("client_ip", c.ClientIP()),
+		}
+		if len(c.Errors) > 0 {
+			fields = append(fields, zap.String("gin_errors", c.Errors.String()))
+		}
+
+		if status >= http.StatusInternalServerError {
+			logger.Error("http request failed", fields...)
+			return
+		}
+		logger.Warn("http request rejected", fields...)
+	}
 }
 
 func loadAllowedCORSOrigins() map[string]struct{} {
