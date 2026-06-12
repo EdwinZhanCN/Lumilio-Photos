@@ -65,8 +65,23 @@ export interface InterruptInfo {
 export interface InterruptContext {
   ID: string;
   Address?: unknown[];
-  Info?: { count?: number; confirmationId?: string; message?: string };
+  Info?: ConfirmationInfo;
   IsRootCause: boolean;
+}
+
+export interface ConfirmationInfo {
+  action?: string;
+  Action?: string;
+  confirmationId?: string;
+  ConfirmationId?: string;
+  count?: number;
+  Count?: number;
+  message?: string;
+  Message?: string;
+  ref_id?: string;
+  RefID?: string;
+  title?: string;
+  Title?: string;
 }
 
 // --- Conversation model: messages are lists of typed blocks ---

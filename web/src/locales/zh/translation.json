@@ -732,7 +732,7 @@
       "notConfigured": "Lumilio Agent 尚未配置。请在 设置 > AI 中完成 provider、model 与 API key。"
     },
     "board": {
-      "empty": "还没有固定任何内容。在对话里让 Lumilio 找照片，然后固定结果，它就会留在这里。",
+      "empty": "还没有固定任何内容。在底部 dock 里让 Lumilio 找照片，然后把结果固定到这个看板。",
       "remove": "从看板移除",
       "unknownWidget": "未知的小组件类型：{{type}}",
       "untitled": "未命名"
@@ -741,6 +741,8 @@
       "confirmation": {
         "approved": "已确认",
         "confirm": "确认",
+        "createAlbum_one": "创建相册「{{title}}」并加入 {{count}} 张照片？",
+        "createAlbum_other": "创建相册「{{title}}」并加入 {{count}} 张照片？",
         "rejected": "已取消",
         "title": "需要确认"
       },
@@ -748,11 +750,20 @@
       "newConversation": "新对话",
       "openAiSettings": "打开 AI 设置"
     },
+    "dock": {
+      "busy": "处理中",
+      "collapse": "折叠对话",
+      "conversation": "对话",
+      "expand": "展开对话",
+      "ready": "就绪",
+      "replyCount_one": "{{count}} 条回复",
+      "replyCount_other": "{{count}} 条回复",
+      "subtitle": "驱动看板",
+      "title": "Lumilio Agent"
+    },
     "input": {
-      "generating": "正在生成回复...",
-      "placeholderLabel": "占位标签",
-      "placeholderType": "占位",
-      "prompt": "向 Lumilio Agent 提问...（输入 @ 或 /）",
+      "prompt": "向 Lumilio Agent 提问...",
+      "send": "发送",
       "unavailable": "Lumilio Agent 当前不可用。"
     },
     "markdown": {
@@ -768,13 +779,6 @@
     },
     "messages": {
       "thinking": "思考中..."
-    },
-    "status": {
-      "loading": "加载中 {{status}}"
-    },
-    "tabs": {
-      "board": "看板",
-      "chat": "对话"
     },
     "tools": {
       "emptyResult": "没有匹配的照片",

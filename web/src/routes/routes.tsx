@@ -147,10 +147,6 @@ export const appRoutes = [
     path: "/lumilio",
     element: <LumilioChatPage />,
   },
-  {
-    path: "/lumilio/board",
-    element: <LumilioChatPage view="board" />,
-  },
   // {
   //   path: "/portfolio",
   //   element: <Portfolio />,

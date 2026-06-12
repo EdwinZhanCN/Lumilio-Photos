@@ -733,7 +733,7 @@
       "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI."
     },
     "board": {
-      "empty": "Nothing pinned yet. Ask Lumilio for photos in the chat, then pin the result to keep it here.",
+      "empty": "Nothing pinned yet. Ask Lumilio in the dock, then pin a result to keep it on this board.",
       "remove": "Remove from board",
       "unknownWidget": "Unknown widget type: {{type}}",
       "untitled": "Untitled"
@@ -742,6 +742,8 @@
       "confirmation": {
         "approved": "Confirmed",
         "confirm": "Confirm",
+        "createAlbum_one": "Create album \"{{title}}\" with {{count}} photo?",
+        "createAlbum_other": "Create album \"{{title}}\" with {{count}} photos?",
         "rejected": "Cancelled",
         "title": "Confirmation required"
       },
@@ -749,11 +751,20 @@
       "newConversation": "New conversation",
       "openAiSettings": "Open AI settings"
     },
+    "dock": {
+      "busy": "Working",
+      "collapse": "Collapse chat",
+      "conversation": "Conversation",
+      "expand": "Expand chat",
+      "ready": "Ready",
+      "replyCount_one": "{{count}} reply",
+      "replyCount_other": "{{count}} replies",
+      "subtitle": "drives the board",
+      "title": "Lumilio Agent"
+    },
     "input": {
-      "generating": "Generating response...",
-      "placeholderLabel": "Placeholder label",
-      "placeholderType": "Placeholder",
-      "prompt": "Ask Lumilio Agent... (Type @ or /)",
+      "prompt": "Ask Lumilio Agent...",
+      "send": "Send",
       "unavailable": "Lumilio Agent is unavailable."
     },
     "markdown": {
@@ -769,13 +780,6 @@
     },
     "messages": {
       "thinking": "Thinking..."
-    },
-    "status": {
-      "loading": "Loading {{status}}"
-    },
-    "tabs": {
-      "board": "Board",
-      "chat": "Chat"
     },
     "tools": {
       "emptyResult": "No matching photos",

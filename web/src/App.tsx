@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GlobalProvider, { useGlobal } from "@/contexts/GlobalContext";
 import "@/styles/App.css";
 import "katex/dist/katex.min.css";
+import "streamdown/styles.css";
 import Notifications from "@/components/Notifications";
 import { SettingsProvider, useSettingsContext } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";

@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // AssetControllerInterface defines the interface for asset controllers
@@ -230,8 +232,11 @@ func NewRouter(
 	duplicateController DuplicateControllerInterface,
 	cloudController CloudControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
+	logger *zap.Logger,
 ) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(requestErrorLogger(logger))
 	allowedOrigins := loadAllowedCORSOrigins()
 
 	// Add CORS middleware
@@ -484,6 +489,40 @@ func NewRouter(
 	}
 
 	return r
+}
+
+func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		status := c.Writer.Status()
+		if status < http.StatusBadRequest {
+			return
+		}
+
+		fields := []zap.Field{
+			zap.String("operation", "http.request"),
+			zap.Int("status", status),
+			zap.String("method", c.Request.Method),
+			zap.String("path", c.FullPath()),
+			zap.String("raw_path", c.Request.URL.Path),
+			zap.Duration("latency", time.Since(start)),
+			zap.String("client_ip", c.ClientIP()),
+		}
+		if len(c.Errors) > 0 {
+			fields = append(fields, zap.String("gin_errors", c.Errors.String()))
+		}
+
+		if status >= http.StatusInternalServerError {
+			logger.Error("http request failed", fields...)
+			return
+		}
+		logger.Warn("http request rejected", fields...)
+	}
 }
 
 func loadAllowedCORSOrigins() map[string]struct{} {
