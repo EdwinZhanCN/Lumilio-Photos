@@ -5,5 +5,5 @@ allowBuilds:
 
 # Route transitive Vite/Vitest consumers through the Vite+ alpha packages.
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@latest
-  vitest: npm:@voidzero-dev/vite-plus-test@latest
+  vite: npm:@voidzero-dev/vite-plus-core@0.1.23
+  vitest: npm:@voidzero-dev/vite-plus-test@0.1.23

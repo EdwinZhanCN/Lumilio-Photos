@@ -732,29 +732,45 @@
       "disabled": "Lumilio Agent is disabled. Enable it in Settings > AI.",
       "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI."
     },
+    "board": {
+      "empty": "Nothing pinned yet. Ask Lumilio in the dock, then pin a result to keep it on this board.",
+      "remove": "Remove from board",
+      "unknownWidget": "Unknown widget type: {{type}}",
+      "untitled": "Untitled"
+    },
     "chat": {
       "confirmation": {
+        "approved": "Confirmed",
         "confirm": "Confirm",
+        "createAlbum_one": "Create album \"{{title}}\" with {{count}} photo?",
+        "createAlbum_other": "Create album \"{{title}}\" with {{count}} photos?",
+        "rejected": "Cancelled",
         "title": "Confirmation required"
       },
       "empty": "Start a conversation with Lumilio!",
+      "newConversation": "New conversation",
       "openAiSettings": "Open AI settings"
     },
+    "dock": {
+      "busy": "Working",
+      "collapse": "Collapse chat",
+      "conversation": "Conversation",
+      "expand": "Expand chat",
+      "ready": "Ready",
+      "replyCount_one": "{{count}} reply",
+      "replyCount_other": "{{count}} replies",
+      "subtitle": "drives the board",
+      "title": "Lumilio Agent",
+      "tokens": "tokens",
+      "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens"
+    },
     "input": {
-      "generating": "Generating response...",
-      "placeholderLabel": "Placeholder label",
-      "placeholderType": "Placeholder",
-      "prompt": "Ask Lumilio Agent... (Type @ or /)",
+      "prompt": "Ask Lumilio Agent...",
+      "send": "Send",
       "unavailable": "Lumilio Agent is unavailable."
     },
     "markdown": {
-      "code": {
-        "copied": "Copied",
-        "copy": "Copy",
-        "languageFallback": "text"
-      },
       "think": {
-        "defaultSummary": "Think about this...",
         "thinking": "Thinking...",
         "thoughtFor": "Thought for {{time}}s"
       }
@@ -762,16 +778,18 @@
     "messages": {
       "thinking": "Thinking..."
     },
-    "status": {
-      "loading": "Loading {{status}}"
-    },
     "tools": {
-      "error": "Error: {{error}}",
-      "eventNotFound": "Tool event not found.",
-      "openFullView": "Open full view",
-      "openMainGallery": "Open in main gallery view",
-      "resultsTitle": "{{toolName}} results",
-      "viewResults": "View results"
+      "emptyResult": "No matching photos",
+      "resultSet": "Result set"
+    },
+    "widgets": {
+      "pin": "Pin to board",
+      "pinned": "Pinned to board",
+      "pinUnavailable": "This widget's photos are unavailable.",
+      "refExpired": "These results have expired. Ask Lumilio to run the search again.",
+      "resultsTitle": "Photos from Lumilio",
+      "viewAll_one": "View all {{count}} photos",
+      "viewAll_other": "View all {{count}} photos"
     }
   },
   "manage": {
@@ -1004,10 +1022,10 @@
     "updates": "Updates"
   },
   "search": {
-    "degraded": "Top results are temporarily unavailable. Showing regular results instead.",
     "error": "Search is temporarily unavailable. Try again in a moment.",
     "loading": "Searching...",
     "results": "Results",
+    "semanticUnavailable": "Semantic search is temporarily unavailable; results may be less complete.",
     "topResults": "Top Results"
   },
   "settings": {

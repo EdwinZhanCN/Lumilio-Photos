@@ -7,9 +7,9 @@ import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import MapComponent from "@/components/MapComponent";
 import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
+import { formatCaptureTime } from "@/lib/utils/formatters";
 import type { Asset, PhotoSpecificMetadata } from "@/lib/http-commons";
 import { isPhotoMetadata } from "@/lib/http-commons";
-
 
 interface PhotoInfoViewProps {
   asset: Asset;
@@ -63,13 +63,12 @@ export default function PhotoInfoView({
   const fmt = (v: any, fallback = "-") =>
     v === undefined || v === null || v === "" ? fallback : v;
 
-  // Basic info
-  const takenTime = metadata.taken_time
-    ? new Date(metadata.taken_time).toLocaleString()
-    : asset?.upload_time
-      ? new Date(asset.upload_time).toLocaleString()
-      : undefined;
-  const takenDisplay = fmt(takenTime);
+  // Basic info — use top-level taken_time with capture_offset_minutes to display
+  // the time in the original capture timezone.
+  const takenTimeIso = asset?.taken_time || asset?.upload_time;
+  const takenDisplay = takenTimeIso
+    ? formatCaptureTime(takenTimeIso, asset?.capture_offset_minutes)
+    : "-";
   const mimeDisplay = fmt(asset?.mime_type);
   const filename = fmt(asset?.original_filename);
 
@@ -180,7 +179,9 @@ export default function PhotoInfoView({
               <div className="flex flex-wrap gap-2 items-center">
                 <p className="text-sm">{takenDisplay}</p>
                 <div className="text-xs text-info">{mimeDisplay}</div>
-                {isRaw && <div className="badge badge-xs badge-warning">{isRaw}</div>}
+                {isRaw && (
+                  <div className="badge badge-xs badge-warning">{isRaw}</div>
+                )}
               </div>
               <div className="flex gap-2 items-center mt-2">
                 <RatingComponent
@@ -263,7 +264,9 @@ export default function PhotoInfoView({
                     </div>
                   ) : (
                     locationName && (
-                      <div className="font-medium leading-tight">{locationName}</div>
+                      <div className="font-medium leading-tight">
+                        {locationName}
+                      </div>
                     )
                   )}
                 </div>

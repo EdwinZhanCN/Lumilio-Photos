@@ -818,6 +818,161 @@ func (q *Queries) GetAssetExifRaw(ctx context.Context, assetID pgtype.UUID) (jso
 	return exif_raw, err
 }
 
+const getAssetIDsUnified = `-- name: GetAssetIDsUnified :many
+
+SELECT a.asset_id
+FROM assets a
+WHERE a.is_deleted = false
+  AND ($1::text IS NULL OR a.original_filename ILIKE '%' || $1 || '%')
+  AND ($2::text IS NULL OR a.type = $2)
+  AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
+  AND ($4::integer IS NULL OR a.owner_id = $4)
+  AND ($5::uuid IS NULL OR a.repository_id = $5)
+  AND (
+    $6::text IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM asset_tags at
+      JOIN tags t ON t.tag_id = at.tag_id
+      WHERE at.asset_id = a.asset_id
+        AND t.tag_name = $6
+        AND ($7::text IS NULL OR at.source = $7)
+    )
+  )
+  AND (
+    $8::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = $8
+        AND fi_person.asset_id = a.asset_id
+    )
+  )
+  AND (
+    $9::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = $9
+    )
+  )
+  AND ($10::text IS NULL OR
+    CASE COALESCE($11::text, 'contains')
+      WHEN 'matches' THEN a.original_filename ILIKE $10
+      WHEN 'starts_with' THEN a.original_filename ILIKE $10 || '%'
+      WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $10
+      ELSE a.original_filename ILIKE '%' || $10 || '%'
+    END
+  )
+  AND ($12::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $12)
+  AND ($13::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $13)
+  AND ($14::boolean IS NULL OR
+    CASE
+      WHEN $14 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND ($15::integer IS NULL OR
+    CASE
+      WHEN $15 = 0 THEN a.rating IS NULL OR a.rating = 0
+      ELSE a.rating = $15
+    END
+  )
+  AND ($16::boolean IS NULL OR
+    CASE
+      WHEN $16 = false THEN a.liked IS NULL OR a.liked = false
+      ELSE a.liked = true
+    END
+  )
+  AND ($17::text IS NULL OR a.specific_metadata->>'camera_model' = $17)
+  AND ($18::text IS NULL OR a.specific_metadata->>'lens_model' = $18)
+  AND (
+    $19::text IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM location_cluster_assets lca
+      JOIN location_clusters lc ON lc.cluster_id = lca.cluster_id
+      WHERE lca.asset_id = a.asset_id
+        AND lc.search_vector @@ plainto_tsquery('simple', $19)
+    )
+  )
+ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+LIMIT $20
+`
+
+type GetAssetIDsUnifiedParams struct {
+	Query            *string            `db:"query" json:"query"`
+	AssetType        *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	TagName          *string            `db:"tag_name" json:"tag_name"`
+	TagSource        *string            `db:"tag_source" json:"tag_source"`
+	PersonID         *int32             `db:"person_id" json:"person_id"`
+	AlbumID          *int32             `db:"album_id" json:"album_id"`
+	FilenameVal      *string            `db:"filename_val" json:"filename_val"`
+	FilenameOperator *string            `db:"filename_operator" json:"filename_operator"`
+	DateFrom         pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo           pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw            *bool              `db:"is_raw" json:"is_raw"`
+	Rating           *int32             `db:"rating" json:"rating"`
+	Liked            *bool              `db:"liked" json:"liked"`
+	CameraModel      *string            `db:"camera_model" json:"camera_model"`
+	LensModel        *string            `db:"lens_model" json:"lens_model"`
+	Place            *string            `db:"place" json:"place"`
+	Limit            int32              `db:"limit" json:"limit"`
+}
+
+// ============================================================================
+// UNIFIED QUERY API
+// These queries consolidate List, Filter, and Search operations with shared WHERE logic
+// ============================================================================
+// Agent ref materialization: same filter semantics as GetAssetsUnified but
+// returns ordered asset ids only (capture time desc). The limit is the ref
+// snapshot cap; callers detect truncation by requesting cap+1.
+func (q *Queries) GetAssetIDsUnified(ctx context.Context, arg GetAssetIDsUnifiedParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, getAssetIDsUnified,
+		arg.Query,
+		arg.AssetType,
+		arg.AssetTypes,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.TagName,
+		arg.TagSource,
+		arg.PersonID,
+		arg.AlbumID,
+		arg.FilenameVal,
+		arg.FilenameOperator,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.Place,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var asset_id pgtype.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetStatsForOwner = `-- name: GetAssetStatsForOwner :one
 SELECT
   COUNT(*) as total_assets,
@@ -1781,7 +1936,6 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 }
 
 const getAssetsUnified = `-- name: GetAssetsUnified :many
-
 WITH page_ids AS MATERIALIZED (
   SELECT
     a.asset_id,
@@ -1917,10 +2071,6 @@ type GetAssetsUnifiedParams struct {
 	Limit            int32              `db:"limit" json:"limit"`
 }
 
-// ============================================================================
-// UNIFIED QUERY API
-// These queries consolidate List, Filter, and Search operations with shared WHERE logic
-// ============================================================================
 // Handles: listing, filename search, and all filtering
 // Use this for most queries unless semantic search is needed
 func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error) {

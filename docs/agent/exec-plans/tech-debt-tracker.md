@@ -3,6 +3,7 @@
 Keep this list short. Each item should have a concrete owner path and a reason it matters.
 
 - Docker image build is not currently verified in this workspace when the local Docker/Orbstack socket is unavailable.
+- **Lumilio Agent RichInput is temporarily offline.** The dock now uses a plain input under `web/src/features/lumilio/components/Chat`; restore mention/@people and slash injection from `web/src/features/lumilio/components/RichInput` after the agent ref workflow stabilizes.
 - **Desktop bundle: native binaries + signing not yet wired into a release.** The
   desktop module (`desktop/`) is code-complete and compiles, but packaging is
   unfinished and needs a macOS build host with staged binaries:

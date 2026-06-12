@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
+import { formatCaptureTime } from "@/lib/utils/formatters";
 import type { Asset, VideoSpecificMetadata } from "@/lib/http-commons";
 import { isVideoMetadata } from "@/lib/http-commons";
 
@@ -41,13 +42,12 @@ export default function VideoInfoView({
   const fmt = (v: any, fallback = "-") =>
     v === undefined || v === null || v === "" ? fallback : v;
 
-  // Basic info
-  const recordedTime = metadata.recorded_time
-    ? new Date(metadata.recorded_time).toLocaleString()
-    : asset?.upload_time
-      ? new Date(asset.upload_time).toLocaleString()
-      : undefined;
-  const recordedDisplay = fmt(recordedTime);
+  // Basic info — use top-level taken_time (which for videos = recorded_time)
+  // with capture_offset_minutes to display the time in the original capture timezone.
+  const recordedTimeIso = asset?.taken_time || asset?.upload_time;
+  const recordedDisplay = recordedTimeIso
+    ? formatCaptureTime(recordedTimeIso, asset?.capture_offset_minutes)
+    : "-";
   const mimeDisplay = fmt(asset?.mime_type);
   const filename = fmt(asset?.original_filename);
 
@@ -135,7 +135,9 @@ export default function VideoInfoView({
               <h1 className="font-sans font-bold">
                 {t("assets.basicInfo.title")}
               </h1>
-              <div className="badge badge-soft badge-info">{t("assets.videoInfoView.video_badge")}</div>
+              <div className="badge badge-soft badge-info">
+                {t("assets.videoInfoView.video_badge")}
+              </div>
             </div>
             <div className="flex gap-1">
               <button className="btn btn-circle btn-xs" disabled>
@@ -172,8 +174,12 @@ export default function VideoInfoView({
             {/* Video Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">
               <div className="px-3 py-2 space-y-1">
-                {cameraModel !== "-" && <p className="text-sm font-medium">{cameraModel}</p>}
-                <p className="text-xs opacity-70">{t("assets.videoInfoView.codec_label", { codec })}</p>
+                {cameraModel !== "-" && (
+                  <p className="text-sm font-medium">{cameraModel}</p>
+                )}
+                <p className="text-xs opacity-70">
+                  {t("assets.videoInfoView.codec_label", { codec })}
+                </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
                   <span>{resolution}</span>
                   <span>{duration}</span>
