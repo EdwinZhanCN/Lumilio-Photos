@@ -39,6 +39,7 @@ require (
 
 require (
 	github.com/chyroc/persistent-cookiejar v0.1.0 // indirect
+	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/mdns v1.0.6 // indirect
 )
@@ -150,4 +151,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/edwinzhancn/lumen-sdk => /Volumes/CodeBase/Projects/Lumen-SDK
+replace github.com/edwinzhancn/lumen-sdk => ../../Lumen-SDK

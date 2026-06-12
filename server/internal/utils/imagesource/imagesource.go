@@ -94,12 +94,7 @@ func ProcessMLImageTensorFromReader(reader io.Reader, purpose Purpose) (*MLImage
 }
 
 func ProcessMLImageTensorBytes(source []byte, purpose Purpose) (*MLImage, error) {
-	opts, err := mlOptions(purpose)
-	if err != nil {
-		return nil, err
-	}
-
-	rgb, err := imaging.ProcessImageRGBBytes(source, opts)
+	rgb, err := mlRGB(source, purpose)
 	if err != nil {
 		return nil, err
 	}
@@ -116,26 +111,29 @@ func ProcessMLImageTensorBytes(source []byte, purpose Purpose) (*MLImage, error)
 	}, nil
 }
 
-func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
+// mlRGB produces the HWC RGB uint8 pixels for an ML purpose. The semantic and
+// BioCLIP variants replicate the exact resize/crop semantics and resampling
+// kernels of the model contracts (validated by the Lumen tensor conformance
+// test) so the SDK tensor fast path can consume the pixels without another
+// decode.
+func mlRGB(source []byte, purpose Purpose) (*imaging.RGBImage, error) {
 	switch purpose {
-	case PurposeSemantic, PurposeBioClip:
-		return imaging.ProcessOptions{
-			Width:     224,
-			Height:    224,
-			Crop:      true,
-			Quality:   90,
-			Format:    vips.ImageTypeWEBP,
-			NoProfile: true,
-		}, nil
+	case PurposeSemantic:
+		// SigLIP: one direct bilinear resize to 224x224 (do_center_crop=false).
+		return imaging.DecodeRGBResizeExact(source, 224, 224, imaging.KernelBilinear)
+	case PurposeBioClip:
+		// BioCLIP follows CLIP preprocessing: bicubic shortest-edge resize,
+		// then center crop to 224x224.
+		return imaging.DecodeRGBShortestEdgeCenterCrop(source, 224, 224, imaging.KernelBicubic)
 	case PurposeOCR, PurposeFace:
-		return imaging.ProcessOptions{
+		return imaging.ProcessImageRGBBytes(source, imaging.ProcessOptions{
 			Width:     1920,
 			Height:    1920,
 			Quality:   90,
 			Format:    vips.ImageTypeWEBP,
 			NoProfile: true,
-		}, nil
+		})
 	default:
-		return imaging.ProcessOptions{}, fmt.Errorf("unsupported image purpose: %s", purpose)
+		return nil, fmt.Errorf("unsupported image purpose: %s", purpose)
 	}
 }
