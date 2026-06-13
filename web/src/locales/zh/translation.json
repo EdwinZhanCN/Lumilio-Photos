@@ -826,49 +826,8 @@
     "noLocationData": "无位置数据"
   },
   "monitor": {
-    "adminOnlyDescription": "队列监控与运行时诊断仅对管理员开放。",
+    "adminOnlyDescription": "处理活动与运行时诊断仅对管理员开放。",
     "adminOnlyTitle": "需要管理员权限",
-    "jobs": {
-      "attempts": "尝试 {{current}}/{{max}} 次",
-      "empty": "当前筛选条件下没有任务",
-      "fetchError": "获取任务失败",
-      "filters": {
-        "allQueues": "全部",
-        "queue": "队列",
-        "state": "状态",
-        "states": {
-          "all": "全部",
-          "available": "可执行",
-          "cancelled": "已取消",
-          "completed": "已完成",
-          "discarded": "已丢弃",
-          "retryable": "可重试",
-          "running": "运行中",
-          "scheduled": "已调度"
-        }
-      },
-      "labels": {
-        "created": "创建于",
-        "failed": "失败于",
-        "finished": "结束于",
-        "scheduled": "计划于",
-        "started": "开始于"
-      },
-      "loading": "正在加载任务...",
-      "pagination": {
-        "moreResults": "还有更多结果",
-        "totalJobs_one": "{{count}} 个任务",
-        "totalJobs_other": "{{count}} 个任务"
-      },
-      "timeAgoDays_one": "{{count}} 天前",
-      "timeAgoDays_other": "{{count}} 天前",
-      "timeAgoHours_one": "{{count}} 小时前",
-      "timeAgoHours_other": "{{count}} 小时前",
-      "timeAgoMinutes_one": "{{count}} 分钟前",
-      "timeAgoMinutes_other": "{{count}} 分钟前",
-      "timeAgoSeconds_one": "{{count}} 秒前",
-      "timeAgoSeconds_other": "{{count}} 秒前"
-    },
     "ml": {
       "bioAlbumCoverage": "生物图鉴相册覆盖率",
       "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
@@ -895,58 +854,182 @@
       },
       "remainingAssets": "剩余"
     },
-    "queues": {
-      "active": "活跃",
-      "activeCount_one": "{{count}} 个活跃队列",
-      "activeCount_other": "{{count}} 个活跃队列",
-      "empty": "暂无活跃队列",
-      "fetchError": "获取队列失败",
-      "idle": "空闲",
-      "loading": "正在加载队列...",
-      "timeAgoHours_one": "{{count}} 小时前",
-      "timeAgoHours_other": "{{count}} 小时前",
-      "timeAgoMinutes_one": "{{count}} 分钟前",
-      "timeAgoMinutes_other": "{{count}} 分钟前",
-      "timeAgoSeconds_one": "{{count}} 秒前",
-      "timeAgoSeconds_other": "{{count}} 秒前"
-    },
-    "sections": {
-      "activeQueues": "活跃队列",
-      "recentJobs": "最近任务"
+    "queueSummary": {
+      "copied": "已复制",
+      "copyError": "复制错误",
+      "emptyDescription": "当图库有后台处理任务时，会显示在这里。",
+      "emptyTitle": "当前没有需要关注的处理项",
+      "errorAttempt": "尝试 {{current}} / {{max}}",
+      "errorFallback": "没有记录错误信息。",
+      "errorStates": {
+        "cancelled": "已停止",
+        "discarded": "已停止",
+        "retryable": "将重试",
+        "unknown": "需要关注"
+      },
+      "fetchError": "加载处理活动失败。",
+      "kinds": {
+        "classify_zeroshot": "匹配已保存分类器",
+        "detect_stacks": "查找关联原片",
+        "discover_asset": "导入扫描发现的文件",
+        "ingest_asset": "导入上传文件",
+        "match_live_photo": "匹配 Live Photo",
+        "metadata_asset": "读取媒体信息",
+        "process_bioclip": "识别自然与物种",
+        "process_face": "识别人像",
+        "process_ocr": "识别图片文字",
+        "process_phash": "分析重复照片",
+        "process_semantic": "建立视觉搜索索引",
+        "rebuild_location_clusters": "刷新地点",
+        "reindex_assets": "重建 AI 索引",
+        "retry_asset": "重试媒体处理",
+        "scan_repository": "扫描图库文件夹",
+        "schedule_repository_scans": "安排图库扫描",
+        "thumbnail_asset": "生成预览图",
+        "transcode_asset": "准备可播放媒体"
+      },
+      "loading": "正在加载处理活动...",
+      "metrics": {
+        "attention": "需关注",
+        "averageLatency": "平均总耗时",
+        "averageRuntime": "平均处理耗时",
+        "latestActivity": "最近活动 {{value}}",
+        "notEnoughData": "—",
+        "oldestRemaining": "最早剩余 {{value}}",
+        "processed": "已处理",
+        "remaining": "剩余",
+        "total": "总数"
+      },
+      "noErrorSamples": "这个处理模块没有记录最近错误详情。",
+      "queues": {
+        "classify_zeroshot": {
+          "description": "在视觉索引完成后匹配已保存的分类相册。",
+          "name": "分类器匹配"
+        },
+        "default": {
+          "description": "照片图库的后台处理。"
+        },
+        "detect_stacks": {
+          "description": "查找 RAW+JPEG 以及相关媒体堆叠。",
+          "name": "堆叠检测"
+        },
+        "discover_asset": {
+          "description": "整理图库扫描时发现的文件。",
+          "name": "扫描发现"
+        },
+        "ingest_asset": {
+          "description": "安全地把上传媒体放入图库。",
+          "name": "导入"
+        },
+        "match_live_photo": {
+          "description": "配对 Apple Live Photo 的照片与视频文件。",
+          "name": "Live Photo 匹配"
+        },
+        "metadata_asset": {
+          "description": "读取 EXIF、拍摄时间、相机、位置和媒体信息。",
+          "name": "媒体信息"
+        },
+        "process_bioclip": {
+          "description": "在启用时添加自然与物种标签。",
+          "name": "自然识别"
+        },
+        "process_face": {
+          "description": "查找人脸并更新人物分组。",
+          "name": "人物识别"
+        },
+        "process_ocr": {
+          "description": "从图片中提取可搜索文字。",
+          "name": "文字识别"
+        },
+        "process_phash": {
+          "description": "计算用于重复照片检测的指纹。",
+          "name": "重复分析"
+        },
+        "process_semantic": {
+          "description": "建立用于搜索和 AI 整理的视觉向量。",
+          "name": "视觉搜索索引"
+        },
+        "rebuild_location_clusters": {
+          "description": "在媒体位置变化后刷新地点聚类。",
+          "name": "地点"
+        },
+        "reindex_assets": {
+          "description": "为已有照片补齐 AI 索引。",
+          "name": "AI 重建索引"
+        },
+        "retry_asset": {
+          "description": "在处理失败后重新尝试。",
+          "name": "重试"
+        },
+        "scan_repository": {
+          "description": "扫描图库文件夹中的新增、变更或移除文件。",
+          "name": "图库扫描"
+        },
+        "thumbnail_asset": {
+          "description": "生成图库各处使用的预览图。",
+          "name": "预览图"
+        },
+        "transcode_asset": {
+          "description": "为浏览器播放准备视频和音频版本。",
+          "name": "播放媒体"
+        }
+      },
+      "reviewErrors_one": "查看 {{count}} 个问题",
+      "reviewErrors_other": "查看 {{count}} 个问题",
+      "status": {
+        "idle": "空闲",
+        "needsAttention": "需要关注",
+        "pendingWork": "等待处理",
+        "settled": "安静",
+        "working": "处理中"
+      },
+      "subtitle": "按照片图库后台处理模块聚合。",
+      "time": {
+        "daysAgo_one": "{{count}} 天前",
+        "daysAgo_other": "{{count}} 天前",
+        "hoursAgo_one": "{{count}} 小时前",
+        "hoursAgo_other": "{{count}} 小时前",
+        "justNow": "刚刚",
+        "minutesAgo_one": "{{count}} 分钟前",
+        "minutesAgo_other": "{{count}} 分钟前",
+        "never": "从未"
+      },
+      "title": "处理活动",
+      "updated": "{{time}} 更新"
     },
     "stats": {
-      "activeJobs": "活跃任务",
+      "activeJobs": "待处理",
       "allHealthy": "状态正常",
-      "availableCount_one": "{{count}} 可用",
-      "availableCount_other": "{{count}} 可用",
-      "cancelledCount_one": "{{count}} 已取消",
-      "cancelledCount_other": "{{count}} 已取消",
-      "completed": "已完成",
-      "discardedCount_one": "{{count}} 已丢弃",
-      "discardedCount_other": "{{count}} 已丢弃",
+      "availableCount_one": "{{count}} 个等待处理",
+      "availableCount_other": "{{count}} 个等待处理",
+      "cancelledCount_one": "{{count}} 个已停止",
+      "cancelledCount_other": "{{count}} 个已停止",
+      "completed": "已处理",
+      "discardedCount_one": "{{count}} 个已停止",
+      "discardedCount_other": "{{count}} 个已停止",
       "fetchError": "获取队列统计失败",
-      "issues": "异常",
+      "issues": "需关注",
       "noData": "暂无数据",
       "noProcessedJobs": "暂无已处理任务",
-      "retryableCount_one": "{{count}} 可重试",
-      "retryableCount_other": "{{count}} 可重试",
-      "runningCount_one": "{{count}} 运行中",
-      "runningCount_other": "{{count}} 运行中",
-      "scheduledCount_one": "{{count}} 已调度",
-      "scheduledCount_other": "{{count}} 已调度",
+      "retryableCount_one": "{{count}} 个将重试",
+      "retryableCount_other": "{{count}} 个将重试",
+      "runningCount_one": "{{count}} 个处理中",
+      "runningCount_other": "{{count}} 个处理中",
+      "scheduledCount_one": "{{count}} 个稍后处理",
+      "scheduledCount_other": "{{count}} 个稍后处理",
       "successRate": "成功率 {{rate}}%"
     },
     "subtitles": {
       "capabilities": "ML 服务发现与 LLM Agent 运行状态",
       "ml": "ML 索引覆盖率与回填进度",
-      "queue": "实时任务队列监控"
+      "queue": "集中查看图库导入、预览图、AI 索引和后台整理进度"
     },
     "tabs": {
       "capabilities": "能力",
       "ml": "ML",
-      "queue": "队列"
+      "queue": "处理活动"
     },
-    "title": "服务器监控"
+    "title": "系统状态"
   },
   "navbar": {
     "agent": {

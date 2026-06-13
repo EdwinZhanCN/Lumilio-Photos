@@ -119,9 +119,7 @@ type SpeciesControllerInterface interface {
 
 // QueueControllerInterface defines the interface for queue monitoring controllers
 type QueueControllerInterface interface {
-	ListJobs(c *gin.Context)
-	GetJob(c *gin.Context)
-	ListQueues(c *gin.Context)
+	GetQueueSummary(c *gin.Context)
 	GetJobStats(c *gin.Context)
 }
 
@@ -441,9 +439,7 @@ func NewRouter(
 		{
 			river := admin.Group("/river")
 			{
-				river.GET("/jobs", queueController.ListJobs)
-				river.GET("/jobs/:id", queueController.GetJob)
-				river.GET("/queues", queueController.ListQueues)
+				river.GET("/queue-summary", queueController.GetQueueSummary)
 				river.GET("/stats", queueController.GetJobStats)
 			}
 		}

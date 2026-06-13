@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"server/config"
 
@@ -17,6 +18,8 @@ import (
 // ErrSystemAlreadyInitialized is returned when setup is attempted on a system
 // whose configuration payload already exists on disk.
 var ErrSystemAlreadyInitialized = errors.New("system already initialized")
+
+var setupInitializeMu sync.Mutex
 
 // generatedPasswordLength is the length of the high-entropy database password
 // minted during first-run bootstrapping.
@@ -85,6 +88,9 @@ func (s *SetupService) Status(_ context.Context) (SetupStatus, error) {
 // Initialize performs first-run bootstrapping. It is idempotent-by-refusal: a
 // second call once the password file exists returns ErrSystemAlreadyInitialized.
 func (s *SetupService) Initialize(ctx context.Context, _ SetupRequest) (SetupResult, error) {
+	setupInitializeMu.Lock()
+	defer setupInitializeMu.Unlock()
+
 	status, err := s.Status(ctx)
 	if err != nil {
 		return SetupResult{}, err

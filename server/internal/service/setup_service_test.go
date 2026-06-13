@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	"server/config"
@@ -119,6 +120,49 @@ func TestSetupService_Initialize_RotationFailureLeavesSystemUninitialized(t *tes
 	}
 	if status.Initialized {
 		t.Fatal("system must remain uninitialized after a failed setup")
+	}
+}
+
+func TestSetupService_Initialize_SerializesConcurrentCalls(t *testing.T) {
+	rotator := &fakeRotator{}
+	svc, _ := newTestSetupService(t, rotator)
+
+	const callers = 2
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			<-start
+			_, errs[index] = svc.Initialize(context.Background(), SetupRequest{})
+		}(i)
+	}
+
+	close(start)
+	wg.Wait()
+
+	successes := 0
+	alreadyInitialized := 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrSystemAlreadyInitialized):
+			alreadyInitialized++
+		default:
+			t.Fatalf("unexpected initialize error: %v", err)
+		}
+	}
+
+	if successes != 1 || alreadyInitialized != callers-1 {
+		t.Fatalf("expected one success and %d initialized refusals, got successes=%d initialized=%d errs=%v",
+			callers-1, successes, alreadyInitialized, errs)
+	}
+	if rotator.calls != 1 {
+		t.Fatalf("expected one password rotation, got %d", rotator.calls)
 	}
 }
 

@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/v1/admin/river/jobs": {
+    "/api/v1/admin/river/queue-summary": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,163 +12,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List jobs with filters
-         * @description Get a paginated list of jobs with optional state, queue, kind, and time range filters
+         * Get queue summaries
+         * @description Get aggregated processing activity per queue, including recent error samples
          */
         get: {
             parameters: {
                 query?: {
-                    /** @description Job state filter (available,scheduled,running,retryable,completed,cancelled,discarded) */
-                    state?: string;
-                    /** @description Queue name filter */
-                    queue?: string;
-                    /** @description Job kind filter */
-                    kind?: string;
-                    /** @description Number of jobs to return (default: 50, max: 200) */
-                    limit?: number;
-                    /** @description Pagination cursor for next page */
-                    cursor?: string;
-                    /** @description Time range filter (1h, 24h, 30d) - filters by created_at */
-                    time_range?: string;
-                    /** @description Include total count of matching jobs (may be slower) */
-                    include_count?: boolean;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/river/jobs/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get job by ID
-         * @description Get detailed information about a specific job
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Job ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Job not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/river/queues": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List all queues
-         * @description Get a list of all active queues with their metadata
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of queues to return (default: 100) */
-                    limit?: number;
+                    /** @description Recent error samples per queue (default: 5, max: 20) */
+                    error_limit?: number;
                 };
                 header?: never;
                 path?: never;
@@ -11490,27 +11341,6 @@ export interface components {
             count?: number;
             date?: string;
         };
-        "handler.JobDTO": {
-            args?: unknown;
-            attempt?: number;
-            attempted_at?: string;
-            created_at?: string;
-            errors?: string[];
-            finalized_at?: string;
-            id?: number;
-            kind?: string;
-            max_attempts?: number;
-            metadata?: unknown;
-            priority?: number;
-            queue?: string;
-            scheduled_at?: string;
-            state?: string;
-        };
-        "handler.JobListResponse": {
-            cursor?: string;
-            jobs?: components["schemas"]["handler.JobDTO"][];
-            total_count?: number;
-        };
         "handler.JobStatsResponse": {
             available?: number;
             cancelled?: number;
@@ -11520,13 +11350,34 @@ export interface components {
             running?: number;
             scheduled?: number;
         };
-        "handler.QueueStatsDTO": {
-            metadata?: unknown;
-            name?: string;
-            updated_at?: string;
+        "handler.QueueErrorSampleDTO": {
+            attempt?: number;
+            attempted_at?: string;
+            created_at?: string;
+            finalized_at?: string;
+            job_id?: number;
+            kind?: string;
+            last_error?: string;
+            max_attempts?: number;
+            scheduled_at?: string;
+            state?: string;
         };
-        "handler.QueueStatsResponse": {
-            queues?: components["schemas"]["handler.QueueStatsDTO"][];
+        "handler.QueueSummaryDTO": {
+            attention_jobs?: number;
+            average_latency_ms?: number;
+            average_runtime_ms?: number;
+            error_samples?: components["schemas"]["handler.QueueErrorSampleDTO"][];
+            latest_activity_at?: string;
+            name?: string;
+            oldest_remaining_at?: string;
+            processed_jobs?: number;
+            remaining_jobs?: number;
+            running_jobs?: number;
+            total_jobs?: number;
+        };
+        "handler.QueueSummaryResponse": {
+            generated_at?: string;
+            queues?: components["schemas"]["handler.QueueSummaryDTO"][];
         };
         "handler.TimeBucket": {
             count?: number;

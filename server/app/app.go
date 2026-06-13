@@ -270,7 +270,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	locationController := handler.NewLocationHandler(locationService, queueClient)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService)
-	queueController := handler.NewQueueHandler(queueClient, pgxPool)
+	queueController := handler.NewQueueHandler(pgxPool)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
