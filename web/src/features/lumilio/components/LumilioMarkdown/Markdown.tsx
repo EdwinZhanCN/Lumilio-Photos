@@ -1,105 +1,45 @@
-// 只剩最小核心组件
-import ReactMarkdown, { Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { CodeBlock, Img, Link, ThinkBlock } from "./MarkdownBlocks";
-import { MarkdownToolBlock } from "./MarkdownBlocks/ToolBlock.tsx";
+import { code } from "@streamdown/code";
+import { cjk } from "@streamdown/cjk";
+import { createMathPlugin } from "@streamdown/math";
+import { Streamdown, type Components } from "streamdown";
+import { Img, Link } from "./MarkdownBlocks";
 
-interface CustomComponents extends Partial<Components> {
-  "lumilio-tool"?: React.ComponentType<any>;
-  [key: string]: any; // 允许任意其他字符串键
-}
+const math = createMathPlugin({
+  singleDollarTextMath: true,
+  errorColor: "var(--color-error)",
+});
 
-// Create a custom sanitize schema that allows KaTeX elements
-const mathSafeSchema = {
-  ...defaultSchema,
-  attributes: {
-    ...defaultSchema.attributes,
-    span: [
-      ...(defaultSchema.attributes?.span || []),
-      "className",
-      "style",
-      ["className", /^katex/],
-    ],
-    div: [
-      ...(defaultSchema.attributes?.div || []),
-      "className",
-      "style",
-      ["className", /^katex/],
-    ],
-    annotation: ["encoding"],
-    math: ["display"],
-    semantics: [],
-    mrow: [],
-    mo: [],
-    mi: [],
-    mn: [],
-    mfrac: [],
-    msup: [],
-    msub: [],
-    msubsup: [],
-    munder: [],
-    mover: [],
-    munderover: [],
-    mtable: [],
-    mtr: [],
-    mtd: [],
-    mtext: [],
-    mspace: ["width"],
-    "lumilio-tool": ["id", "data-id", "className", "style"],
-  },
-  tagNames: [
-    ...(defaultSchema.tagNames || []),
-    "math",
-    "annotation",
-    "semantics",
-    "mrow",
-    "mo",
-    "mi",
-    "mn",
-    "mfrac",
-    "msup",
-    "msub",
-    "msubsup",
-    "munder",
-    "mover",
-    "munderover",
-    "mtable",
-    "mtr",
-    "mtd",
-    "mtext",
-    "mspace",
-    "lumilio-tool",
-  ],
-};
+const plugins = { code, cjk, math };
 
-const components: CustomComponents = {
-  code: CodeBlock,
+const components: Components = {
   img: Img,
   a: Link,
-  details: ThinkBlock,
-  "lumilio-tool": MarkdownToolBlock,
-  p: (props: any) => <div {...props} />,
+  p: (props) => <div {...props} />,
 };
+
+interface MarkdownProps {
+  content?: string;
+  className?: string;
+  isAnimating?: boolean;
+}
 
 export const Markdown = ({
   content = "",
   className = "text-base leading-relaxed",
-}) => (
-  <div className={className}>
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
-      rehypePlugins={[
-        rehypeRaw,
-        [rehypeKatex, { output: "mathml" }],
-        [rehypeSanitize, mathSafeSchema],
-      ]}
-      components={components}
-    >
-      {content}
-    </ReactMarkdown>
-  </div>
+  isAnimating = false,
+}: MarkdownProps) => (
+  <Streamdown
+    className={className}
+    components={components}
+    controls={{
+      code: { copy: true, download: false },
+      table: { copy: true, download: false, fullscreen: false },
+    }}
+    dir="auto"
+    isAnimating={isAnimating}
+    lineNumbers={false}
+    plugins={plugins}
+  >
+    {content}
+  </Streamdown>
 );

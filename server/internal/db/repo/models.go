@@ -109,6 +109,24 @@ type AgentCheckpoint struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type AgentPin struct {
+	PinID     pgtype.UUID        `db:"pin_id" json:"pin_id"`
+	UserID    int32              `db:"user_id" json:"user_id"`
+	Title     string             `db:"title" json:"title"`
+	Widget    string             `db:"widget" json:"widget"`
+	Mode      string             `db:"mode" json:"mode"`
+	Plan      []byte             `db:"plan" json:"plan"`
+	Summary   string             `db:"summary" json:"summary"`
+	AssetIds  []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
+	Truncated bool               `db:"truncated" json:"truncated"`
+	LayoutX   int32              `db:"layout_x" json:"layout_x"`
+	LayoutY   int32              `db:"layout_y" json:"layout_y"`
+	LayoutW   int32              `db:"layout_w" json:"layout_w"`
+	LayoutH   int32              `db:"layout_h" json:"layout_h"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Album struct {
 	AlbumID      int32              `db:"album_id" json:"album_id"`
 	UserID       int32              `db:"user_id" json:"user_id"`

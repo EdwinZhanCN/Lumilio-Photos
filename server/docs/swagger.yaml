@@ -170,6 +170,159 @@ components:
           example: alex
           type: string
       type: object
+    dto.AgentDateRangeDTO:
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+      type: object
+    dto.AgentFacetBucket:
+      properties:
+        bucket:
+          example: 2025-04
+          type: string
+        count:
+          example: 12
+          type: integer
+      type: object
+    dto.AgentNameCountDTO:
+      properties:
+        count:
+          example: 42
+          type: integer
+        name:
+          example: Kyoto
+          type: string
+      type: object
+    dto.AgentPinDTO:
+      properties:
+        count:
+          example: 24
+          type: integer
+        created_at:
+          type: string
+        layout:
+          $ref: '#/components/schemas/dto.AgentPinLayoutDTO'
+        mode:
+          enum:
+          - frozen
+          - live
+          example: frozen
+          type: string
+        pin_id:
+          example: 7d4df41e-9aa2-4d44-9a3d-111111111111
+          type: string
+        summary:
+          type: string
+        title:
+          example: Kyoto 2025
+          type: string
+        truncated:
+          type: boolean
+        widget:
+          example: asset_grid
+          type: string
+      type: object
+    dto.AgentPinLayoutDTO:
+      properties:
+        h:
+          example: 4
+          type: integer
+        w:
+          example: 4
+          type: integer
+        x:
+          example: 0
+          type: integer
+        "y":
+          example: 0
+          type: integer
+      type: object
+    dto.AgentPinLayoutItemDTO:
+      properties:
+        h:
+          type: integer
+        pin_id:
+          type: string
+        w:
+          type: integer
+        x:
+          type: integer
+        "y":
+          type: integer
+      required:
+      - pin_id
+      type: object
+    dto.AgentRefAssetsDTO:
+      properties:
+        assets:
+          items:
+            $ref: '#/components/schemas/dto.AssetDTO'
+          type: array
+          uniqueItems: false
+        pagination:
+          $ref: '#/components/schemas/dto.PaginationDTO'
+        total:
+          example: 97
+          type: integer
+      type: object
+    dto.AgentRefDTO:
+      properties:
+        count:
+          example: 97
+          type: integer
+        created_at:
+          type: string
+        facets:
+          $ref: '#/components/schemas/dto.AgentRefFacetsDTO'
+        op:
+          example: combine
+          type: string
+        ref_id:
+          example: r3_kyoto
+          type: string
+        truncated:
+          type: boolean
+      type: object
+    dto.AgentRefFacetsDTO:
+      properties:
+        cameras:
+          items:
+            $ref: '#/components/schemas/dto.AgentNameCountDTO'
+          type: array
+          uniqueItems: false
+        count:
+          type: integer
+        date_range:
+          $ref: '#/components/schemas/dto.AgentDateRangeDTO'
+        histogram:
+          items:
+            $ref: '#/components/schemas/dto.AgentFacetBucket'
+          type: array
+          uniqueItems: false
+        liked_count:
+          type: integer
+        rating_dist:
+          items:
+            type: integer
+          type: array
+          uniqueItems: false
+        top_people:
+          items:
+            $ref: '#/components/schemas/dto.AgentNameCountDTO'
+          type: array
+          uniqueItems: false
+        top_places:
+          items:
+            $ref: '#/components/schemas/dto.AgentNameCountDTO'
+          type: array
+          uniqueItems: false
+        types:
+          additionalProperties:
+            type: integer
+          type: object
+      type: object
     dto.AssetDTO:
       properties:
         asset_id:
@@ -547,58 +700,6 @@ components:
           example: 3
           type: integer
       type: object
-    dto.BulkLikeUpdateDTO:
-      properties:
-        action:
-          description: 'Action performed: "like" or "unlike"'
-          enum:
-          - like
-          - unlike
-          example: like
-          type: string
-        description:
-          description: Human-readable description
-          example: 'Bulk like: 98/100 successful'
-          type: string
-        failed:
-          description: Number of failed updates
-          example: 2
-          minimum: 0
-          type: integer
-        failed_asset_ids:
-          description: List of asset IDs that failed to update (only present when
-            Failed > 0)
-          example:
-          - 550e8400-e29b-41d4-a716-446655440000
-          - 660e8400-e29b-41d4-a716-446655440001
-          items:
-            type: string
-          type: array
-          uniqueItems: false
-        liked:
-          description: The like status that was applied (true = liked, false = unliked)
-          example: true
-          type: boolean
-        ref_id:
-          description: Reference ID for this result (can be used in subsequent tool
-            calls)
-          example: ref_1234567890
-          type: string
-        success:
-          description: Number of successfully updated assets
-          example: 98
-          minimum: 0
-          type: integer
-        timestamp:
-          description: Timestamp when the operation completed
-          example: "2026-01-18T19:34:00Z"
-          type: string
-        total:
-          description: Total number of assets in the batch
-          example: 100
-          minimum: 0
-          type: integer
-      type: object
     dto.CapabilitiesResponseDTO:
       properties:
         llm:
@@ -797,6 +898,28 @@ components:
         type:
           example: email
           type: string
+      type: object
+    dto.CreateAgentPinRequest:
+      properties:
+        layout:
+          $ref: '#/components/schemas/dto.AgentPinLayoutDTO'
+        mode:
+          enum:
+          - frozen
+          - live
+          type: string
+        ref_id:
+          type: string
+        thread_id:
+          type: string
+        title:
+          type: string
+        widget:
+          example: asset_grid
+          type: string
+      required:
+      - ref_id
+      - thread_id
       type: object
     dto.CreateAlbumRequestDTO:
       properties:
@@ -2399,6 +2522,16 @@ components:
         setup_token:
           type: string
       type: object
+    dto.UpdateAgentPinLayoutRequest:
+      properties:
+        layouts:
+          items:
+            $ref: '#/components/schemas/dto.AgentPinLayoutItemDTO'
+          type: array
+          uniqueItems: false
+      required:
+      - layouts
+      type: object
     dto.UpdateAlbumRequestDTO:
       properties:
         album_name:
@@ -2641,11 +2774,6 @@ components:
           type: string
         thread_id:
           type: string
-        tool_names:
-          items:
-            type: string
-          type: array
-          uniqueItems: false
       required:
       - query
       type: object
@@ -2832,11 +2960,6 @@ components:
         name:
           type: string
       type: object
-    handler.ToolSchemaResponse:
-      properties:
-        bulk_like_update_example:
-          $ref: '#/components/schemas/dto.BulkLikeUpdateDTO'
-      type: object
   securitySchemes:
     BearerAuth:
       description: Type "Bearer" followed by a space and JWT token.
@@ -2970,6 +3093,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Invalid request
+        "401":
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
         "500":
           content:
             text/event-stream:
@@ -3007,6 +3136,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Invalid request
+        "401":
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
         "500":
           content:
             text/event-stream:
@@ -3016,9 +3151,9 @@ paths:
       summary: Resume Agent Chat
       tags:
       - agent
-  /api/v1/agent/schemas:
+  /api/v1/agent/pins:
     get:
-      description: Get all DTO schemas used by agent tools for type reference
+      description: List all pinned widgets for the current user, in creation order.
       responses:
         "200":
           content:
@@ -3046,7 +3181,334 @@ paths:
                     type: string
                 type: object
           description: OK
-      summary: Get Agent Tool DTO Schemas
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
+      summary: List Agent Pins
+      tags:
+      - agent
+    post:
+      description: Copy a session ref into a durable board widget. Live mode replays
+        the producing plan on hydration when replayable; otherwise the pin freezes
+        the snapshot.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.CreateAgentPinRequest'
+                description: Pin request
+                summary: request
+        description: Pin request
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Invalid request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Ref not found
+      summary: Pin an Agent Ref
+      tags:
+      - agent
+  /api/v1/agent/pins/{id}:
+    delete:
+      description: Remove a pinned widget from the board.
+      parameters:
+      - description: Pin ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: OK
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Pin not found
+      summary: Delete Agent Pin
+      tags:
+      - agent
+  /api/v1/agent/pins/{id}/assets:
+    get:
+      description: Get a page of assets for a pinned widget. Frozen pins serve the
+        stored snapshot; live pins replay their plan.
+      parameters:
+      - description: Pin ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        schema:
+          type: integer
+      - description: Page offset (default 0)
+        in: query
+        name: offset
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: OK
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Pin not found
+      summary: Get Agent Pin Assets
+      tags:
+      - agent
+  /api/v1/agent/pins/layout:
+    patch:
+      description: Persist the board grid placement for one or more pins.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateAgentPinLayoutRequest'
+                description: Layout updates
+                summary: request
+        description: Layout updates
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Invalid request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
+      summary: Update Agent Pin Layout
+      tags:
+      - agent
+  /api/v1/agent/refs/{id}:
+    get:
+      description: Get metadata and facet summary for an agent ref. Refs are scoped
+        to the requesting user and thread.
+      parameters:
+      - description: Ref ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - description: Thread (conversation) the ref belongs to
+        in: query
+        name: thread_id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: OK
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Ref not found
+      summary: Get Agent Ref Metadata
+      tags:
+      - agent
+  /api/v1/agent/refs/{id}/assets:
+    get:
+      description: Get a page of assets for an agent ref, in snapshot order.
+      parameters:
+      - description: Ref ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - description: Thread (conversation) the ref belongs to
+        in: query
+        name: thread_id
+        required: true
+        schema:
+          type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        schema:
+          type: integer
+      - description: Page offset (default 0)
+        in: query
+        name: offset
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: OK
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Unauthorized
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Ref not found
+      summary: Get Agent Ref Assets
       tags:
       - agent
   /api/v1/agent/tools:

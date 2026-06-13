@@ -128,7 +128,10 @@ const EMPTY_PHOTO_SEARCH_VIEW_RESULT: PhotoSearchViewResult = {
   topResultsMeta: DEFAULT_TOP_RESULTS_META,
 };
 
-const TOP_RESULTS_LIMIT = 200;
+// Apple Photos-style two-tier search: Top Results is a small, high-precision
+// showcase (aggregate relevance order); the Results tier below carries the
+// full relevance set sorted by capture time.
+const TOP_RESULTS_LIMIT = 9;
 const DEFAULT_ASSET_TYPES: AssetMediaType[] = ["photos", "videos"];
 
 const getApiMimeTypes = (

@@ -3,13 +3,16 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/config"
+	"server/internal/agent/ref"
 	"server/internal/db/repo"
 	"server/internal/llm"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/adk/middlewares/summarization"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
@@ -20,17 +23,14 @@ type LLMConfigProvider interface {
 }
 
 type AgentService interface {
-	// AskAgent 执行 Agent 查询或开启新会话
-	AskAgent(ctx context.Context, threadID, query string, toolNames []string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
+	// AskAgent 执行 Agent 查询或开启新会话。userID 与 threadID 共同构成 ref 作用域（INV-4）。
+	AskAgent(ctx context.Context, userID int32, threadID, query string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
 
 	// ResumeAgent 恢复中断的会话
-	ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error)
+	ResumeAgent(ctx context.Context, userID int32, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error)
 
 	// GetAvailableTools 列出所有可用工具
 	GetAvailableTools() []*schema.ToolInfo
-
-	// AskLLM 直接与 LLM 交互，不使用任何工具
-	AskLLM(ctx context.Context, query string) (resp string, err error)
 }
 
 type agentService struct {
@@ -38,19 +38,20 @@ type agentService struct {
 	registry       *ToolRegistry
 	configProvider LLMConfigProvider
 	store          *PostgresStore
+	refStore       ref.Store
+	search         RetrieverSearch
+	conversations  *ConversationStore
 }
 
-func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider) AgentService {
-	// 注册核心工具
-	// 注意：在实际启动时应该统一注册
-	// tools.RegisterFilterAsset()
-	// tools.RegisterBulkLikeTool()
-
+func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider, refStore ref.Store, search RetrieverSearch, conversations *ConversationStore) AgentService {
 	return &agentService{
 		queries:        queries,
 		registry:       GetRegistry(),
 		configProvider: configProvider,
-		store:          NewPostgresStore(queries), // 初始化 Store
+		store:          NewPostgresStore(queries),
+		refStore:       refStore,
+		search:         search,
+		conversations:  conversations,
 	}
 }
 
@@ -67,78 +68,127 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 	return llm.NewChatModel(ctx, cfg)
 }
 
-// buildAgent 是一个辅助方法，用于构建 Agent 实例。
-// AskAgent 和 ResumeAgent 都需要使用完全相同的配置来构建 Agent，因此将此逻辑提取出来。
-func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
-	// 1. 准备工具依赖
+// buildAgent 构建 Agent 实例。AskAgent 和 ResumeAgent 必须使用完全相同的配置
+// （全量工具集），否则 checkpoint 恢复后工具集对不齐。
+func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
 	deps := &ToolDependencies{
 		Queries:     s.queries,
 		SideChannel: sideChannel,
-	}
-	deps.ReferenceManager = NewReferenceManager(deps)
-
-	// 2. 默认或按需加载工具
-	if len(toolNames) == 0 {
-		toolNames = []string{"filter_assets", "bulk_like_assets"}
+		RefStore:    s.refStore,
+		Search:      s.search,
+		UserID:      userID,
+		ThreadID:    threadID,
 	}
 
-	tools, err := s.registry.GetTools(ctx, toolNames, deps)
+	tools, err := s.registry.GetAllTools(ctx, deps)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tools: %w", err)
 	}
 
-	// 3. 创建 ChatModel
 	chatModel, err := s.newChatModel(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat model: %w", err)
 	}
 
-	// 4. 构建 Agent
-	// Time with weekdays
+	// Summarization compacts the conversation in place once it crosses the
+	// token budget; the session middleware then writes the (possibly
+	// compacted) state back to the conversation store, so long threads stay
+	// bounded without losing the recent exchange. Ref handles survive
+	// compaction by construction — the ledger is rebuilt into the
+	// instruction every turn from the ref store, not from messages.
+	summarizer, err := summarization.New(ctx, &summarization.Config{
+		Model:   chatModel,
+		Trigger: &summarization.TriggerCondition{ContextTokens: summarizeTriggerTokens},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create summarization middleware: %w", err)
+	}
+
+	session := &sessionMiddleware{
+		store:    s.conversations,
+		userID:   userID,
+		threadID: threadID,
+		onUsage: func(usage *schema.TokenUsage) {
+			if sideChannel == nil || usage == nil {
+				return
+			}
+			deps.Send(&SideChannelEvent{
+				Type:      EventTypeTokenUsage,
+				Timestamp: time.Now().UnixMilli(),
+				Usage: &TokenUsageInfo{
+					PromptTokens:     usage.PromptTokens,
+					CompletionTokens: usage.CompletionTokens,
+					TotalTokens:      usage.TotalTokens,
+				},
+			})
+		},
+	}
+
 	t := time.Now()
 	today := fmt.Sprintf("%s, %s", t.Weekday().String(), t.Format("2006-01-02"))
+	ledger := s.refStore.List(ref.Scope{UserID: userID, ThreadID: threadID})
 	return adk.NewChatModelAgent(
 		ctx,
 		&adk.ChatModelAgentConfig{
 			Name:        "Photo Asset Assistant",
 			Description: "Agent for managing photo assets with filtering and search capabilities",
-			Instruction: fmt.Sprintf("You are a helpful assistant for managing photo assets. Today is %s. "+
-				"You can use tools to help the user. You cannot tell user anything about ref_id", today),
-			Model: chatModel,
+			Instruction: buildInstruction(today, ledger),
+			Model:       chatModel,
 			ToolsConfig: adk.ToolsConfig{
 				ToolsNodeConfig: compose.ToolsNodeConfig{
 					Tools: tools,
 				},
 			},
+			Handlers: []adk.ChatModelAgentMiddleware{summarizer, session},
 		},
 	)
 }
 
-func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, err error) {
-	cm, err := s.newChatModel(ctx)
-	if err != nil {
-		return "", fmt.Errorf("create chat model error: %w", err)
-	}
+// summarizeTriggerTokens is the context budget before the conversation is
+// compacted. Conservative relative to common local-model windows; promote to
+// an LLM settings knob when per-deployment tuning is needed.
+const summarizeTriggerTokens = 60000
 
-	input := []*schema.Message{
-		schema.SystemMessage("You are a helpful assistant that should respond to user with their language unless specified."),
-		schema.UserMessage(query),
-	}
+// buildInstruction states the ref discipline the model must follow: act
+// through refs, verify counts, never recite internal ids or asset data.
+// The ref ledger (one line per active ref) is rebuilt every turn from the
+// store, so resumed conversations keep their handles without the model
+// having to remember them.
+func buildInstruction(today string, ledger []*ref.Ref) string {
+	instruction := fmt.Sprintf(
+		"You are a helpful assistant for managing the user's photo library. Today is %s.\n"+
+			"Tools return refs: server-side handles like r3_kyoto that stand for a set of photos. "+
+			"Always pass refs between tools instead of describing photos; check the count in each tool receipt before acting on a ref, "+
+			"and tell the user when a result is empty. "+
+			"Use the show tool to display results to the user — never enumerate photos in text. "+
+			"Never mention ref ids or other internal identifiers to the user; speak about results in plain language. "+
+			"Respond in the user's language.",
+		today,
+	)
 
-	response, err := cm.Generate(ctx, input)
-	if err != nil {
-		return "", fmt.Errorf("ask llm error: %w", err)
+	if len(ledger) > 0 {
+		var b strings.Builder
+		b.WriteString(instruction)
+		b.WriteString("\n\nActive refs from earlier in this conversation:\n")
+		for _, r := range ledger {
+			summary := r.Summary
+			if summary == "" {
+				summary = r.Plan.Op
+			}
+			fmt.Fprintf(&b, "- %s: %d assets — %s\n", r.ID, r.Count(), summary)
+		}
+		return b.String()
 	}
-	return response.Content, nil
+	return instruction
 }
 
-func (s *agentService) AskAgent(ctx context.Context, threadID, query string, toolNames []string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
+func (s *agentService) AskAgent(ctx context.Context, userID int32, threadID, query string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
 	var sideChannel chan<- *SideChannelEvent
 	if len(sideChannels) > 0 && sideChannels[0] != nil {
 		sideChannel = sideChannels[0]
 	}
 
-	agent, err := s.buildAgent(ctx, toolNames, sideChannel)
+	agent, err := s.buildAgent(ctx, userID, threadID, sideChannel)
 	if err != nil {
 		// 在异步迭代器中返回错误
 		iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
@@ -153,31 +203,30 @@ func (s *agentService) AskAgent(ctx context.Context, threadID, query string, too
 		CheckPointStore: s.store, // 注入 Store，开启自动存档
 	})
 
-	// 执行时绑定 threadID (即 CheckPointID)
-	return runner.Query(ctx, query, adk.WithCheckPointID(threadID))
+	// Multi-turn: replay the thread's history plus the new user message.
+	// Query() would start a blank conversation every turn — the model would
+	// never see prior exchanges. History comes back via sessionMiddleware.
+	messages := append(s.conversations.Messages(userID, threadID), schema.UserMessage(query))
+	return runner.Run(ctx, messages, adk.WithCheckPointID(threadID))
 }
 
-func (s *agentService) ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error) {
+func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error) {
 	var sideChannel chan<- *SideChannelEvent
 	if len(sideChannels) > 0 && sideChannels[0] != nil {
 		sideChannel = sideChannels[0]
 	}
 
-	// 1. 重建 Agent (配置必须与 AskAgent 完全一致！)
-	// 注意：toolNames 必须为空，以便 buildAgent 加载所有默认工具，确保与原始会话的工具集匹配
-	agent, err := s.buildAgent(ctx, []string{}, sideChannel)
+	agent, err := s.buildAgent(ctx, userID, threadID, sideChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build agent for resume: %w", err)
 	}
 
-	// 2. 创建 Runner
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{
 		Agent:           agent,
 		EnableStreaming: true,
 		CheckPointStore: s.store,
 	})
 
-	// 3. 调用 Resume
 	// Eino 会自动从 Postgres 加载 data -> 反序列化 -> 填充 Session
 	iter, err := runner.ResumeWithParams(ctx, threadID, params)
 	if err != nil {

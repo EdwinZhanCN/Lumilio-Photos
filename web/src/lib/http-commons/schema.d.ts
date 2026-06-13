@@ -174,6 +174,15 @@ export interface paths {
                         "text/event-stream": components["schemas"]["api.Result"];
                     };
                 };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -236,6 +245,15 @@ export interface paths {
                         "text/event-stream": components["schemas"]["api.Result"];
                     };
                 };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -253,7 +271,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/agent/schemas": {
+    "/api/v1/agent/pins": {
         parameters: {
             query?: never;
             header?: never;
@@ -261,8 +279,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Agent Tool DTO Schemas
-         * @description Get all DTO schemas used by agent tools for type reference
+         * List Agent Pins
+         * @description List all pinned widgets for the current user, in creation order.
          */
         get: {
             parameters: {
@@ -298,6 +316,459 @@ export interface paths {
                              */
                             message?: string;
                         } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Pin an Agent Ref
+         * @description Copy a session ref into a durable board widget. Live mode replays the producing plan on hydration when replayable; otherwise the pin freezes the snapshot.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Pin request */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.CreateAgentPinRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Ref not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/pins/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Agent Pin
+         * @description Remove a pinned widget from the board.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/pins/{id}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Pin Assets
+         * @description Get a page of assets for a pinned widget. Frozen pins serve the stored snapshot; live pins replay their plan.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Page size (default 50, max 200) */
+                    limit?: number;
+                    /** @description Page offset (default 0) */
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/pins/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Agent Pin Layout
+         * @description Persist the board grid placement for one or more pins.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Layout updates */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAgentPinLayoutRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/agent/refs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Ref Metadata
+         * @description Get metadata and facet summary for an agent ref. Refs are scoped to the requesting user and thread.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Thread (conversation) the ref belongs to */
+                    thread_id: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Ref ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Ref not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/refs/{id}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Ref Assets
+         * @description Get a page of assets for an agent ref, in snapshot order.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Thread (conversation) the ref belongs to */
+                    thread_id: string;
+                    /** @description Page size (default 50, max 200) */
+                    limit?: number;
+                    /** @description Page offset (default 0) */
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Ref ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Ref not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
                     };
                 };
             };
@@ -9856,6 +10327,88 @@ export interface components {
             /** @example alex */
             username?: string;
         };
+        "dto.AgentDateRangeDTO": {
+            from?: string;
+            to?: string;
+        };
+        "dto.AgentFacetBucket": {
+            /** @example 2025-04 */
+            bucket?: string;
+            /** @example 12 */
+            count?: number;
+        };
+        "dto.AgentNameCountDTO": {
+            /** @example 42 */
+            count?: number;
+            /** @example Kyoto */
+            name?: string;
+        };
+        "dto.AgentPinDTO": {
+            /** @example 24 */
+            count?: number;
+            created_at?: string;
+            layout?: components["schemas"]["dto.AgentPinLayoutDTO"];
+            /**
+             * @example frozen
+             * @enum {string}
+             */
+            mode?: "frozen" | "live";
+            /** @example 7d4df41e-9aa2-4d44-9a3d-111111111111 */
+            pin_id?: string;
+            summary?: string;
+            /** @example Kyoto 2025 */
+            title?: string;
+            truncated?: boolean;
+            /** @example asset_grid */
+            widget?: string;
+        };
+        "dto.AgentPinLayoutDTO": {
+            /** @example 4 */
+            h?: number;
+            /** @example 4 */
+            w?: number;
+            /** @example 0 */
+            x?: number;
+            /** @example 0 */
+            y?: number;
+        };
+        "dto.AgentPinLayoutItemDTO": {
+            h?: number;
+            pin_id: string;
+            w?: number;
+            x?: number;
+            y?: number;
+        };
+        "dto.AgentRefAssetsDTO": {
+            assets?: components["schemas"]["dto.AssetDTO"][];
+            pagination?: components["schemas"]["dto.PaginationDTO"];
+            /** @example 97 */
+            total?: number;
+        };
+        "dto.AgentRefDTO": {
+            /** @example 97 */
+            count?: number;
+            created_at?: string;
+            facets?: components["schemas"]["dto.AgentRefFacetsDTO"];
+            /** @example combine */
+            op?: string;
+            /** @example r3_kyoto */
+            ref_id?: string;
+            truncated?: boolean;
+        };
+        "dto.AgentRefFacetsDTO": {
+            cameras?: components["schemas"]["dto.AgentNameCountDTO"][];
+            count?: number;
+            date_range?: components["schemas"]["dto.AgentDateRangeDTO"];
+            histogram?: components["schemas"]["dto.AgentFacetBucket"][];
+            liked_count?: number;
+            rating_dist?: number[];
+            top_people?: components["schemas"]["dto.AgentNameCountDTO"][];
+            top_places?: components["schemas"]["dto.AgentNameCountDTO"][];
+            types?: {
+                [key: string]: number;
+            };
+        };
         "dto.AssetDTO": {
             asset_id?: string;
             capture_offset_minutes?: number;
@@ -10073,57 +10626,6 @@ export interface components {
             /** @example 3 */
             stack_size?: number;
         };
-        "dto.BulkLikeUpdateDTO": {
-            /**
-             * @description Action performed: "like" or "unlike"
-             * @example like
-             * @enum {string}
-             */
-            action?: "like" | "unlike";
-            /**
-             * @description Human-readable description
-             * @example Bulk like: 98/100 successful
-             */
-            description?: string;
-            /**
-             * @description Number of failed updates
-             * @example 2
-             */
-            failed?: number;
-            /**
-             * @description List of asset IDs that failed to update (only present when Failed > 0)
-             * @example [
-             *       "550e8400-e29b-41d4-a716-446655440000",
-             *       "660e8400-e29b-41d4-a716-446655440001"
-             *     ]
-             */
-            failed_asset_ids?: string[];
-            /**
-             * @description The like status that was applied (true = liked, false = unliked)
-             * @example true
-             */
-            liked?: boolean;
-            /**
-             * @description Reference ID for this result (can be used in subsequent tool calls)
-             * @example ref_1234567890
-             */
-            ref_id?: string;
-            /**
-             * @description Number of successfully updated assets
-             * @example 98
-             */
-            success?: number;
-            /**
-             * @description Timestamp when the operation completed
-             * @example 2026-01-18T19:34:00Z
-             */
-            timestamp?: string;
-            /**
-             * @description Total number of assets in the batch
-             * @example 100
-             */
-            total?: number;
-        };
         "dto.CapabilitiesResponseDTO": {
             llm?: components["schemas"]["dto.LLMCapabilitiesDTO"];
             ml?: components["schemas"]["dto.MLCapabilitiesDTO"];
@@ -10229,6 +10731,16 @@ export interface components {
             required?: boolean;
             /** @example email */
             type?: string;
+        };
+        "dto.CreateAgentPinRequest": {
+            layout?: components["schemas"]["dto.AgentPinLayoutDTO"];
+            /** @enum {string} */
+            mode?: "frozen" | "live";
+            ref_id: string;
+            thread_id: string;
+            title?: string;
+            /** @example asset_grid */
+            widget?: string;
         };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
@@ -11176,6 +11688,9 @@ export interface components {
             secret?: string;
             setup_token?: string;
         };
+        "dto.UpdateAgentPinLayoutRequest": {
+            layouts: components["schemas"]["dto.AgentPinLayoutItemDTO"][];
+        };
         "dto.UpdateAlbumRequestDTO": {
             album_name?: string;
             /** @enum {string} */
@@ -11302,7 +11817,6 @@ export interface components {
         "handler.AgentChatRequest": {
             query: string;
             thread_id?: string;
-            tool_names?: string[];
         };
         "handler.AgentResumeRequest": {
             targets: {
@@ -11394,9 +11908,6 @@ export interface components {
                 [key: string]: unknown;
             };
             name?: string;
-        };
-        "handler.ToolSchemaResponse": {
-            bulk_like_update_example?: components["schemas"]["dto.BulkLikeUpdateDTO"];
         };
     };
     responses: never;

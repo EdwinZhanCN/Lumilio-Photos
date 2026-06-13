@@ -14,7 +14,6 @@ import Duplicates from "@/features/collections/routes/Duplicates";
 import UtilityClassifierAlbum from "@/features/collections/routes/UtilityClassifierAlbum";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
-import { AssetsProvider } from "@/features/assets";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import MFAPage from "@/features/auth/routes/MFAPage.tsx";
 import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
@@ -146,11 +145,7 @@ export const appRoutes = [
   },
   {
     path: "/lumilio",
-    element: (
-      <AssetsProvider scopeId="lumilio">
-        <LumilioChatPage />
-      </AssetsProvider>
-    ),
+    element: <LumilioChatPage />,
   },
   // {
   //   path: "/portfolio",

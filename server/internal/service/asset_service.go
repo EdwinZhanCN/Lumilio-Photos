@@ -100,6 +100,13 @@ type AssetService interface {
 	SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error)
 	SearchBrowseItems(ctx context.Context, params SearchAssetsParams) (SearchBrowseResult, error)
 	QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error)
+
+	// Single-retriever set search (agent producer path and the search Results
+	// tier). The semantic channel applies a per-query calibrated relevance
+	// cutoff instead of fixed TopK; the OCR channel is naturally thresholded
+	// by tsquery matching. Rankings are the retrievers' own orders.
+	SearchAssetIDsSemantic(ctx context.Context, query string, strictness aggregatesearch.SetStrictness, maxResults int) ([]uuid.UUID, aggregatesearch.SetMeta, error)
+	SearchAssetIDsOCR(ctx context.Context, query string, maxResults int) ([]uuid.UUID, error)
 }
 
 // QueryAssetsParams contains all parameters for the unified asset query
@@ -205,14 +212,19 @@ type PhotoMapPoint struct {
 }
 
 type assetService struct {
-	queries                          *repo.Queries
-	pool                             *pgxpool.Pool
-	lumen                            LumenService
-	repoManager                      *storage.RepositoryManager
-	embeddingService                 EmbeddingService
-	aggregateSearch                  aggregatesearch.Service
-	queryAssetsUnifiedFn             func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
-	searchAssetsSemanticTopResultsFn func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta)
+	queries                *repo.Queries
+	pool                   *pgxpool.Pool
+	lumen                  LumenService
+	repoManager            *storage.RepositoryManager
+	embeddingService       EmbeddingService
+	aggregateSearch        aggregatesearch.Service
+	semanticRetriever      *aggregatesearch.EmbeddingRetriever
+	ocrRetriever           *aggregatesearch.TextRetriever
+	placeRetriever         *aggregatesearch.TextRetriever
+	queryAssetsUnifiedFn   func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
+	searchAssetsFusedSetFn func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool)
+	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID) ([]repo.Asset, error)
+	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error)
 }
 
 func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *storage.RepositoryManager, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
@@ -227,29 +239,32 @@ func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *sto
 		repoManager:      r,
 		embeddingService: e,
 	}
+	svc.semanticRetriever = aggregatesearch.NewEmbeddingRetriever(
+		pool,
+		func(ctx context.Context, query string, fast bool) (aggregatesearch.QueryEmbedding, error) {
+			embedding, err := svc.resolveSemanticQueryEmbedding(ctx, query, fast)
+			if err != nil {
+				return aggregatesearch.QueryEmbedding{}, err
+			}
+			return aggregatesearch.QueryEmbedding{
+				Model:  embedding.ModelID,
+				Vector: embedding.Vector,
+			}, nil
+		},
+		func(ctx context.Context, model string, dimensions int) (repo.EmbeddingSpace, error) {
+			if svc.embeddingService == nil {
+				return repo.EmbeddingSpace{}, fmt.Errorf("%w: embedding service not available", ErrSemanticSearchUnavailable)
+			}
+			return svc.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, model, dimensions)
+		},
+		1.0,
+	)
+	svc.ocrRetriever = aggregatesearch.NewOCRRetriever(pool, 0.7)
+	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(pool, 0.8)
 	svc.aggregateSearch = aggregatesearch.NewAggregateService(pool, []aggregatesearch.Retriever{
-		aggregatesearch.NewEmbeddingRetriever(
-			pool,
-			func(ctx context.Context, query string, fast bool) (aggregatesearch.QueryEmbedding, error) {
-				embedding, err := svc.resolveSemanticQueryEmbedding(ctx, query, fast)
-				if err != nil {
-					return aggregatesearch.QueryEmbedding{}, err
-				}
-				return aggregatesearch.QueryEmbedding{
-					Model:  embedding.ModelID,
-					Vector: embedding.Vector,
-				}, nil
-			},
-			func(ctx context.Context, model string, dimensions int) (repo.EmbeddingSpace, error) {
-				if svc.embeddingService == nil {
-					return repo.EmbeddingSpace{}, fmt.Errorf("%w: embedding service not available", ErrSemanticSearchUnavailable)
-				}
-				return svc.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, model, dimensions)
-			},
-			1.0,
-		),
-		aggregatesearch.NewOCRRetriever(pool, 0.7),
-		aggregatesearch.NewPlaceRetriever(pool, 0.8),
+		svc.semanticRetriever,
+		svc.ocrRetriever,
+		svc.placeRetriever,
 	}, logger.Named("aggregate_search"))
 	return svc, nil
 }
@@ -1261,46 +1276,6 @@ func cloneStringSlice(values []string) []string {
 	return cloned
 }
 
-func filterOutAssetsByID(assets []repo.Asset, excluded []repo.Asset) ([]repo.Asset, int) {
-	if len(assets) == 0 || len(excluded) == 0 {
-		return assets, 0
-	}
-
-	excludedIDs := make(map[[16]byte]struct{}, len(excluded))
-	for _, asset := range excluded {
-		if asset.AssetID.Valid {
-			excludedIDs[asset.AssetID.Bytes] = struct{}{}
-		}
-	}
-
-	filtered := make([]repo.Asset, 0, len(assets))
-	removed := 0
-	for _, asset := range assets {
-		if asset.AssetID.Valid {
-			if _, ok := excludedIDs[asset.AssetID.Bytes]; ok {
-				removed++
-				continue
-			}
-		}
-		filtered = append(filtered, asset)
-	}
-
-	return filtered, removed
-}
-
-func classifySearchEnhancementError(err error, ctx context.Context) string {
-	switch {
-	case errors.Is(err, ErrSemanticSearchUnavailable):
-		return "runtime_unavailable"
-	case errors.Is(err, context.DeadlineExceeded):
-		return "timeout"
-	case ctx != nil && errors.Is(ctx.Err(), context.DeadlineExceeded):
-		return "timeout"
-	default:
-		return "internal_error"
-	}
-}
-
 func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
 	if s.queryAssetsUnifiedFn != nil {
 		return s.queryAssetsUnifiedFn(ctx, params)
@@ -1308,34 +1283,58 @@ func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAs
 	return s.queryAssetsUnified(ctx, params)
 }
 
-func (s *assetService) runSearchAssetsSemanticTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
-	if s.searchAssetsSemanticTopResultsFn != nil {
-		return s.searchAssetsSemanticTopResultsFn(ctx, params)
-	}
-	return s.searchAssetsAggregateTopResults(ctx, params)
-}
-
+// SearchAssets runs the unified search pipeline (see asset_search_fused.go):
+// all channels fuse into one confidence-ordered set. Results is that whole
+// set under the presentation sort; Best Results (TopResults) is its
+// confidence-ordered Top-N subset — a pure subset, no dedup. When no channel
+// can run at all the legacy filename path is the fallback.
 func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error) {
 	params = normalizeSearchAssetsParams(params)
 
 	result := SearchAssetsResult{
-		TopResults: []repo.Asset{},
-		TopResultsMeta: SearchTopResultsMeta{
-			Enabled:     false,
-			SourceTypes: []string{},
-		},
-		Results: []repo.Asset{},
+		TopResults:     []repo.Asset{},
+		TopResultsMeta: SearchTopResultsMeta{Enabled: false, SourceTypes: []string{}},
+		Results:        []repo.Asset{},
 	}
 
 	query := strings.TrimSpace(params.Query)
-	topResultsEnabled := query != "" && params.EnhancementMode != SearchEnhancementModeOff
+	enhanced := query != "" && params.EnhancementMode != SearchEnhancementModeOff
 
-	if topResultsEnabled {
-		topResults, meta := s.runSearchAssetsSemanticTopResults(ctx, params)
-		result.TopResults = topResults
-		result.TopResultsMeta = meta
-		if params.EnhancementMode == SearchEnhancementModeOnly && meta.Reason == "all_retrievers_failed" {
+	if enhanced {
+		if fused, ok := s.runSearchAssetsFusedSet(ctx, params); ok {
+			result.TopResultsMeta = fused.meta()
+			ids := fused.ids()
+
+			// Best Results exists only when the set is larger than the
+			// showcase size; otherwise everything lives in Results.
+			if len(ids) >= params.TopResultsLimit {
+				topResults, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit])
+				if err != nil {
+					return SearchAssetsResult{}, err
+				}
+				result.TopResults = topResults
+			}
+
+			if params.EnhancementMode != SearchEnhancementModeOnly {
+				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset)
+				if err != nil {
+					return SearchAssetsResult{}, err
+				}
+				result.Results = page
+				result.ResultsTotal = int64(len(ids))
+			}
+			return result, nil
+		}
+
+		if params.EnhancementMode == SearchEnhancementModeOnly {
 			return SearchAssetsResult{}, fmt.Errorf("aggregate search failed")
+		}
+		// No channel could run: degrade to filename, flag semantic missing.
+		result.TopResultsMeta = SearchTopResultsMeta{
+			Enabled:     true,
+			Degraded:    true,
+			Reason:      semanticUnavailableReason,
+			SourceTypes: []string{},
 		}
 	}
 
@@ -1348,30 +1347,16 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 		if err != nil {
 			return SearchAssetsResult{}, err
 		}
-
-		filenameResults, removed := filterOutAssetsByID(filenameResults, result.TopResults)
-		if removed > 0 && total >= int64(removed) {
-			total -= int64(removed)
-		}
-
 		result.Results = filenameResults
 		result.ResultsTotal = total
 	}
 
-	if !topResultsEnabled {
+	if !enhanced {
 		switch {
 		case params.EnhancementMode == SearchEnhancementModeOff:
-			result.TopResultsMeta = SearchTopResultsMeta{
-				Enabled:     false,
-				Reason:      "disabled",
-				SourceTypes: []string{},
-			}
+			result.TopResultsMeta = SearchTopResultsMeta{Enabled: false, Reason: "disabled", SourceTypes: []string{}}
 		case query == "":
-			result.TopResultsMeta = SearchTopResultsMeta{
-				Enabled:     false,
-				Reason:      "empty_query",
-				SourceTypes: []string{},
-			}
+			result.TopResultsMeta = SearchTopResultsMeta{Enabled: false, Reason: "empty_query", SourceTypes: []string{}}
 		}
 	}
 
@@ -1408,86 +1393,6 @@ func (s *assetService) queryAssetsAggregate(ctx context.Context, params QueryAss
 	return response.Assets, int64(response.TotalCandidates), nil
 }
 
-func (s *assetService) searchAssetsSemanticTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
-	meta := SearchTopResultsMeta{
-		Enabled:     true,
-		SourceTypes: []string{"semantic"},
-	}
-
-	searchCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
-	defer cancel()
-
-	results, err := s.queryAssetsVectorTopResults(searchCtx, params.QueryAssetsParams, params.TopResultsLimit)
-	if err != nil {
-		meta.Degraded = true
-		meta.Reason = classifySearchEnhancementError(err, searchCtx)
-		return []repo.Asset{}, meta
-	}
-
-	return results, meta
-}
-
-func (s *assetService) searchAssetsAggregateTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
-	meta := SearchTopResultsMeta{
-		Enabled:     true,
-		SourceTypes: []string{aggregatesearch.SourceEmbedding, aggregatesearch.SourceOCR, aggregatesearch.SourcePlace},
-	}
-	if s.aggregateSearch == nil {
-		meta.Degraded = true
-		meta.Reason = "runtime_unavailable"
-		return []repo.Asset{}, meta
-	}
-
-	searchCtx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
-	defer cancel()
-
-	requestedLimit := params.TopResultsLimit
-	if requestedLimit <= 0 {
-		requestedLimit = TOP_RESULTS_FALLBACK_LIMIT
-	}
-	filter, err := buildAggregateSearchFilter(params.QueryAssetsParams)
-	if err != nil {
-		meta.Degraded = true
-		meta.Reason = "invalid_filter"
-		return []repo.Asset{}, meta
-	}
-
-	response, err := s.aggregateSearch.Search(searchCtx, aggregatesearch.Request{
-		Query:  params.Query,
-		Filter: filter,
-		Limit:  requestedLimit,
-		Offset: 0,
-		TopK:   aggregateCandidatePoolSize(requestedLimit, 0),
-		Debug:  params.Debug,
-	})
-	if err != nil {
-		meta.Degraded = true
-		meta.Reason = classifySearchEnhancementError(err, searchCtx)
-		meta.Sources = mapAggregateSearchSources(response.Sources)
-		meta.CandidateCount = response.TotalCandidates
-		meta.CandidatePoolSize = response.CandidatePoolSize
-		if allAggregateSourcesFailed(response.Sources) {
-			meta.Reason = "all_retrievers_failed"
-		}
-		return []repo.Asset{}, meta
-	}
-
-	meta.Sources = mapAggregateSearchSources(response.Sources)
-	meta.Debug = mapAggregateSearchDebug(response.Debug)
-	meta.CandidateCount = response.TotalCandidates
-	meta.CandidatePoolSize = response.CandidatePoolSize
-	for _, source := range response.Sources {
-		if source.Error != "" {
-			meta.Degraded = true
-			if meta.Reason == "" {
-				meta.Reason = "partial_failure"
-			}
-			break
-		}
-	}
-	return response.Assets, meta
-}
-
 func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filter, error) {
 	var repositoryID *uuid.UUID
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
@@ -1520,53 +1425,6 @@ func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filte
 		LocationEast:     params.LocationEast,
 		LocationWest:     params.LocationWest,
 	}, nil
-}
-
-func mapAggregateSearchSources(sources []aggregatesearch.SourceMeta) []SearchSourceMeta {
-	mapped := make([]SearchSourceMeta, 0, len(sources))
-	for _, source := range sources {
-		mapped = append(mapped, SearchSourceMeta{
-			Type:           source.Type,
-			Weight:         source.Weight,
-			CandidateCount: source.CandidateCount,
-			DurationMs:     source.DurationMs,
-			Error:          source.Error,
-		})
-	}
-	return mapped
-}
-
-func mapAggregateSearchDebug(debug []aggregatesearch.AssetDebug) []SearchDebugItem {
-	mapped := make([]SearchDebugItem, 0, len(debug))
-	for _, item := range debug {
-		contributions := make(map[string]SearchDebugContribution, len(item.Contributions))
-		for source, contribution := range item.Contributions {
-			contributions[source] = SearchDebugContribution{
-				Rank:     contribution.Rank,
-				Weight:   contribution.Weight,
-				RRFScore: contribution.RRFScore,
-				RawScore: contribution.RawScore,
-			}
-		}
-		mapped = append(mapped, SearchDebugItem{
-			AssetID:       item.AssetID,
-			Score:         item.Score,
-			Contributions: contributions,
-		})
-	}
-	return mapped
-}
-
-func allAggregateSourcesFailed(sources []aggregatesearch.SourceMeta) bool {
-	if len(sources) == 0 {
-		return false
-	}
-	for _, source := range sources {
-		if source.Error == "" {
-			return false
-		}
-	}
-	return true
 }
 
 func aggregateCandidatePoolSize(limit, offset int) int {
@@ -1681,20 +1539,6 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 	}
 
 	return assets, countResult, nil
-}
-
-func (s *assetService) queryAssetsVectorTopResults(ctx context.Context, params QueryAssetsParams, limit int) ([]repo.Asset, error) {
-	embeddingResult, err := s.resolveSemanticQueryEmbedding(ctx, params.Query, true)
-	if err != nil {
-		return nil, err
-	}
-
-	assets, _, err := s.searchAssetsInResolvedSpace(ctx, params, embeddingResult.ModelID, embeddingResult.Vector, limit, 0, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return assets, nil
 }
 
 func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
@@ -2013,4 +1857,77 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 	}
 
 	return points, total, nil
+}
+
+func candidateIDs(candidates []aggregatesearch.Candidate) []uuid.UUID {
+	ids := make([]uuid.UUID, len(candidates))
+	for i, c := range candidates {
+		ids[i] = c.AssetID
+	}
+	return ids
+}
+
+// SearchAssetIDsSemantic returns the set of asset ids within the per-query
+// calibrated relevance cutoff, in similarity order.
+func (s *assetService) SearchAssetIDsSemantic(ctx context.Context, query string, strictness aggregatesearch.SetStrictness, maxResults int) ([]uuid.UUID, aggregatesearch.SetMeta, error) {
+	if s.semanticRetriever == nil {
+		return nil, aggregatesearch.SetMeta{}, ErrSemanticSearchUnavailable
+	}
+	candidates, meta, err := s.semanticRetriever.RetrieveSet(ctx, aggregatesearch.Request{Query: query}, strictness, maxResults)
+	if err != nil {
+		return nil, meta, err
+	}
+	return candidateIDs(candidates), meta, nil
+}
+
+// SearchAssetIDsOCR returns asset ids ranked by OCR full-text relevance.
+// tsquery matching is the membership test, so no calibration is needed.
+func (s *assetService) SearchAssetIDsOCR(ctx context.Context, query string, maxResults int) ([]uuid.UUID, error) {
+	if s.ocrRetriever == nil {
+		return nil, ErrSemanticSearchUnavailable
+	}
+	candidates, err := s.ocrRetriever.Retrieve(ctx, aggregatesearch.Request{Query: query, TopK: maxResults})
+	if err != nil {
+		return nil, err
+	}
+	return candidateIDs(candidates), nil
+}
+
+// filenameMembershipParams mirrors the query's filter for the filename
+// channel of the Results tier.
+func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedParams {
+	out := repo.GetAssetIDsUnifiedParams{Limit: fusedSetCap}
+	if params.Query != "" {
+		operator := "contains"
+		filename := params.Query
+		out.FilenameVal = &filename
+		out.FilenameOperator = &operator
+	}
+	out.AssetType = params.AssetType
+	out.AssetTypes = params.AssetTypes
+	out.OwnerID = params.OwnerID
+	out.PersonID = params.PersonID
+	out.AlbumID = params.AlbumID
+	out.TagName = params.TagName
+	out.TagSource = params.TagSource
+	if params.RepositoryID != nil && *params.RepositoryID != "" {
+		if parsed, err := uuid.Parse(strings.TrimSpace(*params.RepositoryID)); err == nil {
+			out.RepositoryID = pgtype.UUID{Bytes: parsed, Valid: true}
+		}
+	}
+	if params.DateFrom != nil {
+		out.DateFrom = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
+	}
+	if params.DateTo != nil {
+		out.DateTo = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
+	}
+	out.IsRaw = params.IsRaw
+	if params.Rating != nil {
+		rating := int32(*params.Rating)
+		out.Rating = &rating
+	}
+	out.Liked = params.Liked
+	out.CameraModel = params.CameraModel
+	out.LensModel = params.LensModel
+	return out
 }
