@@ -9,8 +9,7 @@ import {
   CapabilitiesMonitor,
   MLMonitor,
   StatMonitor,
-  TaskMonitor,
-  QueueList,
+  QueueSummaryList,
 } from "../components";
 
 export default function Monitor() {
@@ -42,7 +41,7 @@ export default function Monitor() {
 
   if (user?.role !== "admin") {
     return (
-      <div className="flex h-full items-center justify-center p-6">
+      <div className="flex min-h-full items-center justify-center p-6">
         <div className="rounded-3xl border border-base-300 bg-base-100 p-8 text-center shadow-sm">
           <div className="text-lg font-semibold">
             {t("monitor.adminOnlyTitle")}
@@ -56,7 +55,7 @@ export default function Monitor() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title={t("monitor.title")}
         subtitle={
@@ -67,8 +66,9 @@ export default function Monitor() {
               : t("monitor.subtitles.capabilities")
         }
         icon={<Activity className="w-6 h-6 text-primary" />}
+        className="flex-wrap gap-y-3"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {view === "ml" && (
             <select
               className="select select-bordered select-sm w-48"
@@ -115,30 +115,12 @@ export default function Monitor() {
         </div>
       </PageHeader>
 
-      <div className="flex-1 flex flex-col min-h-0 container mx-auto p-4 space-y-4">
+      <div className="container mx-auto w-full space-y-4 p-4 pb-6">
         {view === "queue" ? (
           <>
             <StatMonitor />
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
-              <div className="flex flex-col min-h-0">
-                <h2 className="text-lg font-semibold mb-3 px-1">
-                  {t("monitor.sections.activeQueues")}
-                </h2>
-                <div className="flex-1 min-h-0">
-                  <QueueList />
-                </div>
-              </div>
-
-              <div className="flex flex-col min-h-0">
-                <h2 className="text-lg font-semibold mb-3 px-1">
-                  {t("monitor.sections.recentJobs")}
-                </h2>
-                <div className="flex-1 min-h-0">
-                  <TaskMonitor />
-                </div>
-              </div>
-            </div>
+            <QueueSummaryList />
           </>
         ) : view === "ml" ? (
           <MLMonitor localRepoId={localRepoId} />

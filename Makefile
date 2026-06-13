@@ -53,7 +53,7 @@ DB_USER ?= postgres
 DB_PASSWORD ?= postgres
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
-.PHONY: setup dev server-dev web-dev test server-test web-test dto db db-reset clean \
+.PHONY: setup dev server-dev web-dev test server-test web-test dto db db-reset dev-reset clean \
 	desktop-dev desktop-build desktop-test \
 	.server-config .server-env .web-env
 
@@ -117,7 +117,12 @@ db-reset:
 	@echo "==> Resetting database volume"
 	@$(COMPOSE) stop db
 	@$(COMPOSE) rm -f db
-	@$(DOCKER) volume rm -f $(DB_VOLUME) 2>/dev/null || true
+	@if $(DOCKER) volume inspect $(DB_VOLUME) >/dev/null 2>&1; then \
+		$(DOCKER) volume rm $(DB_VOLUME) >/dev/null; \
+	fi
+	@rm -f $(SERVER_DIR)/data/storage/.secrets/db_password
+
+dev-reset: db-reset clean
 
 clean:
 	@echo "==> Cleaning generated local development state"

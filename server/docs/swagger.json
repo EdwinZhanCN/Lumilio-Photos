@@ -3924,71 +3924,6 @@
                 },
                 "type": "object"
             },
-            "handler.JobDTO": {
-                "properties": {
-                    "args": {},
-                    "attempt": {
-                        "type": "integer"
-                    },
-                    "attempted_at": {
-                        "type": "string"
-                    },
-                    "created_at": {
-                        "type": "string"
-                    },
-                    "errors": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
-                    "finalized_at": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "kind": {
-                        "type": "string"
-                    },
-                    "max_attempts": {
-                        "type": "integer"
-                    },
-                    "metadata": {},
-                    "priority": {
-                        "type": "integer"
-                    },
-                    "queue": {
-                        "type": "string"
-                    },
-                    "scheduled_at": {
-                        "type": "string"
-                    },
-                    "state": {
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "handler.JobListResponse": {
-                "properties": {
-                    "cursor": {
-                        "type": "string"
-                    },
-                    "jobs": {
-                        "items": {
-                            "$ref": "#/components/schemas/handler.JobDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
-                    "total_count": {
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
             "handler.JobStatsResponse": {
                 "properties": {
                     "available": {
@@ -4015,23 +3950,91 @@
                 },
                 "type": "object"
             },
-            "handler.QueueStatsDTO": {
+            "handler.QueueErrorSampleDTO": {
                 "properties": {
-                    "metadata": {},
-                    "name": {
+                    "attempt": {
+                        "type": "integer"
+                    },
+                    "attempted_at": {
                         "type": "string"
                     },
-                    "updated_at": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "finalized_at": {
+                        "type": "string"
+                    },
+                    "job_id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "last_error": {
+                        "type": "string"
+                    },
+                    "max_attempts": {
+                        "type": "integer"
+                    },
+                    "scheduled_at": {
+                        "type": "string"
+                    },
+                    "state": {
                         "type": "string"
                     }
                 },
                 "type": "object"
             },
-            "handler.QueueStatsResponse": {
+            "handler.QueueSummaryDTO": {
                 "properties": {
+                    "attention_jobs": {
+                        "type": "integer"
+                    },
+                    "average_latency_ms": {
+                        "type": "integer"
+                    },
+                    "average_runtime_ms": {
+                        "type": "integer"
+                    },
+                    "error_samples": {
+                        "items": {
+                            "$ref": "#/components/schemas/handler.QueueErrorSampleDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "latest_activity_at": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "oldest_remaining_at": {
+                        "type": "string"
+                    },
+                    "processed_jobs": {
+                        "type": "integer"
+                    },
+                    "remaining_jobs": {
+                        "type": "integer"
+                    },
+                    "running_jobs": {
+                        "type": "integer"
+                    },
+                    "total_jobs": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "handler.QueueSummaryResponse": {
+                "properties": {
+                    "generated_at": {
+                        "type": "string"
+                    },
                     "queues": {
                         "items": {
-                            "$ref": "#/components/schemas/handler.QueueStatsDTO"
+                            "$ref": "#/components/schemas/handler.QueueSummaryDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -4119,207 +4122,14 @@
         "url": ""
     },
     "paths": {
-        "/api/v1/admin/river/jobs": {
+        "/api/v1/admin/river/queue-summary": {
             "get": {
-                "description": "Get a paginated list of jobs with optional state, queue, kind, and time range filters",
+                "description": "Get aggregated processing activity per queue, including recent error samples",
                 "parameters": [
                     {
-                        "description": "Job state filter (available,scheduled,running,retryable,completed,cancelled,discarded)",
+                        "description": "Recent error samples per queue (default: 5, max: 20)",
                         "in": "query",
-                        "name": "state",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Queue name filter",
-                        "in": "query",
-                        "name": "queue",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Job kind filter",
-                        "in": "query",
-                        "name": "kind",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Number of jobs to return (default: 50, max: 200)",
-                        "in": "query",
-                        "name": "limit",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Pagination cursor for next page",
-                        "in": "query",
-                        "name": "cursor",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Time range filter (1h, 24h, 30d) - filters by created_at",
-                        "in": "query",
-                        "name": "time_range",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Include total count of matching jobs (may be slower)",
-                        "in": "query",
-                        "name": "include_count",
-                        "schema": {
-                            "type": "boolean"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "summary": "List jobs with filters",
-                "tags": [
-                    "Queue"
-                ]
-            }
-        },
-        "/api/v1/admin/river/jobs/{id}": {
-            "get": {
-                "description": "Get detailed information about a specific job",
-                "parameters": [
-                    {
-                        "description": "Job ID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "404": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Job not found"
-                    }
-                },
-                "summary": "Get job by ID",
-                "tags": [
-                    "Queue"
-                ]
-            }
-        },
-        "/api/v1/admin/river/queues": {
-            "get": {
-                "description": "Get a list of all active queues with their metadata",
-                "parameters": [
-                    {
-                        "description": "Number of queues to return (default: 100)",
-                        "in": "query",
-                        "name": "limit",
+                        "name": "error_limit",
                         "schema": {
                             "type": "integer"
                         }
@@ -4373,7 +4183,7 @@
                         "description": "OK"
                     }
                 },
-                "summary": "List all queues",
+                "summary": "Get queue summaries",
                 "tags": [
                     "Queue"
                 ]

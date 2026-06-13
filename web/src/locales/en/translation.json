@@ -827,49 +827,8 @@
     "noLocationData": "No location data available"
   },
   "monitor": {
-    "adminOnlyDescription": "Queue monitoring and runtime diagnostics are only available to administrators.",
+    "adminOnlyDescription": "Processing activity and runtime diagnostics are only available to administrators.",
     "adminOnlyTitle": "Admin access required",
-    "jobs": {
-      "attempts": "{{current}}/{{max}} attempts",
-      "empty": "No jobs found with current filters",
-      "fetchError": "Failed to fetch jobs",
-      "filters": {
-        "allQueues": "All",
-        "queue": "Queue",
-        "state": "State",
-        "states": {
-          "all": "All",
-          "available": "Available",
-          "cancelled": "Cancelled",
-          "completed": "Completed",
-          "discarded": "Discarded",
-          "retryable": "Retryable",
-          "running": "Running",
-          "scheduled": "Scheduled"
-        }
-      },
-      "labels": {
-        "created": "Created",
-        "failed": "Failed",
-        "finished": "Finished",
-        "scheduled": "Scheduled",
-        "started": "Started"
-      },
-      "loading": "Loading jobs...",
-      "pagination": {
-        "moreResults": "More results available",
-        "totalJobs_one": "{{count}} job",
-        "totalJobs_other": "{{count}} jobs"
-      },
-      "timeAgoDays_one": "{{count}} day ago",
-      "timeAgoDays_other": "{{count}} days ago",
-      "timeAgoHours_one": "{{count}} hour ago",
-      "timeAgoHours_other": "{{count}} hours ago",
-      "timeAgoMinutes_one": "{{count}} minute ago",
-      "timeAgoMinutes_other": "{{count}} minutes ago",
-      "timeAgoSeconds_one": "{{count}} second ago",
-      "timeAgoSeconds_other": "{{count}} seconds ago"
-    },
     "ml": {
       "bioAlbumCoverage": "Bio album species coverage",
       "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
@@ -896,58 +855,182 @@
       },
       "remainingAssets": "Remaining"
     },
-    "queues": {
-      "active": "Active",
-      "activeCount_one": "{{count}} active queue",
-      "activeCount_other": "{{count}} active queues",
-      "empty": "No active queues found",
-      "fetchError": "Failed to fetch queues",
-      "idle": "Idle",
-      "loading": "Loading queues...",
-      "timeAgoHours_one": "{{count}} hour ago",
-      "timeAgoHours_other": "{{count}} hours ago",
-      "timeAgoMinutes_one": "{{count}} minute ago",
-      "timeAgoMinutes_other": "{{count}} minutes ago",
-      "timeAgoSeconds_one": "{{count}} second ago",
-      "timeAgoSeconds_other": "{{count}} seconds ago"
-    },
-    "sections": {
-      "activeQueues": "Active Queues",
-      "recentJobs": "Recent Jobs"
+    "queueSummary": {
+      "copied": "Copied",
+      "copyError": "Copy error",
+      "emptyDescription": "Background processing will appear here when the library has work to do.",
+      "emptyTitle": "Nothing needs attention",
+      "errorAttempt": "Attempt {{current}} / {{max}}",
+      "errorFallback": "No error message was recorded.",
+      "errorStates": {
+        "cancelled": "Stopped",
+        "discarded": "Stopped",
+        "retryable": "Will retry",
+        "unknown": "Needs attention"
+      },
+      "fetchError": "Failed to load processing activity.",
+      "kinds": {
+        "classify_zeroshot": "Match saved classifiers",
+        "detect_stacks": "Find related originals",
+        "discover_asset": "Import discovered file",
+        "ingest_asset": "Import uploaded file",
+        "match_live_photo": "Match Live Photo pair",
+        "metadata_asset": "Read media information",
+        "process_bioclip": "Tag nature photos",
+        "process_face": "Find people",
+        "process_ocr": "Read text in images",
+        "process_phash": "Analyze duplicates",
+        "process_semantic": "Build visual search index",
+        "rebuild_location_clusters": "Refresh places",
+        "reindex_assets": "Rebuild AI index",
+        "retry_asset": "Retry media processing",
+        "scan_repository": "Scan library folder",
+        "schedule_repository_scans": "Schedule library scans",
+        "thumbnail_asset": "Build previews",
+        "transcode_asset": "Prepare playable media"
+      },
+      "loading": "Loading processing activity...",
+      "metrics": {
+        "attention": "Needs attention",
+        "averageLatency": "Avg total time",
+        "averageRuntime": "Avg work time",
+        "latestActivity": "Latest activity {{value}}",
+        "notEnoughData": "—",
+        "oldestRemaining": "Oldest remaining {{value}}",
+        "processed": "Processed",
+        "remaining": "Remaining",
+        "total": "Total"
+      },
+      "noErrorSamples": "No recent error details were recorded for this area.",
+      "queues": {
+        "classify_zeroshot": {
+          "description": "Matches saved classifier albums after visual indexing.",
+          "name": "Classifier matching"
+        },
+        "default": {
+          "description": "Background work for the photo library."
+        },
+        "detect_stacks": {
+          "description": "Looks for RAW+JPEG and related media stacks.",
+          "name": "Stack detection"
+        },
+        "discover_asset": {
+          "description": "Materializes files found during library scans.",
+          "name": "Discovered files"
+        },
+        "ingest_asset": {
+          "description": "Moves uploaded media into the library safely.",
+          "name": "Imports"
+        },
+        "match_live_photo": {
+          "description": "Pairs Apple Live Photo image and video files.",
+          "name": "Live Photo matching"
+        },
+        "metadata_asset": {
+          "description": "Reads EXIF, capture time, camera, location, and media details.",
+          "name": "Media information"
+        },
+        "process_bioclip": {
+          "description": "Adds nature and species labels where enabled.",
+          "name": "Nature tagging"
+        },
+        "process_face": {
+          "description": "Finds faces and updates people groupings.",
+          "name": "People recognition"
+        },
+        "process_ocr": {
+          "description": "Extracts searchable text from images.",
+          "name": "Text recognition"
+        },
+        "process_phash": {
+          "description": "Computes fingerprints used by duplicate detection.",
+          "name": "Duplicate analysis"
+        },
+        "process_semantic": {
+          "description": "Builds visual embeddings for search and AI organization.",
+          "name": "Visual search index"
+        },
+        "rebuild_location_clusters": {
+          "description": "Refreshes place clusters after media locations change.",
+          "name": "Places"
+        },
+        "reindex_assets": {
+          "description": "Backfills AI indexes for existing photos.",
+          "name": "AI reindex"
+        },
+        "retry_asset": {
+          "description": "Retries media processing after a failure.",
+          "name": "Retries"
+        },
+        "scan_repository": {
+          "description": "Scans library folders for new, changed, or removed files.",
+          "name": "Library scan"
+        },
+        "thumbnail_asset": {
+          "description": "Creates previews used throughout the gallery.",
+          "name": "Previews"
+        },
+        "transcode_asset": {
+          "description": "Prepares video and audio versions for browser playback.",
+          "name": "Playback media"
+        }
+      },
+      "reviewErrors_one": "Review {{count}} issue",
+      "reviewErrors_other": "Review {{count}} issues",
+      "status": {
+        "idle": "Idle",
+        "needsAttention": "Needs attention",
+        "pendingWork": "Waiting",
+        "settled": "Quiet",
+        "working": "Working"
+      },
+      "subtitle": "Grouped by the part of the photo library pipeline doing the work.",
+      "time": {
+        "daysAgo_one": "{{count}} day ago",
+        "daysAgo_other": "{{count}} days ago",
+        "hoursAgo_one": "{{count}} hour ago",
+        "hoursAgo_other": "{{count}} hours ago",
+        "justNow": "just now",
+        "minutesAgo_one": "{{count}} minute ago",
+        "minutesAgo_other": "{{count}} minutes ago",
+        "never": "never"
+      },
+      "title": "Processing activity",
+      "updated": "Updated {{time}}"
     },
     "stats": {
-      "activeJobs": "Active jobs",
+      "activeJobs": "Work waiting",
       "allHealthy": "All healthy",
-      "availableCount_one": "{{count}} available",
-      "availableCount_other": "{{count}} available",
-      "cancelledCount_one": "{{count}} cancelled",
-      "cancelledCount_other": "{{count}} cancelled",
-      "completed": "Completed",
-      "discardedCount_one": "{{count}} discarded",
-      "discardedCount_other": "{{count}} discarded",
+      "availableCount_one": "{{count}} waiting",
+      "availableCount_other": "{{count}} waiting",
+      "cancelledCount_one": "{{count}} stopped",
+      "cancelledCount_other": "{{count}} stopped",
+      "completed": "Processed",
+      "discardedCount_one": "{{count}} stopped",
+      "discardedCount_other": "{{count}} stopped",
       "fetchError": "Failed to fetch queue stats",
-      "issues": "Issues",
+      "issues": "Needs attention",
       "noData": "No data",
       "noProcessedJobs": "No jobs processed yet",
-      "retryableCount_one": "{{count}} retryable",
-      "retryableCount_other": "{{count}} retryable",
-      "runningCount_one": "{{count}} running",
-      "runningCount_other": "{{count}} running",
-      "scheduledCount_one": "{{count}} scheduled",
-      "scheduledCount_other": "{{count}} scheduled",
+      "retryableCount_one": "{{count}} will retry",
+      "retryableCount_other": "{{count}} will retry",
+      "runningCount_one": "{{count}} in progress",
+      "runningCount_other": "{{count}} in progress",
+      "scheduledCount_one": "{{count}} planned",
+      "scheduledCount_other": "{{count}} planned",
       "successRate": "{{rate}}% success rate"
     },
     "subtitles": {
       "capabilities": "Runtime ML discovery and LLM agent status",
       "ml": "ML indexing coverage and reindex progress",
-      "queue": "Real-time job queue monitoring"
+      "queue": "Library imports, previews, AI indexing, and background cleanup at a glance"
     },
     "tabs": {
       "capabilities": "Capabilities",
       "ml": "ML",
-      "queue": "Queue"
+      "queue": "Processing"
     },
-    "title": "Server Monitor"
+    "title": "System Status"
   },
   "navbar": {
     "agent": {
