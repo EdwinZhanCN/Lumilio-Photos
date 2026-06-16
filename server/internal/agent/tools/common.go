@@ -104,6 +104,7 @@ func RegisterAll() {
 	RegisterSearchPeople()
 	// Lookup
 	RegisterLookupPeople()
+	RegisterLookupAlbums()
 	// Transformers
 	RegisterCombine()
 	RegisterRank()
@@ -112,8 +113,10 @@ func RegisterAll() {
 	// Observers
 	RegisterDescribe()
 	RegisterPeek()
+	RegisterInspect()
 	// Terminals
 	RegisterShow()
 	RegisterBulkLike()
 	RegisterCreateAlbum()
+	RegisterAddToAlbum()
 }

@@ -147,6 +147,17 @@ func (q *Queries) DeleteCloudCredential(ctx context.Context, credentialID pgtype
 	return err
 }
 
+const disableRepositoryCloudBindingsByCredential = `-- name: DisableRepositoryCloudBindingsByCredential :exec
+UPDATE repository_cloud_bindings
+SET enabled = false, updated_at = now()
+WHERE credential_id = $1
+`
+
+func (q *Queries) DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, disableRepositoryCloudBindingsByCredential, credentialID)
+	return err
+}
+
 const finishCloudImportRun = `-- name: FinishCloudImportRun :one
 UPDATE cloud_import_runs
 SET status = $2, error = $3, finished_at = now(), updated_at = now()

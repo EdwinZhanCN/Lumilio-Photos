@@ -74,13 +74,15 @@ const AbsoluteGalleryItem = memo(
         ref={ref}
         className="absolute"
         role="listitem"
-        style={{
-          top,
-          left,
-          width,
-          height,
-          ...visibilityStyle,
-        } as React.CSSProperties}
+        style={
+          {
+            top,
+            left,
+            width,
+            height,
+            ...visibilityStyle,
+          } as React.CSSProperties
+        }
         data-asset-id={dataAssetId}
       >
         {mounted ? (
@@ -293,7 +295,11 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   ]);
 
   const handleAssetClick = useCallback(
-    (item: BrowseItem, asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
+    (
+      item: BrowseItem,
+      asset: Asset,
+      event: React.MouseEvent | React.KeyboardEvent,
+    ) => {
       if (!asset.asset_id) return;
       if (selection.enabled) {
         selection.handleClick(item.id, event as any);
@@ -401,25 +407,31 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                       dataAssetId={assetId}
                       allowOverflow={hasStackOverlay}
                     >
-                      {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
+                      {stackInfo &&
+                      stackInfo.stack_size &&
+                      stackInfo.stack_size > 1 ? (
                         <StackedThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
                           stackInfo={stackInfo}
                           browseStack={item.type === "stack" ? item : undefined}
-                          onClick={(event) => handleAssetClick(item, asset, event)}
+                          onClick={(event) =>
+                            handleAssetClick(item, asset, event)
+                          }
                           isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
-                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                          className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                         />
                       ) : (
                         <MediaThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
-                          onClick={(event) => handleAssetClick(item, asset, event)}
+                          onClick={(event) =>
+                            handleAssetClick(item, asset, event)
+                          }
                           isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
-                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                          className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                         />
                       )}
                     </AbsoluteGalleryItem>

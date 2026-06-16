@@ -132,6 +132,21 @@ func (r *PhotoAsset) IsDeleted() bool {
 	return r._masterRecord.Deleted
 }
 
+// LiveVideoSize returns the live photo video component size in bytes.
+func (r *PhotoAsset) LiveVideoSize() int {
+	return r._masterRecord.Fields.ResOriginalVidComplRes.Value.Size
+}
+
+// LiveVideoFingerprint returns the live photo video component fingerprint.
+func (r *PhotoAsset) LiveVideoFingerprint() string {
+	return r._masterRecord.Fields.ResOriginalVidComplFingerprint.Value
+}
+
+// LiveVideoMIMEType returns the live photo video component MIME type.
+func (r *PhotoAsset) LiveVideoMIMEType() string {
+	return r._masterRecord.Fields.ResOriginalVidComplFileType.Value
+}
+
 func (r *PhotoAsset) OutputDir(output, folderStructure string) string {
 	if folderStructure == "" || folderStructure == "/" {
 		return output

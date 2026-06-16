@@ -6456,8 +6456,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Disable cloud credential
-         * @description Disable a saved cloud credential so it cannot start new imports.
+         * Remove cloud credential
+         * @description Permanently delete a cloud credential, its session data, and unbind associated repositories.
          */
         delete: {
             parameters: {
@@ -6471,7 +6471,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Credential disabled */
+                /** @description Credential removed */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6545,6 +6545,167 @@ export interface paths {
             };
             responses: {
                 /** @description Challenge verified successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cloud/credentials/{id}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disconnect cloud credential
+         * @description Pause a cloud credential so it cannot start new imports. Can be reconnected later.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Credential UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Credential disconnected */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cloud/credentials/{id}/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reconnect cloud credential
+         * @description Re-authenticate a disconnected or errored credential. If no password is provided, attempts to reuse the existing session.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Credential UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Reconnect inputs */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.ReconnectCloudCredentialRequest"];
+                };
+            };
+            responses: {
+                /** @description Reconnect result */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11330,6 +11491,11 @@ export interface components {
             /** @example queued */
             status?: string;
         };
+        "dto.ReconnectCloudCredentialRequest": {
+            inputs?: {
+                [key: string]: string;
+            };
+        };
         "dto.RecoveryCodesResponseDTO": {
             generated_at?: string;
             recovery_codes?: string[];
@@ -11815,6 +11981,8 @@ export interface components {
             mfa_token: string;
         };
         "handler.AgentChatRequest": {
+            context?: components["schemas"]["inject.ContextItem"][];
+            mentions?: components["schemas"]["inject.MentionItem"][];
             query: string;
             thread_id?: string;
         };
@@ -11908,6 +12076,16 @@ export interface components {
                 [key: string]: unknown;
             };
             name?: string;
+        };
+        "inject.ContextItem": {
+            asset_ids?: string[];
+            label?: string;
+            type?: string;
+        };
+        "inject.MentionItem": {
+            id?: string;
+            label?: string;
+            type?: string;
         };
     };
     responses: never;

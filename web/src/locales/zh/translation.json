@@ -750,6 +750,12 @@
       "newConversation": "新对话",
       "openAiSettings": "打开 AI 设置"
     },
+    "context": {
+      "attached": "",
+      "remove": "",
+      "selected_other": "",
+      "viewing": ""
+    },
     "dock": {
       "busy": "处理中",
       "collapse": "折叠对话",
@@ -758,15 +764,13 @@
       "ready": "就绪",
       "replyCount_one": "{{count}} 条回复",
       "replyCount_other": "{{count}} 条回复",
-      "subtitle": "驱动看板",
       "title": "Lumilio Agent",
       "tokens": "tokens",
       "usageHint": "上次模型调用：{{prompt}} 上下文 + {{completion}} 输出 tokens"
     },
     "input": {
       "prompt": "向 Lumilio Agent 提问...",
-      "send": "发送",
-      "unavailable": "Lumilio Agent 当前不可用。"
+      "send": "发送"
     },
     "markdown": {
       "think": {
@@ -1288,28 +1292,36 @@
     "assetPage": "资源页面",
     "cloud": {
       "addCredential": "添加凭证",
-      "confirmDisable": "要停用 {{name}} 吗？已导入的内容会继续保留在 Lumilio。",
+      "confirmDisconnect": "断开 {{name}}？进行中的导入将停止，你可以随时重新连接。",
+      "confirmRemove": "移除 {{name}}？将永久删除凭证和会话数据。已导入的照片保留在你的媒体库中。",
       "connectCredential": "连接凭证",
       "connectedAccounts_other": "{{count}} 个已连接账号",
       "credentialMeta": "{{provider}} · {{identity}}",
       "description": "管理可复用的云账号凭证。通过 Manage 创建仓库时，可以选择其中一个账号作为导入来源。",
-      "disable": "停用",
+      "disconnect": "断开",
       "empty": "尚未配置云凭证。",
       "errors": {
         "createFailed": "创建云凭证失败。",
-        "disableFailed": "停用凭证失败。",
+        "disconnectFailed": "断开凭证失败。",
         "emptyCredentialResponse": "凭证响应为空。",
+        "reconnectFailed": "重新连接凭证失败。",
+        "removeFailed": "移除凭证失败。",
+        "sessionExpired": "会话已过期，请重新添加此凭证。",
         "verifyFailed": "验证凭证挑战失败。"
       },
       "fields": {
         "label": "标签"
       },
       "messages": {
-        "challengeRequired": "需要完成额外验证。",
+        "challengeRequired": "验证码已发送到你的手机。",
         "connected": "云凭证已连接。",
-        "disabled": "云凭证已停用。",
+        "disconnected": "云凭证已断开。",
+        "reconnected": "云凭证已重新连接。",
+        "removed": "云凭证已移除。",
         "verified": "云凭证已验证。"
       },
+      "reconnect": "重新连接",
+      "remove": "移除",
       "placeholders": {
         "label": "个人云账号"
       },

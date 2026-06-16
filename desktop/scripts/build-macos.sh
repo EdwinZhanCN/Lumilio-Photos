@@ -9,7 +9,7 @@
 # Developer account) per the exec plan's signing strategy.
 #
 # Prerequisites (staged before running — see desktop/resources/README.md):
-#   desktop/resources/postgres/16/<darwin-arch>/bin   PostgreSQL + pgvector
+#   desktop/resources/postgres/17/<darwin-arch>/bin   PostgreSQL + pgvector + pg_textsearch + zhparser
 #   desktop/resources/ffmpeg/{ffmpeg,ffprobe}         static ffmpeg build
 #   desktop/resources/exiftool/exiftool               exiftool standalone
 # Build tools:
@@ -103,7 +103,7 @@ stage() { # src dest
   mkdir -p "$(dirname "$2")"
   cp -R "$1" "$2"
 }
-stage "$RESOURCES_SRC/postgres/16/$PLATFORM" "$RES_DIR/postgres/16/$PLATFORM"
+stage "$RESOURCES_SRC/postgres/17/$PLATFORM" "$RES_DIR/postgres/17/$PLATFORM"
 stage "$RESOURCES_SRC/ffmpeg/ffmpeg"          "$RES_DIR/ffmpeg/ffmpeg"
 stage "$RESOURCES_SRC/ffmpeg/ffprobe"         "$RES_DIR/ffmpeg/ffprobe"
 stage "$RESOURCES_SRC/exiftool"               "$RES_DIR/exiftool"

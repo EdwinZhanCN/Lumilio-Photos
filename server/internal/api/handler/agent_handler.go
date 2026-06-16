@@ -13,6 +13,7 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/facets"
+	"server/internal/agent/inject"
 	"server/internal/agent/pins"
 	"server/internal/agent/ref"
 	"server/internal/api"
@@ -50,8 +51,10 @@ func NewAgentHandler(agentService core.AgentService, refStore ref.Store, queries
 
 // AgentChatRequest represents request body for agent chat
 type AgentChatRequest struct {
-	ThreadID string `json:"thread_id,omitempty"`
-	Query    string `json:"query" binding:"required"`
+	ThreadID string               `json:"thread_id,omitempty"`
+	Query    string               `json:"query" binding:"required"`
+	Context  []inject.ContextItem `json:"context,omitempty"`
+	Mentions []inject.MentionItem `json:"mentions,omitempty"`
 }
 
 // AgentResumeRequest represents request body for resuming agent chat
@@ -100,11 +103,27 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 	// 创建工具侧信道
 	sideChannel := make(chan *core.SideChannelEvent, 100)
 
+	prepared, err := inject.Prepare(c.Request.Context(), inject.Dependencies{
+		Queries:  h.queries,
+		RefStore: h.refStore,
+		Pins:     h.pins,
+		UserID:   int32(user.UserID),
+		ThreadID: threadID,
+	}, req.Context, req.Mentions)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to prepare agent context")
+		return
+	}
+
 	// 获取 Agent 迭代器
-	iter := h.agentService.AskAgent(c.Request.Context(), int32(user.UserID), threadID, req.Query, sideChannel)
+	iter := h.agentService.AskAgent(c.Request.Context(), int32(user.UserID), threadID, req.Query, prepared.InstructionExtras, sideChannel)
 
 	// 发送会话信息事件
-	h.sendSSE(c, flusher, "session_info", map[string]string{"thread_id": threadID})
+	sessionInfo := map[string]any{"thread_id": threadID}
+	if len(prepared.DroppedMentions) > 0 {
+		sessionInfo["dropped_mentions"] = prepared.DroppedMentions
+	}
+	h.sendSSE(c, flusher, "session_info", sessionInfo)
 
 	// 开始流式传输事件
 	h.streamAgentEvents(c, flusher, iter, sideChannel)

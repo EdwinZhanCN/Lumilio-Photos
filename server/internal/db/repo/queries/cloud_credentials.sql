@@ -48,6 +48,11 @@ RETURNING *;
 DELETE FROM cloud_credentials
 WHERE credential_id = $1;
 
+-- name: DisableRepositoryCloudBindingsByCredential :exec
+UPDATE repository_cloud_bindings
+SET enabled = false, updated_at = now()
+WHERE credential_id = $1;
+
 -- name: CountRepositoryCloudBindingsByCredential :one
 SELECT COUNT(*) FROM repository_cloud_bindings
 WHERE credential_id = $1 AND enabled = true;

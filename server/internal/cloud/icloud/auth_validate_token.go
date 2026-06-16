@@ -8,6 +8,12 @@ import (
 
 func (r *Client) validateToken() error {
 	fmt.Printf("Checking session token validity\n")
+	r.debugf(
+		"validate session start apple_id=%s session_token=%t trust_token=%t",
+		maskAppleID(r.appleID),
+		r.sessionData.SessionToken != "",
+		r.sessionData.TrustToken != "",
+	)
 
 	text, err := r.request(&rawReq{
 		Method:  http.MethodPost,
@@ -23,6 +29,7 @@ func (r *Client) validateToken() error {
 		return fmt.Errorf("validateToken unmarshal failed, err: %w, text: %s", err, text)
 	}
 	r.Data = res
+	r.debugState("validate_response")
 
 	return nil
 }

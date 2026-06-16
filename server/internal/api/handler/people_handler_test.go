@@ -103,7 +103,7 @@ func TestPeopleHandlerRebuildPeople(t *testing.T) {
 				capturedRepo = repositoryID
 				require.Nil(t, ownerID)
 				return service.FaceClusterRebuildResult{
-					Algorithm:       "hdbscan-mutual-reachability-v1",
+					Algorithm:       "immich-dbscan-sequential-v1",
 					RepositoryID:    strPtr("550e8400-e29b-41d4-a716-446655440000"),
 					CandidateFaces:  12,
 					ClusteredFaces:  10,
@@ -133,7 +133,7 @@ func TestPeopleHandlerRebuildPeople(t *testing.T) {
 		Data dto.FaceClusterRebuildResponseDTO `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, "hdbscan-mutual-reachability-v1", response.Data.Algorithm)
+	require.Equal(t, "immich-dbscan-sequential-v1", response.Data.Algorithm)
 	require.Equal(t, 12, response.Data.CandidateFaces)
 	require.Equal(t, 4, response.Data.ClustersTotal)
 }

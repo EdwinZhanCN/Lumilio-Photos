@@ -5,7 +5,7 @@ const LumilioChatPage = () => {
   return (
     <div className="relative h-full bg-base-100">
       <AgentBoard />
-      <ChatDock />
+      <ChatDock variant="embedded" />
     </div>
   );
 };

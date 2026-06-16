@@ -159,7 +159,6 @@ func (p *ICloudProvider) List(ctx context.Context, repoID uuid.UUID, cursor *Cur
 
 	var assets []ReleaseAsset
 	for _, photo := range photos {
-		// Cache the photo asset pointer for O(1) downloads
 		p.assetCache.Store(photo.ID(), photo)
 
 		assets = append(assets, ReleaseAsset{
@@ -172,6 +171,19 @@ func (p *ICloudProvider) List(ctx context.Context, repoID uuid.UUID, cursor *Cur
 			ModifiedAt: photo.AddDate(),
 			Deleted:    photo.IsDeleted(),
 		})
+
+		if photo.IsLivePhoto() {
+			assets = append(assets, ReleaseAsset{
+				Provider:   ProviderICloud,
+				RemoteKey:  photo.ID() + livePhotoKeySuffix,
+				Filename:   photo.Filename(true),
+				Size:       int64(photo.LiveVideoSize()),
+				MIME:       photo.LiveVideoMIMEType(),
+				ETag:       photo.LiveVideoFingerprint(),
+				ModifiedAt: photo.AddDate(),
+				Deleted:    photo.IsDeleted(),
+			})
+		}
 	}
 
 	var newOffset int64
@@ -198,9 +210,13 @@ func (p *ICloudProvider) List(ctx context.Context, repoID uuid.UUID, cursor *Cur
 
 // Download fetches a specific iCloud photo asset by its remoteKey (asset ID)
 // and writes it to localPath. It checks the local cache first, and falls back
-// to walking the album if cache misses.
+// to walking the album if cache misses. Keys ending with livePhotoKeySuffix
+// download the Live Photo video component.
 func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteKey string, localPath string) (int64, error) {
 	_ = repoID
+
+	isLive := strings.HasSuffix(remoteKey, livePhotoKeySuffix)
+	assetID := strings.TrimSuffix(remoteKey, livePhotoKeySuffix)
 
 	photoCli, err := p.ensurePhotoCli(ctx)
 	if err != nil {
@@ -212,17 +228,15 @@ func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteK
 		return 0, fmt.Errorf("get all photos album: %w", err)
 	}
 
-	// Try to get from cache first
 	var target *icloud.PhotoAsset
-	if val, ok := p.assetCache.Load(remoteKey); ok {
+	if val, ok := p.assetCache.Load(assetID); ok {
 		target = val.(*icloud.PhotoAsset)
 	} else {
-		// Fallback to walk if not in cache (e.g. if single file download triggered manually)
 		_ = album.WalkPhotos(0, func(offset int64, photos []*icloud.PhotoAsset) error {
 			for _, photo := range photos {
-				if photo.ID() == remoteKey {
+				if photo.ID() == assetID {
 					target = photo
-					return fmt.Errorf("found") // break the walk
+					return fmt.Errorf("found")
 				}
 			}
 			return nil
@@ -230,11 +244,10 @@ func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteK
 	}
 
 	if target == nil {
-		return 0, fmt.Errorf("photo %s not found in iCloud", remoteKey)
+		return 0, fmt.Errorf("photo %s not found in iCloud", assetID)
 	}
 
-	// Download to the target path
-	if err := target.DownloadTo(icloud.PhotoVersionOriginal, false, localPath); err != nil {
+	if err := target.DownloadTo(icloud.PhotoVersionOriginal, isLive, localPath); err != nil {
 		return 0, fmt.Errorf("download photo %s: %w", remoteKey, err)
 	}
 
@@ -245,6 +258,8 @@ func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteK
 
 	return info.Size(), nil
 }
+
+const livePhotoKeySuffix = ":live"
 
 // defaultICloudCookieDir resolves the default icloud cookie directory
 // using the same path resolution as .secrets.

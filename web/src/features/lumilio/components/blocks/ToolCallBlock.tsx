@@ -26,31 +26,37 @@ export function ToolCallBlock({ block }: ToolCallBlockProps) {
           ? "border-success/30 text-success"
           : "border-info/30 text-info";
 
+  const summary = isEmptyResult
+    ? t("lumilio.tools.emptyResult", "No matching photos")
+    : (block.message ?? block.error?.message);
+
   return (
     <div className="my-2">
       <button
         onClick={() => setShowDetail(!showDetail)}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors duration-200 cursor-pointer ${accent}`}
+        className={`inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors duration-200 cursor-pointer ${accent}`}
       >
         <Hammer className="flex-shrink-0" size={12} strokeWidth={1.5} />
-        <span className="truncate max-w-[160px]">{block.name}</span>
+        <span className="flex-shrink-0 whitespace-nowrap">{block.name}</span>
         {block.status === "running" && (
-          <Loader className="animate-spin" size={13} />
+          <Loader className="flex-shrink-0 animate-spin" size={13} />
         )}
         {block.status === "success" &&
           (isEmptyResult ? (
-            <TriangleAlert size={13} />
+            <TriangleAlert className="flex-shrink-0" size={13} />
           ) : (
-            <BadgeCheck size={13} />
+            <BadgeCheck className="flex-shrink-0" size={13} />
           ))}
-        {block.status === "error" && <X size={13} />}
-        <span className="text-base-content/50 truncate max-w-[260px] ml-0.5">
-          {isEmptyResult
-            ? t("lumilio.tools.emptyResult", "No matching photos")
-            : (block.message ?? block.error?.message)}
-        </span>
+        {block.status === "error" && <X className="flex-shrink-0" size={13} />}
+        {summary && (
+          <span className="min-w-0 truncate text-left text-base-content/50 ml-0.5">
+            {summary}
+          </span>
+        )}
         {block.count !== undefined && block.count > 0 && (
-          <span className="text-base-content/40">· {block.count}</span>
+          <span className="flex-shrink-0 text-base-content/40">
+            · {block.count}
+          </span>
         )}
       </button>
 

@@ -24,7 +24,8 @@ type LLMConfigProvider interface {
 
 type AgentService interface {
 	// AskAgent 执行 Agent 查询或开启新会话。userID 与 threadID 共同构成 ref 作用域（INV-4）。
-	AskAgent(ctx context.Context, userID int32, threadID, query string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
+	// instructionExtras is appended to the agent instruction (context/mention bindings).
+	AskAgent(ctx context.Context, userID int32, threadID, query, instructionExtras string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
 
 	// ResumeAgent 恢复中断的会话
 	ResumeAgent(ctx context.Context, userID int32, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error)
@@ -70,7 +71,7 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 
 // buildAgent 构建 Agent 实例。AskAgent 和 ResumeAgent 必须使用完全相同的配置
 // （全量工具集），否则 checkpoint 恢复后工具集对不齐。
-func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
+func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID string, instructionExtras string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
 	deps := &ToolDependencies{
 		Queries:     s.queries,
 		SideChannel: sideChannel,
@@ -132,7 +133,7 @@ func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID st
 		&adk.ChatModelAgentConfig{
 			Name:        "Photo Asset Assistant",
 			Description: "Agent for managing photo assets with filtering and search capabilities",
-			Instruction: buildInstruction(today, ledger),
+			Instruction: buildInstruction(today, ledger) + instructionExtras,
 			Model:       chatModel,
 			ToolsConfig: adk.ToolsConfig{
 				ToolsNodeConfig: compose.ToolsNodeConfig{
@@ -182,13 +183,13 @@ func buildInstruction(today string, ledger []*ref.Ref) string {
 	return instruction
 }
 
-func (s *agentService) AskAgent(ctx context.Context, userID int32, threadID, query string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
+func (s *agentService) AskAgent(ctx context.Context, userID int32, threadID, query, instructionExtras string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
 	var sideChannel chan<- *SideChannelEvent
 	if len(sideChannels) > 0 && sideChannels[0] != nil {
 		sideChannel = sideChannels[0]
 	}
 
-	agent, err := s.buildAgent(ctx, userID, threadID, sideChannel)
+	agent, err := s.buildAgent(ctx, userID, threadID, instructionExtras, sideChannel)
 	if err != nil {
 		// 在异步迭代器中返回错误
 		iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
@@ -216,7 +217,7 @@ func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID s
 		sideChannel = sideChannels[0]
 	}
 
-	agent, err := s.buildAgent(ctx, userID, threadID, sideChannel)
+	agent, err := s.buildAgent(ctx, userID, threadID, "", sideChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build agent for resume: %w", err)
 	}

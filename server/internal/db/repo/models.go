@@ -442,6 +442,7 @@ type OcrResult struct {
 	ProcessingTimeMs *int32             `db:"processing_time_ms" json:"processing_time_ms"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	FullText         string             `db:"full_text" json:"full_text"`
 }
 
 // OCR recognized text items table, storing detailed information for each text region
@@ -456,9 +457,8 @@ type OcrTextItem struct {
 	BoundingBox []byte `db:"bounding_box" json:"bounding_box"`
 	TextLength  int32  `db:"text_length" json:"text_length"`
 	// Approximate area of text region, can be used to filter larger text
-	AreaPixels   *float32           `db:"area_pixels" json:"area_pixels"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	SearchVector string             `db:"search_vector" json:"search_vector"`
+	AreaPixels *float32           `db:"area_pixels" json:"area_pixels"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type RefreshToken struct {

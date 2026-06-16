@@ -75,6 +75,21 @@ OpenAPI is the source of truth for HTTP contracts.
 - Do not hand-edit `src/lib/http-commons/schema.d.ts`.
 - Do not create ad-hoc request/response types when an endpoint exists in OpenAPI.
 
+> **An `as` cast on an API response is a red flag — never use it to "fix" a type.**
+> If you find yourself writing `someQuery.data?.data as { ... }` (or `as any`) to
+> read response fields, the generated type is wrong or missing. Do **not** cast
+> around it — casting silently desyncs the frontend from the contract. Instead:
+> 1. Check the backend handler's `@Success ... {data=dto.XxxDTO}` annotation —
+>    does the referenced DTO actually declare the fields you need?
+> 2. If the DTO is correct but `schema.d.ts` shows `Record<string, never>` or
+>    stale/missing fields, the **generated artifact is stale** → run `make dto`.
+> 3. Only then read the now-typed field.
+>
+> Real bug this caught: `/assets/filter-options` returns `camera_models`, but a
+> cast had guessed `cameras`, silently breaking the camera `@`-mention. The DTO
+> (`dto.OptionsResponseDTO`) and its `@Success` annotation were both correct —
+> `make dto` simply had not been re-run, so the cast masked the stale type.
+
 For API changes:
 
 1. Update backend annotations and handler behavior.

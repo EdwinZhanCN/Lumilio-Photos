@@ -29,6 +29,10 @@ type Querier interface {
 	AgentFacetTopPeople(ctx context.Context, arg AgentFacetTopPeopleParams) ([]AgentFacetTopPeopleRow, error)
 	AgentFacetTopPlaces(ctx context.Context, arg AgentFacetTopPlacesParams) ([]AgentFacetTopPlacesRow, error)
 	AgentFacetTypeCounts(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetTypeCountsRow, error)
+	// inspect observer: per-asset EXIF facets for small refs.
+	AgentInspectAssets(ctx context.Context, assetIds []pgtype.UUID) ([]AgentInspectAssetsRow, error)
+	// lookup_albums entity resolver: albums matching a title query.
+	AgentLookupAlbums(ctx context.Context, arg AgentLookupAlbumsParams) ([]AgentLookupAlbumsRow, error)
 	// lookup_people entity resolver: named face clusters matching a name query.
 	AgentLookupPeople(ctx context.Context, arg AgentLookupPeopleParams) ([]AgentLookupPeopleRow, error)
 	// peek observer: minimal per-asset fields; snapshot order restored in Go.
@@ -103,6 +107,7 @@ type Querier interface {
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteCloudCredential(ctx context.Context, credentialID pgtype.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
+	DeleteEmptyFaceClusters(ctx context.Context) error
 	DeleteEmptyUnconfirmedFaceClusters(ctx context.Context) error
 	DeleteExpiredRegistrationSessions(ctx context.Context) error
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
@@ -132,6 +137,7 @@ type Querier interface {
 	DeleteUserTOTPCredential(ctx context.Context, userID int32) error
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
+	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) error
 	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
 	// Find all assets sharing the same base filename (without extension and without iteration suffix)
 	FindAssetsByBaseName(ctx context.Context, arg FindAssetsByBaseNameParams) ([]FindAssetsByBaseNameRow, error)
@@ -252,6 +258,7 @@ type Querier interface {
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
+	GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error)
 	GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error)
 	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
 	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
@@ -302,6 +309,7 @@ type Querier interface {
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
 	GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTopSpeciesLabelsRow, error)
 	GetUnclusteredFaces(ctx context.Context, arg GetUnclusteredFacesParams) ([]FaceItem, error)
+	GetUnclusteredFacesInScope(ctx context.Context, arg GetUnclusteredFacesInScopeParams) ([]FaceItem, error)
 	GetUserByID(ctx context.Context, userID int32) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error)
@@ -381,8 +389,6 @@ type Querier interface {
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
-	SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error)
-	SearchAssetsByOCRTextWithConfidence(ctx context.Context, arg SearchAssetsByOCRTextWithConfidenceParams) ([]Asset, error)
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
@@ -413,6 +419,7 @@ type Querier interface {
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
 	UpdateFaceResultStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateLocationClusterGeocode(ctx context.Context, arg UpdateLocationClusterGeocodeParams) error
+	UpdateOCRFullText(ctx context.Context, arg UpdateOCRFullTextParams) error
 	UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)

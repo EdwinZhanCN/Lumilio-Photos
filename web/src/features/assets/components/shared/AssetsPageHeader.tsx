@@ -149,7 +149,6 @@ const AssetsPageHeader = ({
       // Prevent re-emit loop when FilterTool mounts with initial values
       const nextHash = JSON.stringify(newFilters || {});
       if (nextHash === inboundHash) {
-        onFiltersChangeRef.current?.(newFilters);
         return;
       }
 

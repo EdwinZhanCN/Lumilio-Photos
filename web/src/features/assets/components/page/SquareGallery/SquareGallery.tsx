@@ -236,7 +236,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
             )}
 
             <div
-              className="grid grid-cols-2 gap-1 md:[grid-template-columns:repeat(var(--square-gallery-columns),minmax(0,1fr))]"
+              className="grid grid-cols-2 gap-0.5 md:[grid-template-columns:repeat(var(--square-gallery-columns),minmax(0,1fr))]"
               style={
                 {
                   "--square-gallery-columns": String(columns),

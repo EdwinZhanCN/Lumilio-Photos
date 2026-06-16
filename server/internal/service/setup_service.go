@@ -13,6 +13,7 @@ import (
 	"server/config"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ErrSystemAlreadyInitialized is returned when setup is attempted on a system
@@ -35,6 +36,10 @@ const passwordAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456
 // new password with a native user-alteration command, and terminate the session.
 type DBCredentialRotator interface {
 	RotatePassword(ctx context.Context, username, newPassword string) error
+}
+
+type reservingCredentialRotator interface {
+	ReserveRotation(ctx context.Context) (DBCredentialRotator, func(), error)
 }
 
 // SetupRequest carries the first-run setup payload submitted from the web wizard.
@@ -71,6 +76,21 @@ func NewSetupService(dbConfig config.DatabaseConfig) *SetupService {
 	}
 }
 
+// NewSetupServiceWithPool wires setup to the already-open application pool. This
+// lets setup recover when the bootstrap password in TOML/env is stale but the
+// running server still owns a valid database session.
+func NewSetupServiceWithPool(dbConfig config.DatabaseConfig, pool *pgxpool.Pool) *SetupService {
+	rotator := DBCredentialRotator(&pgxCredentialRotator{cfg: dbConfig})
+	if pool != nil {
+		rotator = &pgxPoolCredentialRotator{pool: pool}
+	}
+	return &SetupService{
+		dbConfig:   dbConfig,
+		rotator:    rotator,
+		secretPath: config.ResolveDBPasswordFilePath(dbConfig),
+	}
+}
+
 // Status reports whether the rotated database password secret already exists on
 // disk. The web frontend uses this to decide whether first-run setup still
 // needs to rotate the temporary bootstrap credential.
@@ -99,21 +119,35 @@ func (s *SetupService) Initialize(ctx context.Context, _ SetupRequest) (SetupRes
 		return SetupResult{}, ErrSystemAlreadyInitialized
 	}
 
+	rotator := s.rotator
+	releaseRotation := func() {}
+	if reservingRotator, ok := s.rotator.(reservingCredentialRotator); ok {
+		reservedRotator, release, err := reservingRotator.ReserveRotation(ctx)
+		if err != nil {
+			return SetupResult{}, fmt.Errorf("reserve database rotation connection: %w", err)
+		}
+		rotator = reservedRotator
+		releaseRotation = release
+	}
+	defer releaseRotation()
+
 	newPassword, err := generateHighEntropyPassword(generatedPasswordLength)
 	if err != nil {
 		return SetupResult{}, fmt.Errorf("generate database password: %w", err)
 	}
 
-	// Rotate the database credential away from the bootstrap password using the
-	// initial temporary credential, then terminate that session.
-	if err := s.rotator.RotatePassword(ctx, s.dbConfig.User, newPassword); err != nil {
-		return SetupResult{}, fmt.Errorf("rotate database credential: %w", err)
-	}
-
 	// Persist the new secret with locked-down permissions so only the runtime
-	// process can read it.
+	// process can read it. This happens before ALTER USER so a local filesystem
+	// failure cannot leave PostgreSQL rotated with no password file on disk.
 	if err := writeSecretFile(s.secretPath, newPassword); err != nil {
 		return SetupResult{}, fmt.Errorf("persist database secret: %w", err)
+	}
+
+	// Rotate the database credential away from the bootstrap password using the
+	// initial temporary credential, then terminate that session.
+	if err := rotator.RotatePassword(ctx, s.dbConfig.User, newPassword); err != nil {
+		_ = removeSecretFileIfMatches(s.secretPath, newPassword)
+		return SetupResult{}, fmt.Errorf("rotate database credential: %w", err)
 	}
 
 	return SetupResult{
@@ -136,6 +170,17 @@ func writeSecretFile(path, secret string) error {
 		return fmt.Errorf("lock secret permissions %s: %w", path, err)
 	}
 	return nil
+}
+
+func removeSecretFileIfMatches(path, secret string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(string(data)) != secret {
+		return nil
+	}
+	return os.Remove(path)
 }
 
 // generateHighEntropyPassword returns a cryptographically secure random string
@@ -184,6 +229,49 @@ func (r *pgxCredentialRotator) RotatePassword(ctx context.Context, username, new
 	)
 	if _, err := conn.Exec(ctx, stmt); err != nil {
 		return fmt.Errorf("alter user: %w", err)
+	}
+	return nil
+}
+
+// pgxPoolCredentialRotator rotates through an existing application pool. It
+// reserves a live connection before setup writes the new password file so the
+// pool cannot race by opening a fresh connection with the not-yet-activated
+// password.
+type pgxPoolCredentialRotator struct {
+	pool *pgxpool.Pool
+}
+
+func (r *pgxPoolCredentialRotator) ReserveRotation(ctx context.Context) (DBCredentialRotator, func(), error) {
+	if r.pool == nil {
+		return nil, nil, errors.New("database pool unavailable")
+	}
+	conn, err := r.pool.Acquire(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("acquire live database connection: %w", err)
+	}
+	return &pgxPoolConnCredentialRotator{conn: conn}, conn.Release, nil
+}
+
+func (r *pgxPoolCredentialRotator) RotatePassword(ctx context.Context, username, newPassword string) error {
+	reserved, release, err := r.ReserveRotation(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return reserved.RotatePassword(ctx, username, newPassword)
+}
+
+type pgxPoolConnCredentialRotator struct {
+	conn *pgxpool.Conn
+}
+
+func (r *pgxPoolConnCredentialRotator) RotatePassword(ctx context.Context, username, newPassword string) error {
+	stmt := fmt.Sprintf("ALTER USER %s WITH PASSWORD %s",
+		quoteSQLIdentifier(username),
+		quoteSQLLiteral(newPassword),
+	)
+	if _, err := r.conn.Exec(ctx, stmt); err != nil {
+		return fmt.Errorf("alter user through live pool: %w", err)
 	}
 	return nil
 }

@@ -18,7 +18,7 @@ func isSocketHost(host string) bool {
 // socketDSN builds a libpq keyword/value connection string for a Unix-socket
 // directory host. A URL-form DSN (postgres://user:pw@host:port/db) cannot carry
 // a filesystem path — with slashes and spaces, e.g.
-// "/Users/me/Library/Application Support/Lumilio Photos/postgres/16/run" — in
+// "/Users/me/Library/Application Support/Lumilio Photos/postgres/17/run" — in
 // the host position, so the keyword/value form is used instead. pgx accepts it
 // via pgxpool.ParseConfig, the pgx stdlib sql driver, and pgxpool.New, so it
 // works for the connection pool and for both migration paths.

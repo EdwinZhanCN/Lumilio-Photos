@@ -25,18 +25,11 @@ import (
 )
 
 const (
-	faceClusterMinConfidence            = float32(0.60)
-	faceClusterMinAreaPixels            = int32(4096)
-	faceClusterMinSimilarity            = float32(0.55)
-	faceClusterDBSCANMinPoints          = 2
-	faceClusterIncrementalNeighborLimit = 256
-	faceClusterHDBSCANMinClusterSize    = 2
-	faceClusterHDBSCANMinSamples        = 2
-	faceClusterHDBSCANKNearestNeighbors = 48
-	faceClusterHDBSCANMaxDistance       = float64(1.0 - faceClusterMinSimilarity)
-	faceClusterMinMedoidSimilarity      = float64(0.50)
-	faceCropPaddingMultiplier           = float32(0.12)
-	faceCropQuality                     = 85
+	faceRecognitionMinScore    = float32(0.70)
+	faceRecognitionMaxDistance = float64(0.50)
+	faceRecognitionMinFaces    = 3
+	faceCropPaddingMultiplier  = float32(0.12)
+	faceCropQuality            = 85
 )
 
 type faceRepositoryPathResolver interface {
@@ -87,7 +80,7 @@ type Person struct {
 	UpdatedAt             time.Time
 }
 
-// FaceClusterRebuildResult summarizes a full HDBSCAN people-cluster rebuild.
+// FaceClusterRebuildResult summarizes a full people-cluster rebuild.
 type FaceClusterRebuildResult struct {
 	Algorithm       string
 	RepositoryID    *string
@@ -169,6 +162,7 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, 
 	}
 
 	primaryFaceIndex := largestFaceIndex(faceV1.Faces)
+	createdItems := make([]repo.FaceItem, 0, len(faceV1.Faces))
 
 	for i, face := range faceV1.Faces {
 		faceItemMeta, err := s.convertLumenFaceToDBFace(face, i)
@@ -223,10 +217,11 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, 
 		if err != nil {
 			return fmt.Errorf("failed to create face item %d: %w", i, err)
 		}
+		createdItems = append(createdItems, createdItem)
+	}
 
-		if err := s.assignFaceToCluster(ctx, createdItem, *asset); err != nil {
-			return fmt.Errorf("failed to assign face %d to cluster: %w", i, err)
-		}
+	if err := s.recognizePendingFacesForAsset(ctx, *asset, createdItems); err != nil {
+		return fmt.Errorf("recognize pending faces: %w", err)
 	}
 
 	return nil
@@ -363,9 +358,10 @@ func (s *faceService) assignFaceToCluster(ctx context.Context, item repo.FaceIte
 	if !isClusterCandidate(item) || item.Embedding == nil || !asset.RepositoryID.Valid {
 		return nil
 	}
-
-	return s.withTx(ctx, func(q *repo.Queries) error {
-		return s.assignFaceToClusterDBSCAN(ctx, q, item, asset)
+	return s.recognizePendingFaces(ctx, faceClusterScope{
+		RepositoryID:   asset.RepositoryID,
+		OwnerID:        cloneInt32Ptr(asset.OwnerID),
+		EmbeddingModel: normalizedName(item.EmbeddingModel),
 	})
 }
 
@@ -467,10 +463,7 @@ func isClusterCandidate(item repo.FaceItem) bool {
 	if item.Embedding == nil || len(item.Embedding.Slice()) == 0 {
 		return false
 	}
-	if item.Confidence < faceClusterMinConfidence {
-		return false
-	}
-	if item.FaceSize == nil || *item.FaceSize < faceClusterMinAreaPixels {
+	if item.Confidence < faceRecognitionMinScore {
 		return false
 	}
 	return true

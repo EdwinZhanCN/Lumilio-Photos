@@ -1,25 +1,14 @@
 import { useParams } from "react-router-dom";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import {
-  useSortBy,
-  useIsCarouselOpen,
-  useUIActions,
-} from "@/features/assets/selectors";
-import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
-import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
-import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
+import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
-import { AssetViewDefinition, JustifiedGallery } from "@/features/assets";
 import { AlbumIcon, Bird, RefreshCcw } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult } from "@/lib/albums/types";
 import type { components } from "@/lib/http-commons/schema";
 import { useWorkingRepository } from "@/features/settings";
-import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n.tsx";
 
 type RebuildAlbumBioClipResponse =
@@ -28,24 +17,15 @@ type RebuildAlbumBioClipResponse =
 const AlbumAssetsContent = () => {
   const { t, i18n } = useI18n();
   const queryClient = useQueryClient();
-  const { albumId, assetId } = useParams<{
-    albumId: string;
-    assetId: string;
-  }>();
+  const { albumId } = useParams<{ albumId: string }>();
   const { scopedRepositoryId } = useWorkingRepository();
-  const sortBy = useSortBy();
-  const isCarouselOpen = useIsCarouselOpen();
-  const { setSortBy } = useUIActions();
-  const { openCarousel, closeCarousel } = useAssetsNavigation();
-  const [isScrolled, setIsScrolled] = useState(false);
   const [bioClipFeedback, setBioClipFeedback] = useState<{
     tone: "success" | "error";
     message: string;
   } | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const albumIdNumber = albumId ? Number(albumId) : 0;
 
-  // Fetch album metadata
+  // Fetch album metadata for the hero banner.
   const albumQuery = $api.useQuery(
     "get",
     "/api/v1/albums/{id}",
@@ -55,9 +35,7 @@ const AlbumAssetsContent = () => {
         query: scopedRepositoryId ? { repository_id: scopedRepositoryId } : {},
       },
     },
-    {
-      enabled: !!albumId,
-    },
+    { enabled: !!albumId },
   );
   const albumResponse = albumQuery.data as ApiResult<Album> | undefined;
   const album = albumResponse?.data;
@@ -68,85 +46,13 @@ const AlbumAssetsContent = () => {
     "/api/v1/albums/{id}/bioclip/rebuild",
   );
 
-  // Memoize view definition to prevent unnecessary re-renders/fetches
-  const viewDefinition: AssetViewDefinition = useMemo(
-    () => ({
-      filter: {
-        album_id: parseInt(albumId!),
-      },
-      sortBy,
-      pageSize: 50,
-    }),
-    [albumId, sortBy],
-  );
-
-  // Fetch album assets using the assets view hook
-  const {
-    assets,
-    browseGroups,
-    browseItems,
-    browseAssets: flatAssets,
-    isLoading,
-    isLoadingMore,
-    fetchMore,
-    hasMore,
-    error,
-  } = useAssetsView(viewDefinition, { withGroups: true });
-
-  // Calculate slide index from URL assetId
-  const slideIndex = useMemo(() => {
-    if (assetId && flatAssets.length > 0) {
-      return findBrowseItemIndexByAssetId(browseItems, assetId);
-    }
-    return -1;
-  }, [assetId, browseItems, flatAssets.length]);
-
-  // Handle auto-fetching if asset is not in current page
-  const [isLocatingAsset, setIsLocatingAsset] = useState(false);
-
-  useEffect(() => {
-    if (isCarouselOpen && assetId && flatAssets.length > 0) {
-      const index = findBrowseItemIndexByAssetId(browseItems, assetId);
-      if (index < 0) {
-        if (hasMore && !isLoading && !isLoadingMore) {
-          setIsLocatingAsset(true);
-          void fetchMore();
-        }
-      } else {
-        setIsLocatingAsset(false);
-      }
-    }
-  }, [
-    assetId,
-    flatAssets,
-    browseItems,
-    isCarouselOpen,
-    hasMore,
-    isLoading,
-    isLoadingMore,
-    fetchMore,
-  ]);
-
-  const handleLoadMore = useCallback(() => {
-    if (hasMore && !isLoadingMore) {
-      void fetchMore();
-    }
-  }, [hasMore, isLoadingMore, fetchMore]);
-
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const top = e.currentTarget.scrollTop;
-    setIsScrolled((prev) => (prev ? top > 20 : top > 60));
-  }, []);
-
   const handleRebuildBioClip = useCallback(async () => {
     if (!albumIdNumber || !isBioAlbum) return;
 
     setBioClipFeedback(null);
     try {
       const response = await rebuildBioClipMutation.mutateAsync({
-        params: {
-          path: { id: albumIdNumber },
-        },
+        params: { path: { id: albumIdNumber } },
         body: {},
       });
       const responseData = response as ApiResult<RebuildAlbumBioClipResponse>;
@@ -168,194 +74,105 @@ const AlbumAssetsContent = () => {
         message: t("collections.albumDetails.bioClip.error"),
       });
     }
-  }, [
-    albumIdNumber,
-    isBioAlbum,
-    queryClient,
-    rebuildBioClipMutation,
-    t,
-  ]);
+  }, [albumIdNumber, isBioAlbum, queryClient, rebuildBioClipMutation, t]);
 
-  if (error)
-    return (
-      <div className="p-8 text-error">
-        {t("collections.albumDetails.loadError", { error: String(error) })}
-      </div>
-    );
-
-  // Initial loading state: loading assets and we have none yet
-  const isInitialLoading = isLoading && assets.length === 0;
-
-  return (
-    <div className="flex flex-col h-full relative">
-      <div className="sticky top-0 z-30 bg-base-100/80 backdrop-blur-md border-b border-base-200/30">
-        <AssetsPageHeader
-          sortBy={sortBy}
-          onSortByChange={setSortBy}
-          title={
-            album?.album_name || t("collections.albumDetails.fallbackName")
-          }
-          icon={<AlbumIcon className="w-6 h-6 text-primary" />}
-          browseItems={browseItems}
-        />
-
-        <div
-          className={`px-4 transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "py-1.5" : "py-4"}`}
-        >
-          {/* Title and Badge - Collapses when scrolled */}
-          <div
-            className={`flex items-baseline gap-4 transition-all duration-500 ease-in-out ${isScrolled ? "max-h-0 opacity-0 -translate-y-2" : "max-h-20 opacity-100 translate-y-0"}`}
-          >
-            {isAlbumLoading && !album ? (
-              <div className="h-10 w-64 bg-base-300 animate-pulse rounded-lg"></div>
-            ) : (
-              <>
-                <h1 className="text-4xl font-black tracking-tight text-primary">
-                  {album?.album_name || t("collections.untitled")}
-                </h1>
-                <span className="badge badge-ghost font-mono text-xs opacity-50">
-                  {t("collections.albumDetails.albumCode", { id: albumId })}
-                </span>
-                {isBioAlbum && (
-                  <span className="badge badge-primary gap-1.5">
-                    <Bird className="size-3.5" />
-                    {t("collections.albumDetails.bioClip.badge")}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Description - Collapses or becomes a single line preview */}
-          <div
-            className={`transition-all duration-500 ease-in-out ${isScrolled ? "max-h-0 opacity-0" : "max-h-40 opacity-100 mt-3"}`}
-          >
-            {isAlbumLoading && !album ? (
-              <div className="h-4 w-full max-w-xl bg-base-300 animate-pulse rounded"></div>
-            ) : (
-              album?.description && (
-                <p className="text-base-content/70 max-w-3xl leading-relaxed line-clamp-2">
-                  {album.description}
-                </p>
-              )
-            )}
-          </div>
-
-          {/* Stats Row - Always visible but changes style */}
-          <div
-            className={`flex items-center gap-6 transition-all duration-500 ease-in-out ${isScrolled ? "mt-0 text-[10px] opacity-60" : "mt-6 text-xs opacity-40"}`}
-          >
-            <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              <span className="text-primary text-[8px]">●</span>
-              {isAlbumLoading && !album ? (
-                <div className="h-3 w-16 bg-base-300 animate-pulse rounded"></div>
-              ) : (
-                <span>
-                  {t("collections.albumDetails.itemsCount", {
-                    count: album?.asset_count || 0,
-                  })}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              <span className="text-primary text-[8px]">●</span>
-              {isAlbumLoading && !album ? (
-                <div className="h-3 w-24 bg-base-300 animate-pulse rounded"></div>
-              ) : (
-                <span>
-                  {t("collections.albumDetails.createdAtLabel")}{" "}
-                  {album?.created_at
-                    ? new Date(album.created_at).toLocaleDateString(
-                        i18n.resolvedLanguage || i18n.language,
-                      )
-                    : ""}
-                </span>
-              )}
-            </div>
-
+  const hero = (
+    <div className="px-4 py-4">
+      <div className="flex items-baseline gap-4">
+        {isAlbumLoading && !album ? (
+          <div className="h-10 w-64 animate-pulse rounded-lg bg-base-300" />
+        ) : (
+          <>
+            <h1 className="text-4xl font-black tracking-tight text-primary">
+              {album?.album_name || t("collections.untitled")}
+            </h1>
+            <span className="badge badge-ghost font-mono text-xs opacity-50">
+              {t("collections.albumDetails.albumCode", { id: albumId })}
+            </span>
             {isBioAlbum && (
-              <button
-                type="button"
-                className="btn btn-primary btn-xs gap-1.5"
-                onClick={handleRebuildBioClip}
-                disabled={rebuildBioClipMutation.isPending}
-              >
-                {rebuildBioClipMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <RefreshCcw className="size-3.5" />
-                )}
-                {rebuildBioClipMutation.isPending
-                  ? t("collections.albumDetails.bioClip.running")
-                  : t("collections.albumDetails.bioClip.action")}
-              </button>
-            )}
-
-            {/* Inline description preview when scrolled */}
-            <div
-              className={`flex items-center gap-2 ml-auto max-w-[50%] transition-all duration-500 ${isScrolled ? "opacity-70 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"}`}
-            >
-              <span className="truncate italic font-normal normal-case">
-                {album?.description}
+              <span className="badge badge-primary gap-1.5">
+                <Bird className="size-3.5" />
+                {t("collections.albumDetails.bioClip.badge")}
               </span>
-            </div>
-          </div>
-
-          {bioClipFeedback && !isScrolled && (
-            <div
-              className={`alert mt-4 py-2 text-sm max-w-xl ${bioClipFeedback.tone === "success" ? "alert-success" : "alert-error"}`}
-            >
-              {bioClipFeedback.message}
-            </div>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
 
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto"
-        onScroll={handleScroll}
-      >
-        <div>
-          {isInitialLoading ? (
-            <PhotosLoadingSkeleton />
+      {album?.description && (
+        <p className="mt-3 max-w-3xl leading-relaxed text-base-content/70 line-clamp-2">
+          {album.description}
+        </p>
+      )}
+
+      <div className="mt-6 flex items-center gap-6 text-xs opacity-40">
+        <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
+          <span className="text-[8px] text-primary">●</span>
+          {isAlbumLoading && !album ? (
+            <div className="h-3 w-16 animate-pulse rounded bg-base-300" />
           ) : (
-            <JustifiedGallery
-              browseGroups={browseGroups}
-              openCarousel={openCarousel}
-              onLoadMore={handleLoadMore}
-              hasMore={hasMore}
-              isLoadingMore={isLoadingMore}
-            />
+            <span>
+              {t("collections.albumDetails.itemsCount", {
+                count: album?.asset_count || 0,
+              })}
+            </span>
           )}
         </div>
+        <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
+          <span className="text-[8px] text-primary">●</span>
+          {isAlbumLoading && !album ? (
+            <div className="h-3 w-24 animate-pulse rounded bg-base-300" />
+          ) : (
+            <span>
+              {t("collections.albumDetails.createdAtLabel")}{" "}
+              {album?.created_at
+                ? new Date(album.created_at).toLocaleDateString(
+                    i18n.resolvedLanguage || i18n.language,
+                  )
+                : ""}
+            </span>
+          )}
+        </div>
+
+        {isBioAlbum && (
+          <button
+            type="button"
+            className="btn btn-primary btn-xs gap-1.5"
+            onClick={handleRebuildBioClip}
+            disabled={rebuildBioClipMutation.isPending}
+          >
+            {rebuildBioClipMutation.isPending ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <RefreshCcw className="size-3.5" />
+            )}
+            {rebuildBioClipMutation.isPending
+              ? t("collections.albumDetails.bioClip.running")
+              : t("collections.albumDetails.bioClip.action")}
+          </button>
+        )}
       </div>
 
-      {isCarouselOpen && flatAssets.length > 0 && (
-        <>
-          <FullScreenCarousel
-            photos={flatAssets}
-            initialSlide={slideIndex >= 0 ? slideIndex : 0}
-            slideIndex={slideIndex >= 0 ? slideIndex : undefined}
-            onClose={closeCarousel}
-            onNavigate={openCarousel}
-          />
-          {isLocatingAsset && (
-            <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
-              <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
-                <div className="loading loading-spinner loading-lg mb-4"></div>
-                <p className="text-lg font-medium mb-2">
-                  {t("assets.all.locating_asset")}
-                </p>
-                <p className="text-sm text-gray-300">
-                  {t("assets.all.loading_more_data")}
-                </p>
-              </div>
-            </div>
-          )}
-        </>
+      {bioClipFeedback && (
+        <div
+          className={`alert mt-4 max-w-xl py-2 text-sm ${
+            bioClipFeedback.tone === "success" ? "alert-success" : "alert-error"
+          }`}
+        >
+          {bioClipFeedback.message}
+        </div>
       )}
     </div>
+  );
+
+  return (
+    <AssetsGalleryPage
+      title={album?.album_name || t("collections.albumDetails.fallbackName")}
+      icon={<AlbumIcon className="h-6 w-6 text-primary" />}
+      baseFilter={{ album_id: albumIdNumber }}
+      viewKey={`album:${albumId}`}
+      hero={hero}
+    />
   );
 };
 

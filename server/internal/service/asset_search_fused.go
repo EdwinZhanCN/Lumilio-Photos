@@ -102,7 +102,8 @@ func (s *assetService) searchAssetsFusedSet(ctx context.Context, params SearchAs
 		set.SemanticDegraded = true
 	}
 
-	// OCR and place membership: tsquery matching is the threshold.
+	// OCR membership: BM25 matching is the threshold.
+	// Place membership: tsquery matching is the threshold.
 	textReq := req
 	textReq.TopK = fusedSetCap
 	if s.ocrRetriever != nil {

@@ -29,48 +29,8 @@ LIMIT $2;
 -- name: DeleteOCRTextItemsByAsset :exec
 DELETE FROM ocr_text_items WHERE asset_id = $1;
 
--- name: SearchAssetsByOCRText :many
-WITH matched_assets AS MATERIALIZED (
-    SELECT t.asset_id
-    FROM ocr_text_items t
-    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', sqlc.arg('search_text'))
-    GROUP BY t.asset_id
-),
-page_ids AS MATERIALIZED (
-    SELECT
-        m.asset_id,
-        a.upload_time
-    FROM matched_assets m
-    JOIN assets a ON a.asset_id = m.asset_id
-    ORDER BY a.upload_time DESC, m.asset_id DESC
-    LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
-)
-SELECT a.*
-FROM page_ids p
-JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.upload_time DESC, p.asset_id DESC;
-
--- name: SearchAssetsByOCRTextWithConfidence :many
-WITH matched_assets AS MATERIALIZED (
-    SELECT t.asset_id
-    FROM ocr_text_items t
-    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', sqlc.arg('search_text'))
-      AND t.confidence >= sqlc.arg('confidence')
-    GROUP BY t.asset_id
-),
-page_ids AS MATERIALIZED (
-    SELECT
-        m.asset_id,
-        a.upload_time
-    FROM matched_assets m
-    JOIN assets a ON a.asset_id = m.asset_id
-    ORDER BY a.upload_time DESC, m.asset_id DESC
-    LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
-)
-SELECT a.*
-FROM page_ids p
-JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.upload_time DESC, p.asset_id DESC;
+-- name: UpdateOCRFullText :exec
+UPDATE ocr_results SET full_text = $2 WHERE asset_id = $1;
 
 -- name: GetOCRStatsByModel :many
 SELECT

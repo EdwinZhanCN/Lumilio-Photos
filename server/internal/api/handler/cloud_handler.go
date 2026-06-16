@@ -178,19 +178,19 @@ func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
 	})
 }
 
-// DisableCredential disables a saved cloud credential.
-// @Summary Disable cloud credential
-// @Description Disable a saved cloud credential so it cannot start new imports.
+// DisconnectCredential disconnects a cloud credential without deleting it.
+// @Summary Disconnect cloud credential
+// @Description Pause a cloud credential so it cannot start new imports. Can be reconnected later.
 // @Tags cloud
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Credential UUID"
-// @Success 200 {object} api.Result "Credential disabled"
+// @Success 200 {object} api.Result "Credential disconnected"
 // @Failure 400 {object} api.Result "Invalid request"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/cloud/credentials/{id} [delete]
-func (h *CloudHandler) DisableCredential(c *gin.Context) {
+// @Router /api/v1/cloud/credentials/{id}/disconnect [post]
+func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
 		return
 	}
@@ -201,12 +201,93 @@ func (h *CloudHandler) DisableCredential(c *gin.Context) {
 		return
 	}
 
-	if err := h.cloudService.DisableCredential(c.Request.Context(), credentialID); err != nil {
-		api.GinInternalError(c, err, "Failed to disable credential")
+	if err := h.cloudService.DisconnectCredential(c.Request.Context(), credentialID); err != nil {
+		api.GinInternalError(c, err, "Failed to disconnect credential")
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"message": "credential disabled"})
+	api.GinSuccess(c, gin.H{"message": "credential disconnected"})
+}
+
+// ReconnectCredential re-authenticates a disconnected or errored credential.
+// @Summary Reconnect cloud credential
+// @Description Re-authenticate a disconnected or errored credential. If no password is provided, attempts to reuse the existing session.
+// @Tags cloud
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Credential UUID"
+// @Param request body dto.ReconnectCloudCredentialRequest true "Reconnect inputs"
+// @Success 200 {object} api.Result{data=dto.CreateCloudCredentialResponse} "Reconnect result"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/cloud/credentials/{id}/reconnect [post]
+func (h *CloudHandler) ReconnectCredential(c *gin.Context) {
+	if _, ok := requireAdminUser(c); !ok {
+		return
+	}
+
+	credentialID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid credential id")
+		return
+	}
+
+	var req dto.ReconnectCloudCredentialRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	result, err := h.cloudService.ReconnectCredential(ctx, cloud.ReconnectCredentialInput{
+		CredentialID: credentialID,
+		Inputs:       req.Inputs,
+	})
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to reconnect credential")
+		return
+	}
+
+	api.GinSuccess(c, dto.CreateCloudCredentialResponse{
+		Credential: toCloudCredentialDTO(result.Credential, h.cloudService.ProviderTitle(cloud.ProviderKind(result.Credential.Provider))),
+		AuthStatus: result.AuthStatus,
+		Challenge:  toCloudAuthChallengeDTO(result.Challenge),
+	})
+}
+
+// RemoveCredential permanently deletes a cloud credential.
+// @Summary Remove cloud credential
+// @Description Permanently delete a cloud credential, its session data, and unbind associated repositories.
+// @Tags cloud
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Credential UUID"
+// @Success 200 {object} api.Result "Credential removed"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/cloud/credentials/{id} [delete]
+func (h *CloudHandler) RemoveCredential(c *gin.Context) {
+	if _, ok := requireAdminUser(c); !ok {
+		return
+	}
+
+	credentialID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid credential id")
+		return
+	}
+
+	if err := h.cloudService.RemoveCredential(c.Request.Context(), credentialID); err != nil {
+		api.GinInternalError(c, err, "Failed to remove credential")
+		return
+	}
+
+	api.GinSuccess(c, gin.H{"message": "credential removed"})
 }
 
 // StartRepositoryImport starts a cloud import for a repository's binding.

@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 
+	"server/internal/cloud/icloud"
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 	"server/internal/sourcing"
@@ -80,7 +81,9 @@ type CloudSyncService interface {
 	ListCredentials(ctx context.Context) ([]repo.CloudCredential, error)
 	CreateCredential(ctx context.Context, input CreateCloudCredentialInput) (CreateCloudCredentialResult, error)
 	VerifyCredentialChallenge(ctx context.Context, input VerifyCredentialChallengeInput) (CreateCloudCredentialResult, error)
-	DisableCredential(ctx context.Context, credentialID uuid.UUID) error
+	DisconnectCredential(ctx context.Context, credentialID uuid.UUID) error
+	ReconnectCredential(ctx context.Context, input ReconnectCredentialInput) (CreateCloudCredentialResult, error)
+	RemoveCredential(ctx context.Context, credentialID uuid.UUID) error
 	BindRepositoryCredentialAndStartImport(ctx context.Context, input BindRepositoryCredentialInput) (uuid.UUID, error)
 	StartRepositoryImport(ctx context.Context, input StartRepositoryImportInput) (uuid.UUID, error)
 	GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID) (RepositoryCloudStatus, error)
@@ -89,44 +92,21 @@ type CloudSyncService interface {
 	ProviderTitle(provider ProviderKind) string
 }
 
+// ReconnectCredentialInput holds inputs for reconnecting a disabled/error credential.
+type ReconnectCredentialInput struct {
+	CredentialID uuid.UUID
+	Inputs       map[string]string // optional; if empty, tries existing session
+}
+
 type pendingICloudAuth struct {
-	provider *ICloudProvider
-	signal   *twoFASignal
+	client    *icloud.Client
+	phoneID   int
+	phoneMode string
 }
 
 type pendingCredentialAuth struct {
 	provider ProviderKind
 	state    any
-}
-
-// twoFASignal is a TextGetter implementation that signals when a provider
-// challenge is needed.
-type twoFASignal struct {
-	mu        sync.Mutex
-	code      string
-	triggered bool
-}
-
-func (s *twoFASignal) GetText(tip string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.code != "" {
-		return s.code, nil
-	}
-	s.triggered = true
-	return "", fmt.Errorf("authentication challenge required")
-}
-
-func (s *twoFASignal) setCode(code string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.code = code
-}
-
-func (s *twoFASignal) wasTriggered() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.triggered
 }
 
 // activeImport tracks an in-flight import run so it can be single-flighted per
@@ -303,22 +283,129 @@ func (s *cloudSyncService) VerifyCredentialChallenge(ctx context.Context, input 
 	return CreateCloudCredentialResult{Credential: updated, AuthStatus: authResult.AuthStatus}, nil
 }
 
-func (s *cloudSyncService) DisableCredential(ctx context.Context, credentialID uuid.UUID) error {
+func (s *cloudSyncService) DisconnectCredential(ctx context.Context, credentialID uuid.UUID) error {
 	_, err := s.queries.UpdateCloudCredentialStatus(ctx, repo.UpdateCloudCredentialStatusParams{
 		CredentialID: toPGUUID(credentialID),
 		Status:       CredentialStatusDisabled,
 	})
 	if err == nil {
-		s.mu.Lock()
-		delete(s.pendingAuth, credentialID)
-		for _, imp := range s.activeImports {
-			if imp.credentialID == credentialID && imp.cancel != nil {
-				imp.cancel()
-			}
-		}
-		s.mu.Unlock()
+		s.cancelCredentialWork(credentialID)
 	}
 	return err
+}
+
+func (s *cloudSyncService) ReconnectCredential(ctx context.Context, input ReconnectCredentialInput) (CreateCloudCredentialResult, error) {
+	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(input.CredentialID))
+	if err != nil {
+		return CreateCloudCredentialResult{}, fmt.Errorf("credential not found: %w", err)
+	}
+	if credential.Status == CredentialStatusConnected && len(input.Inputs) == 0 {
+		return CreateCloudCredentialResult{Credential: credential, AuthStatus: AuthStatusConnected}, nil
+	}
+
+	provider, err := s.registry.Get(ProviderKind(credential.Provider))
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
+
+	artifactDir := stringPtrValue(credential.ArtifactDir)
+	password := strings.TrimSpace(input.Inputs["password"])
+
+	if password == "" {
+		// Try existing session
+		importer, err := provider.NewImporter(ctx, credential)
+		if err != nil {
+			return CreateCloudCredentialResult{
+				Credential: credential,
+				AuthStatus: AuthStatusPasswordRequired,
+			}, nil
+		}
+		if authenticator, ok := importer.(interface{ ForceAuth(context.Context) error }); ok {
+			if err := authenticator.ForceAuth(ctx); err != nil {
+				return CreateCloudCredentialResult{
+					Credential: credential,
+					AuthStatus: AuthStatusPasswordRequired,
+				}, nil
+			}
+		}
+		// Session is valid, restore connected status
+		updated, err := s.queries.UpdateCloudCredentialStatus(ctx, repo.UpdateCloudCredentialStatusParams{
+			CredentialID: toPGUUID(input.CredentialID),
+			Status:       CredentialStatusConnected,
+		})
+		if err != nil {
+			return CreateCloudCredentialResult{}, err
+		}
+		return CreateCloudCredentialResult{Credential: updated, AuthStatus: AuthStatusConnected}, nil
+	}
+
+	// Full re-authentication with password
+	identity, _ := provider.Identity(map[string]string{
+		"username": credential.MaskedIdentity,
+		"domain":   unmarshalPublicConfig(credential.PublicConfig)["domain"],
+	})
+
+	authResult, err := provider.Authenticate(ctx, CredentialAuthInput{
+		CredentialID: input.CredentialID,
+		DisplayName:  credential.DisplayName,
+		Inputs:       input.Inputs,
+		ArtifactDir:  artifactDir,
+		Identity:     identity,
+	})
+	if err != nil {
+		return CreateCloudCredentialResult{}, fmt.Errorf("reconnect authentication failed: %w", err)
+	}
+
+	updated, err := s.updateCredentialAuthState(ctx, credential, authResult)
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
+	if authResult.PendingState != nil {
+		s.mu.Lock()
+		s.pendingAuth[input.CredentialID] = pendingCredentialAuth{provider: ProviderKind(credential.Provider), state: authResult.PendingState}
+		s.mu.Unlock()
+	}
+	return CreateCloudCredentialResult{
+		Credential: updated,
+		AuthStatus: authResult.AuthStatus,
+		Challenge:  authResult.Challenge,
+	}, nil
+}
+
+func (s *cloudSyncService) RemoveCredential(ctx context.Context, credentialID uuid.UUID) error {
+	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(credentialID))
+	if err != nil {
+		return fmt.Errorf("credential not found: %w", err)
+	}
+
+	s.cancelCredentialWork(credentialID)
+
+	if err := s.queries.DisableRepositoryCloudBindingsByCredential(ctx, toPGUUID(credentialID)); err != nil {
+		s.logger.Warn("failed to disable bindings on credential removal", zap.Error(err))
+	}
+
+	if err := s.queries.DeleteCloudCredential(ctx, toPGUUID(credentialID)); err != nil {
+		return fmt.Errorf("delete credential: %w", err)
+	}
+
+	if dir := stringPtrValue(credential.ArtifactDir); dir != "" {
+		if err := os.RemoveAll(dir); err != nil {
+			s.logger.Warn("failed to remove credential artifact directory", zap.String("dir", dir), zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+func (s *cloudSyncService) cancelCredentialWork(credentialID uuid.UUID) {
+	s.mu.Lock()
+	delete(s.pendingAuth, credentialID)
+	for _, imp := range s.activeImports {
+		if imp.credentialID == credentialID && imp.cancel != nil {
+			imp.cancel()
+		}
+	}
+	s.mu.Unlock()
 }
 
 func (s *cloudSyncService) BindRepositoryCredentialAndStartImport(ctx context.Context, input BindRepositoryCredentialInput) (uuid.UUID, error) {
@@ -550,11 +637,18 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 		}
 	}()
 
+	repository, err := s.queries.GetRepository(ctx, toPGUUID(repositoryID))
+	if err != nil {
+		finish(ImportRunStatusFailed, fmt.Errorf("get repository: %w", err))
+		return
+	}
+	stagingDir := filepath.Join(repository.Path, ".lumilio", "staging", "incoming")
+
 	stateStore := NewPGSyncStateStore(s.queries, credentialID)
 	source := NewCloudImportSource(CloudImportSourceConfig{
 		Provider:   provider,
 		State:      stateStore,
-		StagingDir: defaultStagingDir(),
+		StagingDir: stagingDir,
 		RepoID:     repositoryID,
 		OwnerID:    ownerID,
 		OnProgress: progress,
@@ -661,14 +755,3 @@ func nullableString(value string) *string {
 	return &value
 }
 
-func defaultStagingDir() string {
-	storagePath := strings.TrimSpace(os.Getenv("STORAGE_PATH"))
-	if storagePath != "" {
-		normalized := filepath.Clean(storagePath)
-		if strings.EqualFold(filepath.Base(normalized), "primary") {
-			normalized = filepath.Dir(normalized)
-		}
-		return filepath.Join(normalized, ".cloud-staging")
-	}
-	return filepath.Join("data", "storage", ".cloud-staging")
-}

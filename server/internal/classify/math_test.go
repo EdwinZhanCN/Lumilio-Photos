@@ -62,25 +62,27 @@ func TestContrastiveScore(t *testing.T) {
 	pos := []float32{1, 0}
 	neg := []float32{0, 1}
 
+	// Plain positive cosine when no negative.
 	if s := ContrastiveScore(asset, pos, nil); !almostEqual(s, 1.0, 1e-6) {
-		t.Fatalf("expected positive cosine 1.0, got %f", s)
+		t.Fatalf("positive-only cosine = %f, want 1.0", s)
 	}
+	// Positive beats orthogonal background → margin 1.
 	if s := ContrastiveScore(asset, pos, neg); !almostEqual(s, 1.0, 1e-6) {
-		t.Fatalf("expected contrastive 1.0, got %f", s)
+		t.Fatalf("margin = %f, want 1.0", s)
 	}
+	// When the asset matches the background instead → negative margin.
 	if s := ContrastiveScore([]float32{0, 1}, pos, neg); !almostEqual(s, -1.0, 1e-6) {
-		t.Fatalf("expected contrastive -1.0, got %f", s)
+		t.Fatalf("margin = %f, want -1.0", s)
 	}
 }
 
 func TestScoreToConfidence(t *testing.T) {
-	if c := ScoreToConfidence(0.2, 0.2); !almostEqual(c, 0.5, 1e-9) {
-		t.Fatalf("expected 0.5 at threshold, got %f", c)
+	if c := ScoreToConfidence(0.0, 0.0); !almostEqual(c, 0.5, 1e-9) {
+		t.Fatalf("confidence at threshold = %f, want 0.5", c)
 	}
-	low := ScoreToConfidence(-1, 0.2)
-	high := ScoreToConfidence(1, 0.2)
+	low, high := ScoreToConfidence(-0.2, 0.0), ScoreToConfidence(0.2, 0.0)
 	if !(low < 0.5 && high > 0.5) {
-		t.Fatalf("expected monotonic around threshold, got low=%f high=%f", low, high)
+		t.Fatalf("confidence not monotonic around threshold: low=%f high=%f", low, high)
 	}
 	if low < 0 || high > 1 {
 		t.Fatalf("confidence out of [0,1]: low=%f high=%f", low, high)

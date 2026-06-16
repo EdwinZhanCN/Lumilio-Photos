@@ -9,7 +9,90 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"server/internal/db/dbtypes"
 )
+
+const agentInspectAssets = `-- name: AgentInspectAssets :many
+SELECT asset_id, type, specific_metadata
+FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND is_deleted = false
+`
+
+type AgentInspectAssetsRow struct {
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	Type             string                   `db:"type" json:"type"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+}
+
+// inspect observer: per-asset EXIF facets for small refs.
+func (q *Queries) AgentInspectAssets(ctx context.Context, assetIds []pgtype.UUID) ([]AgentInspectAssetsRow, error) {
+	rows, err := q.db.Query(ctx, agentInspectAssets, assetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentInspectAssetsRow
+	for rows.Next() {
+		var i AgentInspectAssetsRow
+		if err := rows.Scan(&i.AssetID, &i.Type, &i.SpecificMetadata); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const agentLookupAlbums = `-- name: AgentLookupAlbums :many
+SELECT
+    al.album_id,
+    al.album_name::text AS title,
+    COUNT(DISTINCT aa.asset_id) AS asset_count
+FROM albums al
+LEFT JOIN album_assets aa ON aa.album_id = al.album_id
+LEFT JOIN assets a ON a.asset_id = aa.asset_id AND a.is_deleted = false
+WHERE al.user_id = $1
+  AND ($2::text IS NULL OR al.album_name ILIKE '%' || $2 || '%')
+GROUP BY al.album_id, al.album_name
+ORDER BY asset_count DESC
+LIMIT $3
+`
+
+type AgentLookupAlbumsParams struct {
+	UserID     int32   `db:"user_id" json:"user_id"`
+	TitleQuery *string `db:"title_query" json:"title_query"`
+	Limit      int32   `db:"limit" json:"limit"`
+}
+
+type AgentLookupAlbumsRow struct {
+	AlbumID    int32  `db:"album_id" json:"album_id"`
+	Title      string `db:"title" json:"title"`
+	AssetCount int64  `db:"asset_count" json:"asset_count"`
+}
+
+// lookup_albums entity resolver: albums matching a title query.
+func (q *Queries) AgentLookupAlbums(ctx context.Context, arg AgentLookupAlbumsParams) ([]AgentLookupAlbumsRow, error) {
+	rows, err := q.db.Query(ctx, agentLookupAlbums, arg.UserID, arg.TitleQuery, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentLookupAlbumsRow
+	for rows.Next() {
+		var i AgentLookupAlbumsRow
+		if err := rows.Scan(&i.AlbumID, &i.Title, &i.AssetCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const agentLookupPeople = `-- name: AgentLookupPeople :many
 SELECT

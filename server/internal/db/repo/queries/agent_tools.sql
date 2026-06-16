@@ -54,6 +54,28 @@ ORDER BY (
   + 0.35 * LEAST(COALESCE(a.width, 0)::float8 * COALESCE(a.height, 0)::float8 / 24000000.0, 1.0)
 ) ASC, asset_id ASC;
 
+-- name: AgentLookupAlbums :many
+-- lookup_albums entity resolver: albums matching a title query.
+SELECT
+    al.album_id,
+    al.album_name::text AS title,
+    COUNT(DISTINCT aa.asset_id) AS asset_count
+FROM albums al
+LEFT JOIN album_assets aa ON aa.album_id = al.album_id
+LEFT JOIN assets a ON a.asset_id = aa.asset_id AND a.is_deleted = false
+WHERE al.user_id = sqlc.arg('user_id')
+  AND (sqlc.narg('title_query')::text IS NULL OR al.album_name ILIKE '%' || sqlc.narg('title_query') || '%')
+GROUP BY al.album_id, al.album_name
+ORDER BY asset_count DESC
+LIMIT sqlc.arg('limit');
+
+-- name: AgentInspectAssets :many
+-- inspect observer: per-asset EXIF facets for small refs.
+SELECT asset_id, type, specific_metadata
+FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND is_deleted = false;
+
 -- name: AgentPeekAssets :many
 -- peek observer: minimal per-asset fields; snapshot order restored in Go.
 SELECT asset_id, original_filename, type,

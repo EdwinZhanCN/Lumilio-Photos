@@ -6,7 +6,9 @@ import {
   KeyRoundIcon,
   LogOutIcon,
   PlusIcon,
+  RefreshCwIcon,
   ShieldCheckIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -14,7 +16,9 @@ import {
   useCloudCredentials,
   useCloudProviders,
   useCreateCloudCredential,
-  useDisableCloudCredential,
+  useDisconnectCloudCredential,
+  useReconnectCloudCredential,
+  useRemoveCloudCredential,
   useVerifyCloudCredentialChallenge,
   type CloudAuthChallenge,
   type CloudCredential,
@@ -54,7 +58,9 @@ export default function CloudSettings() {
   const credentialsQuery = useCloudCredentials();
   const createCredential = useCreateCloudCredential();
   const verifyChallenge = useVerifyCloudCredentialChallenge();
-  const disableCredential = useDisableCloudCredential();
+  const disconnectCredential = useDisconnectCloudCredential();
+  const reconnectCredential = useReconnectCloudCredential();
+  const removeCredential = useRemoveCloudCredential();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [providerChoice, setProviderChoice] = useState<string | null>(null);
@@ -180,30 +186,55 @@ export default function CloudSettings() {
     }
   };
 
-  const handleDisable = async (credential: CloudCredential) => {
-    if (
-      !confirm(
-        t("settings.cloud.confirmDisable", {
-          name: credential.display_name,
-        }),
-      )
-    ) {
-      return;
-    }
+  const handleDisconnect = async (credential: CloudCredential) => {
+    if (!confirm(t("settings.cloud.confirmDisconnect", { name: credential.display_name }))) return;
     setErrorMsg(null);
     setSuccessMsg(null);
-
     try {
-      await disableCredential.mutateAsync({
-        params: {
-          path: {
-            id: credential.id ?? "",
-          },
-        },
+      await disconnectCredential.mutateAsync({
+        params: { path: { id: credential.id ?? "" } },
       });
-      setSuccessMsg(t("settings.cloud.messages.disabled"));
+      setSuccessMsg(t("settings.cloud.messages.disconnected"));
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.disableFailed"));
+      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.disconnectFailed"));
+    }
+  };
+
+  const handleReconnect = async (credential: CloudCredential) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const result = await reconnectCredential.mutateAsync({
+        params: { path: { id: credential.id ?? "" } },
+        body: { inputs: {} },
+      });
+      if (result.data?.auth_status === "connected") {
+        setSuccessMsg(t("settings.cloud.messages.reconnected"));
+      } else if (result.data?.auth_status === "password_required") {
+        setErrorMsg(t("settings.cloud.errors.sessionExpired"));
+      } else if (result.data?.auth_status === "challenge_required" && result.data.challenge) {
+        setPendingCredential(result.data.credential as CloudCredential);
+        setPendingChallenge(result.data.challenge as CloudAuthChallenge);
+        setChallengeValues(fieldInitialValues((result.data.challenge as CloudAuthChallenge).fields));
+        setSuccessMsg(t("settings.cloud.messages.challengeRequired"));
+        setIsAddOpen(true);
+      }
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.reconnectFailed"));
+    }
+  };
+
+  const handleRemove = async (credential: CloudCredential) => {
+    if (!confirm(t("settings.cloud.confirmRemove", { name: credential.display_name }))) return;
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await removeCredential.mutateAsync({
+        params: { path: { id: credential.id ?? "" } },
+      });
+      setSuccessMsg(t("settings.cloud.messages.removed"));
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.removeFailed"));
     }
   };
 
@@ -341,16 +372,42 @@ export default function CloudSettings() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle text-error"
-                    onClick={() => void handleDisable(credential)}
-                    disabled={disableCredential.isPending || !credential.id}
-                    aria-label={t("settings.cloud.disable")}
-                    title={t("settings.cloud.disable")}
-                  >
-                    <LogOutIcon size={16} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {(credential.status === "disabled" || credential.status === "error") && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs btn-circle text-success"
+                        onClick={() => void handleReconnect(credential)}
+                        disabled={reconnectCredential.isPending || !credential.id}
+                        aria-label={t("settings.cloud.reconnect")}
+                        title={t("settings.cloud.reconnect")}
+                      >
+                        <RefreshCwIcon size={16} />
+                      </button>
+                    )}
+                    {credential.status === "connected" && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs btn-circle text-warning"
+                        onClick={() => void handleDisconnect(credential)}
+                        disabled={disconnectCredential.isPending || !credential.id}
+                        aria-label={t("settings.cloud.disconnect")}
+                        title={t("settings.cloud.disconnect")}
+                      >
+                        <LogOutIcon size={16} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs btn-circle text-error"
+                      onClick={() => void handleRemove(credential)}
+                      disabled={removeCredential.isPending || !credential.id}
+                      aria-label={t("settings.cloud.remove")}
+                      title={t("settings.cloud.remove")}
+                    >
+                      <Trash2Icon size={16} />
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}

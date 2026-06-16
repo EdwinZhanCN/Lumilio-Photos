@@ -48,6 +48,11 @@ type VerifyCloudAuthChallengeRequest struct {
 	Inputs map[string]string `json:"inputs" binding:"required"`
 }
 
+// ReconnectCloudCredentialRequest is the request for reconnecting a credential.
+type ReconnectCloudCredentialRequest struct {
+	Inputs map[string]string `json:"inputs,omitempty"`
+}
+
 // CloudAuthChallengeDTO describes a pending credential authentication challenge.
 type CloudAuthChallengeDTO struct {
 	Type        string                  `json:"type" example:"verification_code"`
