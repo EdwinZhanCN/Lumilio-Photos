@@ -751,6 +751,13 @@
       "newConversation": "New conversation",
       "openAiSettings": "Open AI settings"
     },
+    "context": {
+      "attached": "Attached:",
+      "remove": "Remove",
+      "selected_one": "{{count}} selected",
+      "selected_other": "{{count}} selected",
+      "viewing": "Viewing photo"
+    },
     "dock": {
       "busy": "Working",
       "collapse": "Collapse chat",
@@ -759,15 +766,13 @@
       "ready": "Ready",
       "replyCount_one": "{{count}} reply",
       "replyCount_other": "{{count}} replies",
-      "subtitle": "drives the board",
       "title": "Lumilio Agent",
       "tokens": "tokens",
       "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens"
     },
     "input": {
       "prompt": "Ask Lumilio Agent...",
-      "send": "Send",
-      "unavailable": "Lumilio Agent is unavailable."
+      "send": "Send"
     },
     "markdown": {
       "think": {
@@ -1290,29 +1295,37 @@
     "assetPage": "Asset Page",
     "cloud": {
       "addCredential": "Add credential",
-      "confirmDisable": "Disable {{name}}? Existing imports stay in Lumilio.",
+      "confirmDisconnect": "Disconnect {{name}}? Active imports will stop. You can reconnect later.",
+      "confirmRemove": "Remove {{name}}? This permanently deletes the credential and session data. Imported photos remain in your library.",
       "connectCredential": "Connect credential",
       "connectedAccounts_one": "{{count}} connected account",
       "connectedAccounts_other": "{{count}} connected accounts",
       "credentialMeta": "{{provider}} · {{identity}}",
       "description": "Manage reusable cloud credentials. Repositories choose one of these accounts when they are created from Manage.",
-      "disable": "Disable",
+      "disconnect": "Disconnect",
       "empty": "No cloud credentials are configured.",
       "errors": {
         "createFailed": "Failed to create cloud credential.",
-        "disableFailed": "Failed to disable credential.",
+        "disconnectFailed": "Failed to disconnect credential.",
         "emptyCredentialResponse": "Credential response was empty.",
+        "reconnectFailed": "Failed to reconnect credential.",
+        "removeFailed": "Failed to remove credential.",
+        "sessionExpired": "Session expired. Please re-add this credential with your password.",
         "verifyFailed": "Failed to verify credential challenge."
       },
       "fields": {
         "label": "Label"
       },
       "messages": {
-        "challengeRequired": "Additional verification is required.",
+        "challengeRequired": "A verification code has been sent to your phone.",
         "connected": "Cloud credential connected.",
-        "disabled": "Cloud credential disabled.",
+        "disconnected": "Cloud credential disconnected.",
+        "reconnected": "Cloud credential reconnected.",
+        "removed": "Cloud credential removed.",
         "verified": "Cloud credential verified."
       },
+      "reconnect": "Reconnect",
+      "remove": "Remove",
       "placeholders": {
         "label": "Personal cloud account"
       },

@@ -198,7 +198,9 @@ type CloudControllerInterface interface {
 	ListCredentials(c *gin.Context)               // GET    /cloud/credentials
 	CreateCredential(c *gin.Context)              // POST   /cloud/credentials
 	VerifyCredentialAuthChallenge(c *gin.Context) // POST   /cloud/credentials/:id/auth-challenge
-	DisableCredential(c *gin.Context)             // DELETE /cloud/credentials/:id
+	DisconnectCredential(c *gin.Context)          // POST   /cloud/credentials/:id/disconnect
+	ReconnectCredential(c *gin.Context)           // POST   /cloud/credentials/:id/reconnect
+	RemoveCredential(c *gin.Context)              // DELETE /cloud/credentials/:id
 	StartRepositoryImport(c *gin.Context)         // POST   /repositories/:id/cloud/import
 	GetRepositoryCloudStatus(c *gin.Context)      // GET   /repositories/:id/cloud
 	GetImportRun(c *gin.Context)                  // GET    /cloud/import-runs/:id
@@ -436,10 +438,12 @@ func NewRouter(
 		cloud.Use(authController.AuthMiddleware(), authController.RequireAdmin())
 		{
 			cloud.GET("/providers", cloudController.ListProviders)
-			cloud.GET("/credentials", cloudController.ListCredentials)
-			cloud.POST("/credentials", cloudController.CreateCredential)
-			cloud.POST("/credentials/:id/auth-challenge", cloudController.VerifyCredentialAuthChallenge)
-			cloud.DELETE("/credentials/:id", cloudController.DisableCredential)
+		cloud.GET("/credentials", cloudController.ListCredentials)
+		cloud.POST("/credentials", cloudController.CreateCredential)
+		cloud.POST("/credentials/:id/auth-challenge", cloudController.VerifyCredentialAuthChallenge)
+		cloud.POST("/credentials/:id/disconnect", cloudController.DisconnectCredential)
+		cloud.POST("/credentials/:id/reconnect", cloudController.ReconnectCredential)
+		cloud.DELETE("/credentials/:id", cloudController.RemoveCredential)
 			cloud.GET("/import-runs/:id", cloudController.GetImportRun)
 			cloud.POST("/sync", cloudController.TriggerSync)
 		}

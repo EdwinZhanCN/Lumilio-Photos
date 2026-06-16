@@ -123,6 +123,24 @@ func TestSetupService_Initialize_RotationFailureLeavesSystemUninitialized(t *tes
 	}
 }
 
+func TestSetupService_Initialize_SecretWriteFailureDoesNotRotate(t *testing.T) {
+	rotator := &fakeRotator{}
+	svc, dir := newTestSetupService(t, rotator)
+
+	blockingFile := filepath.Join(dir, "not-a-directory")
+	if err := os.WriteFile(blockingFile, []byte("blocked"), 0o600); err != nil {
+		t.Fatalf("write blocking file: %v", err)
+	}
+	svc.secretPath = filepath.Join(blockingFile, "db_password")
+
+	if _, err := svc.Initialize(context.Background(), SetupRequest{}); err == nil {
+		t.Fatal("expected secret write error")
+	}
+	if rotator.calls != 0 {
+		t.Fatalf("database password must not rotate after secret write failure, got %d calls", rotator.calls)
+	}
+}
+
 func TestSetupService_Initialize_SerializesConcurrentCalls(t *testing.T) {
 	rotator := &fakeRotator{}
 	svc, _ := newTestSetupService(t, rotator)

@@ -32,6 +32,9 @@ import "swiper/css/pagination";
 import "@/styles/custom-swiper.css";
 import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useCarouselContextContributor } from "@/features/lumilio/contributors/useCarouselContextContributor";
+import { useDockStore } from "@/features/lumilio/state/dockStore";
+import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import MediaViewer from "../../../shared/MediaViewer";
 import type { Asset, components } from "@/lib/http-commons";
@@ -308,6 +311,9 @@ const FullScreenCarousel = ({
     const index = slideIndex !== undefined ? slideIndex : initialSlide;
     return photos[index] || photos[0] || null;
   });
+  useCarouselContextContributor(currentAsset?.asset_id);
+  const openAgentDock = useDockStore((s) => s.setCollapsed);
+  const [agentFabHovered, setAgentFabHovered] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { t } = useI18n();
   const { toggleLike, deleteAsset } = useAssetActions();
@@ -503,6 +509,17 @@ const FullScreenCarousel = ({
         className="btn btn-ghost btn-sm absolute top-2 left-4 text-white z-20"
       >
         <X className="w-6 h-6" />
+      </button>
+      <button
+        type="button"
+        onClick={() => openAgentDock(false)}
+        onMouseEnter={() => setAgentFabHovered(true)}
+        onMouseLeave={() => setAgentFabHovered(false)}
+        title={t("lumilio.dock.title", "Lumilio Agent")}
+        aria-label={t("lumilio.dock.title", "Lumilio Agent")}
+        className="absolute right-4 top-4 z-20 transition-transform hover:scale-110"
+      >
+        <LumilioAvatar start={agentFabHovered} size={0.2} />
       </button>
       <Swiper
         ref={swiperRef}

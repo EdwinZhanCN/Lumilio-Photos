@@ -25,7 +25,9 @@ export interface LayoutBox {
   height: number;
 }
 
-export const createResponsiveConfig = (containerWidth: number): LayoutConfig => {
+export const createResponsiveConfig = (
+  containerWidth: number,
+): LayoutConfig => {
   const width = Math.max(containerWidth, 300);
 
   let rowHeight = 220;
@@ -35,7 +37,7 @@ export const createResponsiveConfig = (containerWidth: number): LayoutConfig => 
   return {
     rowHeight,
     rowWidth: width,
-    spacing: 4,
+    spacing: 2,
     heightTolerance: 0.3,
   };
 };

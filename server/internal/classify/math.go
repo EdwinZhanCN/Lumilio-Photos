@@ -10,12 +10,6 @@ import (
 	"math"
 )
 
-// ConfidenceGain controls how sharply the contrastive score maps to a [0,1]
-// confidence around the threshold. semantic cosine scores are uncalibrated and
-// live in a narrow range, so a relatively high gain spreads the confidence
-// across the useful score band. Confidence == 0.5 exactly at the threshold.
-const ConfidenceGain = 12.0
-
 // Normalize returns a unit-length copy of v. A zero (or near-zero) vector is
 // returned unchanged so callers can detect/skip it.
 func Normalize(v []float32) []float32 {
@@ -91,10 +85,10 @@ func Dot(a, b []float32) float64 {
 	return sum
 }
 
-// ContrastiveScore returns the classification score for an asset vector against
-// a positive prototype, optionally subtracting a negative/background prototype.
-// All inputs are expected to be unit vectors. A nil/empty negative prototype
-// degrades to a plain positive cosine.
+// ContrastiveScore is the zero-shot binary decision: cos(asset, positive) −
+// cos(asset, negative), i.e. argmax over {positive, background}. All inputs are
+// unit vectors. A nil/empty negative degrades to the plain positive cosine.
+// score > 0 means the positive prompt beats the background.
 func ContrastiveScore(assetVec, positive, negative []float32) float64 {
 	score := Dot(assetVec, positive)
 	if len(negative) > 0 {
@@ -103,9 +97,11 @@ func ContrastiveScore(assetVec, positive, negative []float32) float64 {
 	return score
 }
 
-// ScoreToConfidence maps a contrastive score to a calibrated [0,1] confidence
-// using a logistic centered on the threshold. Returns exactly 0.5 at the
-// threshold, approaches 1 well above it and 0 well below it.
+// ConfidenceGain shapes how sharply the contrastive margin maps to [0,1].
+const ConfidenceGain = 12.0
+
+// ScoreToConfidence maps a contrastive margin to a [0,1] confidence via a
+// logistic centered on the threshold (exactly 0.5 at the threshold).
 func ScoreToConfidence(score, threshold float64) float64 {
 	c := 1.0 / (1.0 + math.Exp(-ConfidenceGain*(score-threshold)))
 	if math.IsNaN(c) || c < 0 {

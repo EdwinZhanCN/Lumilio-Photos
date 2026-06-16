@@ -130,6 +130,21 @@ AND fi.confidence >= $1
 ORDER BY fi.confidence DESC
 LIMIT $2;
 
+-- name: GetUnclusteredFacesInScope :many
+SELECT fi.*
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
+WHERE fcm.face_id IS NULL
+  AND COALESCE(a.is_deleted, false) = false
+  AND a.repository_id = sqlc.arg('repository_id')::uuid
+  AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
+  AND fi.embedding IS NOT NULL
+  AND fi.confidence >= sqlc.arg('min_confidence')
+  AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
+ORDER BY fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC;
+
 -- name: GetSimilarFaces :many
 SELECT
     fi.*,
@@ -172,6 +187,26 @@ WHERE fi.id != sqlc.arg('id')
   AND fi.confidence >= sqlc.arg('min_confidence')
   AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
   AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_similarity')::float8;
+
+-- name: GetNearestAssignedFaceCluster :one
+SELECT
+    fcm.cluster_id,
+    fi.id AS face_id,
+    CAST(1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) AS double precision) AS similarity
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+JOIN face_cluster_members fcm ON fcm.face_id = fi.id
+WHERE fi.id != sqlc.arg('id')
+  AND COALESCE(a.is_deleted, false) = false
+  AND a.repository_id = sqlc.arg('repository_id')::uuid
+  AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
+  AND fi.embedding IS NOT NULL
+  AND fi.confidence >= sqlc.arg('min_confidence')
+  AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
+  AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_similarity')::float8
+ORDER BY similarity DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
+LIMIT 1;
 
 -- name: GetFaceStatsByModel :many
 SELECT
@@ -325,6 +360,14 @@ WHERE COALESCE(fc.is_confirmed, false) = false
       FROM face_cluster_members fcm
       WHERE fcm.cluster_id = fc.cluster_id
   );
+
+-- name: DeleteEmptyFaceClusters :exec
+DELETE FROM face_clusters fc
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM face_cluster_members fcm
+    WHERE fcm.cluster_id = fc.cluster_id
+);
 
 -- name: MergeFaceClusters :exec
 UPDATE face_cluster_members

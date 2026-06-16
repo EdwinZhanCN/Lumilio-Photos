@@ -1570,7 +1570,7 @@ func (s *assetService) resolveSemanticQueryEmbedding(ctx context.Context, query 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get query embedding: %w", err)
 	}
-	if len(embeddingResult.Vector) == 0 {
+	if embeddingResult == nil || len(embeddingResult.Vector) == 0 {
 		return nil, fmt.Errorf("%w: semantic_text_embed returned empty embedding", ErrSemanticSearchUnavailable)
 	}
 	return embeddingResult, nil

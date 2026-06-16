@@ -14,7 +14,7 @@ import (
 const createOCRResult = `-- name: CreateOCRResult :one
 INSERT INTO ocr_results (asset_id, model_id, total_count, processing_time_ms)
 VALUES ($1, $2, $3, $4)
-RETURNING asset_id, model_id, total_count, processing_time_ms, created_at, updated_at
+RETURNING asset_id, model_id, total_count, processing_time_ms, created_at, updated_at, full_text
 `
 
 type CreateOCRResultParams struct {
@@ -39,6 +39,7 @@ func (q *Queries) CreateOCRResult(ctx context.Context, arg CreateOCRResultParams
 		&i.ProcessingTimeMs,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.FullText,
 	)
 	return i, err
 }
@@ -46,7 +47,7 @@ func (q *Queries) CreateOCRResult(ctx context.Context, arg CreateOCRResultParams
 const createOCRTextItem = `-- name: CreateOCRTextItem :one
 INSERT INTO ocr_text_items (asset_id, text_content, confidence, bounding_box, text_length, area_pixels)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector
+RETURNING id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at
 `
 
 type CreateOCRTextItemParams struct {
@@ -77,7 +78,6 @@ func (q *Queries) CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemPa
 		&i.TextLength,
 		&i.AreaPixels,
 		&i.CreatedAt,
-		&i.SearchVector,
 	)
 	return i, err
 }
@@ -101,7 +101,7 @@ func (q *Queries) DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.
 }
 
 const getHighConfidenceTextItems = `-- name: GetHighConfidenceTextItems :many
-SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector FROM ocr_text_items
+SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
 WHERE confidence >= $1
 ORDER BY confidence DESC, text_length DESC
 LIMIT $2
@@ -130,7 +130,6 @@ func (q *Queries) GetHighConfidenceTextItems(ctx context.Context, arg GetHighCon
 			&i.TextLength,
 			&i.AreaPixels,
 			&i.CreatedAt,
-			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
@@ -143,7 +142,7 @@ func (q *Queries) GetHighConfidenceTextItems(ctx context.Context, arg GetHighCon
 }
 
 const getOCRResultByAsset = `-- name: GetOCRResultByAsset :one
-SELECT asset_id, model_id, total_count, processing_time_ms, created_at, updated_at FROM ocr_results
+SELECT asset_id, model_id, total_count, processing_time_ms, created_at, updated_at, full_text FROM ocr_results
 WHERE asset_id = $1
 `
 
@@ -157,6 +156,7 @@ func (q *Queries) GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) 
 		&i.ProcessingTimeMs,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.FullText,
 	)
 	return i, err
 }
@@ -249,7 +249,7 @@ func (q *Queries) GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype
 }
 
 const getOCRTextItemsByAsset = `-- name: GetOCRTextItemsByAsset :many
-SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector FROM ocr_text_items
+SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
 WHERE asset_id = $1
 ORDER BY confidence DESC, text_length DESC
 `
@@ -272,7 +272,6 @@ func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUI
 			&i.TextLength,
 			&i.AreaPixels,
 			&i.CreatedAt,
-			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
@@ -285,7 +284,7 @@ func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUI
 }
 
 const getOCRTextItemsByAssetWithLimit = `-- name: GetOCRTextItemsByAssetWithLimit :many
-SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector FROM ocr_text_items
+SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
 WHERE asset_id = $1
 ORDER BY confidence DESC, text_length DESC
 LIMIT $2
@@ -314,7 +313,6 @@ func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOC
 			&i.TextLength,
 			&i.AreaPixels,
 			&i.CreatedAt,
-			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
@@ -326,163 +324,18 @@ func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOC
 	return items, nil
 }
 
-const searchAssetsByOCRText = `-- name: SearchAssetsByOCRText :many
-WITH matched_assets AS MATERIALIZED (
-    SELECT t.asset_id
-    FROM ocr_text_items t
-    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
-    GROUP BY t.asset_id
-),
-page_ids AS MATERIALIZED (
-    SELECT
-        m.asset_id,
-        a.upload_time
-    FROM matched_assets m
-    JOIN assets a ON a.asset_id = m.asset_id
-    ORDER BY a.upload_time DESC, m.asset_id DESC
-    LIMIT $3 OFFSET $2
-)
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
-FROM page_ids p
-JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.upload_time DESC, p.asset_id DESC
+const updateOCRFullText = `-- name: UpdateOCRFullText :exec
+UPDATE ocr_results SET full_text = $2 WHERE asset_id = $1
 `
 
-type SearchAssetsByOCRTextParams struct {
-	SearchText string `db:"search_text" json:"search_text"`
-	Offset     int32  `db:"offset" json:"offset"`
-	Limit      int32  `db:"limit" json:"limit"`
+type UpdateOCRFullTextParams struct {
+	AssetID  pgtype.UUID `db:"asset_id" json:"asset_id"`
+	FullText string      `db:"full_text" json:"full_text"`
 }
 
-func (q *Queries) SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, searchAssetsByOCRText, arg.SearchText, arg.Offset, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Asset
-	for rows.Next() {
-		var i Asset
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.Hash,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-			&i.GpsLatitude,
-			&i.GpsLongitude,
-			&i.GpsGeohash5,
-			&i.GpsGeohash7,
-			&i.ExifRaw,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const searchAssetsByOCRTextWithConfidence = `-- name: SearchAssetsByOCRTextWithConfidence :many
-WITH matched_assets AS MATERIALIZED (
-    SELECT t.asset_id
-    FROM ocr_text_items t
-    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
-      AND t.confidence >= $2
-    GROUP BY t.asset_id
-),
-page_ids AS MATERIALIZED (
-    SELECT
-        m.asset_id,
-        a.upload_time
-    FROM matched_assets m
-    JOIN assets a ON a.asset_id = m.asset_id
-    ORDER BY a.upload_time DESC, m.asset_id DESC
-    LIMIT $4 OFFSET $3
-)
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
-FROM page_ids p
-JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.upload_time DESC, p.asset_id DESC
-`
-
-type SearchAssetsByOCRTextWithConfidenceParams struct {
-	SearchText string  `db:"search_text" json:"search_text"`
-	Confidence float32 `db:"confidence" json:"confidence"`
-	Offset     int32   `db:"offset" json:"offset"`
-	Limit      int32   `db:"limit" json:"limit"`
-}
-
-func (q *Queries) SearchAssetsByOCRTextWithConfidence(ctx context.Context, arg SearchAssetsByOCRTextWithConfidenceParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, searchAssetsByOCRTextWithConfidence,
-		arg.SearchText,
-		arg.Confidence,
-		arg.Offset,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Asset
-	for rows.Next() {
-		var i Asset
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.Hash,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-			&i.GpsLatitude,
-			&i.GpsLongitude,
-			&i.GpsGeohash5,
-			&i.GpsGeohash7,
-			&i.ExifRaw,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) UpdateOCRFullText(ctx context.Context, arg UpdateOCRFullTextParams) error {
+	_, err := q.db.Exec(ctx, updateOCRFullText, arg.AssetID, arg.FullText)
+	return err
 }
 
 const updateOCRResultStats = `-- name: UpdateOCRResultStats :exec

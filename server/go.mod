@@ -24,7 +24,6 @@ require (
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/riverqueue/river v0.24.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.24.0
-	github.com/riverqueue/river/rivertype v0.24.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/swaggo/files v1.0.1
@@ -41,6 +40,7 @@ require (
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/mdns v1.0.6 // indirect
+	github.com/riverqueue/river/rivertype v0.24.0 // indirect
 )
 
 require (
@@ -105,7 +105,7 @@ require (
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
 	golang.org/x/image v0.38.0
 	golang.org/x/mod v0.33.0 // indirect
-	google.golang.org/grpc v1.76.0 // indirect
+	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.10 // indirect
 )
 

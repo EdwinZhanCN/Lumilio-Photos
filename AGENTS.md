@@ -31,7 +31,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 - If you are in a sandbox without host environment, like cloud/container, use `make setup` to set up the local dev environment. Do not use your own cli tooling if possible.
 - Backend quality gate: `make server-test` or `cd server && go test ./...`.
 - Frontend quality gate: `make web-test` or `cd web && vp check --no-fmt --no-lint && vp lint && vp test`.
-- API contracts are OpenAPI-first. Do not hand-edit `web/src/lib/http-commons/schema.d.ts`; change backend annotations and run `make dto`.
+- API contracts are OpenAPI-first. Do not hand-edit `web/src/lib/http-commons/schema.d.ts`; change backend annotations and run `make dto`. An `as`-cast on an API response (`query.data?.data as {...}`) is a red flag: the DTO/`@Success` annotation is missing or `make dto` is stale — fix the contract, never cast around it. See [FRONTEND.md](docs/agent/FRONTEND.md) "API Contract".
 - Runtime app defaults belong in TOML (`server/config/server*.toml`). Env files are for bootstrap, machine-specific overrides, and secrets.
 - Do not commit secrets. `LUMILIO_SECRET_KEY` is a key file path, not raw secret text.
 - Go code must be formatted with `gofmt`. TypeScript should follow Vite+ lint/fmt rules and prefer `@/...` imports.

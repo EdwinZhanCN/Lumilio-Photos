@@ -22,6 +22,11 @@ function initI18n(instance: I18NextInstance) {
       fallbackLng: "en",
       supportedLngs: SUPPORTED_LANGUAGES as unknown as string[],
 
+      // Treat an empty string as "untranslated" so it falls back to `fallbackLng`
+      // instead of rendering blank. `i18next-cli extract` seeds non-default
+      // locales with empty values; without this they would render as empty labels.
+      returnEmptyString: false,
+
       // Namespaces (single default namespace "translation")
       ns: ["translation"],
       defaultNS: "translation",

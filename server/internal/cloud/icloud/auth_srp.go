@@ -218,8 +218,19 @@ func (r *Client) signInSRP(password string) error {
 		ExpectStatus: newSet[int](http.StatusOK, http.StatusConflict, http.StatusPreconditionFailed),
 	})
 	if err != nil {
+		r.debugf("srp signin complete failed apple_id=%s err=%v", maskAppleID(r.appleID), err)
 		return fmt.Errorf("SRP signin complete failed: %w", err)
 	}
+
+	r.debugf(
+		"srp signin complete apple_id=%s status=%d session_token=%t trust_token=%t scnt=%t session_id=%t",
+		maskAppleID(r.appleID),
+		status,
+		r.sessionData.SessionToken != "",
+		r.sessionData.TrustToken != "",
+		r.sessionData.Scnt != "",
+		r.sessionData.SessionID != "",
+	)
 
 	// 412: non-2FA account, needs repair
 	if status == http.StatusPreconditionFailed {
@@ -232,8 +243,10 @@ func (r *Client) signInSRP(password string) error {
 			ExpectStatus: newSet[int](http.StatusOK),
 		})
 		if repairErr != nil {
+			r.debugf("srp repair complete failed apple_id=%s err=%v", maskAppleID(r.appleID), repairErr)
 			return fmt.Errorf("SRP repair complete failed: %w", repairErr)
 		}
+		r.debugf("srp repair complete succeeded apple_id=%s", maskAppleID(r.appleID))
 	}
 
 	return nil

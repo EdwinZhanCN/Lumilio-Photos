@@ -14,7 +14,7 @@ Expected layout (per architecture, `darwin-arm64` and/or `darwin-amd64`):
 
 ```
 resources/
-├── postgres/16/darwin-arm64/
+├── postgres/17/darwin-arm64/
 │   ├── bin/        postgres, initdb, pg_ctl, pg_isready, createdb, pg_dump, pg_restore
 │   ├── lib/        (incl. pgvector: vector.dylib under lib/postgresql)
 │   └── share/postgresql/
@@ -42,7 +42,7 @@ directory (`ResourcesDir()` in `supervisor/resources.go`). When a tool is absent
 `fetch-resources.sh` pins the exact URLs + SHA-256 for ffmpeg/ffprobe/exiftool;
 bump the pins (or override via env) when you update versions.
 
-- **PostgreSQL 16 + pgvector**: built from source — see
+- **PostgreSQL 17 + pgvector + pg_textsearch + zhparser**: built from source — see
   `.github/workflows/build-postgres.yml`. Not fetched by `fetch-resources.sh`,
   because Homebrew/prebuilt PostgreSQL is not relocatable (absolute-path dylib
   links + baked-in paths break when moved into the bundle).
@@ -61,6 +61,6 @@ bump the pins (or override via env) when you update versions.
 
 ## Local development
 
-`make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@16/bin` points the
+`make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@17/bin` points the
 supervisor at a locally installed PostgreSQL via `LUMILIO_PG_BIN_DIR`, so you do
 not need to stage anything here to run the app in development.

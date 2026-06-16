@@ -27,6 +27,9 @@ type AssetFilterInput struct {
 	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by exact rating (0-5)"`
 	Liked    *bool  `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
 	Place    string `json:"place,omitempty" jsonschema:"description=Place name to match against the library's location clusters (e.g. Kyoto, Tokyo Tower)"`
+	Camera   string `json:"camera,omitempty" jsonschema:"description=Camera model substring (e.g. Nikon Z8)"`
+	Lens     string `json:"lens,omitempty" jsonschema:"description=Lens model substring"`
+	AlbumID  *int   `json:"album_id,omitempty" jsonschema:"description=Filter to assets in this album id"`
 }
 
 // RegisterFilterAssets registers the filter_assets producer: metadata
@@ -35,7 +38,7 @@ type AssetFilterInput struct {
 func RegisterFilterAssets() {
 	info := &schema.ToolInfo{
 		Name: "filter_assets",
-		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked). " +
+		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked, place, camera, lens, album). " +
 			"Returns a ref: a handle for the matching set. Pass the ref to other tools " +
 			"(combine, describe, show, bulk_like_assets) to work with the set.",
 	}
@@ -130,6 +133,19 @@ func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams,
 	if input.Place != "" {
 		params.Place = &input.Place
 	}
+	if input.Camera != "" {
+		params.CameraModel = &input.Camera
+	}
+	if input.Lens != "" {
+		params.LensModel = &input.Lens
+	}
+	if input.AlbumID != nil {
+		if *input.AlbumID <= 0 {
+			return nil, ref.InvalidArgument(fmt.Sprintf("album_id %d is not positive", *input.AlbumID))
+		}
+		albumID := int32(*input.AlbumID)
+		params.AlbumID = &albumID
+	}
 	return &params, nil
 }
 
@@ -138,6 +154,12 @@ func filterHint(input *AssetFilterInput) string {
 	switch {
 	case input.Place != "":
 		return input.Place
+	case input.Camera != "":
+		return input.Camera
+	case input.Lens != "":
+		return input.Lens
+	case input.AlbumID != nil:
+		return fmt.Sprintf("album%d", *input.AlbumID)
 	case input.Filename != "":
 		return input.Filename
 	case input.DateFrom != "" && len(input.DateFrom) >= 4:
@@ -176,6 +198,15 @@ func filterPlanParams(input *AssetFilterInput) map[string]string {
 	}
 	if input.Place != "" {
 		params["place"] = input.Place
+	}
+	if input.Camera != "" {
+		params["camera"] = input.Camera
+	}
+	if input.Lens != "" {
+		params["lens"] = input.Lens
+	}
+	if input.AlbumID != nil {
+		params["album_id"] = fmt.Sprintf("%d", *input.AlbumID)
 	}
 	return params
 }

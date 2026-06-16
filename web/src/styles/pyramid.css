@@ -1,8 +1,13 @@
 .lumen-avatar {
     margin: 0;
     position: relative;
-    width: 20em;
-    height: 20em;
+    /* Box tightly wraps the visible pyramid + shadow (measured 11.11em x 17.78em,
+       centered on the box center). The pyramid is drawn with fixed-em borders and
+       3D transforms, so it is unaffected by this box size and stays centered —
+       this just stops the old 20em box from reserving ~4.4em of empty space on
+       every side, which made parent positioning (right/align) counter-intuitive. */
+    width: 12em;
+    height: 18.5em;
     display: flex;
     align-items: center;
     justify-content: center;

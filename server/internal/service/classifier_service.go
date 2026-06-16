@@ -23,9 +23,10 @@ const semanticTextEmbedTask = "semantic_text_embed"
 // cached in-process, so the per-asset worker doesn't hit the DB every job.
 const classifierCacheTTL = 60 * time.Second
 
-// defaultBackgroundPrompts produce a generic "background" prototype used as the
-// contrastive baseline when a classifier defines no negative prompts. Subtracting
-// it cancels the model's global bias toward generic imagery.
+// defaultBackgroundPrompts build the generic "background" prototype — the
+// "not this class" side of the zero-shot binary decision (argmax over
+// {positive, background}). A classifier with no explicit negative prompts is
+// scored against this.
 var defaultBackgroundPrompts = []string{
 	"a photo",
 	"an image",
@@ -143,6 +144,9 @@ func (s *classifierService) EnsurePrototypes(ctx context.Context) error {
 		return nil
 	}
 
+	// Background prototype = the "not this class" side of the decision. Built by
+	// prompt-ensembling generic prompts (the zero-shot recipe), shared by every
+	// classifier that defines no explicit negative prompts.
 	background, currentModel, err := s.buildPrototype(ctx, defaultBackgroundPrompts)
 	if err != nil {
 		return fmt.Errorf("build background prototype: %w", err)
@@ -215,6 +219,9 @@ func (s *classifierService) Classify(ctx context.Context, embedding PrimaryEmbed
 				zap.Int("asset_dim", len(embedding.Vector)))
 			continue
 		}
+		// Zero-shot binary decision: the positive prototype must beat the
+		// negative/background prototype (argmax over {positive, background}).
+		// def.Threshold is the relative margin to clear — 0 is pure argmax.
 		negative := def.NegativePrototype
 		if len(negative) == 0 {
 			negative = background
@@ -234,6 +241,21 @@ func (s *classifierService) Classify(ctx context.Context, embedding PrimaryEmbed
 	return hits, nil
 }
 
+// backgroundFor returns the cached background prototype when its dimensionality
+// matches the asset embedding, else nil (degrades to plain positive cosine).
+func (s *classifierService) backgroundFor(dim int) []float32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.backgroundDim == dim {
+		return s.background
+	}
+	return nil
+}
+
+// Preview embeds ad-hoc prompts and returns library assets whose contrastive
+// margin (positive cosine − negative/background cosine) clears threshold — the
+// same zero-shot binary decision Classify uses. If no negative prompts are
+// given, the generic background prototype is used.
 func (s *classifierService) Preview(ctx context.Context, positivePrompts, negativePrompts []string, threshold float64, limit int) ([]ClassifierPreviewMatch, error) {
 	if !s.textEmbedReady() {
 		return nil, fmt.Errorf("%w: semantic text embedding unavailable", ErrSemanticSearchUnavailable)
@@ -249,14 +271,13 @@ func (s *classifierService) Preview(ctx context.Context, positivePrompts, negati
 	if err != nil {
 		return nil, err
 	}
-	var negative []float32
-	if len(negativePrompts) > 0 {
-		negative, _, err = s.buildPrototype(ctx, negativePrompts)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		negative = s.backgroundFor(len(positive))
+	negativePrompts2 := negativePrompts
+	if len(negativePrompts2) == 0 {
+		negativePrompts2 = defaultBackgroundPrompts
+	}
+	negative, _, err := s.buildPrototype(ctx, negativePrompts2)
+	if err != nil {
+		return nil, err
 	}
 
 	space, err := s.embeddings.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, model, len(positive))
@@ -264,38 +285,27 @@ func (s *classifierService) Preview(ctx context.Context, positivePrompts, negati
 		return nil, err
 	}
 
+	// Embeddings are unit vectors, so cosine = 1 - d^2/2. The score is the
+	// contrastive margin: cos(positive) - cos(negative); membership is margin >= threshold.
 	posVec := pgvector.NewVector(positive)
-	args := []any{&posVec, space.ID, threshold, limit}
-	negExpr := "0"
-	if len(negative) > 0 {
-		negVec := pgvector.NewVector(negative)
-		args = []any{&posVec, &negVec, space.ID, threshold, limit}
-		negExpr = fmt.Sprintf("(1 - power(e.vector::vector(%d) <-> $2::vector(%d), 2) / 2)", space.Dimensions, space.Dimensions)
-	}
-
-	// Distances are L2 on unit vectors, so cosine = 1 - d^2/2. The score is a
-	// contrastive cosine (positive minus negative/background prototype).
-	posArgIdx := 1
-	spaceIdx := 2
-	thresholdIdx := 3
-	limitIdx := 4
-	if len(negative) > 0 {
-		spaceIdx, thresholdIdx, limitIdx = 3, 4, 5
-	}
-	posExpr := fmt.Sprintf("(1 - power(e.vector::vector(%d) <-> $%d::vector(%d), 2) / 2)", space.Dimensions, posArgIdx, space.Dimensions)
+	negVec := pgvector.NewVector(negative)
+	marginExpr := fmt.Sprintf(
+		"((1 - power(e.vector::vector(%d) <-> $1::vector(%d), 2) / 2) - (1 - power(e.vector::vector(%d) <-> $2::vector(%d), 2) / 2))",
+		space.Dimensions, space.Dimensions, space.Dimensions, space.Dimensions,
+	)
 	query := fmt.Sprintf(`
-SELECT a.asset_id, (%s - %s)::float8 AS score
+SELECT a.asset_id, %s::float8 AS score
 FROM embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
-WHERE e.space_id = $%d
+WHERE e.space_id = $3
   AND e.is_primary = true
   AND a.is_deleted = false
-  AND (%s - %s) >= $%d
+  AND %s >= $4
 ORDER BY score DESC, a.asset_id DESC
-LIMIT $%d
-`, posExpr, negExpr, spaceIdx, posExpr, negExpr, thresholdIdx, limitIdx)
+LIMIT $5
+`, marginExpr, marginExpr)
 
-	rows, err := s.pool.Query(ctx, query, args...)
+	rows, err := s.pool.Query(ctx, query, &posVec, &negVec, space.ID, threshold, limit)
 	if err != nil {
 		return nil, fmt.Errorf("preview query: %w", err)
 	}
@@ -317,15 +327,6 @@ LIMIT $%d
 		return nil, fmt.Errorf("iterate preview rows: %w", err)
 	}
 	return matches, nil
-}
-
-func (s *classifierService) backgroundFor(dim int) []float32 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.backgroundDim == dim {
-		return s.background
-	}
-	return nil
 }
 
 func (s *classifierService) invalidateCache() {

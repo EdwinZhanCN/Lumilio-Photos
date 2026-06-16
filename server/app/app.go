@@ -272,7 +272,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService)
-	setupController := handler.NewSetupHandler(service.NewSetupService(dbConfig))
+	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, pgxPool))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	locationController := handler.NewLocationHandler(locationService, queueClient)
@@ -405,7 +405,7 @@ func initMLServices(
 
 	embeddingService := service.NewEmbeddingService(queries, pgxPool)
 	speciesService := service.NewSpeciesService(queries)
-	ocrService := service.NewOCRService(queries)
+	ocrService := service.NewOCRService(queries, pgxPool)
 	imageLoader := queue.NewDBMLImageLoader(queries)
 
 	river.AddWorker[queue.ProcessSemanticArgs](workers, &queue.ProcessSemanticWorker{

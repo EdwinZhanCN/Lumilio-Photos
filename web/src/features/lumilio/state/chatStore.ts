@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { streamAgent } from "../api/agentStream";
 import type { ChatMessage, TokenUsageInfo } from "../types";
+import type { MentionPayload } from "../mentions/mentionSources";
+import type { ContextContribution } from "./contextStore";
 import {
   applyChunk,
   applyInterrupt,
@@ -23,7 +25,13 @@ interface LumilioChatStore {
   /** Last model call's token accounting; promptTokens ≈ current context size. */
   usage: TokenUsageInfo | null;
 
-  sendMessage: (query: string) => Promise<void>;
+  sendMessage: (
+    query: string,
+    options?: {
+      context?: ContextContribution[];
+      mentions?: MentionPayload[];
+    },
+  ) => Promise<void>;
   confirmInterrupt: (interruptId: string, approved: boolean) => Promise<void>;
   newConversation: () => void;
 }
@@ -67,7 +75,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
     connectionError: null,
     usage: null,
 
-    sendMessage: async (query: string) => {
+    sendMessage: async (query, options) => {
       const trimmed = query.trim();
       if (!trimmed || get().isGenerating) return;
 
@@ -77,10 +85,31 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         connectionError: null,
       }));
 
+      const contextPayload = options?.context?.map((item) => ({
+        type: item.type,
+        asset_ids: item.assetIds,
+        label: item.label,
+      }));
+
+      const mentionsPayload = options?.mentions?.map((m) => ({
+        type: m.type,
+        id: m.id,
+        label: m.label,
+      }));
+
       try {
         await streamAgent(
           "/api/v1/agent/chat",
-          { query: trimmed, thread_id: get().threadId ?? "" },
+          {
+            query: trimmed,
+            thread_id: get().threadId ?? "",
+            ...(contextPayload && contextPayload.length > 0
+              ? { context: contextPayload }
+              : {}),
+            ...(mentionsPayload && mentionsPayload.length > 0
+              ? { mentions: mentionsPayload }
+              : {}),
+          },
           callbacks,
         );
       } catch (error) {

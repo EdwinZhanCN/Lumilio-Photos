@@ -57,6 +57,13 @@ type FilterToolProps = {
   fetchLenses?: () => Promise<string[]>;
 };
 
+const EMPTY_LOCATION_BBOX: LocationBBox = {
+  north: 0,
+  south: 0,
+  east: 0,
+  west: 0,
+};
+
 /* =========================
    Pure helpers
    ========================= */
@@ -74,6 +81,15 @@ function centerToBBox(lat: number, lon: number, radiusKm: number): LocationBBox 
 
 function isZeroBBox(b: LocationBBox): boolean {
   return b.north === 0 && b.south === 0 && b.east === 0 && b.west === 0;
+}
+
+function areLocationBBoxesEqual(left: LocationBBox, right: LocationBBox): boolean {
+  return (
+    left.north === right.north &&
+    left.south === right.south &&
+    left.east === right.east &&
+    left.west === right.west
+  );
 }
 
 function toDateInput(val: string): string {
@@ -923,6 +939,8 @@ export default function FilterTool({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const initialDTO = useMemo(() => initial ?? {}, [initial]);
   const initialHash = useMemo(() => JSON.stringify(initialDTO), [initialDTO]);
+  const lastSyncedInitialHashRef = useRef<string>(initialHash);
+  const lastAutoAppliedHashRef = useRef<string>("");
   const lockedFieldSet = useMemo(() => {
     if (!lockedFields) return new Set<FilterFieldKey>();
     if (Array.isArray(lockedFields)) {
@@ -992,14 +1010,7 @@ export default function FilterTool({
 
   // Location (BBox)
   const [locationEnabled, setLocationEnabled] = useState<boolean>(!!initialDTO.location);
-  const [location, setLocation] = useState<LocationBBox>(
-    initialDTO.location ?? {
-      north: 0,
-      south: 0,
-      east: 0,
-      west: 0,
-    },
-  );
+  const [location, setLocation] = useState<LocationBBox>(initialDTO.location ?? EMPTY_LOCATION_BBOX);
 
   // Camera model / Lens
   const [cameraModelEnabled, setCameraModelEnabled] = useState<boolean>(!!initialDTO.camera_model);
@@ -1008,6 +1019,9 @@ export default function FilterTool({
   const [lens, setLens] = useState<string>(initialDTO.lens ?? "");
 
   useEffect(() => {
+    if (lastSyncedInitialHashRef.current === initialHash) return;
+    lastSyncedInitialHashRef.current = initialHash;
+
     const next = initialDTO;
 
     setFilterEnabled(Object.keys(next).length > 0 || hasLockedInitialFilters);
@@ -1033,14 +1047,8 @@ export default function FilterTool({
     setDateTo(toDateInput(next.date?.to ?? ""));
 
     setLocationEnabled(!!next.location);
-    setLocation(
-      next.location ?? {
-        north: 0,
-        south: 0,
-        east: 0,
-        west: 0,
-      },
-    );
+    const nextLocation = next.location ?? EMPTY_LOCATION_BBOX;
+    setLocation((prev) => (areLocationBBoxesEqual(prev, nextLocation) ? prev : nextLocation));
 
     setCameraModelEnabled(!!next.camera_model);
     setCameraModel(next.camera_model ?? "");
@@ -1158,9 +1166,11 @@ export default function FilterTool({
 
   // Auto-emit on filter state change if enabled
   useEffect(() => {
-    if (autoApply) {
-      onChangeRef.current?.(filterDTO);
-    }
+    if (!autoApply) return;
+    const nextHash = JSON.stringify(filterDTO);
+    if (lastAutoAppliedHashRef.current === nextHash) return;
+    lastAutoAppliedHashRef.current = nextHash;
+    onChangeRef.current?.(filterDTO);
   }, [autoApply, filterDTO]);
 
   // Close dropdown when clicking outside
@@ -1200,7 +1210,7 @@ export default function FilterTool({
     setDateTo(toDateInput(initialDTO.date?.to ?? ""));
 
     setLocationEnabled(isFieldLocked("location") && isFieldActive(initialDTO, "location"));
-    setLocation(initialDTO.location ?? { north: 0, south: 0, east: 0, west: 0 });
+    setLocation(initialDTO.location ?? EMPTY_LOCATION_BBOX);
 
     setCameraModelEnabled(
       isFieldLocked("camera_model") && isFieldActive(initialDTO, "camera_model"),

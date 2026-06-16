@@ -172,19 +172,17 @@ func (r *TextRetriever) retrieveOCR(ctx context.Context, req Request) ([]Candida
 	if err != nil {
 		return nil, err
 	}
-	conditions = append(conditions, "oti.search_vector @@ q.query")
+	conditions = append(conditions,
+		fmt.Sprintf("r.full_text <@> %s < 'Infinity'", queryPlaceholder))
 	limitPlaceholder := builder.addArg(req.TopK)
 
 	query := fmt.Sprintf(`
-WITH q AS (SELECT plainto_tsquery('simple', %s) AS query)
 SELECT
   a.asset_id,
-  MAX(ts_rank_cd(oti.search_vector, q.query))::float8 AS raw_score
-FROM q
-JOIN ocr_text_items oti ON oti.search_vector @@ q.query
-JOIN assets a ON a.asset_id = oti.asset_id
+  (-(r.full_text <@> %s))::float8 AS raw_score
+FROM ocr_results r
+JOIN assets a ON a.asset_id = r.asset_id
 WHERE %s
-GROUP BY a.asset_id
 ORDER BY raw_score DESC, a.asset_id DESC
 LIMIT %s
 `, queryPlaceholder, joinConditions(conditions), limitPlaceholder)
@@ -204,12 +202,13 @@ func (r *TextRetriever) ocrCountQuery(builder *sqlBuilder, req Request) (string,
 	if err != nil {
 		return "", err
 	}
-	conditions = append(conditions, fmt.Sprintf("oti.search_vector @@ plainto_tsquery('simple', %s)", queryPlaceholder))
+	conditions = append(conditions,
+		fmt.Sprintf("r.full_text <@> %s < 'Infinity'", queryPlaceholder))
 
 	return fmt.Sprintf(`
 SELECT a.asset_id
-FROM ocr_text_items oti
-JOIN assets a ON a.asset_id = oti.asset_id
+FROM ocr_results r
+JOIN assets a ON a.asset_id = r.asset_id
 WHERE %s
 `, joinConditions(conditions)), nil
 }

@@ -284,6 +284,20 @@ func (q *Queries) CreateFaceResult(ctx context.Context, arg CreateFaceResultPara
 	return i, err
 }
 
+const deleteEmptyFaceClusters = `-- name: DeleteEmptyFaceClusters :exec
+DELETE FROM face_clusters fc
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM face_cluster_members fcm
+    WHERE fcm.cluster_id = fc.cluster_id
+)
+`
+
+func (q *Queries) DeleteEmptyFaceClusters(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteEmptyFaceClusters)
+	return err
+}
+
 const deleteEmptyUnconfirmedFaceClusters = `-- name: DeleteEmptyUnconfirmedFaceClusters :exec
 DELETE FROM face_clusters fc
 WHERE COALESCE(fc.is_confirmed, false) = false
@@ -1318,6 +1332,60 @@ func (q *Queries) GetIncrementalFaceNeighbors(ctx context.Context, arg GetIncrem
 	return items, nil
 }
 
+const getNearestAssignedFaceCluster = `-- name: GetNearestAssignedFaceCluster :one
+SELECT
+    fcm.cluster_id,
+    fi.id AS face_id,
+    CAST(1 - (fi.embedding <=> $1::vector) AS double precision) AS similarity
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+JOIN face_cluster_members fcm ON fcm.face_id = fi.id
+WHERE fi.id != $2
+  AND COALESCE(a.is_deleted, false) = false
+  AND a.repository_id = $3::uuid
+  AND a.owner_id IS NOT DISTINCT FROM $4::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM $5::text
+  AND fi.embedding IS NOT NULL
+  AND fi.confidence >= $6
+  AND COALESCE(fi.face_size, 0) >= $7
+  AND 1 - (fi.embedding <=> $1::vector) >= $8::float8
+ORDER BY similarity DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
+LIMIT 1
+`
+
+type GetNearestAssignedFaceClusterParams struct {
+	EmbeddingQuery *pgvector.Vector `db:"embedding_query" json:"embedding_query"`
+	ID             int32            `db:"id" json:"id"`
+	RepositoryID   pgtype.UUID      `db:"repository_id" json:"repository_id"`
+	OwnerID        *int32           `db:"owner_id" json:"owner_id"`
+	EmbeddingModel *string          `db:"embedding_model" json:"embedding_model"`
+	MinConfidence  float32          `db:"min_confidence" json:"min_confidence"`
+	MinFaceSize    *int32           `db:"min_face_size" json:"min_face_size"`
+	MinSimilarity  float64          `db:"min_similarity" json:"min_similarity"`
+}
+
+type GetNearestAssignedFaceClusterRow struct {
+	ClusterID  int32   `db:"cluster_id" json:"cluster_id"`
+	FaceID     int32   `db:"face_id" json:"face_id"`
+	Similarity float64 `db:"similarity" json:"similarity"`
+}
+
+func (q *Queries) GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error) {
+	row := q.db.QueryRow(ctx, getNearestAssignedFaceCluster,
+		arg.EmbeddingQuery,
+		arg.ID,
+		arg.RepositoryID,
+		arg.OwnerID,
+		arg.EmbeddingModel,
+		arg.MinConfidence,
+		arg.MinFaceSize,
+		arg.MinSimilarity,
+	)
+	var i GetNearestAssignedFaceClusterRow
+	err := row.Scan(&i.ClusterID, &i.FaceID, &i.Similarity)
+	return i, err
+}
+
 const getPrimaryFaces = `-- name: GetPrimaryFaces :many
 SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at FROM face_items
 WHERE is_primary = true
@@ -1523,6 +1591,75 @@ type GetUnclusteredFacesParams struct {
 
 func (q *Queries) GetUnclusteredFaces(ctx context.Context, arg GetUnclusteredFacesParams) ([]FaceItem, error) {
 	rows, err := q.db.Query(ctx, getUnclusteredFaces, arg.Confidence, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FaceItem
+	for rows.Next() {
+		var i FaceItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.AssetID,
+			&i.FaceID,
+			&i.BoundingBox,
+			&i.Confidence,
+			&i.AgeGroup,
+			&i.Gender,
+			&i.Ethnicity,
+			&i.Expression,
+			&i.FaceSize,
+			&i.FaceImagePath,
+			&i.Embedding,
+			&i.EmbeddingModel,
+			&i.IsPrimary,
+			&i.QualityScore,
+			&i.BlurScore,
+			&i.PoseAngles,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUnclusteredFacesInScope = `-- name: GetUnclusteredFacesInScope :many
+SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
+WHERE fcm.face_id IS NULL
+  AND COALESCE(a.is_deleted, false) = false
+  AND a.repository_id = $1::uuid
+  AND a.owner_id IS NOT DISTINCT FROM $2::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM $3::text
+  AND fi.embedding IS NOT NULL
+  AND fi.confidence >= $4
+  AND COALESCE(fi.face_size, 0) >= $5
+ORDER BY fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
+`
+
+type GetUnclusteredFacesInScopeParams struct {
+	RepositoryID   pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID        *int32      `db:"owner_id" json:"owner_id"`
+	EmbeddingModel *string     `db:"embedding_model" json:"embedding_model"`
+	MinConfidence  float32     `db:"min_confidence" json:"min_confidence"`
+	MinFaceSize    *int32      `db:"min_face_size" json:"min_face_size"`
+}
+
+func (q *Queries) GetUnclusteredFacesInScope(ctx context.Context, arg GetUnclusteredFacesInScopeParams) ([]FaceItem, error) {
+	rows, err := q.db.Query(ctx, getUnclusteredFacesInScope,
+		arg.RepositoryID,
+		arg.OwnerID,
+		arg.EmbeddingModel,
+		arg.MinConfidence,
+		arg.MinFaceSize,
+	)
 	if err != nil {
 		return nil, err
 	}

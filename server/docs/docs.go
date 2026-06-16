@@ -2808,6 +2808,17 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.ReconnectCloudCredentialRequest": {
+                "properties": {
+                    "inputs": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RecoveryCodesResponseDTO": {
                 "properties": {
                     "generated_at": {
@@ -4002,6 +4013,20 @@ const docTemplate = `{
             },
             "handler.AgentChatRequest": {
                 "properties": {
+                    "context": {
+                        "items": {
+                            "$ref": "#/components/schemas/inject.ContextItem"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "mentions": {
+                        "items": {
+                            "$ref": "#/components/schemas/inject.MentionItem"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "query": {
                         "type": "string"
                     },
@@ -4286,6 +4311,38 @@ const docTemplate = `{
                         "type": "object"
                     },
                     "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "inject.ContextItem": {
+                "properties": {
+                    "asset_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "inject.MentionItem": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "type": {
                         "type": "string"
                     }
                 },
@@ -11628,7 +11685,7 @@ const docTemplate = `{
         },
         "/api/v1/cloud/credentials/{id}": {
             "delete": {
-                "description": "Disable a saved cloud credential so it cannot start new imports.",
+                "description": "Permanently delete a cloud credential, its session data, and unbind associated repositories.",
                 "parameters": [
                     {
                         "description": "Credential UUID",
@@ -11649,7 +11706,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Credential disabled"
+                        "description": "Credential removed"
                     },
                     "400": {
                         "content": {
@@ -11687,7 +11744,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Disable cloud credential",
+                "summary": "Remove cloud credential",
                 "tags": [
                     "cloud"
                 ]
@@ -11802,6 +11859,187 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Verify cloud credential challenge",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/cloud/credentials/{id}/disconnect": {
+            "post": {
+                "description": "Pause a cloud credential so it cannot start new imports. Can be reconnected later.",
+                "parameters": [
+                    {
+                        "description": "Credential UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Credential disconnected"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Disconnect cloud credential",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/cloud/credentials/{id}/reconnect": {
+            "post": {
+                "description": "Re-authenticate a disconnected or errored credential. If no password is provided, attempts to reuse the existing session.",
+                "parameters": [
+                    {
+                        "description": "Credential UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ReconnectCloudCredentialRequest",
+                                        "summary": "request",
+                                        "description": "Reconnect inputs"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Reconnect inputs",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Reconnect result"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Reconnect cloud credential",
                 "tags": [
                     "cloud"
                 ]

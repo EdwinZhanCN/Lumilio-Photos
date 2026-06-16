@@ -7,6 +7,9 @@ import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery
 import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { SearchFAB } from "@/features/assets/components/page/SearchFAB";
+import { ChatDock } from "@/features/lumilio/components/Chat/ChatDock";
+import { useDockStore } from "@/features/lumilio/state/dockStore";
+import { useGalleryContextContributor } from "@/features/lumilio/contributors/useGalleryContextContributor";
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
 import {
   useCurrentAssetsView,
@@ -34,6 +37,10 @@ type AssetsGalleryPageProps = {
   baseFilter?: AssetFilter;
   lockedFilterFields?: readonly FilterFieldKey[];
   viewKey?: string;
+  /** Custom banner rendered between the header and the gallery (album info,
+   * person cover, trip map, etc.). Lets scoped collections reuse this page
+   * instead of hand-rolling header + carousel + search. */
+  hero?: ReactNode;
 };
 
 export function AssetsGalleryPage({
@@ -42,11 +49,15 @@ export function AssetsGalleryPage({
   baseFilter,
   lockedFilterFields,
   viewKey,
+  hero,
 }: AssetsGalleryPageProps = {}) {
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { t } = useI18n();
   const { state: settingsState } = useSettingsContext();
+
+  // Hide the search FAB while the agent dock is expanded (the panel sits over it).
+  const dockExpanded = useDockStore((s) => s.collapsedOverride) === false;
 
   // Selectors
   const sortBy = useSortBy();
@@ -103,6 +114,10 @@ export function AssetsGalleryPage({
   const activeBrowseAssets = isSearchActive
     ? photoSearchView.browseAssets
     : flatAssets;
+
+  // Gallery selection becomes agent context. Selection state stores browse item
+  // ids; resolve them to asset UUIDs before the chat request snapshots context.
+  useGalleryContextContributor(activeBrowseItems);
 
   useEffect(() => {
     if (!isSearchActive && activeBrowseGroups.length > 0) {
@@ -302,6 +317,8 @@ export function AssetsGalleryPage({
         lockedFilterFields={lockedFilterFields}
       />
 
+      {hero}
+
       {isSearchActive ? (
         renderSearchSections()
       ) : isFetching && allAssets.length === 0 ? (
@@ -357,7 +374,8 @@ export function AssetsGalleryPage({
             </div>
           </div>
         ))}
-      <SearchFAB />
+      {!isCarouselOpen && !dockExpanded && <SearchFAB />}
+      <ChatDock variant="fab" hideTrigger={isCarouselOpen} />
     </div>
   );
 }

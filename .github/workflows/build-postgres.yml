@@ -1,18 +1,24 @@
 name: Build PostgreSQL (desktop bundle)
 
-# Builds a relocatable PostgreSQL 16 + pgvector for the macOS desktop bundle.
-# Run on demand; the resulting artifacts are staged into
-# desktop/resources/postgres/16/<platform>/ before packaging the .app.
+# Builds a relocatable PostgreSQL 17 + pgvector + pg_textsearch + zhparser
+# for the macOS desktop bundle. Run on demand; the resulting artifacts are
+# staged into desktop/resources/postgres/17/<platform>/ before packaging.
 
 on:
   workflow_dispatch:
     inputs:
       pg_version:
         description: PostgreSQL version
-        default: "16.9"
+        default: "17.5"
       pgvector_version:
         description: pgvector version (git tag)
         default: "v0.8.0"
+      pg_textsearch_version:
+        description: pg_textsearch version (git tag)
+        default: "v1.3.0"
+      scws_version:
+        description: SCWS version for zhparser
+        default: "1.2.3"
 
 jobs:
   build:
@@ -34,9 +40,6 @@ jobs:
           curl -fsSL -O "https://ftp.postgresql.org/pub/source/v${PGVER}/postgresql-${PGVER}.tar.bz2"
           tar xf "postgresql-${PGVER}.tar.bz2"
           cd "postgresql-${PGVER}"
-          # ICU/OpenSSL are omitted to keep the tree relocatable and small. The
-          # desktop cluster is socket-only and created with --locale=C, so it
-          # does not need TLS or ICU-linked collations.
           ./configure \
             --prefix="$DIST" \
             --without-readline \
@@ -49,10 +52,6 @@ jobs:
           fi
           make -j"$(sysctl -n hw.ncpu)"
           make install
-          # Contrib extensions the schema requires (core `make install` omits
-          # contrib): pg_trgm (trigram filename search). pgcrypto is deliberately
-          # omitted because PostgreSQL 16 provides gen_random_uuid() in core, and
-          # pgcrypto itself requires OpenSSL.
           make -C contrib/pg_trgm install
 
       - name: Build pgvector ${{ inputs.pgvector_version }}
@@ -64,13 +63,47 @@ jobs:
           make PG_CONFIG="$DIST/bin/pg_config"
           make PG_CONFIG="$DIST/bin/pg_config" install
 
+      - name: Build pg_textsearch ${{ inputs.pg_textsearch_version }}
+        run: |
+          set -euo pipefail
+          DIST="$PWD/pg-dist"
+          git clone --branch "${{ inputs.pg_textsearch_version }}" --depth 1 https://github.com/timescale/pg_textsearch.git
+          cd pg_textsearch
+          make PG_CONFIG="$DIST/bin/pg_config"
+          make PG_CONFIG="$DIST/bin/pg_config" install
+
+      - name: Build SCWS + zhparser
+        run: |
+          set -euo pipefail
+          DIST="$PWD/pg-dist"
+          SCWS_VER="${{ inputs.scws_version }}"
+          # Build SCWS (Simple Chinese Word Segmentation)
+          curl -fsSL -O "http://www.xunsearch.com/scws/down/scws-${SCWS_VER}.tar.bz2"
+          tar xf "scws-${SCWS_VER}.tar.bz2"
+          cd "scws-${SCWS_VER}"
+          ./configure --prefix="$DIST/scws"
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+          cd ..
+          # Build zhparser
+          git clone --depth 1 https://github.com/amutu/zhparser.git
+          cd zhparser
+          SCWS_HOME="$DIST/scws" make PG_CONFIG="$DIST/bin/pg_config"
+          SCWS_HOME="$DIST/scws" make PG_CONFIG="$DIST/bin/pg_config" install
+          # Copy SCWS dictionary into PG share for runtime access
+          mkdir -p "$DIST/share/postgresql/tsearch_data"
+          cp -R "$DIST/scws/etc/"* "$DIST/share/postgresql/tsearch_data/" 2>/dev/null || true
+          cp -R "$DIST/scws/share/scws/"* "$DIST/share/postgresql/tsearch_data/" 2>/dev/null || true
+
       - name: Stage bundle layout
         run: |
           set -euo pipefail
           DIST="$PWD/pg-dist"
-          OUT="postgres/16/${{ matrix.platform }}"
+          OUT="postgres/17/${{ matrix.platform }}"
           mkdir -p "$OUT"
           cp -R "$DIST/bin" "$DIST/lib" "$DIST/share" "$OUT/"
+          # Copy SCWS shared libs alongside PG libs for runtime linking
+          cp -R "$DIST/scws/lib/"*.dylib "$OUT/lib/" 2>/dev/null || true
           # Keep only the binaries the supervisor uses to slim the bundle.
           find "$OUT/bin" -maxdepth 1 -type f \
             ! -name postgres ! -name initdb ! -name pg_ctl ! -name pg_isready \

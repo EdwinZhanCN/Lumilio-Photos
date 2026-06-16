@@ -3,7 +3,8 @@
 Keep this list short. Each item should have a concrete owner path and a reason it matters.
 
 - Docker image build is not currently verified in this workspace when the local Docker/Orbstack socket is unavailable.
-- **Lumilio Agent RichInput is temporarily offline.** The dock now uses a plain input under `web/src/features/lumilio/components/Chat`; restore mention/@people and slash injection from `web/src/features/lumilio/components/RichInput` after the agent ref workflow stabilizes.
+- ~~Lumilio Agent RichInput temporarily offline~~ **(resolved 2026-06-12)** — mention/slash were rebuilt natively in `web/src/features/lumilio/components/Chat/MentionInput.tsx` (textarea + popover, no contentEditable) and the legacy `components/RichInput/` directory was deleted. See `exec-plans/active/agent-context-mention-slash.md` v2.
+- ~~`/assets/filter-options` response under-typed / cast in `MentionInput`~~ **(resolved 2026-06-13)** — root cause was a stale `make dto`, not a missing DTO: `dto.OptionsResponseDTO` (`camera_models`, `lenses`) and the handler `@Success` annotation were already correct, but `schema.d.ts` was stale so it surfaced as `Record<string, never>`. Regenerated with `make dto` and removed all `as` casts from `MentionInput.tsx` (now fully type-safe). Rule materialized in [FRONTEND.md](FRONTEND.md)/[BACKEND.md](BACKEND.md): an `as`-cast on an API response means check DTO/annotation and re-run `make dto`, never cast.
 - **Desktop bundle: native binaries + signing not yet wired into a release.** The
   desktop module (`desktop/`) is code-complete and compiles, but packaging is
   unfinished and needs a macOS build host with staged binaries:

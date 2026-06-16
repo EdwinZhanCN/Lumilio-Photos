@@ -46,7 +46,25 @@ export function useVerifyCloudCredentialChallenge() {
   });
 }
 
-export function useDisableCloudCredential() {
+export function useDisconnectCloudCredential() {
+  const queryClient = useQueryClient();
+  return $api.useMutation("post", "/api/v1/cloud/credentials/{id}/disconnect", {
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/cloud/credentials"] });
+    },
+  });
+}
+
+export function useReconnectCloudCredential() {
+  const queryClient = useQueryClient();
+  return $api.useMutation("post", "/api/v1/cloud/credentials/{id}/reconnect", {
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/cloud/credentials"] });
+    },
+  });
+}
+
+export function useRemoveCloudCredential() {
   const queryClient = useQueryClient();
   return $api.useMutation("delete", "/api/v1/cloud/credentials/{id}", {
     onSuccess: () => {

@@ -24,8 +24,9 @@ func (ProcessSemanticArgs) InsertOpts() river.InsertOpts {
 }
 
 const (
-	MLPreprocessVersionV1 = "ml-image-v1"
-	MLProcessMaxAttempts  = 50
+	MLPreprocessVersionV1    = "ml-image-v1"
+	MLProcessMaxAttempts     = 8
+	LocalToolMaxAttempts     = 5
 )
 
 // ZeroshotClassifyArgs is the River job payload for zero-shot
@@ -200,6 +201,10 @@ type IngestAssetArgs struct {
 
 func (IngestAssetArgs) Kind() string { return "ingest_asset" }
 
+func (IngestAssetArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
+}
+
 const (
 	DiscoverOperationUpsert = "upsert"
 	DiscoverOperationDelete = "delete"
@@ -221,6 +226,7 @@ func (DiscoverAssetArgs) Kind() string { return "discover_asset" }
 // InsertOpts reduces burst duplicates from file change storms.
 func (DiscoverAssetArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
+		MaxAttempts: LocalToolMaxAttempts,
 		UniqueOpts: river.UniqueOpts{
 			ByArgs:   true,
 			ByPeriod: 1 * time.Minute,
@@ -241,6 +247,10 @@ type MetadataArgs struct {
 
 func (MetadataArgs) Kind() string { return "metadata_asset" }
 
+func (MetadataArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
+}
+
 // ThumbnailArgs triggers thumbnail generation per asset.
 type ThumbnailArgs struct {
 	AssetID     pgtype.UUID       `json:"assetId"`
@@ -251,6 +261,10 @@ type ThumbnailArgs struct {
 
 func (ThumbnailArgs) Kind() string { return "thumbnail_asset" }
 
+func (ThumbnailArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
+}
+
 // TranscodeArgs triggers audio/video transcoding per asset.
 type TranscodeArgs struct {
 	AssetID     pgtype.UUID       `json:"assetId"`
@@ -260,6 +274,10 @@ type TranscodeArgs struct {
 }
 
 func (TranscodeArgs) Kind() string { return "transcode_asset" }
+
+func (TranscodeArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
+}
 
 // ScheduleRepositoryScansArgs is a periodic trigger that lists all active
 // repositories and enqueues a ScanRepositoryArgs job for each one.

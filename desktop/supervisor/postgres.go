@@ -125,6 +125,7 @@ log_directory = '%s'
 log_filename = 'postgresql-%%Y-%%m-%%d.log'
 log_rotation_age = 1d
 log_rotation_size = 10MB
+shared_preload_libraries = 'pg_textsearch'
 `, pgConfEscape(p.socketDir), p.port, pgConfEscape(p.logsDir))
 
 	if err := os.WriteFile(filepath.Join(p.dataDir, "postgresql.conf"), []byte(conf), 0o600); err != nil {

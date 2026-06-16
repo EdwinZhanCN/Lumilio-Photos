@@ -257,6 +257,18 @@ func (s *Service) replayFilter(ctx context.Context, params map[string]string) ([
 	if v := params["place"]; v != "" {
 		q.Place = &v
 	}
+	if v := params["camera"]; v != "" {
+		q.CameraModel = &v
+	}
+	if v := params["lens"]; v != "" {
+		q.LensModel = &v
+	}
+	if v := params["album_id"]; v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			albumID := int32(n)
+			q.AlbumID = &albumID
+		}
+	}
 	rows, err := s.queries.GetAssetIDsUnified(ctx, q)
 	if err != nil {
 		return nil, err

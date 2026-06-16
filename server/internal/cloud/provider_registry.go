@@ -18,6 +18,7 @@ const (
 
 	AuthStatusConnected         = "connected"
 	AuthStatusChallengeRequired = "challenge_required"
+	AuthStatusPasswordRequired  = "password_required"
 )
 
 // ProviderOption describes a select option for provider forms.

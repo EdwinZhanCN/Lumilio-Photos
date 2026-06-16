@@ -8,6 +8,14 @@ import (
 
 // auth using session token
 func (r *Client) authWithToken() error {
+	r.debugf(
+		"accountLogin start apple_id=%s account_country=%q session_token=%t trust_token=%t",
+		maskAppleID(r.appleID),
+		r.sessionData.AccountCountry,
+		r.sessionData.SessionToken != "",
+		r.sessionData.TrustToken != "",
+	)
+
 	text, err := r.request(&rawReq{
 		Method:  http.MethodPost,
 		URL:     r.setupEndpoint + "/accountLogin",
@@ -29,5 +37,6 @@ func (r *Client) authWithToken() error {
 		return fmt.Errorf("authWithToken unmarshal failed, text: %s", text)
 	}
 	r.Data = data
+	r.debugState("account_login_response")
 	return nil
 }

@@ -107,6 +107,15 @@ cd server && sqlc generate
 
 Do not hand-edit generated OpenAPI or frontend schema artifacts.
 
+> **If the frontend is casting (`as { ... }`) around a response, the contract is
+> the bug — not the frontend.** Either the handler's `@Success ... {data=dto.X}`
+> annotation is missing/points at the wrong DTO, or the DTO is correct and the
+> generated artifacts are stale (`make dto` was not re-run). Fix the annotation /
+> DTO and regenerate; never let the frontend cast around a typed endpoint. A
+> stale `make dto` once let `dto.OptionsResponseDTO.camera_models` surface to the
+> SPA as an untyped `Record<string, never>`, so a frontend cast guessed `cameras`
+> and silently broke a feature.
+
 ## Queues And Processing
 
 River worker counts and queue config live in `internal/queue/queue_setup.go`. Worker registration happens in `server/app/app.go`, and the implementations live in `internal/queue`. The processing pipeline uses services and processors for:

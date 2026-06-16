@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"server/internal/cloud/icloud"
 	"server/internal/db/repo"
 )
 
@@ -36,12 +37,12 @@ func (p *iCloudCredentialProvider) Descriptor() ProviderDescriptor {
 				Autocomplete: "username",
 			},
 			{
-				Name:         "password",
-				Label:        "App-specific password",
-				Type:         "password",
-				Required:     true,
-				Placeholder:  "xxxx-xxxx-xxxx-xxxx",
-				Autocomplete: "current-password",
+			Name:         "password",
+			Label:        "Password",
+			Type:         "password",
+			Required:     true,
+			Placeholder:  "",
+			Autocomplete: "current-password",
 			},
 			{
 				Name:     "domain",
@@ -92,6 +93,7 @@ func (p *iCloudCredentialProvider) DefaultArtifactDir(credentialID uuid.UUID) st
 }
 
 func (p *iCloudCredentialProvider) Authenticate(ctx context.Context, input CredentialAuthInput) (CredentialAuthResult, error) {
+	_ = ctx
 	username := strings.TrimSpace(input.Inputs["username"])
 	password := strings.TrimSpace(input.Inputs["password"])
 	domain := normalizeICloudDomain(input.Inputs["domain"])
@@ -102,38 +104,62 @@ func (p *iCloudCredentialProvider) Authenticate(ctx context.Context, input Crede
 		return CredentialAuthResult{}, err
 	}
 
-	signal := &twoFASignal{}
-	provider := NewICloudProvider(ICloudConfig{
-		Username:  username,
+	client, err := icloud.NewClient(&icloud.ClientOption{
+		AppID:     username,
 		Password:  password,
-		Domain:    domain,
 		CookieDir: input.ArtifactDir,
+		Domain:    domain,
 	})
-	provider.SetTwoFACodeGetter(signal)
+	if err != nil {
+		return CredentialAuthResult{}, fmt.Errorf("create icloud client: %w", err)
+	}
 
-	if err := provider.ForceAuth(ctx); err != nil {
-		if signal.wasTriggered() {
-			return CredentialAuthResult{
-				Status:       CredentialStatusPendingChallenge,
-				AuthStatus:   AuthStatusChallengeRequired,
-				PublicConfig: input.Identity.PublicConfig,
-				ArtifactDir:  input.ArtifactDir,
-				Challenge:    iCloudAuthChallenge(),
-				PendingState: pendingICloudAuth{provider: provider, signal: signal},
-			}, nil
-		}
+	if err := client.SignIn(password); err != nil {
 		return CredentialAuthResult{}, fmt.Errorf("icloud authentication failed: %w", err)
 	}
 
+	if !client.IsRequires2FA() {
+		if err := client.Flush(); err != nil {
+			return CredentialAuthResult{}, fmt.Errorf("persist icloud session: %w", err)
+		}
+		return CredentialAuthResult{
+			Status:       CredentialStatusConnected,
+			AuthStatus:   AuthStatusConnected,
+			PublicConfig: input.Identity.PublicConfig,
+			ArtifactDir:  input.ArtifactDir,
+		}, nil
+	}
+
+	phones, err := client.GetTrustedPhoneNumbers()
+	if err != nil {
+		return CredentialAuthResult{}, fmt.Errorf("get trusted phone numbers: %w", err)
+	}
+	if len(phones) == 0 {
+		return CredentialAuthResult{}, fmt.Errorf("no trusted phone numbers available for SMS verification")
+	}
+
+	phone := phones[0]
+	mode := phone.PushMode
+	if mode == "" {
+		mode = "sms"
+	}
+
+	if err := client.RequestSMSCode(phone.ID, mode); err != nil {
+		return CredentialAuthResult{}, fmt.Errorf("request SMS verification code: %w", err)
+	}
+
 	return CredentialAuthResult{
-		Status:       CredentialStatusConnected,
-		AuthStatus:   AuthStatusConnected,
+		Status:       CredentialStatusPendingChallenge,
+		AuthStatus:   AuthStatusChallengeRequired,
 		PublicConfig: input.Identity.PublicConfig,
 		ArtifactDir:  input.ArtifactDir,
+		Challenge:    iCloudSMSChallenge(phone.NumberWithDialCode),
+		PendingState: pendingICloudAuth{client: client, phoneID: phone.ID, phoneMode: mode},
 	}, nil
 }
 
 func (p *iCloudCredentialProvider) VerifyChallenge(ctx context.Context, input CredentialChallengeInput) (CredentialAuthResult, error) {
+	_ = ctx
 	pending, ok := input.PendingState.(pendingICloudAuth)
 	if !ok {
 		return CredentialAuthResult{}, fmt.Errorf("pending iCloud authentication state is unavailable")
@@ -143,9 +169,12 @@ func (p *iCloudCredentialProvider) VerifyChallenge(ctx context.Context, input Cr
 		return CredentialAuthResult{}, fmt.Errorf("verification code is required")
 	}
 
-	pending.signal.setCode(code)
-	if err := pending.provider.ForceAuth(ctx); err != nil {
-		return CredentialAuthResult{}, fmt.Errorf("icloud challenge verification failed: %w", err)
+	if err := pending.client.VerifySMSCode(pending.phoneID, code, pending.phoneMode); err != nil {
+		return CredentialAuthResult{}, fmt.Errorf("icloud SMS verification failed: %w", err)
+	}
+
+	if err := pending.client.Flush(); err != nil {
+		return CredentialAuthResult{}, fmt.Errorf("persist icloud session: %w", err)
 	}
 
 	return CredentialAuthResult{
@@ -169,11 +198,15 @@ func (p *iCloudCredentialProvider) NewImporter(ctx context.Context, credential r
 	}), nil
 }
 
-func iCloudAuthChallenge() *AuthChallenge {
+func iCloudSMSChallenge(maskedPhone string) *AuthChallenge {
+	desc := "Enter the verification code sent via SMS."
+	if maskedPhone != "" {
+		desc = fmt.Sprintf("Enter the verification code sent to %s.", maskedPhone)
+	}
 	return &AuthChallenge{
 		Type:        "verification_code",
 		Title:       "Verification required",
-		Description: "Enter the code sent to your trusted devices.",
+		Description: desc,
 		Fields:      iCloudChallengeFields(),
 	}
 }

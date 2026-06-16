@@ -5,21 +5,19 @@
 ## Retrievers
 
 - `embedding`: resolves the default semantic search space, embeds the text query through Lumen, and retrieves nearest primary asset embeddings with pgvector.
-- `ocr`: searches `ocr_text_items.search_vector` with `plainto_tsquery('simple', query)` and ranks assets by `ts_rank_cd`.
+- `ocr`: searches `ocr_results.full_text` with pg_textsearch's BM25 `<@>` operator. The `full_text` column concatenates all OCR text items per asset so cross-fragment queries work. Ranked by BM25 score via the `chinese_zh` text search configuration (zhparser for CJK segmentation).
 - `place`: searches `location_clusters.search_vector`, joins through `location_cluster_assets`, and ranks assets by `ts_rank_cd`.
 
 Every retriever receives the same `Filter`, which mirrors the non-query parts of `AssetFilter`: repository, owner, album, person, type, filename filter, date range, RAW, rating, liked, camera/lens, and GPS bounding box.
 
 ## PostgreSQL Indexes
 
-Migration `1769558401_026_aggregate_search_indexes` adds:
-
-- `ocr_text_items.search_vector` stored generated `tsvector` plus a GIN index.
-- `location_clusters.search_vector` stored generated `tsvector` over `label`, `country`, `region`, `city`, and `geohash` plus a GIN index.
+- `ocr_results.full_text` BM25 index via pg_textsearch with `text_config = 'chinese_zh'` (migration 036). Supersedes the per-row tsvector+GIN on `ocr_text_items`.
+- `location_clusters.search_vector` stored generated `tsvector` over `label`, `country`, `region`, `city`, and `geohash` plus a GIN index (migration 026).
 
 Embedding search uses the existing per-space HNSW indexes created by `embedding_service.ensureSearchIndexForSpace`, for example `embeddings_space_<id>_primary_hnsw_l2_idx`, because embedding dimensions can differ by space.
 
-The retriever SQL predicates match these indexes: text retrievers use `search_vector @@ plainto_tsquery(...)`, while embedding retrieval orders by pgvector distance.
+The OCR retriever uses `full_text <@> query` (pg_textsearch BM25), the place retriever uses `search_vector @@ plainto_tsquery(...)`, and embedding retrieval orders by pgvector distance.
 
 ## Fusion
 

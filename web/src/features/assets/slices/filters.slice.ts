@@ -105,10 +105,14 @@ export const createFiltersSlice: StateCreator<
 
   batchUpdateFilters: (updates) =>
     set((state) => {
-      state.filters = {
+      const nextFilters = {
         ...state.filters,
         ...updates,
       };
+      if (JSON.stringify(state.filters) === JSON.stringify(nextFilters)) {
+        return;
+      }
+      state.filters = nextFilters;
     }),
 });
 
