@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func stringPtr(s string) *string {
+	return &s
+}
+
 func TestDirectoryManager_CreateStructure(t *testing.T) {
 	dm := NewDirectoryManager()
 	testDir := t.TempDir()
@@ -20,11 +24,11 @@ func TestDirectoryManager_CreateStructure(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify all directories were created
-		for _, dir := range Directories {
-			dirPath := filepath.Join(testDir, dir)
+		for _, d := range repoDirs {
+			dirPath := filepath.Join(testDir, d.path)
 			info, err := os.Stat(dirPath)
-			assert.NoError(t, err, "Directory %s should exist", dir)
-			assert.True(t, info.IsDir(), "Path %s should be a directory", dir)
+			assert.NoError(t, err, "Directory %s should exist", d.path)
+			assert.True(t, info.IsDir(), "Path %s should be a directory", d.path)
 		}
 
 		// Verify log files were created
@@ -188,13 +192,14 @@ func TestDirectoryManager_ProtectedPaths(t *testing.T) {
 
 func TestDirectoryManager_StagingOperations(t *testing.T) {
 	dm := NewDirectoryManager()
+	sm := NewStagingManager()
 	testDir := t.TempDir()
 
 	err := dm.CreateStructure(testDir)
 	require.NoError(t, err)
 
 	t.Run("create staging file", func(t *testing.T) {
-		stagingFile, err := dm.CreateStagingFile(testDir, "test-upload.jpg")
+		stagingFile, err := sm.CreateStagingFile(testDir, "test-upload.jpg")
 		require.NoError(t, err)
 
 		assert.NotEmpty(t, stagingFile.ID)
@@ -212,7 +217,7 @@ func TestDirectoryManager_StagingOperations(t *testing.T) {
 	})
 
 	t.Run("commit staging file", func(t *testing.T) {
-		stagingFile, err := dm.CreateStagingFile(testDir, "commit-test.jpg")
+		stagingFile, err := sm.CreateStagingFile(testDir, "commit-test.jpg")
 		require.NoError(t, err)
 
 		// Write some content to the staging file
@@ -221,7 +226,7 @@ func TestDirectoryManager_StagingOperations(t *testing.T) {
 		require.NoError(t, err)
 
 		finalPath := "user-content/photos/final.jpg"
-		err = dm.CommitStagingFile(stagingFile, finalPath)
+		err = sm.CommitStagingFile(stagingFile, finalPath)
 		require.NoError(t, err)
 
 		// Verify file moved to final location
@@ -236,32 +241,32 @@ func TestDirectoryManager_StagingOperations(t *testing.T) {
 	})
 
 	t.Run("commit staging file validation", func(t *testing.T) {
-		stagingFile, err := dm.CreateStagingFile(testDir, "validation-test.jpg")
+		stagingFile, err := sm.CreateStagingFile(testDir, "validation-test.jpg")
 		require.NoError(t, err)
 
 		// Test with nil staging file
-		err = dm.CommitStagingFile(nil, "some/path.jpg")
+		err = sm.CommitStagingFile(nil, "some/path.jpg")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "staging file is nil")
 
 		// Test with empty final path
-		err = dm.CommitStagingFile(stagingFile, "")
+		err = sm.CommitStagingFile(stagingFile, "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "final path cannot be empty")
 
 		// Test with absolute final path
-		err = dm.CommitStagingFile(stagingFile, "/absolute/path.jpg")
+		err = sm.CommitStagingFile(stagingFile, "/absolute/path.jpg")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "final path must be repository-relative")
 	})
 
 	t.Run("cleanup staging files", func(t *testing.T) {
 		// Create some staging files
-		staging1, err := dm.CreateStagingFile(testDir, "old-file1.jpg")
+		staging1, err := sm.CreateStagingFile(testDir, "old-file1.jpg")
 		require.NoError(t, err)
-		staging2, err := dm.CreateStagingFile(testDir, "old-file2.jpg")
+		staging2, err := sm.CreateStagingFile(testDir, "old-file2.jpg")
 		require.NoError(t, err)
-		staging3, err := dm.CreateStagingFile(testDir, "new-file.jpg")
+		staging3, err := sm.CreateStagingFile(testDir, "new-file.jpg")
 		require.NoError(t, err)
 
 		// Make first two files old
@@ -272,7 +277,7 @@ func TestDirectoryManager_StagingOperations(t *testing.T) {
 		require.NoError(t, err)
 
 		// Cleanup files older than 1 hour
-		err = dm.CleanupStaging(testDir, time.Hour)
+		err = sm.CleanupStaging(testDir, time.Hour)
 		require.NoError(t, err)
 
 		// Old files should be gone
@@ -509,7 +514,7 @@ func TestDirectoryManager_EdgeCases(t *testing.T) {
 	t.Run("cleanup nonexistent directories", func(t *testing.T) {
 		// Should not error for valid repo path with missing staging dir
 		testDir := t.TempDir()
-		err := dm.CleanupStaging(testDir, time.Hour)
+		err := NewStagingManager().CleanupStaging(testDir, time.Hour)
 		assert.NoError(t, err) // Should succeed even if staging dir doesn't exist
 
 		err = dm.CleanupTempFiles(testDir, time.Hour)

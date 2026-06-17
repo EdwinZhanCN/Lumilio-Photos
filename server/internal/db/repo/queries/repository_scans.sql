@@ -26,11 +26,13 @@ WHERE repository_id = $1
 ORDER BY started_at DESC
 LIMIT $2 OFFSET $3;
 
--- name: CountRunningRepositoryScanRuns :one
-SELECT COUNT(*) FROM repository_scan_runs
-WHERE repository_id = $1
-  AND status = 'running'
-  AND scan_id <> $2;
+-- name: ReclaimInterruptedRepositoryScanRuns :execrows
+UPDATE repository_scan_runs
+SET
+    status = 'failed',
+    finished_at = NOW(),
+    error = 'interrupted by server restart'
+WHERE status = 'running';
 
 -- name: CompleteRepositoryScanRun :one
 UPDATE repository_scan_runs

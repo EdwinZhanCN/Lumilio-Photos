@@ -43,12 +43,6 @@ type AuthResponseDTO struct {
 	BootstrapAdmin bool       `json:"bootstrap_admin,omitempty"`
 }
 
-type BootstrapStatusDTO struct {
-	HasUsers             bool   `json:"has_users"`
-	IsBootstrapMode      bool   `json:"is_bootstrap_mode"`
-	NextRegistrationRole string `json:"next_registration_role"`
-}
-
 type MediaTokenDTO struct {
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expires_at"`
@@ -74,13 +68,5 @@ func ToAuthResponseDTO(response *service.AuthResponse) *AuthResponseDTO {
 		MFAToken:       response.MFAToken,
 		MFAMethods:     append([]string(nil), response.MFAMethods...),
 		BootstrapAdmin: response.BootstrapAdmin,
-	}
-}
-
-func ToBootstrapStatusDTO(status service.BootstrapStatus) BootstrapStatusDTO {
-	return BootstrapStatusDTO{
-		HasUsers:             status.HasUsers,
-		IsBootstrapMode:      status.IsBootstrapMode,
-		NextRegistrationRole: status.NextRegistrationRole,
 	}
 }

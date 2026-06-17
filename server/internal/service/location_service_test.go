@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"server/config"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,10 +58,7 @@ func TestGeohashesForGPSRejectsInvalidCoordinates(t *testing.T) {
 }
 
 func TestReverseGeocoderDefaultsToDisabled(t *testing.T) {
-	t.Setenv("GEOCODING_PROVIDER", "")
-	t.Setenv("GEOCODING_NOMINATIM_ENDPOINT", "")
-
-	geocoder := newReverseGeocoderFromEnv()
+	geocoder := newReverseGeocoder(config.GeocodingConfig{})
 
 	require.Equal(t, geocoderProviderDisabled, geocoder.Provider())
 	_, err := geocoder.Reverse(context.Background(), 0, 0)
@@ -78,12 +77,12 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("GEOCODING_PROVIDER", "nominatim")
-	t.Setenv("GEOCODING_NOMINATIM_ENDPOINT", server.URL)
-	t.Setenv("GEOCODING_LANGUAGE", "en")
-	t.Setenv("GEOCODING_USER_AGENT", "Lumilio-Test/1.0")
-
-	geocoder := newReverseGeocoderFromEnv()
+	geocoder := newReverseGeocoder(config.GeocodingConfig{
+		Provider:          "nominatim",
+		NominatimEndpoint: server.URL,
+		Language:          "en",
+		UserAgent:         "Lumilio-Test/1.0",
+	})
 	result, err := geocoder.Reverse(context.Background(), 0, 0)
 
 	require.NoError(t, err)

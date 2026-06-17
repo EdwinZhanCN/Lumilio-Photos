@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "./useAuth.ts";
-import { bootstrapStatusQueryKey } from "./useBootstrapStatus.ts";
+import { setupStatusQueryKey } from "./useSetupStatus.ts";
 import type {
   ApiResult,
   AuthResponse,
@@ -146,7 +146,7 @@ export function useRegistrationFlow(): RegistrationFlowState {
       // TOTP comes first because a passkey may only be added once TOTP is on.
       startedRef.current = true;
       await completeAuth(payload.data);
-      await queryClient.invalidateQueries({ queryKey: bootstrapStatusQueryKey });
+      await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
 
       const setupResponse = await totpSetupMutation.mutateAsync({});
       const setupPayload = setupResponse as ApiResult<TOTPSetupResponse> | undefined;

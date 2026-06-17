@@ -78,13 +78,19 @@ Keep in TOML:
 
 ## Storage Model
 
-`storage.path` is a storage root. The primary repository is always initialized at:
+`storage.path` is the default repository root used to seed runtime repository
+defaults. Startup does not create a repository there. During authenticated
+first-run setup, the primary repository form defaults to:
 
 ```text
 <storage.path>/primary
 ```
 
-The startup path rejects a legacy repository directly at the storage root. Repository config lives in `.lumiliorepo` files and is handled by `internal/storage/repocfg`.
+Repository identity is explicit in the database through `repositories.role`
+(`primary` or `regular`). The app is fully initialized only when database
+credential setup is complete, an admin exists, and exactly one active primary
+repository exists. Repository config lives in `.lumiliorepo` files and is handled
+by `internal/storage/repocfg`.
 
 ## Database And API Contracts
 

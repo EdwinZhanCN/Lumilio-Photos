@@ -97,25 +97,6 @@ func (q *Queries) CompleteRepositoryScanRun(ctx context.Context, arg CompleteRep
 	return i, err
 }
 
-const countRunningRepositoryScanRuns = `-- name: CountRunningRepositoryScanRuns :one
-SELECT COUNT(*) FROM repository_scan_runs
-WHERE repository_id = $1
-  AND status = 'running'
-  AND scan_id <> $2
-`
-
-type CountRunningRepositoryScanRunsParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	ScanID       pgtype.UUID `db:"scan_id" json:"scan_id"`
-}
-
-func (q *Queries) CountRunningRepositoryScanRuns(ctx context.Context, arg CountRunningRepositoryScanRunsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countRunningRepositoryScanRuns, arg.RepositoryID, arg.ScanID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createRepositoryScanRun = `-- name: CreateRepositoryScanRun :one
 INSERT INTO repository_scan_runs (
     scan_id,
@@ -313,4 +294,21 @@ func (q *Queries) ListRepositoryScanRuns(ctx context.Context, arg ListRepository
 		return nil, err
 	}
 	return items, nil
+}
+
+const reclaimInterruptedRepositoryScanRuns = `-- name: ReclaimInterruptedRepositoryScanRuns :execrows
+UPDATE repository_scan_runs
+SET
+    status = 'failed',
+    finished_at = NOW(),
+    error = 'interrupted by server restart'
+WHERE status = 'running'
+`
+
+func (q *Queries) ReclaimInterruptedRepositoryScanRuns(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, reclaimInterruptedRepositoryScanRuns)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

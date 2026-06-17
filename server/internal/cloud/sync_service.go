@@ -133,13 +133,15 @@ type cloudSyncService struct {
 func NewCloudSyncService(
 	queries *repo.Queries,
 	materializer *sourcing.SourceMaterializer,
+	secretKeyPath string,
+	storageRoot string,
 	logger *zap.Logger,
 ) CloudSyncService {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	scopedLogger := logger.With(zap.String("component", "cloud_sync_service"))
-	box, err := secretbox.New(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")), "cloud.credentials.encryption.v1")
+	box, err := secretbox.New(strings.TrimSpace(secretKeyPath), "cloud.credentials.encryption.v1")
 	if err != nil {
 		scopedLogger.Warn("cloud credential secret box unavailable", zap.Error(err))
 	}
@@ -147,7 +149,7 @@ func NewCloudSyncService(
 		queries:       queries,
 		materializer:  materializer,
 		logger:        scopedLogger,
-		registry:      NewDefaultProviderRegistry(),
+		registry:      NewDefaultProviderRegistry(storageRoot),
 		secretBox:     box,
 		pendingAuth:   make(map[uuid.UUID]pendingCredentialAuth),
 		activeImports: make(map[uuid.UUID]*activeImport),
@@ -754,4 +756,3 @@ func nullableString(value string) *string {
 	}
 	return &value
 }
-

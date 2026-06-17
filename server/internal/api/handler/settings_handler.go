@@ -10,10 +10,26 @@ import (
 
 type SettingsHandler struct {
 	settingsService service.SettingsService
+	runtimeInfo     dto.RuntimeInfoDTO
 }
 
-func NewSettingsHandler(settingsService service.SettingsService) *SettingsHandler {
-	return &SettingsHandler{settingsService: settingsService}
+func NewSettingsHandler(settingsService service.SettingsService, runtimeInfo dto.RuntimeInfoDTO) *SettingsHandler {
+	return &SettingsHandler{settingsService: settingsService, runtimeInfo: runtimeInfo}
+}
+
+// GetRuntimeInfo returns a read-only snapshot of the runtime-immutable
+// configuration (port, storage root, hardware accel, scan schedule, …) for the
+// Settings → Server tab.
+// @Summary Get runtime info
+// @Description Read-only effective runtime-immutable configuration (changed only via TOML + restart).
+// @Tags settings
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} api.Result{data=dto.RuntimeInfoDTO} "Runtime info retrieved successfully"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Router /api/v1/settings/runtime-info [get]
+func (h *SettingsHandler) GetRuntimeInfo(c *gin.Context) {
+	api.GinSuccess(c, h.runtimeInfo)
 }
 
 // GetSystemSettings returns the persisted system settings.

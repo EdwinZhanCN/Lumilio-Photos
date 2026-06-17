@@ -12,40 +12,100 @@ import (
 	"github.com/google/uuid"
 )
 
-// StagingManager handles staging operations with repository configuration integration
+// StagingManager owns the upload staging area (.lumilio/staging) and the rules
+// for committing a staged file into a repository's inbox according to that
+// repository's storage strategy. It is the sole owner of staging; the directory
+// manager no longer exposes staging primitives.
 type StagingManager interface {
-	// Staging operations with repository configuration support
+	// CreateStagingFile creates an empty placeholder in .lumilio/staging/incoming
+	// and returns a handle whose Path/RepoPath the caller writes into.
 	CreateStagingFile(repoPath, filename string) (*StagingFile, error)
+
+	// CommitStagingFile moves a staged file to a repository-relative finalPath.
+	// finalPath must stay inside the repository and must not already exist.
 	CommitStagingFile(stagingFile *StagingFile, finalPath string) error
+
+	// CommitStagingFileToInbox commits a staged file to the inbox location
+	// derived from the repository's storage strategy, returning the inbox-
+	// relative path it was written to.
 	CommitStagingFileToInbox(stagingFile *StagingFile, hash string) (string, error)
+
+	// MoveStagingToFailed moves a staged file into .lumilio/staging/failed.
 	MoveStagingToFailed(stagingFile *StagingFile) error
+
+	// CleanupStaging removes staged files (incoming and failed) older than maxAge.
 	CleanupStaging(repoPath string, maxAge time.Duration) error
-
-	// Path resolution
-	ResolveInboxPath(repoPath string, originalFilename, hash string) (string, error)
-	ResolveFailedPath(repoPath string, originalFilename string) (string, error)
 }
 
-// DefaultStagingManager implements the StagingManager interface
-type DefaultStagingManager struct {
-	dirManager DirectoryManager
+// DefaultStagingManager implements the StagingManager interface.
+type DefaultStagingManager struct{}
+
+// NewStagingManager creates a new staging manager instance.
+func NewStagingManager() *DefaultStagingManager {
+	return &DefaultStagingManager{}
 }
 
-// NewStagingManager creates a new staging manager instance
-func NewStagingManager() StagingManager {
-	return &DefaultStagingManager{
-		dirManager: NewDirectoryManager(),
-	}
-}
+// Ensure the concrete type satisfies the consumer interface.
+var _ StagingManager = (*DefaultStagingManager)(nil)
 
-// CreateStagingFile creates a new file in the staging area
+// CreateStagingFile creates an empty placeholder file in the incoming staging area.
 func (sm *DefaultStagingManager) CreateStagingFile(repoPath, filename string) (*StagingFile, error) {
-	return sm.dirManager.CreateStagingFile(repoPath, filename)
+	cleanRepoPath, err := filepath.Abs(filepath.Clean(repoPath))
+	if err != nil {
+		return nil, fmt.Errorf("invalid repository path: %w", err)
+	}
+
+	stagingDir := filepath.Join(cleanRepoPath, DefaultStructure.IncomingDir)
+	if err := os.MkdirAll(stagingDir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create staging directory: %w", err)
+	}
+
+	id := uuid.New().String()
+	base := filepath.Base(filename)
+	stagingFullPath := filepath.Join(stagingDir, fmt.Sprintf("%s_%s", id, base))
+
+	f, err := os.Create(stagingFullPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create staging file: %w", err)
+	}
+	_ = f.Close()
+
+	return &StagingFile{
+		ID:        id,
+		RepoPath:  cleanRepoPath,
+		Path:      stagingFullPath,
+		Filename:  base,
+		CreatedAt: time.Now(),
+	}, nil
 }
 
-// CommitStagingFile moves a staging file to its final destination
+// CommitStagingFile moves a staging file to its final repository-relative
+// destination. The destination filename is decided upstream (uniqueInboxFilename
+// for rename/uuid, the original for overwrite), so this performs an atomic rename
+// that intentionally replaces an existing file under the "overwrite" strategy.
 func (sm *DefaultStagingManager) CommitStagingFile(stagingFile *StagingFile, finalPath string) error {
-	return sm.dirManager.CommitStagingFile(stagingFile, finalPath)
+	if stagingFile == nil {
+		return fmt.Errorf("staging file is nil")
+	}
+	if strings.TrimSpace(finalPath) == "" {
+		return fmt.Errorf("final path cannot be empty")
+	}
+	if filepath.IsAbs(finalPath) {
+		return fmt.Errorf("final path must be repository-relative")
+	}
+
+	destFullPath, err := resolveInRepo(stagingFile.RepoPath, finalPath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(destFullPath), 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	if err := os.Rename(stagingFile.Path, destFullPath); err != nil {
+		return fmt.Errorf("failed to move staged file: %w", err)
+	}
+	return nil
 }
 
 // CommitStagingFileToInbox commits a staging file to the inbox using repository configuration
@@ -80,7 +140,7 @@ func (sm *DefaultStagingManager) MoveStagingToFailed(stagingFile *StagingFile) e
 	}
 
 	// Resolve failed path
-	failedPath, err := sm.ResolveFailedPath(stagingFile.RepoPath, stagingFile.Filename)
+	failedPath, err := sm.resolveFailedPath(stagingFile.RepoPath, stagingFile.Filename)
 	if err != nil {
 		return fmt.Errorf("failed to resolve failed path: %w", err)
 	}
@@ -92,10 +152,10 @@ func (sm *DefaultStagingManager) MoveStagingToFailed(stagingFile *StagingFile) e
 	return nil
 }
 
-// ResolveFailedPath resolves the path for failed files
-func (sm *DefaultStagingManager) ResolveFailedPath(repoPath string, originalFilename string) (string, error) {
+// resolveFailedPath resolves a timestamped target path under the failed area.
+func (sm *DefaultStagingManager) resolveFailedPath(repoPath string, originalFilename string) (string, error) {
 	failedDir := filepath.Join(repoPath, DefaultStructure.FailedDir)
-	if err := os.MkdirAll(failedDir, 0755); err != nil {
+	if err := os.MkdirAll(failedDir, 0700); err != nil {
 		return "", fmt.Errorf("failed to create failed directory: %w", err)
 	}
 
@@ -109,19 +169,51 @@ func (sm *DefaultStagingManager) ResolveFailedPath(repoPath string, originalFile
 	return filepath.Join(DefaultStructure.FailedDir, failedFilename), nil
 }
 
-// ResolveInboxPath resolves the final inbox path for a file based on repository configuration
+// ResolveInboxPath computes (without moving) the inbox-relative target path for a
+// file under the repository's storage strategy. Kept off the interface; used for
+// inspection and tests. Note: cas/date strategies create the target directory as
+// a side effect.
 func (sm *DefaultStagingManager) ResolveInboxPath(repoPath string, originalFilename, hash string) (string, error) {
 	cfg, err := repocfg.LoadConfigFromFile(repoPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to load repository config: %w", err)
 	}
-
 	return sm.resolveInboxRelativePath(repoPath, cfg, originalFilename, hash)
 }
 
-// CleanupStaging removes old staging files
+// CleanupStaging removes staged files (incoming and failed) older than maxAge.
 func (sm *DefaultStagingManager) CleanupStaging(repoPath string, maxAge time.Duration) error {
-	return sm.dirManager.CleanupStaging(repoPath, maxAge)
+	cleanRepoPath, err := filepath.Abs(filepath.Clean(repoPath))
+	if err != nil {
+		return fmt.Errorf("invalid repository path: %w", err)
+	}
+	cutoff := time.Now().Add(-maxAge)
+
+	dirs := []string{
+		filepath.Join(cleanRepoPath, DefaultStructure.IncomingDir),
+		filepath.Join(cleanRepoPath, DefaultStructure.FailedDir),
+	}
+
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("failed to read staging directory %s: %w", dir, err)
+		}
+		for _, e := range entries {
+			info, err := e.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().Before(cutoff) {
+				_ = os.Remove(filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+
+	return nil
 }
 
 // resolveInboxRelativePath decides the inbox-relative final path based on repository storage strategy.
@@ -133,17 +225,11 @@ func (sm *DefaultStagingManager) resolveInboxRelativePath(repoPath string, cfg *
 	inboxRoot := filepath.Join(repoPath, DefaultStructure.InboxDir)
 	strategy := strings.ToLower(cfg.StorageStrategy)
 	duplicateMode := cfg.LocalSettings.HandleDuplicateFilenames
-	preserve := cfg.LocalSettings.PreserveOriginalFilename
 
 	switch strategy {
 	case "flat":
 		// inbox/<filename>
-		filename := originalFilename
-		if preserve {
-			filename = sm.uniqueInboxFilename(inboxRoot, originalFilename, duplicateMode)
-		} else {
-			filename = sm.uniqueInboxFilename(inboxRoot, filename, duplicateMode)
-		}
+		filename := sm.uniqueInboxFilename(inboxRoot, originalFilename, duplicateMode)
 		return filepath.Join(DefaultStructure.InboxDir, filename), nil
 
 	case "cas":

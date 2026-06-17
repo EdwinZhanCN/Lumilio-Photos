@@ -22,7 +22,7 @@ import {
   useUIActions,
 } from "@/features/assets/selectors";
 import { useI18n } from "@/lib/i18n";
-import { useSettingsContext } from "@/features/settings";
+import { usePreference } from "@/features/settings";
 import type { BrowseGroup } from "@/features/assets";
 import type { AssetGalleryProps } from "./gallery.types";
 import {
@@ -54,7 +54,7 @@ export function AssetsGalleryPage({
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { t } = useI18n();
-  const { state: settingsState } = useSettingsContext();
+  const [assetPage] = usePreference("assetPage");
 
   // Hide the search FAB while the agent dock is expanded (the panel sits over it).
   const dockExpanded = useDockStore((s) => s.collapsedOverride) === false;
@@ -65,8 +65,8 @@ export function AssetsGalleryPage({
   const isCarouselOpen = useIsCarouselOpen();
   const { setSortBy } = useUIActions();
   const isSearchActive = searchQuery.trim().length > 0;
-  const currentLayout = settingsState.ui.asset_page?.layout ?? "full";
-  const compactColumns = settingsState.ui.asset_page?.columns ?? 6;
+  const currentLayout = assetPage.layout;
+  const compactColumns = assetPage.columns;
   const GalleryComponent =
     currentLayout === "compact" ? SquareGallery : JustifiedGallery;
 

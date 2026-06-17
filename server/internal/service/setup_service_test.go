@@ -90,14 +90,8 @@ func TestSetupService_Initialize_RotatesPersistsAndMarksInitialized(t *testing.T
 		t.Fatal("persisted secret does not match rotated password")
 	}
 
-	// Status flips to initialized; a second setup is refused.
-	status, err = svc.Status(context.Background())
-	if err != nil {
-		t.Fatalf("status after init: %v", err)
-	}
-	if !status.Initialized {
-		t.Fatal("expected initialized system after setup")
-	}
+	// Setup rotated the credential; a second setup is refused (the rotated
+	// secret on disk is the db_rotated gate).
 	if _, err := svc.Initialize(context.Background(), SetupRequest{}); !errors.Is(err, ErrSystemAlreadyInitialized) {
 		t.Fatalf("expected ErrSystemAlreadyInitialized, got %v", err)
 	}

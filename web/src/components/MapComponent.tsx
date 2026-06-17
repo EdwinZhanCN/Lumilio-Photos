@@ -13,7 +13,7 @@ import Supercluster, {
   type ClusterFeature,
   type PointFeature,
 } from "supercluster";
-import { useSettingsContext } from "@/features/settings";
+import { usePreference } from "@/features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -271,13 +271,12 @@ function MapComponent({
   showSinglePhoto = false,
   boundsOverlay,
 }: MapComponentProps) {
-  const { state } = useSettingsContext();
+  const [region] = usePreference("region");
   const { t } = useI18n();
   const [mapKey, setMapKey] = useState(0);
   const [viewport, setViewport] = useState<MapViewport | null>(null);
 
   // Determine which map provider to use based on region setting
-  const region = state.ui.region || "other";
   const mapConfig = mapConfigs[region];
   const isChina = region === "china";
 

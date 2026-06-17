@@ -47,7 +47,7 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 	// role password (ALTER USER) and writes the new secret to disk; without this
 	// hook the pool would keep opening connections with the stale bootstrap
 	// password and fail SASL auth (notably River's producer fetching jobs).
-	secretPath := config.ResolveDBPasswordFilePath(cfg)
+	secretPath := strings.TrimSpace(cfg.PasswordFile)
 	poolCfg.BeforeConnect = func(_ context.Context, connConfig *pgx.ConnConfig) error {
 		if password := readRotatedPassword(secretPath); password != "" {
 			connConfig.Password = password

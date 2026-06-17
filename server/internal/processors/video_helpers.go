@@ -38,11 +38,12 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 	defer file.Close()
 
 	config := &exif.Config{
-		MaxFileSize: 20 * 1024 * 1024 * 1024, // 20GB
-		Timeout:     60 * time.Second,        // 60s
-		BufferSize:  128 * 1024,
-		FastMode:    true,
-		IncludeRaw:  true,
+		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
+		MaxFileSize:  20 * 1024 * 1024 * 1024, // 20GB
+		Timeout:      60 * time.Second,        // 60s
+		BufferSize:   128 * 1024,
+		FastMode:     true,
+		IncludeRaw:   true,
 	}
 	extractor := exif.NewExtractor(config)
 	defer extractor.Close()
@@ -167,7 +168,7 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_%d_%s.mp4", approxHeight, filepath.Base(inputPath)))
 
 	args := buildTranscodeArgs(inputPath, outputPath, scaleFilter, approxWidth, approxHeight, cfg)
-	cmd := exec.CommandContext(ctx, config.FFmpegPath(), args...)
+	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), args...)
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ffmpeg transcode failed: %w", err)
@@ -301,7 +302,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 		outputPath,
 	)
 
-	cmd := exec.CommandContext(ctx, config.FFmpegPath(), args...)
+	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -342,7 +343,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 
 // getVideoInfo probes the video using ffprobe to collect dimensions, codec, format, and duration.
 func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
-	cmd := exec.Command(config.FFprobePath(),
+	cmd := exec.Command(ap.toolsConfig.FFprobeCommand(),
 		"-v", "quiet",
 		"-print_format", "json",
 		"-show_format",

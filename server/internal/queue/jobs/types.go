@@ -24,9 +24,9 @@ func (ProcessSemanticArgs) InsertOpts() river.InsertOpts {
 }
 
 const (
-	MLPreprocessVersionV1    = "ml-image-v1"
-	MLProcessMaxAttempts     = 8
-	LocalToolMaxAttempts     = 5
+	MLPreprocessVersionV1 = "ml-image-v1"
+	MLProcessMaxAttempts  = 8
+	LocalToolMaxAttempts  = 5
 )
 
 // ZeroshotClassifyArgs is the River job payload for zero-shot

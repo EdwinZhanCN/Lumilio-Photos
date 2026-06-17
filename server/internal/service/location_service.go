@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"server/config"
 	"server/internal/db/repo"
 )
 
@@ -77,11 +77,11 @@ type locationService struct {
 	geocoder ReverseGeocoder
 }
 
-func NewLocationService(queries *repo.Queries, pool *pgxpool.Pool) LocationService {
+func NewLocationService(queries *repo.Queries, pool *pgxpool.Pool, cfg config.GeocodingConfig) LocationService {
 	return &locationService{
 		queries:  queries,
 		pool:     pool,
-		geocoder: newReverseGeocoderFromEnv(),
+		geocoder: newReverseGeocoder(cfg),
 	}
 }
 
@@ -306,20 +306,20 @@ type nominatimGeocoder struct {
 	httpClient *http.Client
 }
 
-func newReverseGeocoderFromEnv() ReverseGeocoder {
-	provider := strings.ToLower(strings.TrimSpace(os.Getenv("GEOCODING_PROVIDER")))
-	endpoint := strings.TrimSpace(os.Getenv("GEOCODING_NOMINATIM_ENDPOINT"))
+func newReverseGeocoder(cfg config.GeocodingConfig) ReverseGeocoder {
+	provider := strings.ToLower(strings.TrimSpace(cfg.Provider))
+	endpoint := strings.TrimSpace(cfg.NominatimEndpoint)
 	if provider == "" && endpoint != "" {
 		provider = geocoderProviderNominatim
 	}
 	if provider != geocoderProviderNominatim || endpoint == "" {
 		return disabledGeocoder{}
 	}
-	language := strings.TrimSpace(os.Getenv("GEOCODING_LANGUAGE"))
+	language := strings.TrimSpace(cfg.Language)
 	if language == "" {
 		language = defaultGeocodeLanguage
 	}
-	userAgent := strings.TrimSpace(os.Getenv("GEOCODING_USER_AGENT"))
+	userAgent := strings.TrimSpace(cfg.UserAgent)
 	if userAgent == "" {
 		userAgent = "Lumilio-Photos/1.0"
 	}

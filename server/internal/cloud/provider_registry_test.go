@@ -7,7 +7,7 @@ import (
 )
 
 func TestDefaultProviderRegistry_OnlyEnablesICloud(t *testing.T) {
-	registry := NewDefaultProviderRegistry()
+	registry := NewDefaultProviderRegistry(t.TempDir())
 
 	providers := registry.List()
 	require.Len(t, providers, 1)
@@ -20,7 +20,7 @@ func TestDefaultProviderRegistry_OnlyEnablesICloud(t *testing.T) {
 }
 
 func TestProviderRegistry_RejectsUnknownProvider(t *testing.T) {
-	registry := NewDefaultProviderRegistry()
+	registry := NewDefaultProviderRegistry(t.TempDir())
 
 	_, err := registry.Get(ProviderKind("webdav"))
 	require.ErrorContains(t, err, "unsupported cloud provider")

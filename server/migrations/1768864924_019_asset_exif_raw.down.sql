@@ -1,2 +1,0 @@
-ALTER TABLE assets
-DROP COLUMN IF EXISTS exif_raw;

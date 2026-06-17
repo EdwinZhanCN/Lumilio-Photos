@@ -1,93 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
-  useSystemSettings,
-  useUpdateSystemSettings,
-  useValidateLLMSettings,
-  type SystemSettings,
-  type UpdateSystemSettingsPayload,
-} from "@/features/settings/hooks/useSystemSettings";
+  useAISettingsDraft,
+  type AISettingsDraft,
+} from "@/features/settings/hooks/useAISettingsDraft";
+import { useValidateLLMSettings } from "@/features/settings/hooks/useSystemSettings";
 import { SaveIcon, SparklesIcon } from "lucide-react";
 
-type AgentProvider = SystemSettings["llm"]["provider"];
-
-type AIFormState = {
-  llm: {
-    agentEnabled: boolean;
-    provider: AgentProvider;
-    modelName: string;
-    baseURL: string;
-    apiKey: string;
-    clearStoredKey: boolean;
-  };
-  ml: {
-    semanticEnabled: boolean;
-    bioclipEnabled: boolean;
-    ocrEnabled: boolean;
-    faceEnabled: boolean;
-  };
-};
+type AgentProvider = AISettingsDraft["llm"]["provider"];
 
 type FeedbackState = {
   tone: "success" | "error";
   message: string;
 } | null;
-
-function createFormState(settings: SystemSettings): AIFormState {
-  return {
-    llm: {
-      agentEnabled: settings.llm.agentEnabled,
-      provider: settings.llm.provider,
-      modelName: settings.llm.modelName,
-      baseURL: settings.llm.baseURL,
-      apiKey: "",
-      clearStoredKey: false,
-    },
-    ml: {
-      semanticEnabled: settings.ml.semanticEnabled,
-      bioclipEnabled: settings.ml.bioclipEnabled,
-      ocrEnabled: settings.ml.ocrEnabled,
-      faceEnabled: settings.ml.faceEnabled,
-    },
-  };
-}
-
-function buildPayload(form: AIFormState): UpdateSystemSettingsPayload {
-  const payload: UpdateSystemSettingsPayload = {
-    llm: {
-      agent_enabled: form.llm.agentEnabled,
-      model_name: form.llm.modelName.trim(),
-      base_url: form.llm.baseURL.trim(),
-    },
-    ml: {
-      semantic_enabled: form.ml.semanticEnabled,
-      bioclip_enabled: form.ml.bioclipEnabled,
-      ocr_enabled: form.ml.ocrEnabled,
-      face_enabled: form.ml.faceEnabled,
-    },
-  };
-
-  if (form.llm.provider) {
-    payload.llm = {
-      ...payload.llm,
-      provider: form.llm.provider,
-    };
-  }
-
-  if (form.llm.clearStoredKey) {
-    payload.llm = {
-      ...payload.llm,
-      api_key: "",
-    };
-  } else if (form.llm.apiKey.trim()) {
-    payload.llm = {
-      ...payload.llm,
-      api_key: form.llm.apiKey.trim(),
-    };
-  }
-
-  return payload;
-}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -107,48 +32,40 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 export default function AISettings() {
   const { t } = useI18n();
-  const settingsQuery = useSystemSettings();
-  const updateMutation = useUpdateSystemSettings();
+  const {
+    draft,
+    setDraft,
+    isDirty,
+    isSaving,
+    save,
+    saveAsync,
+    saveError,
+    justSaved,
+    apiKeyConfigured,
+    query: settingsQuery,
+  } = useAISettingsDraft();
   const validateMutation = useValidateLLMSettings();
-  const settings = settingsQuery.settings;
-  const [form, setForm] = useState<AIFormState | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   useEffect(() => {
-    if (!settings) return;
-    setForm(createFormState(settings));
-  }, [
-    settings?.llm.agentEnabled,
-    settings?.llm.provider,
-    settings?.llm.modelName,
-    settings?.llm.baseURL,
-    settings?.llm.apiKeyConfigured,
-    settings?.ml.semanticEnabled,
-    settings?.ml.bioclipEnabled,
-    settings?.ml.ocrEnabled,
-    settings?.ml.faceEnabled,
-  ]);
-
-  const isDirty = useMemo(() => {
-    if (!settings || !form) {
-      return false;
+    if (justSaved) {
+      setFeedback({
+        tone: "success",
+        message: t("settings.aiSettings.saveSuccess"),
+      });
     }
+  }, [justSaved, t]);
 
-    return (
-      form.llm.agentEnabled !== settings.llm.agentEnabled ||
-      form.llm.provider !== settings.llm.provider ||
-      form.llm.modelName !== settings.llm.modelName ||
-      form.llm.baseURL !== settings.llm.baseURL ||
-      form.llm.apiKey.trim().length > 0 ||
-      form.llm.clearStoredKey ||
-      form.ml.semanticEnabled !== settings.ml.semanticEnabled ||
-      form.ml.bioclipEnabled !== settings.ml.bioclipEnabled ||
-      form.ml.ocrEnabled !== settings.ml.ocrEnabled ||
-      form.ml.faceEnabled !== settings.ml.faceEnabled
-    );
-  }, [form, settings]);
+  useEffect(() => {
+    if (saveError) {
+      setFeedback({
+        tone: "error",
+        message: getErrorMessage(saveError, t("settings.aiSettings.saveError")),
+      });
+    }
+  }, [saveError, t]);
 
-  const isBusy = updateMutation.isPending || validateMutation.isPending;
+  const isBusy = isSaving || validateMutation.isPending;
 
   const mlTasks = [
     {
@@ -173,48 +90,20 @@ export default function AISettings() {
     },
   ] as const;
 
-  const persistSettings = async (): Promise<boolean> => {
-    if (!form) {
-      return false;
-    }
-
-    try {
-      await updateMutation.mutateAsync({
-        body: buildPayload(form),
-      });
-
-      setForm((current) =>
-        current
-          ? {
-              ...current,
-              llm: {
-                ...current.llm,
-                apiKey: "",
-                clearStoredKey: false,
-              },
-            }
-          : current,
-      );
-      setFeedback({
-        tone: "success",
-        message: t("settings.aiSettings.saveSuccess"),
-      });
-      return true;
-    } catch (error) {
-      setFeedback({
-        tone: "error",
-        message: getErrorMessage(error, t("settings.aiSettings.saveError")),
-      });
-      return false;
-    }
-  };
-
   const handleValidate = async () => {
-    if (!form) return;
+    if (!draft) return;
 
-    const ready = !isDirty || (await persistSettings());
-    if (!ready) {
-      return;
+    setFeedback(null);
+    if (isDirty) {
+      try {
+        await saveAsync();
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message: getErrorMessage(error, t("settings.aiSettings.saveError")),
+        });
+        return;
+      }
     }
 
     try {
@@ -234,7 +123,7 @@ export default function AISettings() {
     }
   };
 
-  if (settingsQuery.isLoading || !form) {
+  if (settingsQuery.isLoading || !draft) {
     return (
       <div className="rounded-2xl border border-base-300 bg-base-100 px-4 py-6 text-sm text-base-content/70">
         {t("common.loading")}
@@ -242,7 +131,7 @@ export default function AISettings() {
     );
   }
 
-  if (settingsQuery.isError || !settings) {
+  if (settingsQuery.isError) {
     return (
       <div className="alert alert-warning">
         <span>{t("settings.aiSettings.loadError")}</span>
@@ -266,14 +155,17 @@ export default function AISettings() {
           type="button"
           className="btn btn-primary gap-2 sm:shrink-0"
           disabled={!isDirty || isBusy}
-          onClick={() => void persistSettings()}
+          onClick={() => {
+            setFeedback(null);
+            save();
+          }}
         >
-          {updateMutation.isPending ? (
+          {isSaving ? (
             <span className="loading loading-spinner loading-xs" />
           ) : (
             <SaveIcon size={16} />
           )}
-          {updateMutation.isPending ? t("common.loading") : t("common.save")}
+          {isSaving ? t("common.loading") : t("common.save")}
         </button>
       </header>
 
@@ -298,21 +190,17 @@ export default function AISettings() {
           <input
             type="checkbox"
             className="toggle toggle-primary mt-1 shrink-0"
-            checked={form.llm.agentEnabled}
+            checked={draft.llm.agentEnabled}
             aria-label={t("settings.aiSettings.agentTitle")}
             onChange={(event) => {
               setFeedback(null);
-              setForm((current) =>
-                current
-                  ? {
-                      ...current,
-                      llm: {
-                        ...current.llm,
-                        agentEnabled: event.target.checked,
-                      },
-                    }
-                  : current,
-              );
+              setDraft({
+                ...draft,
+                llm: {
+                  ...draft.llm,
+                  agentEnabled: event.target.checked,
+                },
+              });
             }}
           />
         </div>
@@ -324,21 +212,17 @@ export default function AISettings() {
             </span>
             <select
               className="select select-bordered w-full"
-              value={form.llm.provider}
+              value={draft.llm.provider}
               onChange={(event) => {
                 const provider = event.target.value as AgentProvider;
                 setFeedback(null);
-                setForm((current) =>
-                  current
-                    ? {
-                        ...current,
-                        llm: {
-                          ...current.llm,
-                          provider,
-                        },
-                      }
-                    : current,
-                );
+                setDraft({
+                  ...draft,
+                  llm: {
+                    ...draft.llm,
+                    provider,
+                  },
+                });
               }}
             >
               <option value="">
@@ -366,21 +250,17 @@ export default function AISettings() {
             <input
               type="text"
               className="input input-bordered w-full"
-              value={form.llm.modelName}
+              value={draft.llm.modelName}
               onChange={(event) => {
                 const modelName = event.target.value;
                 setFeedback(null);
-                setForm((current) =>
-                  current
-                    ? {
-                        ...current,
-                        llm: {
-                          ...current.llm,
-                          modelName,
-                        },
-                      }
-                    : current,
-                );
+                setDraft({
+                  ...draft,
+                  llm: {
+                    ...draft.llm,
+                    modelName,
+                  },
+                });
               }}
             />
           </label>
@@ -394,21 +274,17 @@ export default function AISettings() {
               className="input input-bordered w-full"
               autoComplete="off"
               spellCheck={false}
-              value={form.llm.baseURL}
+              value={draft.llm.baseURL}
               onChange={(event) => {
                 const baseURL = event.target.value;
                 setFeedback(null);
-                setForm((current) =>
-                  current
-                    ? {
-                        ...current,
-                        llm: {
-                          ...current.llm,
-                          baseURL,
-                        },
-                      }
-                    : current,
-                );
+                setDraft({
+                  ...draft,
+                  llm: {
+                    ...draft.llm,
+                    baseURL,
+                  },
+                });
               }}
             />
             <span className="text-sm text-base-content/70">
@@ -425,23 +301,19 @@ export default function AISettings() {
               className="input input-bordered w-full"
               autoComplete="off"
               spellCheck={false}
-              value={form.llm.apiKey}
-              disabled={form.llm.clearStoredKey}
+              value={draft.llm.apiKey}
+              disabled={draft.llm.clearStoredKey}
               placeholder={t("settings.aiSettings.apiKeyPlaceholder")}
               onChange={(event) => {
                 const apiKey = event.target.value;
                 setFeedback(null);
-                setForm((current) =>
-                  current
-                    ? {
-                        ...current,
-                        llm: {
-                          ...current.llm,
-                          apiKey,
-                        },
-                      }
-                    : current,
-                );
+                setDraft({
+                  ...draft,
+                  llm: {
+                    ...draft.llm,
+                    apiKey,
+                  },
+                });
               }}
             />
             <span className="text-sm text-base-content/70">
@@ -455,7 +327,7 @@ export default function AISettings() {
             {t("settings.aiSettings.apiKeyConfigured")}:{" "}
             <span className="font-medium text-base-content">
               {t(
-                `settings.serverSettings.booleanValues.${settings.llm.apiKeyConfigured ? "true" : "false"}`,
+                `settings.serverSettings.booleanValues.${apiKeyConfigured ? "true" : "false"}`,
               )}
             </span>
           </span>
@@ -463,22 +335,18 @@ export default function AISettings() {
             <input
               type="checkbox"
               className="checkbox checkbox-primary checkbox-sm"
-              checked={form.llm.clearStoredKey}
+              checked={draft.llm.clearStoredKey}
               onChange={(event) => {
                 const clearStoredKey = event.target.checked;
                 setFeedback(null);
-                setForm((current) =>
-                  current
-                    ? {
-                        ...current,
-                        llm: {
-                          ...current.llm,
-                          clearStoredKey,
-                          apiKey: clearStoredKey ? "" : current.llm.apiKey,
-                        },
-                      }
-                    : current,
-                );
+                setDraft({
+                  ...draft,
+                  llm: {
+                    ...draft.llm,
+                    clearStoredKey,
+                    apiKey: clearStoredKey ? "" : draft.llm.apiKey,
+                  },
+                });
               }}
             />
             <span>{t("settings.aiSettings.clearStoredKey")}</span>
@@ -520,21 +388,17 @@ export default function AISettings() {
               <input
                 type="checkbox"
                 className="toggle toggle-primary shrink-0"
-                checked={form.ml[key]}
+                checked={draft.ml[key]}
                 onChange={(event) => {
                   const checked = event.target.checked;
                   setFeedback(null);
-                  setForm((current) =>
-                    current
-                      ? {
-                          ...current,
-                          ml: {
-                            ...current.ml,
-                            [key]: checked,
-                          },
-                        }
-                      : current,
-                  );
+                  setDraft({
+                    ...draft,
+                    ml: {
+                      ...draft.ml,
+                      [key]: checked,
+                    },
+                  });
                 }}
               />
             </div>

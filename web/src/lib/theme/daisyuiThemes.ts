@@ -104,8 +104,8 @@ export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
   followSystem: true,
   mode: "light",
   themes: {
-    light: "light",
-    dark: "night",
+    light: "lumilio",
+    dark: "lumilio-dark",
   },
 };
 

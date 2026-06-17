@@ -45,5 +45,10 @@ COPY --from=builder /usr/local/scws/etc/ /usr/local/scws/etc/
 # SCWS shared library must be findable at runtime
 RUN echo "/usr/local/scws/lib" > /etc/ld.so.conf.d/scws.conf && ldconfig
 
+# pg_textsearch's BM25 access method requires preloading. Append to the
+# initdb sample so freshly initialized data dirs enable it by default (the
+# compose command also sets it for existing volumes).
+RUN echo "shared_preload_libraries = 'pg_textsearch'" >> /usr/share/postgresql/17/postgresql.conf.sample
+
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD \
   pg_isready -U "$${POSTGRES_USER:-postgres}" -d "$${POSTGRES_DB:-lumiliophotos}" || exit 1

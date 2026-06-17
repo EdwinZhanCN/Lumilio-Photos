@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"server/config"
 	"server/internal/db/dbtypes"
 	"sync"
 	"time"
@@ -27,6 +26,9 @@ type Extractor struct {
 func NewExtractor(config *Config) *Extractor {
 	if config == nil {
 		config = DefaultConfig()
+	}
+	if config.ExifToolPath == "" {
+		config.ExifToolPath = "exiftool"
 	}
 
 	// Optimize configuration for large file processing
@@ -220,7 +222,7 @@ func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader,
 	args := e.buildExifToolArgs(tags)
 
 	// Create and configure command
-	cmd := exec.CommandContext(ctxWithTimeout, config.ExifToolPath(), args...)
+	cmd := exec.CommandContext(ctxWithTimeout, e.config.ExifToolPath, args...)
 
 	// Set up pipes
 	stdin, stdout, stderr, err := e.setupPipes(cmd)

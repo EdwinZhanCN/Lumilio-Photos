@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"server/config"
+	"server/internal/storage"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -47,7 +48,25 @@ type SetupRequest struct{}
 
 // SetupStatus reports whether the database credential rotation has completed.
 type SetupStatus struct {
-	Initialized bool `json:"initialized"`
+	Initialized                  bool
+	DatabaseInitialized          bool
+	AdminInitialized             bool
+	PrimaryRepositoryInitialized bool
+	NextRegistrationRole         string
+	RepositoryDefaults           *RepositoryDefaults
+}
+
+// RepositoryDefaults is the setup-wizard view of the storage-owned repository
+// defaults plus the immutable default root (the storage root).
+type RepositoryDefaults struct {
+	DefaultRoot       string
+	Strategy          string
+	DuplicateHandling string
+}
+
+// repositoryDefaultsReader reads the storage-owned repository defaults.
+type repositoryDefaultsReader interface {
+	GetRepositoryDefaults(ctx context.Context) (storage.RepoDefaults, error)
 }
 
 // SetupResult summarises a completed initialization.
@@ -61,9 +80,12 @@ type SetupResult struct {
 // rotates the database credential away from the temporary bootstrap password,
 // and persists the new secret with locked-down permissions.
 type SetupService struct {
-	dbConfig   config.DatabaseConfig
-	rotator    DBCredentialRotator
-	secretPath string
+	dbConfig     config.DatabaseConfig
+	rotator      DBCredentialRotator
+	secretPath   string
+	bootstrap    BootstrapService
+	repoDefaults repositoryDefaultsReader
+	storageRoot  string
 }
 
 // NewSetupService wires a setup service using the live (temporary) database
@@ -72,37 +94,66 @@ func NewSetupService(dbConfig config.DatabaseConfig) *SetupService {
 	return &SetupService{
 		dbConfig:   dbConfig,
 		rotator:    &pgxCredentialRotator{cfg: dbConfig},
-		secretPath: config.ResolveDBPasswordFilePath(dbConfig),
+		secretPath: strings.TrimSpace(dbConfig.PasswordFile),
 	}
 }
 
 // NewSetupServiceWithPool wires setup to the already-open application pool. This
 // lets setup recover when the bootstrap password in TOML/env is stale but the
 // running server still owns a valid database session.
-func NewSetupServiceWithPool(dbConfig config.DatabaseConfig, pool *pgxpool.Pool) *SetupService {
+func NewSetupServiceWithPool(dbConfig config.DatabaseConfig, pool *pgxpool.Pool, bootstrap BootstrapService, repoDefaults repositoryDefaultsReader, storageRoot string) *SetupService {
 	rotator := DBCredentialRotator(&pgxCredentialRotator{cfg: dbConfig})
 	if pool != nil {
 		rotator = &pgxPoolCredentialRotator{pool: pool}
 	}
 	return &SetupService{
-		dbConfig:   dbConfig,
-		rotator:    rotator,
-		secretPath: config.ResolveDBPasswordFilePath(dbConfig),
+		dbConfig:     dbConfig,
+		rotator:      rotator,
+		secretPath:   strings.TrimSpace(dbConfig.PasswordFile),
+		bootstrap:    bootstrap,
+		repoDefaults: repoDefaults,
+		storageRoot:  strings.TrimSpace(storageRoot),
 	}
 }
 
 // Status reports whether the rotated database password secret already exists on
 // disk. The web frontend uses this to decide whether first-run setup still
 // needs to rotate the temporary bootstrap credential.
-func (s *SetupService) Status(_ context.Context) (SetupStatus, error) {
-	data, err := os.ReadFile(s.secretPath)
-	if err == nil {
-		return SetupStatus{Initialized: strings.TrimSpace(string(data)) != ""}, nil
+func (s *SetupService) Status(ctx context.Context) (SetupStatus, error) {
+	status := SetupStatus{}
+
+	if s.bootstrap != nil {
+		phase, err := s.bootstrap.Phase(ctx)
+		if err != nil {
+			return SetupStatus{}, fmt.Errorf("load bootstrap phase: %w", err)
+		}
+		status.DatabaseInitialized = phase != BootstrapPhaseFresh
+		status.AdminInitialized = phase == BootstrapPhaseAdminCreated || phase == BootstrapPhaseReady
+		status.PrimaryRepositoryInitialized = phase == BootstrapPhaseReady
+		status.Initialized = phase == BootstrapPhaseReady
 	}
-	if !errors.Is(err, os.ErrNotExist) {
-		return SetupStatus{}, fmt.Errorf("read database password file %s: %w", s.secretPath, err)
+
+	// The first registration (no admin yet) becomes the admin; subsequent ones
+	// are regular users. Folds the former /auth/bootstrap-status semantics.
+	if status.AdminInitialized {
+		status.NextRegistrationRole = string(UserRoleUser)
+	} else {
+		status.NextRegistrationRole = string(UserRoleAdmin)
 	}
-	return SetupStatus{Initialized: false}, nil
+
+	if s.repoDefaults != nil {
+		defaults, err := s.repoDefaults.GetRepositoryDefaults(ctx)
+		if err != nil {
+			return SetupStatus{}, fmt.Errorf("load repository defaults: %w", err)
+		}
+		status.RepositoryDefaults = &RepositoryDefaults{
+			DefaultRoot:       s.storageRoot,
+			Strategy:          defaults.Strategy,
+			DuplicateHandling: defaults.DuplicateHandling,
+		}
+	}
+
+	return status, nil
 }
 
 // Initialize performs first-run bootstrapping. It is idempotent-by-refusal: a
@@ -111,11 +162,10 @@ func (s *SetupService) Initialize(ctx context.Context, _ SetupRequest) (SetupRes
 	setupInitializeMu.Lock()
 	defer setupInitializeMu.Unlock()
 
-	status, err := s.Status(ctx)
-	if err != nil {
-		return SetupResult{}, err
-	}
-	if status.Initialized {
+	// Setup only rotates the database credential; refuse once the rotated secret
+	// exists so a second call cannot mint a fresh password. This gate is the
+	// password file itself (DB-free), independent of the cached bootstrap phase.
+	if s.databaseCredentialRotated() {
 		return SetupResult{}, ErrSystemAlreadyInitialized
 	}
 
@@ -150,11 +200,29 @@ func (s *SetupService) Initialize(ctx context.Context, _ SetupRequest) (SetupRes
 		return SetupResult{}, fmt.Errorf("rotate database credential: %w", err)
 	}
 
+	// Advance the bootstrap phase (fresh → db_rotated) now that the credential
+	// gate is satisfied.
+	if s.bootstrap != nil {
+		if _, err := s.bootstrap.Reconcile(ctx); err != nil {
+			return SetupResult{}, fmt.Errorf("reconcile bootstrap phase: %w", err)
+		}
+	}
+
 	return SetupResult{
 		DatabaseUser:   s.dbConfig.User,
 		SecretPath:     s.secretPath,
 		PasswordLength: len(newPassword),
 	}, nil
+}
+
+// databaseCredentialRotated reports whether the rotated DB password secret
+// already exists on disk (the db_rotated gate).
+func (s *SetupService) databaseCredentialRotated() bool {
+	data, err := os.ReadFile(s.secretPath)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(data)) != ""
 }
 
 // writeSecretFile writes a secret to disk and forces 0600 permissions so the

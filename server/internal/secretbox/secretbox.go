@@ -149,16 +149,8 @@ func isExplicitFilePath(path string) bool {
 	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
 }
 
-// DefaultLumilioSecretKeyPath resolves the default root secret key file path.
+// DefaultLumilioSecretKeyPath is a fallback for direct package use. Runtime
+// services should receive a configured path from server/config.
 func DefaultLumilioSecretKeyPath() string {
-	storagePath := strings.TrimSpace(os.Getenv("STORAGE_PATH"))
-	if storagePath != "" {
-		normalized := filepath.Clean(storagePath)
-		if strings.EqualFold(filepath.Base(normalized), "primary") {
-			normalized = filepath.Dir(normalized)
-		}
-		return filepath.Join(normalized, ".secrets", "lumilio_secret_key")
-	}
-
 	return filepath.Join("data", "storage", ".secrets", "lumilio_secret_key")
 }

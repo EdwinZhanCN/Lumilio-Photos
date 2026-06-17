@@ -10,17 +10,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// When REPO_AUDIT_VERBOSE is 1/true, per-operation success lines are written to operations.log
-// (Debug level). Default is off so high-volume worker success (ingest, discover) does not
-// flood the audit log; errors are still written to error.log at Warn+.
-func auditOperationsMinLevel() zapcore.Level {
-	v := strings.TrimSpace(os.Getenv("REPO_AUDIT_VERBOSE"))
-	if v == "1" || strings.EqualFold(v, "true") {
-		return zapcore.DebugLevel
-	}
-	return zapcore.InfoLevel
-}
-
 const (
 	repositoryLogsDir    = ".lumilio/logs"
 	repositoryOpsLogName = "operations.log"
@@ -42,6 +31,7 @@ type repositoryAuditProvider struct {
 	cache    map[string]*repositoryAuditLogger
 	base     *zap.Logger
 	fileMode os.FileMode
+	verbose  bool
 }
 
 type repositoryAuditLogger struct {
@@ -52,7 +42,7 @@ type repositoryAuditLogger struct {
 
 type noopRepositoryAuditLogger struct{}
 
-func NewRepositoryAuditProvider(baseLogger *zap.Logger) RepositoryAuditProvider {
+func NewRepositoryAuditProvider(baseLogger *zap.Logger, verbose bool) RepositoryAuditProvider {
 	if baseLogger == nil {
 		baseLogger = zap.NewNop()
 	}
@@ -66,6 +56,7 @@ func NewRepositoryAuditProvider(baseLogger *zap.Logger) RepositoryAuditProvider 
 		cache:    make(map[string]*repositoryAuditLogger),
 		base:     baseLogger.With(zap.String("component", "repo_audit")),
 		fileMode: 0644,
+		verbose:  verbose,
 	}
 }
 
@@ -98,11 +89,15 @@ func (p *repositoryAuditProvider) ForPath(repoPath string) RepositoryAuditLogger
 		return noopRepositoryAuditLogger{}
 	}
 
+	minOperationLevel := zapcore.InfoLevel
+	if p.verbose {
+		minOperationLevel = zapcore.DebugLevel
+	}
 	opsLogger := zap.New(zapcore.NewCore(
 		zapcore.NewJSONEncoder(p.enc),
 		zapcore.AddSync(newRollingWriter(opsPath)),
 		zap.LevelEnablerFunc(func(l zapcore.Level) bool {
-			return l >= auditOperationsMinLevel()
+			return l >= minOperationLevel
 		}),
 	))
 	errLogger := zap.New(zapcore.NewCore(

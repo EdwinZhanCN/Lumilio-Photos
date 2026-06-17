@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"server/internal/api/dto"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
@@ -51,6 +52,7 @@ func testRepository(t *testing.T, rawID string, name string, path string) *repo.
 		RepoID: repositoryID,
 		Name:   name,
 		Path:   path,
+		Role:   dbtypes.RepoRoleRegular,
 	}
 }
 
@@ -61,12 +63,16 @@ func TestAssetHandlerListIndexingRepositories_ReturnsOptions(t *testing.T) {
 		repoManager: stubRepositoryManager{
 			listRepositoriesFn: func() ([]*repo.Repository, error) {
 				return []*repo.Repository{
-					testRepository(
-						t,
-						"550e8400-e29b-41d4-a716-446655440000",
-						"primary",
-						"/Volumes/Media/primary",
-					),
+					func() *repo.Repository {
+						repository := testRepository(
+							t,
+							"550e8400-e29b-41d4-a716-446655440000",
+							"primary",
+							"/Volumes/Media/primary",
+						)
+						repository.Role = dbtypes.RepoRolePrimary
+						return repository
+					}(),
 					testRepository(
 						t,
 						"660e8400-e29b-41d4-a716-446655440000",

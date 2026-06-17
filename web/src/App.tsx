@@ -14,10 +14,16 @@ import "@/styles/App.css";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
 import Notifications from "@/components/Notifications";
-import { SettingsProvider, useSettingsContext } from "./features/settings";
+import { PreferencesEffects, usePreference } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
-import { AuthProvider, BootstrapGate, ProtectedRoute, SetupGate } from "./features/auth";
+import {
+  AuthProvider,
+  BootstrapGate,
+  PrimaryRepositoryGate,
+  ProtectedRoute,
+  SetupGate,
+} from "./features/auth";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { UploadProvider } from "@/features/upload";
 
@@ -53,11 +59,13 @@ function AppShellLayout(): React.ReactNode {
 }
 
 function HealthPoller(): React.ReactNode {
-  const { state } = useSettingsContext();
+  const [healthCheckIntervalMs] = usePreference("healthCheckIntervalMs");
   const { setOnline } = useGlobal();
 
-  const intervalSec = state.server?.update_timespan ?? 5;
-  const intervalMs = Math.max(1000, Math.min(50, Math.max(1, intervalSec)) * 1000);
+  const intervalMs = Math.max(
+    1000,
+    Math.min(50_000, Math.max(1000, healthCheckIntervalMs)),
+  );
 
   const healthQuery = $api.useQuery(
     "get",
@@ -85,7 +93,7 @@ function HealthPoller(): React.ReactNode {
 
 function App(): React.ReactNode {
   return (
-    <SettingsProvider>
+    <PreferencesEffects>
       <GlobalProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
@@ -109,11 +117,13 @@ function App(): React.ReactNode {
                     <Route
                       element={
                         <ProtectedRoute>
-                          <WorkerProvider preload={["hash"]}>
-                            <UploadProvider>
-                              <AppShellLayout />
-                            </UploadProvider>
-                          </WorkerProvider>
+                          <PrimaryRepositoryGate>
+                            <WorkerProvider preload={["hash"]}>
+                              <UploadProvider>
+                                <AppShellLayout />
+                              </UploadProvider>
+                            </WorkerProvider>
+                          </PrimaryRepositoryGate>
                         </ProtectedRoute>
                       }
                     >
@@ -130,7 +140,7 @@ function App(): React.ReactNode {
         </QueryClientProvider>
         <Notifications />
       </GlobalProvider>
-    </SettingsProvider>
+    </PreferencesEffects>
   );
 }
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"server/config"
 	"server/internal/service"
+	"server/internal/settings"
 	"server/internal/utils/imagesource"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
@@ -87,8 +87,8 @@ func (s *faceWorkerFaceServiceStub) SaveFaceResults(_ context.Context, assetID p
 
 type faceWorkerConfigStub struct{}
 
-func (faceWorkerConfigStub) GetEffectiveMLConfig(context.Context) (config.MLConfig, error) {
-	return config.MLConfig{
+func (faceWorkerConfigStub) GetEffectiveMLConfig(context.Context) (settings.ML, error) {
+	return settings.ML{
 		FaceEnabled: true,
 	}, nil
 }

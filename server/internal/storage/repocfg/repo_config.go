@@ -24,8 +24,6 @@ type RepositoryConfig struct {
 
 // LocalSettings configures repository-specific behavior
 type LocalSettings struct {
-	// PreserveOriginalFilename whether to preserve original filename in storage
-	PreserveOriginalFilename bool `yaml:"preserve_original_filename" json:"preserve_original_filename"`
 	// HandleDuplicateFilenames how to handle files with same name
 	// "rename" = add (1), (2) suffix, "uuid" = add UUID, "overwrite" = replace existing
 	HandleDuplicateFilenames string `yaml:"handle_duplicate_filenames" json:"handle_duplicate_filenames"`
@@ -38,7 +36,6 @@ func DefaultRepositoryConfig() *RepositoryConfig {
 		Version:         "1.0",
 		StorageStrategy: "date",
 		LocalSettings: LocalSettings{
-			PreserveOriginalFilename: true,
 			HandleDuplicateFilenames: "uuid",
 		},
 	}
@@ -55,18 +52,9 @@ func WithStorageStrategy(strategy string) RepositoryConfigOption {
 }
 
 // WithLocalSettings sets the local settings for the repository
-func WithLocalSettings(preserveFilename bool, duplicateHandling string) RepositoryConfigOption {
+func WithLocalSettings(duplicateHandling string) RepositoryConfigOption {
 	return func(config *RepositoryConfig) {
-		config.LocalSettings.PreserveOriginalFilename = preserveFilename
 		config.LocalSettings.HandleDuplicateFilenames = duplicateHandling
-	}
-}
-
-// WithBackupPath is deprecated and no longer used.
-func WithBackupPath(path string) RepositoryConfigOption {
-	return func(config *RepositoryConfig) {
-		// No-op: backup settings have been removed.
-		_ = path
 	}
 }
 
@@ -94,12 +82,6 @@ func NewRepositoryConfig(name string, options ...RepositoryConfigOption) *Reposi
 	}
 
 	return config
-}
-
-// NewDefaultRepositoryConfig creates a repository with default settings and the given name
-// This is a convenience function equivalent to NewRepositoryConfig(name)
-func NewDefaultRepositoryConfig(name string) *RepositoryConfig {
-	return NewRepositoryConfig(name)
 }
 
 // LoadConfigFromFile loads repository configuration from .lumiliorepo file
@@ -191,25 +173,4 @@ func IsRepositoryRoot(path string) bool {
 	configPath := filepath.Join(path, ".lumiliorepo")
 	_, err := os.Stat(configPath)
 	return err == nil
-}
-
-// Clone creates a deep copy of the repository configuration
-func (rc *RepositoryConfig) Clone() *RepositoryConfig {
-	clone := *rc
-	return &clone
-}
-
-// MergeWithDefaults merges this config with default values for any missing fields
-func (rc *RepositoryConfig) MergeWithDefaults() {
-	defaults := DefaultRepositoryConfig()
-
-	if rc.Version == "" {
-		rc.Version = defaults.Version
-	}
-	if rc.StorageStrategy == "" {
-		rc.StorageStrategy = defaults.StorageStrategy
-	}
-	if rc.LocalSettings.HandleDuplicateFilenames == "" {
-		rc.LocalSettings.HandleDuplicateFilenames = defaults.LocalSettings.HandleDuplicateFilenames
-	}
 }

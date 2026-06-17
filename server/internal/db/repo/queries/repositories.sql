@@ -4,12 +4,13 @@ INSERT INTO repositories (
     name,
     path,
     config,
+    role,
     status,
     default_owner_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
 ) RETURNING *;
 
 -- name: GetRepository :one
@@ -20,6 +21,11 @@ WHERE repo_id = $1;
 SELECT * FROM repositories
 WHERE path = $1;
 
+-- name: GetPrimaryRepository :one
+SELECT * FROM repositories
+WHERE role = 'primary'
+  AND status = 'active';
+
 -- name: ListRepositories :many
 SELECT * FROM repositories
 ORDER BY created_at DESC;
@@ -28,6 +34,11 @@ ORDER BY created_at DESC;
 SELECT * FROM repositories
 WHERE status = 'active'
 ORDER BY created_at DESC;
+
+-- name: CountActivePrimaryRepositories :one
+SELECT COUNT(*) FROM repositories
+WHERE role = 'primary'
+  AND status = 'active';
 
 -- name: UpdateRepository :one
 UPDATE repositories
@@ -82,5 +93,5 @@ UPDATE repositories
 SET
     default_owner_id = $1,
     updated_at = NOW()
-WHERE name = 'Primary Storage' AND default_owner_id IS NULL
+WHERE role = 'primary' AND default_owner_id IS NULL
 RETURNING *;

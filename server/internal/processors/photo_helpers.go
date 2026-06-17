@@ -29,11 +29,12 @@ var thumbnailSizes = map[string][2]int{
 // createEXIFConfig centralizes EXIF extraction settings for photos.
 func (ap *AssetProcessor) createEXIFConfig() *exif.Config {
 	return &exif.Config{
-		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
-		Timeout:     60 * time.Second,
-		BufferSize:  128 * 1024,
-		FastMode:    false, // Full EXIF for photos
-		IncludeRaw:  true,
+		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
+		MaxFileSize:  2 * 1024 * 1024 * 1024, // 2GB
+		Timeout:      60 * time.Second,
+		BufferSize:   128 * 1024,
+		FastMode:     false, // Full EXIF for photos
+		IncludeRaw:   true,
 	}
 }
 

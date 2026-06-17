@@ -3,20 +3,17 @@ package handler
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/cloud"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-	"server/internal/storage/repocfg"
 	"server/internal/storage/scanner"
 
 	"github.com/gin-gonic/gin"
@@ -78,27 +75,32 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		return
 	}
 
-	repoPath, err := resolveRepositoryCreatePath(h.storageRoot, name)
-	if err != nil {
-		api.GinBadRequest(c, err, "Invalid repository name")
+	role := repositoryRoleFromRequest(req.Role)
+	if role == dbtypes.RepoRolePrimary && strings.TrimSpace(req.CloudCredentialID) != "" {
+		api.GinBadRequest(c, errors.New("cloud imports are not supported for primary repository setup"), "Cloud imports are not supported for primary repository setup")
 		return
 	}
 
-	if existing, err := h.repoManager.GetRepositoryByPath(repoPath); err == nil && existing != nil {
-		api.GinBadRequest(c, fmt.Errorf("repository already exists at %s", repoPath), "Repository already exists")
-		return
-	}
-
-	var dbRepo *repo.Repository
 	ownerID := adminIDFromContext(c)
-	if repocfg.IsRepositoryRoot(repoPath) {
-		dbRepo, err = h.repoManager.AddRepository(repoPath, ownerID)
-	} else {
-		cfg := repocfg.NewDefaultRepositoryConfig(name)
-		dbRepo, err = h.repoManager.InitializeRepository(repoPath, *cfg, ownerID)
-	}
+	dbRepo, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
+		Name:              name,
+		Role:              role,
+		Root:              firstNonEmptyString(req.Root, h.storageRoot),
+		OwnerID:           ownerID,
+		StorageStrategy:   req.StorageStrategy,
+		DuplicateHandling: req.DuplicateHandling,
+	})
 	if err != nil {
-		api.GinBadRequest(c, err, "Failed to create repository")
+		switch {
+		case errors.Is(err, storage.ErrPrimaryRepositoryExists):
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Primary repository already exists")
+		case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Primary repository must be created first")
+		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
+			api.GinBadRequest(c, err, "Repository already exists")
+		default:
+			api.GinBadRequest(c, err, "Failed to create repository")
+		}
 		return
 	}
 
@@ -316,7 +318,6 @@ func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 		cfg.StorageStrategy = *req.StorageStrategy
 	}
 	if req.LocalSettings != nil {
-		cfg.LocalSettings.PreserveOriginalFilename = req.LocalSettings.PreserveOriginalFilename
 		cfg.LocalSettings.HandleDuplicateFilenames = req.LocalSettings.HandleDuplicateFilenames
 	}
 
@@ -347,8 +348,13 @@ func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 
-	if _, err := h.repoManager.GetRepository(id); err != nil {
+	existing, err := h.repoManager.GetRepository(id)
+	if err != nil {
 		api.GinNotFound(c, err, "Repository not found")
+		return
+	}
+	if existing.Role == dbtypes.RepoRolePrimary {
+		api.GinError(c, http.StatusConflict, errors.New("primary repository cannot be deleted"), http.StatusConflict, "Primary repository cannot be deleted")
 		return
 	}
 
@@ -360,68 +366,22 @@ func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
 	api.GinSuccess(c, nil)
 }
 
-func resolveRepositoryCreatePath(storageRoot, name string) (string, error) {
-	root := strings.TrimSpace(storageRoot)
-	if root == "" {
-		root = strings.TrimSpace(os.Getenv("STORAGE_PATH"))
+func repositoryRoleFromRequest(raw string) dbtypes.RepoRole {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(dbtypes.RepoRolePrimary):
+		return dbtypes.RepoRolePrimary
+	default:
+		return dbtypes.RepoRoleRegular
 	}
-	if root == "" {
-		return "", errors.New("storage root is not configured")
-	}
-
-	cleanRoot, err := filepath.Abs(filepath.Clean(root))
-	if err != nil {
-		return "", fmt.Errorf("invalid storage root: %w", err)
-	}
-
-	folderName := repositoryFolderNameFromName(name)
-	if folderName == "" {
-		return "", errors.New("repository name must contain letters or numbers")
-	}
-
-	repoPath, err := filepath.Abs(filepath.Join(cleanRoot, folderName))
-	if err != nil {
-		return "", fmt.Errorf("invalid repository path: %w", err)
-	}
-
-	rel, err := filepath.Rel(cleanRoot, repoPath)
-	if err != nil {
-		return "", fmt.Errorf("invalid repository path: %w", err)
-	}
-	if rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
-		return "", errors.New("repository path must be inside storage root")
-	}
-
-	return repoPath, nil
 }
 
-func repositoryFolderNameFromName(name string) string {
-	var builder strings.Builder
-	lastDash := false
-	for _, r := range strings.TrimSpace(name) {
-		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r):
-			builder.WriteRune(unicode.ToLower(r))
-			lastDash = false
-		case r == '-' || r == '_':
-			if builder.Len() > 0 {
-				builder.WriteRune(r)
-				lastDash = r == '-'
-			}
-		case unicode.IsSpace(r):
-			if builder.Len() > 0 && !lastDash {
-				builder.WriteRune('-')
-				lastDash = true
-			}
-		default:
-			if builder.Len() > 0 && !lastDash {
-				builder.WriteRune('-')
-				lastDash = true
-			}
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
 		}
 	}
-
-	return strings.Trim(strings.TrimSpace(builder.String()), "-_")
+	return ""
 }
 
 func toRepositoryDTO(repository *repo.Repository) dto.RepositoryDTO {
@@ -438,11 +398,11 @@ func toRepositoryDTO(repository *repo.Repository) dto.RepositoryDTO {
 		ID:              id,
 		Name:            repository.Name,
 		Path:            repository.Path,
-		IsPrimary:       repo.IsPrimaryRepository(repository.Name, repository.Path),
+		Role:            string(repository.Role),
+		IsPrimary:       repository.Role == dbtypes.RepoRolePrimary,
 		DefaultOwnerID:  repository.DefaultOwnerID,
 		StorageStrategy: repository.Config.StorageStrategy,
 		LocalSettings: dto.RepositoryLocalSettings{
-			PreserveOriginalFilename: repository.Config.LocalSettings.PreserveOriginalFilename,
 			HandleDuplicateFilenames: repository.Config.LocalSettings.HandleDuplicateFilenames,
 		},
 	}

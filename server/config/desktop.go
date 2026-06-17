@@ -58,12 +58,6 @@ func NewDesktopConfig(p DesktopParams) (AppConfig, error) {
 		SSL:          "disable",
 	}
 	cfg.StorageConfig.Path = strings.TrimSpace(p.StoragePath)
-	cfg.MLConfig = MLConfig{
-		SemanticEnabled: true,
-		BioCLIPEnabled:  true,
-		OCREnabled:      true,
-		FaceEnabled:     true,
-	}
 	cfg.Auth.SecretKeyPath = strings.TrimSpace(p.SecretKeyPath)
 	cfg.Auth.WebAuthnRPID = "localhost"
 	cfg.Auth.WebAuthnRPOrigins = []string{"http://localhost:" + cfg.ServerConfig.Port}
@@ -127,8 +121,6 @@ func tomlConfigFromAppConfig(cfg AppConfig) tomlConfig {
 		StorageConfig:  cfg.StorageConfig,
 		RepositoryScan: cfg.RepositoryScan,
 		Geocoding:      cfg.Geocoding,
-		MLConfig:       cfg.MLConfig,
-		LLMConfig:      cfg.LLMConfig,
 		Auth:           cfg.Auth,
 		Transcode:      cfg.Transcode,
 		Lumen:          cfg.Lumen,

@@ -88,8 +88,8 @@ type MergeDuplicatePolicyDTO struct {
 
 // MergeDuplicateGroupRequestDTO is the body for POST /duplicates/groups/:id/merge.
 type MergeDuplicateGroupRequestDTO struct {
-	KeeperAssetID     string                  `json:"keeper_asset_id" binding:"required,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
-	DuplicateAssetIDs []string                `json:"duplicate_asset_ids,omitempty" example:"660e8400-e29b-41d4-a716-446655440001"`
+	KeeperAssetID     string                   `json:"keeper_asset_id" binding:"required,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	DuplicateAssetIDs []string                 `json:"duplicate_asset_ids,omitempty" example:"660e8400-e29b-41d4-a716-446655440001"`
 	Policy            *MergeDuplicatePolicyDTO `json:"policy,omitempty"`
 }
 

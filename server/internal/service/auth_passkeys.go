@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -97,48 +96,6 @@ func (u webAuthnUser) WebAuthnDisplayName() string {
 
 func (u webAuthnUser) WebAuthnCredentials() []webauthn.Credential {
 	return append([]webauthn.Credential(nil), u.credentials...)
-}
-
-func loadWebAuthnAllowedOrigins() []string {
-	raw := strings.TrimSpace(os.Getenv("WEBAUTHN_RP_ORIGINS"))
-	if raw == "" {
-		raw = strings.TrimSpace(os.Getenv("SERVER_CORS_ALLOWED_ORIGINS"))
-	}
-	if raw == "" {
-		return nil
-	}
-
-	parts := strings.Split(raw, ",")
-	origins := make([]string, 0, len(parts))
-	seen := make(map[string]struct{}, len(parts))
-	for _, part := range parts {
-		trimmed := strings.TrimSpace(part)
-		if trimmed == "" {
-			continue
-		}
-		normalized, _, err := normalizeOriginString(trimmed)
-		if err != nil {
-			continue
-		}
-		if _, ok := seen[normalized]; ok {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		origins = append(origins, normalized)
-	}
-
-	return origins
-}
-
-func loadWebAuthnRPDisplayName() string {
-	if value := strings.TrimSpace(os.Getenv("WEBAUTHN_RP_NAME")); value != "" {
-		return value
-	}
-	return defaultWebAuthnRPDisplayName
-}
-
-func loadWebAuthnRPID() string {
-	return strings.TrimSpace(os.Getenv("WEBAUTHN_RP_ID"))
 }
 
 // StartRegistration creates a new account from a username and password and

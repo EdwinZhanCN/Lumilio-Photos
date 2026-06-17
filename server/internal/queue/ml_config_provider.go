@@ -3,11 +3,11 @@ package queue
 import (
 	"context"
 
-	"server/config"
+	"server/internal/settings"
 )
 
 type MLConfigProvider interface {
-	GetEffectiveMLConfig(ctx context.Context) (config.MLConfig, error)
+	GetEffectiveMLConfig(ctx context.Context) (settings.ML, error)
 }
 
 func isMLTaskEnabled(ctx context.Context, provider MLConfigProvider, queueName string) (bool, error) {

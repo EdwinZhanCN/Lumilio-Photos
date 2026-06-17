@@ -64,25 +64,6 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 	api.GinSuccess(c, dto.ToAuthResponseDTO(response))
 }
 
-// GetBootstrapStatus reports whether the system is still waiting for its first account.
-// @Summary Get auth bootstrap status
-// @Description Return whether Lumilio is still in first-user bootstrap mode and which role the next registration receives.
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Success 200 {object} api.Result{data=dto.BootstrapStatusDTO} "Bootstrap status retrieved successfully"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/auth/bootstrap-status [get]
-func (h *AuthHandler) GetBootstrapStatus(c *gin.Context) {
-	status, err := h.authService.GetBootstrapStatus(c.Request.Context())
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to load bootstrap status")
-		return
-	}
-
-	api.GinSuccess(c, dto.ToBootstrapStatusDTO(status))
-}
-
 // Login handles user authentication
 // @Summary Login user
 // @Description Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.

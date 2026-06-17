@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
@@ -32,14 +34,6 @@ const (
 	ScanStatusFailed    = "failed"
 	ScanStatusCancelled = "cancelled"
 )
-
-type Result struct {
-	ScanRun         repo.RepositoryScanRun
-	DiscoveredCount int64
-	UpdatedCount    int64
-	DeletedCount    int64
-	SkippedCount    int64
-}
 
 type EnqueueResult struct {
 	JobID        int64
@@ -105,6 +99,26 @@ func NewScanner(queries *repo.Queries, queue *river.Client[pgx.Tx], cfg config.R
 		cfg:     cfg,
 		logger:  logger.With(zap.String("component", "repository_scanner")),
 	}
+}
+
+// ReclaimInterruptedRuns marks scan runs left "running" by a previous process
+// (e.g. a crash or restart) as failed, so the one-running-per-repository index
+// does not permanently block future scans. Call once at startup.
+func (s *Scanner) ReclaimInterruptedRuns(ctx context.Context) error {
+	if s == nil || s.queries == nil {
+		return nil
+	}
+	reclaimed, err := s.queries.ReclaimInterruptedRepositoryScanRuns(ctx)
+	if err != nil {
+		return fmt.Errorf("reclaim interrupted scan runs: %w", err)
+	}
+	if reclaimed > 0 {
+		s.logger.Warn("reclaimed interrupted repository scan runs",
+			zap.String("operation", "repository_scan.reclaim"),
+			zap.Int64("count", reclaimed),
+		)
+	}
+	return nil
 }
 
 func (s *Scanner) EnqueueManualScan(ctx context.Context, repositoryID string, requestedBy string, force bool) (EnqueueResult, error) {
@@ -207,6 +221,10 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 	if requestedBy != "" {
 		requestedByPtr = &requestedBy
 	}
+	// The repository_scan_runs_one_running partial unique index guarantees at most
+	// one running scan per repository: a concurrent attempt fails here with a
+	// unique violation and is skipped (no row created), replacing the previous
+	// racy create-then-count-then-cancel guard.
 	scanRun, err := s.queries.CreateRepositoryScanRun(ctx, repo.CreateRepositoryScanRunParams{
 		ScanID:       scanID,
 		RepositoryID: repository.RepoID,
@@ -216,20 +234,14 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
+		if isUniqueConstraintViolation(err) {
+			s.logger.Info("repository scan skipped: another scan is already running",
+				zap.String("operation", "repository_scan.skip"),
+				zap.String("repository_id", args.RepositoryID),
+			)
+			return nil
+		}
 		return fmt.Errorf("create scan run: %w", err)
-	}
-
-	running, err := s.queries.CountRunningRepositoryScanRuns(ctx, repo.CountRunningRepositoryScanRunsParams{
-		RepositoryID: repository.RepoID,
-		ScanID:       scanID,
-	})
-	if err != nil {
-		_, _ = s.cancelScan(ctx, scanID, "failed to check running scans")
-		return fmt.Errorf("count running scans: %w", err)
-	}
-	if running > 0 {
-		_, err = s.cancelScan(ctx, scanID, "another scan is already running for this repository")
-		return err
 	}
 
 	counters, scanErr := s.scanRepository(ctx, repository, normalizeMode(args.Mode), args.Force)
@@ -283,7 +295,6 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		zap.Int64("skipped", counters.skipped),
 	)
 
-
 	// Trigger automatic RAW+JPEG stack detection after scan completion.
 	if _, insertErr := s.queue.Insert(ctx, jobs.DetectStacksArgs{
 		RepositoryID: args.RepositoryID,
@@ -293,7 +304,6 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 			zap.Error(insertErr),
 		)
 	}
-
 
 	return nil
 }
@@ -352,6 +362,8 @@ func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository
 		dbByPath[cleaned] = asset
 	}
 
+	batch := s.newDiscoverBatcher(ctx)
+
 	newEntries := make(map[string]diskEntry)
 	for storagePath, entry := range walk.entries {
 		if ctx.Err() != nil {
@@ -365,7 +377,7 @@ func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository
 		delete(dbByPath, storagePath)
 
 		if force || isSoftDeleted(asset) || asset.FileSize != entry.Size || fileMTimeIsNewerThanAsset(entry.MTime, asset) {
-			if err := s.enqueueDiscover(ctx, repository.RepoID, entry, jobs.DiscoverOperationUpsert); err != nil {
+			if err := batch.add(repository.RepoID, entry, jobs.DiscoverOperationUpsert); err != nil {
 				return counters, err
 			}
 			counters.updated++
@@ -382,7 +394,7 @@ func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository
 		if ctx.Err() != nil {
 			return counters, ctx.Err()
 		}
-		if err := s.enqueueDiscover(ctx, repository.RepoID, entry, jobs.DiscoverOperationUpsert); err != nil {
+		if err := batch.add(repository.RepoID, entry, jobs.DiscoverOperationUpsert); err != nil {
 			return counters, err
 		}
 		counters.discovered++
@@ -394,6 +406,9 @@ func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository
 			zap.String("repository_path", repository.Path),
 			zap.String("reason", walk.partialReason),
 		)
+		if err := batch.flush(); err != nil {
+			return counters, err
+		}
 		return counters, nil
 	}
 
@@ -411,12 +426,15 @@ func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository
 			StoragePath: storagePath,
 			Filename:    filepath.Base(storagePath),
 		}
-		if err := s.enqueueDiscover(ctx, repository.RepoID, entry, jobs.DiscoverOperationDelete); err != nil {
+		if err := batch.add(repository.RepoID, entry, jobs.DiscoverOperationDelete); err != nil {
 			return counters, err
 		}
 		counters.deleted++
 	}
 
+	if err := batch.flush(); err != nil {
+		return counters, err
+	}
 	return counters, nil
 }
 
@@ -501,7 +519,20 @@ func (s *Scanner) reconcileMovedEntries(
 	return moved, nil
 }
 
-func (s *Scanner) enqueueDiscover(ctx context.Context, repositoryID pgtype.UUID, entry diskEntry, operation string) error {
+// discoverBatcher accumulates discover_asset jobs and inserts them in batches of
+// cfg.BatchSize via River's InsertMany, instead of one insert per file.
+type discoverBatcher struct {
+	queue     *river.Client[pgx.Tx]
+	ctx       context.Context
+	batchSize int
+	pending   []river.InsertManyParams
+}
+
+func (s *Scanner) newDiscoverBatcher(ctx context.Context) *discoverBatcher {
+	return &discoverBatcher{queue: s.queue, ctx: ctx, batchSize: s.cfg.BatchSize}
+}
+
+func (b *discoverBatcher) add(repositoryID pgtype.UUID, entry diskEntry, operation string) error {
 	args := jobs.DiscoverAssetArgs{
 		RepositoryID: repositoryID.String(),
 		RelativePath: filepath.ToSlash(entry.StoragePath),
@@ -516,16 +547,33 @@ func (s *Scanner) enqueueDiscover(ctx context.Context, repositoryID pgtype.UUID,
 		args.FileSize = entry.Size
 	}
 
-	_, err := s.queue.Insert(ctx, args, &river.InsertOpts{Queue: "discover_asset"})
-	return err
+	b.pending = append(b.pending, river.InsertManyParams{
+		Args:       args,
+		InsertOpts: &river.InsertOpts{Queue: "discover_asset"},
+	})
+	if len(b.pending) >= b.batchSize {
+		return b.flush()
+	}
+	return nil
 }
 
-func (s *Scanner) cancelScan(ctx context.Context, scanID pgtype.UUID, reason string) (repo.RepositoryScanRun, error) {
-	return s.queries.CancelRepositoryScanRun(ctx, repo.CancelRepositoryScanRunParams{
-		ScanID:     scanID,
-		FinishedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		Error:      stringPtr(reason),
-	})
+func (b *discoverBatcher) flush() error {
+	if len(b.pending) == 0 {
+		return nil
+	}
+	if _, err := b.queue.InsertMany(b.ctx, b.pending); err != nil {
+		return fmt.Errorf("enqueue discover batch: %w", err)
+	}
+	b.pending = b.pending[:0]
+	return nil
+}
+
+func isUniqueConstraintViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }
 
 func walkRepository(repoPath string, settle time.Duration) (walkResult, error) {

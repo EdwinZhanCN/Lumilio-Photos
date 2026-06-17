@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useBootstrapStatus } from "../hooks/useBootstrapStatus.ts";
+import { useSetupStatus } from "../hooks/useSetupStatus.ts";
 import { useAuth } from "../hooks/useAuth.ts";
 
 const BOOTSTRAP_PATH = "/bootstrap";
@@ -12,9 +12,11 @@ const isBootstrapPath = (pathname: string) =>
 const BootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useI18n();
   const location = useLocation();
-  const bootstrapQuery = useBootstrapStatus();
+  const bootstrapQuery = useSetupStatus();
   const { isAuthenticated } = useAuth();
-  const isBootstrapMode = bootstrapQuery.data?.data?.is_bootstrap_mode ?? false;
+  // Bootstrap mode = no admin account exists yet (the next registration becomes
+  // the admin). Folds the former /auth/bootstrap-status into /setup/status.
+  const isBootstrapMode = !(bootstrapQuery.data?.data?.admin_initialized ?? true);
   const isBootstrapRoute = isBootstrapPath(location.pathname);
 
   if (bootstrapQuery.isLoading) {

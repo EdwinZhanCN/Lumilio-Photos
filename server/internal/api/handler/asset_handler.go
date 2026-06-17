@@ -160,19 +160,10 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 			return
 		}
 	} else {
-		// Use primary repository as default
-		repositories, err := h.queries.ListRepositories(ctx)
-		if err != nil || len(repositories) == 0 {
+		repository, err = h.queries.GetPrimaryRepository(ctx)
+		if err != nil {
 			api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
 			return
-		}
-		// Find the primary repository; fall back to first if none marked primary
-		repository = repositories[0]
-		for _, r := range repositories {
-			if repo.IsPrimaryRepository(r.Name, r.Path) {
-				repository = r
-				break
-			}
 		}
 	}
 
@@ -316,6 +307,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		if repositoryResolved {
 			return true
 		}
+		var err error
 		if repositoryID != "" {
 			repoUUID, err := uuid.Parse(repositoryID)
 			if err != nil {
@@ -328,19 +320,10 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 				return false
 			}
 		} else {
-			// Use primary repository as default
-			repositories, err := h.queries.ListRepositories(ctx)
-			if err != nil || len(repositories) == 0 {
+			repository, err = h.queries.GetPrimaryRepository(ctx)
+			if err != nil {
 				api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
 				return false
-			}
-			// Find the primary repository; fall back to first if none marked primary
-			repository = repositories[0]
-			for _, r := range repositories {
-				if repo.IsPrimaryRepository(r.Name, r.Path) {
-					repository = r
-					break
-				}
 			}
 		}
 		repositoryResolved = true
@@ -1758,7 +1741,8 @@ func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository) dto.In
 			ID:        uuid.UUID(repository.RepoID.Bytes).String(),
 			Name:      repository.Name,
 			Path:      repository.Path,
-			IsPrimary: repo.IsPrimaryRepository(repository.Name, repository.Path),
+			Role:      string(repository.Role),
+			IsPrimary: repository.Role == dbtypes.RepoRolePrimary,
 		})
 	}
 
