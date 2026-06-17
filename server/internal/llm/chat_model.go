@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"server/config"
+	"server/internal/settings"
 
 	"github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
@@ -22,7 +22,7 @@ const (
 	ollamaProvider   = "ollama"
 )
 
-func NewChatModel(ctx context.Context, cfg config.LLMConfig) (model.ToolCallingChatModel, error) {
+func NewChatModel(ctx context.Context, cfg settings.LLM) (model.ToolCallingChatModel, error) {
 	inner, err := newProviderChatModel(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func NewChatModel(ctx context.Context, cfg config.LLMConfig) (model.ToolCallingC
 	return maybeWrapAudit(inner), nil
 }
 
-func newProviderChatModel(ctx context.Context, cfg config.LLMConfig) (model.ToolCallingChatModel, error) {
+func newProviderChatModel(ctx context.Context, cfg settings.LLM) (model.ToolCallingChatModel, error) {
 	provider := cfg.EffectiveProvider()
 	modelName := strings.TrimSpace(cfg.ModelName)
 	baseURL := strings.TrimSpace(cfg.BaseURL)
@@ -69,7 +69,7 @@ func newProviderChatModel(ctx context.Context, cfg config.LLMConfig) (model.Tool
 	}
 }
 
-func ValidateChatModel(ctx context.Context, cfg config.LLMConfig) error {
+func ValidateChatModel(ctx context.Context, cfg settings.LLM) error {
 	if !cfg.IsConfigured() {
 		return errors.New("llm settings are incomplete")
 	}

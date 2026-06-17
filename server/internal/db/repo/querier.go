@@ -49,6 +49,7 @@ type Querier interface {
 	CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
+	CountActivePrimaryRepositories(ctx context.Context) (int64, error)
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
@@ -76,7 +77,6 @@ type Querier interface {
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) (int64, error)
-	CountRunningRepositoryScanRuns(ctx context.Context, arg CountRunningRepositoryScanRunsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) (AgentPin, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
@@ -269,6 +269,7 @@ type Querier interface {
 	GetPhotoMapPoints(ctx context.Context, arg GetPhotoMapPointsParams) ([]GetPhotoMapPointsRow, error)
 	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (GetPrimaryEmbeddingRow, error)
 	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
+	GetPrimaryRepository(ctx context.Context) (Repository, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRegistrationSessionByID(ctx context.Context, sessionID pgtype.UUID) (RegistrationSession, error)
 	GetRepository(ctx context.Context, repoID pgtype.UUID) (Repository, error)
@@ -276,6 +277,7 @@ type Querier interface {
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
 	GetRepositoryCloudBinding(ctx context.Context, arg GetRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
+	GetRepositoryDefaults(ctx context.Context) (RepositoryDefault, error)
 	GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) (RepositoryScanRun, error)
 	GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	GetSettings(ctx context.Context) (Setting, error)
@@ -294,6 +296,7 @@ type Querier interface {
 	// duplicate edges between intentional stack members (e.g. bursts, RAW+JPEG).
 	GetStackMembershipForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]GetStackMembershipForRepositoryRow, error)
 	GetStacksByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetStacksByAssetIDsRow, error)
+	GetSystemState(ctx context.Context) (SystemState, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
 	GetTagsByCategory(ctx context.Context, category *string) ([]Tag, error)
@@ -377,6 +380,7 @@ type Querier interface {
 	RankAssetIDsByTime(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
 	// "recently added" presentation order, ascending; callers reverse for newest first.
 	RankAssetIDsByUploadTime(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
+	ReclaimInterruptedRepositoryScanRuns(ctx context.Context) (int64, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
 	RemoveStackMember(ctx context.Context, assetID pgtype.UUID) error
@@ -390,6 +394,7 @@ type Querier interface {
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
+	SetBootstrapPhase(ctx context.Context, bootstrapPhase string) (SystemState, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
 	SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error)
@@ -440,6 +445,7 @@ type Querier interface {
 	// Embedding spaces
 	UpsertEmbeddingSpace(ctx context.Context, arg UpsertEmbeddingSpaceParams) (EmbeddingSpace, error)
 	UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
+	UpsertRepositoryDefaults(ctx context.Context, arg UpsertRepositoryDefaultsParams) (RepositoryDefault, error)
 	UpsertReverseGeocodeCache(ctx context.Context, arg UpsertReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
 	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)

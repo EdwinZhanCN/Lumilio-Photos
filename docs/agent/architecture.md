@@ -36,5 +36,7 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 - OpenAPI is the HTTP contract source of truth. Run `make dto` after backend API changes.
 - Do not hand-edit generated OpenAPI artifacts.
-- Storage root means a root directory containing `primary`; the primary repository is `<storage.path>/primary`.
+- `storage.path` seeds repository defaults and suggests the first primary path
+  (`<storage.path>/primary`); startup does not create repositories. Primary
+  identity is explicit via `repositories.role`.
 - ML/Lumen paths should degrade when features are disabled; media management should remain usable without external ML.

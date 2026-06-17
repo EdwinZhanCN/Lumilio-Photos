@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/utils/exif"
@@ -38,11 +37,12 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 	defer file.Close()
 
 	config := &exif.Config{
-		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
-		Timeout:     60 * time.Second,
-		BufferSize:  128 * 1024,
-		FastMode:    true,
-		IncludeRaw:  true,
+		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
+		MaxFileSize:  2 * 1024 * 1024 * 1024, // 2GB
+		Timeout:      60 * time.Second,
+		BufferSize:   128 * 1024,
+		FastMode:     true,
+		IncludeRaw:   true,
 	}
 	extractor := exif.NewExtractor(config)
 	defer extractor.Close()
@@ -107,7 +107,7 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 		targetBitrate = "128k"
 	}
 
-	cmd := exec.CommandContext(ctx, config.FFmpegPath(),
+	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(),
 		"-i", inputPath,
 		"-c:a", "libmp3lame",
 		"-b:a", targetBitrate,
@@ -157,7 +157,7 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID))
 	defer os.Remove(outputPath)
 
-	cmd := exec.CommandContext(ctx, config.FFmpegPath(),
+	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(),
 		"-i", audioPath,
 		"-filter_complex", "showwavespic=s=1200x200:colors=0x3b82f6[v]",
 		"-map", "[v]",
@@ -187,7 +187,7 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 
 // getAudioInfo probes the audio using ffprobe to collect duration, bitrate, codec, and format.
 func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
-	cmd := exec.Command(config.FFprobePath(),
+	cmd := exec.Command(ap.toolsConfig.FFprobeCommand(),
 		"-v", "quiet",
 		"-print_format", "json",
 		"-show_format",

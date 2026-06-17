@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"server/config"
 	"server/internal/api/dto"
 	"server/internal/service"
+	"server/internal/settings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -18,14 +18,14 @@ import (
 type stubSettingsService struct {
 	service.SettingsService
 	getSystemSettingsFn func(ctx context.Context) (service.SystemSettings, error)
-	getEffectiveMLFn    func(ctx context.Context) (config.MLConfig, error)
+	getEffectiveMLFn    func(ctx context.Context) (settings.ML, error)
 }
 
 func (s stubSettingsService) GetSystemSettings(ctx context.Context) (service.SystemSettings, error) {
 	return s.getSystemSettingsFn(ctx)
 }
 
-func (s stubSettingsService) GetEffectiveMLConfig(ctx context.Context) (config.MLConfig, error) {
+func (s stubSettingsService) GetEffectiveMLConfig(ctx context.Context) (settings.ML, error) {
 	return s.getEffectiveMLFn(ctx)
 }
 
@@ -64,11 +64,11 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesSemanticCapabilities(t *test
 					},
 				}, nil
 			},
-			getEffectiveMLFn: func(ctx context.Context) (config.MLConfig, error) {
-				return config.MLConfig{
-					SemanticEnabled:    true,
-					BioCLIPEnabled: true,
-					OCREnabled:         true,
+			getEffectiveMLFn: func(ctx context.Context) (settings.ML, error) {
+				return settings.ML{
+					SemanticEnabled: true,
+					BioCLIPEnabled:  true,
+					OCREnabled:      true,
 				}, nil
 			},
 		},

@@ -1,102 +1,38 @@
 import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { components } from "@/lib/http-commons/schema";
+import type { ApiResult, Schemas } from "../api-types";
 
-type Schemas = components["schemas"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
+export type SystemSettings = Schemas["dto.SystemSettingsDTO"];
+export type UpdateSystemSettings = Schemas["dto.UpdateSystemSettingsDTO"];
 
-type SystemSettingsResponseDTO = Schemas["dto.SystemSettingsDTO"];
-export type UpdateSystemSettingsPayload =
-  Schemas["dto.UpdateSystemSettingsDTO"];
-
-export type SystemSettings = {
-  llm: {
-    agentEnabled: boolean;
-    provider: "" | "ark" | "openai" | "deepseek" | "ollama";
-    modelName: string;
-    baseURL: string;
-    apiKeyConfigured: boolean;
-  };
-  ml: {
-    semanticEnabled: boolean;
-    bioclipEnabled: boolean;
-    ocrEnabled: boolean;
-    faceEnabled: boolean;
-  };
-  updatedAt: string;
-  updatedBy?: number;
-};
-
-function normalizeProvider(
-  value: string | undefined,
-): SystemSettings["llm"]["provider"] {
-  switch (value) {
-    case "":
-    case "openai":
-    case "deepseek":
-    case "ollama":
-    case "ark":
-      return value;
-    default:
-      return "";
-  }
-}
-
-function normalizeSystemSettings(
-  data?: SystemSettingsResponseDTO,
-): SystemSettings | undefined {
-  if (!data) {
-    return undefined;
-  }
-
-  return {
-    llm: {
-      agentEnabled: Boolean(data.llm?.agent_enabled),
-      provider: normalizeProvider(data.llm?.provider),
-      modelName: data.llm?.model_name ?? "",
-      baseURL: data.llm?.base_url ?? "",
-      apiKeyConfigured: Boolean(data.llm?.api_key_configured),
-    },
-    ml: {
-      semanticEnabled: Boolean(data.ml?.semantic_enabled),
-      bioclipEnabled: Boolean(data.ml?.bioclip_enabled),
-      ocrEnabled: Boolean(data.ml?.ocr_enabled),
-      faceEnabled: Boolean(data.ml?.face_enabled),
-    },
-    updatedAt: data.updated_at ?? "",
-    updatedBy: data.updated_by ?? undefined,
-  };
-}
+export const systemSettingsQueryKey = [
+  "get",
+  "/api/v1/settings/system",
+] as const;
 
 export function useSystemSettings(): UseQueryResult<
-  ApiResult<SystemSettingsResponseDTO>,
+  ApiResult<SystemSettings>,
   unknown
-> & { settings?: SystemSettings } {
-  const query = $api.useQuery(
+> {
+  return $api.useQuery(
     "get",
     "/api/v1/settings/system",
     {},
     {
+      staleTime: 30_000,
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<SystemSettingsResponseDTO>, unknown>;
-
-  return {
-    ...query,
-    settings: normalizeSystemSettings(query.data?.data),
-  };
+  ) as UseQueryResult<ApiResult<SystemSettings>, unknown>;
 }
 
 export function useUpdateSystemSettings() {
   const queryClient = useQueryClient();
-
   return $api.useMutation("patch", "/api/v1/settings/system", {
     onSuccess: async () => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: systemSettingsQueryKey }),
         queryClient.invalidateQueries({
-          queryKey: ["get", "/api/v1/settings/system"],
+          queryKey: ["get", "/api/v1/setup/status"],
         }),
         queryClient.invalidateQueries({
           queryKey: ["get", "/api/v1/capabilities"],

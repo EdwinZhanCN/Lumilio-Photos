@@ -71,7 +71,7 @@ func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
 }
 
 func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
-	provider := NewRepositoryAuditProvider(zap.NewNop()).(*repositoryAuditProvider)
+	provider := NewRepositoryAuditProvider(zap.NewNop(), false).(*repositoryAuditProvider)
 
 	nonRepoPath := t.TempDir()
 	provider.ForPath(nonRepoPath).Operation("should_not_write")
@@ -82,7 +82,7 @@ func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(repoPath, repositoryLogsDir), 0755))
 
 	t.Run("operations log quiet without REPO_AUDIT_VERBOSE", func(t *testing.T) {
-		p := NewRepositoryAuditProvider(zap.NewNop())
+		p := NewRepositoryAuditProvider(zap.NewNop(), false)
 		quietRepo := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(quietRepo, repositoryLogsDir), 0755))
 		p.ForPath(quietRepo).Operation("asset.ingest", zap.String("asset_id", "quiet"))
@@ -91,7 +91,7 @@ func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
 		assert.Empty(t, strings.TrimSpace(string(opsBytes)))
 	})
 
-	t.Setenv("REPO_AUDIT_VERBOSE", "1")
+	provider = NewRepositoryAuditProvider(zap.NewNop(), true).(*repositoryAuditProvider)
 
 	first := provider.ForPath(repoPath)
 	second := provider.ForPath(repoPath)

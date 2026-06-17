@@ -1,10 +1,5 @@
-export const SETTINGS_STORAGE_KEY = "app_settings";
-export const LEGACY_SETTINGS_STORAGE_KEY = "app_settings_v1";
-export const SETTINGS_STORAGE_VERSION = 5 as const;
-
-export const THEME_STORAGE_KEY = "lumilio.settings.theme";
-export const THEME_STORAGE_VERSION = 1 as const;
-export const LEGACY_THEME_STORAGE_KEY = "theme";
+export const PREFERENCES_STORAGE_KEY = "lumilio.preferences";
+export const PREFERENCES_STORAGE_VERSION = 2 as const;
 
 export const ASSETS_STATE_STORAGE_KEY = "lumilio.settings.assets_state";
 export const ASSETS_STATE_STORAGE_VERSION = 2 as const;
@@ -21,72 +16,70 @@ export interface SettingRegistryEntry {
   precedence: readonly string[];
 }
 
-// Registry for fields managed by SettingsProvider.
-// This is the canonical ownership map for local settings state.
 export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
   {
-    path: "ui.language",
+    path: "language",
     truthSource: "web_local_preference",
     description: "UI language preference used by i18n",
     precedence: ["user local setting", "browser language fallback", "en"],
   },
   {
-    path: "ui.region",
+    path: "region",
     truthSource: "web_local_preference",
     description: "Region preference for map provider behavior",
     precedence: ["user local setting", "other"],
   },
   {
-    path: "ui.theme.mode",
+    path: "theme.mode",
     truthSource: "web_local_preference",
     description: "Navbar appearance mode preference",
     precedence: ["user local setting", "light"],
   },
   {
-    path: "ui.theme.followSystem",
+    path: "theme.followSystem",
     truthSource: "web_local_preference",
     description: "Whether theme mode follows the operating system preference",
     precedence: ["user local setting", "true"],
   },
   {
-    path: "ui.theme.themes.light",
+    path: "theme.themes.light",
     truthSource: "web_local_preference",
     description: "Concrete daisyUI theme used while light mode is active",
-    precedence: ["user local setting", "light"],
+    precedence: ["user local setting", "lumilio"],
   },
   {
-    path: "ui.theme.themes.dark",
+    path: "theme.themes.dark",
     truthSource: "web_local_preference",
     description: "Concrete daisyUI theme used while dark mode is active",
-    precedence: ["user local setting", "night"],
+    precedence: ["user local setting", "lumilio-dark"],
   },
   {
-    path: "ui.working_repository_id",
+    path: "workingRepositoryId",
     truthSource: "web_local_preference",
     description: "Current working repository scope for repository-aware views",
     precedence: ["user local setting", "all repositories"],
   },
   {
-    path: "ui.asset_page.layout",
+    path: "assetPage.layout",
     truthSource: "web_local_preference",
     description: "Asset page layout preference",
     precedence: ["user local setting", "full"],
   },
   {
-    path: "ui.asset_page.columns",
+    path: "assetPage.columns",
     truthSource: "web_local_preference",
     description: "Square asset page layout column count",
     precedence: ["user local setting", "6"],
   },
   {
-    path: "server.update_timespan",
+    path: "healthCheckIntervalMs",
     truthSource: "web_local_preference",
-    description: "Health poll interval in seconds",
-    precedence: ["user local setting", "5"],
+    description: "Health poll interval in milliseconds",
+    precedence: ["user local setting", "30000"],
   },
 ] as const;
 
-export type LocalSettingsOwner = "settings_provider" | "assets_provider";
+export type LocalSettingsOwner = "preferences_store" | "assets_provider";
 
 export interface LocalStorageRegistryEntry {
   key: string;
@@ -96,14 +89,13 @@ export interface LocalStorageRegistryEntry {
   description: string;
 }
 
-// Key-level registry for browser persistence ownership.
 export const LOCAL_STORAGE_REGISTRY: readonly LocalStorageRegistryEntry[] = [
   {
-    key: SETTINGS_STORAGE_KEY,
-    version: SETTINGS_STORAGE_VERSION,
-    owner: "settings_provider",
-    legacyKeys: [LEGACY_SETTINGS_STORAGE_KEY],
-    description: "App-level settings state",
+    key: PREFERENCES_STORAGE_KEY,
+    version: PREFERENCES_STORAGE_VERSION,
+    owner: "preferences_store",
+    legacyKeys: [],
+    description: "Client-only preferences (theme, language, layout, health poll)",
   },
   {
     key: ASSETS_STATE_STORAGE_KEY,

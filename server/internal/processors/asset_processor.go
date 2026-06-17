@@ -3,6 +3,7 @@ package processors
 import (
 	"time"
 
+	"server/config"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/service"
@@ -36,6 +37,8 @@ type AssetProcessor struct {
 	settingsService  service.SettingsService
 	embeddingService service.EmbeddingService
 	lumenService     service.LumenService
+	transcodeConfig  config.TranscodeConfig
+	toolsConfig      config.ToolsConfig
 	logger           *zap.Logger
 	auditProvider    logging.RepositoryAuditProvider
 }
@@ -51,6 +54,8 @@ func NewAssetProcessor(
 	settingsService service.SettingsService,
 	embeddingService service.EmbeddingService,
 	lumenService service.LumenService,
+	transcodeConfig config.TranscodeConfig,
+	toolsConfig config.ToolsConfig,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 ) *AssetProcessor {
@@ -58,7 +63,7 @@ func NewAssetProcessor(
 		logger = zap.NewNop()
 	}
 	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger)
+		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
 	return &AssetProcessor{
 		assetService:     assetService,
@@ -70,6 +75,8 @@ func NewAssetProcessor(
 		settingsService:  settingsService,
 		embeddingService: embeddingService,
 		lumenService:     lumenService,
+		transcodeConfig:  transcodeConfig,
+		toolsConfig:      toolsConfig,
 		logger:           logger.With(zap.String("component", "processor")),
 		auditProvider:    auditProvider,
 	}
@@ -77,10 +84,10 @@ func NewAssetProcessor(
 
 func (ap *AssetProcessor) repoAudit(repoPath string) logging.RepositoryAuditLogger {
 	if ap == nil {
-		return logging.NewRepositoryAuditProvider(zap.NewNop()).ForPath(repoPath)
+		return logging.NewRepositoryAuditProvider(zap.NewNop(), false).ForPath(repoPath)
 	}
 	if ap.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(ap.logger).ForPath(repoPath)
+		return logging.NewRepositoryAuditProvider(ap.logger, false).ForPath(repoPath)
 	}
 	return ap.auditProvider.ForPath(repoPath)
 }

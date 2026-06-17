@@ -53,9 +53,6 @@ func TestNewDesktopConfigInvariants(t *testing.T) {
 	if got, want := strings.Join(cfg.Auth.WebAuthnRPOrigins, ","), "http://localhost:6680"; got != want {
 		t.Fatalf("webauthn origins = %q, want %q", got, want)
 	}
-	if !cfg.MLConfig.SemanticEnabled || !cfg.MLConfig.BioCLIPEnabled || !cfg.MLConfig.OCREnabled || !cfg.MLConfig.FaceEnabled {
-		t.Fatalf("desktop ML defaults should be enabled, got %+v", cfg.MLConfig)
-	}
 	if !cfg.Lumen.DiscoveryEnabled || !cfg.Lumen.DiscoveryMDNSEnabled {
 		t.Fatalf("desktop Lumen discovery should be enabled, got %+v", cfg.Lumen)
 	}

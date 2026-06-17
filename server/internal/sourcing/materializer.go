@@ -59,7 +59,7 @@ func NewSourceMaterializer(
 		logger = zap.NewNop()
 	}
 	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger)
+		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
 	return &SourceMaterializer{
 		queries:        queries,
@@ -416,16 +416,11 @@ func (m *SourceMaterializer) resolveRepository(ctx context.Context, repoUUID uui
 		return m.queries.GetRepository(ctx, repoUUIDPg)
 	}
 
-	repositories, err := m.queries.ListRepositories(ctx)
-	if err != nil || len(repositories) == 0 {
+	repository, err := m.queries.GetPrimaryRepository(ctx)
+	if err != nil {
 		return repo.Repository{}, fmt.Errorf("no repository available: %w", err)
 	}
-	for _, r := range repositories {
-		if repo.IsPrimaryRepository(r.Name, r.Path) {
-			return r, nil
-		}
-	}
-	return repositories[0], nil
+	return repository, nil
 }
 
 // enqueuePipeline inserts downstream River jobs for the asset pipeline.

@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { HardDrive, KeyRound, ShieldCheck } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { setupStatusQueryKey, useSetupStatus } from "../hooks/useSetupStatus.ts";
@@ -15,30 +16,30 @@ function getApiMessage(error: unknown, fallback: string): string {
 }
 
 /**
- * Runs first-boot database credential rotation before the administrator
- * bootstrap flow or regular app renders.
+ * First-boot STEP ①: rotate the temporary bootstrap database credential to a
+ * high-entropy secret and generate the app key. This is a one-time, user-
+ * initiated action (a welcome screen with an explicit button) — it is not run
+ * automatically. Once the credential is rotated the admin/MFA wizard
+ * (BootstrapGate) and the primary-repository step take over.
  */
 const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const setupQuery = useSetupStatus();
   const setupMutation = $api.useMutation("post", "/api/v1/setup");
-  const requestedSetup = useRef(false);
-  const initialized = setupQuery.data?.data?.initialized ?? false;
+  const databaseInitialized =
+    setupQuery.data?.data?.database_initialized ??
+    setupQuery.data?.data?.initialized ??
+    false;
 
-  useEffect(() => {
-    if (setupQuery.isLoading || setupQuery.isError || initialized || requestedSetup.current) {
-      return;
-    }
-
-    requestedSetup.current = true;
+  const beginSetup = () => {
     void setupMutation
       .mutateAsync({ body: {} })
-      .catch(() => undefined)
-      .finally(() => {
-        void queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
-      });
-  }, [initialized, queryClient, setupMutation, setupQuery.isError, setupQuery.isLoading]);
+      .then(() =>
+        queryClient.invalidateQueries({ queryKey: setupStatusQueryKey }),
+      )
+      .catch(() => undefined);
+  };
 
   if (setupQuery.isLoading) {
     return (
@@ -78,8 +79,8 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   }
 
-  if (!initialized) {
-    const setupError = setupMutation.error
+  if (!databaseInitialized) {
+    const setupError = setupMutation.isError
       ? getApiMessage(
           setupMutation.error,
           t("auth.setup.error", {
@@ -89,35 +90,91 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       : null;
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-base-200 px-4">
-        <div className="flex w-full max-w-md flex-col items-center gap-4 text-center">
-          {setupMutation.isError ? (
-            <div className="alert alert-error text-left text-sm">
-              <div className="flex flex-col gap-3">
-                <span>{setupError}</span>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary self-start"
-                  onClick={() => {
-                    requestedSetup.current = false;
-                    setupMutation.reset();
-                    void setupQuery.refetch();
-                  }}
-                >
-                  {t("common.retry", { defaultValue: "Retry" })}
-                </button>
+      <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+        <div className="w-full max-w-md rounded-2xl border border-base-200 bg-base-100 p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_44px_-18px_rgba(0,0,0,0.18)] sm:p-9">
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-base-200 text-base-content">
+            <ShieldCheck size={24} />
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">
+            {t("auth.setup.welcome.title", {
+              defaultValue: "Initialize this server",
+            })}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-base-content/55">
+            {t("auth.setup.welcome.body", {
+              defaultValue:
+                "Before the first account is created, Lumilio secures the database and generates an application key. This runs once and takes a few seconds.",
+            })}
+          </p>
+
+          <dl className="mt-5 grid gap-2.5">
+            <div className="flex items-start gap-3 rounded-xl border border-base-200 px-4 py-3">
+              <KeyRound
+                size={18}
+                className="mt-0.5 shrink-0 text-base-content/45"
+              />
+              <div>
+                <p className="text-sm font-medium">
+                  {t("auth.setup.welcome.rotateTitle", {
+                    defaultValue: "Rotate the database credential",
+                  })}
+                </p>
+                <p className="text-xs text-base-content/55">
+                  {t("auth.setup.welcome.rotateBody", {
+                    defaultValue:
+                      "Replaces the temporary bootstrap password with a high-entropy secret stored under your storage root.",
+                  })}
+                </p>
               </div>
             </div>
-          ) : (
-            <>
-              <span className="loading loading-spinner loading-lg text-primary" />
-              <p className="animate-pulse text-sm font-medium opacity-50">
-                {t("auth.setup.gate.initializing", {
-                  defaultValue: "Securing database credentials...",
-                })}
-              </p>
-            </>
+            <div className="flex items-start gap-3 rounded-xl border border-base-200 px-4 py-3">
+              <HardDrive
+                size={18}
+                className="mt-0.5 shrink-0 text-base-content/45"
+              />
+              <div>
+                <p className="text-sm font-medium">
+                  {t("auth.setup.welcome.keyTitle", {
+                    defaultValue: "Generate the application key",
+                  })}
+                </p>
+                <p className="text-xs text-base-content/55">
+                  {t("auth.setup.welcome.keyBody", {
+                    defaultValue:
+                      "Used to sign sessions and encrypt secrets; kept in .secrets and never leaves this server.",
+                  })}
+                </p>
+              </div>
+            </div>
+          </dl>
+
+          {setupError && (
+            <div className="alert alert-error mt-5 text-left text-sm">
+              <span>{setupError}</span>
+            </div>
           )}
+
+          <button
+            type="button"
+            className="btn btn-neutral mt-6 w-full"
+            onClick={beginSetup}
+            disabled={setupMutation.isPending}
+          >
+            {setupMutation.isPending ? (
+              <>
+                <span className="loading loading-spinner loading-sm" />
+                {t("auth.setup.welcome.working", {
+                  defaultValue: "Securing database credentials…",
+                })}
+              </>
+            ) : setupMutation.isError ? (
+              t("common.retry", { defaultValue: "Retry" })
+            ) : (
+              t("auth.setup.welcome.cta", {
+                defaultValue: "Begin initialization",
+              })
+            )}
+          </button>
         </div>
       </div>
     );

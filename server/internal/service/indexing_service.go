@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"server/config"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/queue/jobs"
+	"server/internal/settings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -100,7 +100,7 @@ func NewAssetIndexingService(
 		logger = zap.NewNop()
 	}
 	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger)
+		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
 	return &assetIndexingService{
 		queries:         queries,
@@ -563,7 +563,7 @@ WHERE queue = $1
 
 func (s *assetIndexingService) audit(repositoryID *string, repoPath string) logging.RepositoryAuditLogger {
 	if s.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(s.logger).ForPath(repoPath)
+		return logging.NewRepositoryAuditProvider(s.logger, false).ForPath(repoPath)
 	}
 	if strings.TrimSpace(repoPath) != "" {
 		return s.auditProvider.ForPath(repoPath)
@@ -596,7 +596,7 @@ func computeDisabledIndexingTasks(requested, enabled []AssetIndexingTask) []Asse
 	return disabled
 }
 
-func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) []AssetIndexingTask {
+func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg settings.ML) []AssetIndexingTask {
 	enabled := make([]AssetIndexingTask, 0, len(tasks))
 
 	for _, task := range tasks {

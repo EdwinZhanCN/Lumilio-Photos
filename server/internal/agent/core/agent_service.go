@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"server/config"
 	"server/internal/agent/ref"
 	"server/internal/db/repo"
 	"server/internal/llm"
+	"server/internal/settings"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/middlewares/summarization"
@@ -19,7 +19,7 @@ import (
 )
 
 type LLMConfigProvider interface {
-	GetLLMConfig(ctx context.Context) (config.LLMConfig, error)
+	GetLLMConfig(ctx context.Context) (settings.LLM, error)
 }
 
 type AgentService interface {

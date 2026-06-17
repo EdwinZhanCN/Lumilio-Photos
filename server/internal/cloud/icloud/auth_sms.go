@@ -20,10 +20,10 @@ type authOptionsResponse struct {
 	NoTrustedDevices    bool                 `json:"noTrustedDevices"`
 	SecurityCode        *struct {
 		Length                int  `json:"length"`
-		TooManyCodesSent     bool `json:"tooManyCodesSent"`
+		TooManyCodesSent      bool `json:"tooManyCodesSent"`
 		TooManyCodesValidated bool `json:"tooManyCodesValidated"`
-		SecurityCodeLocked   bool `json:"securityCodeLocked"`
-		SecurityCodeCooldown bool `json:"securityCodeCooldown"`
+		SecurityCodeLocked    bool `json:"securityCodeLocked"`
+		SecurityCodeCooldown  bool `json:"securityCodeCooldown"`
 	} `json:"securityCode"`
 	TwoSV *twoSVResponse `json:"twoSV"`
 }

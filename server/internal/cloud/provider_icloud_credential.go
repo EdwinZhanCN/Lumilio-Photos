@@ -15,10 +15,12 @@ import (
 	"server/internal/db/repo"
 )
 
-type iCloudCredentialProvider struct{}
+type iCloudCredentialProvider struct {
+	storageRoot string
+}
 
-func NewICloudCredentialProvider() CredentialProvider {
-	return &iCloudCredentialProvider{}
+func NewICloudCredentialProvider(storageRoot string) CredentialProvider {
+	return &iCloudCredentialProvider{storageRoot: storageRoot}
 }
 
 func (p *iCloudCredentialProvider) Descriptor() ProviderDescriptor {
@@ -37,12 +39,12 @@ func (p *iCloudCredentialProvider) Descriptor() ProviderDescriptor {
 				Autocomplete: "username",
 			},
 			{
-			Name:         "password",
-			Label:        "Password",
-			Type:         "password",
-			Required:     true,
-			Placeholder:  "",
-			Autocomplete: "current-password",
+				Name:         "password",
+				Label:        "Password",
+				Type:         "password",
+				Required:     true,
+				Placeholder:  "",
+				Autocomplete: "current-password",
 			},
 			{
 				Name:     "domain",
@@ -89,7 +91,7 @@ func (p *iCloudCredentialProvider) Identity(inputs map[string]string) (Credentia
 }
 
 func (p *iCloudCredentialProvider) DefaultArtifactDir(credentialID uuid.UUID) string {
-	return filepath.Join(providerArtifactRoot(ProviderICloud), credentialID.String())
+	return filepath.Join(providerArtifactRoot(p.storageRoot, ProviderICloud), credentialID.String())
 }
 
 func (p *iCloudCredentialProvider) Authenticate(ctx context.Context, input CredentialAuthInput) (CredentialAuthResult, error) {

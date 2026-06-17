@@ -40,6 +40,7 @@ export type IndexingRepositoryOption = {
   id: string;
   name: string;
   path: string;
+  role: string;
   isPrimary: boolean;
 };
 
@@ -50,7 +51,8 @@ function normalizeIndexingRepositories(
     id: repository.id ?? "",
     name: repository.name ?? "",
     path: repository.path ?? "",
-    isPrimary: Boolean(repository.is_primary),
+    role: repository.role ?? "regular",
+    isPrimary: repository.role === "primary" || Boolean(repository.is_primary),
   }));
 }
 

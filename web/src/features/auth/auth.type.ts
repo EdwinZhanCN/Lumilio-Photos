@@ -10,7 +10,6 @@ export type MFAStatus = Schemas["dto.MFAStatusDTO"];
 export type TOTPSetupResponse = Schemas["dto.TOTPSetupResponseDTO"];
 export type RecoveryCodesResponse = Schemas["dto.RecoveryCodesResponseDTO"];
 export type VerifyMFARequest = Schemas["dto.VerifyMFARequestDTO"];
-export type BootstrapStatus = Schemas["dto.BootstrapStatusDTO"];
 export type RegistrationStartRequest = Schemas["dto.RegistrationStartRequestDTO"];
 export type PasskeyOptionsRequest = Schemas["dto.PasskeyOptionsRequestDTO"];
 export type PasskeyOptionsResponse = Schemas["dto.PasskeyOptionsResponseDTO"];

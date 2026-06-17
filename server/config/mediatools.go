@@ -1,10 +1,5 @@
 package config
 
-import (
-	"os"
-	"strings"
-)
-
 // ToolsConfig holds optional absolute paths to the external media tools the
 // server shells out to. An empty value means "resolve the bare command name via
 // PATH", which is the default behavior for web/docker deployments. The desktop
@@ -27,32 +22,23 @@ const (
 	defaultFFprobeCommand  = "ffprobe"
 )
 
-// ExifToolPath returns the exiftool executable to invoke: the EXIFTOOL_PATH
-// override when set, otherwise the bare "exiftool" command resolved via PATH.
-//
-// It reads the resolved environment value rather than an AppConfig field so the
-// low-level exec call sites do not need AppConfig threaded through them.
-// ApplyRuntimeEnvDefaults bridges the TOML [tools] section into the environment
-// at startup, so a value set in server.local.toml is honored here too.
-func ExifToolPath() string {
-	return toolPath("EXIFTOOL_PATH", defaultExifToolCommand)
-}
-
-// FFmpegPath returns the ffmpeg executable to invoke (FFMPEG_PATH override or
-// the bare "ffmpeg" command).
-func FFmpegPath() string {
-	return toolPath("FFMPEG_PATH", defaultFFmpegCommand)
-}
-
-// FFprobePath returns the ffprobe executable to invoke (FFPROBE_PATH override or
-// the bare "ffprobe" command).
-func FFprobePath() string {
-	return toolPath("FFPROBE_PATH", defaultFFprobeCommand)
-}
-
-func toolPath(envKey, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(envKey)); v != "" {
-		return v
+func (c ToolsConfig) ExifToolCommand() string {
+	if c.ExifToolPath != "" {
+		return c.ExifToolPath
 	}
-	return fallback
+	return defaultExifToolCommand
+}
+
+func (c ToolsConfig) FFmpegCommand() string {
+	if c.FFmpegPath != "" {
+		return c.FFmpegPath
+	}
+	return defaultFFmpegCommand
+}
+
+func (c ToolsConfig) FFprobeCommand() string {
+	if c.FFprobePath != "" {
+		return c.FFprobePath
+	}
+	return defaultFFprobeCommand
 }

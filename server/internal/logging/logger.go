@@ -38,39 +38,6 @@ type Runtime struct {
 	riverLogger *slog.Logger
 }
 
-func LoadConfig(defaultLevel string) Config {
-	level := strings.TrimSpace(defaultLevel)
-	if level == "" {
-		level = defaultLogLevel
-	}
-	if envLevel := strings.TrimSpace(os.Getenv("LOG_LEVEL")); envLevel != "" {
-		level = envLevel
-	}
-
-	logDir := strings.TrimSpace(os.Getenv("LOG_DIR"))
-	if logDir == "" {
-		logDir = defaultLogDir
-	}
-
-	consoleFormat := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_FORMAT_CONSOLE")))
-	if consoleFormat == "" {
-		consoleFormat = defaultConsoleFormat
-	}
-
-	fileFormat := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_FORMAT_FILE")))
-	if fileFormat == "" {
-		fileFormat = defaultFileFormat
-	}
-
-	return Config{
-		Level:         level,
-		LogDir:        logDir,
-		ConsoleFormat: consoleFormat,
-		FileFormat:    fileFormat,
-		Development:   strings.EqualFold(strings.TrimSpace(os.Getenv("SERVER_ENV")), "development"),
-	}
-}
-
 func NewLogger(cfg Config) (*Runtime, error) {
 	if strings.TrimSpace(cfg.Level) == "" {
 		cfg.Level = defaultLogLevel

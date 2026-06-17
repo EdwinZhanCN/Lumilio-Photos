@@ -121,7 +121,7 @@ load-bearing local/CI wiring.
 └── backups/                          # pg_dump auto-backups
 
 <storage_path>/                       # USER-CHOSEN library location (default: <appdata>/storage)
-└── primary/                          # repo structure created by the server on startup
+└── primary/                          # default first-run primary repository path
 ```
 
 Default `<storage_path>` is `<appdata>/storage`, but the user may relocate it to
@@ -222,7 +222,7 @@ See "User-Selectable Storage Path" below.
     ssl = "disable"
 
     [storage]
-    path = "<storage_path>"              # from step 3a (default <appdata>/storage)
+    path = "<storage_path>"              # default repository root suggestion
 
     [ml]
     semantic_enabled = true
@@ -576,9 +576,9 @@ the plan above.
   `queueClient.Stop` on ctx cancel, then deferred cleanups), and converts the
   former `appLogger.Fatal` startup calls into returned errors so the in-process
   desktop host is not killed by `os.Exit`. The swag general-info annotations
-  stay in `cmd/main.go` because `make dto` runs `swag init -g cmd/main.go`. The
-  `initPrimaryStorage`/`resolvePrimaryStoragePaths` tests moved with the code to
-  `server/app`.
+  stay in `cmd/main.go` because `make dto` runs `swag init -g cmd/main.go`.
+  Primary repository creation has since moved out of startup and into the
+  authenticated first-run setup flow.
 - **Config ownership**: `server/config` now builds the desktop runtime config
   with `NewDesktopConfig`. The desktop supervisor no longer boots through
   `SERVER_CONFIG_FILE`; it writes `config/server.local.toml` only as a debug copy

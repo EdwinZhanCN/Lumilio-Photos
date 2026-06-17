@@ -51,62 +51,80 @@ var DefaultStructure = DirectoryStructure{
 	FailedDir:     ".lumilio/staging/failed",
 }
 
-// Directories lists all directories that should be created in a repository
-var Directories = []string{
-	".lumilio",
-	".lumilio/assets",
-	".lumilio/assets/thumbnails",
-	".lumilio/assets/thumbnails/small",
-	".lumilio/assets/thumbnails/medium",
-	".lumilio/assets/thumbnails/large",
-	".lumilio/assets/videos",
-	".lumilio/assets/videos/web",
-	".lumilio/assets/audios",
-	".lumilio/assets/audios/web",
-	".lumilio/assets/faces",
-	".lumilio/sidecars",         // Studio non-destructive edit sidecar files
-	".lumilio/staging",          // Upload staging area
-	".lumilio/staging/incoming", // Upload staging area
-	".lumilio/staging/failed",   // Upload staging area
-	".lumilio/temp",             // General temporary processing
-	".lumilio/trash",            // Soft-deleted user assets
-	".lumilio/logs",             // Application and operation logs
-	".lumilio/backups",          // Config version backups
-	"inbox",                     // Structured uploads
+// dirSpec is one directory in a repository's layout: its repo-relative path and
+// the permission enforced on it.
+type dirSpec struct {
+	path string
+	mode os.FileMode
 }
 
-// DirectoryManager handles the physical directory structure and system management for repositories
+// repoDirs is the single source of truth for a repository's on-disk layout: the
+// directories created at init, checked by ValidateStructure, and permission-
+// enforced by protectSystemDirectories. Staging and temp are application-only
+// (0700); everything else is world-readable (0755).
+var repoDirs = []dirSpec{
+	{".lumilio", 0o755},
+	{".lumilio/assets", 0o755},
+	{".lumilio/assets/thumbnails", 0o755},
+	{".lumilio/assets/thumbnails/small", 0o755},
+	{".lumilio/assets/thumbnails/medium", 0o755},
+	{".lumilio/assets/thumbnails/large", 0o755},
+	{".lumilio/assets/videos", 0o755},
+	{".lumilio/assets/videos/web", 0o755},
+	{".lumilio/assets/audios", 0o755},
+	{".lumilio/assets/audios/web", 0o755},
+	{".lumilio/assets/faces", 0o755},
+	{".lumilio/sidecars", 0o755}, // Studio non-destructive edit sidecar files
+	{".lumilio/staging", 0o700},
+	{".lumilio/staging/incoming", 0o700},
+	{".lumilio/staging/failed", 0o700},
+	{".lumilio/temp", 0o700},  // General temporary processing
+	{".lumilio/trash", 0o755}, // Soft-deleted user assets
+	{".lumilio/logs", 0o755},  // Application and operation logs
+	{"inbox", 0o755},          // Structured uploads
+}
+
+// repoLogFiles are empty JSONL targets created at init so loggers can append
+// valid lines immediately.
+var repoLogFiles = []string{
+	".lumilio/logs/app.log",
+	".lumilio/logs/error.log",
+	".lumilio/logs/operations.log",
+}
+
+// DirectoryManager owns the structure *inside* a single repository (the
+// .lumilio/* system tree and inbox) and the file operations over it. All paths
+// are repo-relative and resolved under repoPath; operations never escape the
+// repository root. It does not deal with the storage root layout
+// (<path>/.secrets, <path>/.cloud) — that is the storage package's provisioning
+// concern. Staging is owned by StagingManager, not here.
+//
+// Implementations are stateless and safe for concurrent use across different
+// repositories.
 type DirectoryManager interface {
-	// Structure management
+	// CreateStructure creates the full repository directory tree (repoDirs) with
+	// their enforced permissions and the empty log files. It is safe to call on
+	// an existing repository (directories already present are left intact).
 	CreateStructure(repoPath string) error
+
+	// ValidateStructure reports the structural health of a repository. Missing
+	// directories are returned as warnings with Valid still true (they are
+	// recoverable via RepairStructure); a file where a directory is expected, a
+	// missing/non-directory root, or a permission problem set Valid to false.
 	ValidateStructure(repoPath string) (*StructureValidation, error)
-	RepairStructure(repoPath string) error
 
-	// Protection and permissions
-	ProtectSystemDirectories(repoPath string) error
-	IsProtectedPath(repoPath, filePath string) bool
-	EnforcePermissions(repoPath string) error
-
-	// Staging operations
-	CreateStagingFile(repoPath, filename string) (*StagingFile, error)
-	CommitStagingFile(stagingFile *StagingFile, finalPath string) error
-	CleanupStaging(repoPath string, maxAge time.Duration) error
-
-	// Temporary file management
+	// CreateTempFile creates an empty file under .lumilio/temp for transient
+	// processing, named by purpose. Callers are responsible for removing it.
 	CreateTempFile(repoPath, purpose string) (*TempFile, error)
-	CleanupTempFiles(repoPath string, maxAge time.Duration) error
 
-	// Trash operations
+	// MoveToTrash moves a repo file into .lumilio/trash and writes a sidecar JSON
+	// of metadata. filePath must resolve inside the repository.
 	MoveToTrash(repoPath, filePath string, metadata *DeleteMetadata) error
-	ListTrashFiles(repoPath string) ([]*TrashFile, error)
-	RecoverFromTrash(repoPath, trashID string) error
-	PurgeTrash(repoPath string, olderThan time.Duration) error
 
-	// Sidecar operations (Studio non-destructive edit files)
-	SidecarExists(repoPath, assetID string) (bool, error)
+	// ReadSidecar returns the raw sidecar bytes for an asset, or (nil, nil) when
+	// no sidecar exists. WriteSidecar writes it atomically (temp file + rename).
 	ReadSidecar(repoPath, assetID string) ([]byte, error)
 	WriteSidecar(repoPath, assetID string, data []byte) error
-	DeleteSidecar(repoPath, assetID string) error
 }
 
 // StructureValidation represents the result of directory structure validation
@@ -157,10 +175,16 @@ type TrashFile struct {
 // DefaultDirectoryManager implements the DirectoryManager interface
 type DefaultDirectoryManager struct{}
 
-// NewDirectoryManager creates a new directory manager instance
-func NewDirectoryManager() DirectoryManager {
+// NewDirectoryManager creates a new directory manager instance.
+func NewDirectoryManager() *DefaultDirectoryManager {
 	return &DefaultDirectoryManager{}
 }
+
+// Ensure the concrete type satisfies the consumer interface. Methods kept off
+// the interface (RepairStructure, IsProtectedPath, CleanupTempFiles, the trash
+// listing/recovery/purge, protectSystemDirectories) remain available on the
+// concrete type for maintenance use and tests.
+var _ DirectoryManager = (*DefaultDirectoryManager)(nil)
 
 // CreateStructure creates the complete directory structure for a repository
 func (dm *DefaultDirectoryManager) CreateStructure(repoPath string) error {
@@ -170,21 +194,15 @@ func (dm *DefaultDirectoryManager) CreateStructure(repoPath string) error {
 	}
 
 	// Create all required directories
-	for _, dir := range Directories {
-		dirPath := filepath.Join(cleanPath, dir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	for _, d := range repoDirs {
+		dirPath := filepath.Join(cleanPath, d.path)
+		if err := os.MkdirAll(dirPath, d.mode); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", d.path, err)
 		}
 	}
 
 	// Create empty log files so JSON loggers can append valid lines immediately.
-	logFiles := []string{
-		".lumilio/logs/app.log",
-		".lumilio/logs/error.log",
-		".lumilio/logs/operations.log",
-	}
-
-	for _, logFile := range logFiles {
+	for _, logFile := range repoLogFiles {
 		logPath := filepath.Join(cleanPath, logFile)
 		if err := os.WriteFile(logPath, nil, 0644); err != nil {
 			return fmt.Errorf("failed to create log file %s: %w", logFile, err)
@@ -192,7 +210,7 @@ func (dm *DefaultDirectoryManager) CreateStructure(repoPath string) error {
 	}
 
 	// Set initial permissions
-	if err := dm.ProtectSystemDirectories(cleanPath); err != nil {
+	if err := dm.protectSystemDirectories(cleanPath); err != nil {
 		return fmt.Errorf("failed to set directory permissions: %w", err)
 	}
 
@@ -226,16 +244,16 @@ func (dm *DefaultDirectoryManager) ValidateStructure(repoPath string) (*Structur
 	}
 
 	// Validate each required directory
-	for _, dir := range Directories {
-		dirPath := filepath.Join(cleanPath, dir)
+	for _, d := range repoDirs {
+		dirPath := filepath.Join(cleanPath, d.path)
 		if info, err := os.Stat(dirPath); os.IsNotExist(err) {
-			validation.MissingDirectories = append(validation.MissingDirectories, dir)
-			validation.Warnings = append(validation.Warnings, fmt.Sprintf("Missing directory: %s", dir))
+			validation.MissingDirectories = append(validation.MissingDirectories, d.path)
+			validation.Warnings = append(validation.Warnings, fmt.Sprintf("Missing directory: %s", d.path))
 		} else if err == nil && !info.IsDir() {
 			validation.Valid = false
-			validation.InvalidPaths = append(validation.InvalidPaths, fmt.Sprintf("Expected directory but found file: %s", dir))
+			validation.InvalidPaths = append(validation.InvalidPaths, fmt.Sprintf("Expected directory but found file: %s", d.path))
 		} else if err != nil {
-			validation.PermissionIssues = append(validation.PermissionIssues, fmt.Sprintf("Cannot access directory %s: %v", dir, err))
+			validation.PermissionIssues = append(validation.PermissionIssues, fmt.Sprintf("Cannot access directory %s: %v", d.path, err))
 		}
 	}
 
@@ -273,22 +291,23 @@ func (dm *DefaultDirectoryManager) RepairStructure(repoPath string) error {
 		return fmt.Errorf("failed to validate structure: %w", err)
 	}
 
-	// Recreate missing directories
+	// Recreate missing directories at their enforced permission.
 	for _, missingDir := range validation.MissingDirectories {
+		mode := os.FileMode(0o755)
+		for _, d := range repoDirs {
+			if d.path == missingDir {
+				mode = d.mode
+				break
+			}
+		}
 		dirPath := filepath.Join(cleanPath, missingDir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
+		if err := os.MkdirAll(dirPath, mode); err != nil {
 			return fmt.Errorf("failed to recreate directory %s: %w", missingDir, err)
 		}
 	}
 
 	// Recreate missing log files as empty JSONL targets.
-	logFiles := []string{
-		".lumilio/logs/app.log",
-		".lumilio/logs/error.log",
-		".lumilio/logs/operations.log",
-	}
-
-	for _, logFile := range logFiles {
+	for _, logFile := range repoLogFiles {
 		logPath := filepath.Join(cleanPath, logFile)
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
 			if err := os.WriteFile(logPath, nil, 0644); err != nil {
@@ -298,48 +317,27 @@ func (dm *DefaultDirectoryManager) RepairStructure(repoPath string) error {
 	}
 
 	// Fix permissions
-	if err := dm.ProtectSystemDirectories(cleanPath); err != nil {
+	if err := dm.protectSystemDirectories(cleanPath); err != nil {
 		return fmt.Errorf("failed to fix permissions: %w", err)
 	}
 
 	return nil
 }
 
-// ProtectSystemDirectories sets appropriate permissions for system directories
-func (dm *DefaultDirectoryManager) ProtectSystemDirectories(repoPath string) error {
+// protectSystemDirectories enforces each directory's permission from repoDirs
+// (the single layout source). Directories that do not yet exist are skipped.
+func (dm *DefaultDirectoryManager) protectSystemDirectories(repoPath string) error {
 	cleanPath, err := filepath.Abs(filepath.Clean(repoPath))
 	if err != nil {
 		return fmt.Errorf("invalid repository path: %w", err)
 	}
 
-	// System directories should be readable by users but only writable by the application
-	systemDirs := map[string]os.FileMode{
-		DefaultStructure.SystemDir:     0755, // rwxr-xr-x
-		DefaultStructure.AssetsDir:     0755, // rwxr-xr-x
-		DefaultStructure.ThumbnailsDir: 0755, // rwxr-xr-x
-		DefaultStructure.VideosDir:     0755, // rwxr-xr-x
-		DefaultStructure.AudiosDir:     0755, // rwxr-xr-x
-		DefaultStructure.FacesDir:      0755, // rwxr-xr-x
-		DefaultStructure.SidecarsDir:   0755, // rwxr-xr-x
-		DefaultStructure.StagingDir:    0700, // rwx------ (app-only)
-		DefaultStructure.TempDir:       0700, // rwx------
-		DefaultStructure.TrashDir:      0755, // rwxr-xr-x
-	}
-
-	for dir, mode := range systemDirs {
-		dirPath := filepath.Join(cleanPath, dir)
+	for _, d := range repoDirs {
+		dirPath := filepath.Join(cleanPath, d.path)
 		if _, err := os.Stat(dirPath); err == nil {
-			if err := os.Chmod(dirPath, mode); err != nil {
-				return fmt.Errorf("failed to set permissions for %s: %w", dir, err)
+			if err := os.Chmod(dirPath, d.mode); err != nil {
+				return fmt.Errorf("failed to set permissions for %s: %w", d.path, err)
 			}
-		}
-	}
-
-	// Inbox should be read-only for users (application manages content)
-	inboxPath := filepath.Join(cleanPath, DefaultStructure.InboxDir)
-	if _, err := os.Stat(inboxPath); err == nil {
-		if err := os.Chmod(inboxPath, 0755); err != nil {
-			return fmt.Errorf("failed to set inbox permissions: %w", err)
 		}
 	}
 
@@ -384,107 +382,6 @@ func (dm *DefaultDirectoryManager) IsProtectedPath(repoPath, filePath string) bo
 	return false
 }
 
-// EnforcePermissions ensures proper permissions are maintained
-func (dm *DefaultDirectoryManager) EnforcePermissions(repoPath string) error {
-	return dm.ProtectSystemDirectories(repoPath)
-}
-
-// CreateStagingFile creates a new file in the staging area
-func (dm *DefaultDirectoryManager) CreateStagingFile(repoPath, filename string) (*StagingFile, error) {
-	cleanRepoPath, err := filepath.Abs(filepath.Clean(repoPath))
-	if err != nil {
-		return nil, fmt.Errorf("invalid repository path: %w", err)
-	}
-
-	stagingDir := filepath.Join(cleanRepoPath, DefaultStructure.IncomingDir)
-	if err := os.MkdirAll(stagingDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create staging directory: %w", err)
-	}
-
-	id := uuid.New().String()
-	base := filepath.Base(filename)
-	stagingName := fmt.Sprintf("%s_%s", id, base)
-	stagingFullPath := filepath.Join(stagingDir, stagingName)
-
-	// Create empty file placeholder
-	f, err := os.Create(stagingFullPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create staging file: %w", err)
-	}
-	_ = f.Close()
-
-	return &StagingFile{
-		ID:        id,
-		RepoPath:  cleanRepoPath,
-		Path:      stagingFullPath,
-		Filename:  base,
-		CreatedAt: time.Now(),
-	}, nil
-}
-
-// CommitStagingFile moves a staging file to its final destination
-func (dm *DefaultDirectoryManager) CommitStagingFile(stagingFile *StagingFile, finalPath string) error {
-	if stagingFile == nil {
-		return fmt.Errorf("staging file is nil")
-	}
-
-	// Validate that finalPath is provided
-	if strings.TrimSpace(finalPath) == "" {
-		return fmt.Errorf("final path cannot be empty")
-	}
-
-	// finalPath must be repo-relative
-	if filepath.IsAbs(finalPath) {
-		return fmt.Errorf("final path must be repository-relative")
-	}
-
-	destFullPath := filepath.Join(stagingFile.RepoPath, finalPath)
-	destDir := filepath.Dir(destFullPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
-	}
-
-	if err := os.Rename(stagingFile.Path, destFullPath); err != nil {
-		return fmt.Errorf("failed to move staged file: %w", err)
-	}
-	return nil
-}
-
-// CleanupStaging removes old staging files
-func (dm *DefaultDirectoryManager) CleanupStaging(repoPath string, maxAge time.Duration) error {
-	cleanRepoPath, err := filepath.Abs(filepath.Clean(repoPath))
-	if err != nil {
-		return fmt.Errorf("invalid repository path: %w", err)
-	}
-	cutoff := time.Now().Add(-maxAge)
-
-	dirs := []string{
-		filepath.Join(cleanRepoPath, DefaultStructure.IncomingDir),
-		filepath.Join(cleanRepoPath, DefaultStructure.FailedDir),
-	}
-
-	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return fmt.Errorf("failed to read staging directory %s: %w", dir, err)
-		}
-		for _, e := range entries {
-			info, err := e.Info()
-			if err != nil {
-				continue
-			}
-			if info.ModTime().Before(cutoff) {
-				_ = os.Remove(filepath.Join(dir, e.Name()))
-			}
-		}
-	}
-
-	return nil
-}
-
 // CreateTempFile creates a new temporary file
 func (dm *DefaultDirectoryManager) CreateTempFile(repoPath, purpose string) (*TempFile, error) {
 	cleanRepoPath, err := filepath.Abs(filepath.Clean(repoPath))
@@ -493,7 +390,7 @@ func (dm *DefaultDirectoryManager) CreateTempFile(repoPath, purpose string) (*Te
 	}
 
 	tempDir := filepath.Join(cleanRepoPath, DefaultStructure.TempDir)
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
+	if err := os.MkdirAll(tempDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
@@ -553,11 +450,9 @@ func (dm *DefaultDirectoryManager) MoveToTrash(repoPath, filePath string, metada
 		return fmt.Errorf("invalid repository path: %w", err)
 	}
 
-	var originalFull string
-	if filepath.IsAbs(filePath) {
-		originalFull = filePath
-	} else {
-		originalFull = filepath.Join(cleanRepoPath, filePath)
+	originalFull, err := resolveInRepo(cleanRepoPath, filePath)
+	if err != nil {
+		return err
 	}
 
 	if _, err := os.Stat(originalFull); err != nil {
@@ -703,7 +598,13 @@ func (dm *DefaultDirectoryManager) RecoverFromTrash(repoPath, trashID string) er
 		return fmt.Errorf("cannot recover trash item %s: missing original path metadata", trashID)
 	}
 
-	destFull := filepath.Join(cleanRepoPath, originalRel)
+	destFull, err := resolveInRepo(cleanRepoPath, originalRel)
+	if err != nil {
+		return fmt.Errorf("cannot recover trash item %s: %w", trashID, err)
+	}
+	if _, err := os.Stat(destFull); err == nil {
+		return fmt.Errorf("cannot recover trash item %s: destination %s already exists", trashID, originalRel)
+	}
 	if err := os.MkdirAll(filepath.Dir(destFull), 0755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
@@ -766,21 +667,11 @@ func (dm *DefaultDirectoryManager) PurgeTrash(repoPath string, olderThan time.Du
 	return nil
 }
 
-// sidecarPath returns the full path for an asset's sidecar file.
+// sidecarPath returns the full path for an asset's sidecar file. assetID is
+// reduced to its base name so it can never escape the sidecars directory.
 func (dm *DefaultDirectoryManager) sidecarPath(repoPath, assetID string) string {
-	return filepath.Join(repoPath, DefaultStructure.SidecarsDir, assetID+".lumilio-sidecar")
-}
-
-// SidecarExists reports whether a sidecar file exists for the given asset ID.
-func (dm *DefaultDirectoryManager) SidecarExists(repoPath, assetID string) (bool, error) {
-	path := dm.sidecarPath(repoPath, assetID)
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to stat sidecar: %w", err)
-	}
-	return true, nil
+	safeID := filepath.Base(filepath.Clean(assetID))
+	return filepath.Join(repoPath, DefaultStructure.SidecarsDir, safeID+".lumilio-sidecar")
 }
 
 // ReadSidecar reads the raw content of an asset's sidecar file.
@@ -816,16 +707,22 @@ func (dm *DefaultDirectoryManager) WriteSidecar(repoPath, assetID string, data [
 	return nil
 }
 
-// DeleteSidecar removes an asset's sidecar file.
-func (dm *DefaultDirectoryManager) DeleteSidecar(repoPath, assetID string) error {
-	path := dm.sidecarPath(repoPath, assetID)
-	if err := os.Remove(path); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to delete sidecar: %w", err)
+// resolveInRepo resolves a repo-relative or absolute path to a cleaned absolute
+// path and verifies it stays within repoRoot, rejecting traversal escapes.
+func resolveInRepo(repoRoot, p string) (string, error) {
+	root, err := filepath.Abs(filepath.Clean(repoRoot))
+	if err != nil {
+		return "", fmt.Errorf("invalid repository path: %w", err)
 	}
-	return nil
+	full := filepath.Clean(p)
+	if !filepath.IsAbs(full) {
+		full = filepath.Join(root, full)
+	}
+	rel, err := filepath.Rel(root, full)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q escapes repository root", p)
+	}
+	return full, nil
 }
 
 // checkDirectoryPermissions checks if we have proper read/write permissions

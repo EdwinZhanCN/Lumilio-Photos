@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -116,8 +115,8 @@ func NewProviderRegistry(providers ...CredentialProvider) *ProviderRegistry {
 	return registry
 }
 
-func NewDefaultProviderRegistry() *ProviderRegistry {
-	return NewProviderRegistry(NewICloudCredentialProvider())
+func NewDefaultProviderRegistry(storageRoot string) *ProviderRegistry {
+	return NewProviderRegistry(NewICloudCredentialProvider(storageRoot))
 }
 
 func (r *ProviderRegistry) List() []CredentialProvider {
@@ -166,10 +165,9 @@ func unmarshalPublicConfig(data []byte) map[string]string {
 	return config
 }
 
-func providerArtifactRoot(provider ProviderKind) string {
-	storagePath := strings.TrimSpace(os.Getenv("STORAGE_PATH"))
-	if storagePath != "" {
-		normalized := filepath.Clean(storagePath)
+func providerArtifactRoot(storageRoot string, provider ProviderKind) string {
+	normalized := filepath.Clean(strings.TrimSpace(storageRoot))
+	if normalized != "" && normalized != "." {
 		if strings.EqualFold(filepath.Base(normalized), "primary") {
 			normalized = filepath.Dir(normalized)
 		}

@@ -22,6 +22,7 @@ import (
 	"server/internal/agent/ref"
 	"server/internal/agent/tools"
 	"server/internal/api"
+	"server/internal/api/dto"
 	"server/internal/api/handler"
 	"server/internal/cloud"
 	"server/internal/db"
@@ -31,6 +32,7 @@ import (
 	"server/internal/queue"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/settings"
 	"server/internal/sourcing"
 	"server/internal/storage"
 	"server/internal/storage/scanner"
@@ -55,23 +57,6 @@ const shutdownTimeout = 10 * time.Second
 // returns a non-nil error only on a fatal startup failure or an unexpected
 // server error; a clean shutdown returns nil.
 func Run(ctx context.Context, appConfig config.AppConfig) error {
-	config.ApplyRuntimeEnvDefaults(appConfig)
-	dbConfig := appConfig.DatabaseConfig
-
-	return run(ctx, appConfig, dbConfig)
-}
-
-// RunFromEnvironment is a compatibility helper for hosts that still want the
-// legacy behavior of loading .env/TOML/env inside the app package. New hosts
-// should load config themselves and call Run with a typed AppConfig.
-func RunFromEnvironment(ctx context.Context) error {
-	config.LoadEnvironment()
-
-	appConfig, err := config.LoadAppConfigWithError()
-	if err != nil {
-		return fmt.Errorf("load server configuration: %w", err)
-	}
-	config.ApplyRuntimeEnvDefaults(appConfig)
 	dbConfig := appConfig.DatabaseConfig
 
 	return run(ctx, appConfig, dbConfig)
@@ -98,7 +83,9 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	processorLogger := logRuntime.Named("processor")
 	indexingLogger := logRuntime.Named("indexing")
 	scannerLogger := logRuntime.Named("repository_scanner")
-	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"))
+	repoAuditVerbose := strings.EqualFold(strings.TrimSpace(appConfig.LoggingConfig.RepositoryAuditVerbose), "true") ||
+		strings.TrimSpace(appConfig.LoggingConfig.RepositoryAuditVerbose) == "1"
+	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), repoAuditVerbose)
 
 	appLogger.Info("starting Lumilio Photos API",
 		zap.String("operation", "server.start"),
@@ -116,6 +103,13 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// thread pool disabled; outer parallelism is governed by River worker counts.
 	imaging.StartVips()
 	defer imaging.ShutdownVips()
+
+	// Ensure the storage root layout (.secrets, .cloud) exists before anything
+	// reads it. Storage owns the <root> layout; subdirectories are derived from
+	// the immutable storage path by convention.
+	if err := storage.EnsureRootLayout(appConfig.StorageConfig); err != nil {
+		return fmt.Errorf("ensure storage layout: %w", err)
+	}
 
 	// Run database migrations
 	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
@@ -137,9 +131,18 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	pgxPool := database.Pool
 	queries := database.Queries
 
-	settingsService := service.NewSettingsService(queries)
+	settingsService := service.NewSettingsService(queries, settings.Default(appConfig.Environment), appConfig.Auth.SecretKeyPath)
 	if err := settingsService.EnsureInitialized(ctx); err != nil {
 		return fmt.Errorf("initialize system settings: %w", err)
+	}
+
+	// Single source of truth for first-run bootstrap progress. Reconcile at boot
+	// so the cached phase reflects the current gates.
+	bootstrapService := service.NewBootstrapService(queries, dbConfig.PasswordFile)
+	if phase, err := bootstrapService.Reconcile(ctx); err != nil {
+		appLogger.Warn("failed to reconcile bootstrap phase", zap.Error(err))
+	} else {
+		appLogger.Info("bootstrap phase", zap.String("operation", "bootstrap.reconcile"), zap.String("phase", phase))
 	}
 
 	currentMLConfig, err := settingsService.GetMLConfig(ctx)
@@ -163,11 +166,6 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	}
 	stagingManager := storage.NewStagingManager()
 	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
-	// Initialize primary storage repository
-	appLogger.Info("initializing primary storage repository", zap.String("operation", "repository.primary"))
-	if err := initPrimaryStorage(repoManager, repositoryLogger, appConfig.StorageConfig); err != nil {
-		return fmt.Errorf("initialize primary storage: %w", err)
-	}
 
 	workers := river.NewWorkers()
 	queueClient, err := queue.New(pgxPool, workers, logRuntime.RiverLogger())
@@ -189,16 +187,16 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		}
 	}()
 
-	assetService, err := service.NewAssetService(queries, pgxPool, lumenService, &repoManager, embeddingService, appLogger.Named("asset_service"))
+	assetService, err := service.NewAssetService(queries, pgxPool, lumenService, embeddingService, appLogger.Named("asset_service"))
 	if err != nil {
 		return fmt.Errorf("initialize asset service: %w", err)
 	}
-	locationService := service.NewLocationService(queries, pgxPool)
+	locationService := service.NewLocationService(queries, pgxPool, appConfig.Geocoding)
 	speciesReferenceService := service.NewSpeciesReferenceService()
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
 	duplicateService := service.NewDuplicateService(queries, pgxPool, appLogger.Named("duplicate"), assetService)
-	authService := service.NewAuthService(queries, pgxPool)
+	authService := service.NewAuthService(queries, pgxPool, appConfig.Auth)
 	albumService := service.NewAlbumService(queries)
 	userService := service.NewUserService(queries, pgxPool)
 
@@ -225,7 +223,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
 	sourceMaterializer := sourcing.NewSourceMaterializer(queries, stagingManager, queueClient, assetService, processorLogger, repoAuditProvider)
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, processorLogger, repoAuditProvider)
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, appConfig.Transcode, appConfig.Tools, processorLogger, repoAuditProvider)
 	repositoryScanner := scanner.NewScanner(queries, queueClient, appConfig.RepositoryScan, scannerLogger)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
@@ -272,7 +270,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService)
-	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, pgxPool))
+	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, pgxPool, bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	locationController := handler.NewLocationHandler(locationService, queueClient)
@@ -282,14 +280,19 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
-	settingsController := handler.NewSettingsHandler(settingsService)
+	settingsController := handler.NewSettingsHandler(settingsService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
-	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appLogger.Named("cloud_sync"))
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyPath, appConfig.StorageConfig.Path, appLogger.Named("cloud_sync"))
 	// Reconcile import runs left "running"/"queued" by a previous crash/restart
 	// so repositories are not stuck with an import that never finishes.
 	if err := cloudSyncService.RecoverInterruptedRuns(ctx); err != nil {
 		appLogger.Warn("failed to recover interrupted cloud import runs", zap.Error(err))
+	}
+	// Reclaim scan runs left "running" by a previous crash/restart so the
+	// one-running-per-repository index does not permanently block scans.
+	if err := repositoryScanner.ReclaimInterruptedRuns(ctx); err != nil {
+		appLogger.Warn("failed to reclaim interrupted repository scan runs", zap.Error(err))
 	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, appConfig.StorageConfig.Path, cloudSyncService)
@@ -322,6 +325,8 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		duplicateController,
 		cloudController,
 		handler.RequireLLMAgentEnabled(settingsService),
+		handler.RequireAppInitialized(bootstrapService),
+		appConfig.ServerConfig.CORSAllowedOrigins,
 		appLogger.Named("http"),
 	)
 

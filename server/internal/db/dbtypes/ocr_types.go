@@ -7,12 +7,12 @@ import (
 
 // OCRResultMeta 用于在 PhotoSpecificMetadata 中缓存 OCR 统计信息
 type OCRResultMeta struct {
-	HasOCR        bool      `json:"has_ocr"`         // 是否有 OCR 结果
-	TotalCount    int       `json:"total_count"`      // 文字区域总数
-	FirstText     string    `json:"first_text"`       // 第一个识别的文字（预览）
-	ProcessingTime int      `json:"processing_time_ms"` // 处理耗时
-	GeneratedAt   time.Time `json:"generated_at"`     // 生成时间
-	ModelID       string    `json:"model_id"`         // 模型标识
+	HasOCR         bool      `json:"has_ocr"`            // 是否有 OCR 结果
+	TotalCount     int       `json:"total_count"`        // 文字区域总数
+	FirstText      string    `json:"first_text"`         // 第一个识别的文字（预览）
+	ProcessingTime int       `json:"processing_time_ms"` // 处理耗时
+	GeneratedAt    time.Time `json:"generated_at"`       // 生成时间
+	ModelID        string    `json:"model_id"`           // 模型标识
 }
 
 // BoundingBoxPoint 表示多边形的一个顶点
@@ -121,30 +121,30 @@ func (bb *BoundingBox) DeserializeFromJSON(data []byte) error {
 
 // OCRTextItemMeta 表示单个 OCR 文字项的元数据
 type OCRTextItemMeta struct {
-	Text       string       `json:"text"`
-	Confidence float32      `json:"confidence"`
+	Text        string       `json:"text"`
+	Confidence  float32      `json:"confidence"`
 	BoundingBox *BoundingBox `json:"bounding_box"`
-	TextLength int          `json:"text_length"`
-	Area       float64      `json:"area"`
-	Position   *Position    `json:"position,omitempty"` // 额外的位置信息
+	TextLength  int          `json:"text_length"`
+	Area        float64      `json:"area"`
+	Position    *Position    `json:"position,omitempty"` // 额外的位置信息
 }
 
 // Position 表示文字在图片中的位置信息
 type Position struct {
-	Page      int     `json:"page"`       // 页码（适用于多页文档）
-	Paragraph int     `json:"paragraph"`   // 段落编号
-	Line      int     `json:"line"`        // 行号
-	Word      int     `json:"word"`        // 词号
-	ReadingOrder int  `json:"reading_order"` // 阅读顺序
+	Page         int `json:"page"`          // 页码（适用于多页文档）
+	Paragraph    int `json:"paragraph"`     // 段落编号
+	Line         int `json:"line"`          // 行号
+	Word         int `json:"word"`          // 词号
+	ReadingOrder int `json:"reading_order"` // 阅读顺序
 }
 
 // OCRStats 表示 OCR 处理的统计信息
 type OCRStats struct {
-	ModelID          string  `json:"model_id"`
-	TotalAssets      int     `json:"total_assets"`
-	TotalTextItems   int     `json:"total_text_items"`
-	AvgItemsPerAsset float64 `json:"avg_items_per_asset"`
-	MinProcessingTime int   `json:"min_processing_time_ms"`
-	MaxProcessingTime int   `json:"max_processing_time_ms"`
+	ModelID           string  `json:"model_id"`
+	TotalAssets       int     `json:"total_assets"`
+	TotalTextItems    int     `json:"total_text_items"`
+	AvgItemsPerAsset  float64 `json:"avg_items_per_asset"`
+	MinProcessingTime int     `json:"min_processing_time_ms"`
+	MaxProcessingTime int     `json:"max_processing_time_ms"`
 	AvgProcessingTime float64 `json:"avg_processing_time_ms"`
 }

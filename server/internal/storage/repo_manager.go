@@ -24,52 +24,63 @@ type ValidationResult struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
+// RepositoryManager is the consumer-facing contract for the repository
+// lifecycle. Implementations keep the database record and the on-disk
+// repository (its directory structure and .lumiliorepo config) in sync: a
+// successful mutating call has applied to both, and a failed one rolls back the
+// filesystem side. Calls are not safe for concurrent use on the same repository;
+// the caller serializes mutations.
 type RepositoryManager interface {
-	// Validation
-	ValidateRepository(path string) (*ValidationResult, error)
+	// InitializeRepository creates a brand-new repository: it builds the
+	// directory structure, writes the .lumiliorepo config, and inserts the
+	// database record. It fails if a repository already exists at path or path
+	// is nested inside one, and removes any partially created files on failure.
+	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error)
 
-	// Repository lifecycle CRUD
-	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error)
-	AddRepository(path string, defaultOwnerID *int32) (*repo.Repository, error)
+	// AddRepository registers an already-initialized on-disk repository (one
+	// that has a valid .lumiliorepo). It fails if the path is not a valid
+	// repository or is already registered.
+	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error)
+
+	// GetRepository returns the repository with the given UUID, or an error if
+	// the id is malformed or no such repository exists.
 	GetRepository(id string) (*repo.Repository, error)
+
+	// GetRepositoryByPath returns the repository registered at the given path
+	// (matched after cleaning to an absolute path), or an error if none is.
 	GetRepositoryByPath(path string) (*repo.Repository, error)
+
+	// ListRepositories returns all registered repositories.
 	ListRepositories() ([]*repo.Repository, error)
-	RemoveRepository(id string) error
-	RemoveRepositories(ids []string) error
+
+	// UpdateRepository validates and persists config to both the database record
+	// and the on-disk .lumiliorepo file.
 	UpdateRepository(id string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error)
 
-	// Repository-Asset relationship (path-based)
-	GetRepositoryAssetStats(repoID string, ownerID *int32) (*RepositoryAssetStats, error)
+	// RemoveRepository deletes only the database record; the on-disk repository
+	// and its media are left untouched so the data can be re-registered later.
+	RemoveRepository(id string) error
 
-	// Configuration management
-	LoadConfig(repoPath string) (*repocfg.RepositoryConfig, error)
-	SaveConfig(repoPath string, config *repocfg.RepositoryConfig) error
-
-	// Validation
-	IsNestedRepository(path string) (bool, string, error)
-
-	// Helper methods
+	// GetRepositoryPath returns the absolute on-disk path of a repository.
+	// face/people depend on this via their own narrow interfaces.
 	GetRepositoryPath(repoID string) (string, error)
 
-	// Staging operations (delegated to staging manager)
+	// GetRepositoryDefaults / UpdateRepositoryDefaults are the storage-owned,
+	// runtime-mutable defaults applied to newly created repositories.
+	GetRepositoryDefaults(ctx context.Context) (RepoDefaults, error)
+	UpdateRepositoryDefaults(ctx context.Context, defaults RepoDefaults) (RepoDefaults, error)
+
+	// Provisioning: CreateRepository enforces the primary-first / single-primary
+	// policy and path resolution; EnsurePrimaryRepository is its idempotent
+	// bootstrap helper for the mandatory primary repository.
+	CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*repo.Repository, error)
+	EnsurePrimaryRepository(ctx context.Context, root string, ownerID *int32) (*repo.Repository, error)
+
+	// GetStagingManager and GetDirectoryManager expose the sub-managers.
+	// Transitional: consumers should eventually receive these by direct
+	// injection instead of reaching through the repository manager.
 	GetStagingManager() StagingManager
-
-	// Directory manager access
 	GetDirectoryManager() DirectoryManager
-}
-
-// RepositoryAssetStats contains statistics about assets in a repository
-type RepositoryAssetStats struct {
-	TotalAssets  int64      `json:"total_assets"`
-	PhotoCount   int64      `json:"photo_count"`
-	VideoCount   int64      `json:"video_count"`
-	AudioCount   int64      `json:"audio_count"`
-	LikedCount   int64      `json:"liked_count"`
-	RatedCount   int64      `json:"rated_count"`
-	AvgRating    *float64   `json:"avg_rating"`
-	TotalSize    *int64     `json:"total_size"`
-	OldestUpload *time.Time `json:"oldest_upload"`
-	NewestUpload *time.Time `json:"newest_upload"`
 }
 
 // DefaultRepositoryManager implements the RepositoryManager interface
@@ -86,12 +97,12 @@ func NewRepositoryManager(
 	queries *repo.Queries,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
-) (RepositoryManager, error) {
+) (*DefaultRepositoryManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger)
+		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
 
 	rm := &DefaultRepositoryManager{
@@ -105,8 +116,11 @@ func NewRepositoryManager(
 	return rm, nil
 }
 
+// Ensure the concrete type satisfies the consumer interface.
+var _ RepositoryManager = (*DefaultRepositoryManager)(nil)
+
 // AddRepository registers an existing repository with the system
-func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
@@ -115,7 +129,7 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 	}
 
 	// Validate that this is a valid repository
-	result, err := rm.ValidateRepository(cleanPath)
+	result, err := rm.validateRepository(cleanPath)
 	if err != nil {
 		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_path", cleanPath))
 		return nil, fmt.Errorf("failed to validate repository: %w", err)
@@ -155,6 +169,7 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 		Name:           config.Name,
 		Path:           cleanPath,
 		Config:         *config,
+		Role:           normalizeRepoRole(role),
 		Status:         dbtypes.RepoStatusActive,
 		DefaultOwnerID: defaultOwnerID,
 		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
@@ -178,8 +193,8 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 	return &dbRepo, nil
 }
 
-// ValidateRepository validates a repository at the given path
-func (rm *DefaultRepositoryManager) ValidateRepository(path string) (*ValidationResult, error) {
+// validateRepository validates a repository at the given path
+func (rm *DefaultRepositoryManager) validateRepository(path string) (*ValidationResult, error) {
 	result := &ValidationResult{
 		Valid:    true,
 		Errors:   []string{},
@@ -238,7 +253,7 @@ func (rm *DefaultRepositoryManager) ValidateRepository(path string) (*Validation
 	}
 
 	// Check for nested repositories
-	isNested, parentRepo, err := rm.IsNestedRepository(cleanPath)
+	isNested, parentRepo, err := rm.isNestedRepository(cleanPath)
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf("Could not check for nested repositories: %v", err))
 	} else if isNested {
@@ -287,8 +302,8 @@ func (rm *DefaultRepositoryManager) ValidateRepository(path string) (*Validation
 	return result, nil
 }
 
-// IsNestedRepository checks if a repository path is nested inside another repository
-func (rm *DefaultRepositoryManager) IsNestedRepository(path string) (bool, string, error) {
+// isNestedRepository checks if a repository path is nested inside another repository
+func (rm *DefaultRepositoryManager) isNestedRepository(path string) (bool, string, error) {
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return false, "", err
@@ -314,21 +329,6 @@ func (rm *DefaultRepositoryManager) IsNestedRepository(path string) (bool, strin
 	return false, "", nil
 }
 
-// LoadConfig loads repository configuration from the given path
-func (rm *DefaultRepositoryManager) LoadConfig(repoPath string) (*repocfg.RepositoryConfig, error) {
-	return repocfg.LoadConfigFromFile(repoPath)
-}
-
-// SaveConfig saves repository configuration to the given path
-func (rm *DefaultRepositoryManager) SaveConfig(repoPath string, config *repocfg.RepositoryConfig) error {
-	return config.SaveConfigToFile(repoPath)
-}
-
-// Helper function to create string pointer
-func stringPtr(s string) *string {
-	return &s
-}
-
 // checkDirectoryPermissions checks if we have proper read/write permissions
 func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error {
 	// Test read permission
@@ -349,7 +349,7 @@ func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error
 }
 
 // InitializeRepository creates a new repository with full directory structure
-func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
@@ -363,7 +363,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	}
 
 	// Check for nested repositories
-	isNested, parentRepo, err := rm.IsNestedRepository(cleanPath)
+	isNested, parentRepo, err := rm.isNestedRepository(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for nested repositories: %w", err)
 	}
@@ -404,6 +404,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 		Name:           config.Name,
 		Path:           cleanPath,
 		Config:         config,
+		Role:           normalizeRepoRole(role),
 		Status:         dbtypes.RepoStatusActive,
 		DefaultOwnerID: defaultOwnerID,
 		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
@@ -507,24 +508,6 @@ func (rm *DefaultRepositoryManager) GetDirectoryManager() DirectoryManager {
 	return rm.dirManager
 }
 
-func (rm *DefaultRepositoryManager) RemoveRepositories(ids []string) error {
-	uuids := make([]pgtype.UUID, len(ids))
-	for i, id := range ids {
-		repoUUID, err := uuid.Parse(id)
-		if err != nil {
-			return fmt.Errorf("invalid repository ID %s: %w", id, err)
-		}
-		uuids[i] = pgtype.UUID{Bytes: repoUUID, Valid: true}
-	}
-
-	err := rm.queries.DeleteRepositories(context.Background(), uuids)
-	if err != nil {
-		return fmt.Errorf("failed to remove repositories: %w", err)
-	}
-
-	return nil
-}
-
 func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error) {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
@@ -568,60 +551,18 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 
 func (rm *DefaultRepositoryManager) repoAudit(repoPath string) logging.RepositoryAuditLogger {
 	if rm.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(rm.logger).ForPath(repoPath)
+		return logging.NewRepositoryAuditProvider(rm.logger, false).ForPath(repoPath)
 	}
 	return rm.auditProvider.ForPath(repoPath)
 }
 
-// GetRepositoryAssetStats returns comprehensive statistics about assets in a repository
-func (rm *DefaultRepositoryManager) GetRepositoryAssetStats(repoID string, ownerID *int32) (*RepositoryAssetStats, error) {
-	// Get repository to find its path
-	repository, err := rm.GetRepository(repoID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get repository: %w", err)
+func normalizeRepoRole(role dbtypes.RepoRole) dbtypes.RepoRole {
+	switch role {
+	case dbtypes.RepoRolePrimary:
+		return dbtypes.RepoRolePrimary
+	default:
+		return dbtypes.RepoRoleRegular
 	}
-
-	// Get repository asset statistics
-	stats, err := rm.queries.GetRepositoryAssetStats(context.Background(), repo.GetRepositoryAssetStatsParams{
-		RepositoryID: repository.RepoID,
-		OwnerID:      ownerID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get asset stats for repository: %w", err)
-	}
-
-	result := &RepositoryAssetStats{
-		TotalAssets: stats.TotalAssets,
-		PhotoCount:  stats.PhotoCount,
-		VideoCount:  stats.VideoCount,
-		AudioCount:  stats.AudioCount,
-		LikedCount:  stats.LikedCount,
-		RatedCount:  stats.RatedCount,
-	}
-
-	// Handle non-zero values (SQLite aggregates return 0 for empty sets)
-	if stats.AvgRating != 0 {
-		result.AvgRating = &stats.AvgRating
-	}
-
-	if stats.TotalSize != 0 {
-		result.TotalSize = &stats.TotalSize
-	}
-
-	// Handle timestamp interfaces - need to convert from interface{}
-	if stats.OldestUpload != nil {
-		if oldest, ok := stats.OldestUpload.(time.Time); ok {
-			result.OldestUpload = &oldest
-		}
-	}
-
-	if stats.NewestUpload != nil {
-		if newest, ok := stats.NewestUpload.(time.Time); ok {
-			result.NewestUpload = &newest
-		}
-	}
-
-	return result, nil
 }
 
 // GetRepositoryPath returns the repository path for use in asset filtering

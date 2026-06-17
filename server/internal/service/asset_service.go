@@ -215,7 +215,6 @@ type assetService struct {
 	queries                *repo.Queries
 	pool                   *pgxpool.Pool
 	lumen                  LumenService
-	repoManager            *storage.RepositoryManager
 	embeddingService       EmbeddingService
 	aggregateSearch        aggregatesearch.Service
 	semanticRetriever      *aggregatesearch.EmbeddingRetriever
@@ -227,7 +226,7 @@ type assetService struct {
 	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error)
 }
 
-func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *storage.RepositoryManager, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
+func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
 	logger := zap.NewNop()
 	if len(loggers) > 0 && loggers[0] != nil {
 		logger = loggers[0]
@@ -236,7 +235,6 @@ func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *sto
 		queries:          q,
 		pool:             pool,
 		lumen:            l,
-		repoManager:      r,
 		embeddingService: e,
 	}
 	svc.semanticRetriever = aggregatesearch.NewEmbeddingRetriever(

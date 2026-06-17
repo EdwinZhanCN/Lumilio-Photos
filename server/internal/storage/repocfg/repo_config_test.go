@@ -14,7 +14,7 @@ func TestRepositoryConfig_SaveAndLoad(t *testing.T) {
 
 	cfg := NewRepositoryConfig("Family Photos",
 		WithStorageStrategy("date"),
-		WithLocalSettings(true, "rename"),
+		WithLocalSettings("rename"),
 	)
 
 	require.NoError(t, cfg.SaveConfigToFile(repoPath))
@@ -26,7 +26,7 @@ func TestRepositoryConfig_SaveAndLoad(t *testing.T) {
 	assert.Equal(t, cfg.ID, loaded.ID)
 	assert.Equal(t, cfg.Name, loaded.Name)
 	assert.Equal(t, cfg.StorageStrategy, loaded.StorageStrategy)
-	assert.Equal(t, cfg.LocalSettings.PreserveOriginalFilename, loaded.LocalSettings.PreserveOriginalFilename)
+	assert.Equal(t, cfg.LocalSettings.HandleDuplicateFilenames, loaded.LocalSettings.HandleDuplicateFilenames)
 	assert.Equal(t, cfg.LocalSettings.HandleDuplicateFilenames, loaded.LocalSettings.HandleDuplicateFilenames)
 }
 
@@ -69,11 +69,10 @@ func TestNewRepositoryConfig_SystemGeneratedFields(t *testing.T) {
 func TestNewRepositoryConfig_WithOptions(t *testing.T) {
 	cfg := NewRepositoryConfig("Archive",
 		WithStorageStrategy("cas"),
-		WithLocalSettings(false, "overwrite"),
+		WithLocalSettings("overwrite"),
 	)
 
 	assert.Equal(t, "cas", cfg.StorageStrategy)
-	assert.False(t, cfg.LocalSettings.PreserveOriginalFilename)
 	assert.Equal(t, "overwrite", cfg.LocalSettings.HandleDuplicateFilenames)
 	assert.NoError(t, cfg.Validate())
 }
@@ -93,16 +92,6 @@ func TestRepositoryConfig_ValidateFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid handle_duplicate_filenames")
 	})
-}
-
-func TestRepositoryConfig_WithBackupPathRemoved(t *testing.T) {
-	cfg := NewRepositoryConfig("Repository",
-		WithLocalSettings(true, "uuid"),
-		WithBackupPath("/external/backup/drive"),
-	)
-
-	// WithBackupPath is now a no-op — backup settings have been removed.
-	assert.NoError(t, cfg.Validate())
 }
 
 func TestIsRepositoryRoot(t *testing.T) {

@@ -4,7 +4,11 @@ import { Folder, Moon, Sun } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
-import { useSettingsContext, useWorkingRepository } from "@/features/settings";
+import {
+  useResolvedThemeMode,
+  useThemePreference,
+} from "@/lib/theme";
+import { useWorkingRepository } from "@/features/settings";
 import UserAvatar from "@/components/UserAvatar";
 import MessageCenter from "@/components/MessageCenter";
 import NavbarUploadQueue from "@/features/upload/components/NavbarUploadQueue";
@@ -14,7 +18,8 @@ function NavBar() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { state, dispatch, resolvedThemeMode } = useSettingsContext();
+  const [theme, setTheme] = useThemePreference();
+  const resolvedThemeMode = useResolvedThemeMode();
   const {
     repositories,
     repositoriesQuery,
@@ -24,7 +29,7 @@ function NavBar() {
     getRepositoryLabel,
   } = useWorkingRepository();
   const isDarkMode = resolvedThemeMode === "dark";
-  const isFollowingSystem = state.ui.theme.followSystem;
+  const isFollowingSystem = theme.followSystem;
   const displayName = user?.display_name || user?.username || "User";
 
   return (
@@ -120,9 +125,9 @@ function NavBar() {
               checked={isDarkMode}
               disabled={isFollowingSystem}
               onChange={(e) => {
-                dispatch({
-                  type: "SET_THEME_MODE",
-                  payload: e.target.checked ? "dark" : "light",
+                setTheme({
+                  ...theme,
+                  mode: e.target.checked ? "dark" : "light",
                 });
               }}
             />

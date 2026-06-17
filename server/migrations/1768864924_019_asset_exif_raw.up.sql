@@ -1,2 +1,0 @@
-ALTER TABLE assets
-ADD COLUMN IF NOT EXISTS exif_raw JSONB;

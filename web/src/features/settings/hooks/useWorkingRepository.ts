@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useSettingsContext } from "./useSettings";
+import { usePreference } from "../preferences";
 import {
   type IndexingRepositoryOption,
   useIndexingRepositories,
@@ -29,31 +29,34 @@ export function getRepositoryDisplayName(
 
 export function useWorkingRepository() {
   const { t } = useI18n();
-  const { state, dispatch } = useSettingsContext();
+  const [workingRepositoryId, setWorkingRepositoryIdPreference] =
+    usePreference("workingRepositoryId");
   const repositoriesQuery = useIndexingRepositories();
   const repositories = repositoriesQuery.repositories;
-  const workingRepositoryId = state.ui.working_repository_id?.trim() ?? "";
+  const normalizedWorkingRepositoryId = workingRepositoryId?.trim() ?? "";
 
   const selectedRepository = useMemo(
     () =>
-      repositories.find((repository) => repository.id === workingRepositoryId),
-    [repositories, workingRepositoryId],
+      repositories.find(
+        (repository) => repository.id === normalizedWorkingRepositoryId,
+      ),
+    [repositories, normalizedWorkingRepositoryId],
   );
 
   const setWorkingRepositoryId = useCallback(
     (repositoryId?: string | null) => {
-      dispatch({
-        type: "SET_WORKING_REPOSITORY_ID",
-        payload: repositoryId?.trim() || null,
-      });
+      const normalized = repositoryId?.trim();
+      setWorkingRepositoryIdPreference(
+        normalized && normalized.length > 0 ? normalized : undefined,
+      );
     },
-    [dispatch],
+    [setWorkingRepositoryIdPreference],
   );
 
   useEffect(() => {
     if (
       !repositoriesQuery.isSuccess ||
-      !workingRepositoryId ||
+      !normalizedWorkingRepositoryId ||
       selectedRepository
     ) {
       return;
@@ -64,12 +67,12 @@ export function useWorkingRepository() {
     repositoriesQuery.isSuccess,
     selectedRepository,
     setWorkingRepositoryId,
-    workingRepositoryId,
+    normalizedWorkingRepositoryId,
   ]);
 
   const scopeLabel = selectedRepository
     ? getRepositoryDisplayName(selectedRepository, t)
-    : workingRepositoryId
+    : normalizedWorkingRepositoryId
       ? repositoriesQuery.isLoading
         ? t("common.loading")
         : t("navbar.repository.unavailable", {
@@ -81,7 +84,7 @@ export function useWorkingRepository() {
 
   const scopeDescription = selectedRepository?.path
     ? selectedRepository.path
-    : workingRepositoryId
+    : normalizedWorkingRepositoryId
       ? t("settings.serverSettings.workingRepositoryUnavailable", {
           defaultValue: "Repository options are temporarily unavailable.",
         })
@@ -93,8 +96,8 @@ export function useWorkingRepository() {
   return {
     repositories,
     repositoriesQuery,
-    workingRepositoryId,
-    scopedRepositoryId: workingRepositoryId || undefined,
+    workingRepositoryId: normalizedWorkingRepositoryId,
+    scopedRepositoryId: normalizedWorkingRepositoryId || undefined,
     selectedRepository,
     scopeLabel,
     scopeDescription,

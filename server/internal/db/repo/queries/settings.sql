@@ -16,7 +16,6 @@ INSERT INTO settings (
     ml_bioclip_enabled,
     ml_ocr_enabled,
     ml_face_enabled,
-    ml_zeroshot_classify_enabled,
     updated_by
 )
 VALUES (
@@ -32,8 +31,7 @@ VALUES (
     $9,
     $10,
     $11,
-    $12,
-    $13
+    $12
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -47,7 +45,6 @@ ON CONFLICT (id) DO UPDATE SET
     ml_bioclip_enabled = EXCLUDED.ml_bioclip_enabled,
     ml_ocr_enabled = EXCLUDED.ml_ocr_enabled,
     ml_face_enabled = EXCLUDED.ml_face_enabled,
-    ml_zeroshot_classify_enabled = EXCLUDED.ml_zeroshot_classify_enabled,
     updated_at = NOW(),
     updated_by = EXCLUDED.updated_by
 RETURNING *;

@@ -261,16 +261,6 @@ func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteK
 
 const livePhotoKeySuffix = ":live"
 
-// defaultICloudCookieDir resolves the default icloud cookie directory
-// using the same path resolution as .secrets.
 func defaultICloudCookieDir() string {
-	storagePath := strings.TrimSpace(os.Getenv("STORAGE_PATH"))
-	if storagePath != "" {
-		normalized := filepath.Clean(storagePath)
-		if strings.EqualFold(filepath.Base(normalized), "primary") {
-			normalized = filepath.Dir(normalized)
-		}
-		return filepath.Join(normalized, ".icloud")
-	}
 	return filepath.Join("data", "storage", ".icloud")
 }

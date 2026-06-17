@@ -4560,76 +4560,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/bootstrap-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get auth bootstrap status
-         * @description Return whether Lumilio is still in first-user bootstrap mode and which role the next registration receives.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Bootstrap status retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -8993,6 +8923,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/runtime-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get runtime info
+         * @description Read-only effective runtime-immutable configuration (changed only via TOML + restart).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Runtime info retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/system": {
         parameters: {
             query?: never;
@@ -10755,11 +10751,6 @@ export interface components {
             success?: boolean;
             task_id?: number;
         };
-        "dto.BootstrapStatusDTO": {
-            has_users?: boolean;
-            is_bootstrap_mode?: boolean;
-            next_registration_role?: string;
-        };
         "dto.BrowseItemDTO": {
             asset?: components["schemas"]["dto.AssetDTO"];
             /** @example stack:550e8400-e29b-41d4-a716-446655440000 */
@@ -10937,8 +10928,25 @@ export interface components {
         "dto.CreateRepositoryRequestDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             cloud_credential_id?: string;
+            /**
+             * @example rename
+             * @enum {string}
+             */
+            duplicate_handling?: "rename" | "uuid" | "overwrite";
             /** @example Family Photos */
             name: string;
+            /**
+             * @example regular
+             * @enum {string}
+             */
+            role?: "primary" | "regular";
+            /** @example /data/storage */
+            root?: string;
+            /**
+             * @example date
+             * @enum {string}
+             */
+            storage_strategy?: "date" | "flat" | "cas";
         };
         "dto.CreateRepositoryResponseDTO": {
             cloud_import_error?: string;
@@ -11115,6 +11123,8 @@ export interface components {
             name?: string;
             /** @example /Volumes/Media/Photos */
             path?: string;
+            /** @example regular */
+            role?: string;
         };
         "dto.LLMCapabilitiesDTO": {
             agent_enabled?: boolean;
@@ -11268,7 +11278,6 @@ export interface components {
             face_enabled?: boolean;
             ocr_enabled?: boolean;
             semantic_enabled?: boolean;
-            zeroshot_classify_enabled?: boolean;
         };
         "dto.MLTaskCapabilityDTO": {
             available?: boolean;
@@ -11531,14 +11540,22 @@ export interface components {
             name?: string;
             /** @example /data/storage/family-photos */
             path?: string;
+            /** @example regular */
+            role?: string;
             /** @example date */
             storage_strategy?: string;
+        };
+        "dto.RepositoryDefaultsDTO": {
+            /** @example /data/storage */
+            default_root?: string;
+            /** @example rename */
+            duplicate_handling?: string;
+            /** @example date */
+            strategy?: string;
         };
         "dto.RepositoryLocalSettings": {
             /** @example uuid */
             handle_duplicate_filenames?: string;
-            /** @example true */
-            preserve_original_filename?: boolean;
         };
         "dto.RepositoryScanQueuedDTO": {
             /** @example 12345 */
@@ -11618,6 +11635,26 @@ export interface components {
             cleared_passkeys?: boolean;
             cleared_totp?: boolean;
             temporary_password?: string;
+        };
+        "dto.RuntimeInfoDTO": {
+            /** @example production */
+            environment?: string;
+            /** @example disabled */
+            geocoding_provider?: string;
+            /** @example none */
+            hardware_accel?: string;
+            /** @example info */
+            log_level?: string;
+            /** @example true */
+            lumen_discovery_enabled?: boolean;
+            /** @example true */
+            repository_scan_enabled?: boolean;
+            /** @example 300 */
+            repository_scan_interval_seconds?: number;
+            /** @example 8080 */
+            server_port?: string;
+            /** @example /data/storage */
+            storage_root?: string;
         };
         "dto.SearchAssetsRequestDTO": {
             debug?: boolean;
@@ -11718,7 +11755,17 @@ export interface components {
             password_length?: number;
         };
         "dto.SetupStatusDTO": {
+            admin_initialized?: boolean;
+            database_initialized?: boolean;
             initialized?: boolean;
+            /**
+             * @description NextRegistrationRole is the role the next /auth/register will assign
+             *     ("admin" while no admin exists yet, "user" afterwards). Folds the former
+             *     /auth/bootstrap-status semantics into the unified setup status.
+             */
+            next_registration_role?: string;
+            primary_repository_initialized?: boolean;
+            repository_defaults?: components["schemas"]["dto.RepositoryDefaultsDTO"];
         };
         "dto.SpeciesReferenceResponseDTO": {
             /** @example Barasingha */
@@ -11891,7 +11938,6 @@ export interface components {
             face_enabled?: boolean;
             ocr_enabled?: boolean;
             semantic_enabled?: boolean;
-            zeroshot_classify_enabled?: boolean;
         };
         "dto.UpdateOwnProfileRequestDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */

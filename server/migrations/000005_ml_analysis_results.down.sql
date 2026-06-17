@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS public.classifier_definitions CASCADE;
+DROP TABLE IF EXISTS public.species_predictions CASCADE;
+DROP TABLE IF EXISTS public.face_cluster_members CASCADE;
+DROP TABLE IF EXISTS public.face_clusters CASCADE;
+DROP TABLE IF EXISTS public.face_items CASCADE;
+DROP TABLE IF EXISTS public.face_results CASCADE;
+DROP TABLE IF EXISTS public.ocr_text_items CASCADE;
+DROP TABLE IF EXISTS public.ocr_results CASCADE;
+DROP TABLE IF EXISTS public.embeddings CASCADE;
+DROP TABLE IF EXISTS public.embedding_spaces CASCADE;

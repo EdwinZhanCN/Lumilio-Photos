@@ -27,7 +27,7 @@ func TestValidateRepository(t *testing.T) {
 		err = config.SaveConfigToFile(testDir)
 		require.NoError(t, err)
 
-		result, err := manager.ValidateRepository(testDir)
+		result, err := manager.validateRepository(testDir)
 		require.NoError(t, err)
 		assert.True(t, result.Valid)
 		assert.Empty(t, result.Errors)
@@ -36,7 +36,7 @@ func TestValidateRepository(t *testing.T) {
 	t.Run("missing config file", func(t *testing.T) {
 		testDir := t.TempDir()
 
-		result, err := manager.ValidateRepository(testDir)
+		result, err := manager.validateRepository(testDir)
 		require.NoError(t, err)
 		assert.False(t, result.Valid)
 		assert.Contains(t, result.Errors[0], "Missing .lumiliorepo configuration file")
@@ -50,14 +50,14 @@ func TestValidateRepository(t *testing.T) {
 		err := os.WriteFile(configPath, []byte("invalid yaml: ["), 0644)
 		require.NoError(t, err)
 
-		result, err := manager.ValidateRepository(testDir)
+		result, err := manager.validateRepository(testDir)
 		require.NoError(t, err)
 		assert.False(t, result.Valid)
 		assert.Contains(t, result.Errors[0], "Invalid configuration")
 	})
 
 	t.Run("nonexistent directory", func(t *testing.T) {
-		result, err := manager.ValidateRepository("/nonexistent/path")
+		result, err := manager.validateRepository("/nonexistent/path")
 		require.NoError(t, err)
 		assert.False(t, result.Valid)
 		assert.Contains(t, result.Errors[0], "Repository directory does not exist")
@@ -82,7 +82,7 @@ func TestIsNestedRepository(t *testing.T) {
 	err = os.MkdirAll(nestedPath, 0755)
 	require.NoError(t, err)
 
-	isNested, parentPath, err := manager.IsNestedRepository(nestedPath)
+	isNested, parentPath, err := manager.isNestedRepository(nestedPath)
 	require.NoError(t, err)
 	assert.True(t, isNested)
 	assert.Equal(t, parentRepo, parentPath)
@@ -92,7 +92,7 @@ func TestIsNestedRepository(t *testing.T) {
 	err = os.MkdirAll(nonNestedPath, 0755)
 	require.NoError(t, err)
 
-	isNested, _, err = manager.IsNestedRepository(nonNestedPath)
+	isNested, _, err = manager.isNestedRepository(nonNestedPath)
 	require.NoError(t, err)
 	assert.False(t, isNested)
 }
@@ -147,7 +147,7 @@ func TestRepositoryWorkflow_Integration(t *testing.T) {
 	// Test validation of each repository
 	t.Run("validate repositories", func(t *testing.T) {
 		for _, repo := range repos {
-			result, err := manager.ValidateRepository(repo.path)
+			result, err := manager.validateRepository(repo.path)
 			require.NoError(t, err)
 
 			t.Logf("Validation for %s: Valid=%v, Errors=%d, Warnings=%d",
@@ -171,7 +171,7 @@ func TestRepositoryWorkflow_Integration(t *testing.T) {
 		err := os.MkdirAll(nestedPath, 0755)
 		require.NoError(t, err)
 
-		isNested, parentPath, err := manager.IsNestedRepository(nestedPath)
+		isNested, parentPath, err := manager.isNestedRepository(nestedPath)
 		require.NoError(t, err)
 		assert.True(t, isNested)
 		assert.Equal(t, repos[0].path, parentPath)

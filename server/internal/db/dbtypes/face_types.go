@@ -7,10 +7,10 @@ import (
 
 // FaceResultMeta 用于在 PhotoSpecificMetadata 中缓存人脸识别统计信息
 type FaceResultMeta struct {
-	HasFaces       bool      `json:"has_faces"`         // 是否检测到人脸
+	HasFaces       bool      `json:"has_faces"`          // 是否检测到人脸
 	TotalFaces     int       `json:"total_faces"`        // 检测到的人脸总数
 	HasPrimaryFace bool      `json:"has_primary_face"`   // 是否有主要人脸
-	ProcessingTime int       `json:"processing_time_ms"`  // 处理耗时
+	ProcessingTime int       `json:"processing_time_ms"` // 处理耗时
 	GeneratedAt    time.Time `json:"generated_at"`       // 生成时间
 	ModelID        string    `json:"model_id"`           // 模型标识
 }
@@ -124,23 +124,23 @@ func (pa *PoseAngles) SerializeToJSON() ([]byte, error) {
 
 // FaceItemMeta 表示单个人脸的元数据（用于内部处理）
 type FaceItemMeta struct {
-	ID            int32              `json:"id"`
-	FaceID        string             `json:"face_id,omitempty"`
-	BoundingBox   *FaceBoundingBox   `json:"bounding_box"`
-	Confidence    float32            `json:"confidence"`
-	Landmarks     *FaceLandmarks     `json:"landmarks,omitempty"`
-	Embedding     []float32          `json:"embedding,omitempty"`
-	EmbeddingModel string            `json:"embedding_model,omitempty"`
-	IsPrimary     bool               `json:"is_primary"`
-	AgeGroup      string             `json:"age_group,omitempty"`       // 预留字段
-	Gender        string             `json:"gender,omitempty"`         // 预留字段
-	Ethnicity     string             `json:"ethnicity,omitempty"`      // 预留字段
-	Expression    string             `json:"expression,omitempty"`     // 预留字段
-	FaceSize      int32              `json:"face_size"`
-	QualityScore  float32            `json:"quality_score,omitempty"`  // 预留字段
-	BlurScore     float32            `json:"blur_score,omitempty"`     // 预留字段
-	PoseAngles    *PoseAngles        `json:"pose_angles,omitempty"`    // 预留字段
-	CreatedAt     time.Time          `json:"created_at"`
+	ID             int32            `json:"id"`
+	FaceID         string           `json:"face_id,omitempty"`
+	BoundingBox    *FaceBoundingBox `json:"bounding_box"`
+	Confidence     float32          `json:"confidence"`
+	Landmarks      *FaceLandmarks   `json:"landmarks,omitempty"`
+	Embedding      []float32        `json:"embedding,omitempty"`
+	EmbeddingModel string           `json:"embedding_model,omitempty"`
+	IsPrimary      bool             `json:"is_primary"`
+	AgeGroup       string           `json:"age_group,omitempty"`  // 预留字段
+	Gender         string           `json:"gender,omitempty"`     // 预留字段
+	Ethnicity      string           `json:"ethnicity,omitempty"`  // 预留字段
+	Expression     string           `json:"expression,omitempty"` // 预留字段
+	FaceSize       int32            `json:"face_size"`
+	QualityScore   float32          `json:"quality_score,omitempty"` // 预留字段
+	BlurScore      float32          `json:"blur_score,omitempty"`    // 预留字段
+	PoseAngles     *PoseAngles      `json:"pose_angles,omitempty"`   // 预留字段
+	CreatedAt      time.Time        `json:"created_at"`
 }
 
 // FaceStats 表示人脸检测处理的统计信息
@@ -156,22 +156,22 @@ type FaceStats struct {
 
 // FaceDemographics 表示人脸人口统计学信息
 type FaceDemographics struct {
-	AgeGroup     string  `json:"age_group"`
-	Gender       string  `json:"gender"`
-	Ethnicity    string  `json:"ethnicity"`
-	Count        int     `json:"count"`
+	AgeGroup      string  `json:"age_group"`
+	Gender        string  `json:"gender"`
+	Ethnicity     string  `json:"ethnicity"`
+	Count         int     `json:"count"`
 	AvgConfidence float32 `json:"avg_confidence"`
 }
 
 // FaceClusterMeta 表示人脸聚类元数据
 type FaceClusterMeta struct {
-	ClusterID      int32     `json:"cluster_id"`
-	ClusterName    string    `json:"cluster_name"`
-	MemberCount    int       `json:"member_count"`
-	RepresentativeFaceID int32 `json:"representative_face_id"`
-	IsConfirmed    bool      `json:"is_confirmed"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ClusterID            int32     `json:"cluster_id"`
+	ClusterName          string    `json:"cluster_name"`
+	MemberCount          int       `json:"member_count"`
+	RepresentativeFaceID int32     `json:"representative_face_id"`
+	IsConfirmed          bool      `json:"is_confirmed"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // SerializeJSON 通用的 JSON 序列化函数

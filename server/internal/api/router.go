@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -63,7 +62,6 @@ type AssetControllerInterface interface {
 // AuthControllerInterface defines the interface for authentication controllers
 type AuthControllerInterface interface {
 	StartRegistration(c *gin.Context)
-	GetBootstrapStatus(c *gin.Context)
 	Login(c *gin.Context)
 	BeginPasskeyLogin(c *gin.Context)
 	VerifyPasskeyLogin(c *gin.Context)
@@ -157,6 +155,7 @@ type SettingsControllerInterface interface {
 	GetSystemSettings(c *gin.Context)
 	UpdateSystemSettings(c *gin.Context)
 	ValidateLLMSettings(c *gin.Context)
+	GetRuntimeInfo(c *gin.Context)
 }
 
 type ClassifierControllerInterface interface {
@@ -232,12 +231,14 @@ func NewRouter(
 	duplicateController DuplicateControllerInterface,
 	cloudController CloudControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
+	appInitializedMiddleware gin.HandlerFunc,
+	corsAllowedOrigins []string,
 	logger *zap.Logger,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(requestErrorLogger(logger))
-	allowedOrigins := loadAllowedCORSOrigins()
+	allowedOrigins := mapAllowedCORSOrigins(corsAllowedOrigins)
 
 	// Add CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -266,15 +267,16 @@ func NewRouter(
 		}
 
 		settings := v1.Group("/settings")
-		settings.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		settings.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
 			settings.GET("/system", settingsController.GetSystemSettings)
 			settings.PATCH("/system", settingsController.UpdateSystemSettings)
 			settings.POST("/system/validate-llm", settingsController.ValidateLLMSettings)
+			settings.GET("/runtime-info", settingsController.GetRuntimeInfo)
 		}
 
 		classifiers := v1.Group("/classifiers")
-		classifiers.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		classifiers.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
 			classifiers.POST("/preview", classifierController.PreviewClassifier)
 		}
@@ -282,7 +284,6 @@ func NewRouter(
 		// Authentication routes
 		auth := v1.Group("/auth")
 		{
-			auth.GET("/bootstrap-status", authController.GetBootstrapStatus)
 			auth.POST("/register/start", authController.StartRegistration)
 			auth.POST("/login", authController.Login)
 			auth.POST("/passkeys/login/options", authController.BeginPasskeyLogin)
@@ -304,7 +305,7 @@ func NewRouter(
 		}
 
 		users := v1.Group("/users")
-		users.Use(authController.AuthMiddleware())
+		users.Use(authController.AuthMiddleware(), appInitializedMiddleware)
 		{
 			users.PATCH("/me/profile", userController.UpdateMyProfile)
 			users.PATCH("/me/password", userController.ChangeMyPassword)
@@ -316,35 +317,35 @@ func NewRouter(
 		repositories := v1.Group("/repositories")
 		repositories.Use(authController.AuthMiddleware(), authController.RequireAdmin())
 		{
-			repositories.GET("", repositoryScanController.ListRepositories)
+			repositories.GET("", appInitializedMiddleware, repositoryScanController.ListRepositories)
 			repositories.POST("", repositoryScanController.CreateRepository)
-			repositories.GET("/:id", repositoryScanController.GetRepository)
-			repositories.PATCH("/:id", repositoryScanController.UpdateRepository)
-			repositories.DELETE("/:id", repositoryScanController.DeleteRepository)
-			repositories.GET("/:id/cloud", cloudController.GetRepositoryCloudStatus)
-			repositories.POST("/:id/cloud/import", cloudController.StartRepositoryImport)
-			repositories.POST("/:id/scan", repositoryScanController.QueueRepositoryScan)
-			repositories.GET("/:id/scans/latest", repositoryScanController.GetLatestRepositoryScan)
-			repositories.GET("/:id/scans", repositoryScanController.ListRepositoryScans)
-			repositories.POST("/:id/stacks/detect", assetController.AutoDetectStacks)
+			repositories.GET("/:id", appInitializedMiddleware, repositoryScanController.GetRepository)
+			repositories.PATCH("/:id", appInitializedMiddleware, repositoryScanController.UpdateRepository)
+			repositories.DELETE("/:id", appInitializedMiddleware, repositoryScanController.DeleteRepository)
+			repositories.GET("/:id/cloud", appInitializedMiddleware, cloudController.GetRepositoryCloudStatus)
+			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
+			repositories.POST("/:id/scan", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)
+			repositories.GET("/:id/scans/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
+			repositories.GET("/:id/scans", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
+			repositories.POST("/:id/stacks/detect", appInitializedMiddleware, assetController.AutoDetectStacks)
 		}
 
 		locations := v1.Group("/locations")
-		locations.Use(authController.OptionalAuthMiddleware())
+		locations.Use(appInitializedMiddleware, authController.OptionalAuthMiddleware())
 		{
 			locations.GET("/clusters", locationController.ListLocationClusters)
 			locations.POST("/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), locationController.RebuildLocationClusters)
 		}
 
 		species := v1.Group("/species")
-		species.Use(authController.OptionalAuthMiddleware())
+		species.Use(appInitializedMiddleware, authController.OptionalAuthMiddleware())
 		{
 			species.GET("/reference", speciesController.GetSpeciesReference)
 		}
 
 		// Asset routes (new unified API) - with optional authentication
 		assets := v1.Group("/assets")
-		assets.Use(authController.OptionalAuthMiddleware())
+		assets.Use(appInitializedMiddleware, authController.OptionalAuthMiddleware())
 		{
 			assets.POST("", assetController.UploadAsset)
 			assets.GET("/types", assetController.GetAssetTypes)
@@ -395,7 +396,7 @@ func NewRouter(
 
 		// Album routes - with authentication required
 		albums := v1.Group("/albums")
-		albums.Use(authController.AuthMiddleware())
+		albums.Use(authController.AuthMiddleware(), appInitializedMiddleware)
 		{
 			albums.POST("", albumController.NewAlbum)
 			albums.GET("", albumController.ListAlbums)
@@ -410,7 +411,7 @@ func NewRouter(
 		}
 
 		people := v1.Group("/people")
-		people.Use(authController.OptionalAuthMiddleware())
+		people.Use(appInitializedMiddleware, authController.OptionalAuthMiddleware())
 		{
 			people.GET("", peopleController.ListPeople)
 			people.POST("/rebuild", authController.AuthMiddleware(), peopleController.RebuildPeople)
@@ -423,7 +424,7 @@ func NewRouter(
 		// Duplicate detection routes (Utilities Rail). Auth is required for
 		// mutating actions (detect/merge/dismiss); reads are open to authed users.
 		duplicates := v1.Group("/duplicates")
-		duplicates.Use(authController.AuthMiddleware())
+		duplicates.Use(authController.AuthMiddleware(), appInitializedMiddleware)
 		{
 			duplicates.GET("/summary", duplicateController.GetDuplicateSummary)
 			duplicates.GET("/groups", duplicateController.ListDuplicateGroups)
@@ -435,22 +436,22 @@ func NewRouter(
 
 		// Cloud sync routes - admin only
 		cloud := v1.Group("/cloud")
-		cloud.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		cloud.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
 			cloud.GET("/providers", cloudController.ListProviders)
-		cloud.GET("/credentials", cloudController.ListCredentials)
-		cloud.POST("/credentials", cloudController.CreateCredential)
-		cloud.POST("/credentials/:id/auth-challenge", cloudController.VerifyCredentialAuthChallenge)
-		cloud.POST("/credentials/:id/disconnect", cloudController.DisconnectCredential)
-		cloud.POST("/credentials/:id/reconnect", cloudController.ReconnectCredential)
-		cloud.DELETE("/credentials/:id", cloudController.RemoveCredential)
+			cloud.GET("/credentials", cloudController.ListCredentials)
+			cloud.POST("/credentials", cloudController.CreateCredential)
+			cloud.POST("/credentials/:id/auth-challenge", cloudController.VerifyCredentialAuthChallenge)
+			cloud.POST("/credentials/:id/disconnect", cloudController.DisconnectCredential)
+			cloud.POST("/credentials/:id/reconnect", cloudController.ReconnectCredential)
+			cloud.DELETE("/credentials/:id", cloudController.RemoveCredential)
 			cloud.GET("/import-runs/:id", cloudController.GetImportRun)
 			cloud.POST("/sync", cloudController.TriggerSync)
 		}
 
 		// Admin routes for queue monitoring (read-only)
 		admin := v1.Group("/admin")
-		admin.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		admin.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
 			river := admin.Group("/river")
 			{
@@ -461,7 +462,7 @@ func NewRouter(
 
 		// Stats routes - with optional authentication
 		stats := v1.Group("/stats")
-		stats.Use(authController.OptionalAuthMiddleware())
+		stats.Use(appInitializedMiddleware, authController.OptionalAuthMiddleware())
 		{
 			stats.GET("/focal-length", statsController.GetFocalLengthDistribution)
 			stats.GET("/camera-lens", statsController.GetCameraLensStats)
@@ -473,7 +474,7 @@ func NewRouter(
 		// Agent routes - authentication required: refs are scoped to the
 		// requesting user (INV-4), so an anonymous agent session is meaningless.
 		agent := v1.Group("/agent")
-		agent.Use(agentAvailabilityMiddleware, authController.AuthMiddleware())
+		agent.Use(appInitializedMiddleware, agentAvailabilityMiddleware, authController.AuthMiddleware())
 		{
 			agent.POST("/chat", agentController.Chat)
 			agent.POST("/chat/resume", agentController.ResumeChat)
@@ -525,19 +526,14 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 	}
 }
 
-func loadAllowedCORSOrigins() map[string]struct{} {
+func mapAllowedCORSOrigins(configured []string) map[string]struct{} {
 	origins := map[string]struct{}{
 		"http://localhost:6657":  {},
 		"https://localhost:6657": {},
 	}
 
-	rawOrigins := strings.TrimSpace(os.Getenv("SERVER_CORS_ALLOWED_ORIGINS"))
-	if rawOrigins == "" {
-		return origins
-	}
-
 	customOrigins := make(map[string]struct{})
-	for _, origin := range strings.Split(rawOrigins, ",") {
+	for _, origin := range configured {
 		normalized := strings.TrimSpace(origin)
 		if normalized != "" {
 			customOrigins[normalized] = struct{}{}

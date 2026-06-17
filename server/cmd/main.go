@@ -9,6 +9,8 @@ import (
 
 	"server/app"
 	"server/config"
+
+	"github.com/joho/godotenv"
 )
 
 // @title Lumilio-Photos API
@@ -36,8 +38,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	config.LoadEnvironment()
-	appConfig, err := config.LoadAppConfigWithError()
+	loadEnvFiles()
+	appConfig, err := config.LoadAppConfigWithOptions(config.LoadOptions{
+		Environment: os.Getenv("SERVER_ENV"),
+		ConfigFile:  os.Getenv("SERVER_CONFIG_FILE"),
+		Env:         config.ProcessEnv(),
+	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load server configuration: %v\n", err)
 		os.Exit(1)
@@ -46,5 +52,12 @@ func main() {
 	if err := app.Run(ctx, appConfig); err != nil {
 		fmt.Fprintf(os.Stderr, "server exited with error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func loadEnvFiles() {
+	_ = godotenv.Load(".env")
+	if os.Getenv("SERVER_ENV") == "development" {
+		_ = godotenv.Load(".env.development")
 	}
 }

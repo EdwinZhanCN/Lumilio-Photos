@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
-	"server/config"
 	"time"
 )
 
@@ -14,7 +13,7 @@ func IsExifToolAvailable() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, config.ExifToolPath(), "-ver")
+	cmd := exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-ver")
 	return cmd.Run() == nil
 }
 
@@ -23,7 +22,7 @@ func GetExifToolVersion() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, config.ExifToolPath(), "-ver")
+	cmd := exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-ver")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -35,7 +34,7 @@ func GetExifToolVersion() (string, error) {
 // ValidateExifToolInstallation performs a comprehensive check of exiftool installation
 func ValidateExifToolInstallation() error {
 	// Check if exiftool is in PATH
-	if _, err := exec.LookPath(config.ExifToolPath()); err != nil {
+	if _, err := exec.LookPath(DefaultConfig().ExifToolPath); err != nil {
 		return err
 	}
 
@@ -53,13 +52,13 @@ func checkExifToolSupport() error {
 	defer cancel()
 
 	// Test JSON output support
-	cmd := exec.CommandContext(ctx, config.ExifToolPath(), "-j", "-ver")
+	cmd := exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-j", "-ver")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("exiftool does not support JSON output: %w", err)
 	}
 
 	// Test stdin reading support
-	cmd = exec.CommandContext(ctx, config.ExifToolPath(), "-j", "-")
+	cmd = exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-j", "-")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("exiftool stdin pipe not available: %w", err)

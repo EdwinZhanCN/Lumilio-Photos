@@ -6,11 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"server/config"
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 
@@ -65,12 +65,6 @@ type AuthResponse struct {
 	BootstrapAdmin bool          `json:"bootstrap_admin,omitempty"`
 }
 
-type BootstrapStatus struct {
-	HasUsers             bool   `json:"has_users"`
-	IsBootstrapMode      bool   `json:"is_bootstrap_mode"`
-	NextRegistrationRole string `json:"next_registration_role"`
-}
-
 // AuthService handles JWT authentication operations
 type AuthService struct {
 	queries                *repo.Queries
@@ -106,11 +100,11 @@ type MediaTokenClaims struct {
 
 const mediaTokenScope = "media"
 
-// NewAuthService creates a new authentication service
-func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
-	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")))
+// NewAuthService creates a new authentication service.
+func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConfig) *AuthService {
+	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(cfg.SecretKeyPath))
 	if err != nil {
-		panic(fmt.Sprintf("failed to initialize JWT secret from LUMILIO_SECRET_KEY: %v", err))
+		panic(fmt.Sprintf("failed to initialize root secret key: %v", err))
 	}
 	jwtSecret := secretbox.DeriveScopedSecret(rootSecret, "jwt.signing.v1")
 	mfaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "mfa.signing.v1")
@@ -118,29 +112,9 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
 	mediaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "media.url.signing.v1")
 	mfaEncryptKey := secretbox.DeriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
-	// Access token TTL (default: 15 minutes)
-	accessTokenTTL := 15 * time.Minute
-	if ttlStr := os.Getenv("ACCESS_TOKEN_TTL"); ttlStr != "" {
-		if ttl, err := time.ParseDuration(ttlStr); err == nil {
-			accessTokenTTL = ttl
-		}
-	}
-
-	// Refresh token TTL (default: 7 days)
-	refreshTokenTTL := 7 * 24 * time.Hour
-	if ttlStr := os.Getenv("REFRESH_TOKEN_TTL"); ttlStr != "" {
-		if ttl, err := time.ParseDuration(ttlStr); err == nil {
-			refreshTokenTTL = ttl
-		}
-	}
-
-	// Media token TTL (default: 10 minutes)
-	mediaTokenTTL := 10 * time.Minute
-	if ttlStr := os.Getenv("MEDIA_TOKEN_TTL"); ttlStr != "" {
-		if ttl, err := time.ParseDuration(ttlStr); err == nil {
-			mediaTokenTTL = ttl
-		}
-	}
+	accessTokenTTL := parseDurationOrDefault(cfg.AccessTokenTTL, 15*time.Minute)
+	refreshTokenTTL := parseDurationOrDefault(cfg.RefreshTokenTTL, 7*24*time.Hour)
+	mediaTokenTTL := parseDurationOrDefault(cfg.MediaTokenTTL, 10*time.Minute)
 
 	return &AuthService{
 		queries:                queries,
@@ -153,10 +127,41 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
 		accessTokenTTL:         accessTokenTTL,
 		refreshTokenTTL:        refreshTokenTTL,
 		mediaTokenTTL:          mediaTokenTTL,
-		webauthnRPDisplayName:  loadWebAuthnRPDisplayName(),
-		webauthnRPID:           loadWebAuthnRPID(),
-		webauthnAllowedOrigins: loadWebAuthnAllowedOrigins(),
+		webauthnRPDisplayName:  webAuthnRPDisplayName(cfg),
+		webauthnRPID:           strings.TrimSpace(cfg.WebAuthnRPID),
+		webauthnAllowedOrigins: normalizeConfiguredWebAuthnOrigins(cfg.WebAuthnRPOrigins),
 	}
+}
+
+func parseDurationOrDefault(raw string, fallback time.Duration) time.Duration {
+	if parsed, err := time.ParseDuration(strings.TrimSpace(raw)); err == nil {
+		return parsed
+	}
+	return fallback
+}
+
+func webAuthnRPDisplayName(cfg config.AuthConfig) string {
+	if value := strings.TrimSpace(cfg.WebAuthnRPName); value != "" {
+		return value
+	}
+	return defaultWebAuthnRPDisplayName
+}
+
+func normalizeConfiguredWebAuthnOrigins(values []string) []string {
+	origins := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		normalized, _, err := normalizeOriginString(value)
+		if err != nil {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		origins = append(origins, normalized)
+	}
+	return origins
 }
 
 // Login authenticates a user and returns tokens
@@ -345,27 +350,6 @@ func (s *AuthService) GetCurrentUser(userID int) (*UserResponse, error) {
 
 	response := ConvertUserToResponse(user)
 	return &response, nil
-}
-
-func (s *AuthService) GetBootstrapStatus(ctx context.Context) (BootstrapStatus, error) {
-	userCount, err := s.queries.CountUsers(ctx)
-	if err != nil {
-		return BootstrapStatus{}, fmt.Errorf("count users: %w", err)
-	}
-
-	if userCount == 0 {
-		return BootstrapStatus{
-			HasUsers:             false,
-			IsBootstrapMode:      true,
-			NextRegistrationRole: string(UserRoleAdmin),
-		}, nil
-	}
-
-	return BootstrapStatus{
-		HasUsers:             true,
-		IsBootstrapMode:      false,
-		NextRegistrationRole: string(UserRoleUser),
-	}, nil
 }
 
 // generateAuthResponse creates an authentication response with tokens

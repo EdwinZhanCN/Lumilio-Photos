@@ -4,6 +4,9 @@ import "time"
 
 // Config holds configuration for the EXIF extractor
 type Config struct {
+	// ExifToolPath is the executable path or command name for exiftool.
+	ExifToolPath string
+
 	// Timeout for exiftool command execution
 	Timeout time.Duration
 
@@ -35,6 +38,7 @@ type Config struct {
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
+		ExifToolPath:  "exiftool",
 		Timeout:       30 * time.Second,
 		BufferSize:    8192,
 		MaxFileSize:   2 * 1024 * 1024 * 1024, // 2GB

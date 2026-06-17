@@ -939,20 +939,6 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.BootstrapStatusDTO": {
-                "properties": {
-                    "has_users": {
-                        "type": "boolean"
-                    },
-                    "is_bootstrap_mode": {
-                        "type": "boolean"
-                    },
-                    "next_registration_role": {
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "dto.BrowseItemDTO": {
                 "properties": {
                     "asset": {
@@ -1419,8 +1405,38 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
+                    "duplicate_handling": {
+                        "enum": [
+                            "rename",
+                            "uuid",
+                            "overwrite"
+                        ],
+                        "example": "rename",
+                        "type": "string"
+                    },
                     "name": {
                         "example": "Family Photos",
+                        "type": "string"
+                    },
+                    "role": {
+                        "enum": [
+                            "primary",
+                            "regular"
+                        ],
+                        "example": "regular",
+                        "type": "string"
+                    },
+                    "root": {
+                        "example": "/data/storage",
+                        "type": "string"
+                    },
+                    "storage_strategy": {
+                        "enum": [
+                            "date",
+                            "flat",
+                            "cas"
+                        ],
+                        "example": "date",
                         "type": "string"
                     }
                 },
@@ -1847,6 +1863,10 @@ const docTemplate = `{
                     "path": {
                         "example": "/Volumes/Media/Photos",
                         "type": "string"
+                    },
+                    "role": {
+                        "example": "regular",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2245,9 +2265,6 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "semantic_enabled": {
-                        "type": "boolean"
-                    },
-                    "zeroshot_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -2923,7 +2940,28 @@ const docTemplate = `{
                         "example": "/data/storage/family-photos",
                         "type": "string"
                     },
+                    "role": {
+                        "example": "regular",
+                        "type": "string"
+                    },
                     "storage_strategy": {
+                        "example": "date",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryDefaultsDTO": {
+                "properties": {
+                    "default_root": {
+                        "example": "/data/storage",
+                        "type": "string"
+                    },
+                    "duplicate_handling": {
+                        "example": "rename",
+                        "type": "string"
+                    },
+                    "strategy": {
                         "example": "date",
                         "type": "string"
                     }
@@ -2935,10 +2973,6 @@ const docTemplate = `{
                     "handle_duplicate_filenames": {
                         "example": "uuid",
                         "type": "string"
-                    },
-                    "preserve_original_filename": {
-                        "example": true,
-                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -3104,6 +3138,47 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "temporary_password": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RuntimeInfoDTO": {
+                "properties": {
+                    "environment": {
+                        "example": "production",
+                        "type": "string"
+                    },
+                    "geocoding_provider": {
+                        "example": "disabled",
+                        "type": "string"
+                    },
+                    "hardware_accel": {
+                        "example": "none",
+                        "type": "string"
+                    },
+                    "log_level": {
+                        "example": "info",
+                        "type": "string"
+                    },
+                    "lumen_discovery_enabled": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_scan_enabled": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_scan_interval_seconds": {
+                        "example": 300,
+                        "type": "integer"
+                    },
+                    "server_port": {
+                        "example": "8080",
+                        "type": "string"
+                    },
+                    "storage_root": {
+                        "example": "/data/storage",
                         "type": "string"
                     }
                 },
@@ -3357,8 +3432,24 @@ const docTemplate = `{
             },
             "dto.SetupStatusDTO": {
                 "properties": {
+                    "admin_initialized": {
+                        "type": "boolean"
+                    },
+                    "database_initialized": {
+                        "type": "boolean"
+                    },
                     "initialized": {
                         "type": "boolean"
+                    },
+                    "next_registration_role": {
+                        "description": "NextRegistrationRole is the role the next /auth/register will assign\n(\"admin\" while no admin exists yet, \"user\" afterwards). Folds the former\n/auth/bootstrap-status semantics into the unified setup status.",
+                        "type": "string"
+                    },
+                    "primary_repository_initialized": {
+                        "type": "boolean"
+                    },
+                    "repository_defaults": {
+                        "$ref": "#/components/schemas/dto.RepositoryDefaultsDTO"
                     }
                 },
                 "type": "object"
@@ -3763,9 +3854,6 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "semantic_enabled": {
-                        "type": "boolean"
-                    },
-                    "zeroshot_classify_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -9633,73 +9721,6 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/auth/bootstrap-status": {
-            "get": {
-                "description": "Return whether Lumilio is still in first-user bootstrap mode and which role the next registration receives.",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        },
-                        "description": "Bootstrap status retrieved successfully"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Internal server error"
-                    }
-                },
-                "summary": "Get auth bootstrap status",
-                "tags": [
-                    "auth"
-                ]
-            }
-        },
         "/api/v1/auth/login": {
             "post": {
                 "description": "Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.",
@@ -14579,6 +14600,69 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/settings/runtime-info": {
+            "get": {
+                "description": "Read-only effective runtime-immutable configuration (changed only via TOML + restart).",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Runtime info retrieved successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get runtime info",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
         "/api/v1/settings/system": {
             "get": {
                 "description": "Return persisted system settings without exposing secret values.",
@@ -16131,7 +16215,7 @@ const docTemplate = `{
     "openapi": "3.1.0",
     "servers": [
         {
-            "url": "localhost:8080/api/v1"
+            "url": "localhost:6680/api/v1"
         }
     ]
 }`
@@ -16140,7 +16224,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Title:            "Lumilio-Photos API",
-	Description:      "Media management system API with asset upload, processing, and organization features",
+	Description:      "Media management system API with asset features",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

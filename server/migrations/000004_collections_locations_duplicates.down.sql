@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS public.reverse_geocode_cache CASCADE;
+DROP TABLE IF EXISTS public.location_cluster_assets CASCADE;
+DROP TABLE IF EXISTS public.location_clusters CASCADE;
+DROP TABLE IF EXISTS public.duplicate_group_edges CASCADE;
+DROP TABLE IF EXISTS public.duplicate_group_assets CASCADE;
+DROP TABLE IF EXISTS public.duplicate_groups CASCADE;
+DROP TABLE IF EXISTS public.asset_stack_members CASCADE;
+DROP TABLE IF EXISTS public.asset_stacks CASCADE;
+DROP TABLE IF EXISTS public.album_assets CASCADE;
+DROP TABLE IF EXISTS public.albums CASCADE;

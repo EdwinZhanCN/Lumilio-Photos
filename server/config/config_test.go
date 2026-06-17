@@ -3,296 +3,188 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestLoadMLConfig_RespectsExplicitFlags(t *testing.T) {
-	t.Setenv("SERVER_ENV", "development")
-	t.Setenv("ML_SEMANTIC_ENABLED", "true")
-	t.Setenv("ML_BIOCLIP_ENABLED", "false")
-	t.Setenv("ML_OCR_ENABLED", "false")
-	t.Setenv("ML_FACE_ENABLED", "false")
-
-	cfg := LoadMLConfig()
-
-	if !cfg.SemanticEnabled {
-		t.Fatalf("expected semantic enabled, got %+v", cfg)
-	}
-	if cfg.BioCLIPEnabled || cfg.OCREnabled || cfg.FaceEnabled {
-		t.Fatalf("expected non-semantic tasks disabled, got %+v", cfg)
-	}
-}
-
-func TestMLConfig_HasRuntimeDemandReflectsTaskFlags(t *testing.T) {
-	cfg := MLConfig{
-		SemanticEnabled:    false,
-		BioCLIPEnabled: false,
-		OCREnabled:         false,
-		FaceEnabled:        false,
+func TestLoadAppConfigWithOptionsResolvesPrecedenceWithoutAmbientEnv(t *testing.T) {
+	dir := t.TempDir()
+	passwordFile := filepath.Join(dir, "db_password")
+	if err := os.WriteFile(passwordFile, []byte("rotated-secret\n"), 0o600); err != nil {
+		t.Fatalf("write password file: %v", err)
 	}
 
-	if cfg.HasRuntimeDemand() {
-		t.Fatalf("expected no runtime demand when all ML tasks are disabled, got %+v", cfg)
-	}
-	cfg.FaceEnabled = true
-	if !cfg.HasRuntimeDemand() {
-		t.Fatalf("expected runtime demand when a task is enabled, got %+v", cfg)
-	}
-}
-
-func TestLLMConfig_IsConfigured_APIKeyProviders(t *testing.T) {
-	cfg := LLMConfig{
-		Provider:  "openai",
-		APIKey:    "sk-test",
-		ModelName: "gpt-4.1-mini",
-	}
-
-	if !cfg.IsConfigured() {
-		t.Fatalf("expected api-key provider config to be configured, got %+v", cfg)
-	}
-}
-
-func TestLLMConfig_IsConfigured_OllamaRequiresBaseURL(t *testing.T) {
-	cfg := LLMConfig{
-		Provider:  "ollama",
-		ModelName: "qwen3:latest",
-	}
-
-	if cfg.IsConfigured() {
-		t.Fatalf("expected ollama without base url to be unconfigured, got %+v", cfg)
-	}
-}
-
-func TestLoadRepositoryScanConfig_Defaults(t *testing.T) {
-	t.Setenv("REPOSITORY_SCAN_ENABLED", "")
-	t.Setenv("REPOSITORY_SCAN_INTERVAL_SECONDS", "")
-	t.Setenv("REPOSITORY_SCAN_SETTLE_SECONDS", "")
-	t.Setenv("REPOSITORY_SCAN_MAX_CONCURRENT_REPOS", "")
-	t.Setenv("REPOSITORY_SCAN_BATCH_SIZE", "")
-
-	cfg := LoadRepositoryScanConfig()
-
-	if !cfg.Enabled {
-		t.Fatalf("expected repository scan enabled by default")
-	}
-	if cfg.IntervalSeconds != 300 {
-		t.Fatalf("expected default interval of 300 seconds, got %d", cfg.IntervalSeconds)
-	}
-	if cfg.SettleSeconds != 5 {
-		t.Fatalf("expected default settle of 5 seconds, got %d", cfg.SettleSeconds)
-	}
-	if cfg.MaxConcurrentRepos != 1 {
-		t.Fatalf("expected default max concurrent repos of 1, got %d", cfg.MaxConcurrentRepos)
-	}
-	if cfg.BatchSize != 500 {
-		t.Fatalf("expected default batch size of 500, got %d", cfg.BatchSize)
-	}
-}
-
-func TestLoadRepositoryScanConfig_EnvOverrides(t *testing.T) {
-	t.Setenv("REPOSITORY_SCAN_ENABLED", "false")
-	t.Setenv("REPOSITORY_SCAN_INTERVAL_SECONDS", "60")
-	t.Setenv("REPOSITORY_SCAN_SETTLE_SECONDS", "2")
-	t.Setenv("REPOSITORY_SCAN_MAX_CONCURRENT_REPOS", "3")
-	t.Setenv("REPOSITORY_SCAN_BATCH_SIZE", "25")
-
-	cfg := LoadRepositoryScanConfig()
-
-	if cfg.Enabled {
-		t.Fatalf("expected repository scan disabled")
-	}
-	if cfg.IntervalSeconds != 60 || cfg.SettleSeconds != 2 || cfg.MaxConcurrentRepos != 3 || cfg.BatchSize != 25 {
-		t.Fatalf("unexpected config overrides: %+v", cfg)
-	}
-}
-
-func TestLoadAppConfigWithError_LoadsExplicitTOML(t *testing.T) {
-	configFile := writeTestConfig(t, `
-environment = "development"
+	configFile := filepath.Join(dir, "server.local.toml")
+	if err := os.WriteFile(configFile, []byte(`
+environment = "production"
 
 [server]
-port = "7777"
-log_level = "debug"
-cors_allowed_origins = ["http://localhost:6657"]
+port = "9000"
+log_level = "warn"
+cors_allowed_origins = ["http://toml.example"]
+web_root = "/toml/web"
+
+[logging]
+level = "warn"
+dir = "/toml/logs"
+console_format = "json"
+file_format = "json"
+repository_audit_verbose = "toml"
 
 [database]
-host = "db-from-toml"
-port = "5432"
-user = "postgres"
-password = "postgres"
-password_file = "/tmp/lumilio-db-password"
-name = "lumiliophotos"
-ssl = "disable"
-
-[storage]
-path = "/tmp/lumilio"
-strategy = "date"
-preserve_filename = true
-duplicate_handling = "rename"
-
-[repository_scan]
-enabled = false
-interval_seconds = 120
-settle_seconds = 3
-max_concurrent_repos = 2
-batch_size = 250
-
-[geocoding]
-provider = "nominatim"
-nominatim_endpoint = "https://example.invalid/reverse"
-language = "zh"
-user_agent = "Lumilio-Test/1.0"
-
-[ml]
-semantic_enabled = true
-bioclip_enabled = false
-ocr_enabled = false
-face_enabled = true
-
-[auth]
-secret_key_path = "/tmp/secret"
-access_token_ttl = "10m"
-refresh_token_ttl = "24h"
-media_token_ttl = "5m"
-
-[transcode]
-hardware_accel = "auto"
-`)
-	t.Setenv("SERVER_CONFIG_FILE", configFile)
-	t.Setenv("SERVER_ENV", "")
-
-	cfg, err := LoadAppConfigWithError()
-	if err != nil {
-		t.Fatalf("expected config to load: %v", err)
-	}
-
-	if cfg.ServerConfig.Port != "7777" {
-		t.Fatalf("expected server port from toml, got %+v", cfg.ServerConfig)
-	}
-	if cfg.DatabaseConfig.Host != "db-from-toml" {
-		t.Fatalf("expected database host from toml, got %+v", cfg.DatabaseConfig)
-	}
-	if cfg.DatabaseConfig.PasswordFile != "/tmp/lumilio-db-password" {
-		t.Fatalf("expected database password_file from toml, got %+v", cfg.DatabaseConfig)
-	}
-	if cfg.RepositoryScan.Enabled || cfg.RepositoryScan.IntervalSeconds != 120 {
-		t.Fatalf("expected repository scan from toml, got %+v", cfg.RepositoryScan)
-	}
-	if cfg.Geocoding.Provider != "nominatim" || cfg.Geocoding.Language != "zh" {
-		t.Fatalf("expected geocoding from toml, got %+v", cfg.Geocoding)
-	}
-	if !cfg.MLConfig.SemanticEnabled || !cfg.MLConfig.FaceEnabled {
-		t.Fatalf("expected ml flags from toml, got %+v", cfg.MLConfig)
-	}
-}
-
-func TestLoadAppConfigWithError_EnvOverridesTOML(t *testing.T) {
-	configFile := writeTestConfig(t, `
-[server]
-port = "7777"
-log_level = "info"
-
-[database]
-host = "db-from-toml"
+host = "toml-db"
+port = "15432"
+user = "toml-user"
+password = "toml-bootstrap"
+password_file = "`+passwordFile+`"
+name = "tomldb"
+ssl = "require"
 
 [storage]
 path = "/toml/storage"
 
 [repository_scan]
-enabled = true
-interval_seconds = 300
-settle_seconds = 5
-max_concurrent_repos = 1
-batch_size = 500
+enabled = false
+interval_seconds = 600
+settle_seconds = 9
+max_concurrent_repos = 3
+batch_size = 99
 
-[ml]
-semantic_enabled = false
-`)
-	t.Setenv("SERVER_CONFIG_FILE", configFile)
+[geocoding]
+provider = "nominatim"
+nominatim_endpoint = "https://geo.example/reverse"
+language = "en"
+user_agent = "TomlAgent/1.0"
+
+[auth]
+secret_key_path = "/toml/secret"
+access_token_ttl = "10m"
+refresh_token_ttl = "24h"
+media_token_ttl = "5m"
+webauthn_rp_name = "Toml RP"
+webauthn_rp_id = "toml.example"
+webauthn_rp_origins = ["https://toml.example"]
+
+[transcode]
+hardware_accel = "none"
+
+[lumen]
+discovery_enabled = false
+discovery_mdns_enabled = false
+discovery_hub_url = "https://lumen.example"
+connection_insecure = false
+
+[tools]
+exiftool_path = "/toml/exiftool"
+ffmpeg_path = "/toml/ffmpeg"
+ffprobe_path = "/toml/ffprobe"
+`), 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
 	t.Setenv("SERVER_PORT", "9999")
-	t.Setenv("DB_HOST", "db-from-env")
-	t.Setenv("DB_PASSWORD_FILE", "/tmp/env-db-password")
-	t.Setenv("STORAGE_PATH", "/env/storage")
-	t.Setenv("REPOSITORY_SCAN_ENABLED", "false")
-	t.Setenv("ML_SEMANTIC_ENABLED", "true")
+	t.Setenv("DB_PASSWORD", "ambient-password")
+	t.Setenv("STORAGE_PATH", "/ambient/storage")
 
-	cfg, err := LoadAppConfigWithError()
+	cfg, err := LoadAppConfigWithOptions(LoadOptions{
+		Environment: "development",
+		ConfigFile:  configFile,
+		Env: map[string]string{
+			"SERVER_ENV":                   "development",
+			"SERVER_PORT":                  "6680",
+			"SERVER_LOG_LEVEL":             "debug",
+			"LOG_DIR":                      "/env/logs",
+			"DB_HOST":                      "env-db",
+			"DB_PASSWORD":                  "env-bootstrap",
+			"STORAGE_PATH":                 "/env/storage",
+			"LUMILIO_SECRET_KEY":           "/env/secret",
+			"LUMEN_DISCOVERY_MDNS_ENABLED": "true",
+			"EXIFTOOL_PATH":                "/env/exiftool",
+		},
+	})
 	if err != nil {
-		t.Fatalf("expected config to load: %v", err)
+		t.Fatalf("LoadAppConfigWithOptions: %v", err)
 	}
 
-	if cfg.ServerConfig.Port != "9999" {
-		t.Fatalf("expected env server port override, got %s", cfg.ServerConfig.Port)
+	if cfg.Environment != "development" {
+		t.Fatalf("Environment = %q, want development from explicit env map", cfg.Environment)
 	}
-	if cfg.DatabaseConfig.Host != "db-from-env" {
-		t.Fatalf("expected env database host override, got %s", cfg.DatabaseConfig.Host)
+	if cfg.ServerConfig.Port != "6680" {
+		t.Fatalf("ServerConfig.Port = %q, want env-map override 6680", cfg.ServerConfig.Port)
 	}
-	if cfg.DatabaseConfig.PasswordFile != "/tmp/env-db-password" {
-		t.Fatalf("expected env database password file override, got %s", cfg.DatabaseConfig.PasswordFile)
+	if cfg.ServerConfig.LogLevel != "debug" || cfg.LoggingConfig.Level != "debug" {
+		t.Fatalf("SERVER_LOG_LEVEL should update server and logging levels, got server=%q logging=%q", cfg.ServerConfig.LogLevel, cfg.LoggingConfig.Level)
+	}
+	if cfg.LoggingConfig.LogDir != "/env/logs" {
+		t.Fatalf("LoggingConfig.LogDir = %q, want env-map override /env/logs", cfg.LoggingConfig.LogDir)
+	}
+	if cfg.DatabaseConfig.Host != "env-db" {
+		t.Fatalf("DatabaseConfig.Host = %q, want env-map override env-db", cfg.DatabaseConfig.Host)
+	}
+	if cfg.DatabaseConfig.Password != "rotated-secret" {
+		t.Fatalf("DatabaseConfig.Password = %q, want password_file to beat env bootstrap password", cfg.DatabaseConfig.Password)
 	}
 	if cfg.StorageConfig.Path != "/env/storage" {
-		t.Fatalf("expected env storage path override, got %s", cfg.StorageConfig.Path)
+		t.Fatalf("StorageConfig.Path = %q, want env-map override /env/storage", cfg.StorageConfig.Path)
 	}
-	if cfg.RepositoryScan.Enabled {
-		t.Fatalf("expected env repository scan override, got %+v", cfg.RepositoryScan)
+	if cfg.Auth.SecretKeyPath != "/env/secret" {
+		t.Fatalf("Auth.SecretKeyPath = %q, want env-map override /env/secret", cfg.Auth.SecretKeyPath)
 	}
-	if !cfg.MLConfig.SemanticEnabled {
-		t.Fatalf("expected env ML override, got %+v", cfg.MLConfig)
+	if !cfg.Lumen.DiscoveryMDNSEnabled {
+		t.Fatalf("Lumen.DiscoveryMDNSEnabled = false, want env-map override true")
 	}
-}
-
-func TestLoadAppConfigWithError_LoadsExampleTOML(t *testing.T) {
-	t.Setenv("SERVER_CONFIG_FILE", "server.example.toml")
-	t.Setenv("SERVER_ENV", "development")
-
-	cfg, err := LoadAppConfigWithError()
-	if err != nil {
-		t.Fatalf("expected example config to load: %v", err)
-	}
-
-	if cfg.ServerConfig.Port != "6680" {
-		t.Fatalf("expected example server port, got %s", cfg.ServerConfig.Port)
-	}
-	if cfg.DatabaseConfig.DBName != "lumiliophotos" {
-		t.Fatalf("expected example database name, got %s", cfg.DatabaseConfig.DBName)
-	}
-	if cfg.Auth.SecretKeyPath == "" {
-		t.Fatalf("expected example auth secret path")
+	if cfg.Tools.ExifToolPath != "/env/exiftool" || cfg.Tools.FFmpegPath != "/toml/ffmpeg" {
+		t.Fatalf("unexpected tool paths after env-map override: %+v", cfg.Tools)
 	}
 }
 
-func TestConfigFilePathPrefersLocalConfig(t *testing.T) {
-	t.Setenv("SERVER_CONFIG_FILE", "")
-	tmpDir := t.TempDir()
-	t.Chdir(tmpDir)
+func TestLoadAppConfigWithOptionsValidatesConfigValues(t *testing.T) {
+	dir := t.TempDir()
+	configFile := filepath.Join(dir, "server.local.toml")
+	if err := os.WriteFile(configFile, []byte(`
+[server]
+port = "6680"
+log_level = "verbose"
 
-	configDir := filepath.Join(tmpDir, "config")
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
-		t.Fatalf("create config dir: %v", err)
-	}
-	localPath := filepath.Join(configDir, "server.local.toml")
-	if err := os.WriteFile(localPath, []byte("[server]\nport = \"6680\"\n"), 0o600); err != nil {
-		t.Fatalf("write local config: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(configDir, "server.development.toml"), []byte("[server]\nport = \"7777\"\n"), 0o600); err != nil {
-		t.Fatalf("write legacy config: %v", err)
+[geocoding]
+provider = "somewhere"
+
+[transcode]
+hardware_accel = "magic"
+`), 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
 	}
 
-	path, explicit := configFilePath("development")
-
-	if explicit {
-		t.Fatalf("expected discovered config, got explicit")
+	_, err := LoadAppConfigWithOptions(LoadOptions{
+		Environment: "development",
+		ConfigFile:  configFile,
+	})
+	if err == nil {
+		t.Fatal("expected invalid config values to fail validation")
 	}
-	if path != filepath.Join("config", "server.local.toml") {
-		t.Fatalf("expected local config path, got %s", path)
+
+	message := err.Error()
+	for _, field := range []string{
+		"server.log_level",
+		"geocoding.provider",
+		"transcode.hardware_accel",
+	} {
+		if !strings.Contains(message, field) {
+			t.Fatalf("validation error %q should mention %s", message, field)
+		}
 	}
 }
 
-func writeTestConfig(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "server.toml")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write test config: %v", err)
+func TestLoadAppConfigWithOptionsReportsExplicitMissingConfigFile(t *testing.T) {
+	_, err := LoadAppConfigWithOptions(LoadOptions{
+		Environment:       "development",
+		ConfigFile:        filepath.Join(t.TempDir(), "missing.toml"),
+		RequireConfigFile: true,
+	})
+	if err == nil {
+		t.Fatal("expected missing required config file to fail")
 	}
-	return path
+	if !strings.Contains(err.Error(), "missing.toml") {
+		t.Fatalf("missing config error should include path, got %v", err)
+	}
 }

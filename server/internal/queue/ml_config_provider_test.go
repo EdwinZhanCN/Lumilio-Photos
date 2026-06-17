@@ -4,22 +4,21 @@ import (
 	"context"
 	"testing"
 
-	"server/config"
+	"server/internal/settings"
 )
 
 type staticMLConfigProvider struct {
-	cfg config.MLConfig
+	cfg settings.ML
 }
 
-func (p staticMLConfigProvider) GetEffectiveMLConfig(context.Context) (config.MLConfig, error) {
+func (p staticMLConfigProvider) GetEffectiveMLConfig(context.Context) (settings.ML, error) {
 	return p.cfg, nil
 }
 
 func TestZeroshotClassifyFollowsSemanticEnabled(t *testing.T) {
 	enabled, err := isMLTaskEnabled(context.Background(), staticMLConfigProvider{
-		cfg: config.MLConfig{
-			SemanticEnabled:         true,
-			ZeroshotClassifyEnabled: false,
+		cfg: settings.ML{
+			SemanticEnabled: true,
 		},
 	}, "classify_zeroshot")
 	if err != nil {
@@ -30,9 +29,8 @@ func TestZeroshotClassifyFollowsSemanticEnabled(t *testing.T) {
 	}
 
 	disabled, err := isMLTaskEnabled(context.Background(), staticMLConfigProvider{
-		cfg: config.MLConfig{
-			SemanticEnabled:         false,
-			ZeroshotClassifyEnabled: true,
+		cfg: settings.ML{
+			SemanticEnabled: false,
 		},
 	}, "classify_zeroshot")
 	if err != nil {

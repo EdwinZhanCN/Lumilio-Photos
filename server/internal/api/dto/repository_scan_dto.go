@@ -4,6 +4,10 @@ import "time"
 
 type CreateRepositoryRequestDTO struct {
 	Name              string `json:"name" binding:"required" example:"Family Photos"`
+	Role              string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
+	Root              string `json:"root,omitempty" example:"/data/storage"`
+	StorageStrategy   string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
+	DuplicateHandling string `json:"duplicate_handling,omitempty" binding:"omitempty,oneof=rename uuid overwrite" example:"rename"`
 	CloudCredentialID string `json:"cloud_credential_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
@@ -11,6 +15,7 @@ type RepositoryDTO struct {
 	ID              string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Name            string                  `json:"name" example:"Family Photos"`
 	Path            string                  `json:"path" example:"/data/storage/family-photos"`
+	Role            string                  `json:"role" example:"regular"`
 	IsPrimary       bool                    `json:"is_primary" example:"false"`
 	DefaultOwnerID  *int32                  `json:"default_owner_id,omitempty"`
 	StorageStrategy string                  `json:"storage_strategy" example:"date"`
@@ -18,7 +23,6 @@ type RepositoryDTO struct {
 }
 
 type RepositoryLocalSettings struct {
-	PreserveOriginalFilename bool   `json:"preserve_original_filename" example:"true"`
 	HandleDuplicateFilenames string `json:"handle_duplicate_filenames" example:"uuid"`
 }
 

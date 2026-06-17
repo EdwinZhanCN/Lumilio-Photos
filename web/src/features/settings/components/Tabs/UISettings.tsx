@@ -1,6 +1,10 @@
 import React from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useSettingsContext } from "@/features/settings";
+import { usePreference } from "@/features/settings";
+import {
+  useResolvedThemeMode,
+  useThemePreference,
+} from "@/lib/theme";
 import {
   DAISYUI_DARK_THEMES,
   DAISYUI_LIGHT_THEMES,
@@ -118,46 +122,57 @@ function ThemePickerSection({
 export default function UISettings() {
   const { t } = useI18n();
 
-  const { state, dispatch, resolvedThemeMode } = useSettingsContext();
-  const isFollowingSystem = state.ui.theme.followSystem;
+  const [language, setLanguage] = usePreference("language");
+  const [region, setRegion] = usePreference("region");
+  const [theme, setTheme] = useThemePreference();
+  const [assetPage, setAssetPage] = usePreference("assetPage");
+  const resolvedThemeMode = useResolvedThemeMode();
+
+  const isFollowingSystem = theme.followSystem;
   const currentThemeMode = resolvedThemeMode;
-  const lightModeTheme = state.ui.theme.themes.light;
-  const darkModeTheme = state.ui.theme.themes.dark;
-  const currentLayout = state.ui.asset_page?.layout ?? "full";
+  const lightModeTheme = theme.themes.light;
+  const darkModeTheme = theme.themes.dark;
+  const currentLayout = assetPage.layout;
   const themeModeNameKey =
     currentThemeMode === "light"
       ? "settings.appearanceSettings.themes.modeNames.light"
       : "settings.appearanceSettings.themes.modeNames.dark";
-  const compactColumns = state.ui.asset_page?.columns ?? 6;
+  const compactColumns = assetPage.columns;
 
   const onChangeLanguage = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const lng = e.target.value as "en" | "zh";
-    dispatch({ type: "SET_LANGUAGE", payload: lng });
+    setLanguage(lng);
   };
 
   const onChangeRegion = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const region = e.target.value as "china" | "other";
-    dispatch({ type: "SET_REGION", payload: region });
+    const nextRegion = e.target.value as "china" | "other";
+    setRegion(nextRegion);
   };
 
   const onChangeCompactColumns = (e: React.ChangeEvent<HTMLInputElement>) => {
-    dispatch({
-      type: "SET_ASSETS_COLUMNS",
-      payload: Number(e.target.value),
+    setAssetPage({
+      ...assetPage,
+      columns: Number(e.target.value),
     });
   };
 
-  const onChangeLightModeTheme = (theme: ModeThemeName) => {
-    dispatch({
-      type: "SET_LIGHT_MODE_THEME",
-      payload: theme as DaisyUILightThemeName,
+  const onChangeLightModeTheme = (nextTheme: ModeThemeName) => {
+    setTheme({
+      ...theme,
+      themes: {
+        ...theme.themes,
+        light: nextTheme as DaisyUILightThemeName,
+      },
     });
   };
 
-  const onChangeDarkModeTheme = (theme: ModeThemeName) => {
-    dispatch({
-      type: "SET_DARK_MODE_THEME",
-      payload: theme as DaisyUIDarkThemeName,
+  const onChangeDarkModeTheme = (nextTheme: ModeThemeName) => {
+    setTheme({
+      ...theme,
+      themes: {
+        ...theme.themes,
+        dark: nextTheme as DaisyUIDarkThemeName,
+      },
     });
   };
 
@@ -165,15 +180,17 @@ export default function UISettings() {
     const nextFollowSystem = e.target.checked;
 
     if (!nextFollowSystem) {
-      dispatch({
-        type: "SET_THEME_MODE",
-        payload: resolvedThemeMode,
+      setTheme({
+        ...theme,
+        followSystem: false,
+        mode: resolvedThemeMode,
       });
+      return;
     }
 
-    dispatch({
-      type: "SET_THEME_FOLLOW_SYSTEM",
-      payload: nextFollowSystem,
+    setTheme({
+      ...theme,
+      followSystem: nextFollowSystem,
     });
   };
 
@@ -222,7 +239,7 @@ export default function UISettings() {
             </label>
             <select
               className="select select-bordered w-full"
-              value={state.ui.language}
+              value={language}
               onChange={onChangeLanguage}
             >
               <option value="en">English</option>
@@ -236,7 +253,7 @@ export default function UISettings() {
             </label>
             <select
               className="select select-bordered w-full"
-              value={state.ui.region ?? "other"}
+              value={region}
               onChange={onChangeRegion}
             >
               <option value="china">{t("settings.regionOptions.china")}</option>
@@ -338,9 +355,9 @@ export default function UISettings() {
                     : "border-base-300 bg-base-100 hover:border-base-content/30",
                 ].join(" ")}
                 onClick={() =>
-                  dispatch({
-                    type: "SET_ASSETS_LAYOUT",
-                    payload: option.value,
+                  setAssetPage({
+                    ...assetPage,
+                    layout: option.value,
                   })
                 }
               >
