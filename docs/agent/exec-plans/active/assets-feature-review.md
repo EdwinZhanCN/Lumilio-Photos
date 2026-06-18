@@ -30,7 +30,7 @@ backend annotation/DTO edits.
 
 ## Findings
 
-### F1 — `GET /assets/:id` returns an untyped map that violates its `dto.AssetDTO` contract (HIGH)
+### F1 — `GET /assets/:id` returns an untyped map that violates its `dto.AssetDTO` contract (HIGH) — ✅ DONE
 
 - Handler `GetAsset` is annotated `@Success 200 {object} dto.AssetDTO` and its
   description advertises `include_thumbnails|tags|albums|species|ocr|faces|captions`
@@ -50,7 +50,7 @@ backend annotation/DTO edits.
 This is the headline backend defect: the endpoint's real response shape is
 neither typed nor matches its annotation.
 
-### F2 — Stack mutation handlers have no auth/ownership check (HIGH)
+### F2 — Stack mutation handlers have no auth/ownership check (HIGH) — ✅ DONE
 
 - `GetAssetStack`, `CreateManualStack`, `UnstackAsset`
   (`asset_handler.go:3736`, `:3789`, `:3849`) carry `@Security BearerAuth`
@@ -115,6 +115,21 @@ neither typed nor matches its annotation.
 ## Fix Plan
 
 Ordered by severity; F1/F2 are the priority and self-contained.
+
+> **Status:** F1 and F2 are implemented (Steps 1–2 below). F3–F8 remain open.
+> Implementation notes:
+> - F1: introduced typed `dto.AssetDetailDTO` (embeds `AssetDTO` + typed
+>   `thumbnails`/`tags`/`albums`/`ocr_result`/`face_result`), added
+>   `ToAssetDetailDTO`, replaced the service's `GetAssetWithOptions(...) interface{}`
+>   with `GetAssetRelations(...) repo.GetAssetWithRelationsRow`, repointed the
+>   `@Success` annotation, and regenerated `make dto`. Only the deeply-nested
+>   freeform jsonb geometry (`bounding_box`) remains untyped, which is correct.
+> - F2: `CreateManualStack`/`UnstackAsset` now require `AuthMiddleware` (resolves
+>   Open Question 3) and enforce per-asset ownership via `getAuthorizedAsset`
+>   (every member checked for `CreateManualStack`); `GetAssetStack` (read) keeps
+>   optional auth but now enforces ownership too.
+> - Gates: backend `go build`/`go test ./...` + `gofmt` clean; frontend
+>   `vp check`/`vp lint`/`vp test` all pass against the regenerated schema.
 
 ### Step 1 — Fix the `GET /assets/:id` contract (F1)
 
@@ -190,9 +205,9 @@ Ordered by severity; F1/F2 are the priority and self-contained.
 ## Open Questions
 
 1. **F4**: add trash/restore (restore endpoint + Trash view) now, or document
-   delete as terminal for this milestone?
-2. **F1**: extend the existing `AssetDTO` with optional detail fields, or
-   introduce a dedicated `AssetDetailDTO` (keeps list payloads lean)? Plan
-   assumes a dedicated detail DTO.
-3. **F2**: keep stack routes under `OptionalAuthMiddleware` with per-handler
-   ownership checks (matches siblings), or move them under `AuthMiddleware()`?
+   delete as terminal for this milestone? *(still open)*
+2. ~~**F1**: extend `AssetDTO` vs. dedicated `AssetDetailDTO`?~~ **Resolved:**
+   dedicated `AssetDetailDTO` (keeps list payloads lean).
+3. ~~**F2**: `OptionalAuthMiddleware` + per-handler checks vs. `AuthMiddleware`?~~
+   **Resolved:** stack mutations now require `AuthMiddleware`; reads keep optional
+   auth with a per-asset ownership check.

@@ -292,6 +292,203 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	}
 }
 
+// AssetThumbnailDTO mirrors one entry of the `thumbnails` aggregate built by
+// GetAssetWithRelations.
+type AssetThumbnailDTO struct {
+	ThumbnailID string `json:"thumbnail_id"`
+	Size        string `json:"size"`
+	StoragePath string `json:"storage_path"`
+	MimeType    string `json:"mime_type"`
+}
+
+// AssetTagDTO mirrors one entry of the `tags` aggregate built by
+// GetAssetWithRelations.
+type AssetTagDTO struct {
+	TagID      int32    `json:"tag_id"`
+	TagName    string   `json:"tag_name"`
+	Confidence *float64 `json:"confidence,omitempty"`
+}
+
+// AssetAlbumRefDTO mirrors one entry of the `albums` aggregate built by
+// GetAssetWithRelations.
+type AssetAlbumRefDTO struct {
+	AlbumID   int32      `json:"album_id"`
+	AlbumName string     `json:"album_name"`
+	Position  *int32     `json:"position,omitempty"`
+	AddedTime *time.Time `json:"added_time,omitempty"`
+}
+
+// AssetOCRTextItemDTO mirrors one OCR text item produced by GetAssetWithRelations.
+// BoundingBox is freeform jsonb geometry and is left untyped.
+type AssetOCRTextItemDTO struct {
+	ID          int64           `json:"id"`
+	TextContent string          `json:"text_content"`
+	Confidence  *float64        `json:"confidence,omitempty"`
+	BoundingBox json.RawMessage `json:"bounding_box,omitempty" swaggertype:"object"`
+	TextLength  *int32          `json:"text_length,omitempty"`
+	AreaPixels  *float64        `json:"area_pixels,omitempty"`
+}
+
+// AssetOCRResultDTO mirrors the `ocr_result` object produced by
+// GetAssetWithRelations when include_ocr is requested.
+type AssetOCRResultDTO struct {
+	ModelID          string                `json:"model_id"`
+	TotalCount       *int32                `json:"total_count,omitempty"`
+	ProcessingTimeMs *int32                `json:"processing_time_ms,omitempty"`
+	CreatedAt        *time.Time            `json:"created_at,omitempty"`
+	UpdatedAt        *time.Time            `json:"updated_at,omitempty"`
+	TextItems        []AssetOCRTextItemDTO `json:"text_items"`
+}
+
+// AssetFaceItemDTO mirrors one detected face produced by GetAssetWithRelations.
+// BoundingBox and Expression are freeform jsonb and are left untyped.
+type AssetFaceItemDTO struct {
+	ID          int64           `json:"id"`
+	FaceID      *string         `json:"face_id,omitempty"`
+	BoundingBox json.RawMessage `json:"bounding_box,omitempty" swaggertype:"object"`
+	Confidence  *float64        `json:"confidence,omitempty"`
+	AgeGroup    *string         `json:"age_group,omitempty"`
+	Gender      *string         `json:"gender,omitempty"`
+	Ethnicity   *string         `json:"ethnicity,omitempty"`
+	Expression  *string         `json:"expression,omitempty"`
+	IsPrimary   *bool           `json:"is_primary,omitempty"`
+	ClusterID   *int32          `json:"cluster_id,omitempty"`
+	ClusterName *string         `json:"cluster_name,omitempty"`
+}
+
+// AssetFaceResultDTO mirrors the `face_result` object produced by
+// GetAssetWithRelations when include_faces is requested.
+type AssetFaceResultDTO struct {
+	ModelID          string             `json:"model_id"`
+	TotalFaces       *int32             `json:"total_faces,omitempty"`
+	ProcessingTimeMs *int32             `json:"processing_time_ms,omitempty"`
+	CreatedAt        *time.Time         `json:"created_at,omitempty"`
+	UpdatedAt        *time.Time         `json:"updated_at,omitempty"`
+	Faces            []AssetFaceItemDTO `json:"faces"`
+}
+
+// AssetDetailDTO is the typed response for GET /assets/{id}. It embeds the base
+// AssetDTO and exposes the optional relations populated by the include_* query
+// flags. Replaces the previous untyped map[string]interface{} response so the
+// contract is honest and frontend access is type-safe.
+type AssetDetailDTO struct {
+	AssetDTO
+	Thumbnails []AssetThumbnailDTO `json:"thumbnails,omitempty"`
+	Tags       []AssetTagDTO       `json:"tags,omitempty"`
+	Albums     []AssetAlbumRefDTO  `json:"albums,omitempty"`
+	OcrResult  *AssetOCRResultDTO  `json:"ocr_result,omitempty"`
+	FaceResult *AssetFaceResultDTO `json:"face_result,omitempty"`
+}
+
+// AssetDetailIncludes controls which optional relations ToAssetDetailDTO emits.
+type AssetDetailIncludes struct {
+	Thumbnails bool
+	Tags       bool
+	Albums     bool
+	Species    bool
+	OCR        bool
+	Faces      bool
+}
+
+// ToAssetDetailDTO converts a GetAssetWithRelations row into a typed
+// AssetDetailDTO, honoring the requested includes. Aggregate columns arrive as
+// raw JSON ([]byte); malformed or empty blobs degrade to nil rather than erroring.
+func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) AssetDetailDTO {
+	var id string
+	if r.AssetID.Valid {
+		id = uuid.UUID(r.AssetID.Bytes).String()
+	}
+	var storagePath string
+	if r.StoragePath != nil {
+		storagePath = *r.StoragePath
+	}
+	var uploadTime time.Time
+	if r.UploadTime.Valid {
+		uploadTime = r.UploadTime.Time
+	}
+	var takenTime *time.Time
+	if r.TakenTime.Valid {
+		t := r.TakenTime.Time
+		takenTime = &t
+	}
+	var deletedAt *time.Time
+	if r.DeletedAt.Valid {
+		t := r.DeletedAt.Time
+		deletedAt = &t
+	}
+	var repositoryID *string
+	if r.RepositoryID.Valid {
+		repoUUID := uuid.UUID(r.RepositoryID.Bytes).String()
+		repositoryID = &repoUUID
+	}
+
+	base := AssetDTO{
+		AssetID:              id,
+		OwnerID:              r.OwnerID,
+		RepositoryID:         repositoryID,
+		Type:                 r.Type,
+		OriginalFilename:     r.OriginalFilename,
+		StoragePath:          storagePath,
+		MimeType:             r.MimeType,
+		FileSize:             r.FileSize,
+		Hash:                 r.Hash,
+		Width:                r.Width,
+		Height:               r.Height,
+		Duration:             r.Duration,
+		UploadTime:           uploadTime,
+		TakenTime:            takenTime,
+		CaptureOffsetMinutes: r.CaptureOffsetMinutes,
+		Rating:               r.Rating,
+		Liked:                r.Liked,
+		IsDeleted:            r.IsDeleted,
+		DeletedAt:            deletedAt,
+		Metadata:             r.SpecificMetadata,
+		Status:               r.Status,
+	}
+
+	if inc.Species && len(r.SpeciesPredictions) > 0 {
+		var preds []dbtypes.SpeciesPredictionMeta
+		if err := json.Unmarshal(r.SpeciesPredictions, &preds); err == nil {
+			base.SpeciesPredictions = preds
+		}
+	}
+
+	detail := AssetDetailDTO{AssetDTO: base}
+
+	if inc.Thumbnails && len(r.Thumbnails) > 0 {
+		var thumbs []AssetThumbnailDTO
+		if err := json.Unmarshal(r.Thumbnails, &thumbs); err == nil {
+			detail.Thumbnails = thumbs
+		}
+	}
+	if inc.Tags && len(r.Tags) > 0 {
+		var tags []AssetTagDTO
+		if err := json.Unmarshal(r.Tags, &tags); err == nil {
+			detail.Tags = tags
+		}
+	}
+	if inc.Albums && len(r.Albums) > 0 {
+		var albums []AssetAlbumRefDTO
+		if err := json.Unmarshal(r.Albums, &albums); err == nil {
+			detail.Albums = albums
+		}
+	}
+	if inc.OCR && len(r.OcrResult) > 0 {
+		var ocr AssetOCRResultDTO
+		if err := json.Unmarshal(r.OcrResult, &ocr); err == nil {
+			detail.OcrResult = &ocr
+		}
+	}
+	if inc.Faces && len(r.FaceResult) > 0 {
+		var face AssetFaceResultDTO
+		if err := json.Unmarshal(r.FaceResult, &face); err == nil {
+			detail.FaceResult = &face
+		}
+	}
+
+	return detail
+}
+
 // AssetListResponseDTO represents the response structure for asset listing
 type AssetListResponseDTO struct {
 	Assets []AssetDTO `json:"assets"`
