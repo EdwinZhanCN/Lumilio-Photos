@@ -917,7 +917,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	idStr := c.Param("id")
 	assetID, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
@@ -926,7 +926,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 
 	// Validate size parameter
 	if size != "small" && size != "medium" && size != "large" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid size parameter. Must be 'small', 'medium', or 'large'"})
+		api.GinBadRequest(c, errors.New("invalid size parameter"), "Invalid size parameter. Must be 'small', 'medium', or 'large'")
 		return
 	}
 
@@ -939,18 +939,18 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), assetID, size)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
+			api.GinNotFound(c, err, "Thumbnail not found")
 			return
 		}
 		log.Printf("Failed to retrieve thumbnail metadata: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve thumbnail"})
+		api.GinInternalError(c, err, "Failed to retrieve thumbnail")
 		return
 	}
 
 	repository, err := h.getRepositoryForAsset(c.Request.Context(), asset)
 	if err != nil {
 		log.Printf("Failed to resolve repository for thumbnail request: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve repository"})
+		api.GinInternalError(c, err, "Failed to resolve repository")
 		return
 	}
 	fullPath := h.resolveRepositoryPath(repository.Path, thumbnail.StoragePath)
@@ -959,11 +959,11 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	fileInfo, err := os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail file not found"})
+			api.GinNotFound(c, err, "Thumbnail file not found")
 			return
 		}
 		log.Printf("Failed to get file info for %s: %v", fullPath, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to access thumbnail file"})
+		api.GinInternalError(c, err, "Failed to access thumbnail file")
 		return
 	}
 
@@ -2071,7 +2071,7 @@ func toSearchDebugItemDTOs(debug []service.SearchDebugItem) []dto.SearchDebugIte
 // @Accept json
 // @Produce json
 // @Param request body dto.AssetQueryRequestDTO true "Query parameters"
-// @Success 200 {object} dto.QueryAssetsResponse "Assets queried successfully"
+// @Success 200 {object} dto.QueryAssetsResponseDTO "Assets queried successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
@@ -3504,9 +3504,9 @@ func (h *AssetHandler) checkHashCollisionBeforeEnqueue(ctx context.Context, hash
 // @Param id path string true "Asset ID"
 // @Param request body dto.ReprocessAssetRequestDTO false "Reprocessing tasks (optional)"
 // @Success 200 {object} dto.ReprocessAssetResponseDTO
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 404 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/assets/{id}/reprocess [post]
 func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -3515,7 +3515,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
@@ -3540,7 +3540,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 
 		for _, task := range req.Tasks {
 			if !validQueues[task] {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid queue name: %s", task)})
+				api.GinBadRequest(c, fmt.Errorf("invalid queue name: %s", task), fmt.Sprintf("Invalid queue name: %s", task))
 				return
 			}
 		}
@@ -3549,17 +3549,17 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	// Get the asset to check its current status
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(assetID.String()); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID format"})
+		api.GinBadRequest(c, err, "Invalid asset ID format")
 		return
 	}
 
 	asset, err := h.queries.GetAssetByID(ctx, pgUUID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
+			api.GinNotFound(c, err, "Asset not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get asset"})
+		api.GinInternalError(c, err, "Failed to get asset")
 		return
 	}
 
@@ -3572,14 +3572,14 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	if len(asset.Status) > 0 {
 		currentStatus, err = status.FromJSONB(asset.Status)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse asset status"})
+			api.GinInternalError(c, err, "Failed to parse asset status")
 			return
 		}
 	}
 
 	// Check for fatal errors (skip state check to allow retry on any state)
 	if currentStatus.HasFatalErrors() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Asset has fatal errors that prevent reprocessing"})
+		api.GinBadRequest(c, errors.New("asset has fatal errors"), "Asset has fatal errors that prevent reprocessing")
 		return
 	}
 
@@ -3588,20 +3588,20 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		// Full retry - reset status and enqueue full processing job
 		updatedAsset, err := h.queries.ResetAssetStatusForRetry(ctx, pgUUID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset asset status"})
+			api.GinInternalError(c, err, "Failed to reset asset status")
 			return
 		}
 
 		// Get repository information
 		repository, err := h.queries.GetRepository(ctx, updatedAsset.RepositoryID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get repository"})
+			api.GinInternalError(c, err, "Failed to get repository")
 			return
 		}
 
 		// Check if storage path exists
 		if updatedAsset.StoragePath == nil || *updatedAsset.StoragePath == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Asset has no storage path"})
+			api.GinBadRequest(c, errors.New("asset has no storage path"), "Asset has no storage path")
 			return
 		}
 
@@ -3610,7 +3610,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 
 		// Check if the file exists
 		if _, err := os.Stat(assetPath); os.IsNotExist(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Asset file not found"})
+			api.GinNotFound(c, err, "Asset file not found")
 			return
 		}
 
@@ -3628,7 +3628,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			MimeType:         updatedAsset.MimeType,
 		}
 		if _, err := h.queueClient.Insert(ctx, metaArgs, &river.InsertOpts{Queue: "metadata_asset"}); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue metadata job"})
+			api.GinInternalError(c, err, "Failed to enqueue metadata job")
 			return
 		}
 
@@ -3640,7 +3640,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				StoragePath: storagePath,
 				AssetType:   assetType,
 			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue thumbnail job"})
+				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
 				return
 			}
 		case dbtypes.AssetTypeVideo:
@@ -3650,7 +3650,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				StoragePath: storagePath,
 				AssetType:   assetType,
 			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue thumbnail job"})
+				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
 				return
 			}
 			if _, err := h.queueClient.Insert(ctx, jobs.TranscodeArgs{
@@ -3659,7 +3659,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				StoragePath: storagePath,
 				AssetType:   assetType,
 			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue transcode job"})
+				api.GinInternalError(c, err, "Failed to enqueue transcode job")
 				return
 			}
 		case dbtypes.AssetTypeAudio:
@@ -3669,7 +3669,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				StoragePath: storagePath,
 				AssetType:   assetType,
 			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue transcode job"})
+				api.GinInternalError(c, err, "Failed to enqueue transcode job")
 				return
 			}
 		}
@@ -3684,7 +3684,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			RetryTasks: []string{"all_failed_tasks"}, // Indicate full retry
 		}
 
-		c.JSON(http.StatusOK, response)
+		api.JSONOK(c, response)
 		return
 	} else {
 		// Selective retry - enqueue selective retry job
@@ -3700,7 +3700,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			Queue: "retry_asset",
 		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue selective retry job"})
+			api.GinInternalError(c, err, "Failed to enqueue selective retry job")
 			return
 		}
 
@@ -3714,7 +3714,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			RetryTasks: req.Tasks,
 		}
 
-		c.JSON(http.StatusOK, response)
+		api.JSONOK(c, response)
 		return
 	}
 }
@@ -3737,17 +3737,17 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
 	stackInfo, err := h.stackService.GetStackByAsset(c.Request.Context(), assetID)
 	if err != nil {
 		if errors.Is(err, service.ErrStackNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Asset is not in a stack"})
+			api.GinNotFound(c, err, "Asset is not in a stack")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get stack"})
+		api.GinInternalError(c, err, "Failed to get stack")
 		return
 	}
 
@@ -3771,7 +3771,7 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 		},
 	}
 
-	c.JSON(http.StatusOK, response)
+	api.JSONOK(c, response)
 }
 
 // CreateManualStack manually groups assets into a stack.
@@ -3789,12 +3789,12 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 	var req dto.CreateManualStackRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		api.GinBadRequest(c, err, "Invalid request body")
 		return
 	}
 
 	if len(req.AssetIDs) < 2 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "At least 2 asset IDs are required"})
+		api.GinBadRequest(c, errors.New("at least 2 asset IDs are required"), "At least 2 asset IDs are required")
 		return
 	}
 
@@ -3802,7 +3802,7 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 	for i, idStr := range req.AssetIDs {
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid asset ID: %s", idStr)})
+			api.GinBadRequest(c, err, fmt.Sprintf("Invalid asset ID: %s", idStr))
 			return
 		}
 		assetIDs[i] = id
@@ -3811,10 +3811,10 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 	stackInfo, err := h.stackService.CreateManualStack(c.Request.Context(), assetIDs)
 	if err != nil {
 		if errors.Is(err, service.ErrAssetAlreadyStacked) {
-			c.JSON(http.StatusConflict, gin.H{"error": "One or more assets already belong to a stack"})
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "One or more assets already belong to a stack")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create stack"})
+		api.GinInternalError(c, err, "Failed to create stack")
 		return
 	}
 
@@ -3850,16 +3850,16 @@ func (h *AssetHandler) UnstackAsset(c *gin.Context) {
 	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
 	if err := h.stackService.RemoveFromStack(c.Request.Context(), assetID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unstack asset"})
+		api.GinInternalError(c, err, "Failed to unstack asset")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Asset removed from stack"})
+	api.JSONOK(c, api.SuccessResponse{Message: "Asset removed from stack"})
 }
 
 // AutoDetectStacks triggers automatic RAW+JPEG stack detection for a repository.
@@ -3875,17 +3875,17 @@ func (h *AssetHandler) AutoDetectStacks(c *gin.Context) {
 	repoIDStr := c.Param("id")
 	repoID, err := uuid.Parse(repoIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid repository ID"})
+		api.GinBadRequest(c, err, "Invalid repository ID")
 		return
 	}
 
 	count, err := h.stackService.AutoDetectStacks(c.Request.Context(), repoID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to detect stacks: %v", err)})
+		api.GinInternalError(c, err, "Failed to detect stacks")
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.AutoDetectStacksResponseDTO{
+	api.JSONOK(c, dto.AutoDetectStacksResponseDTO{
 		RepositoryID:  repoID.String(),
 		StacksCreated: count,
 	})

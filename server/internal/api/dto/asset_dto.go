@@ -309,15 +309,6 @@ type QueryAssetsResponseDTO struct {
 	Offset       int             `json:"offset" example:"0"`
 }
 
-// QueryAssetsResponse wraps QueryAssetsResponseDTO with the standard API envelope
-// to give swaggo a concrete type it can reference without generic resolution.
-type QueryAssetsResponse struct {
-	Code    int                    `json:"code" example:"0"`
-	Message string                 `json:"message" example:"success"`
-	Data    QueryAssetsResponseDTO `json:"data"`
-	Error   string                 `json:"error,omitempty"`
-}
-
 // SearchAssetsResponseDTO represents the response structure for searching assets
 type SearchAssetsResponseDTO struct {
 	TopItems            []BrowseItemDTO         `json:"top_items,omitempty"`

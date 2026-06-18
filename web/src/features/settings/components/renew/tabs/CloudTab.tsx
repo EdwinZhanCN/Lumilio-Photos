@@ -140,14 +140,14 @@ export default function CloudTab() {
           inputs: formValues,
         },
       });
-      const credential = result.data?.credential;
+      const credential = result.credential;
       if (!credential) {
         throw new Error(t("settings.cloud.errors.emptyCredentialResponse"));
       }
-      if (result.data?.auth_status === "challenge_required" && result.data.challenge) {
+      if (result.auth_status === "challenge_required" && result.challenge) {
         setPendingCredential(credential);
-        setPendingChallenge(result.data.challenge);
-        setChallengeValues(fieldInitialValues(result.data.challenge.fields));
+        setPendingChallenge(result.challenge);
+        setChallengeValues(fieldInitialValues(result.challenge.fields));
         setSuccessMsg(t("settings.cloud.messages.challengeRequired"));
       } else {
         resetForm();
@@ -197,14 +197,14 @@ export default function CloudTab() {
         params: { path: { id: credential.id ?? "" } },
         body: { inputs: {} },
       });
-      if (result.data?.auth_status === "connected") {
+      if (result.auth_status === "connected") {
         setSuccessMsg(t("settings.cloud.messages.reconnected"));
-      } else if (result.data?.auth_status === "password_required") {
+      } else if (result.auth_status === "password_required") {
         setErrorMsg(t("settings.cloud.errors.sessionExpired"));
-      } else if (result.data?.auth_status === "challenge_required" && result.data.challenge) {
-        setPendingCredential(result.data.credential as CloudCredential);
-        setPendingChallenge(result.data.challenge as CloudAuthChallenge);
-        setChallengeValues(fieldInitialValues((result.data.challenge as CloudAuthChallenge).fields));
+      } else if (result.auth_status === "challenge_required" && result.challenge) {
+        setPendingCredential(result.credential as CloudCredential);
+        setPendingChallenge(result.challenge as CloudAuthChallenge);
+        setChallengeValues(fieldInitialValues((result.challenge as CloudAuthChallenge).fields));
         setSuccessMsg(t("settings.cloud.messages.challengeRequired"));
         setIsAddOpen(true);
       }

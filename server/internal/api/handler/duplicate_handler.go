@@ -256,7 +256,7 @@ func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 		case errors.Is(err, service.ErrDuplicateGroupNotFound):
 			api.GinNotFound(c, err, "Duplicate group not found")
 		case errors.Is(err, service.ErrDuplicateGroupAlreadyResolved):
-			c.JSON(409, gin.H{"error": "Duplicate group already resolved"})
+			api.GinError(c, 409, err, 409, "Duplicate group already resolved")
 		case errors.Is(err, service.ErrDuplicateKeeperInvalid):
 			api.GinBadRequest(c, err, "Invalid keeper or duplicate selection")
 		default:
@@ -300,7 +300,7 @@ func (h *DuplicateHandler) DismissDuplicateGroup(c *gin.Context) {
 		case errors.Is(err, service.ErrDuplicateGroupNotFound):
 			api.GinNotFound(c, err, "Duplicate group not found")
 		case errors.Is(err, service.ErrDuplicateGroupAlreadyResolved):
-			c.JSON(409, gin.H{"error": "Duplicate group already resolved"})
+			api.GinError(c, 409, err, 409, "Duplicate group already resolved")
 		default:
 			log.Printf("dismiss duplicate group failed: %v", err)
 			api.GinInternalError(c, err, "Failed to dismiss duplicate group")

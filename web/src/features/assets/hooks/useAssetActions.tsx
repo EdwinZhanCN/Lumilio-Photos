@@ -113,23 +113,15 @@ export const useAssetActions = (): AssetActionsResult => {
           return {
             ...oldData,
             pages: oldData.pages.map((page: any) => {
-              if (page.data) {
-                const nextData = {
-                  ...page.data,
-                  assets: updateAssets(page.data.assets),
-                  results: updateAssets(page.data.results),
-                  top_results: updateAssets(page.data.top_results),
-                  items: updateBrowseItems(page.data.items),
-                  result_items: updateBrowseItems(page.data.result_items),
-                  top_items: updateBrowseItems(page.data.top_items),
-                };
-
-                return {
-                  ...page,
-                  data: nextData,
-                };
-              }
-              return page;
+              return {
+                ...page,
+                assets: updateAssets(page.assets),
+                results: updateAssets(page.results),
+                top_results: updateAssets(page.top_results),
+                items: updateBrowseItems(page.items),
+                result_items: updateBrowseItems(page.result_items),
+                top_items: updateBrowseItems(page.top_items),
+              };
             }),
           };
         }

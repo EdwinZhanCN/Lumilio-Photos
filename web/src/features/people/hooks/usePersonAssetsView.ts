@@ -16,7 +16,7 @@ import {
   selectFiltersEnabled,
 } from "@/features/assets/slices/filters.slice";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { components, paths } from "@/lib/http-commons/schema.d.ts";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 import { useWorkingRepository } from "@/features/settings";
 import {
   flattenAssetGroups,
@@ -35,13 +35,6 @@ type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
 type QueryAssetsResponseDTO =
   components["schemas"]["dto.QueryAssetsResponseDTO"];
-
-type PersonAssetsApiEnvelope = Omit<
-  paths["/api/v1/people/{id}/assets/list"]["post"]["responses"][200]["content"]["application/json"],
-  "data"
-> & {
-  data?: QueryAssetsResponseDTO;
-};
 
 const normalizeSearchSortBy = (
   sortBy?: SortByType,
@@ -132,7 +125,7 @@ export function usePersonAssetsView(
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as PersonAssetsApiEnvelope | undefined)?.data;
+        const responseData = lastPage as QueryAssetsResponseDTO | undefined;
         const total = responseData?.total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
@@ -146,15 +139,15 @@ export function usePersonAssetsView(
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<PersonAssetsApiEnvelope>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsResponseDTO>, unknown>;
 
   const pages = useMemo(() => {
-    const responsePages = (query.data?.pages ?? []) as PersonAssetsApiEnvelope[];
+    const responsePages = (query.data?.pages ?? []) as QueryAssetsResponseDTO[];
     const pageParams = query.data?.pageParams ?? [];
 
     return responsePages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
-      const responseData = page?.data;
+      const responseData = page;
       const browseGroups = browseGroupsFromQueryLikePage({
         items: responseData?.items,
         sortBy,

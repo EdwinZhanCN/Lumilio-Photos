@@ -186,7 +186,7 @@ func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 			return
 		}
 	}
-	api.JSONOK(c, nil)
+	api.JSONOK(c, api.SuccessResponse{Message: "Pin layout updated"})
 }
 
 // DeletePin removes a board widget.
@@ -213,7 +213,7 @@ func (h *AgentHandler) DeletePin(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to delete pin")
 		return
 	}
-	api.JSONOK(c, nil)
+	api.JSONOK(c, api.SuccessResponse{Message: "Pin deleted"})
 }
 
 func toAgentPinDTO(pin repo.AgentPin) dto.AgentPinDTO {

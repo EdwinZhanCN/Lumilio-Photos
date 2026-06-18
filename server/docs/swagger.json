@@ -453,6 +453,182 @@
                 },
                 "type": "object"
             },
+            "dto.AlbumAssetDTO": {
+                "properties": {
+                    "added_time": {
+                        "type": "string"
+                    },
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "capture_offset_minutes": {
+                        "type": "integer"
+                    },
+                    "deleted_at": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "file_size": {
+                        "type": "integer"
+                    },
+                    "hash": {
+                        "type": "string"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "is_deleted": {
+                        "type": "boolean"
+                    },
+                    "liked": {
+                        "type": "boolean"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "original_filename": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "type": "integer"
+                    },
+                    "repository_id": {
+                        "type": "string"
+                    },
+                    "species_predictions": {
+                        "items": {
+                            "$ref": "#/components/schemas/dbtypes.SpeciesPredictionMeta"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "specific_metadata": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/dbtypes.PhotoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.VideoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.AudioSpecificMetadata"
+                            }
+                        ],
+                        "type": "object"
+                    },
+                    "stack": {
+                        "$ref": "#/components/schemas/dto.StackPreviewDTO"
+                    },
+                    "status": {
+                        "items": {
+                            "type": "integer"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "storage_path": {
+                        "type": "string"
+                    },
+                    "taken_time": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "upload_time": {
+                        "type": "string"
+                    },
+                    "width": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AlbumAssetsResponseDTO": {
+                "properties": {
+                    "album_id": {
+                        "type": "integer"
+                    },
+                    "assets": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AlbumAssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "count": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetAlbumDTO": {
+                "properties": {
+                    "added_time": {
+                        "type": "string"
+                    },
+                    "album_id": {
+                        "type": "integer"
+                    },
+                    "album_name": {
+                        "type": "string"
+                    },
+                    "album_type": {
+                        "type": "string"
+                    },
+                    "asset_count": {
+                        "type": "integer"
+                    },
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "display_cover_asset_id": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetAlbumsResponseDTO": {
+                "properties": {
+                    "albums": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetAlbumDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetDTO": {
                 "properties": {
                     "asset_id": {
@@ -2627,25 +2803,6 @@
                     },
                     "total_sessions": {
                         "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "dto.QueryAssetsResponse": {
-                "properties": {
-                    "code": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/dto.QueryAssetsResponseDTO"
-                    },
-                    "error": {
-                        "type": "string"
-                    },
-                    "message": {
-                        "example": "success",
-                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -5579,7 +5736,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                    "$ref": "#/components/schemas/dto.AlbumAssetsResponseDTO"
                                 }
                             }
                         },
@@ -6667,7 +6824,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.QueryAssetsResponse"
+                                    "$ref": "#/components/schemas/dto.QueryAssetsResponseDTO"
                                 }
                             }
                         },
@@ -7299,7 +7456,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                    "$ref": "#/components/schemas/dto.AssetAlbumsResponseDTO"
                                 }
                             }
                         },
@@ -8211,10 +8368,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8224,10 +8378,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8237,10 +8388,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },

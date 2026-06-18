@@ -234,7 +234,7 @@ func (h *AuthHandler) DeletePasskey(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{"deleted": true})
+	api.JSONOK(c, api.SuccessResponse{Message: "Passkey deleted successfully"})
 }
 
 func requestOrigin(c *gin.Context) string {

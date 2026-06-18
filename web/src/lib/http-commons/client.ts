@@ -47,8 +47,8 @@ const authMiddleware: Middleware = {
 
           if (refreshResponse.ok) {
             const data = await refreshResponse.json();
-            if (data.code === 0 && data.data) {
-              const { token, refreshToken: newRefreshToken } = data.data;
+            if (data.token) {
+              const { token, refreshToken: newRefreshToken } = data;
               saveToken(token, newRefreshToken);
 
               // Retry original request with new token

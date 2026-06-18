@@ -21,7 +21,7 @@ import {
   selectFiltersEnabled,
 } from "../slices/filters.slice";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { components, paths } from "@/lib/http-commons/schema.d.ts";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 import { Asset } from "@/lib/assets/types";
 import { useWorkingRepository } from "@/features/settings";
 import {
@@ -48,19 +48,6 @@ type SearchAssetsRequestDTO =
   components["schemas"]["dto.SearchAssetsRequestDTO"];
 type SearchAssetsResponseDTO =
   components["schemas"]["dto.SearchAssetsResponseDTO"];
-
-type QueryAssetsApiEnvelope = Omit<
-  paths["/api/v1/assets/list"]["post"]["responses"][200]["content"]["application/json"],
-  "data"
-> & {
-  data?: QueryAssetsResponseDTO;
-};
-type SearchAssetsApiEnvelope = Omit<
-  paths["/api/v1/assets/search"]["post"]["responses"][200]["content"]["application/json"],
-  "data"
-> & {
-  data?: SearchAssetsResponseDTO;
-};
 
 type SearchTopResultsMeta = {
   enabled: boolean;
@@ -284,8 +271,7 @@ export const useAssetsViewQuery = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as QueryAssetsApiEnvelope | undefined)
-          ?.data;
+        const responseData = lastPage as QueryAssetsResponseDTO | undefined;
         const total = responseData?.total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
@@ -299,15 +285,15 @@ export const useAssetsViewQuery = (
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsApiEnvelope>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsResponseDTO>, unknown>;
 
   const assetsPages = useMemo(() => {
-    const pages = (query.data?.pages ?? []) as QueryAssetsApiEnvelope[];
+    const pages = (query.data?.pages ?? []) as QueryAssetsResponseDTO[];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
-      const responseData = page?.data;
+      const responseData = page;
       const browseGroups = browseGroupsFromQueryLikePage({
         items: responseData?.items,
         sortBy,
@@ -466,8 +452,7 @@ export const usePhotoSearchView = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as SearchAssetsApiEnvelope | undefined)
-          ?.data;
+        const responseData = lastPage as SearchAssetsResponseDTO | undefined;
         const total = responseData?.results_total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
@@ -481,14 +466,14 @@ export const usePhotoSearchView = (
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<SearchAssetsApiEnvelope>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<SearchAssetsResponseDTO>, unknown>;
 
   const searchPages = useMemo(() => {
-    const pages = (query.data?.pages ?? []) as SearchAssetsApiEnvelope[];
+    const pages = (query.data?.pages ?? []) as SearchAssetsResponseDTO[];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {
-      const responseData = page?.data;
+      const responseData = page;
       const offset = Number(pageParams[index] ?? 0) || 0;
       const total = responseData?.results_total_visible;
       const loadedCount = countLoadedBrowseRowsFromPage({

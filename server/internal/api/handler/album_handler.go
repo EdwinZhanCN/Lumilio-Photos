@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"server/internal/api"
 	"server/internal/api/dto"
@@ -28,11 +29,74 @@ func optionalUUIDToString(value pgtype.UUID) *string {
 	return &id
 }
 
+func optionalPGTime(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+
+	return &value.Time
+}
+
 func toAlbumResponseDTO(album dto.AlbumDTO, assetCount int64, displayCoverAssetID *string) dto.GetAlbumResponseDTO {
 	return dto.GetAlbumResponseDTO{
 		AlbumDTO:            album,
 		AssetCount:          assetCount,
 		DisplayCoverAssetID: displayCoverAssetID,
+	}
+}
+
+func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
+	return dto.AlbumAssetDTO{
+		AssetDTO: dto.ToAssetDTO(repo.Asset{
+			AssetID:              row.AssetID,
+			OwnerID:              row.OwnerID,
+			Type:                 row.Type,
+			OriginalFilename:     row.OriginalFilename,
+			StoragePath:          row.StoragePath,
+			MimeType:             row.MimeType,
+			FileSize:             row.FileSize,
+			Hash:                 row.Hash,
+			Width:                row.Width,
+			Height:               row.Height,
+			Duration:             row.Duration,
+			UploadTime:           row.UploadTime,
+			TakenTime:            row.TakenTime,
+			CaptureOffsetMinutes: row.CaptureOffsetMinutes,
+			IsDeleted:            row.IsDeleted,
+			DeletedAt:            row.DeletedAt,
+			SpecificMetadata:     row.SpecificMetadata,
+			Rating:               row.Rating,
+			Liked:                row.Liked,
+			RepositoryID:         row.RepositoryID,
+			Status:               row.Status,
+			UpdatedAt:            row.UpdatedAt,
+			GpsLatitude:          row.GpsLatitude,
+			GpsLongitude:         row.GpsLongitude,
+			GpsGeohash5:          row.GpsGeohash5,
+			GpsGeohash7:          row.GpsGeohash7,
+			ExifRaw:              row.ExifRaw,
+		}),
+		Position:  row.Position,
+		AddedTime: optionalPGTime(row.AddedTime),
+	}
+}
+
+func toAssetAlbumDTO(row repo.GetAssetAlbumsRow) dto.AssetAlbumDTO {
+	return dto.AssetAlbumDTO{
+		GetAlbumResponseDTO: dto.GetAlbumResponseDTO{
+			AlbumDTO: dto.ToAlbumDTO(repo.Album{
+				AlbumID:      row.AlbumID,
+				UserID:       row.UserID,
+				AlbumName:    row.AlbumName,
+				CreatedAt:    row.CreatedAt,
+				UpdatedAt:    row.UpdatedAt,
+				Description:  row.Description,
+				CoverAssetID: row.CoverAssetID,
+				AlbumType:    row.AlbumType,
+			}),
+		},
+		Position:  row.Position,
+		AddedTime: optionalPGTime(row.AddedTime),
 	}
 }
 
@@ -406,7 +470,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{"message": "Album deleted successfully"})
+	api.JSONOK(c, api.SuccessResponse{Message: "Album deleted successfully"})
 }
 
 // GetAlbumAssets retrieves all assets in an album
@@ -417,7 +481,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.SuccessResponse "Assets retrieved successfully"
+// @Success 200 {object} dto.AlbumAssetsResponseDTO "Assets retrieved successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid album ID"
 // @Failure 404 {object} api.ErrorResponse "Album not found"
 // @Failure 500 {object} api.ErrorResponse "Failed to retrieve album assets"
@@ -450,10 +514,15 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{
-		"album_id": albumID,
-		"assets":   assets,
-		"count":    len(assets),
+	items := make([]dto.AlbumAssetDTO, 0, len(assets))
+	for _, asset := range assets {
+		items = append(items, toAlbumAssetDTO(asset))
+	}
+
+	api.JSONOK(c, dto.AlbumAssetsResponseDTO{
+		AlbumID: albumID,
+		Assets:  items,
+		Count:   len(items),
 	})
 }
 
@@ -526,7 +595,7 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 	}
 	h.enqueueBioClipForAddedAsset(c.Request.Context(), *album, asset)
 
-	api.JSONOK(c, gin.H{"message": "Asset added to album successfully"})
+	api.JSONOK(c, api.SuccessResponse{Message: "Asset added to album successfully"})
 }
 
 // RebuildAlbumBioClip queues BioCLIP processing for missing species predictions in a bio album.
@@ -657,7 +726,7 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{"message": "Asset removed from album successfully"})
+	api.JSONOK(c, api.SuccessResponse{Message: "Asset removed from album successfully"})
 }
 
 // UpdateAssetPositionInAlbum updates the position of an asset within an album
@@ -712,7 +781,7 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{"message": "Asset position updated successfully"})
+	api.JSONOK(c, api.SuccessResponse{Message: "Asset position updated successfully"})
 }
 
 // GetAssetAlbums retrieves all albums that contain a specific asset
@@ -722,7 +791,7 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)"
-// @Success 200 {object} api.SuccessResponse "Albums retrieved successfully"
+// @Success 200 {object} dto.AssetAlbumsResponseDTO "Albums retrieved successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
 // @Failure 500 {object} api.ErrorResponse "Failed to retrieve asset albums"
 // @Router /api/v1/assets/{id}/albums [get]
@@ -759,9 +828,14 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		}
 	}
 
-	api.JSONOK(c, gin.H{
-		"asset_id": assetID,
-		"albums":   filteredAlbums,
-		"count":    len(filteredAlbums),
+	items := make([]dto.AssetAlbumDTO, 0, len(filteredAlbums))
+	for _, album := range filteredAlbums {
+		items = append(items, toAssetAlbumDTO(album))
+	}
+
+	api.JSONOK(c, dto.AssetAlbumsResponseDTO{
+		AssetID: assetID.String(),
+		Albums:  items,
+		Count:   len(items),
 	})
 }

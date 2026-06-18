@@ -255,7 +255,9 @@ func NewRouter(
 	{
 		// Health check
 		v1.GET("/health", func(c *gin.Context) {
-			JSONOK(c, gin.H{"status": "ok"})
+			JSONOK(c, struct {
+				Status string `json:"status"`
+			}{Status: "ok"})
 		})
 		v1.GET("/capabilities", authController.OptionalAuthMiddleware(), capabilitiesController.GetCapabilities)
 
