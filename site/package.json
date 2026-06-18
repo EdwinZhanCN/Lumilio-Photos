@@ -21,12 +21,5 @@
     "vitepress-markdown-timeline": "^1.2.2",
     "vitepress-plugin-group-icons": "^1.7.5",
     "vitepress-plugin-mermaid": "^2.0.17"
-  },
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "11.7.0",
-      "onFail": "download"
-    }
   }
 }
