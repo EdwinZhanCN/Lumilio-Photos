@@ -71,15 +71,30 @@ neither typed nor matches its annotation.
   `web/src/features/assets/`.
 - `StackDetailModal.tsx` and `StackCarouselOverlay.tsx` display stacks but expose
   no action to form or break a stack, so the capability is dead-ended in the UI.
+- Cross-plan dependency: the selection-toolbar entry point for "Stack selected"
+  should be implemented through
+  [assets-bulk-actions.md](assets-bulk-actions.md)'s contextual bulk-action
+  model, because that plan owns header action composition and whole-stack
+  selection semantics. F3 owns the stack API mutations and stack detail/overlay
+  actions; the bulk-action plan owns how the multi-selection action is exposed.
 
-### F4 — Soft-delete with no restore path (MEDIUM, product decision)
+### F4 — Soft-delete with no restore path (MEDIUM) — DECIDED
 
 - `DeleteAsset` soft-deletes (`is_deleted` / `deleted_at`), but there is no
   restore endpoint and no trash view. The frontend shows `delete.success` with no
   recovery affordance, so deletes are effectively permanent to users despite the
   recoverable backend state. This conflicts with the local-first
-  "preserve original media" belief. Needs a product decision (add trash/restore
-  vs. document delete as terminal) before implementing.
+  "preserve original media" belief.
+- Product decision: normal delete becomes **Move to Trash**, not permanent
+  deletion. Add Trash + Restore now; do not implement permanent delete in this
+  milestone. A future permanent-delete path is tracked in the tech-debt tracker
+  and must be explicit, Trash-only, strongly confirmed, and never confused with
+  ordinary delete.
+- Implementation dependency: finish
+  [assets-bulk-actions.md](assets-bulk-actions.md) Steps 1-7 first. Trash/Restore
+  should reuse that contextual bulk-action model: main library actions can expose
+  "Move to Trash", while the Trash view can expose "Restore" without hard-coding
+  route-specific behavior into `AssetsPageHeader`.
 
 ### F5 — `refreshAsset` type/impl signature mismatch + dead alias (LOW)
 
@@ -168,13 +183,26 @@ Ordered by severity; F1/F2 are the priority and self-contained.
 - Surface actions in `StackDetailModal` / selection toolbar: "Stack selected"
   (≥2 selected) and "Remove from stack" inside the stack detail view. Add i18n
   keys via the extract flow.
+- For the selection toolbar path, treat
+  [assets-bulk-actions.md](assets-bulk-actions.md) as the implementation plan for
+  the action slot, selection context, and collapsed-stack impact rules. Do not
+  add a parallel ad-hoc stack menu in `AssetsPageHeader`; add a stack custom
+  action to the bulk-action model instead.
 
-### Step 4 — Trash/restore decision (F4)
+### Step 4 — Add Trash/Restore (F4)
 
-- Product decision required (see Open Questions). If "add restore": add
-  `POST /assets/:id/restore` (clears `is_deleted`/`deleted_at`, owner-scoped) +
-  a Trash view filtering `is_deleted=true`; if "terminal": adjust delete copy to
-  make permanence explicit and log the decision in the tech-debt tracker.
+- Rename ordinary delete UX to "Move to Trash"; keep it as a soft-delete that
+  sets `is_deleted` / `deleted_at` and never removes original media.
+- Add `POST /assets/:id/restore` (clears `is_deleted` / `deleted_at`,
+  owner-scoped) plus bulk restore support for Trash selection flows.
+- Add a Trash view filtering `is_deleted=true`; its primary contextual bulk
+  action should be "Restore".
+- Do not implement permanent delete or automatic Trash retention in this
+  milestone. Track that as future work only.
+- Frontend dependency: complete
+  [assets-bulk-actions.md](assets-bulk-actions.md) Steps 1-7 first so
+  "Move to Trash" and "Restore" can be contextual bulk actions rather than
+  one-off header branches.
 
 ### Step 5 — Type/cleanup hygiene (F5–F8)
 
@@ -204,8 +232,9 @@ Ordered by severity; F1/F2 are the priority and self-contained.
 
 ## Open Questions
 
-1. **F4**: add trash/restore (restore endpoint + Trash view) now, or document
-   delete as terminal for this milestone? *(still open)*
+1. ~~**F4**: add trash/restore (restore endpoint + Trash view) now, or document
+   delete as terminal for this milestone?~~ **Resolved:** add Trash/Restore now;
+   no permanent delete in this milestone.
 2. ~~**F1**: extend `AssetDTO` vs. dedicated `AssetDetailDTO`?~~ **Resolved:**
    dedicated `AssetDetailDTO` (keeps list payloads lean).
 3. ~~**F2**: `OptionalAuthMiddleware` + per-handler checks vs. `AuthMiddleware`?~~
