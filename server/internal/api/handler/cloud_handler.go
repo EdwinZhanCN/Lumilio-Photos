@@ -32,9 +32,9 @@ func NewCloudHandler(cloudService cloud.CloudSyncService) *CloudHandler {
 // @Tags cloud
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.ListCloudProvidersResponse} "Provider list"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.ListCloudProvidersResponse "Provider list"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/providers [get]
 func (h *CloudHandler) ListProviders(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -51,7 +51,7 @@ func (h *CloudHandler) ListProviders(c *gin.Context) {
 	for _, provider := range providers {
 		items = append(items, toCloudProviderDTO(provider))
 	}
-	api.GinSuccess(c, dto.ListCloudProvidersResponse{Providers: items})
+	api.JSONOK(c, dto.ListCloudProvidersResponse{Providers: items})
 }
 
 // ListCredentials returns all saved cloud credentials.
@@ -60,9 +60,9 @@ func (h *CloudHandler) ListProviders(c *gin.Context) {
 // @Tags cloud
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.ListCloudCredentialsResponse} "Credential list"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.ListCloudCredentialsResponse "Credential list"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials [get]
 func (h *CloudHandler) ListCredentials(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -79,7 +79,7 @@ func (h *CloudHandler) ListCredentials(c *gin.Context) {
 	for _, credential := range credentials {
 		items = append(items, toCloudCredentialDTO(credential, h.cloudService.ProviderTitle(cloud.ProviderKind(credential.Provider))))
 	}
-	api.GinSuccess(c, dto.ListCloudCredentialsResponse{Credentials: items})
+	api.JSONOK(c, dto.ListCloudCredentialsResponse{Credentials: items})
 }
 
 // CreateCredential initiates cloud credential creation.
@@ -90,10 +90,10 @@ func (h *CloudHandler) ListCredentials(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateCloudCredentialRequest true "Cloud credential"
-// @Success 200 {object} api.Result{data=dto.CreateCloudCredentialResponse} "Credential creation result"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.CreateCloudCredentialResponse "Credential creation result"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials [post]
 func (h *CloudHandler) CreateCredential(c *gin.Context) {
 	user, ok := requireAdminUser(c)
@@ -122,7 +122,7 @@ func (h *CloudHandler) CreateCredential(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.CreateCloudCredentialResponse{
+	api.JSONOK(c, dto.CreateCloudCredentialResponse{
 		Credential: toCloudCredentialDTO(result.Credential, h.cloudService.ProviderTitle(cloud.ProviderKind(result.Credential.Provider))),
 		AuthStatus: result.AuthStatus,
 		Challenge:  toCloudAuthChallengeDTO(result.Challenge),
@@ -138,10 +138,10 @@ func (h *CloudHandler) CreateCredential(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Credential UUID"
 // @Param request body dto.VerifyCloudAuthChallengeRequest true "Challenge inputs"
-// @Success 200 {object} api.Result{data=dto.VerifyCloudAuthChallengeResponse} "Challenge verified successfully"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.VerifyCloudAuthChallengeResponse "Challenge verified successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id}/auth-challenge [post]
 func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -172,7 +172,7 @@ func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.VerifyCloudAuthChallengeResponse{
+	api.JSONOK(c, dto.VerifyCloudAuthChallengeResponse{
 		Credential: toCloudCredentialDTO(result.Credential, h.cloudService.ProviderTitle(cloud.ProviderKind(result.Credential.Provider))),
 		AuthStatus: result.AuthStatus,
 	})
@@ -185,10 +185,10 @@ func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Credential UUID"
-// @Success 200 {object} api.Result "Credential disconnected"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} api.SuccessResponse "Credential disconnected"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id}/disconnect [post]
 func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -206,7 +206,7 @@ func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"message": "credential disconnected"})
+	api.JSONOK(c, gin.H{"message": "credential disconnected"})
 }
 
 // ReconnectCredential re-authenticates a disconnected or errored credential.
@@ -218,10 +218,10 @@ func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Credential UUID"
 // @Param request body dto.ReconnectCloudCredentialRequest true "Reconnect inputs"
-// @Success 200 {object} api.Result{data=dto.CreateCloudCredentialResponse} "Reconnect result"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.CreateCloudCredentialResponse "Reconnect result"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id}/reconnect [post]
 func (h *CloudHandler) ReconnectCredential(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -252,7 +252,7 @@ func (h *CloudHandler) ReconnectCredential(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.CreateCloudCredentialResponse{
+	api.JSONOK(c, dto.CreateCloudCredentialResponse{
 		Credential: toCloudCredentialDTO(result.Credential, h.cloudService.ProviderTitle(cloud.ProviderKind(result.Credential.Provider))),
 		AuthStatus: result.AuthStatus,
 		Challenge:  toCloudAuthChallengeDTO(result.Challenge),
@@ -266,10 +266,10 @@ func (h *CloudHandler) ReconnectCredential(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Credential UUID"
-// @Success 200 {object} api.Result "Credential removed"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} api.SuccessResponse "Credential removed"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id} [delete]
 func (h *CloudHandler) RemoveCredential(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -287,7 +287,7 @@ func (h *CloudHandler) RemoveCredential(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"message": "credential removed"})
+	api.JSONOK(c, gin.H{"message": "credential removed"})
 }
 
 // StartRepositoryImport starts a cloud import for a repository's binding.
@@ -297,10 +297,10 @@ func (h *CloudHandler) RemoveCredential(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
-// @Success 200 {object} api.Result{data=dto.StartCloudImportResponse} "Import started"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.StartCloudImportResponse "Import started"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/repositories/{id}/cloud/import [post]
 func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 	user, ok := requireAdminUser(c)
@@ -329,7 +329,7 @@ func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to load cloud import run")
 		return
 	}
-	api.GinSuccess(c, dto.StartCloudImportResponse{Run: toCloudImportRunDTO(run)})
+	api.JSONOK(c, dto.StartCloudImportResponse{Run: toCloudImportRunDTO(run)})
 }
 
 // GetRepositoryCloudStatus returns cloud binding and latest import status for a repository.
@@ -339,10 +339,10 @@ func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
-// @Success 200 {object} api.Result{data=dto.RepositoryCloudStatusDTO} "Repository cloud status"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.RepositoryCloudStatusDTO "Repository cloud status"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/repositories/{id}/cloud [get]
 func (h *CloudHandler) GetRepositoryCloudStatus(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -360,7 +360,7 @@ func (h *CloudHandler) GetRepositoryCloudStatus(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to load repository cloud status")
 		return
 	}
-	api.GinSuccess(c, toRepositoryCloudStatusDTO(status, h.cloudService))
+	api.JSONOK(c, toRepositoryCloudStatusDTO(status, h.cloudService))
 }
 
 // GetImportRun returns a cloud import run.
@@ -370,10 +370,10 @@ func (h *CloudHandler) GetRepositoryCloudStatus(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Import run UUID"
-// @Success 200 {object} api.Result{data=dto.CloudImportRunDTO} "Import run"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.CloudImportRunDTO "Import run"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/import-runs/{id} [get]
 func (h *CloudHandler) GetImportRun(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -391,7 +391,7 @@ func (h *CloudHandler) GetImportRun(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to load cloud import run")
 		return
 	}
-	api.GinSuccess(c, toCloudImportRunDTO(run))
+	api.JSONOK(c, toCloudImportRunDTO(run))
 }
 
 // TriggerSync is kept temporarily as an explicit deprecation response.
@@ -400,7 +400,7 @@ func (h *CloudHandler) GetImportRun(c *gin.Context) {
 // @Tags cloud
 // @Produce json
 // @Security BearerAuth
-// @Failure 400 {object} api.Result "Deprecated endpoint"
+// @Failure 400 {object} api.ErrorResponse "Deprecated endpoint"
 // @Router /api/v1/cloud/sync [post]
 func (h *CloudHandler) TriggerSync(c *gin.Context) {
 	api.GinBadRequest(c, errors.New("deprecated endpoint"), "Use repo-scoped cloud import endpoints")

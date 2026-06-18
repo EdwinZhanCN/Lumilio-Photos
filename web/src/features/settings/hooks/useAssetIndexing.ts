@@ -3,9 +3,6 @@ import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
 
 type Schemas = components["schemas"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
 
 type IndexingRepositoryListResponseDTO =
   Schemas["dto.IndexingRepositoryListResponseDTO"];
@@ -94,7 +91,7 @@ function normalizeAssetIndexingStats(
 }
 
 export function useIndexingRepositories(): UseQueryResult<
-  ApiResult<IndexingRepositoryListResponseDTO>,
+  IndexingRepositoryListResponseDTO,
   unknown
 > & {
   repositories: IndexingRepositoryOption[];
@@ -107,16 +104,16 @@ export function useIndexingRepositories(): UseQueryResult<
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<IndexingRepositoryListResponseDTO>, unknown>;
+  ) as UseQueryResult<IndexingRepositoryListResponseDTO, unknown>;
 
   return {
     ...query,
-    repositories: normalizeIndexingRepositories(query.data?.data),
+    repositories: normalizeIndexingRepositories(query.data),
   };
 }
 
 export function useAssetIndexingStats(repositoryId?: string): UseQueryResult<
-  ApiResult<AssetIndexingStatsResponseDTO>,
+  AssetIndexingStatsResponseDTO,
   unknown
 > & {
   stats?: AssetIndexingStats;
@@ -133,11 +130,11 @@ export function useAssetIndexingStats(repositoryId?: string): UseQueryResult<
       refetchInterval: 15_000,
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<AssetIndexingStatsResponseDTO>, unknown>;
+  ) as UseQueryResult<AssetIndexingStatsResponseDTO, unknown>;
 
   return {
     ...query,
-    stats: normalizeAssetIndexingStats(query.data?.data),
+    stats: normalizeAssetIndexingStats(query.data),
   };
 }
 
@@ -156,8 +153,8 @@ export function useRebuildAssetIndexes() {
 export function extractRebuildResponseData(
   raw: unknown,
 ): RebuildAssetIndexesResponse | undefined {
-  if (raw && typeof raw === "object" && "data" in raw) {
-    return (raw as { data?: RebuildAssetIndexesResponse }).data;
+  if (raw && typeof raw === "object") {
+    return raw as RebuildAssetIndexesResponse;
   }
   return undefined;
 }

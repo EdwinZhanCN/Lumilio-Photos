@@ -99,9 +99,9 @@ const (
 // @Tags stats
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=FocalLengthDistributionResponse}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} FocalLengthDistributionResponse
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/stats/focal-length [get]
 func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 	repositoryID, ok := parseOptionalRepositoryUUID(c)
@@ -138,7 +138,7 @@ func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 		Total: total,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // GetCameraLensStats godoc
@@ -148,9 +148,9 @@ func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 // @Produce json
 // @Param limit query int false "Number of results to return" default(20)
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=CameraLensStatsResponse}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} CameraLensStatsResponse
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/stats/camera-lens [get]
 func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 	// Parse limit parameter
@@ -204,7 +204,7 @@ func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 		Total: total,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // GetTimeDistribution godoc
@@ -214,9 +214,9 @@ func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 // @Produce json
 // @Param type query string false "Distribution type: hourly or monthly" default(hourly) Enums(hourly, monthly)
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=TimeDistributionResponse}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} TimeDistributionResponse
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/stats/time-distribution [get]
 func (h *StatsHandler) GetTimeDistribution(c *gin.Context) {
 	distType := c.DefaultQuery("type", "hourly")
@@ -248,7 +248,7 @@ func (h *StatsHandler) GetTimeDistribution(c *gin.Context) {
 		Type: distType,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // getHourlyDistribution fetches hourly time distribution
@@ -305,9 +305,9 @@ func (h *StatsHandler) getMonthlyDistribution(c *gin.Context, repositoryID pgtyp
 // @Param end_date query string false "End date in YYYY-MM-DD, inclusive (must be used with start_date)"
 // @Param days query int false "Deprecated fallback: number of days to look back (used only when year/start_date/end_date are absent)"
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=HeatmapResponse}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} HeatmapResponse
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/stats/daily-activity [get]
 func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 	startDate, endDate, err := resolveHeatmapRange(c, time.Now())
@@ -354,7 +354,7 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 		Data: data,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 func resolveHeatmapRange(c *gin.Context, now time.Time) (time.Time, time.Time, error) {
@@ -422,9 +422,9 @@ func resolveHeatmapRange(c *gin.Context, now time.Time) (time.Time, time.Time, e
 // @Tags stats
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=AvailableYearsResponse}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} AvailableYearsResponse
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/stats/available-years [get]
 func (h *StatsHandler) GetAvailableYears(c *gin.Context) {
 	repositoryID, ok := parseOptionalRepositoryUUID(c)
@@ -447,7 +447,7 @@ func (h *StatsHandler) GetAvailableYears(c *gin.Context) {
 		Years: years,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 func parseOptionalRepositoryUUID(c *gin.Context) (pgtype.UUID, bool) {

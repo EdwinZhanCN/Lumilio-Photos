@@ -81,7 +81,7 @@ export function useUploadProcess(): useUploadProcessReturn {
   const batchUploadMutation = useBatchUploadMutation();
   const chunkedUploadMutation = useChunkedUploadMutation();
   const uploadConfigQuery = useUploadConfig();
-  const serverUploadConfig = uploadConfigQuery.data?.data;
+  const serverUploadConfig = uploadConfigQuery.data;
 
   const {
     generateHashCodes,
@@ -217,7 +217,7 @@ export function useUploadProcess(): useUploadProcessReturn {
           },
         });
 
-        const batchResults = response.data?.results || [];
+        const batchResults = response.results || [];
         results.push(...batchResults);
 
         const sessionsByFileName = new Map<string, FileUploadSession[]>();
@@ -281,7 +281,7 @@ export function useUploadProcess(): useUploadProcessReturn {
           },
         });
 
-        const result = resp.data?.results?.[0] || {
+        const result = resp.results?.[0] || {
           success: false,
           file_name: session.file.name,
           error: t("upload.UploadProcess.noResult"),

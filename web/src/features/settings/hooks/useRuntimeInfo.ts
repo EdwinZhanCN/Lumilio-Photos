@@ -1,6 +1,6 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { ApiResult, Schemas } from "../api-types";
+import type { Schemas } from "../api-types";
 
 export type RuntimeInfo = Schemas["dto.RuntimeInfoDTO"];
 
@@ -9,10 +9,7 @@ export const runtimeInfoQueryKey = [
   "/api/v1/settings/runtime-info",
 ] as const;
 
-export function useRuntimeInfo(): UseQueryResult<
-  ApiResult<RuntimeInfo>,
-  unknown
-> {
+export function useRuntimeInfo(): UseQueryResult<RuntimeInfo, unknown> {
   return $api.useQuery(
     "get",
     "/api/v1/settings/runtime-info",
@@ -21,5 +18,5 @@ export function useRuntimeInfo(): UseQueryResult<
       staleTime: Infinity,
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<RuntimeInfo>, unknown>;
+  ) as UseQueryResult<RuntimeInfo, unknown>;
 }

@@ -49,8 +49,6 @@ type WorkerResult = {
 
 type WorkerSuccessType = "IMAGE_LOADED" | "PREVIEW_COMPLETE" | "EXPORT_COMPLETE";
 
-type ApiResult<T = unknown> = { data?: T };
-
 export type StudioEditorActivity = {
   assetId: string;
   name: string;
@@ -102,9 +100,6 @@ function unwrapData<T>(
   guard: (value: unknown) => value is T,
 ): T | undefined {
   if (guard(response)) return response;
-  const wrapped = response as ApiResult<unknown> | undefined;
-  const data = wrapped?.data;
-  if (guard(data)) return data;
   return undefined;
 }
 

@@ -1,6 +1,5 @@
 import { getToken } from "@/lib/http-commons/auth.ts";
 import type {
-  ApiResult,
   UploadResponse,
   BatchUploadResponse,
   UploadOptions,
@@ -22,7 +21,7 @@ export const uploadFile = async (
   file: File,
   hash: string,
   options?: UploadOptions,
-): Promise<ApiResult<UploadResponse>> => {
+): Promise<UploadResponse> => {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -84,7 +83,7 @@ export const batchUploadFiles = async (
   files: BatchUploadFile[],
   repositoryId?: string,
   options?: BatchUploadOptions,
-): Promise<ApiResult<BatchUploadResponse>> => {
+): Promise<BatchUploadResponse> => {
   const formData = new FormData();
 
   if (repositoryId) {
@@ -173,11 +172,11 @@ export const uploadFileInChunks = async (
   repositoryId?: string,
   onProgress?: (progress: number) => void,
   options?: ChunkedUploadOptions,
-): Promise<ApiResult<BatchUploadResponse>> => {
+): Promise<BatchUploadResponse> => {
   const effectiveChunkSize = options?.chunkSize ?? chunkSize;
   const totalChunks = Math.ceil(file.size / effectiveChunkSize);
   const maxConcurrent = options?.maxConcurrent ?? 6;
-  let lastResponse: ApiResult<BatchUploadResponse> | null = null;
+  let lastResponse: BatchUploadResponse | null = null;
 
   const uploadChunk = async (chunkIndex: number) => {
     const start = chunkIndex * effectiveChunkSize;

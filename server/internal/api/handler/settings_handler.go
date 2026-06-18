@@ -25,11 +25,11 @@ func NewSettingsHandler(settingsService service.SettingsService, runtimeInfo dto
 // @Tags settings
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.RuntimeInfoDTO} "Runtime info retrieved successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
+// @Success 200 {object} dto.RuntimeInfoDTO "Runtime info retrieved successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
 // @Router /api/v1/settings/runtime-info [get]
 func (h *SettingsHandler) GetRuntimeInfo(c *gin.Context) {
-	api.GinSuccess(c, h.runtimeInfo)
+	api.JSONOK(c, h.runtimeInfo)
 }
 
 // GetSystemSettings returns the persisted system settings.
@@ -39,9 +39,9 @@ func (h *SettingsHandler) GetRuntimeInfo(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.SystemSettingsDTO} "System settings retrieved successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.SystemSettingsDTO "System settings retrieved successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/settings/system [get]
 func (h *SettingsHandler) GetSystemSettings(c *gin.Context) {
 	settings, err := h.settingsService.GetSystemSettings(c.Request.Context())
@@ -50,7 +50,7 @@ func (h *SettingsHandler) GetSystemSettings(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToSystemSettingsDTO(settings))
+	api.JSONOK(c, dto.ToSystemSettingsDTO(settings))
 }
 
 // UpdateSystemSettings updates persisted system settings.
@@ -61,10 +61,10 @@ func (h *SettingsHandler) GetSystemSettings(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.UpdateSystemSettingsDTO true "System settings patch"
-// @Success 200 {object} api.Result{data=dto.SystemSettingsDTO} "System settings updated successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.SystemSettingsDTO "System settings updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/settings/system [patch]
 func (h *SettingsHandler) UpdateSystemSettings(c *gin.Context) {
 	var req dto.UpdateSystemSettingsDTO
@@ -91,7 +91,7 @@ func (h *SettingsHandler) UpdateSystemSettings(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToSystemSettingsDTO(settings))
+	api.JSONOK(c, dto.ToSystemSettingsDTO(settings))
 }
 
 // ValidateLLMSettings validates the persisted LLM configuration against the current provider.
@@ -101,10 +101,10 @@ func (h *SettingsHandler) UpdateSystemSettings(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.ValidateLLMSettingsResponseDTO} "LLM settings validated successfully"
-// @Failure 400 {object} api.Result "LLM validation failed"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.ValidateLLMSettingsResponseDTO "LLM settings validated successfully"
+// @Failure 400 {object} api.ErrorResponse "LLM validation failed"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/settings/system/validate-llm [post]
 func (h *SettingsHandler) ValidateLLMSettings(c *gin.Context) {
 	if _, err := currentUserIDFromContext(c); err != nil {
@@ -117,5 +117,5 @@ func (h *SettingsHandler) ValidateLLMSettings(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ValidateLLMSettingsResponseDTO{Valid: true})
+	api.JSONOK(c, dto.ValidateLLMSettingsResponseDTO{Valid: true})
 }

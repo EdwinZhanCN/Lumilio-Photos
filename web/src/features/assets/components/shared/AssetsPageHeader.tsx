@@ -42,7 +42,7 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
 import { useFilterState, useFilterActions } from "@/features/assets/selectors";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
+import type { Album } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import {
@@ -355,11 +355,8 @@ const AssetsPageHeader = ({
       const response = await listAlbumsMutation.mutateAsync({
         params: { query: { limit: 50 } },
       });
-      const responseData = response as
-        | ApiResult<ListAlbumsResponse>
-        | undefined;
-      if (responseData?.data) {
-        setAlbums(responseData.data.albums || []);
+      if (response?.albums) {
+        setAlbums(response.albums || []);
       }
     } catch {
       showMessage(

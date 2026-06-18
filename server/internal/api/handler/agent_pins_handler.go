@@ -21,10 +21,10 @@ import (
 // @Accept json
 // @Produce json
 // @Param request body dto.CreateAgentPinRequest true "Pin request"
-// @Success 200 {object} api.Result{data=dto.AgentPinDTO}
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 404 {object} api.Result "Ref not found"
+// @Success 200 {object} dto.AgentPinDTO
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Ref not found"
 // @Router /api/v1/agent/pins [post]
 func (h *AgentHandler) CreatePin(c *gin.Context) {
 	var req dto.CreateAgentPinRequest
@@ -58,7 +58,7 @@ func (h *AgentHandler) CreatePin(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to create pin")
 		return
 	}
-	api.GinSuccess(c, toAgentPinDTO(pin))
+	api.JSONOK(c, toAgentPinDTO(pin))
 }
 
 // ListPins lists the user's board widgets.
@@ -66,8 +66,8 @@ func (h *AgentHandler) CreatePin(c *gin.Context) {
 // @Description List all pinned widgets for the current user, in creation order.
 // @Tags agent
 // @Produce json
-// @Success 200 {object} api.Result{data=[]dto.AgentPinDTO}
-// @Failure 401 {object} api.Result "Unauthorized"
+// @Success 200 {array} dto.AgentPinDTO
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
 // @Router /api/v1/agent/pins [get]
 func (h *AgentHandler) ListPins(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -83,7 +83,7 @@ func (h *AgentHandler) ListPins(c *gin.Context) {
 	for _, pin := range rows {
 		out = append(out, toAgentPinDTO(pin))
 	}
-	api.GinSuccess(c, out)
+	api.JSONOK(c, out)
 }
 
 // GetPinAssets hydrates one page of a pinned widget.
@@ -94,9 +94,9 @@ func (h *AgentHandler) ListPins(c *gin.Context) {
 // @Param id path string true "Pin ID"
 // @Param limit query int false "Page size (default 50, max 200)"
 // @Param offset query int false "Page offset (default 0)"
-// @Success 200 {object} api.Result{data=dto.AgentRefAssetsDTO}
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 404 {object} api.Result "Pin not found"
+// @Success 200 {object} dto.AgentRefAssetsDTO
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Pin not found"
 // @Router /api/v1/agent/pins/{id}/assets [get]
 func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -147,7 +147,7 @@ func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 		}
 	}
 
-	api.GinSuccess(c, dto.AgentRefAssetsDTO{
+	api.JSONOK(c, dto.AgentRefAssetsDTO{
 		Assets:     assets,
 		Total:      len(ids),
 		Pagination: dto.PaginationDTO{Limit: limit, Offset: offset},
@@ -161,9 +161,9 @@ func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.UpdateAgentPinLayoutRequest true "Layout updates"
-// @Success 200 {object} api.Result
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
+// @Success 200 {object} api.SuccessResponse
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
 // @Router /api/v1/agent/pins/layout [patch]
 func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 	var req dto.UpdateAgentPinLayoutRequest
@@ -186,7 +186,7 @@ func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 			return
 		}
 	}
-	api.GinSuccess(c, nil)
+	api.JSONOK(c, nil)
 }
 
 // DeletePin removes a board widget.
@@ -195,9 +195,9 @@ func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 // @Tags agent
 // @Produce json
 // @Param id path string true "Pin ID"
-// @Success 200 {object} api.Result
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 404 {object} api.Result "Pin not found"
+// @Success 200 {object} api.SuccessResponse
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Pin not found"
 // @Router /api/v1/agent/pins/{id} [delete]
 func (h *AgentHandler) DeletePin(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -213,7 +213,7 @@ func (h *AgentHandler) DeletePin(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to delete pin")
 		return
 	}
-	api.GinSuccess(c, nil)
+	api.JSONOK(c, nil)
 }
 
 func toAgentPinDTO(pin repo.AgentPin) dto.AgentPinDTO {

@@ -27,11 +27,11 @@ func NewClassifierHandler(classifierService service.ClassifierService) *Classifi
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.ClassifierPreviewRequestDTO true "Prompts and threshold"
-// @Success 200 {object} api.Result{data=dto.ClassifierPreviewResponseDTO} "Preview matches retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 503 {object} api.Result "Classification unavailable"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.ClassifierPreviewResponseDTO "Preview matches retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 503 {object} api.ErrorResponse "Classification unavailable"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/classifiers/preview [post]
 func (h *ClassifierHandler) PreviewClassifier(c *gin.Context) {
 	var req dto.ClassifierPreviewRequestDTO
@@ -56,5 +56,5 @@ func (h *ClassifierHandler) PreviewClassifier(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToClassifierPreviewResponseDTO(matches))
+	api.JSONOK(c, dto.ToClassifierPreviewResponseDTO(matches))
 }

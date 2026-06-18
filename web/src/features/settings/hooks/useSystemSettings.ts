@@ -1,6 +1,6 @@
 import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { ApiResult, Schemas } from "../api-types";
+import type { Schemas } from "../api-types";
 
 export type SystemSettings = Schemas["dto.SystemSettingsDTO"];
 export type UpdateSystemSettings = Schemas["dto.UpdateSystemSettingsDTO"];
@@ -10,10 +10,7 @@ export const systemSettingsQueryKey = [
   "/api/v1/settings/system",
 ] as const;
 
-export function useSystemSettings(): UseQueryResult<
-  ApiResult<SystemSettings>,
-  unknown
-> {
+export function useSystemSettings(): UseQueryResult<SystemSettings, unknown> {
   return $api.useQuery(
     "get",
     "/api/v1/settings/system",
@@ -22,7 +19,7 @@ export function useSystemSettings(): UseQueryResult<
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<SystemSettings>, unknown>;
+  ) as UseQueryResult<SystemSettings, unknown>;
 }
 
 export function useUpdateSystemSettings() {

@@ -26,7 +26,7 @@ function UnifiedUploadSection(): React.JSX.Element {
 
   const uploadConfigQuery = useUploadConfig();
 
-  const uploadConfig = uploadConfigQuery.data?.data;
+  const uploadConfig = uploadConfigQuery.data;
   const {
     repositories,
     repositoriesQuery,

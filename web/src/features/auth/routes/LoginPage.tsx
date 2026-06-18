@@ -5,7 +5,6 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
 import type {
-  ApiResult,
   AuthResponse,
   MFAMethod,
   PasskeyOptionsResponse,
@@ -128,24 +127,24 @@ const LoginPage: React.FC = () => {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({
         body: { username },
       });
-      const optionsData = optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
-      if (!optionsData?.data) {
-        throw new Error(optionsData?.message || t("auth.login.passkeyStartError"));
+      const optionsData = optionsResponse as PasskeyOptionsResponse | undefined;
+      if (!optionsData) {
+        throw new Error(t("auth.login.passkeyStartError"));
       }
 
-      const credential = await getPasskeyCredential(optionsData.data.options);
+      const credential = await getPasskeyCredential(optionsData.options);
       const verifyResponse = await passkeyVerifyMutation.mutateAsync({
         body: {
-          challenge_token: optionsData.data.challenge_token,
+          challenge_token: optionsData.challenge_token,
           credential,
         },
       });
-      const verifyData = verifyResponse as ApiResult<AuthResponse> | undefined;
-      if (!verifyData?.data) {
-        throw new Error(verifyData?.message || t("auth.login.passkeyVerifyError"));
+      const verifyData = verifyResponse as AuthResponse | undefined;
+      if (!verifyData) {
+        throw new Error(t("auth.login.passkeyVerifyError"));
       }
 
-      await completeAuth(verifyData.data);
+      await completeAuth(verifyData);
       void navigate(redirectTo, { replace: true });
     } catch (passkeyAuthError) {
       setPasskeyError(getApiMessage(passkeyAuthError, t("auth.login.passkeyUnavailable")));

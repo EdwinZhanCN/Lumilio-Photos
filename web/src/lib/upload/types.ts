@@ -2,10 +2,6 @@ import type { components } from "@/lib/http-commons/schema.d.ts";
 
 type Schemas = components["schemas"];
 
-export type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
-
 export type UploadResponse = Schemas["dto.UploadResponseDTO"];
 export type BatchUploadResponse = Schemas["dto.BatchUploadResponseDTO"];
 export type BatchUploadResult = Schemas["dto.BatchUploadResultDTO"];

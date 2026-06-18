@@ -23,7 +23,7 @@ export default function ServerTab() {
   const [healthCheckIntervalMs, setHealthCheckIntervalMs] =
     useDebouncedPreference("healthCheckIntervalMs");
   const runtimeQuery = useRuntimeInfo();
-  const runtime = runtimeQuery.data?.data;
+  const runtime = runtimeQuery.data;
 
   const valueSec = healthCheckIntervalMs / 1000;
   const presets = [1, 2, 5, 10, 30, 50];

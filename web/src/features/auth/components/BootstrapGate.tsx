@@ -16,7 +16,7 @@ const BootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const { isAuthenticated } = useAuth();
   // Bootstrap mode = no admin account exists yet (the next registration becomes
   // the admin). Folds the former /auth/bootstrap-status into /setup/status.
-  const isBootstrapMode = !(bootstrapQuery.data?.data?.admin_initialized ?? true);
+  const isBootstrapMode = !(bootstrapQuery.data?.admin_initialized ?? true);
   const isBootstrapRoute = isBootstrapPath(location.pathname);
 
   if (bootstrapQuery.isLoading) {

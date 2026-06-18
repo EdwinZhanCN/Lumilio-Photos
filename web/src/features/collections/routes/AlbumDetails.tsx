@@ -6,7 +6,7 @@ import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalle
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AlbumIcon, Bird, RefreshCcw } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { Album, ApiResult } from "@/lib/albums/types";
+import type { Album } from "@/lib/albums/types";
 import type { components } from "@/lib/http-commons/schema";
 import { useWorkingRepository } from "@/features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -37,8 +37,7 @@ const AlbumAssetsContent = () => {
     },
     { enabled: !!albumId },
   );
-  const albumResponse = albumQuery.data as ApiResult<Album> | undefined;
-  const album = albumResponse?.data;
+  const album = albumQuery.data as Album | undefined;
   const isAlbumLoading = albumQuery.isLoading;
   const isBioAlbum = album?.album_type === "bio";
   const rebuildBioClipMutation = $api.useMutation(
@@ -55,8 +54,8 @@ const AlbumAssetsContent = () => {
         params: { path: { id: albumIdNumber } },
         body: {},
       });
-      const responseData = response as ApiResult<RebuildAlbumBioClipResponse>;
-      const queuedAssets = responseData?.data?.queued_assets ?? 0;
+      const responseData = response as RebuildAlbumBioClipResponse | undefined;
+      const queuedAssets = responseData?.queued_assets ?? 0;
 
       await queryClient.invalidateQueries({
         queryKey: ["get", "/api/v1/assets/indexing/stats"],

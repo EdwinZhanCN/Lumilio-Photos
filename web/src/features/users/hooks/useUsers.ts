@@ -4,10 +4,6 @@ import type { components } from "@/lib/http-commons/schema";
 
 type Schemas = components["schemas"];
 
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
-
 type UserDTO = Schemas["dto.UserDTO"];
 type ManagedUserDTO = Schemas["dto.ManagedUserDTO"];
 type ListUsersResponseDTO = Schemas["dto.ListUsersResponseDTO"];
@@ -20,7 +16,7 @@ export type ChangePasswordPayload =
   Schemas["dto.ChangePasswordRequestDTO"];
 
 export function useUsers(limit = 50, offset = 0): UseQueryResult<
-  ApiResult<ListUsersResponseDTO>,
+  ListUsersResponseDTO,
   unknown
 > & {
   users: ManagedUserDTO[];
@@ -40,12 +36,12 @@ export function useUsers(limit = 50, offset = 0): UseQueryResult<
     {
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<ListUsersResponseDTO>, unknown>;
+  ) as UseQueryResult<ListUsersResponseDTO, unknown>;
 
   return {
     ...query,
-    users: query.data?.data?.users ?? [],
-    total: query.data?.data?.total ?? 0,
+    users: query.data?.users ?? [],
+    total: query.data?.total ?? 0,
   };
 }
 

@@ -37,25 +37,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.QueueSummaryResponse"];
                     };
                 };
             };
@@ -98,25 +80,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.JobStatsResponse"];
                     };
                 };
             };
@@ -171,7 +135,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
+                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -180,7 +144,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
+                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -189,7 +153,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
+                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -242,7 +206,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
+                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -251,7 +215,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
+                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -260,7 +224,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.Result"];
+                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -297,25 +261,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AgentPinDTO"][];
                     };
                 };
                 /** @description Unauthorized */
@@ -324,7 +270,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -354,25 +300,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AgentPinDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -381,7 +309,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -390,7 +318,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Ref not found */
@@ -399,7 +327,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -442,7 +370,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -451,7 +379,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -460,7 +388,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -504,25 +432,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AgentRefAssetsDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -531,7 +441,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -540,7 +450,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -590,7 +500,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid request */
@@ -599,7 +509,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -608,7 +518,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -647,25 +557,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AgentRefDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -674,7 +566,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Ref not found */
@@ -683,7 +575,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -732,25 +624,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AgentRefAssetsDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -759,7 +633,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Ref not found */
@@ -768,7 +642,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -807,25 +681,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.ToolInfoResponse"][];
                     };
                 };
             };
@@ -875,25 +731,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ListAlbumsResponseDTO"];
                     };
                 };
                 /** @description Invalid parameters */
@@ -902,7 +740,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -911,7 +749,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to retrieve albums */
@@ -920,7 +758,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -950,25 +788,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.GetAlbumResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -977,7 +797,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -986,7 +806,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to create album */
@@ -995,7 +815,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1042,25 +862,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.GetAlbumResponseDTO"];
                     };
                 };
                 /** @description Invalid album ID */
@@ -1069,7 +871,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1078,7 +880,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1110,25 +912,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.GetAlbumResponseDTO"];
                     };
                 };
                 /** @description Invalid album ID or request data */
@@ -1137,7 +921,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1146,7 +930,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -1155,7 +939,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1164,7 +948,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to update album */
@@ -1173,7 +957,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1205,7 +989,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid album ID */
@@ -1214,7 +998,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1223,7 +1007,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -1232,7 +1016,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1241,7 +1025,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to delete album */
@@ -1250,7 +1034,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1296,7 +1080,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid album ID */
@@ -1305,7 +1089,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1314,7 +1098,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to retrieve album assets */
@@ -1323,7 +1107,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1374,7 +1158,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid album ID or asset ID */
@@ -1383,7 +1167,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1392,7 +1176,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to add asset to album */
@@ -1401,7 +1185,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1434,7 +1218,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid album ID or asset ID */
@@ -1443,7 +1227,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to remove asset from album */
@@ -1452,7 +1236,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1499,7 +1283,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid album ID or asset ID */
@@ -1508,7 +1292,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to update asset position */
@@ -1517,7 +1301,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1564,25 +1348,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
                     };
                 };
                 /** @description Invalid album or album type */
@@ -1591,7 +1357,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1600,7 +1366,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -1609,7 +1375,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1618,7 +1384,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description BioCLIP unavailable */
@@ -1627,7 +1393,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1675,25 +1441,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.UploadResponseDTO"];
                     };
                 };
                 /** @description Bad request - no file provided or parse error */
@@ -1702,7 +1450,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -1711,7 +1459,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1771,25 +1519,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetDTO"];
                     };
                 };
                 /** @description Invalid asset ID */
@@ -1798,7 +1528,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -1807,7 +1537,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1842,25 +1572,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Invalid asset ID or request body */
@@ -1869,7 +1581,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -1878,7 +1590,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1913,25 +1625,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Invalid asset ID format */
@@ -1940,7 +1634,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -1949,7 +1643,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -1992,7 +1686,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid asset ID */
@@ -2001,7 +1695,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Failed to retrieve asset albums */
@@ -2010,7 +1704,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2066,25 +1760,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Invalid asset ID or album ID */
@@ -2093,7 +1769,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2102,7 +1778,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2154,7 +1830,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "audio/mpeg": components["schemas"]["api.Result"];
+                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found or not audio */
@@ -2163,7 +1839,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "audio/mpeg": components["schemas"]["api.Result"];
+                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2172,7 +1848,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "audio/mpeg": components["schemas"]["api.Result"];
+                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2220,25 +1896,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Bad request */
@@ -2247,7 +1905,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2256,7 +1914,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2265,7 +1923,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2313,25 +1971,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetExifResponseDTO"];
                     };
                 };
                 /** @description Invalid asset ID */
@@ -2340,7 +1980,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset or EXIF not found */
@@ -2349,7 +1989,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2414,10 +2054,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.Result"];
-                        "image/jpeg": components["schemas"]["api.Result"];
-                        "image/png": components["schemas"]["api.Result"];
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/avif": components["schemas"]["api.ErrorResponse"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "image/png": components["schemas"]["api.ErrorResponse"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Authentication required */
@@ -2426,10 +2066,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.Result"];
-                        "image/jpeg": components["schemas"]["api.Result"];
-                        "image/png": components["schemas"]["api.Result"];
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/avif": components["schemas"]["api.ErrorResponse"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "image/png": components["schemas"]["api.ErrorResponse"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -2438,10 +2078,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.Result"];
-                        "image/jpeg": components["schemas"]["api.Result"];
-                        "image/png": components["schemas"]["api.Result"];
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/avif": components["schemas"]["api.ErrorResponse"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "image/png": components["schemas"]["api.ErrorResponse"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset or original file not found */
@@ -2450,10 +2090,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.Result"];
-                        "image/jpeg": components["schemas"]["api.Result"];
-                        "image/png": components["schemas"]["api.Result"];
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/avif": components["schemas"]["api.ErrorResponse"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "image/png": components["schemas"]["api.ErrorResponse"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Source image could not be encoded */
@@ -2462,10 +2102,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.Result"];
-                        "image/jpeg": components["schemas"]["api.Result"];
-                        "image/png": components["schemas"]["api.Result"];
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/avif": components["schemas"]["api.ErrorResponse"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "image/png": components["schemas"]["api.ErrorResponse"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2474,10 +2114,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.Result"];
-                        "image/jpeg": components["schemas"]["api.Result"];
-                        "image/png": components["schemas"]["api.Result"];
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/avif": components["schemas"]["api.ErrorResponse"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "image/png": components["schemas"]["api.ErrorResponse"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2525,25 +2165,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Bad request */
@@ -2552,7 +2174,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2561,7 +2183,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2570,7 +2192,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2623,7 +2245,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.Result"];
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2632,7 +2254,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.Result"];
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2641,7 +2263,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.Result"];
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2689,25 +2311,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Bad request */
@@ -2716,7 +2320,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2725,7 +2329,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2734,7 +2338,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2781,25 +2385,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Bad request */
@@ -2808,7 +2394,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2817,7 +2403,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2826,7 +2412,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -2954,25 +2540,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetSidecarResponseDTO"];
                     };
                 };
                 /** @description Invalid asset ID */
@@ -2981,7 +2549,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2990,7 +2558,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2999,7 +2567,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3034,25 +2602,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetSidecarResponseDTO"];
                     };
                 };
                 /** @description Invalid asset ID or request body */
@@ -3061,7 +2611,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -3070,7 +2620,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3079,7 +2629,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3120,25 +2670,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.StackByAssetResponseDTO"];
                     };
                 };
                 /** @description Not Found */
@@ -3147,7 +2679,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3176,7 +2708,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
             };
@@ -3230,7 +2762,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset or thumbnail not found */
@@ -3239,7 +2771,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3248,7 +2780,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3302,7 +2834,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "video/mp4": components["schemas"]["api.Result"];
+                        "video/mp4": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset not found or not a video */
@@ -3311,7 +2843,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "video/mp4": components["schemas"]["api.Result"];
+                        "video/mp4": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3320,7 +2852,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "video/mp4": components["schemas"]["api.Result"];
+                        "video/mp4": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3367,25 +2899,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.BatchUploadResponseDTO"];
                     };
                 };
                 /** @description Bad request - no files provided or parse error */
@@ -3394,7 +2908,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3403,7 +2917,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3444,25 +2958,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.UploadConfigResponseDTO"];
                     };
                 };
             };
@@ -3508,25 +3004,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.UploadProgressResponseDTO"];
                     };
                 };
             };
@@ -3581,7 +3059,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.Result"];
+                        "application/zip": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Authentication required */
@@ -3590,7 +3068,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.Result"];
+                        "application/zip": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -3599,7 +3077,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.Result"];
+                        "application/zip": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Asset or original file not found */
@@ -3608,7 +3086,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.Result"];
+                        "application/zip": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3617,7 +3095,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.Result"];
+                        "application/zip": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3669,25 +3147,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.FeaturedAssetsResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -3696,7 +3156,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3705,7 +3165,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3748,25 +3208,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.OptionsResponseDTO"];
                     };
                 };
                 /** @description Internal server error */
@@ -3775,7 +3217,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3821,25 +3263,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RebuildAssetIndexesResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -3848,7 +3272,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3857,7 +3281,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3898,25 +3322,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.IndexingRepositoryListResponseDTO"];
                     };
                 };
                 /** @description Internal server error */
@@ -3925,7 +3331,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3971,25 +3377,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetIndexingStatsResponseDTO"];
                     };
                 };
                 /** @description Invalid repository ID */
@@ -3998,7 +3386,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4007,7 +3395,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4055,25 +3443,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetListResponseDTO"];
                     };
                 };
                 /** @description Internal server error */
@@ -4082,7 +3452,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4137,7 +3507,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4146,7 +3516,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Semantic search unavailable */
@@ -4155,7 +3525,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4203,25 +3573,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetMapPointListResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -4230,7 +3582,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4239,7 +3591,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4290,25 +3642,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetListResponseDTO"];
                     };
                 };
                 /** @description Bad request */
@@ -4317,7 +3651,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4326,7 +3660,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4372,25 +3706,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.SearchAssetsResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -4399,7 +3715,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4408,7 +3724,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4452,25 +3768,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.StackDTO"];
                     };
                 };
                 /** @description Bad Request */
@@ -4479,7 +3777,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -4488,7 +3786,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4529,25 +3827,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AssetTypesResponseDTO"];
                     };
                 };
             };
@@ -4593,25 +3873,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AuthResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -4620,7 +3882,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Invalid credentials */
@@ -4629,7 +3891,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4638,7 +3900,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4682,7 +3944,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid request data */
@@ -4691,7 +3953,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Invalid refresh token */
@@ -4700,7 +3962,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4709,7 +3971,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4750,25 +4012,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.UserDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -4777,7 +4021,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4786,7 +4030,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4829,25 +4073,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MediaTokenDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -4856,7 +4082,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4865,7 +4091,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4908,7 +4134,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.MFAStatusResultDTO"];
+                        "application/json": components["schemas"]["dto.MFAStatusDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -4917,7 +4143,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4926,7 +4152,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -4969,7 +4195,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.PasskeyListResultDTO"];
+                        "application/json": components["schemas"]["dto.PasskeyListResponseDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -4978,7 +4204,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4987,7 +4213,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5036,7 +4262,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5045,7 +4271,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Passkey not found */
@@ -5054,7 +4280,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5063,7 +4289,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5105,7 +4331,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.PasskeyOptionsResultDTO"];
+                        "application/json": components["schemas"]["dto.PasskeyOptionsResponseDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5114,7 +4340,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5123,7 +4349,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5167,7 +4393,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.PasskeyCredentialResultDTO"];
+                        "application/json": components["schemas"]["dto.PasskeyCredentialSummaryDTO"];
                     };
                 };
                 /** @description Invalid or expired challenge */
@@ -5176,7 +4402,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5185,7 +4411,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5194,7 +4420,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5238,25 +4464,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RecoveryCodesResponseDTO"];
                     };
                 };
                 /** @description MFA is not enabled */
@@ -5265,7 +4473,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized or incorrect password */
@@ -5274,7 +4482,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5283,7 +4491,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5327,7 +4535,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.MFAStatusResultDTO"];
+                        "application/json": components["schemas"]["dto.MFAStatusDTO"];
                     };
                 };
                 /** @description MFA is not enabled */
@@ -5336,7 +4544,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized or incorrect password */
@@ -5345,7 +4553,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5354,7 +4562,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5398,25 +4606,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RecoveryCodesResponseDTO"];
                     };
                 };
                 /** @description Invalid setup token or verification code */
@@ -5425,7 +4615,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5434,7 +4624,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5443,7 +4633,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5486,25 +4676,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.TOTPSetupResponseDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5513,7 +4685,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5522,7 +4694,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5566,25 +4738,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AuthResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -5593,7 +4747,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Invalid or expired MFA challenge */
@@ -5602,7 +4756,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5611,7 +4765,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5655,25 +4809,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.PasskeyOptionsResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -5682,7 +4818,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Invalid credentials */
@@ -5691,7 +4827,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5700,7 +4836,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5744,25 +4880,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AuthResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -5771,7 +4889,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Invalid credentials */
@@ -5780,7 +4898,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5789,7 +4907,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5833,25 +4951,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AuthResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -5860,7 +4960,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Invalid or expired refresh token */
@@ -5869,7 +4969,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5878,7 +4978,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -5922,25 +5022,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AuthResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -5949,7 +5031,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description User already exists */
@@ -5958,7 +5040,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5967,7 +5049,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6008,25 +5090,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.CapabilitiesResponseDTO"];
                     };
                 };
             };
@@ -6072,25 +5136,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ClassifierPreviewResponseDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -6099,7 +5145,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6108,7 +5154,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6117,7 +5163,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Classification unavailable */
@@ -6126,7 +5172,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6163,25 +5209,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ListCloudCredentialsResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6190,7 +5218,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6199,7 +5227,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6229,25 +5257,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.CreateCloudCredentialResponse"];
                     };
                 };
                 /** @description Invalid request */
@@ -6256,7 +5266,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6265,7 +5275,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6274,7 +5284,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6317,7 +5327,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid request */
@@ -6326,7 +5336,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6335,7 +5345,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6344,7 +5354,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6390,25 +5400,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.VerifyCloudAuthChallengeResponse"];
                     };
                 };
                 /** @description Invalid request */
@@ -6417,7 +5409,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6426,7 +5418,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6435,7 +5427,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6477,7 +5469,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid request */
@@ -6486,7 +5478,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6495,7 +5487,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6504,7 +5496,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6551,25 +5543,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.CreateCloudCredentialResponse"];
                     };
                 };
                 /** @description Invalid request */
@@ -6578,7 +5552,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6587,7 +5561,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6596,7 +5570,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6636,25 +5610,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.CloudImportRunDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -6663,7 +5619,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6672,7 +5628,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6681,7 +5637,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6720,25 +5676,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ListCloudProvidersResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6747,7 +5685,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6756,7 +5694,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6797,7 +5735,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6841,25 +5779,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.DetectDuplicatesResponseDTO"];
                     };
                 };
                 /** @description Bad Request */
@@ -6868,7 +5788,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -6877,7 +5797,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -6927,25 +5847,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ListDuplicateGroupsResponseDTO"];
                     };
                 };
                 /** @description Bad Request */
@@ -6954,7 +5856,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -6963,7 +5865,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7009,25 +5911,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.DuplicateGroupDTO"];
                     };
                 };
                 /** @description Not Found */
@@ -7036,7 +5920,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7084,25 +5968,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
                     };
                 };
                 /** @description Not Found */
@@ -7111,7 +5977,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -7120,7 +5986,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7167,25 +6033,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MergeDuplicateGroupResponseDTO"];
                     };
                 };
                 /** @description Bad Request */
@@ -7194,7 +6042,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -7203,7 +6051,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -7212,7 +6060,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -7221,7 +6069,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7265,25 +6113,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.DuplicateSummaryDTO"];
                     };
                 };
                 /** @description Bad Request */
@@ -7292,7 +6122,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -7301,7 +6131,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7344,25 +6174,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.HealthResponse"];
                     };
                 };
             };
@@ -7414,25 +6226,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.LocationClusterListResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -7441,7 +6235,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7450,7 +6244,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7496,25 +6290,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RebuildLocationClustersResponseDTO"];
                     };
                 };
                 /** @description Invalid request body */
@@ -7523,7 +6299,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7532,7 +6308,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7576,25 +6352,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ListPeopleResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -7603,7 +6361,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7612,7 +6370,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7657,25 +6415,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.PersonDetailDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -7684,7 +6424,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -7693,7 +6433,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7702,7 +6442,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7742,25 +6482,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.PersonDetailDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -7769,7 +6491,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -7778,7 +6500,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7787,7 +6509,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7830,25 +6552,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.QueryAssetsResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -7857,7 +6561,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -7866,7 +6570,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7875,7 +6579,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Semantic search unavailable */
@@ -7884,7 +6588,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -7936,7 +6640,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -7945,7 +6649,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Person cover not found */
@@ -7954,7 +6658,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7963,7 +6667,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.Result"];
+                        "image/webp": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8007,25 +6711,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.FaceClusterRebuildResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -8034,7 +6720,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8043,7 +6729,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8052,7 +6738,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8089,25 +6775,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ListRepositoriesResponseDTO"];
                     };
                 };
             };
@@ -8137,25 +6805,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.CreateRepositoryResponseDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -8164,7 +6814,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8173,7 +6823,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -8182,7 +6832,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8191,7 +6841,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8231,25 +6881,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
                     };
                 };
                 /** @description Repository not found */
@@ -8258,7 +6890,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8287,7 +6919,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Repository not found */
@@ -8296,7 +6928,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8330,25 +6962,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -8357,7 +6971,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Repository not found */
@@ -8366,7 +6980,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8402,25 +7016,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RepositoryCloudStatusDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -8429,7 +7025,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8438,7 +7034,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8447,7 +7043,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8491,25 +7087,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.StartCloudImportResponse"];
                     };
                 };
                 /** @description Invalid request */
@@ -8518,7 +7096,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8527,7 +7105,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8536,7 +7114,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8583,25 +7161,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RepositoryScanQueuedDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -8610,7 +7170,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8619,7 +7179,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -8628,7 +7188,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8673,25 +7233,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RepositoryScanRunListDTO"];
                     };
                 };
             };
@@ -8733,25 +7275,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
                     };
                 };
                 /** @description No scan run found */
@@ -8760,7 +7284,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8804,25 +7328,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.AutoDetectStacksResponseDTO"];
                     };
                 };
             };
@@ -8859,25 +7365,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.RuntimeInfoDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8886,7 +7374,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8929,25 +7417,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.SystemSettingsDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8956,7 +7426,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8965,7 +7435,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -8999,25 +7469,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.SystemSettingsDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -9026,7 +7478,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9035,7 +7487,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9044,7 +7496,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9083,25 +7535,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ValidateLLMSettingsResponseDTO"];
                     };
                 };
                 /** @description LLM validation failed */
@@ -9110,7 +7544,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9119,7 +7553,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9128,7 +7562,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9172,25 +7606,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.SetupResultDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -9199,7 +7615,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description System already initialized */
@@ -9208,7 +7624,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9217,7 +7633,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9254,25 +7670,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.SetupStatusDTO"];
                     };
                 };
                 /** @description Internal server error */
@@ -9281,7 +7679,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9340,25 +7738,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.SpeciesReferenceResponseDTO"];
                     };
                 };
                 /** @description Invalid query */
@@ -9367,7 +7747,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Species reference not found */
@@ -9376,7 +7756,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9385,7 +7765,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9427,25 +7807,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.AvailableYearsResponse"];
                     };
                 };
                 /** @description Bad Request */
@@ -9454,7 +7816,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -9463,7 +7825,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9507,25 +7869,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.CameraLensStatsResponse"];
                     };
                 };
                 /** @description Bad Request */
@@ -9534,7 +7878,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -9543,7 +7887,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9593,25 +7937,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.HeatmapResponse"];
                     };
                 };
                 /** @description Bad Request */
@@ -9620,7 +7946,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -9629,7 +7955,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9671,25 +7997,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.FocalLengthDistributionResponse"];
                     };
                 };
                 /** @description Bad Request */
@@ -9698,7 +8006,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -9707,7 +8015,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9751,25 +8059,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["handler.TimeDistributionResponse"];
                     };
                 };
                 /** @description Bad Request */
@@ -9778,7 +8068,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -9787,7 +8077,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9835,25 +8125,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ListUsersResponseDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9862,7 +8134,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -9871,7 +8143,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9880,7 +8152,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9933,7 +8205,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.UserResultDTO"];
+                        "application/json": components["schemas"]["dto.UserDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -9942,7 +8214,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9951,7 +8223,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -9960,7 +8232,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description User not found */
@@ -9969,7 +8241,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description User already exists */
@@ -9978,7 +8250,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9987,7 +8259,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -10029,7 +8301,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.ResetAccessResultDTO"];
+                        "application/json": components["schemas"]["dto.ResetAccessResponseDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -10038,7 +8310,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -10047,7 +8319,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -10056,7 +8328,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description User not found */
@@ -10065,7 +8337,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -10074,7 +8346,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -10122,7 +8394,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
                 /** @description Invalid request data */
@@ -10131,7 +8403,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Current password is incorrect */
@@ -10140,7 +8412,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -10149,7 +8421,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -10193,7 +8465,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.UserResultDTO"];
+                        "application/json": components["schemas"]["dto.UserDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -10202,7 +8474,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -10211,7 +8483,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -10220,7 +8492,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -10231,28 +8503,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Standard API response wrapper */
-        "api.Result": {
-            /**
-             * @description Business status code (0 for success, non-zero for errors)
-             * @example 0
-             */
+        "api.ErrorResponse": {
+            /** @example 400 */
             code?: number;
-            /** @description Business data, ignore empty values */
-            data?: Record<string, never>;
-            /**
-             * @description Debug error message, ignore empty values
-             * @example error details
-             */
+            /** @example validation failed */
             error?: string;
-            /**
-             * @description User readable message
-             * @example success
-             */
+            /** @example Bad request */
             message?: string;
-        } & components["schemas"]["data"];
-        data: {
-            data?: components["schemas"]["dto.ListUsersResponseDTO"];
+        };
+        "api.SuccessResponse": {
+            /** @example Operation completed successfully */
+            message?: string;
         };
         /** @enum {string} */
         "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
@@ -11122,15 +9383,6 @@ export interface components {
             recovery_codes_remaining?: number;
             totp_enabled?: boolean;
         };
-        "dto.MFAStatusResultDTO": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.MFAStatusDTO"];
-            /** @example error details */
-            error?: string;
-            /** @example success */
-            message?: string;
-        };
         "dto.MLCapabilitiesDTO": {
             /** @example 1 */
             active_node_count?: number;
@@ -11237,15 +9489,6 @@ export interface components {
             /** @example 0 */
             offset?: number;
         };
-        "dto.PasskeyCredentialResultDTO": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"];
-            /** @example error details */
-            error?: string;
-            /** @example success */
-            message?: string;
-        };
         "dto.PasskeyCredentialSummaryDTO": {
             created_at?: string;
             label?: string;
@@ -11257,30 +9500,12 @@ export interface components {
             credentials?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"][];
             total?: number;
         };
-        "dto.PasskeyListResultDTO": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.PasskeyListResponseDTO"];
-            /** @example error details */
-            error?: string;
-            /** @example success */
-            message?: string;
-        };
         "dto.PasskeyOptionsRequestDTO": {
             username?: string;
         };
         "dto.PasskeyOptionsResponseDTO": {
             challenge_token?: string;
             options?: unknown;
-        };
-        "dto.PasskeyOptionsResultDTO": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.PasskeyOptionsResponseDTO"];
-            /** @example error details */
-            error?: string;
-            /** @example success */
-            message?: string;
         };
         "dto.PasskeyVerifyRequestDTO": {
             challenge_token: string;
@@ -11527,15 +9752,6 @@ export interface components {
             cleared_passkeys?: boolean;
             cleared_totp?: boolean;
             temporary_password?: string;
-        };
-        "dto.ResetAccessResultDTO": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.ResetAccessResponseDTO"];
-            /** @example error details */
-            error?: string;
-            /** @example success */
-            message?: string;
         };
         "dto.RuntimeInfoDTO": {
             /** @example production */
@@ -11907,15 +10123,6 @@ export interface components {
             updated_at?: string;
             user_id?: number;
             username?: string;
-        };
-        "dto.UserResultDTO": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.UserDTO"];
-            /** @example error details */
-            error?: string;
-            /** @example success */
-            message?: string;
         };
         "dto.ValidateLLMSettingsResponseDTO": {
             valid?: boolean;

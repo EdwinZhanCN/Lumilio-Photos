@@ -8,40 +8,28 @@ const docTemplate = `{
     "schemes": {{ marshal .Schemes }},
     "components": {
         "schemas": {
-            "api.Result": {
-                "allOf": [
-                    {
-                        "$ref": "#/components/schemas/data"
-                    }
-                ],
-                "description": "Standard API response wrapper",
+            "api.ErrorResponse": {
                 "properties": {
                     "code": {
-                        "description": "Business status code (0 for success, non-zero for errors)",
-                        "example": 0,
+                        "example": 400,
                         "type": "integer"
                     },
-                    "data": {
-                        "description": "Business data, ignore empty values",
-                        "type": "object"
-                    },
                     "error": {
-                        "description": "Debug error message, ignore empty values",
-                        "example": "error details",
+                        "example": "validation failed",
                         "type": "string"
                     },
                     "message": {
-                        "description": "User readable message",
-                        "example": "success",
+                        "example": "Bad request",
                         "type": "string"
                     }
                 },
                 "type": "object"
             },
-            "data": {
+            "api.SuccessResponse": {
                 "properties": {
-                    "data": {
-                        "$ref": "#/components/schemas/dto.ListUsersResponseDTO"
+                    "message": {
+                        "example": "Operation completed successfully",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2237,26 +2225,6 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.MFAStatusResultDTO": {
-                "properties": {
-                    "code": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/dto.MFAStatusDTO"
-                    },
-                    "error": {
-                        "example": "error details",
-                        "type": "string"
-                    },
-                    "message": {
-                        "example": "success",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "dto.MLCapabilitiesDTO": {
                 "properties": {
                     "active_node_count": {
@@ -2517,26 +2485,6 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.PasskeyCredentialResultDTO": {
-                "properties": {
-                    "code": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/dto.PasskeyCredentialSummaryDTO"
-                    },
-                    "error": {
-                        "example": "error details",
-                        "type": "string"
-                    },
-                    "message": {
-                        "example": "success",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "dto.PasskeyCredentialSummaryDTO": {
                 "properties": {
                     "created_at": {
@@ -2576,26 +2524,6 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.PasskeyListResultDTO": {
-                "properties": {
-                    "code": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/dto.PasskeyListResponseDTO"
-                    },
-                    "error": {
-                        "example": "error details",
-                        "type": "string"
-                    },
-                    "message": {
-                        "example": "success",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "dto.PasskeyOptionsRequestDTO": {
                 "properties": {
                     "username": {
@@ -2610,26 +2538,6 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "options": {}
-                },
-                "type": "object"
-            },
-            "dto.PasskeyOptionsResultDTO": {
-                "properties": {
-                    "code": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/dto.PasskeyOptionsResponseDTO"
-                    },
-                    "error": {
-                        "example": "error details",
-                        "type": "string"
-                    },
-                    "message": {
-                        "example": "success",
-                        "type": "string"
-                    }
                 },
                 "type": "object"
             },
@@ -3218,26 +3126,6 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "temporary_password": {
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "dto.ResetAccessResultDTO": {
-                "properties": {
-                    "code": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/dto.ResetAccessResponseDTO"
-                    },
-                    "error": {
-                        "example": "error details",
-                        "type": "string"
-                    },
-                    "message": {
-                        "example": "success",
                         "type": "string"
                     }
                 },
@@ -4142,26 +4030,6 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.UserResultDTO": {
-                "properties": {
-                    "code": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/dto.UserDTO"
-                    },
-                    "error": {
-                        "example": "error details",
-                        "type": "string"
-                    },
-                    "message": {
-                        "example": "success",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "dto.ValidateLLMSettingsResponseDTO": {
                 "properties": {
                     "valid": {
@@ -4611,34 +4479,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.QueueSummaryResponse"
                                 }
                             }
                         },
@@ -4668,34 +4509,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.JobStatsResponse"
                                 }
                             }
                         },
@@ -4746,7 +4560,7 @@ const docTemplate = `{
                         "content": {
                             "text/event-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4756,7 +4570,7 @@ const docTemplate = `{
                         "content": {
                             "text/event-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4766,7 +4580,7 @@ const docTemplate = `{
                         "content": {
                             "text/event-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4817,7 +4631,7 @@ const docTemplate = `{
                         "content": {
                             "text/event-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4827,7 +4641,7 @@ const docTemplate = `{
                         "content": {
                             "text/event-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4837,7 +4651,7 @@ const docTemplate = `{
                         "content": {
                             "text/event-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4858,34 +4672,10 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
+                                    "items": {
+                                        "$ref": "#/components/schemas/dto.AgentPinDTO"
                                     },
-                                    "type": "object"
+                                    "type": "array"
                                 }
                             }
                         },
@@ -4895,7 +4685,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4934,34 +4724,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AgentPinDTO"
                                 }
                             }
                         },
@@ -4971,7 +4734,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4981,7 +4744,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -4991,7 +4754,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5032,7 +4795,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -5042,7 +4805,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5052,7 +4815,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5084,7 +4847,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -5094,7 +4857,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5104,7 +4867,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5152,34 +4915,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AgentRefAssetsDTO"
                                 }
                             }
                         },
@@ -5189,7 +4925,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5199,7 +4935,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5240,34 +4976,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AgentRefDTO"
                                 }
                             }
                         },
@@ -5277,7 +4986,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5287,7 +4996,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5344,34 +5053,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AgentRefAssetsDTO"
                                 }
                             }
                         },
@@ -5381,7 +5063,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5391,7 +5073,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5412,34 +5094,10 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
+                                    "items": {
+                                        "$ref": "#/components/schemas/handler.ToolInfoResponse"
                                     },
-                                    "type": "object"
+                                    "type": "array"
                                 }
                             }
                         },
@@ -5497,34 +5155,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ListAlbumsResponseDTO"
                                 }
                             }
                         },
@@ -5534,7 +5165,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5544,7 +5175,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5554,7 +5185,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5598,34 +5229,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.GetAlbumResponseDTO"
                                 }
                             }
                         },
@@ -5635,7 +5239,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5645,7 +5249,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5655,7 +5259,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5701,7 +5305,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -5711,7 +5315,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5721,7 +5325,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5731,7 +5335,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5741,7 +5345,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5751,7 +5355,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5803,34 +5407,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.GetAlbumResponseDTO"
                                 }
                             }
                         },
@@ -5840,7 +5417,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5850,7 +5427,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5905,34 +5482,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.GetAlbumResponseDTO"
                                 }
                             }
                         },
@@ -5942,7 +5492,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5952,7 +5502,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5962,7 +5512,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5972,7 +5522,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -5982,7 +5532,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6036,7 +5586,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -6046,7 +5596,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6056,7 +5606,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6066,7 +5616,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6121,7 +5671,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -6131,7 +5681,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6141,7 +5691,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6204,7 +5754,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -6214,7 +5764,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6224,7 +5774,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6234,7 +5784,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6300,7 +5850,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -6310,7 +5860,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6320,7 +5870,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6366,34 +5916,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RebuildAlbumBioClipResponseDTO"
                                 }
                             }
                         },
@@ -6403,7 +5926,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6413,7 +5936,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6423,7 +5946,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6433,7 +5956,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6443,7 +5966,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6504,34 +6027,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.UploadResponseDTO"
                                 }
                             }
                         },
@@ -6541,7 +6037,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6551,7 +6047,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6601,34 +6097,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.BatchUploadResponseDTO"
                                 }
                             }
                         },
@@ -6638,7 +6107,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6648,7 +6117,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6678,34 +6147,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.UploadConfigResponseDTO"
                                 }
                             }
                         },
@@ -6745,34 +6187,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.UploadProgressResponseDTO"
                                 }
                             }
                         },
@@ -6823,7 +6238,7 @@ const docTemplate = `{
                         "content": {
                             "application/zip": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6833,7 +6248,7 @@ const docTemplate = `{
                         "content": {
                             "application/zip": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6843,7 +6258,7 @@ const docTemplate = `{
                         "content": {
                             "application/zip": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6853,7 +6268,7 @@ const docTemplate = `{
                         "content": {
                             "application/zip": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6863,7 +6278,7 @@ const docTemplate = `{
                         "content": {
                             "application/zip": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6938,34 +6353,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.FeaturedAssetsResponseDTO"
                                 }
                             }
                         },
@@ -6975,7 +6363,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -6985,7 +6373,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7015,34 +6403,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.OptionsResponseDTO"
                                 }
                             }
                         },
@@ -7052,7 +6413,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7092,34 +6453,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RebuildAssetIndexesResponseDTO"
                                 }
                             }
                         },
@@ -7129,7 +6463,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7139,7 +6473,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7169,34 +6503,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.IndexingRepositoryListResponseDTO"
                                 }
                             }
                         },
@@ -7206,7 +6513,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7246,34 +6553,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetIndexingStatsResponseDTO"
                                 }
                             }
                         },
@@ -7283,7 +6563,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7293,7 +6573,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7343,34 +6623,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetListResponseDTO"
                                 }
                             }
                         },
@@ -7380,7 +6633,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7431,7 +6684,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7441,7 +6694,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7451,7 +6704,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7509,34 +6762,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetMapPointListResponseDTO"
                                 }
                             }
                         },
@@ -7546,7 +6772,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7556,7 +6782,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7615,34 +6841,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetListResponseDTO"
                                 }
                             }
                         },
@@ -7652,7 +6851,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7662,7 +6861,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7703,34 +6902,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.SearchAssetsResponseDTO"
                                 }
                             }
                         },
@@ -7740,7 +6912,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7750,7 +6922,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7791,34 +6963,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.StackDTO"
                                 }
                             }
                         },
@@ -7828,7 +6973,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7838,7 +6983,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7873,34 +7018,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetTypesResponseDTO"
                                 }
                             }
                         },
@@ -7942,34 +7060,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -7979,7 +7070,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -7989,7 +7080,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8083,34 +7174,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetDTO"
                                 }
                             }
                         },
@@ -8120,7 +7184,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8130,7 +7194,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8181,34 +7245,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -8218,7 +7255,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8228,7 +7265,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8269,7 +7306,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -8279,7 +7316,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8289,7 +7326,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8346,34 +7383,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -8383,7 +7393,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8393,7 +7403,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8436,7 +7446,7 @@ const docTemplate = `{
                         "content": {
                             "audio/mpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8446,7 +7456,7 @@ const docTemplate = `{
                         "content": {
                             "audio/mpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8456,7 +7466,7 @@ const docTemplate = `{
                         "content": {
                             "audio/mpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8508,34 +7518,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -8545,7 +7528,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8555,7 +7538,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8565,7 +7548,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8607,34 +7590,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetExifResponseDTO"
                                 }
                             }
                         },
@@ -8644,7 +7600,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8654,7 +7610,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8752,22 +7708,22 @@ const docTemplate = `{
                         "content": {
                             "image/avif": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/png": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8777,22 +7733,22 @@ const docTemplate = `{
                         "content": {
                             "image/avif": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/png": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8802,22 +7758,22 @@ const docTemplate = `{
                         "content": {
                             "image/avif": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/png": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8827,22 +7783,22 @@ const docTemplate = `{
                         "content": {
                             "image/avif": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/png": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8852,22 +7808,22 @@ const docTemplate = `{
                         "content": {
                             "image/avif": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/png": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8877,22 +7833,22 @@ const docTemplate = `{
                         "content": {
                             "image/avif": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/png": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             },
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8944,34 +7900,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -8981,7 +7910,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -8991,7 +7920,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9001,7 +7930,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9044,7 +7973,7 @@ const docTemplate = `{
                         "content": {
                             "application/octet-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9054,7 +7983,7 @@ const docTemplate = `{
                         "content": {
                             "application/octet-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9064,7 +7993,7 @@ const docTemplate = `{
                         "content": {
                             "application/octet-stream": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9116,34 +8045,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -9153,7 +8055,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9163,7 +8065,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9173,7 +8075,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9225,34 +8127,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -9262,7 +8137,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9272,7 +8147,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9282,7 +8157,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9414,34 +8289,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetSidecarResponseDTO"
                                 }
                             }
                         },
@@ -9451,7 +8299,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9461,7 +8309,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9471,7 +8319,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9522,34 +8370,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AssetSidecarResponseDTO"
                                 }
                             }
                         },
@@ -9559,7 +8380,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9569,7 +8390,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9579,7 +8400,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9611,7 +8432,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -9646,34 +8467,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.StackByAssetResponseDTO"
                                 }
                             }
                         },
@@ -9683,7 +8477,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9745,7 +8539,7 @@ const docTemplate = `{
                         "content": {
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9755,7 +8549,7 @@ const docTemplate = `{
                         "content": {
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9765,7 +8559,7 @@ const docTemplate = `{
                         "content": {
                             "image/jpeg": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9808,7 +8602,7 @@ const docTemplate = `{
                         "content": {
                             "video/mp4": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9818,7 +8612,7 @@ const docTemplate = `{
                         "content": {
                             "video/mp4": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9828,7 +8622,7 @@ const docTemplate = `{
                         "content": {
                             "video/mp4": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9869,34 +8663,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AuthResponseDTO"
                                 }
                             }
                         },
@@ -9906,7 +8673,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9916,7 +8683,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9926,7 +8693,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9967,7 +8734,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -9977,7 +8744,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9987,7 +8754,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -9997,7 +8764,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10027,34 +8794,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.UserDTO"
                                 }
                             }
                         },
@@ -10064,7 +8804,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10074,7 +8814,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10109,34 +8849,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MediaTokenDTO"
                                 }
                             }
                         },
@@ -10146,7 +8859,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10156,7 +8869,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10191,7 +8904,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.MFAStatusResultDTO"
+                                    "$ref": "#/components/schemas/dto.MFAStatusDTO"
                                 }
                             }
                         },
@@ -10201,7 +8914,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10211,7 +8924,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10246,7 +8959,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.PasskeyListResultDTO"
+                                    "$ref": "#/components/schemas/dto.PasskeyListResponseDTO"
                                 }
                             }
                         },
@@ -10256,7 +8969,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10266,7 +8979,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10301,7 +9014,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.PasskeyOptionsResultDTO"
+                                    "$ref": "#/components/schemas/dto.PasskeyOptionsResponseDTO"
                                 }
                             }
                         },
@@ -10311,7 +9024,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10321,7 +9034,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10367,7 +9080,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.PasskeyCredentialResultDTO"
+                                    "$ref": "#/components/schemas/dto.PasskeyCredentialSummaryDTO"
                                 }
                             }
                         },
@@ -10377,7 +9090,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10387,7 +9100,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10397,7 +9110,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10443,7 +9156,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -10453,7 +9166,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10463,7 +9176,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10473,7 +9186,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10519,34 +9232,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RecoveryCodesResponseDTO"
                                 }
                             }
                         },
@@ -10556,7 +9242,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10566,7 +9252,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10576,7 +9262,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10622,7 +9308,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.MFAStatusResultDTO"
+                                    "$ref": "#/components/schemas/dto.MFAStatusDTO"
                                 }
                             }
                         },
@@ -10632,7 +9318,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10642,7 +9328,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10652,7 +9338,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10698,34 +9384,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RecoveryCodesResponseDTO"
                                 }
                             }
                         },
@@ -10735,7 +9394,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10745,7 +9404,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10755,7 +9414,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10790,34 +9449,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.TOTPSetupResponseDTO"
                                 }
                             }
                         },
@@ -10827,7 +9459,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10837,7 +9469,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10883,34 +9515,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AuthResponseDTO"
                                 }
                             }
                         },
@@ -10920,7 +9525,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10930,7 +9535,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10940,7 +9545,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -10981,34 +9586,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.PasskeyOptionsResponseDTO"
                                 }
                             }
                         },
@@ -11018,7 +9596,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11028,7 +9606,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11038,7 +9616,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11079,34 +9657,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AuthResponseDTO"
                                 }
                             }
                         },
@@ -11116,7 +9667,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11126,7 +9677,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11136,7 +9687,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11177,34 +9728,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AuthResponseDTO"
                                 }
                             }
                         },
@@ -11214,7 +9738,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11224,7 +9748,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11234,7 +9758,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11275,34 +9799,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AuthResponseDTO"
                                 }
                             }
                         },
@@ -11312,7 +9809,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11322,7 +9819,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11332,7 +9829,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11362,34 +9859,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.CapabilitiesResponseDTO"
                                 }
                             }
                         },
@@ -11430,34 +9900,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ClassifierPreviewResponseDTO"
                                 }
                             }
                         },
@@ -11467,7 +9910,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11477,7 +9920,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11487,7 +9930,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11497,7 +9940,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11523,34 +9966,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ListCloudCredentialsResponse"
                                 }
                             }
                         },
@@ -11560,7 +9976,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11570,7 +9986,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11614,34 +10030,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.CreateCloudCredentialResponse"
                                 }
                             }
                         },
@@ -11651,7 +10040,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11661,7 +10050,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11671,7 +10060,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11708,7 +10097,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -11718,7 +10107,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11728,7 +10117,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11738,7 +10127,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11795,34 +10184,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.VerifyCloudAuthChallengeResponse"
                                 }
                             }
                         },
@@ -11832,7 +10194,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11842,7 +10204,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11852,7 +10214,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11889,7 +10251,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -11899,7 +10261,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11909,7 +10271,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11919,7 +10281,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -11976,34 +10338,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.CreateCloudCredentialResponse"
                                 }
                             }
                         },
@@ -12013,7 +10348,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12023,7 +10358,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12033,7 +10368,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12070,34 +10405,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.CloudImportRunDTO"
                                 }
                             }
                         },
@@ -12107,7 +10415,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12117,7 +10425,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12127,7 +10435,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12153,34 +10461,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ListCloudProvidersResponse"
                                 }
                             }
                         },
@@ -12190,7 +10471,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12200,7 +10481,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12226,7 +10507,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12272,34 +10553,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.DetectDuplicatesResponseDTO"
                                 }
                             }
                         },
@@ -12309,7 +10563,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12319,7 +10573,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12385,34 +10639,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ListDuplicateGroupsResponseDTO"
                                 }
                             }
                         },
@@ -12422,7 +10649,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12432,7 +10659,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12473,34 +10700,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.DuplicateGroupDTO"
                                 }
                             }
                         },
@@ -12510,7 +10710,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12551,34 +10751,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
                                 }
                             }
                         },
@@ -12588,7 +10761,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12598,7 +10771,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12650,34 +10823,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MergeDuplicateGroupResponseDTO"
                                 }
                             }
                         },
@@ -12687,7 +10833,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12697,7 +10843,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12707,7 +10853,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12717,7 +10863,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12757,34 +10903,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.DuplicateSummaryDTO"
                                 }
                             }
                         },
@@ -12794,7 +10913,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12804,7 +10923,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12834,34 +10953,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.HealthResponse"
                                 }
                             }
                         },
@@ -12927,34 +11019,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.LocationClusterListResponseDTO"
                                 }
                             }
                         },
@@ -12964,7 +11029,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -12974,7 +11039,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13014,34 +11079,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RebuildLocationClustersResponseDTO"
                                 }
                             }
                         },
@@ -13051,7 +11089,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13061,7 +11099,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13110,34 +11148,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ListPeopleResponseDTO"
                                 }
                             }
                         },
@@ -13147,7 +11158,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13157,7 +11168,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13188,34 +11199,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.FaceClusterRebuildResponseDTO"
                                 }
                             }
                         },
@@ -13225,7 +11209,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13235,7 +11219,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13245,7 +11229,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13290,34 +11274,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.PersonDetailDTO"
                                 }
                             }
                         },
@@ -13327,7 +11284,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13337,7 +11294,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13347,7 +11304,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13405,34 +11362,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.PersonDetailDTO"
                                 }
                             }
                         },
@@ -13442,7 +11372,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13452,7 +11382,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13462,7 +11392,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13519,34 +11449,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.QueryAssetsResponseDTO"
                                 }
                             }
                         },
@@ -13556,7 +11459,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13566,7 +11469,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13576,7 +11479,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13586,7 +11489,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13636,7 +11539,7 @@ const docTemplate = `{
                         "content": {
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13646,7 +11549,7 @@ const docTemplate = `{
                         "content": {
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13656,7 +11559,7 @@ const docTemplate = `{
                         "content": {
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13666,7 +11569,7 @@ const docTemplate = `{
                         "content": {
                             "image/webp": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13687,34 +11590,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ListRepositoriesResponseDTO"
                                 }
                             }
                         },
@@ -13758,34 +11634,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.CreateRepositoryResponseDTO"
                                 }
                             }
                         },
@@ -13795,7 +11644,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13805,7 +11654,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13815,7 +11664,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13825,7 +11674,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13862,7 +11711,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -13872,7 +11721,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13907,34 +11756,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
                                 }
                             }
                         },
@@ -13944,7 +11766,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -13999,34 +11821,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
                                 }
                             }
                         },
@@ -14036,7 +11831,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14046,7 +11841,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14083,34 +11878,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RepositoryCloudStatusDTO"
                                 }
                             }
                         },
@@ -14120,7 +11888,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14130,7 +11898,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14140,7 +11908,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14177,34 +11945,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.StartCloudImportResponse"
                                 }
                             }
                         },
@@ -14214,7 +11955,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14224,7 +11965,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14234,7 +11975,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14290,34 +12031,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RepositoryScanQueuedDTO"
                                 }
                             }
                         },
@@ -14327,7 +12041,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14337,7 +12051,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14347,7 +12061,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14402,34 +12116,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunListDTO"
                                 }
                             }
                         },
@@ -14466,34 +12153,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
                                 }
                             }
                         },
@@ -14503,7 +12163,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14540,34 +12200,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.AutoDetectStacksResponseDTO"
                                 }
                             }
                         },
@@ -14593,34 +12226,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.RuntimeInfoDTO"
                                 }
                             }
                         },
@@ -14630,7 +12236,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14665,34 +12271,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.SystemSettingsDTO"
                                 }
                             }
                         },
@@ -14702,7 +12281,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14712,7 +12291,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14756,34 +12335,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.SystemSettingsDTO"
                                 }
                             }
                         },
@@ -14793,7 +12345,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14803,7 +12355,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14813,7 +12365,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14848,34 +12400,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ValidateLLMSettingsResponseDTO"
                                 }
                             }
                         },
@@ -14885,7 +12410,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14895,7 +12420,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14905,7 +12430,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14950,34 +12475,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.SetupResultDTO"
                                 }
                             }
                         },
@@ -14987,7 +12485,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -14997,7 +12495,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15007,7 +12505,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15028,34 +12526,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.SetupStatusDTO"
                                 }
                             }
                         },
@@ -15065,7 +12536,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15124,34 +12595,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.SpeciesReferenceResponseDTO"
                                 }
                             }
                         },
@@ -15161,7 +12605,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15171,7 +12615,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15181,7 +12625,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15212,34 +12656,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.AvailableYearsResponse"
                                 }
                             }
                         },
@@ -15249,7 +12666,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15259,7 +12676,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15299,34 +12716,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.CameraLensStatsResponse"
                                 }
                             }
                         },
@@ -15336,7 +12726,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15346,7 +12736,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15409,34 +12799,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.HeatmapResponse"
                                 }
                             }
                         },
@@ -15446,7 +12809,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15456,7 +12819,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15487,34 +12850,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.FocalLengthDistributionResponse"
                                 }
                             }
                         },
@@ -15524,7 +12860,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15534,7 +12870,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15578,34 +12914,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/handler.TimeDistributionResponse"
                                 }
                             }
                         },
@@ -15615,7 +12924,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15625,7 +12934,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15675,34 +12984,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ListUsersResponseDTO"
                                 }
                             }
                         },
@@ -15712,7 +12994,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15722,7 +13004,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15732,7 +13014,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15778,7 +13060,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
                                 }
                             }
                         },
@@ -15788,7 +13070,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15798,7 +13080,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15808,7 +13090,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15854,7 +13136,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.UserResultDTO"
+                                    "$ref": "#/components/schemas/dto.UserDTO"
                                 }
                             }
                         },
@@ -15864,7 +13146,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15874,7 +13156,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15884,7 +13166,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15941,7 +13223,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.UserResultDTO"
+                                    "$ref": "#/components/schemas/dto.UserDTO"
                                 }
                             }
                         },
@@ -15951,7 +13233,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15961,7 +13243,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15971,7 +13253,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15981,7 +13263,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -15991,7 +13273,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -16001,7 +13283,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -16047,7 +13329,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.ResetAccessResultDTO"
+                                    "$ref": "#/components/schemas/dto.ResetAccessResponseDTO"
                                 }
                             }
                         },
@@ -16057,7 +13339,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -16067,7 +13349,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -16077,7 +13359,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -16087,7 +13369,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
@@ -16097,7 +13379,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },

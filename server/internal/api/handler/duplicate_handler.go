@@ -39,9 +39,9 @@ func NewDuplicateHandler(duplicateService service.DuplicateService, queries *rep
 // @Accept json
 // @Produce json
 // @Param repository_id query string false "Repository UUID to scope the summary"
-// @Success 200 {object} api.Result{data=dto.DuplicateSummaryDTO}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} dto.DuplicateSummaryDTO
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/duplicates/summary [get]
 func (h *DuplicateHandler) GetDuplicateSummary(c *gin.Context) {
 	repoID, err := optionalRepositoryUUIDParam(c.Query("repository_id"))
@@ -55,7 +55,7 @@ func (h *DuplicateHandler) GetDuplicateSummary(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to load duplicate summary")
 		return
 	}
-	api.GinSuccess(c, toDuplicateSummaryDTO(summary))
+	api.JSONOK(c, toDuplicateSummaryDTO(summary))
 }
 
 // ListDuplicateGroups returns paginated duplicate groups with their assets.
@@ -68,9 +68,9 @@ func (h *DuplicateHandler) GetDuplicateSummary(c *gin.Context) {
 // @Param status query string false "pending | merged | dismissed (defaults to pending)"
 // @Param limit query int false "Page size" default(20)
 // @Param offset query int false "Page offset" default(0)
-// @Success 200 {object} api.Result{data=dto.ListDuplicateGroupsResponseDTO}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} dto.ListDuplicateGroupsResponseDTO
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/duplicates/groups [get]
 func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 	repoID, err := optionalRepositoryUUIDParam(c.Query("repository_id"))
@@ -109,7 +109,7 @@ func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ListDuplicateGroupsResponseDTO{
+	api.JSONOK(c, dto.ListDuplicateGroupsResponseDTO{
 		Groups: groups,
 		Total:  result.Total,
 		Limit:  limit,
@@ -124,8 +124,8 @@ func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Duplicate group UUID"
-// @Success 200 {object} api.Result{data=dto.DuplicateGroupDTO}
-// @Failure 404 {object} api.Result
+// @Success 200 {object} dto.DuplicateGroupDTO
+// @Failure 404 {object} api.ErrorResponse
 // @Router /api/v1/duplicates/groups/{id} [get]
 func (h *DuplicateHandler) GetDuplicateGroup(c *gin.Context) {
 	groupID, err := uuid.Parse(c.Param("id"))
@@ -153,7 +153,7 @@ func (h *DuplicateHandler) GetDuplicateGroup(c *gin.Context) {
 		api.GinNotFound(c, errors.New("group disappeared"), "Duplicate group not found")
 		return
 	}
-	api.GinSuccess(c, groups[0])
+	api.JSONOK(c, groups[0])
 }
 
 // DetectDuplicates triggers a synchronous detection run for a repository.
@@ -163,9 +163,9 @@ func (h *DuplicateHandler) GetDuplicateGroup(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.DetectDuplicatesRequestDTO true "Repository to scan"
-// @Success 200 {object} api.Result{data=dto.DetectDuplicatesResponseDTO}
-// @Failure 400 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} dto.DetectDuplicatesResponseDTO
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/duplicates/detect [post]
 func (h *DuplicateHandler) DetectDuplicates(c *gin.Context) {
 	var req dto.DetectDuplicatesRequestDTO
@@ -184,7 +184,7 @@ func (h *DuplicateHandler) DetectDuplicates(c *gin.Context) {
 		api.GinInternalError(c, err, "Duplicate detection failed")
 		return
 	}
-	api.GinSuccess(c, dto.DetectDuplicatesResponseDTO{
+	api.JSONOK(c, dto.DetectDuplicatesResponseDTO{
 		Groups:         result.Groups,
 		ExactGroups:    result.ExactGroups,
 		PHashGroups:    result.PHashGroups,
@@ -202,11 +202,11 @@ func (h *DuplicateHandler) DetectDuplicates(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Duplicate group UUID"
 // @Param request body dto.MergeDuplicateGroupRequestDTO true "Merge configuration"
-// @Success 200 {object} api.Result{data=dto.MergeDuplicateGroupResponseDTO}
-// @Failure 400 {object} api.Result
-// @Failure 404 {object} api.Result
-// @Failure 409 {object} api.Result
-// @Failure 500 {object} api.Result
+// @Success 200 {object} dto.MergeDuplicateGroupResponseDTO
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 404 {object} api.ErrorResponse
+// @Failure 409 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
 // @Router /api/v1/duplicates/groups/{id}/merge [post]
 func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 	groupID, err := uuid.Parse(c.Param("id"))
@@ -270,7 +270,7 @@ func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 	for i, id := range result.MergedDuplicates {
 		mergedIDs[i] = id.String()
 	}
-	api.GinSuccess(c, dto.MergeDuplicateGroupResponseDTO{
+	api.JSONOK(c, dto.MergeDuplicateGroupResponseDTO{
 		GroupID:          result.GroupID.String(),
 		KeeperAssetID:    result.KeeperAssetID.String(),
 		MergedDuplicates: mergedIDs,
@@ -285,9 +285,9 @@ func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Duplicate group UUID"
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO}
-// @Failure 404 {object} api.Result
-// @Failure 409 {object} api.Result
+// @Success 200 {object} dto.MessageResponseDTO
+// @Failure 404 {object} api.ErrorResponse
+// @Failure 409 {object} api.ErrorResponse
 // @Router /api/v1/duplicates/groups/{id}/dismiss [post]
 func (h *DuplicateHandler) DismissDuplicateGroup(c *gin.Context) {
 	groupID, err := uuid.Parse(c.Param("id"))
@@ -307,7 +307,7 @@ func (h *DuplicateHandler) DismissDuplicateGroup(c *gin.Context) {
 		}
 		return
 	}
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Duplicate group dismissed"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Duplicate group dismissed"})
 }
 
 // ----------------------------------------------------------------------------

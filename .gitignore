@@ -79,8 +79,8 @@ server/.cache/
 /pml/pt
 
 web/docs/
-/docs/.vitepress/dist/
-/docs/.vitepress/cache/
+/site/docs/.vitepress/dist/
+/site/docs/.vitepress/cache/
 
 /share/
 /pml/build
@@ -91,7 +91,6 @@ web/docs/
 /server/api
 /server/worker
 pml/data/bioclip/txt_emb_species.json
-*.npz
 /data
 server/main
 /ml/lumen-clip/data

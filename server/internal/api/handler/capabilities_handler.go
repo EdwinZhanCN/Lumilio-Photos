@@ -30,7 +30,7 @@ func NewCapabilitiesHandler(
 // @Tags capabilities
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=dto.CapabilitiesResponseDTO} "Capabilities retrieved successfully"
+// @Success 200 {object} dto.CapabilitiesResponseDTO "Capabilities retrieved successfully"
 // @Router /api/v1/capabilities [get]
 func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 	systemSettings, err := h.settingsService.GetSystemSettings(c.Request.Context())
@@ -100,5 +100,5 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 		},
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }

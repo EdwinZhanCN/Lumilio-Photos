@@ -1,10 +1,6 @@
 import { $api } from "@/lib/http-commons/queryClient";
 import type { StackByAssetResponse } from "@/lib/assets/types";
 
-type ApiResult<T = unknown> = {
-  data?: T;
-};
-
 const isStackByAssetResponse = (
   value: unknown,
 ): value is StackByAssetResponse => {
@@ -25,11 +21,6 @@ const unwrapStackByAssetResponse = (
 ): StackByAssetResponse | undefined => {
   if (isStackByAssetResponse(response)) {
     return response;
-  }
-
-  const wrapped = response as ApiResult<unknown> | undefined;
-  if (isStackByAssetResponse(wrapped?.data)) {
-    return wrapped.data;
   }
 
   return undefined;

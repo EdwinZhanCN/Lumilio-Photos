@@ -21,10 +21,10 @@ import (
 // @Accept json
 // @Produce json
 // @Param request body dto.PasskeyOptionsRequestDTO true "Username for passkey login"
-// @Success 200 {object} api.Result{data=dto.PasskeyOptionsResponseDTO} "Passkey login options created successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Invalid credentials"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.PasskeyOptionsResponseDTO "Passkey login options created successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Invalid credentials"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/options [post]
 func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 	var req dto.PasskeyOptionsRequestDTO
@@ -49,7 +49,7 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToPasskeyOptionsResponseDTO(response))
+	api.JSONOK(c, dto.ToPasskeyOptionsResponseDTO(response))
 }
 
 // VerifyPasskeyLogin completes username-first passkey login.
@@ -59,10 +59,10 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.PasskeyVerifyRequestDTO true "Passkey login verification payload"
-// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Passkey login verified successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Invalid credentials"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AuthResponseDTO "Passkey login verified successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Invalid credentials"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/verify [post]
 func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 	var req dto.PasskeyVerifyRequestDTO
@@ -91,7 +91,7 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToAuthResponseDTO(response))
+	api.JSONOK(c, dto.ToAuthResponseDTO(response))
 }
 
 // ListPasskeys returns the authenticated user's passkeys.
@@ -101,9 +101,9 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} dto.PasskeyListResultDTO "Passkeys retrieved successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.PasskeyListResponseDTO "Passkeys retrieved successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys [get]
 func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -117,7 +117,7 @@ func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToPasskeyListResponseDTO(response))
+	api.JSONOK(c, dto.ToPasskeyListResponseDTO(response))
 }
 
 // BeginPasskeyEnrollment creates WebAuthn registration options for the authenticated user.
@@ -127,9 +127,9 @@ func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} dto.PasskeyOptionsResultDTO "Passkey enrollment options created successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.PasskeyOptionsResponseDTO "Passkey enrollment options created successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/options [post]
 func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -148,7 +148,7 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToPasskeyOptionsResponseDTO(response))
+	api.JSONOK(c, dto.ToPasskeyOptionsResponseDTO(response))
 }
 
 // VerifyPasskeyEnrollment completes passkey enrollment for the authenticated user.
@@ -159,10 +159,10 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.PasskeyVerifyRequestDTO true "Passkey enrollment verification payload"
-// @Success 200 {object} dto.PasskeyCredentialResultDTO "Passkey enrolled successfully"
-// @Failure 400 {object} api.Result "Invalid or expired challenge"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.PasskeyCredentialSummaryDTO "Passkey enrolled successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid or expired challenge"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/verify [post]
 func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -196,7 +196,7 @@ func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToPasskeyCredentialSummaryDTO(response))
+	api.JSONOK(c, dto.ToPasskeyCredentialSummaryDTO(response))
 }
 
 // DeletePasskey removes an enrolled passkey from the authenticated user.
@@ -207,10 +207,10 @@ func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Passkey ID"
-// @Success 200 {object} api.Result "Passkey deleted successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 404 {object} api.Result "Passkey not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} api.SuccessResponse "Passkey deleted successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Passkey not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/{id} [delete]
 func (h *AuthHandler) DeletePasskey(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -234,7 +234,7 @@ func (h *AuthHandler) DeletePasskey(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"deleted": true})
+	api.JSONOK(c, gin.H{"deleted": true})
 }
 
 func requestOrigin(c *gin.Context) string {

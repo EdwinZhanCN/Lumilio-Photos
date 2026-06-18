@@ -6,7 +6,6 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "./useAuth.ts";
 import { setupStatusQueryKey } from "./useSetupStatus.ts";
 import type {
-  ApiResult,
   AuthResponse,
   PasskeyOptionsResponse,
   RecoveryCodesResponse,
@@ -137,23 +136,23 @@ export function useRegistrationFlow(): RegistrationFlowState {
       const response = await registerMutation.mutateAsync({
         body: { username, password },
       });
-      const payload = response as ApiResult<AuthResponse> | undefined;
-      if (!payload?.data) {
-        throw new Error(payload?.message || t("auth.register.startError"));
+      const payload = response as AuthResponse | undefined;
+      if (!payload) {
+        throw new Error(t("auth.register.startError"));
       }
 
       // Account exists and is logged in. MFA is offered next but fully optional;
       // TOTP comes first because a passkey may only be added once TOTP is on.
       startedRef.current = true;
-      await completeAuth(payload.data);
+      await completeAuth(payload);
       await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
 
       const setupResponse = await totpSetupMutation.mutateAsync({});
-      const setupPayload = setupResponse as ApiResult<TOTPSetupResponse> | undefined;
-      if (!setupPayload?.data) {
-        throw new Error(setupPayload?.message || t("auth.register.totpSetupStartError"));
+      const setupPayload = setupResponse as TOTPSetupResponse | undefined;
+      if (!setupPayload) {
+        throw new Error(t("auth.register.totpSetupStartError"));
       }
-      setTotpSetup(setupPayload.data);
+      setTotpSetup(setupPayload);
       setTotpCode("");
       setStep("totp");
     } catch (registrationError) {
@@ -173,12 +172,12 @@ export function useRegistrationFlow(): RegistrationFlowState {
           code: totpCode,
         },
       });
-      const payload = response as ApiResult<RecoveryCodesResponse> | undefined;
-      if (!payload?.data) {
-        throw new Error(payload?.message || t("auth.register.totpSetupCompleteError"));
+      const payload = response as RecoveryCodesResponse | undefined;
+      if (!payload) {
+        throw new Error(t("auth.register.totpSetupCompleteError"));
       }
 
-      setRecoveryCodes(payload.data.recovery_codes ?? []);
+      setRecoveryCodes(payload.recovery_codes ?? []);
       // TOTP is now enabled, so a passkey may be offered as the next option.
       setStep(passkeySupport.supported ? "passkey" : "recovery");
     } catch (totpError) {
@@ -196,15 +195,15 @@ export function useRegistrationFlow(): RegistrationFlowState {
     setFlowError(null);
     try {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({});
-      const optionsData = optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
-      if (!optionsData?.data) {
-        throw new Error(optionsData?.message || t("auth.register.passkeyStartError"));
+      const optionsData = optionsResponse as PasskeyOptionsResponse | undefined;
+      if (!optionsData) {
+        throw new Error(t("auth.register.passkeyStartError"));
       }
 
-      const credential = await createPasskeyCredential(optionsData.data.options);
+      const credential = await createPasskeyCredential(optionsData.options);
       await passkeyVerifyMutation.mutateAsync({
         body: {
-          challenge_token: optionsData.data.challenge_token,
+          challenge_token: optionsData.challenge_token,
           credential,
         },
       });

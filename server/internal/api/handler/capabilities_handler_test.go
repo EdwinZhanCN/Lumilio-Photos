@@ -93,16 +93,12 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesSemanticCapabilities(t *test
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                         `json:"code"`
-		Data dto.CapabilitiesResponseDTO `json:"data"`
-	}
+	var response dto.CapabilitiesResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.True(t, response.Data.ML.Tasks.SemanticImageEmbed.Enabled)
-	require.True(t, response.Data.ML.Tasks.SemanticImageEmbed.Available)
-	require.True(t, response.Data.ML.Tasks.SemanticTextEmbed.Enabled)
-	require.True(t, response.Data.ML.Tasks.SemanticTextEmbed.Available)
-	require.True(t, response.Data.ML.Tasks.BioClipClassify.Enabled)
-	require.True(t, response.Data.ML.Tasks.BioClipClassify.Available)
+	require.True(t, response.ML.Tasks.SemanticImageEmbed.Enabled)
+	require.True(t, response.ML.Tasks.SemanticImageEmbed.Available)
+	require.True(t, response.ML.Tasks.SemanticTextEmbed.Enabled)
+	require.True(t, response.ML.Tasks.SemanticTextEmbed.Available)
+	require.True(t, response.ML.Tasks.BioClipClassify.Enabled)
+	require.True(t, response.ML.Tasks.BioClipClassify.Available)
 }

@@ -17,10 +17,10 @@ import (
 // @Accept json
 // @Produce json
 // @Param request body dto.VerifyMFARequestDTO true "MFA verification payload"
-// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "MFA verification successful"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Invalid or expired MFA challenge"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AuthResponseDTO "MFA verification successful"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Invalid or expired MFA challenge"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/verify [post]
 func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 	var req dto.VerifyMFARequestDTO
@@ -48,7 +48,7 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToAuthResponseDTO(authResponse))
+	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
 }
 
 // GetMFAStatus returns the current user's MFA status.
@@ -58,9 +58,9 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} dto.MFAStatusResultDTO "MFA status retrieved successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MFAStatusDTO "MFA status retrieved successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa [get]
 func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -74,7 +74,7 @@ func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToMFAStatusDTO(status))
+	api.JSONOK(c, dto.ToMFAStatusDTO(status))
 }
 
 // BeginTOTPSetup starts a TOTP setup flow.
@@ -84,9 +84,9 @@ func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.TOTPSetupResponseDTO} "TOTP setup created successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.TOTPSetupResponseDTO "TOTP setup created successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/totp/setup [post]
 func (h *AuthHandler) BeginTOTPSetup(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -100,7 +100,7 @@ func (h *AuthHandler) BeginTOTPSetup(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToTOTPSetupResponseDTO(response))
+	api.JSONOK(c, dto.ToTOTPSetupResponseDTO(response))
 }
 
 // EnableTOTP completes TOTP enrollment.
@@ -111,10 +111,10 @@ func (h *AuthHandler) BeginTOTPSetup(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.EnableTOTPRequestDTO true "TOTP enable payload"
-// @Success 200 {object} api.Result{data=dto.RecoveryCodesResponseDTO} "TOTP enabled successfully"
-// @Failure 400 {object} api.Result "Invalid setup token or verification code"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.RecoveryCodesResponseDTO "TOTP enabled successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid setup token or verification code"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/totp/enable [post]
 func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -144,7 +144,7 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToRecoveryCodesResponseDTO(response))
+	api.JSONOK(c, dto.ToRecoveryCodesResponseDTO(response))
 }
 
 // DisableTOTP disables TOTP MFA for the authenticated user.
@@ -155,10 +155,10 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.DisableTOTPRequestDTO true "Disable TOTP payload"
-// @Success 200 {object} dto.MFAStatusResultDTO "TOTP disabled successfully"
-// @Failure 400 {object} api.Result "MFA is not enabled"
-// @Failure 401 {object} api.Result "Unauthorized or incorrect password"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MFAStatusDTO "TOTP disabled successfully"
+// @Failure 400 {object} api.ErrorResponse "MFA is not enabled"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized or incorrect password"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/totp/disable [post]
 func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -185,7 +185,7 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToMFAStatusDTO(status))
+	api.JSONOK(c, dto.ToMFAStatusDTO(status))
 }
 
 // RegenerateRecoveryCodes replaces the current recovery codes.
@@ -196,10 +196,10 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.RegenerateRecoveryCodesRequestDTO true "Recovery code regeneration payload"
-// @Success 200 {object} api.Result{data=dto.RecoveryCodesResponseDTO} "Recovery codes regenerated successfully"
-// @Failure 400 {object} api.Result "MFA is not enabled"
-// @Failure 401 {object} api.Result "Unauthorized or incorrect password"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.RecoveryCodesResponseDTO "Recovery codes regenerated successfully"
+// @Failure 400 {object} api.ErrorResponse "MFA is not enabled"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized or incorrect password"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/recovery-codes/regenerate [post]
 func (h *AuthHandler) RegenerateRecoveryCodes(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -226,5 +226,5 @@ func (h *AuthHandler) RegenerateRecoveryCodes(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToRecoveryCodesResponseDTO(response))
+	api.JSONOK(c, dto.ToRecoveryCodesResponseDTO(response))
 }

@@ -78,7 +78,7 @@ type QueueErrorSampleDTO struct {
 // @Accept json
 // @Produce json
 // @Param error_limit query int false "Recent error samples per queue (default: 5, max: 20)"
-// @Success 200 {object} api.Result{data=QueueSummaryResponse}
+// @Success 200 {object} QueueSummaryResponse
 // @Router /api/v1/admin/river/queue-summary [get]
 func (h *QueueHandler) GetQueueSummary(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
@@ -98,7 +98,7 @@ func (h *QueueHandler) GetQueueSummary(c *gin.Context) {
 		}
 	}
 
-	api.GinSuccess(c, QueueSummaryResponse{
+	api.JSONOK(c, QueueSummaryResponse{
 		Queues:      queues,
 		GeneratedAt: time.Now(),
 	})
@@ -110,7 +110,7 @@ func (h *QueueHandler) GetQueueSummary(c *gin.Context) {
 // @Tags Queue
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=JobStatsResponse}
+// @Success 200 {object} JobStatsResponse
 // @Router /api/v1/admin/river/stats [get]
 func (h *QueueHandler) GetJobStats(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
@@ -139,7 +139,7 @@ func (h *QueueHandler) GetJobStats(c *gin.Context) {
 		}
 	}
 
-	api.GinSuccess(c, stats)
+	api.JSONOK(c, stats)
 }
 
 func parseErrorLimit(raw string) int {

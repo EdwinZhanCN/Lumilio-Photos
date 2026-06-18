@@ -92,17 +92,13 @@ func TestAssetHandlerListIndexingRepositories_ReturnsOptions(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                                   `json:"code"`
-		Data dto.IndexingRepositoryListResponseDTO `json:"data"`
-	}
+	var response dto.IndexingRepositoryListResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.Len(t, response.Data.Repositories, 2)
-	require.Equal(t, "primary", response.Data.Repositories[0].Name)
-	require.Equal(t, "/Volumes/Media/primary", response.Data.Repositories[0].Path)
-	require.True(t, response.Data.Repositories[0].IsPrimary)
-	require.False(t, response.Data.Repositories[1].IsPrimary)
+	require.Len(t, response.Repositories, 2)
+	require.Equal(t, "primary", response.Repositories[0].Name)
+	require.Equal(t, "/Volumes/Media/primary", response.Repositories[0].Path)
+	require.True(t, response.Repositories[0].IsPrimary)
+	require.False(t, response.Repositories[1].IsPrimary)
 }
 
 func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
@@ -136,26 +132,22 @@ func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                               `json:"code"`
-		Data dto.AssetIndexingStatsResponseDTO `json:"data"`
-	}
+	var response dto.AssetIndexingStatsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.Equal(t, 240, response.Data.PhotoTotal)
-	require.Equal(t, 2, response.Data.ReindexJobs)
-	require.Equal(t, 120, response.Data.Tasks.Semantic.IndexedCount)
-	require.Equal(t, 4, response.Data.Tasks.Semantic.QueuedJobs)
-	require.Equal(t, 240, response.Data.Tasks.Semantic.TotalCount)
-	require.Equal(t, 80, response.Data.Tasks.BioCLIP.IndexedCount)
-	require.Equal(t, 5, response.Data.Tasks.BioCLIP.QueuedJobs)
-	require.Equal(t, 90, response.Data.Tasks.BioCLIP.TotalCount)
-	require.Equal(t, 110, response.Data.Tasks.OCR.IndexedCount)
-	require.Equal(t, 3, response.Data.Tasks.OCR.QueuedJobs)
-	require.Equal(t, 240, response.Data.Tasks.OCR.TotalCount)
-	require.Equal(t, 60, response.Data.Tasks.Face.IndexedCount)
-	require.Equal(t, 1, response.Data.Tasks.Face.QueuedJobs)
-	require.Equal(t, 240, response.Data.Tasks.Face.TotalCount)
+	require.Equal(t, 240, response.PhotoTotal)
+	require.Equal(t, 2, response.ReindexJobs)
+	require.Equal(t, 120, response.Tasks.Semantic.IndexedCount)
+	require.Equal(t, 4, response.Tasks.Semantic.QueuedJobs)
+	require.Equal(t, 240, response.Tasks.Semantic.TotalCount)
+	require.Equal(t, 80, response.Tasks.BioCLIP.IndexedCount)
+	require.Equal(t, 5, response.Tasks.BioCLIP.QueuedJobs)
+	require.Equal(t, 90, response.Tasks.BioCLIP.TotalCount)
+	require.Equal(t, 110, response.Tasks.OCR.IndexedCount)
+	require.Equal(t, 3, response.Tasks.OCR.QueuedJobs)
+	require.Equal(t, 240, response.Tasks.OCR.TotalCount)
+	require.Equal(t, 60, response.Tasks.Face.IndexedCount)
+	require.Equal(t, 1, response.Tasks.Face.QueuedJobs)
+	require.Equal(t, 240, response.Tasks.Face.TotalCount)
 }
 
 func TestAssetHandlerGetIndexingStats_RejectsInvalidRepositoryID(t *testing.T) {
@@ -209,17 +201,13 @@ func TestAssetHandlerRebuildAssetIndexes_QueuesDefaultBatch(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                                `json:"code"`
-		Data dto.RebuildAssetIndexesResponseDTO `json:"data"`
-	}
+	var response dto.RebuildAssetIndexesResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.Equal(t, "queued", response.Data.Status)
-	require.Equal(t, int64(42), response.Data.JobID)
-	require.Equal(t, 200, response.Data.Limit)
-	require.True(t, response.Data.MissingOnly)
-	require.Equal(t, []string{"semantic", "ocr"}, response.Data.RequestedTasks)
+	require.Equal(t, "queued", response.Status)
+	require.Equal(t, int64(42), response.JobID)
+	require.Equal(t, 200, response.Limit)
+	require.True(t, response.MissingOnly)
+	require.Equal(t, []string{"semantic", "ocr"}, response.RequestedTasks)
 }
 
 func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
@@ -266,17 +254,13 @@ func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                                `json:"code"`
-		Data dto.RebuildAssetIndexesResponseDTO `json:"data"`
-	}
+	var response dto.RebuildAssetIndexesResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.Equal(t, int64(99), response.Data.JobID)
-	require.Equal(t, 500, response.Data.Limit)
-	require.False(t, response.Data.MissingOnly)
-	require.Equal(t, repositoryID, *response.Data.RepositoryID)
-	require.Equal(t, []string{"semantic", "ocr"}, response.Data.RequestedTasks)
+	require.Equal(t, int64(99), response.JobID)
+	require.Equal(t, 500, response.Limit)
+	require.False(t, response.MissingOnly)
+	require.Equal(t, repositoryID, *response.RepositoryID)
+	require.Equal(t, []string{"semantic", "ocr"}, response.RequestedTasks)
 }
 
 func TestAssetHandlerRebuildAssetIndexes_RejectsInvalidTask(t *testing.T) {

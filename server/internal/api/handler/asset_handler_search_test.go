@@ -160,17 +160,13 @@ func TestAssetHandlerSearchAssets_ReturnsDegradedResultsWithout503(t *testing.T)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                         `json:"code"`
-		Data dto.SearchAssetsResponseDTO `json:"data"`
-	}
+	var response dto.SearchAssetsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.Empty(t, response.Data.TopItems)
-	require.Len(t, response.Data.ResultItems, 1)
-	require.True(t, response.Data.TopResultsMeta.Enabled)
-	require.True(t, response.Data.TopResultsMeta.Degraded)
-	require.Equal(t, "runtime_unavailable", response.Data.TopResultsMeta.Reason)
+	require.Empty(t, response.TopItems)
+	require.Len(t, response.ResultItems, 1)
+	require.True(t, response.TopResultsMeta.Enabled)
+	require.True(t, response.TopResultsMeta.Degraded)
+	require.Equal(t, "runtime_unavailable", response.TopResultsMeta.Reason)
 }
 
 func TestAssetHandlerSearchAssets_ReturnsTopResultsAndResults(t *testing.T) {
@@ -218,16 +214,12 @@ func TestAssetHandlerSearchAssets_ReturnsTopResultsAndResults(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                         `json:"code"`
-		Data dto.SearchAssetsResponseDTO `json:"data"`
-	}
+	var response dto.SearchAssetsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.Len(t, response.Data.TopItems, 1)
-	require.Len(t, response.Data.ResultItems, 1)
-	require.True(t, response.Data.TopResultsMeta.Enabled)
-	require.False(t, response.Data.TopResultsMeta.Degraded)
+	require.Len(t, response.TopItems, 1)
+	require.Len(t, response.ResultItems, 1)
+	require.True(t, response.TopResultsMeta.Enabled)
+	require.False(t, response.TopResultsMeta.Degraded)
 }
 
 func TestAssetHandlerQueryAssets_InvalidSortByReturnsBadRequest(t *testing.T) {

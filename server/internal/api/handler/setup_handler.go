@@ -27,8 +27,8 @@ func NewSetupHandler(setupService *service.SetupService) *SetupHandler {
 // @Description Report whether Lumilio has rotated the temporary database credential. The web frontend runs setup as a preflight while uninitialized.
 // @Tags setup
 // @Produce json
-// @Success 200 {object} api.Result{data=dto.SetupStatusDTO} "Setup status retrieved successfully"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.SetupStatusDTO "Setup status retrieved successfully"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/setup/status [get]
 func (h *SetupHandler) GetSetupStatus(c *gin.Context) {
 	status, err := h.setupService.Status(c.Request.Context())
@@ -36,7 +36,7 @@ func (h *SetupHandler) GetSetupStatus(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to load setup status")
 		return
 	}
-	api.GinSuccess(c, dto.ToSetupStatusDTO(status))
+	api.JSONOK(c, dto.ToSetupStatusDTO(status))
 }
 
 // Setup performs first-run initialization: it mints a high-entropy database
@@ -48,10 +48,10 @@ func (h *SetupHandler) GetSetupStatus(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.SetupRequestDTO false "Optional empty setup payload"
-// @Success 200 {object} api.Result{data=dto.SetupResultDTO} "System initialized successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 409 {object} api.Result "System already initialized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.SetupResultDTO "System initialized successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 409 {object} api.ErrorResponse "System already initialized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/setup [post]
 func (h *SetupHandler) Setup(c *gin.Context) {
 	var req dto.SetupRequestDTO
@@ -70,5 +70,5 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToSetupResultDTO(result))
+	api.JSONOK(c, dto.ToSetupResultDTO(result))
 }

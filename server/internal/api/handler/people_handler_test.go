@@ -81,15 +81,12 @@ func TestPeopleHandlerListPeople(t *testing.T) {
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.True(t, capturedRepo.Valid)
 
-	var response struct {
-		Code int                       `json:"code"`
-		Data dto.ListPeopleResponseDTO `json:"data"`
-	}
+	var response dto.ListPeopleResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 1, response.Data.Total)
-	require.Len(t, response.Data.People, 1)
-	require.Equal(t, int32(7), response.Data.People[0].PersonID)
-	require.Equal(t, "Alice", *response.Data.People[0].Name)
+	require.Equal(t, 1, response.Total)
+	require.Len(t, response.People, 1)
+	require.Equal(t, int32(7), response.People[0].PersonID)
+	require.Equal(t, "Alice", *response.People[0].Name)
 }
 
 func TestPeopleHandlerRebuildPeople(t *testing.T) {
@@ -128,14 +125,11 @@ func TestPeopleHandlerRebuildPeople(t *testing.T) {
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.True(t, capturedRepo.Valid)
 
-	var response struct {
-		Code int                               `json:"code"`
-		Data dto.FaceClusterRebuildResponseDTO `json:"data"`
-	}
+	var response dto.FaceClusterRebuildResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, "immich-dbscan-sequential-v1", response.Data.Algorithm)
-	require.Equal(t, 12, response.Data.CandidateFaces)
-	require.Equal(t, 4, response.Data.ClustersTotal)
+	require.Equal(t, "immich-dbscan-sequential-v1", response.Algorithm)
+	require.Equal(t, 12, response.CandidateFaces)
+	require.Equal(t, 4, response.ClustersTotal)
 }
 
 func TestPeopleHandlerUpdatePerson(t *testing.T) {
@@ -185,13 +179,10 @@ func TestPeopleHandlerUpdatePerson(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                 `json:"code"`
-		Data dto.PersonDetailDTO `json:"data"`
-	}
+	var response dto.PersonDetailDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, "Grace", *response.Data.Name)
-	require.True(t, response.Data.IsConfirmed)
+	require.Equal(t, "Grace", *response.Name)
+	require.True(t, response.IsConfirmed)
 }
 
 func TestPeopleHandlerListPersonAssetsInjectsPersonScope(t *testing.T) {
@@ -325,19 +316,16 @@ func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                        `json:"code"`
-		Data dto.QueryAssetsResponseDTO `json:"data"`
-	}
+	var response dto.QueryAssetsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Len(t, response.Data.Items, 1)
-	require.Equal(t, "stack", response.Data.Items[0].Type)
-	require.NotNil(t, response.Data.Items[0].Stack)
-	require.Equal(t, coverUUID.String(), response.Data.Items[0].Stack.CoverAssetID)
-	require.NotNil(t, response.Data.TotalVisible)
-	require.Equal(t, 1, *response.Data.TotalVisible)
-	require.NotNil(t, response.Data.TotalAssets)
-	require.Equal(t, 2, *response.Data.TotalAssets)
+	require.Len(t, response.Items, 1)
+	require.Equal(t, "stack", response.Items[0].Type)
+	require.NotNil(t, response.Items[0].Stack)
+	require.Equal(t, coverUUID.String(), response.Items[0].Stack.CoverAssetID)
+	require.NotNil(t, response.TotalVisible)
+	require.Equal(t, 1, *response.TotalVisible)
+	require.NotNil(t, response.TotalAssets)
+	require.Equal(t, 2, *response.TotalAssets)
 }
 
 func TestPeopleHandlerListPersonAssets_InvalidStackModeReturnsBadRequest(t *testing.T) {

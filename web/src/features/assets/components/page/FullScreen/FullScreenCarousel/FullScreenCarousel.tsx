@@ -59,10 +59,6 @@ interface FullScreenCarouselProps {
   onAssetDelete?: (deletedAssetId: string) => void;
 }
 
-type ApiResult<T = unknown> = {
-  data?: T;
-};
-
 type AssetWithSpecies = Asset & {
   species_predictions?: unknown;
 };
@@ -108,9 +104,7 @@ const SpeciesReferenceTrigger = ({
       retry: 1,
     },
   );
-  const reference = (
-    referenceQuery.data as ApiResult<SpeciesReference> | undefined
-  )?.data;
+  const reference = referenceQuery.data as SpeciesReference | undefined;
 
   const handleOpen = useCallback(() => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
@@ -338,9 +332,9 @@ const FullScreenCarousel = ({
       staleTime: 60_000,
     },
   );
-  const fieldGuideAsset = (
-    fieldGuideAssetQuery.data as ApiResult<AssetWithSpecies> | undefined
-  )?.data;
+  const fieldGuideAsset = fieldGuideAssetQuery.data as
+    | AssetWithSpecies
+    | undefined;
 
   const slides = useMemo(() => {
     return photos.map((photo) => ({

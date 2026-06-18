@@ -1,5 +1,5 @@
 import { $api } from "@/lib/http-commons/queryClient";
-import type { ApiResult, AgentRefAssetsDTO } from "../types";
+import type { AgentRefAssetsDTO } from "../types";
 import type { WidgetSource } from "./types";
 
 /** Hydration hooks: the data plane. Both endpoints return the same page
@@ -36,8 +36,7 @@ export function useWidgetAssetsPreview(source: WidgetSource, limit: number) {
   );
 
   const query = source.kind === "ref" ? refQuery : pinQuery;
-  const payload = (query.data as ApiResult<AgentRefAssetsDTO> | undefined)
-    ?.data;
+  const payload = query.data as AgentRefAssetsDTO | undefined;
   return {
     assets: payload?.assets ?? [],
     total: payload?.total ?? 0,
@@ -60,7 +59,7 @@ export function useWidgetAssetsInfinite(
       _allPages: unknown[],
       lastPageParam: unknown,
     ) => {
-      const payload = (lastPage as ApiResult<AgentRefAssetsDTO>)?.data;
+      const payload = lastPage as AgentRefAssetsDTO | undefined;
       const fetched =
         (Number(lastPageParam ?? 0) || 0) + (payload?.assets?.length ?? 0);
       return payload && fetched < (payload.total ?? 0) ? fetched : undefined;

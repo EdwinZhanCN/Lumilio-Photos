@@ -3,10 +3,6 @@ import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
 
 type Schemas = components["schemas"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
-
 export type CloudCredential = Schemas["dto.CloudCredentialDTO"];
 export type CloudProvider = Schemas["dto.CloudProviderDTO"];
 export type CloudAuthChallenge = Schemas["dto.CloudAuthChallengeDTO"];
@@ -16,14 +12,14 @@ export type RepositoryCloudStatus = Schemas["dto.RepositoryCloudStatusDTO"];
 
 export function useCloudProviders() {
   return $api.useQuery("get", "/api/v1/cloud/providers", {}) as UseQueryResult<
-    ApiResult<{ providers: CloudProvider[] }>,
+    { providers: CloudProvider[] },
     unknown
   >;
 }
 
 export function useCloudCredentials(options?: { refetchInterval?: number }) {
   return $api.useQuery("get", "/api/v1/cloud/credentials", {}, options) as UseQueryResult<
-    ApiResult<{ credentials: CloudCredential[] }>,
+    { credentials: CloudCredential[] },
     unknown
   >;
 }
@@ -90,13 +86,13 @@ export function useRepositoryCloudStatus(repositoryId: string, enabled = true) {
       // Only poll while an import is actively in progress; otherwise fetch once.
       // Avoids every repository card hammering this endpoint every 5s forever.
       refetchInterval: (query) => {
-        const status = (query.state.data as ApiResult<RepositoryCloudStatus> | undefined)?.data
+        const status = (query.state.data as RepositoryCloudStatus | undefined)
           ?.latest_run?.status;
         return status === "running" || status === "queued" ? 5000 : false;
       },
       staleTime: 2000,
     },
-  ) as UseQueryResult<ApiResult<RepositoryCloudStatus>, unknown>;
+  ) as UseQueryResult<RepositoryCloudStatus, unknown>;
 }
 
 export function useStartRepositoryCloudImport() {

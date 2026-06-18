@@ -3,10 +3,6 @@ import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 type Schemas = components["schemas"];
 type Paths = paths;
 
-export type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
-
 export type DuplicateSummary = Schemas["dto.DuplicateSummaryDTO"];
 export type DuplicateGroup = Schemas["dto.DuplicateGroupDTO"];
 export type DuplicateAsset = Schemas["dto.DuplicateAssetDTO"];

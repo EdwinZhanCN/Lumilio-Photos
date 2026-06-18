@@ -261,13 +261,13 @@ function useFilterOptions({
   useEffect(() => {
     if (!shouldFetchDefault) return;
     const response = filterOptionsQuery.data;
-    if (!response?.data) return;
+    if (!response) return;
 
     if (needsCameraModels) {
-      setCameraModelItems(response.data.camera_models || []);
+      setCameraModelItems(response.camera_models || []);
     }
     if (needsLenses) {
-      setLensItems(response.data.lenses || []);
+      setLensItems(response.lenses || []);
     }
 
     setHasLoaded(true);

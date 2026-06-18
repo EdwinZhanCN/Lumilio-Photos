@@ -51,11 +51,11 @@ func NewRepositoryScanHandler(scanService RepositoryScanService, repoManager sto
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateRepositoryRequestDTO true "Repository name"
-// @Success 200 {object} api.Result{data=dto.CreateRepositoryResponseDTO} "Repository created successfully"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.CreateRepositoryResponseDTO "Repository created successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/repositories [post]
 func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	if h == nil || h.repoManager == nil {
@@ -133,7 +133,7 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		}
 	}
 
-	api.GinSuccess(c, dto.CreateRepositoryResponseDTO{
+	api.JSONOK(c, dto.CreateRepositoryResponseDTO{
 		Repository:       toRepositoryDTO(dbRepo),
 		CloudImportRunID: cloudImportRunID,
 		CloudImportError: cloudImportError,
@@ -149,10 +149,10 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Param request body dto.RepositoryScanRequestDTO false "Scan request"
-// @Success 200 {object} api.Result{data=dto.RepositoryScanQueuedDTO} "Repository scan queued successfully"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
+// @Success 200 {object} dto.RepositoryScanQueuedDTO "Repository scan queued successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
 // @Router /api/v1/repositories/{id}/scan [post]
 func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 	if h == nil || h.scanService == nil {
@@ -183,7 +183,7 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.RepositoryScanQueuedDTO{
+	api.JSONOK(c, dto.RepositoryScanQueuedDTO{
 		JobID:        result.JobID,
 		RepositoryID: result.RepositoryID,
 		Mode:         result.Mode,
@@ -198,8 +198,8 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
-// @Success 200 {object} api.Result{data=dto.RepositoryScanRunDTO} "Latest repository scan retrieved successfully"
-// @Failure 404 {object} api.Result "No scan run found"
+// @Success 200 {object} dto.RepositoryScanRunDTO "Latest repository scan retrieved successfully"
+// @Failure 404 {object} api.ErrorResponse "No scan run found"
 // @Router /api/v1/repositories/{id}/scans/latest [get]
 func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 	scanRun, err := h.scanService.GetLatestScanRun(c.Request.Context(), strings.TrimSpace(c.Param("id")))
@@ -211,7 +211,7 @@ func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 		api.GinBadRequest(c, err, "Failed to load latest repository scan")
 		return
 	}
-	api.GinSuccess(c, toRepositoryScanRunDTO(scanRun))
+	api.JSONOK(c, toRepositoryScanRunDTO(scanRun))
 }
 
 // ListRepositoryScans lists recent scan runs for a repository.
@@ -223,7 +223,7 @@ func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 // @Param id path string true "Repository UUID"
 // @Param limit query int false "Limit" default(20)
 // @Param offset query int false "Offset" default(0)
-// @Success 200 {object} api.Result{data=dto.RepositoryScanRunListDTO} "Repository scan runs retrieved successfully"
+// @Success 200 {object} dto.RepositoryScanRunListDTO "Repository scan runs retrieved successfully"
 // @Router /api/v1/repositories/{id}/scans [get]
 func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 	limit := parseInt32Query(c, "limit", 20)
@@ -237,7 +237,7 @@ func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 	for _, scanRun := range scans {
 		items = append(items, toRepositoryScanRunDTO(scanRun))
 	}
-	api.GinSuccess(c, dto.RepositoryScanRunListDTO{Scans: items})
+	api.JSONOK(c, dto.RepositoryScanRunListDTO{Scans: items})
 }
 
 // ListRepositories returns all registered repositories.
@@ -246,7 +246,7 @@ func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 // @Tags repositories
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.ListRepositoriesResponseDTO} "Repositories retrieved successfully"
+// @Success 200 {object} dto.ListRepositoriesResponseDTO "Repositories retrieved successfully"
 // @Router /api/v1/repositories [get]
 func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
 	repos, err := h.repoManager.ListRepositories()
@@ -259,7 +259,7 @@ func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
 	for _, r := range repos {
 		items = append(items, toRepositoryDTO(r))
 	}
-	api.GinSuccess(c, dto.ListRepositoriesResponseDTO{Repositories: items})
+	api.JSONOK(c, dto.ListRepositoriesResponseDTO{Repositories: items})
 }
 
 // GetRepository returns a single repository by ID.
@@ -269,8 +269,8 @@ func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
-// @Success 200 {object} api.Result{data=dto.RepositoryDTO} "Repository retrieved successfully"
-// @Failure 404 {object} api.Result "Repository not found"
+// @Success 200 {object} dto.RepositoryDTO "Repository retrieved successfully"
+// @Failure 404 {object} api.ErrorResponse "Repository not found"
 // @Router /api/v1/repositories/{id} [get]
 func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
 	repo, err := h.repoManager.GetRepository(strings.TrimSpace(c.Param("id")))
@@ -278,7 +278,7 @@ func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
 		api.GinNotFound(c, err, "Repository not found")
 		return
 	}
-	api.GinSuccess(c, toRepositoryDTO(repo))
+	api.JSONOK(c, toRepositoryDTO(repo))
 }
 
 // UpdateRepository updates mutable fields of a repository.
@@ -290,9 +290,9 @@ func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Param request body dto.UpdateRepositoryRequestDTO true "Fields to update"
-// @Success 200 {object} api.Result{data=dto.RepositoryDTO} "Repository updated successfully"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 404 {object} api.Result "Repository not found"
+// @Success 200 {object} dto.RepositoryDTO "Repository updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 404 {object} api.ErrorResponse "Repository not found"
 // @Router /api/v1/repositories/{id} [patch]
 func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
@@ -332,7 +332,7 @@ func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, toRepositoryDTO(updated))
+	api.JSONOK(c, toRepositoryDTO(updated))
 }
 
 // DeleteRepository removes a repository registration.
@@ -342,8 +342,8 @@ func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
-// @Success 200 {object} api.Result "Repository deleted successfully"
-// @Failure 404 {object} api.Result "Repository not found"
+// @Success 200 {object} api.SuccessResponse "Repository deleted successfully"
+// @Failure 404 {object} api.ErrorResponse "Repository not found"
 // @Router /api/v1/repositories/{id} [delete]
 func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
@@ -363,7 +363,7 @@ func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, nil)
+	api.JSONOK(c, nil)
 }
 
 func repositoryRoleFromRequest(raw string) dbtypes.RepoRole {

@@ -71,9 +71,9 @@ type AgentResumeRequest struct {
 // @Produce text/event-stream
 // @Param request body AgentChatRequest true "Chat request"
 // @Success 200 {string} string "SSE stream"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/agent/chat [post]
 func (h *AgentHandler) Chat(c *gin.Context) {
 	var req AgentChatRequest
@@ -137,9 +137,9 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 // @Produce text/event-stream
 // @Param request body AgentResumeRequest true "Resume request"
 // @Success 200 {string} string "SSE stream"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/agent/chat/resume [post]
 func (h *AgentHandler) ResumeChat(c *gin.Context) {
 	var req AgentResumeRequest
@@ -185,9 +185,9 @@ func (h *AgentHandler) ResumeChat(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Ref ID"
 // @Param thread_id query string true "Thread (conversation) the ref belongs to"
-// @Success 200 {object} api.Result{data=dto.AgentRefDTO}
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 404 {object} api.Result "Ref not found"
+// @Success 200 {object} dto.AgentRefDTO
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Ref not found"
 // @Router /api/v1/agent/refs/{id} [get]
 func (h *AgentHandler) GetRef(c *gin.Context) {
 	r, ok := h.resolveRef(c)
@@ -201,7 +201,7 @@ func (h *AgentHandler) GetRef(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.AgentRefDTO{
+	api.JSONOK(c, dto.AgentRefDTO{
 		RefID:     r.ID,
 		Count:     r.Count(),
 		Truncated: r.Truncated,
@@ -221,9 +221,9 @@ func (h *AgentHandler) GetRef(c *gin.Context) {
 // @Param thread_id query string true "Thread (conversation) the ref belongs to"
 // @Param limit query int false "Page size (default 50, max 200)"
 // @Param offset query int false "Page offset (default 0)"
-// @Success 200 {object} api.Result{data=dto.AgentRefAssetsDTO}
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 404 {object} api.Result "Ref not found"
+// @Success 200 {object} dto.AgentRefAssetsDTO
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Ref not found"
 // @Router /api/v1/agent/refs/{id}/assets [get]
 func (h *AgentHandler) GetRefAssets(c *gin.Context) {
 	r, ok := h.resolveRef(c)
@@ -263,7 +263,7 @@ func (h *AgentHandler) GetRefAssets(c *gin.Context) {
 		}
 	}
 
-	api.GinSuccess(c, dto.AgentRefAssetsDTO{
+	api.JSONOK(c, dto.AgentRefAssetsDTO{
 		Assets:     assets,
 		Total:      r.Count(),
 		Pagination: dto.PaginationDTO{Limit: limit, Offset: offset},
@@ -533,7 +533,7 @@ type ToolInfoResponse struct {
 // @Description Get list of all registered agent tools
 // @Tags agent
 // @Produce json
-// @Success 200 {object} api.Result{data=[]ToolInfoResponse}
+// @Success 200 {array} ToolInfoResponse
 // @Router /api/v1/agent/tools [get]
 func (h *AgentHandler) GetTools(c *gin.Context) {
 	tools := h.agentService.GetAvailableTools()
@@ -549,5 +549,5 @@ func (h *AgentHandler) GetTools(c *gin.Context) {
 		}
 		result = append(result, toolData)
 	}
-	api.GinSuccess(c, result)
+	api.JSONOK(c, result)
 }

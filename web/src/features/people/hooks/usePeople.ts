@@ -2,7 +2,6 @@ import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useWorkingRepository } from "@/features/settings";
 import type {
-  ApiResult,
   FaceClusterRebuildResponse,
   ListPeopleResponse,
   PersonDetail,
@@ -17,7 +16,7 @@ export type UsePeopleOptions = {
 };
 
 export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
-  ApiResult<ListPeopleResponse>,
+  ListPeopleResponse,
   unknown
 > & {
   people: PersonSummaryList;
@@ -45,17 +44,17 @@ export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
       gcTime: 30 * 60 * 1000,
       retry: 1,
     },
-  ) as UseQueryResult<ApiResult<ListPeopleResponse>, unknown>;
+  ) as UseQueryResult<ListPeopleResponse, unknown>;
 
   return {
     ...query,
-    people: query.data?.data?.people ?? [],
-    total: query.data?.data?.total ?? 0,
+    people: query.data?.people ?? [],
+    total: query.data?.total ?? 0,
   };
 }
 
 export function useRebuildPeopleClusters(repositoryId?: string): {
-  rebuildPeople: () => Promise<ApiResult<FaceClusterRebuildResponse>>;
+  rebuildPeople: () => Promise<FaceClusterRebuildResponse>;
   isRebuilding: boolean;
 } {
   const { scopedRepositoryId } = useWorkingRepository();
@@ -81,7 +80,7 @@ export function useRebuildPeopleClusters(repositoryId?: string): {
         params: {
           query: scopedId ? { repository_id: scopedId } : {},
         },
-      }) as Promise<ApiResult<FaceClusterRebuildResponse>>,
+      }) as Promise<FaceClusterRebuildResponse>,
     isRebuilding: mutation.isPending,
   };
 }
@@ -89,7 +88,7 @@ export function useRebuildPeopleClusters(repositoryId?: string): {
 export function usePersonDetails(
   personId?: number,
   repositoryId?: string,
-): UseQueryResult<ApiResult<PersonDetail>, unknown> & {
+): UseQueryResult<PersonDetail, unknown> & {
   person?: PersonDetail;
   renamePerson: (name: string) => Promise<unknown>;
   isRenaming: boolean;
@@ -113,7 +112,7 @@ export function usePersonDetails(
       enabled: Boolean(personId && personId > 0),
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<PersonDetail>, unknown>;
+  ) as UseQueryResult<PersonDetail, unknown>;
 
   const renameMutation = $api.useMutation("patch", "/api/v1/people/{id}", {
     onSuccess: async () => {
@@ -130,7 +129,7 @@ export function usePersonDetails(
 
   return {
     ...query,
-    person: query.data?.data,
+    person: query.data,
     renamePerson: (name: string) =>
       renameMutation.mutateAsync({
         params: {

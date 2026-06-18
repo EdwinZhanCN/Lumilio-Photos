@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/api"
 	"server/internal/db/repo"
 
 	"github.com/gin-gonic/gin"
@@ -96,9 +95,8 @@ func TestStatsHandlerGetFocalLengthDistribution_UsesRepositoryScope(t *testing.T
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response api.Result
+	var response FocalLengthDistributionResponse
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
 }
 
 func TestStatsHandlerGetDailyActivityHeatmap_RejectsInvalidRepositoryID(t *testing.T) {

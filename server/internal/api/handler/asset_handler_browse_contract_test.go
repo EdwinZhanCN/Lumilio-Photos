@@ -70,24 +70,20 @@ func TestAssetHandlerQueryAssets_StackModeCollapsed_ReturnsBrowseRowsAndLegacyRe
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                        `json:"code"`
-		Data dto.QueryAssetsResponseDTO `json:"data"`
-	}
+	var response dto.QueryAssetsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, 0, response.Code)
-	require.Len(t, response.Data.Items, 1)
-	require.Equal(t, "stack", response.Data.Items[0].Type)
-	require.NotNil(t, response.Data.Items[0].Stack)
-	require.Len(t, response.Data.Items[0].Stack.MemberAssetIDs, 2)
-	require.Equal(t, stackID.String(), response.Data.Items[0].Stack.StackID)
-	require.Equal(t, coverUUID.String(), response.Data.Items[0].Stack.CoverAssetID)
+	require.Len(t, response.Items, 1)
+	require.Equal(t, "stack", response.Items[0].Type)
+	require.NotNil(t, response.Items[0].Stack)
+	require.Len(t, response.Items[0].Stack.MemberAssetIDs, 2)
+	require.Equal(t, stackID.String(), response.Items[0].Stack.StackID)
+	require.Equal(t, coverUUID.String(), response.Items[0].Stack.CoverAssetID)
 
-	require.NotNil(t, response.Data.TotalVisible)
-	require.Equal(t, 1, *response.Data.TotalVisible)
-	require.NotNil(t, response.Data.TotalAssets)
-	require.Equal(t, 2, *response.Data.TotalAssets)
-	require.Equal(t, service.StackModeCollapsed, response.Data.StackMode)
+	require.NotNil(t, response.TotalVisible)
+	require.Equal(t, 1, *response.TotalVisible)
+	require.NotNil(t, response.TotalAssets)
+	require.Equal(t, 2, *response.TotalAssets)
+	require.Equal(t, service.StackModeCollapsed, response.StackMode)
 }
 
 func TestAssetHandlerQueryAssets_StackModeExpanded_AssetBrowseItemsConsistentTotals(t *testing.T) {
@@ -132,17 +128,14 @@ func TestAssetHandlerQueryAssets_StackModeExpanded_AssetBrowseItemsConsistentTot
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                        `json:"code"`
-		Data dto.QueryAssetsResponseDTO `json:"data"`
-	}
+	var response dto.QueryAssetsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Len(t, response.Data.Items, 2)
-	require.NotNil(t, response.Data.TotalVisible)
-	require.Equal(t, 2, *response.Data.TotalVisible)
-	require.NotNil(t, response.Data.TotalAssets)
-	require.Equal(t, 2, *response.Data.TotalAssets)
-	require.Equal(t, service.StackModeExpanded, response.Data.StackMode)
+	require.Len(t, response.Items, 2)
+	require.NotNil(t, response.TotalVisible)
+	require.Equal(t, 2, *response.TotalVisible)
+	require.NotNil(t, response.TotalAssets)
+	require.Equal(t, 2, *response.TotalAssets)
+	require.Equal(t, service.StackModeExpanded, response.StackMode)
 }
 
 func TestAssetHandlerQueryAssets_InvalidStackModeReturnsBadRequest(t *testing.T) {
@@ -228,31 +221,28 @@ func TestAssetHandlerSearchAssets_StackModeCollapsed_ReturnsBrowseRowsAndLegacyR
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                         `json:"code"`
-		Data dto.SearchAssetsResponseDTO `json:"data"`
-	}
+	var response dto.SearchAssetsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 
-	require.Len(t, response.Data.TopItems, 1)
-	require.Equal(t, "stack", response.Data.TopItems[0].Type)
-	require.NotNil(t, response.Data.TopItems[0].Stack)
-	require.Equal(t, stackID.String(), response.Data.TopItems[0].Stack.StackID)
-	require.Equal(t, coverUUID.String(), response.Data.TopItems[0].Stack.CoverAssetID)
-	require.Equal(t, 2, response.Data.TopItems[0].Stack.StackSize)
+	require.Len(t, response.TopItems, 1)
+	require.Equal(t, "stack", response.TopItems[0].Type)
+	require.NotNil(t, response.TopItems[0].Stack)
+	require.Equal(t, stackID.String(), response.TopItems[0].Stack.StackID)
+	require.Equal(t, coverUUID.String(), response.TopItems[0].Stack.CoverAssetID)
+	require.Equal(t, 2, response.TopItems[0].Stack.StackSize)
 
-	require.Len(t, response.Data.ResultItems, 1)
-	require.Equal(t, "stack", response.Data.ResultItems[0].Type)
-	require.NotNil(t, response.Data.ResultItems[0].Stack)
-	require.Equal(t, stackID.String(), response.Data.ResultItems[0].Stack.StackID)
-	require.Equal(t, coverUUID.String(), response.Data.ResultItems[0].Stack.CoverAssetID)
-	require.Equal(t, 2, response.Data.ResultItems[0].Stack.StackSize)
+	require.Len(t, response.ResultItems, 1)
+	require.Equal(t, "stack", response.ResultItems[0].Type)
+	require.NotNil(t, response.ResultItems[0].Stack)
+	require.Equal(t, stackID.String(), response.ResultItems[0].Stack.StackID)
+	require.Equal(t, coverUUID.String(), response.ResultItems[0].Stack.CoverAssetID)
+	require.Equal(t, 2, response.ResultItems[0].Stack.StackSize)
 
-	require.NotNil(t, response.Data.ResultsTotalVisible)
-	require.Equal(t, 1, *response.Data.ResultsTotalVisible)
-	require.NotNil(t, response.Data.ResultsTotalAssets)
-	require.Equal(t, 2, *response.Data.ResultsTotalAssets)
-	require.Equal(t, service.StackModeCollapsed, response.Data.StackMode)
+	require.NotNil(t, response.ResultsTotalVisible)
+	require.Equal(t, 1, *response.ResultsTotalVisible)
+	require.NotNil(t, response.ResultsTotalAssets)
+	require.Equal(t, 2, *response.ResultsTotalAssets)
+	require.Equal(t, service.StackModeCollapsed, response.StackMode)
 }
 
 func TestAssetHandlerSearchAssets_StackModeExpanded_AssetBrowseItemsConsistentTotals(t *testing.T) {
@@ -299,18 +289,15 @@ func TestAssetHandlerSearchAssets_StackModeExpanded_AssetBrowseItemsConsistentTo
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var response struct {
-		Code int                         `json:"code"`
-		Data dto.SearchAssetsResponseDTO `json:"data"`
-	}
+	var response dto.SearchAssetsResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 
-	require.Len(t, response.Data.ResultItems, 2)
-	require.NotNil(t, response.Data.ResultsTotalVisible)
-	require.Equal(t, 2, *response.Data.ResultsTotalVisible)
-	require.NotNil(t, response.Data.ResultsTotalAssets)
-	require.Equal(t, 2, *response.Data.ResultsTotalAssets)
-	require.Equal(t, service.StackModeExpanded, response.Data.StackMode)
+	require.Len(t, response.ResultItems, 2)
+	require.NotNil(t, response.ResultsTotalVisible)
+	require.Equal(t, 2, *response.ResultsTotalVisible)
+	require.NotNil(t, response.ResultsTotalAssets)
+	require.Equal(t, 2, *response.ResultsTotalAssets)
+	require.Equal(t, service.StackModeExpanded, response.StackMode)
 }
 
 func TestAssetHandlerSearchAssets_InvalidStackModeReturnsBadRequest(t *testing.T) {

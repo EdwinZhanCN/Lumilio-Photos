@@ -72,9 +72,7 @@ describe("UsersTab", () => {
     mocks.dispatch.mockClear();
     mocks.updateUserMutateAsync.mockReset();
     mocks.updateUserMutateAsync.mockResolvedValue({
-      code: 0,
-      message: "success",
-      data: mocks.users[0],
+      ...mocks.users[0],
     });
   });
 

@@ -1,7 +1,6 @@
 import { $api } from "@/lib/http-commons/queryClient";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type {
-  ApiResult,
   UploadConfigResponse,
   UploadProgressResponse,
 } from "@/lib/upload/types";
@@ -26,7 +25,7 @@ import type {
  */
 export const useUploadConfig = () =>
   $api.useQuery("get", "/api/v1/assets/batch/config", {}) as UseQueryResult<
-    ApiResult<UploadConfigResponse>,
+    UploadConfigResponse,
     unknown
   >;
 
@@ -70,4 +69,4 @@ export const useUploadProgress = (
       enabled: options?.enabled ?? Boolean(sessionIds),
       refetchInterval: options?.refetchInterval,
     },
-  ) as UseQueryResult<ApiResult<UploadProgressResponse>, unknown>;
+  ) as UseQueryResult<UploadProgressResponse, unknown>;
