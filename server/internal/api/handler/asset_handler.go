@@ -689,7 +689,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Param include_species query bool false "Include species predictions" default(true)
 // @Param include_ocr query bool false "Include OCR results" default(false)
 // @Param include_faces query bool false "Include face recognition" default(false)
-// @Success 200 {object} dto.AssetDTO "Asset details with optional relationships"
+// @Success 200 {object} dto.AssetDetailDTO "Asset details with optional relationships"
 // @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
 // @Failure 404 {object} api.ErrorResponse "Asset not found"
 // @Router /api/v1/assets/{id} [get]
@@ -705,32 +705,24 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 		return
 	}
 
-	// Parse include options with defaults
-	includeThumbnails := c.DefaultQuery("include_thumbnails", "true") == "true"
-	includeTags := c.DefaultQuery("include_tags", "true") == "true"
-	includeAlbums := c.DefaultQuery("include_albums", "true") == "true"
-	includeSpecies := c.DefaultQuery("include_species", "true") == "true"
+	// Parse include options. Thumbnails/tags/albums/species default on; the
+	// heavier AI relations (OCR, faces) default off to avoid extra payload.
+	includes := dto.AssetDetailIncludes{
+		Thumbnails: c.DefaultQuery("include_thumbnails", "true") == "true",
+		Tags:       c.DefaultQuery("include_tags", "true") == "true",
+		Albums:     c.DefaultQuery("include_albums", "true") == "true",
+		Species:    c.DefaultQuery("include_species", "true") == "true",
+		OCR:        c.DefaultQuery("include_ocr", "false") == "true",
+		Faces:      c.DefaultQuery("include_faces", "false") == "true",
+	}
 
-	// New AI includes - default to false to avoid performance impact
-	includeOCR := c.DefaultQuery("include_ocr", "false") == "true"
-	includeFaces := c.DefaultQuery("include_faces", "false") == "true"
-
-	asset, err := h.assetService.GetAssetWithOptions(
-		c.Request.Context(),
-		id,
-		includeThumbnails,
-		includeTags,
-		includeAlbums,
-		includeSpecies,
-		includeOCR,
-		includeFaces,
-	)
+	row, err := h.assetService.GetAssetRelations(c.Request.Context(), id)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")
 		return
 	}
 
-	api.JSONOK(c, asset)
+	api.JSONOK(c, dto.ToAssetDetailDTO(row, includes))
 }
 
 // GetAssetExif retrieves the raw EXIF JSON captured during metadata processing.
@@ -3741,6 +3733,10 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 		return
 	}
 
+	if _, ok := h.getAuthorizedAsset(c, assetID, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
+		return
+	}
+
 	stackInfo, err := h.stackService.GetStackByAsset(c.Request.Context(), assetID)
 	if err != nil {
 		if errors.Is(err, service.ErrStackNotFound) {
@@ -3808,6 +3804,13 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 		assetIDs[i] = id
 	}
 
+	// Every asset in the stack must belong to the caller (or caller is admin).
+	for _, id := range assetIDs {
+		if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to stack these assets", "You don't have permission to stack one or more of these assets"); !ok {
+			return
+		}
+	}
+
 	stackInfo, err := h.stackService.CreateManualStack(c.Request.Context(), assetIDs)
 	if err != nil {
 		if errors.Is(err, service.ErrAssetAlreadyStacked) {
@@ -3851,6 +3854,10 @@ func (h *AssetHandler) UnstackAsset(c *gin.Context) {
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
 		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAsset(c, assetID, "Authentication required to modify this asset", "You don't have permission to modify this asset"); !ok {
 		return
 	}
 

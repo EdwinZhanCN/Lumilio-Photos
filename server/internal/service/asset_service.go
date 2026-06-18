@@ -48,7 +48,7 @@ var (
 // AssetService defines the interface for asset-related operations
 type AssetService interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
-	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces bool) (interface{}, error)
+	GetAssetRelations(ctx context.Context, id uuid.UUID) (repo.GetAssetWithRelationsRow, error)
 	GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.RawMessage, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
@@ -312,152 +312,22 @@ func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.
 	return exifRaw, nil
 }
 
-func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces bool) (interface{}, error) {
+// GetAssetRelations returns a single asset together with its aggregated
+// relations (thumbnails, tags, albums, species predictions, OCR, and face
+// results) in one query. The handler projects this into a typed
+// dto.AssetDetailDTO, honoring the include_* query flags. Excludes soft-deleted
+// assets.
+func (s *assetService) GetAssetRelations(ctx context.Context, id uuid.UUID) (repo.GetAssetWithRelationsRow, error) {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
+		return repo.GetAssetWithRelationsRow{}, fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	// 1) Full relations (thumbnails + tags + albums) OR species predictions OR any AI data requested
-	if includeSpecies || includeOCR || includeFaces || (includeThumbnails && includeTags && includeAlbums) {
-		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
-		}
-
-		speciesPredictions := []dbtypes.SpeciesPredictionMeta{}
-		if includeSpecies && len(dbAsset.SpeciesPredictions) > 0 {
-			if err := json.Unmarshal(dbAsset.SpeciesPredictions, &speciesPredictions); err != nil {
-				return nil, fmt.Errorf("decode species predictions: %w", err)
-			}
-		}
-
-		// Create a map to conditionally include AI data based on flags
-		result := map[string]interface{}{
-			"asset_id":          dbAsset.AssetID,
-			"owner_id":          dbAsset.OwnerID,
-			"type":              dbAsset.Type,
-			"original_filename": dbAsset.OriginalFilename,
-			"storage_path":      dbAsset.StoragePath,
-			"mime_type":         dbAsset.MimeType,
-			"file_size":         dbAsset.FileSize,
-			"hash":              dbAsset.Hash,
-			"width":             dbAsset.Width,
-			"height":            dbAsset.Height,
-			"duration":          dbAsset.Duration,
-			"taken_time":        dbAsset.TakenTime,
-			"upload_time":       dbAsset.UploadTime,
-			"is_deleted":        dbAsset.IsDeleted,
-			"deleted_at":        dbAsset.DeletedAt,
-			"specific_metadata": dbAsset.SpecificMetadata,
-			"rating":            dbAsset.Rating,
-			"liked":             dbAsset.Liked,
-			"repository_id":     dbAsset.RepositoryID,
-			"status":            dbAsset.Status,
-			"thumbnails":        dbAsset.Thumbnails,
-			"tags":              dbAsset.Tags,
-			"albums":            dbAsset.Albums,
-		}
-
-		// Only include AI data if specifically requested
-		if includeSpecies {
-			result["species_predictions"] = speciesPredictions
-		}
-		if includeOCR {
-			result["ocr_result"] = dbAsset.OcrResult
-		}
-		if includeFaces {
-			result["face_result"] = dbAsset.FaceResult
-		}
-		return result, nil
+	row, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
+	if err != nil {
+		return repo.GetAssetWithRelationsRow{}, fmt.Errorf("failed to get asset with relations: %w", err)
 	}
-
-	// 2) Thumbnails + Tags (albums not requested) -> still use relations query (albums will be empty in SQL)
-	if includeThumbnails && includeTags {
-		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
-		}
-		return dbAsset, nil
-	}
-
-	// 3) Any case where albums are requested (but not both thumbnails & tags simultaneously handled above)
-	//    Manually compose result to avoid creating many specialized SQL queries.
-	if includeAlbums {
-		asset, err := s.queries.GetAssetByID(ctx, pgUUID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get asset: %w", err)
-		}
-
-		// Thumbnails (optional)
-		var thumbnails interface{} = []interface{}{}
-		if includeThumbnails {
-			tList, err := s.queries.GetThumbnailsByAsset(ctx, pgUUID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get thumbnails: %w", err)
-			}
-			thumbnails = tList
-		}
-
-		// Tags (optional)
-		var tags interface{} = []interface{}{}
-		if includeTags {
-			tagsRow, err := s.queries.GetAssetWithTags(ctx, pgUUID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get tags: %w", err)
-			}
-			tags = tagsRow.Tags
-		}
-
-		// Albums
-		albums, err := s.queries.GetAssetAlbums(ctx, pgUUID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get asset albums: %w", err)
-		}
-
-		result := map[string]interface{}{
-			"asset_id":          asset.AssetID,
-			"owner_id":          asset.OwnerID,
-			"type":              asset.Type,
-			"original_filename": asset.OriginalFilename,
-			"storage_path":      asset.StoragePath,
-			"mime_type":         asset.MimeType,
-			"file_size":         asset.FileSize,
-			"hash":              asset.Hash,
-			"width":             asset.Width,
-			"height":            asset.Height,
-			"duration":          asset.Duration,
-			"upload_time":       asset.UploadTime,
-			"is_deleted":        asset.IsDeleted,
-			"deleted_at":        asset.DeletedAt,
-			"specific_metadata": asset.SpecificMetadata,
-			"thumbnails":        thumbnails,
-			"tags":              tags,
-			"albums":            albums,
-		}
-		return result, nil
-	}
-
-	// 4) Only thumbnails
-	if includeThumbnails {
-		dbAsset, err := s.queries.GetAssetWithThumbnails(ctx, pgUUID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get asset with thumbnails: %w", err)
-		}
-		return dbAsset, nil
-	}
-
-	// 5) Only tags
-	if includeTags {
-		dbAsset, err := s.queries.GetAssetWithTags(ctx, pgUUID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get asset with tags: %w", err)
-		}
-		return dbAsset, nil
-	}
-
-	// 6) Plain asset
-	return s.GetAsset(ctx, id)
+	return row, nil
 }
 
 // GetAssetsByType retrieves assets by type with pagination

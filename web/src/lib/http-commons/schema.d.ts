@@ -1519,7 +1519,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.AssetDTO"];
+                        "application/json": components["schemas"]["dto.AssetDetailDTO"];
                     };
                 };
                 /** @description Invalid asset ID */
@@ -8723,6 +8723,12 @@ export interface components {
             updated_at?: string;
             user_id?: number;
         };
+        "dto.AssetAlbumRefDTO": {
+            added_time?: string;
+            album_id?: number;
+            album_name?: string;
+            position?: number;
+        };
         "dto.AssetAlbumsResponseDTO": {
             albums?: components["schemas"]["dto.AssetAlbumDTO"][];
             asset_id?: string;
@@ -8753,9 +8759,60 @@ export interface components {
             upload_time?: string;
             width?: number;
         };
+        "dto.AssetDetailDTO": {
+            albums?: components["schemas"]["dto.AssetAlbumRefDTO"][];
+            asset_id?: string;
+            capture_offset_minutes?: number;
+            deleted_at?: string;
+            duration?: number;
+            face_result?: components["schemas"]["dto.AssetFaceResultDTO"];
+            file_size?: number;
+            hash?: string;
+            height?: number;
+            is_deleted?: boolean;
+            liked?: boolean;
+            mime_type?: string;
+            ocr_result?: components["schemas"]["dto.AssetOCRResultDTO"];
+            original_filename?: string;
+            owner_id?: number;
+            rating?: number;
+            repository_id?: string;
+            species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
+            specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
+            stack?: components["schemas"]["dto.StackPreviewDTO"];
+            status?: number[];
+            storage_path?: string;
+            tags?: components["schemas"]["dto.AssetTagDTO"][];
+            taken_time?: string;
+            thumbnails?: components["schemas"]["dto.AssetThumbnailDTO"][];
+            type?: string;
+            upload_time?: string;
+            width?: number;
+        };
         "dto.AssetExifResponseDTO": {
             asset_id?: string;
             exif_raw?: Record<string, never>;
+        };
+        "dto.AssetFaceItemDTO": {
+            age_group?: string;
+            bounding_box?: Record<string, never>;
+            cluster_id?: number;
+            cluster_name?: string;
+            confidence?: number;
+            ethnicity?: string;
+            expression?: string;
+            face_id?: string;
+            gender?: string;
+            id?: number;
+            is_primary?: boolean;
+        };
+        "dto.AssetFaceResultDTO": {
+            created_at?: string;
+            faces?: components["schemas"]["dto.AssetFaceItemDTO"][];
+            model_id?: string;
+            processing_time_ms?: number;
+            total_faces?: number;
+            updated_at?: string;
         };
         /** @description Unified filter options */
         "dto.AssetFilterDTO": {
@@ -8849,6 +8906,22 @@ export interface components {
             /** @example 1500 */
             total?: number;
         };
+        "dto.AssetOCRResultDTO": {
+            created_at?: string;
+            model_id?: string;
+            processing_time_ms?: number;
+            text_items?: components["schemas"]["dto.AssetOCRTextItemDTO"][];
+            total_count?: number;
+            updated_at?: string;
+        };
+        "dto.AssetOCRTextItemDTO": {
+            area_pixels?: number;
+            bounding_box?: Record<string, never>;
+            confidence?: number;
+            id?: number;
+            text_content?: string;
+            text_length?: number;
+        };
         "dto.AssetQueryRequestDTO": {
             filter?: components["schemas"]["dto.AssetFilterDTO"];
             pagination?: components["schemas"]["dto.PaginationDTO"];
@@ -8882,6 +8955,17 @@ export interface components {
             /** @example true */
             exists?: boolean;
             sidecar?: components["schemas"]["dto.LumilioSidecarV1DTO"];
+        };
+        "dto.AssetTagDTO": {
+            confidence?: number;
+            tag_id?: number;
+            tag_name?: string;
+        };
+        "dto.AssetThumbnailDTO": {
+            mime_type?: string;
+            size?: string;
+            storage_path?: string;
+            thumbnail_id?: string;
         };
         "dto.AssetTypesResponseDTO": {
             types?: components["schemas"]["dbtypes.AssetType"][];
