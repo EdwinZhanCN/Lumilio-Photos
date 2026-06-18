@@ -1,6 +1,7 @@
 SHELL := /bin/sh
 
 WEB_DIR := web
+SITE_DIR := site
 SERVER_DIR := server
 DESKTOP_DIR := desktop
 SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/server.example.toml
@@ -62,6 +63,8 @@ setup: .server-config
 	cd $(SERVER_DIR) && $(GO) mod download
 	@echo "==> Installing web dependencies"
 	cd $(WEB_DIR) && $(VP) install
+	@echo "==> Installing documentation site dependencies"
+	cd $(SITE_DIR) && $(VP) install
 	@echo "==> Ensuring wasm-pack is installed"
 	@command -v wasm-pack >/dev/null 2>&1 || { curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh; }
 	@echo "==> Ensuring swag CLI is installed"
@@ -109,9 +112,10 @@ desktop-build:
 	$(DESKTOP_DIR)/scripts/build-macos.sh
 
 dto:
-	@echo "==> Generating OpenAPI spec and TypeScript types"
+	@echo "==> Generating OpenAPI spec, TypeScript types, and API documentation"
 	cd $(SERVER_DIR) && swag init --v3.1 -g cmd/main.go -o docs/
 	cd $(WEB_DIR) && ./node_modules/.bin/openapi-typescript ../server/docs/swagger.yaml -o ./src/lib/http-commons/schema.d.ts
+	cd $(SITE_DIR) && ./node_modules/.bin/redocly build-docs ../server/docs/swagger.yaml --output docs/public/redoc-static.html
 
 db-reset:
 	@echo "==> Resetting database volume"

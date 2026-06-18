@@ -42,6 +42,9 @@ importers:
         specifier: ^2.0.17
         version: 2.0.17(mermaid@11.15.0)(vitepress@2.0.0-alpha.17(@types/node@25.9.3)(lightningcss@1.32.0)(markdown-it-mathjax3@4.3.2)(postcss@8.5.15))
     devDependencies:
+      '@redocly/cli':
+        specifier: ^2.34.0
+        version: 2.34.0
       '@types/node':
         specifier: ^25.9.3
         version: 25.9.3
@@ -574,6 +577,11 @@ packages:
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
+
+  '@redocly/cli@2.34.0':
+    resolution: {integrity: sha512-wlEy03fyf+xrEatHbSSLFGP7T8slYwyJHO6xooArvUOntiGRMPuTGivaSPhxx+f2bFhe69zDDzDy51+CsvJ/zw==}
+    engines: {node: '>=22.12.0 || >=20.19.0 <21.0.0', npm: '>=10'}
+    hasBin: true
 
   '@rolldown/binding-android-arm64@1.0.3':
     resolution: {integrity: sha512-454rs7jHngixp/NMxd5srYD57OnzSlZ/eFTETjORQHLwJG1lRtmNOJcBerZlfu4GjKqeq8aCCIQrMdHyhI51Hw==}
@@ -2432,6 +2440,8 @@ snapshots:
   '@oxlint/plugins@1.61.0': {}
 
   '@polka/url@1.0.0-next.29': {}
+
+  '@redocly/cli@2.34.0': {}
 
   '@rolldown/binding-android-arm64@1.0.3':
     optional: true
