@@ -611,6 +611,23 @@
                 },
                 "type": "object"
             },
+            "dto.AssetAlbumRefDTO": {
+                "properties": {
+                    "added_time": {
+                        "type": "string"
+                    },
+                    "album_id": {
+                        "type": "integer"
+                    },
+                    "album_name": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetAlbumsResponseDTO": {
                 "properties": {
                     "albums": {
@@ -722,6 +739,126 @@
                 },
                 "type": "object"
             },
+            "dto.AssetDetailDTO": {
+                "properties": {
+                    "albums": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetAlbumRefDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "capture_offset_minutes": {
+                        "type": "integer"
+                    },
+                    "deleted_at": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "face_result": {
+                        "$ref": "#/components/schemas/dto.AssetFaceResultDTO"
+                    },
+                    "file_size": {
+                        "type": "integer"
+                    },
+                    "hash": {
+                        "type": "string"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "is_deleted": {
+                        "type": "boolean"
+                    },
+                    "liked": {
+                        "type": "boolean"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "ocr_result": {
+                        "$ref": "#/components/schemas/dto.AssetOCRResultDTO"
+                    },
+                    "original_filename": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "type": "integer"
+                    },
+                    "repository_id": {
+                        "type": "string"
+                    },
+                    "species_predictions": {
+                        "items": {
+                            "$ref": "#/components/schemas/dbtypes.SpeciesPredictionMeta"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "specific_metadata": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/dbtypes.PhotoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.VideoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.AudioSpecificMetadata"
+                            }
+                        ],
+                        "type": "object"
+                    },
+                    "stack": {
+                        "$ref": "#/components/schemas/dto.StackPreviewDTO"
+                    },
+                    "status": {
+                        "items": {
+                            "type": "integer"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "storage_path": {
+                        "type": "string"
+                    },
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetTagDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "taken_time": {
+                        "type": "string"
+                    },
+                    "thumbnails": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetThumbnailDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "upload_time": {
+                        "type": "string"
+                    },
+                    "width": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetExifResponseDTO": {
                 "properties": {
                     "asset_id": {
@@ -729,6 +866,71 @@
                     },
                     "exif_raw": {
                         "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetFaceItemDTO": {
+                "properties": {
+                    "age_group": {
+                        "type": "string"
+                    },
+                    "bounding_box": {
+                        "type": "object"
+                    },
+                    "cluster_id": {
+                        "type": "integer"
+                    },
+                    "cluster_name": {
+                        "type": "string"
+                    },
+                    "confidence": {
+                        "type": "number"
+                    },
+                    "ethnicity": {
+                        "type": "string"
+                    },
+                    "expression": {
+                        "type": "string"
+                    },
+                    "face_id": {
+                        "type": "string"
+                    },
+                    "gender": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "is_primary": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetFaceResultDTO": {
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "faces": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetFaceItemDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "model_id": {
+                        "type": "string"
+                    },
+                    "processing_time_ms": {
+                        "type": "integer"
+                    },
+                    "total_faces": {
+                        "type": "integer"
+                    },
+                    "updated_at": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -938,6 +1140,56 @@
                 },
                 "type": "object"
             },
+            "dto.AssetOCRResultDTO": {
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "model_id": {
+                        "type": "string"
+                    },
+                    "processing_time_ms": {
+                        "type": "integer"
+                    },
+                    "text_items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetOCRTextItemDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "total_count": {
+                        "type": "integer"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetOCRTextItemDTO": {
+                "properties": {
+                    "area_pixels": {
+                        "type": "number"
+                    },
+                    "bounding_box": {
+                        "type": "object"
+                    },
+                    "confidence": {
+                        "type": "number"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "text_content": {
+                        "type": "string"
+                    },
+                    "text_length": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetQueryRequestDTO": {
                 "properties": {
                     "filter": {
@@ -995,6 +1247,37 @@
                     },
                     "sidecar": {
                         "$ref": "#/components/schemas/dto.LumilioSidecarV1DTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetTagDTO": {
+                "properties": {
+                    "confidence": {
+                        "type": "number"
+                    },
+                    "tag_id": {
+                        "type": "integer"
+                    },
+                    "tag_name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetThumbnailDTO": {
+                "properties": {
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "size": {
+                        "type": "string"
+                    },
+                    "storage_path": {
+                        "type": "string"
+                    },
+                    "thumbnail_id": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -7324,7 +7607,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.AssetDTO"
+                                    "$ref": "#/components/schemas/dto.AssetDetailDTO"
                                 }
                             }
                         },
