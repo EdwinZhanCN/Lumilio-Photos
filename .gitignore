@@ -3,6 +3,7 @@ node_modules/
 .pnpm-store/
 /vendor/
 package-lock.json
+!site/package-lock.json
 yarn.lock
 __pycache__/
 *.py[cod]
