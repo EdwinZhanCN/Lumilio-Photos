@@ -1,7 +1,6 @@
 import React, { createContext, useReducer, useEffect, ReactNode, useRef } from "react";
 import { authReducer, initialState } from "./auth.reducer";
 import {
-  ApiResult,
   AuthAction,
   AuthResponse,
   AuthState,
@@ -33,7 +32,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const getApiMessage = (error: unknown, fallback: string) => {
     if (!error || typeof error !== "object") return fallback;
-    const apiError = error as ApiResult;
+    const apiError = error as { message?: string; error?: string };
     return apiError.message || apiError.error || fallback;
   };
 
@@ -67,10 +66,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (token) {
           try {
             const response = await currentUserMutation.mutateAsync({});
-            const responseData = response as ApiResult<User> | undefined;
-            if (responseData?.code === 0 && responseData?.data) {
+            const responseData = response as User | undefined;
+            if (responseData) {
               await ensureMediaToken();
-              dispatch({ type: "AUTH_SUCCESS", payload: responseData.data });
+              dispatch({ type: "AUTH_SUCCESS", payload: responseData });
               isInitialized.current = true;
               return;
             }
@@ -85,9 +84,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const refreshRes = await refreshMutation.mutateAsync({
               body: { refreshToken },
             });
-            const refreshData = refreshRes as ApiResult<AuthResponse> | undefined;
-            if (refreshData?.code === 0 && refreshData?.data) {
-              await completeAuth(refreshData.data);
+            const refreshData = refreshRes as AuthResponse | undefined;
+            if (refreshData) {
+              await completeAuth(refreshData);
               isInitialized.current = true;
               return;
             }
@@ -138,9 +137,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await loginMutation.mutateAsync({
         body: { username, password },
       });
-      const responseData = response as ApiResult<AuthResponse> | undefined;
-      if (responseData?.code === 0 && responseData?.data) {
-        const { requires_mfa, mfa_token, mfa_methods, user } = responseData.data;
+      const responseData = response as AuthResponse | undefined;
+      if (responseData) {
+        const { requires_mfa, mfa_token, mfa_methods, user } = responseData;
         if (requires_mfa && mfa_token) {
           dispatch({ type: "AUTH_IDLE" });
           return {
@@ -153,17 +152,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           };
         }
         if (user) {
-          await completeAuth(responseData.data);
+          await completeAuth(responseData);
           return { status: "authenticated" };
         }
       } else {
         dispatch({
           type: "AUTH_FAILURE",
-          payload: responseData?.message || "auth.errors.loginFailed",
+          payload: "auth.errors.loginFailed",
         });
       }
 
-      throw new Error(responseData?.message || "auth.errors.loginFailed");
+      throw new Error("auth.errors.loginFailed");
     } catch (error: any) {
       dispatch({
         type: "AUTH_FAILURE",
@@ -179,15 +178,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await verifyMFAMutation.mutateAsync({
         body: { mfa_token: mfaToken, code, method },
       });
-      const responseData = response as ApiResult<AuthResponse> | undefined;
-      if (responseData?.code === 0 && responseData?.data) {
-        if (responseData.data.user) {
-          await completeAuth(responseData.data);
+      const responseData = response as AuthResponse | undefined;
+      if (responseData) {
+        if (responseData.user) {
+          await completeAuth(responseData);
           return;
         }
       }
 
-      const message = responseData?.message || "auth.errors.verificationFailed";
+      const message = "auth.errors.verificationFailed";
       dispatch({ type: "AUTH_FAILURE", payload: message });
       throw new Error(message);
     } catch (error: any) {

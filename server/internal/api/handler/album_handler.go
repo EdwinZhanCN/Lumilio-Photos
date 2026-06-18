@@ -102,10 +102,10 @@ func NewAlbumHandler(
 // @Accept json
 // @Produce json
 // @Param request body dto.CreateAlbumRequestDTO true "Album creation data"
-// @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album created successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Failed to create album"
+// @Success 200 {object} dto.GetAlbumResponseDTO "Album created successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Failed to create album"
 // @Router /api/v1/albums [post]
 // @Security BearerAuth
 func (h *AlbumHandler) NewAlbum(c *gin.Context) {
@@ -159,7 +159,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 		optionalUUIDToString(album.CoverAssetID),
 	)
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // GetAlbum retrieves a specific album by ID
@@ -170,9 +170,9 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid album ID"
-// @Failure 404 {object} api.Result "Album not found"
+// @Success 200 {object} dto.GetAlbumResponseDTO "Album retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album ID"
+// @Failure 404 {object} api.ErrorResponse "Album not found"
 // @Router /api/v1/albums/{id} [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAlbum(c *gin.Context) {
@@ -201,7 +201,7 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, toScopedAlbumResponseDTO(album))
+	api.JSONOK(c, toScopedAlbumResponseDTO(album))
 }
 
 // ListAlbums retrieves albums for the authenticated user
@@ -213,10 +213,10 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 // @Param limit query int false "Maximum number of results (max 100)" default(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0)
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=dto.ListAlbumsResponseDTO} "Albums retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid parameters"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Failed to retrieve albums"
+// @Success 200 {object} dto.ListAlbumsResponseDTO "Albums retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid parameters"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Failed to retrieve albums"
 // @Router /api/v1/albums [get]
 // @Security BearerAuth
 func (h *AlbumHandler) ListAlbums(c *gin.Context) {
@@ -283,7 +283,7 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 		Offset: int(offset),
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // UpdateAlbum updates an existing album
@@ -294,12 +294,12 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Param request body dto.UpdateAlbumRequestDTO true "Album update data"
-// @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album updated successfully"
-// @Failure 400 {object} api.Result "Invalid album ID or request data"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 404 {object} api.Result "Album not found"
-// @Failure 500 {object} api.Result "Failed to update album"
+// @Success 200 {object} dto.GetAlbumResponseDTO "Album updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album ID or request data"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "Album not found"
+// @Failure 500 {object} api.ErrorResponse "Failed to update album"
 // @Router /api/v1/albums/{id} [put]
 // @Security BearerAuth
 func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
@@ -369,7 +369,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		optionalUUIDToString(updatedAlbum.CoverAssetID),
 	)
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // DeleteAlbum deletes an album
@@ -379,12 +379,12 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Album ID"
-// @Success 200 {object} api.Result "Album deleted successfully"
-// @Failure 400 {object} api.Result "Invalid album ID"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 404 {object} api.Result "Album not found"
-// @Failure 500 {object} api.Result "Failed to delete album"
+// @Success 200 {object} api.SuccessResponse "Album deleted successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album ID"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "Album not found"
+// @Failure 500 {object} api.ErrorResponse "Failed to delete album"
 // @Router /api/v1/albums/{id} [delete]
 // @Security BearerAuth
 func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
@@ -406,7 +406,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"message": "Album deleted successfully"})
+	api.JSONOK(c, gin.H{"message": "Album deleted successfully"})
 }
 
 // GetAlbumAssets retrieves all assets in an album
@@ -417,10 +417,10 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result "Assets retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid album ID"
-// @Failure 404 {object} api.Result "Album not found"
-// @Failure 500 {object} api.Result "Failed to retrieve album assets"
+// @Success 200 {object} api.SuccessResponse "Assets retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album ID"
+// @Failure 404 {object} api.ErrorResponse "Album not found"
+// @Failure 500 {object} api.ErrorResponse "Failed to retrieve album assets"
 // @Router /api/v1/albums/{id}/assets [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
@@ -450,7 +450,7 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{
+	api.JSONOK(c, gin.H{
 		"album_id": albumID,
 		"assets":   assets,
 		"count":    len(assets),
@@ -466,10 +466,10 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 // @Param id path int true "Album ID"
 // @Param assetId path string true "Asset ID (UUID format)"
 // @Param request body dto.AddAssetToAlbumRequestDTO false "Asset position in album"
-// @Success 200 {object} api.Result "Asset added to album successfully"
-// @Failure 400 {object} api.Result "Invalid album ID or asset ID"
-// @Failure 404 {object} api.Result "Album not found"
-// @Failure 500 {object} api.Result "Failed to add asset to album"
+// @Success 200 {object} api.SuccessResponse "Asset added to album successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album ID or asset ID"
+// @Failure 404 {object} api.ErrorResponse "Album not found"
+// @Failure 500 {object} api.ErrorResponse "Failed to add asset to album"
 // @Router /api/v1/albums/{id}/assets/{assetId} [post]
 // @Security BearerAuth
 func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
@@ -526,7 +526,7 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 	}
 	h.enqueueBioClipForAddedAsset(c.Request.Context(), *album, asset)
 
-	api.GinSuccess(c, gin.H{"message": "Asset added to album successfully"})
+	api.JSONOK(c, gin.H{"message": "Asset added to album successfully"})
 }
 
 // RebuildAlbumBioClip queues BioCLIP processing for missing species predictions in a bio album.
@@ -536,12 +536,12 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Album ID"
-// @Success 200 {object} api.Result{data=dto.RebuildAlbumBioClipResponseDTO} "BioCLIP jobs queued successfully"
-// @Failure 400 {object} api.Result "Invalid album or album type"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 404 {object} api.Result "Album not found"
-// @Failure 503 {object} api.Result "BioCLIP unavailable"
+// @Success 200 {object} dto.RebuildAlbumBioClipResponseDTO "BioCLIP jobs queued successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album or album type"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "Album not found"
+// @Failure 503 {object} api.ErrorResponse "BioCLIP unavailable"
 // @Router /api/v1/albums/{id}/bioclip/rebuild [post]
 // @Security BearerAuth
 func (h *AlbumHandler) RebuildAlbumBioClip(c *gin.Context) {
@@ -589,7 +589,7 @@ func (h *AlbumHandler) RebuildAlbumBioClip(c *gin.Context) {
 		queued++
 	}
 
-	api.GinSuccess(c, dto.RebuildAlbumBioClipResponseDTO{
+	api.JSONOK(c, dto.RebuildAlbumBioClipResponseDTO{
 		Status:       "queued",
 		Message:      "BioCLIP processing queued successfully",
 		QueuedAssets: queued,
@@ -621,9 +621,9 @@ func (h *AlbumHandler) enqueueBioClipForAddedAsset(ctx context.Context, album re
 // @Produce json
 // @Param id path int true "Album ID"
 // @Param assetId path string true "Asset ID (UUID format)"
-// @Success 200 {object} api.Result "Asset removed from album successfully"
-// @Failure 400 {object} api.Result "Invalid album ID or asset ID"
-// @Failure 500 {object} api.Result "Failed to remove asset from album"
+// @Success 200 {object} api.SuccessResponse "Asset removed from album successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album ID or asset ID"
+// @Failure 500 {object} api.ErrorResponse "Failed to remove asset from album"
 // @Router /api/v1/albums/{id}/assets/{assetId} [delete]
 // @Security BearerAuth
 func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
@@ -657,7 +657,7 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"message": "Asset removed from album successfully"})
+	api.JSONOK(c, gin.H{"message": "Asset removed from album successfully"})
 }
 
 // UpdateAssetPositionInAlbum updates the position of an asset within an album
@@ -669,9 +669,9 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 // @Param id path int true "Album ID"
 // @Param assetId path string true "Asset ID (UUID format)"
 // @Param request body dto.UpdateAssetPositionRequestDTO true "New position data"
-// @Success 200 {object} api.Result "Asset position updated successfully"
-// @Failure 400 {object} api.Result "Invalid album ID or asset ID"
-// @Failure 500 {object} api.Result "Failed to update asset position"
+// @Success 200 {object} api.SuccessResponse "Asset position updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid album ID or asset ID"
+// @Failure 500 {object} api.ErrorResponse "Failed to update asset position"
 // @Router /api/v1/albums/{id}/assets/{assetId}/position [put]
 // @Security BearerAuth
 func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
@@ -712,7 +712,7 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"message": "Asset position updated successfully"})
+	api.JSONOK(c, gin.H{"message": "Asset position updated successfully"})
 }
 
 // GetAssetAlbums retrieves all albums that contain a specific asset
@@ -722,9 +722,9 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)"
-// @Success 200 {object} api.Result "Albums retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid asset ID"
-// @Failure 500 {object} api.Result "Failed to retrieve asset albums"
+// @Success 200 {object} api.SuccessResponse "Albums retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
+// @Failure 500 {object} api.ErrorResponse "Failed to retrieve asset albums"
 // @Router /api/v1/assets/{id}/albums [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
@@ -759,7 +759,7 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		}
 	}
 
-	api.GinSuccess(c, gin.H{
+	api.JSONOK(c, gin.H{
 		"asset_id": assetID,
 		"albums":   filteredAlbums,
 		"count":    len(filteredAlbums),

@@ -37,9 +37,9 @@ func NewLocationHandler(locationService service.LocationService, queueClient *ri
 // @Param offset query int false "Page offset" default(0)
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Param geohash query string false "Optional geohash filter"
-// @Success 200 {object} api.Result{data=dto.LocationClusterListResponseDTO} "Location clusters retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.LocationClusterListResponseDTO "Location clusters retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/locations/clusters [get]
 func (h *LocationHandler) ListLocationClusters(c *gin.Context) {
 	limit, err := parseIntQueryWithRange(c, "limit", 100, 1, 1000)
@@ -100,7 +100,7 @@ func (h *LocationHandler) ListLocationClusters(c *gin.Context) {
 	}
 
 	totalInt := int(total)
-	api.GinSuccess(c, dto.LocationClusterListResponseDTO{
+	api.JSONOK(c, dto.LocationClusterListResponseDTO{
 		Clusters: dtos,
 		Total:    &totalInt,
 		Limit:    limit,
@@ -115,9 +115,9 @@ func (h *LocationHandler) ListLocationClusters(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.RebuildLocationClustersRequestDTO false "Rebuild request"
-// @Success 200 {object} api.Result{data=dto.RebuildLocationClustersResponseDTO} "Location cluster rebuild queued successfully"
-// @Failure 400 {object} api.Result "Invalid request body"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.RebuildLocationClustersResponseDTO "Location cluster rebuild queued successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request body"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/locations/rebuild [post]
 func (h *LocationHandler) RebuildLocationClusters(c *gin.Context) {
 	var req dto.RebuildLocationClustersRequestDTO
@@ -151,7 +151,7 @@ func (h *LocationHandler) RebuildLocationClusters(c *gin.Context) {
 	if jobResult != nil && jobResult.Job != nil {
 		jobID = jobResult.Job.ID
 	}
-	api.GinSuccess(c, dto.RebuildLocationClustersResponseDTO{
+	api.JSONOK(c, dto.RebuildLocationClustersResponseDTO{
 		Status:       "queued",
 		Message:      "Location cluster rebuild queued successfully",
 		JobID:        jobID,

@@ -5,7 +5,6 @@ import {
   uploadFileInChunks,
 } from "@/lib/upload/uploadTransport";
 import type {
-  ApiResult,
   UploadResponse,
   BatchUploadResponse,
   UploadOptions,
@@ -75,7 +74,7 @@ export type ChunkedUploadVariables = {
  * ```
  */
 export const useUploadFileMutation = () =>
-  useMutation<ApiResult<UploadResponse>, Error, UploadFileVariables>({
+  useMutation<UploadResponse, Error, UploadFileVariables>({
     mutationFn: ({ file, hash, options }) => uploadFile(file, hash, options),
   });
 
@@ -96,7 +95,7 @@ export const useUploadFileMutation = () =>
  * ```
  */
 export const useBatchUploadMutation = () =>
-  useMutation<ApiResult<BatchUploadResponse>, Error, BatchUploadVariables>({
+  useMutation<BatchUploadResponse, Error, BatchUploadVariables>({
     mutationFn: ({ files, repositoryId, options }) =>
       batchUploadFiles(files, repositoryId, options),
   });
@@ -123,7 +122,7 @@ export const useBatchUploadMutation = () =>
  * ```
  */
 export const useChunkedUploadMutation = () =>
-  useMutation<ApiResult<BatchUploadResponse>, Error, ChunkedUploadVariables>({
+  useMutation<BatchUploadResponse, Error, ChunkedUploadVariables>({
     mutationFn: ({
       file,
       sessionId,

@@ -109,9 +109,9 @@ func NewAssetHandler(
 // @Param file formData file true "Asset file to upload"
 // @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
-// @Success 200 {object} api.Result{data=dto.UploadResponseDTO} "Upload successful"
-// @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.UploadResponseDTO "Upload successful"
+// @Failure 400 {object} api.ErrorResponse "Bad request - no file provided or parse error"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets [post]
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	h.uploadLimiter <- struct{}{}
@@ -278,7 +278,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		}(repositoryID)
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // BatchUploadAssets handles multiple asset uploads with unified chunk support
@@ -290,9 +290,9 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 // @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param file formData file false "Single file upload - use format: single_{session_id}" example("single_123e4567-e89b-12d3-a456-426614174000")
 // @Param file formData file false "Chunked file upload - use format: chunk_{session_id}_{index}_{total}" example("chunk_123e4567-e89b-12d3-a456-426614174000_1_10")
-// @Success 200 {object} api.Result{data=dto.BatchUploadResponseDTO} "Batch upload completed"
-// @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.BatchUploadResponseDTO "Batch upload completed"
+// @Failure 400 {object} api.ErrorResponse "Bad request - no files provided or parse error"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/batch [post]
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	h.uploadLimiter <- struct{}{}
@@ -562,7 +562,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}(repositoryID)
 	}
 
-	api.GinSuccess(c, dto.BatchUploadResponseDTO{Results: results})
+	api.JSONOK(c, dto.BatchUploadResponseDTO{Results: results})
 }
 
 // GetUploadConfig returns current upload configuration
@@ -571,7 +571,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=dto.UploadConfigResponseDTO} "Upload configuration"
+// @Success 200 {object} dto.UploadConfigResponseDTO "Upload configuration"
 // @Router /api/v1/assets/batch/config [get]
 func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 	config, err := h.memoryMonitor.GetOptimalChunkConfig()
@@ -595,7 +595,7 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 		MaxInFlightRequests: config.MaxInFlightRequests,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // GetUploadProgress returns upload progress for sessions
@@ -605,7 +605,7 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param session_ids query string false "Comma-separated session IDs (optional)"
-// @Success 200 {object} api.Result{data=dto.UploadProgressResponseDTO} "Upload progress details"
+// @Success 200 {object} dto.UploadProgressResponseDTO "Upload progress details"
 // @Router /api/v1/assets/batch/progress [get]
 func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 	sessionIDsParam := c.Query("session_ids")
@@ -673,7 +673,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 		Summary:  summary,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // GetAsset retrieves a single asset by ID
@@ -689,9 +689,9 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Param include_species query bool false "Include species predictions" default(true)
 // @Param include_ocr query bool false "Include OCR results" default(false)
 // @Param include_faces query bool false "Include face recognition" default(false)
-// @Success 200 {object} api.Result{data=dto.AssetDTO} "Asset details with optional relationships"
-// @Failure 400 {object} api.Result "Invalid asset ID"
-// @Failure 404 {object} api.Result "Asset not found"
+// @Success 200 {object} dto.AssetDTO "Asset details with optional relationships"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
 // @Router /api/v1/assets/{id} [get]
 func (h *AssetHandler) GetAsset(c *gin.Context) {
 	idStr := c.Param("id")
@@ -730,7 +730,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, asset)
+	api.JSONOK(c, asset)
 }
 
 // GetAssetExif retrieves the raw EXIF JSON captured during metadata processing.
@@ -740,9 +740,9 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Success 200 {object} api.Result{data=dto.AssetExifResponseDTO} "Raw EXIF JSON"
-// @Failure 400 {object} api.Result "Invalid asset ID"
-// @Failure 404 {object} api.Result "Asset or EXIF not found"
+// @Success 200 {object} dto.AssetExifResponseDTO "Raw EXIF JSON"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
+// @Failure 404 {object} api.ErrorResponse "Asset or EXIF not found"
 // @Router /api/v1/assets/{id}/exif [get]
 func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 	idStr := c.Param("id")
@@ -772,7 +772,7 @@ func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.AssetExifResponseDTO{
+	api.JSONOK(c, dto.AssetExifResponseDTO{
 		AssetID: id.String(),
 		ExifRaw: exifRawObject,
 	})
@@ -785,10 +785,10 @@ func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Success 200 {object} api.Result{data=dto.AssetSidecarResponseDTO} "Asset sidecar"
-// @Failure 400 {object} api.Result "Invalid asset ID"
-// @Failure 404 {object} api.Result "Asset not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AssetSidecarResponseDTO "Asset sidecar"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/sidecar [get]
 func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
@@ -832,7 +832,7 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 		sidecar.AssetID = id.String()
 	}
 
-	api.GinSuccess(c, dto.AssetSidecarResponseDTO{
+	api.JSONOK(c, dto.AssetSidecarResponseDTO{
 		AssetID: id.String(),
 		Exists:  exists,
 		Sidecar: sidecar,
@@ -847,10 +847,10 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param request body dto.LumilioSidecarV1DTO true "Sidecar payload"
-// @Success 200 {object} api.Result{data=dto.AssetSidecarResponseDTO} "Asset sidecar saved"
-// @Failure 400 {object} api.Result "Invalid asset ID or request body"
-// @Failure 404 {object} api.Result "Asset not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AssetSidecarResponseDTO "Asset sidecar saved"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or request body"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/sidecar [put]
 func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
@@ -893,7 +893,7 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.AssetSidecarResponseDTO{
+	api.JSONOK(c, dto.AssetSidecarResponseDTO{
 		AssetID: id.String(),
 		Exists:  true,
 		Sidecar: sidecar,
@@ -908,9 +908,9 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param size query string false "Thumbnail size" default(medium) Enums(small,medium,large)
 // @Success 200 {file} string "Thumbnail image file"
-// @Failure 400 {object} api.Result "Invalid asset ID or size parameter"
-// @Failure 404 {object} api.Result "Asset or thumbnail not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or size parameter"
+// @Failure 404 {object} api.ErrorResponse "Asset or thumbnail not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/thumbnail [get]
 func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	// Parse asset ID from URL parameter
@@ -997,9 +997,9 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 // @Produce application/octet-stream
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {file} file "Original file content"
-// @Failure 400 {object} api.Result "Invalid asset ID"
-// @Failure 404 {object} api.Result "Asset not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/original [get]
 func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1078,12 +1078,12 @@ func clampedIntQuery(c *gin.Context, key string, def, min, max int) int {
 // @Param max_height query int false "Maximum output height in pixels"
 // @Param filename query string false "Base download filename (without extension)"
 // @Success 200 {file} file "Encoded image"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Authentication required"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 404 {object} api.Result "Asset or original file not found"
-// @Failure 422 {object} api.Result "Source image could not be encoded"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Authentication required"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "Asset or original file not found"
+// @Failure 422 {object} api.ErrorResponse "Source image could not be encoded"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/export [get]
 func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1177,11 +1177,11 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 // @Produce application/zip
 // @Param request body dto.DownloadAssetsRequestDTO true "Asset IDs to download"
 // @Success 200 {file} file "Zip archive"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Authentication required"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 404 {object} api.Result "Asset or original file not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Authentication required"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "Asset or original file not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/download [post]
 func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1310,9 +1310,9 @@ func uniqueZipArchiveName(seen map[string]int, filename string) string {
 // @Produce video/mp4
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {file} file "Web-optimized video file"
-// @Failure 400 {object} api.Result "Invalid asset ID"
-// @Failure 404 {object} api.Result "Asset not found or not a video"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
+// @Failure 404 {object} api.ErrorResponse "Asset not found or not a video"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/video/web [get]
 func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1390,9 +1390,9 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 // @Produce audio/mpeg
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {file} file "Web-optimized audio file"
-// @Failure 400 {object} api.Result "Invalid asset ID"
-// @Failure 404 {object} api.Result "Asset not found or not audio"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
+// @Failure 404 {object} api.ErrorResponse "Asset not found or not audio"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/audio/web [get]
 func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1472,9 +1472,9 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param request body dto.UpdateAssetRequestDTO true "Asset metadata"
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Asset updated successfully"
-// @Failure 400 {object} api.Result "Invalid asset ID or request body"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MessageResponseDTO "Asset updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or request body"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id} [put]
 func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 	idStr := c.Param("id")
@@ -1501,7 +1501,7 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Asset updated successfully"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Asset updated successfully"})
 }
 
 // DeleteAsset deletes an asset
@@ -1511,9 +1511,9 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Asset deleted successfully"
-// @Failure 400 {object} api.Result "Invalid asset ID format"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MessageResponseDTO "Asset deleted successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID format"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id} [delete]
 func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	idStr := c.Param("id")
@@ -1534,7 +1534,7 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Asset deleted successfully"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Asset deleted successfully"})
 }
 
 // AddAssetToAlbum adds an asset to an album
@@ -1545,9 +1545,9 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param albumId path int true "Album ID" example(123)
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Asset added to album successfully"
-// @Failure 400 {object} api.Result "Invalid asset ID or album ID"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MessageResponseDTO "Asset added to album successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or album ID"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/albums/{albumId} [post]
 func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 	assetID, err := uuid.Parse(c.Param("id"))
@@ -1588,7 +1588,7 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 	}
 	h.enqueueBioClipForAddedAsset(c.Request.Context(), album, *asset)
 
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Asset added to album successfully"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Asset added to album successfully"})
 }
 
 func (h *AssetHandler) enqueueBioClipForAddedAsset(ctx context.Context, album repo.Album, asset repo.Asset) {
@@ -1614,7 +1614,7 @@ func (h *AssetHandler) enqueueBioClipForAddedAsset(ctx context.Context, album re
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=dto.AssetTypesResponseDTO} "Asset types retrieved successfully"
+// @Success 200 {object} dto.AssetTypesResponseDTO "Asset types retrieved successfully"
 // @Router /api/v1/assets/types [get]
 func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 	types := []dbtypes.AssetType{
@@ -1623,7 +1623,7 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 		dbtypes.AssetTypeAudio,
 	}
 
-	api.GinSuccess(c, dto.AssetTypesResponseDTO{Types: types})
+	api.JSONOK(c, dto.AssetTypesResponseDTO{Types: types})
 }
 
 func normalizeAssetQueryPagination(pagination *dto.PaginationDTO) {
@@ -2072,9 +2072,9 @@ func toSearchDebugItemDTOs(debug []service.SearchDebugItem) []dto.SearchDebugIte
 // @Produce json
 // @Param request body dto.AssetQueryRequestDTO true "Query parameters"
 // @Success 200 {object} dto.QueryAssetsResponse "Assets queried successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 503 {object} api.Result "Semantic search unavailable"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/list [post]
 func (h *AssetHandler) QueryAssets(c *gin.Context) {
 	var req dto.AssetQueryRequestDTO
@@ -2123,7 +2123,7 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		req.Pagination.Limit,
 		req.Pagination.Offset,
 	)
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // SearchAssets handles sectioned asset search with best-effort top results.
@@ -2133,9 +2133,9 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.SearchAssetsRequestDTO true "Search parameters"
-// @Success 200 {object} api.Result{data=dto.SearchAssetsResponseDTO} "Assets searched successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.SearchAssetsResponseDTO "Assets searched successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/search [post]
 func (h *AssetHandler) SearchAssets(c *gin.Context) {
 	var req dto.SearchAssetsRequestDTO
@@ -2179,7 +2179,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 
 	searchResponse := toSearchBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset)
 
-	api.GinSuccess(c, searchResponse)
+	api.JSONOK(c, searchResponse)
 }
 
 // ListIndexingRepositories returns repository options for indexing filters and reindex scope selection.
@@ -2188,8 +2188,8 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=dto.IndexingRepositoryListResponseDTO} "Repository options retrieved successfully"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.IndexingRepositoryListResponseDTO "Repository options retrieved successfully"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/indexing/repositories [get]
 func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
 	repositories, err := h.repoManager.ListRepositories()
@@ -2199,7 +2199,7 @@ func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, toIndexingRepositoryListResponseDTO(repositories))
+	api.JSONOK(c, toIndexingRepositoryListResponseDTO(repositories))
 }
 
 // GetIndexingStats returns indexing coverage and queue status for photo AI tasks.
@@ -2209,9 +2209,9 @@ func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=dto.AssetIndexingStatsResponseDTO} "Indexing stats retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid repository ID"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AssetIndexingStatsResponseDTO "Indexing stats retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid repository ID"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/indexing/stats [get]
 func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
 	repositoryID := strings.TrimSpace(c.Query("repository_id"))
@@ -2231,7 +2231,7 @@ func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, toIndexingStatsResponseDTO(stats))
+	api.JSONOK(c, toIndexingStatsResponseDTO(stats))
 }
 
 // RebuildAssetIndexes queues a background indexing backfill batch for existing photos.
@@ -2241,9 +2241,9 @@ func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.RebuildAssetIndexesRequestDTO false "Reindex request"
-// @Success 200 {object} api.Result{data=dto.RebuildAssetIndexesResponseDTO} "Reindex job queued successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.RebuildAssetIndexesResponseDTO "Reindex job queued successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/indexing/rebuild [post]
 func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 	var req dto.RebuildAssetIndexesRequestDTO
@@ -2297,7 +2297,7 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 		message = "All requested indexing tasks are disabled in ML settings"
 	}
 
-	api.GinSuccess(c, dto.RebuildAssetIndexesResponseDTO{
+	api.JSONOK(c, dto.RebuildAssetIndexesResponseDTO{
 		Status:         status,
 		Message:        message,
 		JobID:          result.JobID,
@@ -2320,9 +2320,9 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 // @Param days query int false "Only consider photos from the last N days (0 disables date cutoff)" default(3650)
 // @Param seed query string false "Deterministic seed (default: current UTC date YYYY-MM-DD)"
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=dto.FeaturedAssetsResponseDTO} "Featured photos selected successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.FeaturedAssetsResponseDTO "Featured photos selected successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/featured [get]
 func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 	count, err := parseIntQueryWithRange(c, "count", 8, 1, 24)
@@ -2403,7 +2403,7 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 		Strategy:        "weighted_aes_v1",
 		GeneratedAtTime: now,
 	}
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // GetPhotoMapPoints returns lightweight photo map points with valid GPS coordinates.
@@ -2415,9 +2415,9 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 // @Param limit query int false "Page size (1-5000)" default(1000)
 // @Param offset query int false "Page offset" default(0)
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=dto.AssetMapPointListResponseDTO} "Map points retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AssetMapPointListResponseDTO "Map points retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/map-points [get]
 func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 	limit, err := parseIntQueryWithRange(c, "limit", 1000, 1, 5000)
@@ -2471,7 +2471,7 @@ func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 		Limit:  limit,
 		Offset: offset,
 	}
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 func parseIntQueryWithRange(
@@ -2517,8 +2517,8 @@ func countUniqueAssets(assets []repo.Asset) int {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=dto.OptionsResponseDTO} "Filter options retrieved successfully"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.OptionsResponseDTO "Filter options retrieved successfully"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/filter-options [get]
 func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -2541,7 +2541,7 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 		CameraModels: cameraModels,
 		Lenses:       lenses,
 	}
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // Rating Management Handlers
@@ -2554,10 +2554,10 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param rating body dto.UpdateRatingRequestDTO true "Rating data"
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Rating updated successfully"
-// @Failure 400 {object} api.Result "Bad request"
-// @Failure 404 {object} api.Result "Asset not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MessageResponseDTO "Rating updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/rating [put]
 func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 	idStr := c.Param("id")
@@ -2589,7 +2589,7 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Rating updated successfully"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Rating updated successfully"})
 }
 
 // UpdateAssetLike updates the like status of an asset
@@ -2600,10 +2600,10 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param like body dto.UpdateLikeRequestDTO true "Like data"
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Like status updated successfully"
-// @Failure 400 {object} api.Result "Bad request"
-// @Failure 404 {object} api.Result "Asset not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MessageResponseDTO "Like status updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/like [put]
 func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 	idStr := c.Param("id")
@@ -2630,7 +2630,7 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Like status updated successfully"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Like status updated successfully"})
 }
 
 // UpdateAssetRatingAndLike updates both rating and like status of an asset
@@ -2641,10 +2641,10 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param data body dto.UpdateRatingAndLikeRequestDTO true "Rating and like data"
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Rating and like status updated successfully"
-// @Failure 400 {object} api.Result "Bad request"
-// @Failure 404 {object} api.Result "Asset not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MessageResponseDTO "Rating and like status updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/rating-and-like [put]
 func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 	idStr := c.Param("id")
@@ -2676,7 +2676,7 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Rating and like status updated successfully"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Rating and like status updated successfully"})
 }
 
 // UpdateAssetDescription updates the description of an asset
@@ -2687,10 +2687,10 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param description body dto.UpdateDescriptionRequestDTO true "Description data"
-// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Description updated successfully"
-// @Failure 400 {object} api.Result "Bad request"
-// @Failure 404 {object} api.Result "Asset not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MessageResponseDTO "Description updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/{id}/description [put]
 func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 	idStr := c.Param("id")
@@ -2717,7 +2717,7 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Description updated successfully"})
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Description updated successfully"})
 }
 
 // GetAssetsByRating gets assets filtered by rating
@@ -2729,9 +2729,9 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 // @Param rating path int true "Rating (0-5)"
 // @Param limit query int false "Number of assets to return" default(20)
 // @Param offset query int false "Number of assets to skip" default(0)
-// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets retrieved successfully"
-// @Failure 400 {object} api.Result "Bad request"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AssetListResponseDTO "Assets retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/rating/{rating} [get]
 func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 	ratingStr := c.Param("rating")
@@ -2789,7 +2789,7 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 		Offset: offset,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // GetLikedAssets gets all liked/favorited assets
@@ -2800,8 +2800,8 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 // @Produce json
 // @Param limit query int false "Number of assets to return" default(20)
 // @Param offset query int false "Number of assets to skip" default(0)
-// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Liked assets retrieved successfully"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AssetListResponseDTO "Liked assets retrieved successfully"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/liked [get]
 func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -2848,7 +2848,7 @@ func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 		Offset: offset,
 	}
 
-	api.GinSuccess(c, response)
+	api.JSONOK(c, response)
 }
 
 // Helper methods for unified chunk upload
@@ -3729,8 +3729,8 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 // @Tags assets
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Success 200 {object} api.Result{data=dto.StackByAssetResponseDTO}
-// @Failure 404 {object} api.Result
+// @Success 200 {object} dto.StackByAssetResponseDTO
+// @Failure 404 {object} api.ErrorResponse
 // @Router /api/v1/assets/{id}/stack [get]
 // @Security BearerAuth
 func (h *AssetHandler) GetAssetStack(c *gin.Context) {
@@ -3781,9 +3781,9 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.CreateManualStackRequestDTO true "Asset IDs to stack"
-// @Success 201 {object} api.Result{data=dto.StackDTO}
-// @Failure 400 {object} api.Result
-// @Failure 409 {object} api.Result
+// @Success 201 {object} dto.StackDTO
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 409 {object} api.ErrorResponse
 // @Router /api/v1/assets/stacks [post]
 // @Security BearerAuth
 func (h *AssetHandler) CreateManualStack(c *gin.Context) {
@@ -3843,7 +3843,7 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 // @Tags assets
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Success 200 {object} api.Result
+// @Success 200 {object} api.SuccessResponse
 // @Router /api/v1/assets/{id}/stack [delete]
 // @Security BearerAuth
 func (h *AssetHandler) UnstackAsset(c *gin.Context) {
@@ -3868,7 +3868,7 @@ func (h *AssetHandler) UnstackAsset(c *gin.Context) {
 // @Tags repositories
 // @Produce json
 // @Param id path string true "Repository ID"
-// @Success 200 {object} api.Result{data=dto.AutoDetectStacksResponseDTO}
+// @Success 200 {object} dto.AutoDetectStacksResponseDTO
 // @Router /api/v1/repositories/{id}/stacks/detect [post]
 // @Security BearerAuth
 func (h *AssetHandler) AutoDetectStacks(c *gin.Context) {

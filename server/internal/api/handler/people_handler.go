@@ -53,9 +53,9 @@ func NewPeopleHandler(
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Param limit query int false "Maximum number of results (max 100)" default(24)
 // @Param offset query int false "Number of results to skip" default(0)
-// @Success 200 {object} api.Result{data=dto.ListPeopleResponseDTO} "People listed successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.ListPeopleResponseDTO "People listed successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/people [get]
 func (h *PeopleHandler) ListPeople(c *gin.Context) {
 	limit, offset := parseListPagination(c, 24, 100)
@@ -76,7 +76,7 @@ func (h *PeopleHandler) ListPeople(c *gin.Context) {
 		items = append(items, dto.ToPersonSummaryDTO(person))
 	}
 
-	api.GinSuccess(c, dto.ListPeopleResponseDTO{
+	api.JSONOK(c, dto.ListPeopleResponseDTO{
 		People: items,
 		Total:  int(total),
 		Limit:  limit,
@@ -90,10 +90,10 @@ func (h *PeopleHandler) ListPeople(c *gin.Context) {
 // @Tags people
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=dto.FaceClusterRebuildResponseDTO} "People clusters rebuilt successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.FaceClusterRebuildResponseDTO "People clusters rebuilt successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/people/rebuild [post]
 // @Security BearerAuth
 func (h *PeopleHandler) RebuildPeople(c *gin.Context) {
@@ -109,7 +109,7 @@ func (h *PeopleHandler) RebuildPeople(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToFaceClusterRebuildResponseDTO(result))
+	api.JSONOK(c, dto.ToFaceClusterRebuildResponseDTO(result))
 }
 
 // GetPerson gets a single recognized person.
@@ -119,10 +119,10 @@ func (h *PeopleHandler) RebuildPeople(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Person ID"
 // @Param repository_id query string false "Optional repository UUID filter"
-// @Success 200 {object} api.Result{data=dto.PersonDetailDTO} "Person fetched successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 404 {object} api.Result "Person not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.PersonDetailDTO "Person fetched successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 404 {object} api.ErrorResponse "Person not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/people/{id} [get]
 func (h *PeopleHandler) GetPerson(c *gin.Context) {
 	personID, ok := parsePersonID(c)
@@ -145,7 +145,7 @@ func (h *PeopleHandler) GetPerson(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToPersonDetailDTO(*person))
+	api.JSONOK(c, dto.ToPersonDetailDTO(*person))
 }
 
 // UpdatePerson renames a recognized person.
@@ -157,10 +157,10 @@ func (h *PeopleHandler) GetPerson(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Param request body dto.UpdatePersonRequestDTO true "Person update payload"
-// @Success 200 {object} api.Result{data=dto.PersonDetailDTO} "Person updated successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 404 {object} api.Result "Person not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.PersonDetailDTO "Person updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 404 {object} api.ErrorResponse "Person not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/people/{id} [patch]
 // @Security BearerAuth
 func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
@@ -209,7 +209,7 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToPersonDetailDTO(*person))
+	api.JSONOK(c, dto.ToPersonDetailDTO(*person))
 }
 
 // ListPersonAssets lists assets belonging to a person while preserving the standard asset query shape.
@@ -220,11 +220,11 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Person ID"
 // @Param request body dto.AssetQueryRequestDTO true "Asset query parameters"
-// @Success 200 {object} api.Result{data=dto.QueryAssetsResponseDTO} "Assets listed successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 404 {object} api.Result "Person not found"
-// @Failure 503 {object} api.Result "Semantic search unavailable"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.QueryAssetsResponseDTO "Assets listed successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 404 {object} api.ErrorResponse "Person not found"
+// @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/people/{id}/assets/list [post]
 func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 	personID, ok := parsePersonID(c)
@@ -286,7 +286,7 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, toQueryBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
+	api.JSONOK(c, toQueryBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
 }
 
 // GetPersonCover serves the representative face crop for a person.
@@ -297,10 +297,10 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {file} binary "Face crop"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 404 {object} api.Result "Person cover not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Person cover not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/people/{id}/cover [get]
 func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 	personID, ok := parsePersonID(c)

@@ -12,7 +12,6 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { getWidget } from "../../widgets/registry";
 import type { AgentPinDTO } from "../../widgets/types";
-import type { ApiResult } from "../../types";
 
 const BOARD_COLS = 12;
 const ROW_HEIGHT = 72;
@@ -31,7 +30,7 @@ type LayoutPatchVariables = {
 };
 
 type LayoutMutationContext = {
-  previousPins?: ApiResult<AgentPinDTO[]>;
+  previousPins?: AgentPinDTO[];
 };
 
 function serializeLayout(layout: Layout) {
@@ -56,7 +55,7 @@ export function AgentBoard() {
 
   const pinsQuery = $api.useQuery("get", "/api/v1/agent/pins", {});
   const pins = useMemo(
-    () => (pinsQuery.data as ApiResult<AgentPinDTO[]> | undefined)?.data ?? [],
+    () => (pinsQuery.data as AgentPinDTO[] | undefined) ?? [],
     [pinsQuery.data],
   );
 
@@ -67,31 +66,28 @@ export function AgentBoard() {
 
       await queryClient.cancelQueries({ queryKey: PINS_QUERY_KEY });
       const previousPins =
-        queryClient.getQueryData<ApiResult<AgentPinDTO[]>>(PINS_QUERY_KEY);
+        queryClient.getQueryData<AgentPinDTO[]>(PINS_QUERY_KEY);
       const nextLayouts = new Map(
         body.layouts.map((item) => [item.pin_id, item]),
       );
 
-      queryClient.setQueryData<ApiResult<AgentPinDTO[]> | undefined>(
+      queryClient.setQueryData<AgentPinDTO[] | undefined>(
         PINS_QUERY_KEY,
         (current) => {
-          if (!current?.data) return current;
-          return {
-            ...current,
-            data: current.data.map((pin) => {
-              const next = nextLayouts.get(pin.pin_id ?? "");
-              if (!next) return pin;
-              return {
-                ...pin,
-                layout: {
-                  x: next.x ?? pin.layout?.x ?? 0,
-                  y: next.y ?? pin.layout?.y ?? 0,
-                  w: next.w ?? pin.layout?.w ?? 4,
-                  h: next.h ?? pin.layout?.h ?? 4,
-                },
-              };
-            }),
-          };
+          if (!current) return current;
+          return current.map((pin) => {
+            const next = nextLayouts.get(pin.pin_id ?? "");
+            if (!next) return pin;
+            return {
+              ...pin,
+              layout: {
+                x: next.x ?? pin.layout?.x ?? 0,
+                y: next.y ?? pin.layout?.y ?? 0,
+                w: next.w ?? pin.layout?.w ?? 4,
+                h: next.h ?? pin.layout?.h ?? 4,
+              },
+            };
+          });
         },
       );
 

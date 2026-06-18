@@ -1,16 +1,9 @@
 import { $api } from "@/lib/http-commons/queryClient";
-import type { components, paths } from "@/lib/http-commons/schema";
+import type { components } from "@/lib/http-commons/schema";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 type CapabilitiesResponseDTO =
   components["schemas"]["dto.CapabilitiesResponseDTO"];
-
-type CapabilitiesApiResult = Omit<
-  paths["/api/v1/capabilities"]["get"]["responses"][200]["content"]["application/json"],
-  "data"
-> & {
-  data?: CapabilitiesResponseDTO;
-};
 
 type MLTaskCapability = {
   enabled: boolean;
@@ -87,7 +80,7 @@ function normalizeCapabilities(
 
 export function useCapabilities(
   refetchInterval?: number | false,
-): UseQueryResult<CapabilitiesApiResult, unknown> & {
+): UseQueryResult<CapabilitiesResponseDTO, unknown> & {
   capabilities?: Capabilities;
 } {
   const query = $api.useQuery(
@@ -97,11 +90,11 @@ export function useCapabilities(
     {
       refetchInterval,
     },
-  ) as UseQueryResult<CapabilitiesApiResult, unknown>;
+  ) as UseQueryResult<CapabilitiesResponseDTO, unknown>;
 
   return {
     ...query,
-    capabilities: normalizeCapabilities(query.data?.data),
+    capabilities: normalizeCapabilities(query.data),
   };
 }
 

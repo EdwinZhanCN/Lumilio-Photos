@@ -10,7 +10,6 @@ import {
   X,
 } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { ApiResult } from "@/lib/albums/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import PhotoPicker from "@/components/PhotoPicker";
 
@@ -39,7 +38,7 @@ const CreateAlbumModal: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await createAlbumMutation.mutateAsync({
+      await createAlbumMutation.mutateAsync({
         body: {
           album_name: name,
           description: description,
@@ -48,12 +47,9 @@ const CreateAlbumModal: React.FC = () => {
         },
       });
 
-      const responseData = response as ApiResult;
-      if (responseData?.code === 0) {
-        await queryClient.invalidateQueries({ queryKey: ["albums"] });
-        dispatch({ type: "CLOSE_CREATE_MODAL" });
-        resetForm();
-      }
+      await queryClient.invalidateQueries({ queryKey: ["albums"] });
+      dispatch({ type: "CLOSE_CREATE_MODAL" });
+      resetForm();
     } catch (error) {
       console.error("Failed to create album:", error);
     } finally {

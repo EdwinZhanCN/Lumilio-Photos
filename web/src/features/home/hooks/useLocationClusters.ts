@@ -6,9 +6,6 @@ import { $api } from "@/lib/http-commons/queryClient";
 type Schemas = components["schemas"];
 type LocationClusterDTO = Schemas["dto.LocationClusterDTO"];
 type LocationClusterListResponse = Schemas["dto.LocationClusterListResponseDTO"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
 
 export type LocationCluster = LocationClusterDTO;
 
@@ -39,7 +36,7 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
       gcTime: 15 * 60 * 1000,
       retry: 1,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = (lastPage as ApiResult<LocationClusterListResponse>)?.data;
+        const payload = lastPage as LocationClusterListResponse | undefined;
         const pageClusters = payload?.clusters ?? [];
         const total = payload?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
@@ -53,7 +50,7 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
         return pageClusters.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<ApiResult<LocationClusterListResponse>>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<LocationClusterListResponse>, unknown>;
 
   const clusters = useMemo(() => {
     const pages = query.data?.pages ?? [];
@@ -61,7 +58,7 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
     const seen = new Set<string>();
 
     for (const page of pages) {
-      const pageClusters = page.data?.clusters ?? [];
+      const pageClusters = page.clusters ?? [];
       for (const cluster of pageClusters) {
         const clusterId = cluster.cluster_id;
         if (!clusterId || seen.has(clusterId)) {
@@ -76,7 +73,7 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
   }, [query.data?.pages]);
 
   const totalClusters = query.data?.pages?.reduce((maxTotal, page) => {
-    const total = page.data?.total;
+    const total = page.total;
     if (typeof total !== "number") {
       return maxTotal;
     }

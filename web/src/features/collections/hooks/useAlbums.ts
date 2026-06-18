@@ -1,7 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type {
-  ApiResult,
   Album as AlbumDTO,
   ListAlbumsResponse,
 } from "@/lib/albums/types";
@@ -58,10 +57,7 @@ export function useAlbums(
           },
         },
       });
-      const responseData = response as
-        | ApiResult<ListAlbumsResponse>
-        | undefined;
-      const payload = responseData?.data;
+      const payload = response as ListAlbumsResponse | undefined;
       const total = payload?.total ?? 0;
 
       return {

@@ -7,9 +7,6 @@ import { encodeGeohash } from "@/lib/utils/geohash";
 type Schemas = components["schemas"];
 type LocationClusterDTO = Schemas["dto.LocationClusterDTO"];
 type LocationClusterListResponse = Schemas["dto.LocationClusterListResponseDTO"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
 
 type UseAssetLocationClusterOptions = {
   latitude?: number;
@@ -47,9 +44,9 @@ export function useAssetLocationCluster({
       gcTime: 30 * 60 * 1000,
       retry: 1,
     },
-  ) as UseQueryResult<ApiResult<LocationClusterListResponse>, unknown>;
+  ) as UseQueryResult<LocationClusterListResponse, unknown>;
 
-  const cluster = query.data?.data?.clusters?.[0] as LocationClusterDTO | undefined;
+  const cluster = query.data?.clusters?.[0] as LocationClusterDTO | undefined;
 
   return {
     cluster,

@@ -31,10 +31,10 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // @Accept json
 // @Produce json
 // @Param request body dto.RegistrationStartRequestDTO true "Registration data"
-// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Account created successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 409 {object} api.Result "User already exists"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AuthResponseDTO "Account created successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 409 {object} api.ErrorResponse "User already exists"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/register/start [post]
 func (h *AuthHandler) StartRegistration(c *gin.Context) {
 	var req dto.RegistrationStartRequestDTO
@@ -61,7 +61,7 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToAuthResponseDTO(response))
+	api.JSONOK(c, dto.ToAuthResponseDTO(response))
 }
 
 // Login handles user authentication
@@ -71,10 +71,10 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.LoginRequestDTO true "Login credentials"
-// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Login successful"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Invalid credentials"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AuthResponseDTO "Login successful"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Invalid credentials"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequestDTO
@@ -96,7 +96,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToAuthResponseDTO(authResponse))
+	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
 }
 
 // RefreshToken handles JWT token refresh
@@ -106,10 +106,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.RefreshTokenRequestDTO true "Refresh token"
-// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Token refreshed successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Invalid or expired refresh token"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.AuthResponseDTO "Token refreshed successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Invalid or expired refresh token"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req dto.RefreshTokenRequestDTO
@@ -130,7 +130,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToAuthResponseDTO(authResponse))
+	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
 }
 
 // Logout handles user logout
@@ -140,10 +140,10 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body dto.RefreshTokenRequestDTO true "Refresh token to revoke"
-// @Success 200 {object} api.Result "Logout successful"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Invalid refresh token"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} api.SuccessResponse "Logout successful"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Invalid refresh token"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req dto.RefreshTokenRequestDTO
@@ -162,7 +162,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, nil)
+	api.JSONOK(c, nil)
 }
 
 // Me returns the current authenticated user's information
@@ -172,9 +172,9 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.UserDTO} "User information retrieved successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.UserDTO "User information retrieved successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -182,7 +182,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToUserDTO(*user))
+	api.JSONOK(c, dto.ToUserDTO(*user))
 }
 
 // GetMediaToken issues a short-lived token that can be attached to media URLs.
@@ -192,9 +192,9 @@ func (h *AuthHandler) Me(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.MediaTokenDTO} "Media token issued successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.MediaTokenDTO "Media token issued successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/media-token [get]
 func (h *AuthHandler) GetMediaToken(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -208,7 +208,7 @@ func (h *AuthHandler) GetMediaToken(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.MediaTokenDTO{
+	api.JSONOK(c, dto.MediaTokenDTO{
 		Token:     token,
 		ExpiresAt: expiresAt,
 	})

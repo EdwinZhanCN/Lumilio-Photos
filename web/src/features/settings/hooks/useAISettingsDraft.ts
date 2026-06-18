@@ -75,7 +75,7 @@ function buildPayload(draft: AISettingsDraft): UpdateSystemSettings {
 }
 
 function toServerDraft(
-  data: NonNullable<ReturnType<typeof useSystemSettings>["data"]>["data"],
+  data: NonNullable<ReturnType<typeof useSystemSettings>["data"]>,
 ): AISettingsDraft | undefined {
   if (!data) return undefined;
 
@@ -103,7 +103,7 @@ export function useAISettingsDraft(): DraftSettings<AISettingsDraft> & {
 } {
   const query = useSystemSettings();
   const mutation = useUpdateSystemSettings();
-  const server = toServerDraft(query.data?.data);
+  const server = query.data ? toServerDraft(query.data) : undefined;
 
   const draftSettings = useDraftSettings<AISettingsDraft>({
     server,
@@ -117,7 +117,7 @@ export function useAISettingsDraft(): DraftSettings<AISettingsDraft> & {
 
   return {
     ...draftSettings,
-    apiKeyConfigured: Boolean(query.data?.data?.llm?.api_key_configured),
+    apiKeyConfigured: Boolean(query.data?.llm?.api_key_configured),
     query,
   };
 }

@@ -4,10 +4,6 @@ import type { components } from "@/lib/http-commons/schema.d.ts";
 
 type Schemas = components["schemas"];
 
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
-
 type FocalLengthDistributionResponse =
   Schemas["handler.FocalLengthDistributionResponse"];
 type CameraLensStatsResponse = Schemas["handler.CameraLensStatsResponse"];
@@ -121,36 +117,24 @@ export function usePhotoStats(
           }),
         ]);
 
-      // Check focal length response (openapi-fetch format)
-      const focalData = focalResponse as
-        | ApiResult<FocalLengthDistributionResponse>
-        | undefined;
-      if (focalData?.code === 0 && focalData.data) {
-        setFocalLengthData(focalData.data);
+      const focalData = focalResponse as FocalLengthDistributionResponse | undefined;
+      if (focalData) {
+        setFocalLengthData(focalData);
       }
 
-      // Check camera lens response
-      const cameraLensData = cameraLensResponse as
-        | ApiResult<CameraLensStatsResponse>
-        | undefined;
-      if (cameraLensData?.code === 0 && cameraLensData.data) {
-        setCameraLensData(cameraLensData.data);
+      const cameraLensData = cameraLensResponse as CameraLensStatsResponse | undefined;
+      if (cameraLensData) {
+        setCameraLensData(cameraLensData);
       }
 
-      // Check time distribution response
-      const timeDistributionData = timeResponse as
-        | ApiResult<TimeDistributionResponse>
-        | undefined;
-      if (timeDistributionData?.code === 0 && timeDistributionData.data) {
-        setTimeDistributionData(timeDistributionData.data);
+      const timeDistributionData = timeResponse as TimeDistributionResponse | undefined;
+      if (timeDistributionData) {
+        setTimeDistributionData(timeDistributionData);
       }
 
-      // Check years response
-      const yearsData = yearsResponse as
-        | ApiResult<AvailableYearsResponse>
-        | undefined;
-      if (yearsData?.code === 0 && yearsData.data) {
-        const years = yearsData.data.years ?? [];
+      const yearsData = yearsResponse as AvailableYearsResponse | undefined;
+      if (yearsData) {
+        const years = yearsData.years ?? [];
         setAvailableYears(years);
 
         // Fetch heatmap for the most recent year
@@ -167,11 +151,9 @@ export function usePhotoStats(
                 },
               },
             });
-            const heatmapData = heatmapResponse as
-              | ApiResult<HeatmapResponse>
-              | undefined;
-            if (heatmapData?.code === 0 && heatmapData.data) {
-              setHeatmapData(heatmapData.data);
+            const heatmapData = heatmapResponse as HeatmapResponse | undefined;
+            if (heatmapData) {
+              setHeatmapData(heatmapData);
             }
           }
         } finally {
@@ -211,12 +193,10 @@ export function usePhotoStats(
             },
           },
         });
-        const heatmapData = heatmapResponse as
-          | ApiResult<HeatmapResponse>
-          | undefined;
+        const heatmapData = heatmapResponse as HeatmapResponse | undefined;
 
-        if (heatmapData?.code === 0 && heatmapData.data) {
-          setHeatmapData(heatmapData.data);
+        if (heatmapData) {
+          setHeatmapData(heatmapData);
         }
       } catch (err) {
         const errorMessage =

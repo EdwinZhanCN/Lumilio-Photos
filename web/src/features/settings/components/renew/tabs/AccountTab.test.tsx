@@ -19,10 +19,8 @@ const mocks = vi.hoisted(() => ({
   },
   mfaStatusQuery: {
     data: {
-      data: {
-        totp_enabled: false,
-        recovery_codes_remaining: 0,
-      },
+      totp_enabled: false,
+      recovery_codes_remaining: 0,
     },
     isLoading: false,
     isFetching: false,
@@ -112,10 +110,8 @@ describe("AccountTab", () => {
     };
     mocks.mfaStatusQuery = {
       data: {
-        data: {
-          totp_enabled: false,
-          recovery_codes_remaining: 0,
-        },
+        totp_enabled: false,
+        recovery_codes_remaining: 0,
       },
       isLoading: false,
       isFetching: false,
@@ -139,9 +135,7 @@ describe("AccountTab", () => {
       display_name: "New Name",
     };
     mocks.updateProfileMutateAsync.mockResolvedValue({
-      code: 0,
-      message: "success",
-      data: updatedUser,
+      ...updatedUser,
     });
 
     render(<AccountTab />);
@@ -169,9 +163,7 @@ describe("AccountTab", () => {
 
   it("shows an error and does not dispatch SET_USER for invalid profile payloads", async () => {
     mocks.updateProfileMutateAsync.mockResolvedValue({
-      code: 0,
-      message: "success",
-      data: {},
+      user_id: undefined,
     });
 
     render(<AccountTab />);
@@ -193,12 +185,8 @@ describe("AccountTab", () => {
       avatar_asset_id: "asset-1",
     };
     mocks.updateProfileMutateAsync.mockResolvedValue({
-      code: 0,
-      message: "success",
-      data: {
-        ...mocks.user,
-        avatar_asset_id: undefined,
-      },
+      ...mocks.user,
+      avatar_asset_id: undefined,
     });
 
     render(<AccountTab />);

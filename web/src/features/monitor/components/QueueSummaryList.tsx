@@ -24,7 +24,6 @@ import type { LucideIcon } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import type {
-  ApiResult,
   QueueErrorSampleDTO,
   QueueSummaryDTO,
   QueueSummaryResponse,
@@ -305,11 +304,9 @@ export function QueueSummaryList() {
     },
   );
 
-  const response = summaryQuery.data as
-    | ApiResult<QueueSummaryResponse>
-    | undefined;
-  const queues = response?.data?.queues ?? [];
-  const generatedAt = response?.data?.generated_at;
+  const response = summaryQuery.data as QueueSummaryResponse | undefined;
+  const queues = response?.queues ?? [];
+  const generatedAt = response?.generated_at;
   const numberFormatter = useMemo(
     () => new Intl.NumberFormat(i18n.resolvedLanguage || i18n.language),
     [i18n.language, i18n.resolvedLanguage],

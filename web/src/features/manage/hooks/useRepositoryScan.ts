@@ -7,10 +7,6 @@ type AutoDetectStacksResponse = {
   stacks_created?: number;
 };
 
-type ApiResult<T = unknown> = {
-  data?: T;
-};
-
 const invalidateRepositoryAwareQueries = async (
   queryClient: ReturnType<typeof useQueryClient>,
 ) => {
@@ -37,15 +33,6 @@ const unwrapAutoDetectStacksResponse = (
   const record = response as Record<string, unknown>;
   if (typeof record.stacks_created === "number") {
     return response as AutoDetectStacksResponse;
-  }
-
-  const wrapped = response as ApiResult<unknown>;
-  if (
-    wrapped.data &&
-    typeof wrapped.data === "object" &&
-    typeof (wrapped.data as Record<string, unknown>).stacks_created === "number"
-  ) {
-    return wrapped.data as AutoDetectStacksResponse;
   }
 
   return undefined;

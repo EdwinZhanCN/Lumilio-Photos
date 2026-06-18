@@ -5,7 +5,7 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import { useI18n } from "@/lib/i18n.tsx";
-import type { ApiResult, AgentRefAssetsDTO } from "../types";
+import type { AgentRefAssetsDTO } from "../types";
 import type { WidgetProps } from "./types";
 import { useWidgetAssetsInfinite, useWidgetAssetsPreview } from "./useWidgetAssets";
 
@@ -120,7 +120,7 @@ function BoardGrid({ source, count }: WidgetProps) {
   const assets = useMemo<Asset[]>(
     () =>
       (query.data?.pages ?? []).flatMap(
-        (page) => (page as ApiResult<AgentRefAssetsDTO>)?.data?.assets ?? [],
+        (page) => (page as AgentRefAssetsDTO | undefined)?.assets ?? [],
       ),
     [query.data],
   );
@@ -212,7 +212,7 @@ function GridModal({
   const assets = useMemo<Asset[]>(
     () =>
       (query.data?.pages ?? []).flatMap(
-        (page) => (page as ApiResult<AgentRefAssetsDTO>)?.data?.assets ?? [],
+        (page) => (page as AgentRefAssetsDTO | undefined)?.assets ?? [],
       ),
     [query.data],
   );

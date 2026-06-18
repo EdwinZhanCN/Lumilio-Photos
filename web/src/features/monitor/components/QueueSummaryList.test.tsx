@@ -69,36 +69,34 @@ const now = new Date("2026-06-12T12:00:00.000Z").toISOString();
 const oneMinuteAgo = new Date("2026-06-12T11:59:00.000Z").toISOString();
 
 const summaryResponse = {
-  data: {
-    generated_at: now,
-    queues: [
-      {
-        name: "thumbnail_asset",
-        total_jobs: 100,
-        processed_jobs: 80,
-        remaining_jobs: 20,
-        running_jobs: 1,
-        attention_jobs: 2,
-        average_latency_ms: 5000,
-        average_runtime_ms: 1200,
-        latest_activity_at: now,
-        oldest_remaining_at: oneMinuteAgo,
-        error_samples: [
-          {
-            job_id: 42,
-            kind: "thumbnail_asset",
-            state: "retryable",
-            attempt: 3,
-            max_attempts: 50,
-            created_at: oneMinuteAgo,
-            scheduled_at: now,
-            attempted_at: now,
-            last_error: "thumbnail failed: decode error",
-          },
-        ],
-      },
-    ],
-  },
+  generated_at: now,
+  queues: [
+    {
+      name: "thumbnail_asset",
+      total_jobs: 100,
+      processed_jobs: 80,
+      remaining_jobs: 20,
+      running_jobs: 1,
+      attention_jobs: 2,
+      average_latency_ms: 5000,
+      average_runtime_ms: 1200,
+      latest_activity_at: now,
+      oldest_remaining_at: oneMinuteAgo,
+      error_samples: [
+        {
+          job_id: 42,
+          kind: "thumbnail_asset",
+          state: "retryable",
+          attempt: 3,
+          max_attempts: 50,
+          created_at: oneMinuteAgo,
+          scheduled_at: now,
+          attempted_at: now,
+          last_error: "thumbnail failed: decode error",
+        },
+      ],
+    },
+  ],
 };
 
 let clipboardWriteText: ReturnType<typeof vi.fn>;

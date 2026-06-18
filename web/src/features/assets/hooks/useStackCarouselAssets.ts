@@ -4,10 +4,6 @@ import type { Asset, StackMemberDTO } from "@/lib/assets/types";
 import client from "@/lib/http-commons/client";
 import { useAssetStackDetails } from "./useAssetStackDetails";
 
-type ApiResult<T = unknown> = {
-  data?: T;
-};
-
 const isAsset = (value: unknown): value is Asset => {
   if (!value || typeof value !== "object") {
     return false;
@@ -19,11 +15,6 @@ const isAsset = (value: unknown): value is Asset => {
 const unwrapAssetResponse = (response: unknown): Asset | undefined => {
   if (isAsset(response)) {
     return response;
-  }
-
-  const wrapped = response as ApiResult<unknown> | undefined;
-  if (isAsset(wrapped?.data)) {
-    return wrapped.data;
   }
 
   return undefined;

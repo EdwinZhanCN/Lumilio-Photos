@@ -74,7 +74,7 @@ function useRepositoryAssetCount(repositoryId: string) {
 
   return {
     ...query,
-    assetCount: (query.data?.data?.total_assets ?? 0) as number,
+    assetCount: (query.data?.total_assets ?? 0) as number,
   };
 }
 
@@ -106,7 +106,7 @@ function RepositoryCard({
   const { t } = useI18n();
   const countQuery = useRepositoryAssetCount(repository.id);
   const cloudStatusQuery = useRepositoryCloudStatus(repository.id);
-  const cloudStatus = cloudStatusQuery.data?.data;
+  const cloudStatus = cloudStatusQuery.data;
   const latestRun = cloudStatus?.latest_run;
   const name = getRepositoryDisplayName(repository, t);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -321,7 +321,7 @@ function AddRepositoryModal({
   const [credentialId, setCredentialId] = useState("");
 
   const credentials = useMemo(
-    () => (credentialsQuery.data?.data?.credentials ?? []).filter((item) => item.status === "connected"),
+    () => (credentialsQuery.data?.credentials ?? []).filter((item) => item.status === "connected"),
     [credentialsQuery.data],
   );
 
@@ -359,10 +359,10 @@ function AddRepositoryModal({
           }),
         ]);
         showMessage(
-          response.data?.cloud_import_error ? "info" : "success",
-          response.data?.cloud_import_error
+          response.cloud_import_error ? "info" : "success",
+          response.cloud_import_error
             ? t("manage.repositories.cloudImportCreatePartial", {
-                error: response.data.cloud_import_error,
+                error: response.cloud_import_error,
               })
             : source === "cloud"
               ? t("manage.repositories.cloudImportCreateSuccess", {

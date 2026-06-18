@@ -90,7 +90,7 @@ export async function startWorkers(module, memory, builder) {
       // into the parent entry instead of creating another split point -
       // this would be preferable from optimization perspective -
       // however, Webpack then eliminates all message handler code
-      // because wasm-pack produces "sideEffects":false in package.json
+      // because wasm-pack produces "sideEffects":false in package.txt
       // unconditionally.
       //
       // The only way to work around that is to have side effect code

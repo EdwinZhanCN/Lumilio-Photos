@@ -16,7 +16,7 @@ export function useLLMSettingsDraft(): DraftSettings<LLMDraft> {
   const query = useSystemSettings();
   const mutation = useUpdateSystemSettings();
 
-  const llm = query.data?.data?.llm;
+  const llm = query.data?.llm;
   const server: LLMDraft | undefined = llm
     ? {
         agent_enabled: llm.agent_enabled ?? false,

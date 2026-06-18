@@ -3,10 +3,6 @@ import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 type Schemas = components["schemas"];
 type Paths = paths;
 
-export type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
-
 export type Album = Schemas["dto.GetAlbumResponseDTO"];
 export type ListAlbumsResponse = Schemas["dto.ListAlbumsResponseDTO"];
 export type CreateAlbumRequest = Schemas["dto.CreateAlbumRequestDTO"];

@@ -75,11 +75,11 @@ export default function CloudTab() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const providers = useMemo(
-    () => providersQuery.data?.data?.providers ?? [],
+    () => providersQuery.data?.providers ?? [],
     [providersQuery.data],
   );
   const credentials = useMemo(
-    () => credentialsQuery.data?.data?.credentials ?? [],
+    () => credentialsQuery.data?.credentials ?? [],
     [credentialsQuery.data],
   );
   const selectedProvider = providers.find((provider) => provider.id === providerChoice) ?? null;

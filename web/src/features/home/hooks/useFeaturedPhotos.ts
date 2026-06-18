@@ -4,9 +4,6 @@ import type { UseQueryResult } from "@tanstack/react-query";
 
 type Schemas = components["schemas"];
 type FeaturedAssetsResponse = Schemas["dto.FeaturedAssetsResponseDTO"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
 
 export type UseFeaturedPhotosOptions = {
   count?: number;
@@ -44,9 +41,9 @@ export function useFeaturedPhotos(options: UseFeaturedPhotosOptions = {}) {
       gcTime: 30 * 60 * 1000,
       retry: 1,
     },
-  ) as UseQueryResult<ApiResult<FeaturedAssetsResponse>, unknown>;
+  ) as UseQueryResult<FeaturedAssetsResponse, unknown>;
 
-  const payload = query.data?.data;
+  const payload = query.data;
 
   return {
     assets: payload?.assets ?? [],

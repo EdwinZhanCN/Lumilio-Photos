@@ -8,7 +8,6 @@ import {
   useEnableTOTP,
   useMFAStatus,
   useRegenerateRecoveryCodes,
-  type ApiResult,
   type MFAStatus,
   type RecoveryCodesResponse,
   type TOTPSetupResponse,
@@ -74,7 +73,7 @@ export default function MFAPage(): React.ReactNode {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [activeAction, setActiveAction] = useState<"disable" | "regenerate" | null>(null);
 
-  const status = statusQuery.data?.data as MFAStatus | undefined;
+  const status = statusQuery.data as MFAStatus | undefined;
   const shouldAutoStartSetup = searchParams.get("mfa") === "setup";
   const requestedAction = searchParams.get("action");
 
@@ -107,9 +106,9 @@ export default function MFAPage(): React.ReactNode {
     setError(null);
     try {
       const response = await beginSetupMutation.mutateAsync({});
-      const payload = response as ApiResult<TOTPSetupResponse> | undefined;
-      if (payload?.data) {
-        setSetupResponse(payload.data);
+      const payload = response as TOTPSetupResponse | undefined;
+      if (payload) {
+        setSetupResponse(payload);
         setVerificationCode("");
         setRecoveryCodes([]);
         setActiveAction(null);
@@ -136,8 +135,8 @@ export default function MFAPage(): React.ReactNode {
           code: verificationCode,
         },
       });
-      const payload = response as ApiResult<RecoveryCodesResponse> | undefined;
-      setRecoveryCodes(payload?.data?.recovery_codes ?? []);
+      const payload = response as RecoveryCodesResponse | undefined;
+      setRecoveryCodes(payload?.recovery_codes ?? []);
       setSetupResponse(null);
       setVerificationCode("");
       clearFlowParams("mfa", "action");
@@ -179,8 +178,8 @@ export default function MFAPage(): React.ReactNode {
       const response = await regenerateRecoveryCodes.mutateAsync({
         body: { current_password: password },
       });
-      const payload = response as ApiResult<RecoveryCodesResponse> | undefined;
-      setRecoveryCodes(payload?.data?.recovery_codes ?? []);
+      const payload = response as RecoveryCodesResponse | undefined;
+      setRecoveryCodes(payload?.recovery_codes ?? []);
       setActiveAction(null);
       setPassword("");
       clearFlowParams("action");

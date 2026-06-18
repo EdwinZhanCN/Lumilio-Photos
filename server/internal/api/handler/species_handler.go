@@ -30,10 +30,10 @@ func NewSpeciesHandler(speciesReferenceService service.SpeciesReferenceService) 
 // @Param scientific_name query string false "Scientific name" example("Rucervus duvaucelii")
 // @Param common_name query string false "Common name fallback" example("Barasingha")
 // @Param locale query string false "iNaturalist locale for localized common names and wiki summaries" example("zh")
-// @Success 200 {object} api.Result{data=dto.SpeciesReferenceResponseDTO} "Species reference retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid query"
-// @Failure 404 {object} api.Result "Species reference not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.SpeciesReferenceResponseDTO "Species reference retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid query"
+// @Failure 404 {object} api.ErrorResponse "Species reference not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/species/reference [get]
 func (h *SpeciesHandler) GetSpeciesReference(c *gin.Context) {
 	scientificName := strings.TrimSpace(c.Query("scientific_name"))
@@ -58,5 +58,5 @@ func (h *SpeciesHandler) GetSpeciesReference(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToSpeciesReferenceResponseDTO(ref))
+	api.JSONOK(c, dto.ToSpeciesReferenceResponseDTO(ref))
 }

@@ -29,10 +29,10 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.UpdateOwnProfileRequestDTO true "Profile update payload"
-// @Success 200 {object} dto.UserResultDTO "Profile updated successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.UserDTO "Profile updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/users/me/profile [patch]
 func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -67,7 +67,7 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 	c.Set("user_role", updated.Role)
 	c.Set("user_permissions", updated.Permissions)
 
-	api.GinSuccess(c, dto.ToUserDTO(updated))
+	api.JSONOK(c, dto.ToUserDTO(updated))
 }
 
 // ListUsers returns paginated users for administrators.
@@ -79,10 +79,10 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 // @Security BearerAuth
 // @Param limit query int false "Maximum number of results" default(20)
 // @Param offset query int false "Number of results to skip" default(0)
-// @Success 200 {object} api.Result{data=dto.ListUsersResponseDTO} "Users retrieved successfully"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.ListUsersResponseDTO "Users retrieved successfully"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/users [get]
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -111,7 +111,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToListUsersResponseDTO(result))
+	api.JSONOK(c, dto.ToListUsersResponseDTO(result))
 }
 
 // UpdateUser updates a user as an administrator.
@@ -123,13 +123,13 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path int true "User ID"
 // @Param request body dto.AdminUpdateUserRequestDTO true "User update payload"
-// @Success 200 {object} dto.UserResultDTO "User updated successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 404 {object} api.Result "User not found"
-// @Failure 409 {object} api.Result "User already exists"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.UserDTO "User updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "User not found"
+// @Failure 409 {object} api.ErrorResponse "User already exists"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/users/{id} [patch]
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	admin, ok := requireAdminUser(c)
@@ -186,7 +186,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToUserDTO(updated))
+	api.JSONOK(c, dto.ToUserDTO(updated))
 }
 
 // ChangeMyPassword rotates the authenticated user's password and revokes all refresh tokens.
@@ -197,10 +197,10 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.ChangePasswordRequestDTO true "Password change payload"
-// @Success 200 {object} api.Result "Password updated successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Current password is incorrect"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} api.SuccessResponse "Password updated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 401 {object} api.ErrorResponse "Current password is incorrect"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/users/me/password [patch]
 func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -230,7 +230,7 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"password_changed": true})
+	api.JSONOK(c, gin.H{"password_changed": true})
 }
 
 // ResetUserAccess resets password and clears MFA factors for a target user.
@@ -241,12 +241,12 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "User ID"
-// @Success 200 {object} dto.ResetAccessResultDTO "User access reset successfully"
-// @Failure 400 {object} api.Result "Invalid request"
-// @Failure 401 {object} api.Result "Unauthorized"
-// @Failure 403 {object} api.Result "Forbidden"
-// @Failure 404 {object} api.Result "User not found"
-// @Failure 500 {object} api.Result "Internal server error"
+// @Success 200 {object} dto.ResetAccessResponseDTO "User access reset successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "User not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/users/{id}/reset-access [post]
 func (h *UserHandler) ResetUserAccess(c *gin.Context) {
 	admin, ok := requireAdminUser(c)
@@ -273,5 +273,5 @@ func (h *UserHandler) ResetUserAccess(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, dto.ToResetAccessResponseDTO(result))
+	api.JSONOK(c, dto.ToResetAccessResponseDTO(result))
 }

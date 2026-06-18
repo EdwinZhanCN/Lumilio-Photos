@@ -6,9 +6,6 @@ import { $api } from "@/lib/http-commons/queryClient";
 type Schemas = components["schemas"];
 type AssetMapPointDTO = Schemas["dto.AssetMapPointDTO"];
 type AssetMapPointListResponse = Schemas["dto.AssetMapPointListResponseDTO"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
 export type MapPhotoPoint = AssetMapPointDTO;
 
 const PAGE_SIZE = 1000;
@@ -38,7 +35,7 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
       gcTime: 15 * 60 * 1000,
       retry: 1,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = (lastPage as ApiResult<AssetMapPointListResponse>)?.data;
+        const payload = lastPage as AssetMapPointListResponse | undefined;
         const pagePoints = payload?.points ?? [];
         const total = payload?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
@@ -52,7 +49,7 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
         return pagePoints.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<ApiResult<AssetMapPointListResponse>>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<AssetMapPointListResponse>, unknown>;
 
   useEffect(() => {
     if (
@@ -79,7 +76,7 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
     const seen = new Set<string>();
 
     for (const page of pages) {
-      const points = page.data?.points ?? [];
+      const points = page.points ?? [];
       for (const point of points) {
         const assetId = point.asset_id;
         if (!assetId || seen.has(assetId)) {
@@ -94,7 +91,7 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
   }, [query.data?.pages]);
 
   const totalPhotos = query.data?.pages?.reduce((maxTotal, page) => {
-    const total = page.data?.total;
+    const total = page.total;
     if (typeof total !== "number") {
       return maxTotal;
     }

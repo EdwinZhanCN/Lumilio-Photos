@@ -416,7 +416,7 @@ export default function AccountTab() {
   }
 
   const resolvedName = user.display_name || user.username || "User";
-  const mfaStatus = mfaStatusQuery.data?.data;
+  const mfaStatus = mfaStatusQuery.data;
   const effectiveAvatarAssetId = avatarAssetId || undefined;
   const isDirty =
     profileTouched &&
@@ -456,14 +456,14 @@ export default function AccountTab() {
       const response = await updateProfileMutation.mutateAsync({
         body: { display_name: displayName, avatar_asset_id: avatarAssetId },
       });
-      if (!isValidUserDTO(response.data)) {
+      if (!isValidUserDTO(response)) {
         throw new Error(
           t("settings.account.invalidProfileResponse", {
             defaultValue: "Profile saved, but the server returned an invalid user payload.",
           }),
         );
       }
-      dispatch({ type: "SET_USER", payload: response.data });
+      dispatch({ type: "SET_USER", payload: response });
       setProfileTouched(false);
       setProfileJustSaved(true);
       if (profileSavedTimer.current) clearTimeout(profileSavedTimer.current);
@@ -479,12 +479,12 @@ export default function AccountTab() {
     setSecurityFeedback(null);
     try {
       const optionsResponse = await beginPasskeyEnrollment.mutateAsync({});
-      if (!optionsResponse.data?.challenge_token) {
-        throw new Error(optionsResponse.message || "Failed to start passkey enrollment.");
+      if (!optionsResponse.challenge_token) {
+        throw new Error("Failed to start passkey enrollment.");
       }
-      const credential = await createPasskeyCredential(optionsResponse.data.options);
+      const credential = await createPasskeyCredential(optionsResponse.options);
       await verifyPasskeyEnrollment.mutateAsync({
-        body: { challenge_token: optionsResponse.data.challenge_token, credential },
+        body: { challenge_token: optionsResponse.challenge_token, credential },
       });
       setSecurityFeedback({ tone: "success", message: "Passkey added successfully." });
     } catch (error) {

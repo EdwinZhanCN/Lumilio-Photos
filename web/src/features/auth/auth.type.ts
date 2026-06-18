@@ -21,10 +21,6 @@ export type ResetAccessResponse = Schemas["dto.ResetAccessResponseDTO"];
 
 export type MFAMethod = "totp" | "recovery_code";
 
-export type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
-
 export type LoginResult =
   | { status: "authenticated" }
   | {

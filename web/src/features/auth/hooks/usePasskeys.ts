@@ -1,18 +1,15 @@
 import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type {
+  PasskeyListResponse,
   PasskeyCredentialSummary,
   PasskeyOptionsResponse,
 } from "../auth.type.ts";
-import type { components } from "@/lib/http-commons/schema";
-
-type Schemas = components["schemas"];
-type PasskeyListResult = Schemas["dto.PasskeyListResultDTO"];
 
 const passkeysQueryKey = ["get", "/api/v1/auth/mfa/passkeys"];
 const mfaStatusQueryKey = ["get", "/api/v1/auth/mfa"];
 
-export function usePasskeys(): UseQueryResult<PasskeyListResult, unknown> & {
+export function usePasskeys(): UseQueryResult<PasskeyListResponse, unknown> & {
   passkeys: PasskeyCredentialSummary[];
   total: number;
 } {
@@ -23,12 +20,12 @@ export function usePasskeys(): UseQueryResult<PasskeyListResult, unknown> & {
     {
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<PasskeyListResult, unknown>;
+  ) as UseQueryResult<PasskeyListResponse, unknown>;
 
   return {
     ...query,
-    passkeys: query.data?.data?.credentials ?? [],
-    total: query.data?.data?.total ?? 0,
+    passkeys: query.data?.credentials ?? [],
+    total: query.data?.total ?? 0,
   };
 }
 

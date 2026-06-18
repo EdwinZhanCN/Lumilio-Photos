@@ -28,8 +28,8 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const setupQuery = useSetupStatus();
   const setupMutation = $api.useMutation("post", "/api/v1/setup");
   const databaseInitialized =
-    setupQuery.data?.data?.database_initialized ??
-    setupQuery.data?.data?.initialized ??
+    setupQuery.data?.database_initialized ??
+    setupQuery.data?.initialized ??
     false;
 
   const beginSetup = () => {

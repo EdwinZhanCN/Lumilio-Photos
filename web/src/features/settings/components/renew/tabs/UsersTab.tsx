@@ -144,8 +144,8 @@ export default function UsersTab() {
           is_active: form.isActive,
         },
       });
-      if (response.data && response.data.user_id === user.user_id) {
-        dispatch({ type: "SET_USER", payload: response.data });
+      if (response.user_id === user.user_id) {
+        dispatch({ type: "SET_USER", payload: response });
       }
       setFeedback({
         tone: "success",
@@ -168,14 +168,13 @@ export default function UsersTab() {
       const response = await resetUserAccessMutation.mutateAsync({
         params: { path: { id: selectedUser.user_id } },
       });
-      const data = response.data;
-      if (!data?.temporary_password) {
-        throw new Error(response.message || "Failed to reset access.");
+      if (!response.temporary_password) {
+        throw new Error("Failed to reset access.");
       }
       setResetAccessState({
-        temporaryPassword: data.temporary_password,
-        clearedPasskeys: data.cleared_passkeys ?? true,
-        clearedTotp: data.cleared_totp ?? true,
+        temporaryPassword: response.temporary_password,
+        clearedPasskeys: response.cleared_passkeys ?? true,
+        clearedTotp: response.cleared_totp ?? true,
       });
       setFeedback({
         tone: "success",

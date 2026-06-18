@@ -109,11 +109,11 @@ export function MentionInput({
   const sources = useMemo(
     () =>
       createMentionSources({
-        people: peopleQuery.data?.data?.people ?? [],
-        albums: albumsQuery.data?.data?.albums ?? [],
-        pins: pinsQuery.data?.data ?? [],
-        cameras: filterOptionsQuery.data?.data?.camera_models ?? [],
-        lenses: filterOptionsQuery.data?.data?.lenses ?? [],
+        people: peopleQuery.data?.people ?? [],
+        albums: albumsQuery.data?.albums ?? [],
+        pins: pinsQuery.data ?? [],
+        cameras: filterOptionsQuery.data?.camera_models ?? [],
+        lenses: filterOptionsQuery.data?.lenses ?? [],
       }),
     [
       peopleQuery.data,

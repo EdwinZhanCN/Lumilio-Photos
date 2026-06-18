@@ -17,9 +17,6 @@ import AudioInfoView from "./AudioInfoView";
 
 type Schemas = components["schemas"];
 type AssetExifResponse = Schemas["dto.AssetExifResponseDTO"];
-type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
-  data?: T;
-};
 
 interface FullScreenBasicInfoProps {
   asset?: Asset;
@@ -43,10 +40,10 @@ export default function FullScreenBasicInfo({
       enabled: false,
       retry: 1,
     },
-  ) as UseQueryResult<ApiResult<AssetExifResponse>, unknown>;
+  ) as UseQueryResult<AssetExifResponse, unknown>;
 
   const rawExif =
-    (exifQuery.data?.data?.exif_raw as Record<string, unknown> | undefined) ??
+    (exifQuery.data?.exif_raw as Record<string, unknown> | undefined) ??
     null;
   const rawExifForDisplay =
     rawExif && Object.keys(rawExif).length > 0
@@ -80,20 +77,8 @@ export default function FullScreenBasicInfo({
       return;
     }
 
-    const payload = result.data as ApiResult<AssetExifResponse> | undefined;
-
-    if (payload && typeof payload.code === "number" && payload.code !== 0) {
-      showMessage(
-        "error",
-        payload.message ||
-          t("assets.basicInfo.errors.extractFailed", {
-            message: payload.error || "",
-          }),
-      );
-      return;
-    }
-
-    const exifRaw = payload?.data?.exif_raw as
+    const payload = result.data;
+    const exifRaw = payload?.exif_raw as
       | Record<string, unknown>
       | undefined;
     if (!exifRaw || Object.keys(exifRaw).length === 0) {

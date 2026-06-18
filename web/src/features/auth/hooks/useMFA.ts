@@ -1,20 +1,15 @@
 import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type {
-  ApiResult,
   MFAStatus,
   RecoveryCodesResponse,
   TOTPSetupResponse,
 } from "../auth.type.ts";
-import type { components } from "@/lib/http-commons/schema";
-
-type Schemas = components["schemas"];
-type MFAStatusResult = Schemas["dto.MFAStatusResultDTO"];
 
 const mfaStatusQueryKey = ["get", "/api/v1/auth/mfa"];
 const passkeysQueryKey = ["get", "/api/v1/auth/mfa/passkeys"];
 
-export function useMFAStatus(): UseQueryResult<MFAStatusResult, unknown> {
+export function useMFAStatus(): UseQueryResult<MFAStatus, unknown> {
   return $api.useQuery(
     "get",
     "/api/v1/auth/mfa",
@@ -22,7 +17,7 @@ export function useMFAStatus(): UseQueryResult<MFAStatusResult, unknown> {
     {
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<MFAStatusResult, unknown>;
+  ) as UseQueryResult<MFAStatus, unknown>;
 }
 
 export function useBeginTOTPSetup() {
@@ -63,4 +58,4 @@ export function useRegenerateRecoveryCodes() {
   });
 }
 
-export type { ApiResult, MFAStatus, RecoveryCodesResponse, TOTPSetupResponse };
+export type { MFAStatus, RecoveryCodesResponse, TOTPSetupResponse };

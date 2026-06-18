@@ -30,8 +30,7 @@ function PeopleContent() {
 
   const handleRebuildPeople = async () => {
     try {
-      const response = await rebuildPeople();
-      const result = response.data;
+      const result = await rebuildPeople();
       showMessage(
         "success",
         t("people.rebuild.success", {

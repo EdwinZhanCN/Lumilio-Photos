@@ -19,7 +19,7 @@ ARG VITE_PLUGIN_REGISTRY_URL=https://registry.lumilio.org
 ARG VITE_PLUGIN_CDN_ORIGIN=https://cdn.lumilio.org
 ARG VITE_STUDIO_PLUGIN_RUNTIME_ENABLED=true
 
-# Copy package.json and pnpm-lock.yaml files
+# Copy package.txt and pnpm-lock.yaml files
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 
 # Install dependencies

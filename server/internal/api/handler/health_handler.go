@@ -25,8 +25,8 @@ type HealthResponse struct {
 // @Tags Health
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=HealthResponse} "Server is healthy"
+// @Success 200 {object} HealthResponse "Server is healthy"
 // @Router /api/v1/health [get]
 func (h *HealthHandler) Check(c *gin.Context) {
-	api.GinSuccess(c, HealthResponse{Status: "ok"})
+	api.JSONOK(c, HealthResponse{Status: "ok"})
 }
