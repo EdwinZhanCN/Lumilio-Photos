@@ -1,7 +1,7 @@
 # Agent 输入面三件套 v2：Gallery 统一 · 伪全局入口 · 原生 Mention/Slash
 
 > 状态: active · 面向: 编码代理与人类贡献者
-> 前置阅读: [agent-ref-system.md](agent-ref-system.md)（INV-1~7、ref/ledger/pin）、[agent-ui-refine.md](agent-ui-refine.md)（ChatDock 现状）。
+> 前置阅读: [agent-ref-system.md](../active/agent-ref-system.md)（INV-1~7、ref/ledger/pin）、[agent-ui-refine.md](agent-ui-refine.md)（ChatDock 现状）。
 > 本文取代上一版「四批次」计划。上一版被另一个 agent 实现了一遍，方向有三处偏差（见 §1），本文是纠偏后的重构方案。
 
 ## 1. 为什么重构（对上一版实现的纠偏）
