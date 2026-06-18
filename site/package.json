@@ -1,5 +1,6 @@
 {
-  "packageManager": "pnpm@11.7.0",
+  "name": "lumilio-docs",
+  "private": true,
   "devDependencies": {
     "@types/node": "^25.9.3",
     "vitepress": "2.0.0-alpha.17"
