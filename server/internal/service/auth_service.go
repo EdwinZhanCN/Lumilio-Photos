@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -80,6 +81,7 @@ type AuthService struct {
 	webauthnRPDisplayName  string
 	webauthnRPID           string
 	webauthnAllowedOrigins []string
+	logger                 *zap.Logger
 }
 
 // JWTClaims represents the claims in the JWT token
@@ -100,8 +102,14 @@ type MediaTokenClaims struct {
 
 const mediaTokenScope = "media"
 
-// NewAuthService creates a new authentication service.
-func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConfig) *AuthService {
+// NewAuthService creates a new authentication service. An optional zap logger
+// can be supplied for structured auth/audit logging; when omitted, a no-op
+// logger is used so callers (and tests) without logging stay valid.
+func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConfig, loggers ...*zap.Logger) *AuthService {
+	logger := zap.NewNop()
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
 	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(cfg.SecretKeyPath))
 	if err != nil {
 		panic(fmt.Sprintf("failed to initialize root secret key: %v", err))
@@ -130,6 +138,7 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConf
 		webauthnRPDisplayName:  webAuthnRPDisplayName(cfg),
 		webauthnRPID:           strings.TrimSpace(cfg.WebAuthnRPID),
 		webauthnAllowedOrigins: normalizeConfiguredWebAuthnOrigins(cfg.WebAuthnRPOrigins),
+		logger:                 logger,
 	}
 }
 
@@ -198,7 +207,8 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 	lastLogin, err := s.updateUserLastLogin(context.Background(), user.UserID)
 	if err != nil {
 		// Log error but don't fail login
-		fmt.Printf("Warning: failed to update last login for user %d: %v\n", user.UserID, err)
+		s.logger.Warn("failed to update last login",
+			zap.Int32("user_id", user.UserID), zap.Error(err))
 	} else {
 		user.LastLogin = lastLogin
 	}
@@ -215,8 +225,20 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 		return nil, ErrTokenNotFound
 	}
 
-	// Check if token is revoked
+	// Check if token is revoked. Presenting an already-revoked (but not yet
+	// expired) refresh token is a strong signal of token theft/replay: the
+	// legitimate client rotates to a fresh token, so the only party still
+	// holding the old one is an attacker (or vice versa). Treat reuse as a
+	// breach and revoke the user's entire token family to force every device
+	// to re-authenticate.
 	if refreshToken.IsRevoked != nil && *refreshToken.IsRevoked {
+		if err := s.queries.RevokeUserRefreshTokens(context.Background(), refreshToken.UserID); err != nil {
+			s.logger.Error("failed to revoke refresh token family after reuse",
+				zap.Int32("user_id", refreshToken.UserID), zap.Error(err))
+		} else {
+			s.logger.Warn("refresh token reuse detected; revoked all sessions",
+				zap.Int32("user_id", refreshToken.UserID))
+		}
 		return nil, ErrInvalidToken
 	}
 
@@ -240,16 +262,17 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 		return nil, ErrUserNotFound
 	}
 
+	// Rotate fail-closed: revoke the presented refresh token *before* issuing a
+	// new one. If revocation fails we abort instead of leaving two valid tokens
+	// in circulation; the user simply re-authenticates.
+	if err := s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID); err != nil {
+		return nil, fmt.Errorf("revoke refresh token during rotation: %w", err)
+	}
+
 	// Generate new tokens
 	authResponse, err := s.generateAuthResponse(user)
 	if err != nil {
 		return nil, err
-	}
-
-	// Revoke old refresh token
-	if err := s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID); err != nil {
-		// Log error but don't fail the refresh
-		fmt.Printf("Warning: failed to revoke old refresh token: %v\n", err)
 	}
 
 	return authResponse, nil

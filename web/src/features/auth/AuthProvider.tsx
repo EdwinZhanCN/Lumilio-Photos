@@ -17,7 +17,7 @@ interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<LoginResult>;
   verifyMFA: (mfaToken: string, code: string, method: MFAMethod) => Promise<void>;
   completeAuth: (response: AuthResponse) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +29,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const refreshMutation = $api.useMutation("post", "/api/v1/auth/refresh");
   const loginMutation = $api.useMutation("post", "/api/v1/auth/login");
   const verifyMFAMutation = $api.useMutation("post", "/api/v1/auth/mfa/verify");
+  const logoutMutation = $api.useMutation("post", "/api/v1/auth/logout");
 
   const getApiMessage = (error: unknown, fallback: string) => {
     if (!error || typeof error !== "object") return fallback;
@@ -56,7 +57,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const refreshToken = getRefreshToken();
 
       if (!token && !refreshToken) {
-        dispatch({ type: "AUTH_FAILURE", payload: null as any });
+        // No stored session: not authenticated, but this is idle, not a failure.
+        dispatch({ type: "AUTH_IDLE" });
         isInitialized.current = true;
         return;
       }
@@ -198,7 +200,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Best-effort server-side revocation of the current device's refresh token.
+    // Always clear local state afterwards, even if the request fails, so the
+    // user is never trapped in a logged-in UI.
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        await logoutMutation.mutateAsync({ body: { refreshToken } });
+      } catch (error) {
+        console.warn("Logout request failed; clearing local session anyway:", error);
+      }
+    }
     removeToken();
     dispatch({ type: "LOGOUT" });
   };
