@@ -162,7 +162,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, nil)
+	api.JSONOK(c, api.SuccessResponse{Message: "Logout successful"})
 }
 
 // Me returns the current authenticated user's information

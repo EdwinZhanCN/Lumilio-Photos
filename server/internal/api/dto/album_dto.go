@@ -79,6 +79,30 @@ type ListAlbumsResponseDTO struct {
 	Offset int                   `json:"offset"`
 }
 
+type AlbumAssetDTO struct {
+	AssetDTO
+	Position  *int32     `json:"position,omitempty"`
+	AddedTime *time.Time `json:"added_time,omitempty"`
+}
+
+type AlbumAssetsResponseDTO struct {
+	AlbumID int64           `json:"album_id"`
+	Assets  []AlbumAssetDTO `json:"assets"`
+	Count   int             `json:"count"`
+}
+
+type AssetAlbumDTO struct {
+	GetAlbumResponseDTO
+	Position  *int32     `json:"position,omitempty"`
+	AddedTime *time.Time `json:"added_time,omitempty"`
+}
+
+type AssetAlbumsResponseDTO struct {
+	AssetID string          `json:"asset_id"`
+	Albums  []AssetAlbumDTO `json:"albums"`
+	Count   int             `json:"count"`
+}
+
 // AddAssetToAlbumRequestDTO represents the request structure for adding an asset to an album
 type AddAssetToAlbumRequestDTO struct {
 	Position *int32 `json:"position"`

@@ -363,7 +363,7 @@ func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, nil)
+	api.JSONOK(c, api.SuccessResponse{Message: "Repository deleted successfully"})
 }
 
 func repositoryRoleFromRequest(raw string) dbtypes.RepoRole {

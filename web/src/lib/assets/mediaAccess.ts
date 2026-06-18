@@ -30,8 +30,8 @@ const requestMediaToken = async (): Promise<string | null> => {
     throw new Error(`media token request failed: ${JSON.stringify(error)}`);
   }
 
-  const token = data.data?.token;
-  const expiresAt = data.data?.expires_at;
+  const token = data.token;
+  const expiresAt = data.expires_at;
   if (!token || !expiresAt) {
     throw new Error("media token response is missing required fields");
   }

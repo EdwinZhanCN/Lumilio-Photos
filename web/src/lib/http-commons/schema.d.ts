@@ -1080,7 +1080,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
+                        "application/json": components["schemas"]["dto.AlbumAssetsResponseDTO"];
                     };
                 };
                 /** @description Invalid album ID */
@@ -1686,7 +1686,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
+                        "application/json": components["schemas"]["dto.AssetAlbumsResponseDTO"];
                     };
                 };
                 /** @description Invalid asset ID */
@@ -2469,9 +2469,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: string;
-                        };
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -2480,9 +2478,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: string;
-                        };
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -2491,9 +2487,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: string;
-                        };
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -3498,7 +3492,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.QueryAssetsResponse"];
+                        "application/json": components["schemas"]["dto.QueryAssetsResponseDTO"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -8683,6 +8677,57 @@ export interface components {
                 [key: string]: number;
             };
         };
+        "dto.AlbumAssetDTO": {
+            added_time?: string;
+            asset_id?: string;
+            capture_offset_minutes?: number;
+            deleted_at?: string;
+            duration?: number;
+            file_size?: number;
+            hash?: string;
+            height?: number;
+            is_deleted?: boolean;
+            liked?: boolean;
+            mime_type?: string;
+            original_filename?: string;
+            owner_id?: number;
+            position?: number;
+            rating?: number;
+            repository_id?: string;
+            species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
+            specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
+            stack?: components["schemas"]["dto.StackPreviewDTO"];
+            status?: number[];
+            storage_path?: string;
+            taken_time?: string;
+            type?: string;
+            upload_time?: string;
+            width?: number;
+        };
+        "dto.AlbumAssetsResponseDTO": {
+            album_id?: number;
+            assets?: components["schemas"]["dto.AlbumAssetDTO"][];
+            count?: number;
+        };
+        "dto.AssetAlbumDTO": {
+            added_time?: string;
+            album_id?: number;
+            album_name?: string;
+            album_type?: string;
+            asset_count?: number;
+            cover_asset_id?: string;
+            created_at?: string;
+            description?: string;
+            display_cover_asset_id?: string;
+            position?: number;
+            updated_at?: string;
+            user_id?: number;
+        };
+        "dto.AssetAlbumsResponseDTO": {
+            albums?: components["schemas"]["dto.AssetAlbumDTO"][];
+            asset_id?: string;
+            count?: number;
+        };
         "dto.AssetDTO": {
             asset_id?: string;
             capture_offset_minutes?: number;
@@ -9539,14 +9584,6 @@ export interface components {
             failed_sessions?: number;
             overall_progress?: number;
             total_sessions?: number;
-        };
-        "dto.QueryAssetsResponse": {
-            /** @example 0 */
-            code?: number;
-            data?: components["schemas"]["dto.QueryAssetsResponseDTO"];
-            error?: string;
-            /** @example success */
-            message?: string;
         };
         "dto.QueryAssetsResponseDTO": {
             items?: components["schemas"]["dto.BrowseItemDTO"][];

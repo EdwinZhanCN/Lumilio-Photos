@@ -230,7 +230,7 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{"password_changed": true})
+	api.JSONOK(c, api.SuccessResponse{Message: "Password updated successfully"})
 }
 
 // ResetUserAccess resets password and clears MFA factors for a target user.

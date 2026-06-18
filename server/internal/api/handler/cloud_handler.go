@@ -206,7 +206,7 @@ func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{"message": "credential disconnected"})
+	api.JSONOK(c, api.SuccessResponse{Message: "credential disconnected"})
 }
 
 // ReconnectCredential re-authenticates a disconnected or errored credential.
@@ -287,7 +287,7 @@ func (h *CloudHandler) RemoveCredential(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, gin.H{"message": "credential removed"})
+	api.JSONOK(c, api.SuccessResponse{Message: "credential removed"})
 }
 
 // StartRepositoryImport starts a cloud import for a repository's binding.
