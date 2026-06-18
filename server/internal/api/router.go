@@ -390,10 +390,11 @@ func NewRouter(
 			assets.GET("/liked", assetController.GetLikedAssets)
 			assets.POST("/:id/reprocess", assetController.ReprocessAsset)
 
-			// Stack routes
+			// Stack routes. Reads use optional auth (handler enforces
+			// per-asset ownership); mutations require authentication.
 			assets.GET("/:id/stack", assetController.GetAssetStack)
-			assets.DELETE("/:id/stack", assetController.UnstackAsset)
-			assets.POST("/stacks", assetController.CreateManualStack)
+			assets.DELETE("/:id/stack", authController.AuthMiddleware(), assetController.UnstackAsset)
+			assets.POST("/stacks", authController.AuthMiddleware(), assetController.CreateManualStack)
 		}
 
 		// Album routes - with authentication required
