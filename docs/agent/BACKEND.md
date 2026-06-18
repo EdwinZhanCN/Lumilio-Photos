@@ -117,10 +117,14 @@ Do not hand-edit generated OpenAPI or frontend schema artifacts.
 > the bug — not the frontend.** Either the handler's `@Success ... {data=dto.X}`
 > annotation is missing/points at the wrong DTO, or the DTO is correct and the
 > generated artifacts are stale (`make dto` was not re-run). Fix the annotation /
-> DTO and regenerate; never let the frontend cast around a typed endpoint. A
-> stale `make dto` once let `dto.OptionsResponseDTO.camera_models` surface to the
-> SPA as an untyped `Record<string, never>`, so a frontend cast guessed `cameras`
-> and silently broke a feature.
+> DTO and regenerate; never let the frontend cast around a typed endpoint. If
+> generated `schema.d.ts` exposes `data?: Record<string, never>` or
+> `data?: unknown` for an endpoint that returns payload data, that is a contract
+> failure: fix backend DTO/annotation/codegen before frontend work proceeds. Do
+> not add frontend compatibility shims for stale DTOs. A stale `make dto` once
+> let `dto.OptionsResponseDTO.camera_models` surface to the SPA as an untyped
+> `Record<string, never>`, so a frontend cast guessed `cameras` and silently
+> broke a feature.
 
 ## Queues And Processing
 
@@ -153,7 +157,9 @@ Backend gate:
 make server-test
 ```
 
-Equivalent:
+Use the Makefile target by default. It exports the local cgo flag allowlist
+needed by media dependencies on macOS. Only run the direct command when you have
+a concrete reason and preserve the same environment:
 
 ```bash
 cd server && go test ./...

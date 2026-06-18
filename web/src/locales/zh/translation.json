@@ -432,6 +432,19 @@
         "activeLabel": "Passkey 已启用"
       }
     },
+    "primaryRepository": {
+      "description": "选择 Lumilio 存放第一个本地仓库的位置。现有设置也会作为后续仓库的默认值。",
+      "duplicates": "重复文件处理",
+      "error": "创建主仓库失败。",
+      "loading": "正在检查仓库设置...",
+      "name": "名称",
+      "root": "存储根目录",
+      "rootHint": "由服务器配置决定。主仓库会创建在 <root>/primary。",
+      "statusError": "无法加载仓库默认值。",
+      "strategy": "存储策略",
+      "submit": "创建仓库",
+      "title": "创建主仓库"
+    },
     "register": {
       "confirmPassword": "确认密码",
       "confirmPasswordHint": "两次输入的密码必须完全一致。",
@@ -474,9 +487,18 @@
     "setup": {
       "error": "初始化失败。请检查服务器日志后重试。",
       "gate": {
-        "initializing": "正在保护数据库凭证...",
         "loading": "正在检查系统状态…",
         "statusError": "无法验证系统状态。"
+      },
+      "welcome": {
+        "body": "创建第一个账户前，Lumilio 会保护数据库并生成应用密钥。此操作只运行一次，通常需要几秒钟。",
+        "cta": "开始初始化",
+        "keyBody": "用于签名会话并加密密钥；保存在 .secrets 中，不会离开此服务器。",
+        "keyTitle": "生成应用密钥",
+        "rotateBody": "将临时 bootstrap 密码替换为高强度密钥，并存储在你的存储根目录下。",
+        "rotateTitle": "轮换数据库凭证",
+        "title": "初始化此服务器",
+        "working": "正在保护数据库凭证…"
       }
     }
   },
@@ -499,8 +521,7 @@
       "createdAtLabel": "创建于",
       "fallbackName": "相册",
       "itemsCount_one": "{{count}} 项",
-      "itemsCount_other": "{{count}} 项",
-      "loadError": "加载相册失败：{{error}}"
+      "itemsCount_other": "{{count}} 项"
     },
     "coverAlt": "相册封面图",
     "coverAltWithName": "相册 {{albumName}} 的封面图",
@@ -751,10 +772,9 @@
       "openAiSettings": "打开 AI 设置"
     },
     "context": {
-      "attached": "",
-      "remove": "",
-      "selected_other": "",
-      "viewing": ""
+      "remove": "移除",
+      "selected_other": "已选 {{count}} 项",
+      "viewing": "正在查看"
     },
     "dock": {
       "busy": "处理中",
@@ -777,6 +797,16 @@
         "thinking": "思考中...",
         "thoughtFor": "思考用时 {{time}} 秒"
       }
+    },
+    "mention": {
+      "album": "相册",
+      "camera": "相机",
+      "commands": "命令",
+      "lens": "镜头",
+      "mention": "提及",
+      "noResults": "无结果",
+      "person": "人物",
+      "pin": "固定项"
     },
     "messages": {
       "thinking": "思考中..."
@@ -1115,14 +1145,12 @@
   },
   "settings": {
     "account": {
-      "avatarEmpty": "从资源库中选择一张照片，或留空以显示首字母缩写。",
-      "avatarHint": "使用图片 URL。留空则显示首字母缩写。",
       "avatarPhoto": "头像照片",
-      "avatarSelected": "已为你的头像选择了一张照片。",
       "changeAvatar": "更换照片",
       "chooseAvatar": "选择照片",
       "displayName": "显示名称",
       "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
+      "invalidProfileResponse": "个人资料已保存，但服务器返回了无效的用户数据。",
       "mfa": {
         "addPasskey": "添加通行密钥",
         "addPasskeyPrompt": "添加通行密钥后，即可使用设备的生物识别或安全密钥登录。",
@@ -1146,6 +1174,7 @@
         "passkeyCreated": "创建于",
         "passkeyDescription": "使用设备原生的通行密钥流程进行登录。",
         "passkeyLastUsed": "上次使用",
+        "passkeyLoadError": "通行密钥暂时不可用。",
         "passkeyRequiresTotp": "请先启用身份验证器应用（TOTP）— 通行密钥只能在其基础上添加。",
         "passkeyTitle": "通行密钥",
         "recoveryCodesTitle": "恢复码",
@@ -1155,8 +1184,10 @@
         "regenerateTitle": "重新生成恢复码",
         "remainingCodes_one": "剩余 {{count}} 个恢复码",
         "remainingCodes_other": "剩余 {{count}} 个恢复码",
-        "setupError": "启动身份验证器设置失败。"
+        "setupError": "启动身份验证器设置失败。",
+        "statusLoadError": "MFA 状态暂时不可用。"
       },
+      "pageDescription": "管理你的资料、密码、MFA 和通行密钥。",
       "passwordDescription": "修改你的账户密码。修改后需重新登录。",
       "passwordTitle": "密码",
       "permissions": {
@@ -1196,8 +1227,6 @@
       "profileInfoHint": "更新你的显示名称和头像。用户名和角色由管理员管理。",
       "removeAvatar": "移除照片",
       "role": "角色",
-      "save": "保存资料",
-      "saved": "个人资料已更新。",
       "saveError": "更新个人资料失败。",
       "securityDescription": "管理你的密码、认证方式和登录验证因子。",
       "securityTitle": "安全设置",
@@ -1208,15 +1237,14 @@
     "ai": "AI",
     "aiSettings": {
       "agentDescription": "配置 Agent 使用的服务端 LLM 提供方和凭据。",
+      "agentEnabledLabel": "启用 AI Agent",
       "agentTitle": "Lumilio Agent",
       "apiKey": "API Key",
       "apiKeyConfigured": "已保存 API Key",
-      "apiKeyDescription": "API Key 为只写字段。留空时会保留当前已保存的 Key。",
       "apiKeyPlaceholder": "输入新的 API Key",
       "baseUrl": "Base URL",
       "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
       "clearStoredKey": "清除已保存的 API Key",
-      "description": "配置智能助手和照片智能能力。",
       "loadError": "加载 AI 设置失败。",
       "mlTitle": "照片智能",
       "modelName": "模型名称",
@@ -1252,7 +1280,7 @@
         "description": "设置紧凑布局激活时每行显示的资源数量。",
         "label": "紧凑布局列数"
       },
-      "description": "配置当前浏览器的语言、主题、地区和资源页默认布局。",
+      "languageRegionDescription": "界面显示语言和区域格式。",
       "layoutDescription": "设置资源页使用的默认布局。",
       "layoutOptions": {
         "compact": {
@@ -1266,7 +1294,6 @@
       },
       "themes": {
         "activeBadge": "当前模式",
-        "currentMode": "当前模式",
         "dark": {
           "description": "导航栏处于暗色模式时使用。",
           "label": "暗色模式主题"
@@ -1275,16 +1302,11 @@
         "followSystem": {
           "description": "使用操作系统的外观偏好来决定当前是亮色模式还是暗色模式。",
           "label": "跟随系统",
-          "navbarHint": "当前主题模式跟随系统。若要手动切换，请先在设置中关闭该选项。",
-          "status": "系统当前正在使用{{mode}}。"
+          "navbarHint": "当前主题模式跟随系统。若要手动切换，请先在设置中关闭该选项。"
         },
         "light": {
           "description": "导航栏处于亮色模式时使用。",
           "label": "亮色模式主题"
-        },
-        "modeNames": {
-          "dark": "暗色",
-          "light": "亮色"
         },
         "title": "主题配对"
       }
@@ -1295,9 +1317,7 @@
       "confirmDisconnect": "断开 {{name}}？进行中的导入将停止，你可以随时重新连接。",
       "confirmRemove": "移除 {{name}}？将永久删除凭证和会话数据。已导入的照片保留在你的媒体库中。",
       "connectCredential": "连接凭证",
-      "connectedAccounts_other": "{{count}} 个已连接账号",
       "credentialMeta": "{{provider}} · {{identity}}",
-      "description": "管理可复用的云账号凭证。通过 Manage 创建仓库时，可以选择其中一个账号作为导入来源。",
       "disconnect": "断开",
       "empty": "尚未配置云凭证。",
       "errors": {
@@ -1320,8 +1340,7 @@
         "removed": "云凭证已移除。",
         "verified": "云凭证已验证。"
       },
-      "reconnect": "重新连接",
-      "remove": "移除",
+      "pageDescription": "管理已连接的云服务提供方和凭证。",
       "placeholders": {
         "label": "个人云账号"
       },
@@ -1329,6 +1348,8 @@
       "providerFormDescription": "输入该 provider 需要的认证信息来连接账号。",
       "providerFormTitle": "添加 {{provider}} 凭证",
       "providerTitle": "选择云服务",
+      "reconnect": "重新连接",
+      "remove": "移除",
       "savedTitle": "已保存凭证",
       "status": {
         "connected": "已连接",
@@ -1344,10 +1365,22 @@
     },
     "language": "语言",
     "languageAndRegion": "语言和地区",
+    "pageDescriptions": {
+      "ai": "配置模型提供方和机器学习功能。",
+      "appearance": "调整语言、地区、主题和布局偏好。",
+      "server": "查看仓库范围、健康检查和运行时详情。"
+    },
     "region": "地区",
     "regionOptions": {
       "china": "中国大陆",
       "other": "其他国家和地区"
+    },
+    "section": {
+      "reset": "重置",
+      "save": "保存",
+      "saved": "更改已保存",
+      "saving": "正在保存更改...",
+      "unsavedCareful": "注意，你有未保存的更改。"
     },
     "server": "服务器",
     "serverSettings": {
@@ -1372,6 +1405,9 @@
       "provider": "提供方",
       "refresh": "刷新",
       "reset": "重置",
+      "runtimeInfoDescription": "当前生效的服务器配置。请在 TOML 中修改这些值并重启服务器。",
+      "runtimeInfoLoadError": "运行时配置暂时不可用。",
+      "runtimeInfoTitle": "运行时配置",
       "taskAvailability": "任务可用性",
       "taskNames": {
         "bioClipClassify": "BioCLIP 分类",
@@ -1395,10 +1431,7 @@
       "albumCount_other": "{{count}} 个相册",
       "assetCount_one": "{{count}} 个资源",
       "assetCount_other": "{{count}} 个资源",
-      "avatarAssetIdHint": "选择一张照片资源作为此用户的头像。仅支持照片资源。",
-      "avatarEmpty": "从资源库中选择一张照片，或留空以显示首字母缩写。",
       "avatarPhoto": "头像照片",
-      "avatarSelected": "已为此用户的头像选择了一张照片。",
       "changeAvatar": "更换照片",
       "chooseAvatar": "选择照片",
       "clearedPasskeys": "通行密钥已清除",
@@ -1408,20 +1441,24 @@
       "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
       "editHint": "更新此用户的资料、角色和账户状态。",
       "editTitle": "个人信息",
-      "empty": "请选择一个用户进行编辑。",
       "inactive": "非活跃",
       "lastLogin": "最后登录",
+      "listHint": "选择账户以查看资料、角色和访问设置。",
+      "listTitle": "用户目录",
       "loadError": "加载用户列表失败。",
       "neverLoggedIn": "从未登录",
+      "pageDescription": "查看并管理用户账户和访问权限。",
       "removeAvatar": "移除照片",
       "resetAccess": "重置访问权限",
       "resetAccessError": "重置访问权限失败。",
       "resetAccessHint": "生成临时密码并清除此用户的所有 MFA 验证因子。",
       "resetAccessPanelBody": "请通过安全渠道一次性分享此密码。通行密钥、TOTP 和恢复码已被清除。",
       "resetAccessPanelTitle": "临时密码",
+      "resetAccessScope": "当账户所有者失去所有登录因子的访问权限时使用。",
       "resetAccessSelfHint": "请前往账户设置中的修改密码功能操作你自己的账户。",
       "resetAccessSuccess": "临时访问凭证已生成，请通过安全渠道一次性分享。",
       "resetAccessTitle": "重置访问权限",
+      "resetAccessUnavailable": "你不能对自己的账户执行此操作。",
       "role": "角色",
       "save": "保存用户",
       "saved": "用户信息已更新。",

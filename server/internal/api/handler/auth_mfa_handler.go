@@ -58,7 +58,7 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.MFAStatusDTO} "MFA status retrieved successfully"
+// @Success 200 {object} dto.MFAStatusResultDTO "MFA status retrieved successfully"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /api/v1/auth/mfa [get]
@@ -155,7 +155,7 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.DisableTOTPRequestDTO true "Disable TOTP payload"
-// @Success 200 {object} api.Result{data=dto.MFAStatusDTO} "TOTP disabled successfully"
+// @Success 200 {object} dto.MFAStatusResultDTO "TOTP disabled successfully"
 // @Failure 400 {object} api.Result "MFA is not enabled"
 // @Failure 401 {object} api.Result "Unauthorized or incorrect password"
 // @Failure 500 {object} api.Result "Internal server error"

@@ -432,6 +432,19 @@
         "activeLabel": "Passkey active"
       }
     },
+    "primaryRepository": {
+      "description": "Choose where Lumilio should store the first local repository. Existing settings use this as the default for future repositories too.",
+      "duplicates": "Duplicates",
+      "error": "Failed to create the primary repository.",
+      "loading": "Checking repository setup...",
+      "name": "Name",
+      "root": "Storage root",
+      "rootHint": "Set by server configuration. The primary repository is created at <root>/primary.",
+      "statusError": "Unable to load repository defaults.",
+      "strategy": "Storage strategy",
+      "submit": "Create repository",
+      "title": "Create primary repository"
+    },
     "register": {
       "confirmPassword": "Confirm password",
       "confirmPasswordHint": "Passwords must match exactly.",
@@ -474,9 +487,18 @@
     "setup": {
       "error": "Setup failed. Check the server logs and try again.",
       "gate": {
-        "initializing": "Securing database credentials...",
         "loading": "Checking system status…",
         "statusError": "Unable to verify system status."
+      },
+      "welcome": {
+        "body": "Before the first account is created, Lumilio secures the database and generates an application key. This runs once and takes a few seconds.",
+        "cta": "Begin initialization",
+        "keyBody": "Used to sign sessions and encrypt secrets; kept in .secrets and never leaves this server.",
+        "keyTitle": "Generate the application key",
+        "rotateBody": "Replaces the temporary bootstrap password with a high-entropy secret stored under your storage root.",
+        "rotateTitle": "Rotate the database credential",
+        "title": "Initialize this server",
+        "working": "Securing database credentials…"
       }
     }
   },
@@ -499,8 +521,7 @@
       "createdAtLabel": "Created",
       "fallbackName": "Album",
       "itemsCount_one": "{{count}} item",
-      "itemsCount_other": "{{count}} items",
-      "loadError": "Failed to load album: {{error}}"
+      "itemsCount_other": "{{count}} items"
     },
     "coverAlt": "Album cover image",
     "coverAltWithName": "Cover image for album {{albumName}}",
@@ -752,7 +773,6 @@
       "openAiSettings": "Open AI settings"
     },
     "context": {
-      "attached": "Attached:",
       "remove": "Remove",
       "selected_one": "{{count}} selected",
       "selected_other": "{{count}} selected",
@@ -779,6 +799,16 @@
         "thinking": "Thinking...",
         "thoughtFor": "Thought for {{time}}s"
       }
+    },
+    "mention": {
+      "album": "Album",
+      "camera": "Camera",
+      "commands": "Commands",
+      "lens": "Lens",
+      "mention": "Mention",
+      "noResults": "No results",
+      "person": "Person",
+      "pin": "Pin"
     },
     "messages": {
       "thinking": "Thinking..."
@@ -1118,14 +1148,12 @@
   },
   "settings": {
     "account": {
-      "avatarEmpty": "Choose a photo from your library, or leave empty to fall back to initials.",
-      "avatarHint": "Pick a photo asset to use as your avatar. Only photo assets are supported.",
       "avatarPhoto": "Avatar photo",
-      "avatarSelected": "A photo is selected for your avatar.",
       "changeAvatar": "Change photo",
       "chooseAvatar": "Choose photo",
       "displayName": "Display name",
       "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
+      "invalidProfileResponse": "Profile saved, but the server returned an invalid user payload.",
       "mfa": {
         "addPasskey": "Add Passkey",
         "addPasskeyPrompt": "Add a passkey to sign in with your device's biometrics or security key.",
@@ -1149,6 +1177,7 @@
         "passkeyCreated": "Created",
         "passkeyDescription": "Use your device's native passkey flow for sign-in.",
         "passkeyLastUsed": "Last used",
+        "passkeyLoadError": "Passkeys are temporarily unavailable.",
         "passkeyRequiresTotp": "Enable an authenticator app (TOTP) first — a passkey can only be added on top of it.",
         "passkeyTitle": "Passkeys",
         "recoveryCodesTitle": "Recovery codes",
@@ -1158,8 +1187,10 @@
         "regenerateTitle": "Regenerate recovery codes",
         "remainingCodes_one": "{{count}} recovery codes remaining",
         "remainingCodes_other": "{{count}} recovery codes remaining",
-        "setupError": "Failed to start TOTP setup."
+        "setupError": "Failed to start TOTP setup.",
+        "statusLoadError": "MFA status is temporarily unavailable."
       },
+      "pageDescription": "Manage your profile, password, MFA, and passkeys.",
       "passwordDescription": "Change your account password. You will be signed out afterwards.",
       "passwordTitle": "Password",
       "permissions": {
@@ -1199,8 +1230,6 @@
       "profileInfoHint": "Update your display name and avatar. Username and role are managed by administrators.",
       "removeAvatar": "Remove photo",
       "role": "Role",
-      "save": "Save profile",
-      "saved": "Profile updated successfully.",
       "saveError": "Failed to update profile.",
       "securityDescription": "Manage your password, authentication methods, and sign-in factors.",
       "securityTitle": "Security",
@@ -1211,15 +1240,14 @@
     "ai": "AI",
     "aiSettings": {
       "agentDescription": "Configure the server-side LLM provider and credentials used by the agent.",
+      "agentEnabledLabel": "Enable AI agent",
       "agentTitle": "Lumilio Agent",
       "apiKey": "API key",
       "apiKeyConfigured": "Stored API key",
-      "apiKeyDescription": "API keys are write-only. Leaving this field empty keeps the stored key unchanged.",
       "apiKeyPlaceholder": "Enter a new API key",
       "baseUrl": "Base URL",
       "baseUrlDescription": "Optional override for provider-compatible endpoints.",
       "clearStoredKey": "Clear stored API key",
-      "description": "Configure the assistant and photo intelligence features.",
       "loadError": "Failed to load AI settings.",
       "mlTitle": "Photo Intelligence",
       "modelName": "Model name",
@@ -1255,7 +1283,7 @@
         "description": "Choose how many assets are shown per row when Compact layout is active.",
         "label": "Compact columns"
       },
-      "description": "Configure language, theme, region, and the default asset page layout for this browser.",
+      "languageRegionDescription": "Interface display language and regional formats.",
       "layoutDescription": "Set the default layout used on the asset page.",
       "layoutOptions": {
         "compact": {
@@ -1269,7 +1297,6 @@
       },
       "themes": {
         "activeBadge": "Current mode",
-        "currentMode": "Current mode",
         "dark": {
           "description": "Applied when the navbar is in dark mode.",
           "label": "Dark mode theme"
@@ -1278,16 +1305,11 @@
         "followSystem": {
           "description": "Use your operating system appearance preference to choose light or dark mode.",
           "label": "Follow system",
-          "navbarHint": "Theme mode follows the system preference. Turn this off in Settings to switch manually.",
-          "status": "System is currently using {{mode}}."
+          "navbarHint": "Theme mode follows the system preference. Turn this off in Settings to switch manually."
         },
         "light": {
           "description": "Applied when the navbar is in light mode.",
           "label": "Light mode theme"
-        },
-        "modeNames": {
-          "dark": "Dark",
-          "light": "Light"
         },
         "title": "Theme pairing"
       }
@@ -1298,10 +1320,7 @@
       "confirmDisconnect": "Disconnect {{name}}? Active imports will stop. You can reconnect later.",
       "confirmRemove": "Remove {{name}}? This permanently deletes the credential and session data. Imported photos remain in your library.",
       "connectCredential": "Connect credential",
-      "connectedAccounts_one": "{{count}} connected account",
-      "connectedAccounts_other": "{{count}} connected accounts",
       "credentialMeta": "{{provider}} · {{identity}}",
-      "description": "Manage reusable cloud credentials. Repositories choose one of these accounts when they are created from Manage.",
       "disconnect": "Disconnect",
       "empty": "No cloud credentials are configured.",
       "errors": {
@@ -1324,8 +1343,7 @@
         "removed": "Cloud credential removed.",
         "verified": "Cloud credential verified."
       },
-      "reconnect": "Reconnect",
-      "remove": "Remove",
+      "pageDescription": "Manage connected cloud providers and credentials.",
       "placeholders": {
         "label": "Personal cloud account"
       },
@@ -1333,6 +1351,8 @@
       "providerFormDescription": "Enter the provider-specific credentials to connect this account.",
       "providerFormTitle": "Add {{provider}} credential",
       "providerTitle": "Choose provider",
+      "reconnect": "Reconnect",
+      "remove": "Remove",
       "savedTitle": "Saved credentials",
       "status": {
         "connected": "Connected",
@@ -1348,10 +1368,22 @@
     },
     "language": "Language",
     "languageAndRegion": "Language & Region",
+    "pageDescriptions": {
+      "ai": "Configure model providers and machine learning features.",
+      "appearance": "Adjust language, region, theme, and layout preferences.",
+      "server": "Review repository scope, health checks, and runtime details."
+    },
     "region": "Region",
     "regionOptions": {
       "china": "China Mainland",
       "other": "Other country and region"
+    },
+    "section": {
+      "reset": "Reset",
+      "save": "Save",
+      "saved": "Changes saved",
+      "saving": "Saving changes...",
+      "unsavedCareful": "Careful, you have unsaved changes."
     },
     "server": "Server",
     "serverSettings": {
@@ -1376,6 +1408,9 @@
       "provider": "Provider",
       "refresh": "Refresh",
       "reset": "Reset",
+      "runtimeInfoDescription": "Effective server configuration. Change these values in TOML and restart the server.",
+      "runtimeInfoLoadError": "Runtime configuration is temporarily unavailable.",
+      "runtimeInfoTitle": "Runtime configuration",
       "taskAvailability": "Task availability",
       "taskNames": {
         "bioClipClassify": "BioCLIP classify",
@@ -1399,10 +1434,7 @@
       "albumCount_other": "{{count}} albums",
       "assetCount_one": "{{count}} assets",
       "assetCount_other": "{{count}} assets",
-      "avatarAssetIdHint": "Pick a photo asset to use as this user's avatar. Only photo assets are supported.",
-      "avatarEmpty": "Choose a photo from the library, or leave empty to fall back to initials.",
       "avatarPhoto": "Avatar photo",
-      "avatarSelected": "A photo is selected for this user's avatar.",
       "changeAvatar": "Change photo",
       "chooseAvatar": "Choose photo",
       "clearedPasskeys": "Passkeys cleared",
@@ -1412,20 +1444,24 @@
       "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
       "editHint": "Update this user's profile, role, and account status.",
       "editTitle": "Profile Information",
-      "empty": "Select a user to edit.",
       "inactive": "Inactive",
       "lastLogin": "Last login",
+      "listHint": "Select an account to review profile, role, and access settings.",
+      "listTitle": "User directory",
       "loadError": "Failed to load users.",
       "neverLoggedIn": "Never",
+      "pageDescription": "Inspect and manage user accounts and access.",
       "removeAvatar": "Remove photo",
       "resetAccess": "Reset access",
       "resetAccessError": "Failed to reset access.",
       "resetAccessHint": "Generate a temporary password and clear every MFA factor for this user.",
       "resetAccessPanelBody": "Share this once through a secure channel. Passkeys, TOTP, and recovery codes were cleared.",
       "resetAccessPanelTitle": "Temporary password",
+      "resetAccessScope": "Use this when an account owner has lost access to every sign-in factor.",
       "resetAccessSelfHint": "Use Change password in Account settings for your own account.",
       "resetAccessSuccess": "Temporary access issued. Share it securely once.",
       "resetAccessTitle": "Reset access",
+      "resetAccessUnavailable": "This action is unavailable for your own account.",
       "role": "Role",
       "save": "Save user",
       "saved": "User updated successfully.",

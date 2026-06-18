@@ -41,7 +41,7 @@ const docTemplate = `{
             "data": {
                 "properties": {
                     "data": {
-                        "$ref": "#/components/schemas/dto.ResetAccessResponseDTO"
+                        "$ref": "#/components/schemas/dto.ListUsersResponseDTO"
                     }
                 },
                 "type": "object"
@@ -2237,6 +2237,26 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.MFAStatusResultDTO": {
+                "properties": {
+                    "code": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/dto.MFAStatusDTO"
+                    },
+                    "error": {
+                        "example": "error details",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "success",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.MLCapabilitiesDTO": {
                 "properties": {
                     "active_node_count": {
@@ -2497,6 +2517,26 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.PasskeyCredentialResultDTO": {
+                "properties": {
+                    "code": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/dto.PasskeyCredentialSummaryDTO"
+                    },
+                    "error": {
+                        "example": "error details",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "success",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.PasskeyCredentialSummaryDTO": {
                 "properties": {
                     "created_at": {
@@ -2536,6 +2576,26 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.PasskeyListResultDTO": {
+                "properties": {
+                    "code": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/dto.PasskeyListResponseDTO"
+                    },
+                    "error": {
+                        "example": "error details",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "success",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.PasskeyOptionsRequestDTO": {
                 "properties": {
                     "username": {
@@ -2550,6 +2610,26 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "options": {}
+                },
+                "type": "object"
+            },
+            "dto.PasskeyOptionsResultDTO": {
+                "properties": {
+                    "code": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/dto.PasskeyOptionsResponseDTO"
+                    },
+                    "error": {
+                        "example": "error details",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "success",
+                        "type": "string"
+                    }
                 },
                 "type": "object"
             },
@@ -3138,6 +3218,26 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "temporary_password": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ResetAccessResultDTO": {
+                "properties": {
+                    "code": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/dto.ResetAccessResponseDTO"
+                    },
+                    "error": {
+                        "example": "error details",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "success",
                         "type": "string"
                     }
                 },
@@ -4037,6 +4137,26 @@ const docTemplate = `{
                         "type": "integer"
                     },
                     "username": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UserResultDTO": {
+                "properties": {
+                    "code": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/dto.UserDTO"
+                    },
+                    "error": {
+                        "example": "error details",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "success",
                         "type": "string"
                     }
                 },
@@ -10071,34 +10191,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MFAStatusResultDTO"
                                 }
                             }
                         },
@@ -10153,34 +10246,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.PasskeyListResultDTO"
                                 }
                             }
                         },
@@ -10235,34 +10301,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.PasskeyOptionsResultDTO"
                                 }
                             }
                         },
@@ -10328,34 +10367,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.PasskeyCredentialResultDTO"
                                 }
                             }
                         },
@@ -10610,34 +10622,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.MFAStatusResultDTO"
                                 }
                             }
                         },
@@ -15869,34 +15854,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.UserResultDTO"
                                 }
                             }
                         },
@@ -15983,34 +15941,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.UserResultDTO"
                                 }
                             }
                         },
@@ -16116,34 +16047,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.ResetAccessResultDTO"
                                 }
                             }
                         },

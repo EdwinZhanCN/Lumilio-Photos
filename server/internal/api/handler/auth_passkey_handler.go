@@ -101,7 +101,7 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.PasskeyListResponseDTO} "Passkeys retrieved successfully"
+// @Success 200 {object} dto.PasskeyListResultDTO "Passkeys retrieved successfully"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys [get]
@@ -127,7 +127,7 @@ func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=dto.PasskeyOptionsResponseDTO} "Passkey enrollment options created successfully"
+// @Success 200 {object} dto.PasskeyOptionsResultDTO "Passkey enrollment options created successfully"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/options [post]
@@ -159,7 +159,7 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.PasskeyVerifyRequestDTO true "Passkey enrollment verification payload"
-// @Success 200 {object} api.Result{data=dto.PasskeyCredentialSummaryDTO} "Passkey enrolled successfully"
+// @Success 200 {object} dto.PasskeyCredentialResultDTO "Passkey enrolled successfully"
 // @Failure 400 {object} api.Result "Invalid or expired challenge"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"

@@ -24,7 +24,9 @@ import {
   type CloudCredential,
   type CloudProvider,
   type CloudProviderField,
-} from "../../hooks/useCloudSync";
+} from "../../../hooks/useCloudSync";
+import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
+import { SettingsDropdown } from "../SettingsDropdown";
 
 type FormValues = Record<string, string>;
 
@@ -52,7 +54,7 @@ const fieldInitialValues = (fields: CloudProviderField[] = []): FormValues =>
 const requiredFieldsFilled = (fields: CloudProviderField[] = [], values: FormValues) =>
   fields.every((field) => !field.required || !field.name || values[field.name]?.trim());
 
-export default function CloudSettings() {
+export default function CloudTab() {
   const { t } = useI18n();
   const providersQuery = useCloudProviders();
   const credentialsQuery = useCloudCredentials();
@@ -81,7 +83,6 @@ export default function CloudSettings() {
     [credentialsQuery.data],
   );
   const selectedProvider = providers.find((provider) => provider.id === providerChoice) ?? null;
-  const connectedCount = credentials.filter((item) => item.status === "connected").length;
 
   const resetForm = () => {
     setDisplayName("");
@@ -131,7 +132,6 @@ export default function CloudSettings() {
     if (!selectedProvider?.id) return;
     setErrorMsg(null);
     setSuccessMsg(null);
-
     try {
       const result = await createCredential.mutateAsync({
         body: {
@@ -155,9 +155,7 @@ export default function CloudSettings() {
         setSuccessMsg(t("settings.cloud.messages.connected"));
       }
     } catch (error) {
-      setErrorMsg(
-        error instanceof Error ? error.message : t("settings.cloud.errors.createFailed"),
-      );
+      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.createFailed"));
     }
   };
 
@@ -166,17 +164,10 @@ export default function CloudSettings() {
     if (!pendingCredential?.id) return;
     setErrorMsg(null);
     setSuccessMsg(null);
-
     try {
       await verifyChallenge.mutateAsync({
-        params: {
-          path: {
-            id: pendingCredential.id,
-          },
-        },
-        body: {
-          inputs: challengeValues,
-        },
+        params: { path: { id: pendingCredential.id } },
+        body: { inputs: challengeValues },
       });
       resetForm();
       setIsAddOpen(false);
@@ -191,9 +182,7 @@ export default function CloudSettings() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      await disconnectCredential.mutateAsync({
-        params: { path: { id: credential.id ?? "" } },
-      });
+      await disconnectCredential.mutateAsync({ params: { path: { id: credential.id ?? "" } } });
       setSuccessMsg(t("settings.cloud.messages.disconnected"));
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.disconnectFailed"));
@@ -229,9 +218,7 @@ export default function CloudSettings() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      await removeCredential.mutateAsync({
-        params: { path: { id: credential.id ?? "" } },
-      });
+      await removeCredential.mutateAsync({ params: { path: { id: credential.id ?? "" } } });
       setSuccessMsg(t("settings.cloud.messages.removed"));
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.removeFailed"));
@@ -247,28 +234,25 @@ export default function CloudSettings() {
     if (!field.name) return null;
     const id = `cloud-field-${field.name}`;
     const value = values[field.name] ?? "";
-    const onChange = (next: string) => {
-      setValues((current) => ({ ...current, [field.name!]: next }));
-    };
+    const onChange = (next: string) => setValues((current) => ({ ...current, [field.name!]: next }));
 
     return (
       <label key={field.name} className="form-control w-full" htmlFor={id}>
         <span className="label-text pb-1 text-sm font-medium">{field.label}</span>
         {field.type === "select" ? (
-          <select
+          <SettingsDropdown
             id={id}
-            className="select select-bordered w-full"
             value={value}
-            onChange={(event) => onChange(event.target.value)}
             disabled={disabled}
-            required={field.required}
-          >
-            {(field.options ?? []).map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={(field.options ?? []).map((option) => ({
+              value: option.value ?? "",
+              label: option.label ?? option.value ?? "",
+            }))}
+            onChange={onChange}
+            ariaLabel={field.label}
+            className="w-full"
+            menuClassName="w-full"
+          />
         ) : (
           <input
             id={id}
@@ -287,154 +271,116 @@ export default function CloudSettings() {
     );
   };
 
-  return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-primary/10 p-2 text-primary">
-            <CloudIcon className="size-6" />
-          </div>
-          <h2 className="text-2xl font-bold">{t("settings.cloud.title")}</h2>
-        </div>
-        <p className="text-sm text-base-content/65">{t("settings.cloud.description")}</p>
-      </header>
+  const busyLoading = credentialsQuery.isLoading || providersQuery.isLoading;
 
+  return (
+    <div className="w-full space-y-8 lg:space-y-10">
       {errorMsg && (
-        <div className="alert alert-error rounded-lg">
-          <AlertTriangleIcon className="size-5" />
+        <div className="flex items-center gap-2 rounded-xl bg-error/10 px-4 py-3 text-sm text-error">
+          <AlertTriangleIcon className="size-4" />
           <span>{errorMsg}</span>
         </div>
       )}
       {successMsg && (
-        <div className="alert alert-success rounded-lg">
-          <CheckCircle2Icon className="size-5" />
+        <div className="flex items-center gap-2 rounded-xl bg-success/10 px-4 py-3 text-sm text-success">
+          <CheckCircle2Icon className="size-4" />
           <span>{successMsg}</span>
         </div>
       )}
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold">{t("settings.cloud.savedTitle")}</h3>
-            <p className="text-sm text-base-content/60">
-              {t("settings.cloud.connectedAccounts", { count: connectedCount })}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {(credentialsQuery.isLoading || providersQuery.isLoading) && (
-              <span className="loading loading-spinner loading-sm" />
-            )}
-            <button
-              type="button"
-              className="btn btn-primary btn-sm btn-circle"
-              onClick={openModal}
-              aria-label={t("settings.cloud.addCredential")}
-              title={t("settings.cloud.addCredential")}
-              disabled={providers.length === 0}
-            >
-              <PlusIcon size={18} />
-            </button>
-          </div>
-        </div>
-
+      <SettingsGroup
+        title={t("settings.cloud.savedTitle")}
+        description={t("settings.cloud.pageDescription", {
+          defaultValue: "Manage connected cloud providers and credentials.",
+        })}
+      >
         {credentials.length === 0 && !credentialsQuery.isLoading ? (
-          <div className="rounded-lg border border-base-300 px-4 py-8 text-center text-sm text-base-content/60">
-            {t("settings.cloud.empty")}
-          </div>
+          <SettingsBlock>
+            <p className="text-center text-sm text-base-content/55">{t("settings.cloud.empty")}</p>
+          </SettingsBlock>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {credentials.map((credential) => (
-              <article
-                key={credential.id}
-                className="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <KeyRoundIcon size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="truncate text-sm font-semibold">
-                          {credential.display_name}
-                        </h4>
-                        <span
-                          className={`badge badge-sm ${credentialStatusClass(credential.status)}`}
-                        >
-                          {statusLabel(credential.status)}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-base-content/60">
-                        {t("settings.cloud.credentialMeta", {
-                          provider: credential.provider_title ?? credential.provider,
-                          identity: credential.masked_identity,
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {(credential.status === "disabled" || credential.status === "error") && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-xs btn-circle text-success"
-                        onClick={() => void handleReconnect(credential)}
-                        disabled={reconnectCredential.isPending || !credential.id}
-                        aria-label={t("settings.cloud.reconnect")}
-                        title={t("settings.cloud.reconnect")}
-                      >
-                        <RefreshCwIcon size={16} />
-                      </button>
-                    )}
-                    {credential.status === "connected" && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-xs btn-circle text-warning"
-                        onClick={() => void handleDisconnect(credential)}
-                        disabled={disconnectCredential.isPending || !credential.id}
-                        aria-label={t("settings.cloud.disconnect")}
-                        title={t("settings.cloud.disconnect")}
-                      >
-                        <LogOutIcon size={16} />
-                      </button>
-                    )}
+          credentials.map((credential) => (
+            <SettingsRow
+              key={credential.id}
+              align="start"
+              icon={<KeyRoundIcon className="size-4" />}
+              iconColor="bg-info text-info-content"
+              label={credential.display_name}
+              description={t("settings.cloud.credentialMeta", {
+                provider: credential.provider_title ?? credential.provider,
+                identity: credential.masked_identity,
+              })}
+              value={
+                <span className={`badge badge-sm ${credentialStatusClass(credential.status)}`}>
+                  {statusLabel(credential.status)}
+                </span>
+              }
+              control={
+                <div className="flex items-center gap-1">
+                  {(credential.status === "disabled" || credential.status === "error") && (
                     <button
                       type="button"
-                      className="btn btn-ghost btn-xs btn-circle text-error"
-                      onClick={() => void handleRemove(credential)}
-                      disabled={removeCredential.isPending || !credential.id}
-                      aria-label={t("settings.cloud.remove")}
-                      title={t("settings.cloud.remove")}
+                      className="btn btn-ghost btn-xs btn-circle text-success"
+                      onClick={() => void handleReconnect(credential)}
+                      disabled={reconnectCredential.isPending || !credential.id}
+                      aria-label={t("settings.cloud.reconnect")}
+                      title={t("settings.cloud.reconnect")}
                     >
-                      <Trash2Icon size={16} />
+                      <RefreshCwIcon size={16} />
                     </button>
-                  </div>
+                  )}
+                  {credential.status === "connected" && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs btn-circle text-warning"
+                      onClick={() => void handleDisconnect(credential)}
+                      disabled={disconnectCredential.isPending || !credential.id}
+                      aria-label={t("settings.cloud.disconnect")}
+                      title={t("settings.cloud.disconnect")}
+                    >
+                      <LogOutIcon size={16} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle text-error"
+                    onClick={() => void handleRemove(credential)}
+                    disabled={removeCredential.isPending || !credential.id}
+                    aria-label={t("settings.cloud.remove")}
+                    title={t("settings.cloud.remove")}
+                  >
+                    <Trash2Icon size={16} />
+                  </button>
                 </div>
-              </article>
-            ))}
-          </div>
+              }
+            />
+          ))
         )}
-      </section>
+        <SettingsRow
+          icon={busyLoading ? <span className="loading loading-spinner loading-xs" /> : <PlusIcon className="size-4" />}
+          iconColor="bg-primary text-primary-content"
+          label={t("settings.cloud.addCredential")}
+          onClick={providers.length === 0 ? undefined : openModal}
+          chevron={providers.length > 0}
+        />
+      </SettingsGroup>
 
       {isAddOpen && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-lg rounded-lg">
+          <div className="modal-box max-w-lg rounded-2xl">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold">
                   {pendingChallenge
                     ? (pendingChallenge.title ?? t("settings.cloud.verifyTitle"))
                     : selectedProvider
-                      ? t("settings.cloud.providerFormTitle", {
-                          provider: selectedProvider.title,
-                        })
+                      ? t("settings.cloud.providerFormTitle", { provider: selectedProvider.title })
                       : t("settings.cloud.providerTitle")}
                 </h3>
                 <p className="mt-1 text-sm text-base-content/65">
                   {pendingChallenge
                     ? (pendingChallenge.description ??
-                      t("settings.cloud.verifyDescription", {
-                        name: pendingCredential?.display_name,
-                      }))
+                      t("settings.cloud.verifyDescription", { name: pendingCredential?.display_name }))
                     : selectedProvider
                       ? (selectedProvider.security_note ?? t("settings.cloud.providerFormDescription"))
                       : t("settings.cloud.providerDescription")}
@@ -457,7 +403,7 @@ export default function CloudSettings() {
                   <button
                     key={provider.id}
                     type="button"
-                    className="flex w-full items-center gap-3 rounded-lg border border-base-300 bg-base-100 p-4 text-left transition hover:border-primary disabled:opacity-60"
+                    className="flex w-full items-center gap-3 rounded-xl border border-base-300 bg-base-100 p-4 text-left transition hover:border-primary disabled:opacity-60"
                     onClick={() => chooseProvider(provider)}
                     disabled={provider.status !== "enabled"}
                   >
@@ -492,7 +438,6 @@ export default function CloudSettings() {
                 {(selectedProvider.form_fields ?? []).map((field) =>
                   renderField(field, formValues, setFormValues, createCredential.isPending),
                 )}
-
                 <div className="modal-action">
                   <button
                     type="button"

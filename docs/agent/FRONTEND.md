@@ -34,7 +34,8 @@ make web-dev
 make web-test
 ```
 
-Equivalent direct commands:
+Use the Makefile targets by default. Direct commands are acceptable when you are
+intentionally running only the web workspace:
 
 ```bash
 cd web
@@ -81,9 +82,15 @@ OpenAPI is the source of truth for HTTP contracts.
 > around it — casting silently desyncs the frontend from the contract. Instead:
 > 1. Check the backend handler's `@Success ... {data=dto.XxxDTO}` annotation —
 >    does the referenced DTO actually declare the fields you need?
-> 2. If the DTO is correct but `schema.d.ts` shows `Record<string, never>` or
->    stale/missing fields, the **generated artifact is stale** → run `make dto`.
+> 2. If the DTO is correct but `schema.d.ts` shows `Record<string, never>`,
+>    `unknown`, or stale/missing fields, the **generated contract is broken** →
+>    fix the backend annotation/DTO/codegen and run `make dto`.
 > 3. Only then read the now-typed field.
+>
+> Do not add frontend compatibility shims, endpoint-local response casts, or
+> hand-written response types to work around stale DTO output. Runtime guards are
+> allowed only as defensive checks after the generated contract is correct; they
+> are not a substitute for fixing OpenAPI.
 >
 > Real bug this caught: `/assets/filter-options` returns `camera_models`, but a
 > cast had guessed `cameras`, silently breaking the camera `@`-mention. The DTO
@@ -174,7 +181,7 @@ Frontend gate:
 make web-test
 ```
 
-Equivalent:
+Direct equivalent when intentionally scoped to `web/`:
 
 ```bash
 cd web && vp check --no-fmt --no-lint && vp lint && vp test

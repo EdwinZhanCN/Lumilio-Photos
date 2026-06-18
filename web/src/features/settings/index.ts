@@ -1,4 +1,14 @@
 export { PreferencesEffects } from "./preferencesEffects";
+export {
+  SettingsBlock,
+  SettingsGroup,
+  SettingsPage,
+  SettingsRow,
+  SettingsSaveBar,
+  SettingsShell,
+  ThemePicker,
+} from "./components/renew";
+export type { ModeThemeName } from "./components/renew";
 export { useWorkingRepository } from "./hooks/useWorkingRepository";
 export {
   usePreference,

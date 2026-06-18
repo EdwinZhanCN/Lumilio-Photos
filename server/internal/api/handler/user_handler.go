@@ -29,7 +29,7 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.UpdateOwnProfileRequestDTO true "Profile update payload"
-// @Success 200 {object} api.Result{data=dto.UserDTO} "Profile updated successfully"
+// @Success 200 {object} dto.UserResultDTO "Profile updated successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -123,7 +123,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path int true "User ID"
 // @Param request body dto.AdminUpdateUserRequestDTO true "User update payload"
-// @Success 200 {object} api.Result{data=dto.UserDTO} "User updated successfully"
+// @Success 200 {object} dto.UserResultDTO "User updated successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 403 {object} api.Result "Forbidden"
@@ -241,7 +241,7 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "User ID"
-// @Success 200 {object} api.Result{data=dto.ResetAccessResponseDTO} "User access reset successfully"
+// @Success 200 {object} dto.ResetAccessResultDTO "User access reset successfully"
 // @Failure 400 {object} api.Result "Invalid request"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 403 {object} api.Result "Forbidden"
