@@ -9,7 +9,9 @@ Docs are local at `web/node_modules/vite-plus/docs` or online at https://viteplu
 ## Review Checklist
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
-- [ ] Run the repo gate as documented in `make web-test`: `vp check --no-fmt --no-lint`, `vp lint`, then `vp test`.
+- [ ] Prefer the repo gate `make web-test`. If intentionally scoped to `web/`,
+      run the same sequence directly: `vp check --no-fmt --no-lint`, `vp lint`,
+      then `vp test`.
 - [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 

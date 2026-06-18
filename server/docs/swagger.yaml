@@ -24,7 +24,7 @@ components:
     data:
       properties:
         data:
-          $ref: '#/components/schemas/dto.ResetAccessResponseDTO'
+          $ref: '#/components/schemas/dto.ListUsersResponseDTO'
       type: object
     dbtypes.AssetType:
       enum:
@@ -1553,6 +1553,20 @@ components:
         totp_enabled:
           type: boolean
       type: object
+    dto.MFAStatusResultDTO:
+      properties:
+        code:
+          example: 0
+          type: integer
+        data:
+          $ref: '#/components/schemas/dto.MFAStatusDTO'
+        error:
+          example: error details
+          type: string
+        message:
+          example: success
+          type: string
+      type: object
     dto.MLCapabilitiesDTO:
       properties:
         active_node_count:
@@ -1733,6 +1747,20 @@ components:
           minimum: 0
           type: integer
       type: object
+    dto.PasskeyCredentialResultDTO:
+      properties:
+        code:
+          example: 0
+          type: integer
+        data:
+          $ref: '#/components/schemas/dto.PasskeyCredentialSummaryDTO'
+        error:
+          example: error details
+          type: string
+        message:
+          example: success
+          type: string
+      type: object
     dto.PasskeyCredentialSummaryDTO:
       properties:
         created_at:
@@ -1759,6 +1787,20 @@ components:
         total:
           type: integer
       type: object
+    dto.PasskeyListResultDTO:
+      properties:
+        code:
+          example: 0
+          type: integer
+        data:
+          $ref: '#/components/schemas/dto.PasskeyListResponseDTO'
+        error:
+          example: error details
+          type: string
+        message:
+          example: success
+          type: string
+      type: object
     dto.PasskeyOptionsRequestDTO:
       properties:
         username:
@@ -1769,6 +1811,20 @@ components:
         challenge_token:
           type: string
         options: {}
+      type: object
+    dto.PasskeyOptionsResultDTO:
+      properties:
+        code:
+          example: 0
+          type: integer
+        data:
+          $ref: '#/components/schemas/dto.PasskeyOptionsResponseDTO'
+        error:
+          example: error details
+          type: string
+        message:
+          example: success
+          type: string
       type: object
     dto.PasskeyVerifyRequestDTO:
       properties:
@@ -2178,6 +2234,20 @@ components:
         cleared_totp:
           type: boolean
         temporary_password:
+          type: string
+      type: object
+    dto.ResetAccessResultDTO:
+      properties:
+        code:
+          example: 0
+          type: integer
+        data:
+          $ref: '#/components/schemas/dto.ResetAccessResponseDTO'
+        error:
+          example: error details
+          type: string
+        message:
+          example: success
           type: string
       type: object
     dto.RuntimeInfoDTO:
@@ -2804,6 +2874,20 @@ components:
         user_id:
           type: integer
         username:
+          type: string
+      type: object
+    dto.UserResultDTO:
+      properties:
+        code:
+          example: 0
+          type: integer
+        data:
+          $ref: '#/components/schemas/dto.UserDTO'
+        error:
+          example: error details
+          type: string
+        message:
+          example: success
           type: string
       type: object
     dto.ValidateLLMSettingsResponseDTO:
@@ -6669,27 +6753,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.MFAStatusResultDTO'
           description: MFA status retrieved successfully
         "401":
           content:
@@ -6721,27 +6785,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.PasskeyListResultDTO'
           description: Passkeys retrieved successfully
         "401":
           content:
@@ -6819,27 +6863,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.PasskeyOptionsResultDTO'
           description: Passkey enrollment options created successfully
         "401":
           content:
@@ -6878,27 +6902,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.PasskeyCredentialResultDTO'
           description: Passkey enrolled successfully
         "400":
           content:
@@ -7007,27 +7011,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.MFAStatusResultDTO'
           description: TOTP disabled successfully
         "400":
           content:
@@ -10344,27 +10328,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.UserResultDTO'
           description: User updated successfully
         "400":
           content:
@@ -10428,27 +10392,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.ResetAccessResultDTO'
           description: User access reset successfully
         "400":
           content:
@@ -10550,27 +10494,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
+                $ref: '#/components/schemas/dto.UserResultDTO'
           description: Profile updated successfully
         "400":
           content:

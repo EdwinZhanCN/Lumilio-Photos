@@ -6,11 +6,15 @@ import type {
   RecoveryCodesResponse,
   TOTPSetupResponse,
 } from "../auth.type.ts";
+import type { components } from "@/lib/http-commons/schema";
+
+type Schemas = components["schemas"];
+type MFAStatusResult = Schemas["dto.MFAStatusResultDTO"];
 
 const mfaStatusQueryKey = ["get", "/api/v1/auth/mfa"];
 const passkeysQueryKey = ["get", "/api/v1/auth/mfa/passkeys"];
 
-export function useMFAStatus(): UseQueryResult<ApiResult<MFAStatus>, unknown> {
+export function useMFAStatus(): UseQueryResult<MFAStatusResult, unknown> {
   return $api.useQuery(
     "get",
     "/api/v1/auth/mfa",
@@ -18,7 +22,7 @@ export function useMFAStatus(): UseQueryResult<ApiResult<MFAStatus>, unknown> {
     {
       refetchOnWindowFocus: false,
     },
-  ) as UseQueryResult<ApiResult<MFAStatus>, unknown>;
+  ) as UseQueryResult<MFAStatusResult, unknown>;
 }
 
 export function useBeginTOTPSetup() {

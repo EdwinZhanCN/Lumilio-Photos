@@ -4908,25 +4908,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MFAStatusResultDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -4987,25 +4969,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.PasskeyListResultDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5141,25 +5105,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.PasskeyOptionsResultDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5221,25 +5167,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.PasskeyCredentialResultDTO"];
                     };
                 };
                 /** @description Invalid or expired challenge */
@@ -5399,25 +5327,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.MFAStatusResultDTO"];
                     };
                 };
                 /** @description MFA is not enabled */
@@ -10023,25 +9933,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.UserResultDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -10137,25 +10029,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.ResetAccessResultDTO"];
                     };
                 };
                 /** @description Invalid request */
@@ -10319,25 +10193,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.UserResultDTO"];
                     };
                 };
                 /** @description Invalid request data */
@@ -10396,7 +10252,7 @@ export interface components {
             message?: string;
         } & components["schemas"]["data"];
         data: {
-            data?: components["schemas"]["dto.ResetAccessResponseDTO"];
+            data?: components["schemas"]["dto.ListUsersResponseDTO"];
         };
         /** @enum {string} */
         "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
@@ -11266,6 +11122,15 @@ export interface components {
             recovery_codes_remaining?: number;
             totp_enabled?: boolean;
         };
+        "dto.MFAStatusResultDTO": {
+            /** @example 0 */
+            code?: number;
+            data?: components["schemas"]["dto.MFAStatusDTO"];
+            /** @example error details */
+            error?: string;
+            /** @example success */
+            message?: string;
+        };
         "dto.MLCapabilitiesDTO": {
             /** @example 1 */
             active_node_count?: number;
@@ -11372,6 +11237,15 @@ export interface components {
             /** @example 0 */
             offset?: number;
         };
+        "dto.PasskeyCredentialResultDTO": {
+            /** @example 0 */
+            code?: number;
+            data?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"];
+            /** @example error details */
+            error?: string;
+            /** @example success */
+            message?: string;
+        };
         "dto.PasskeyCredentialSummaryDTO": {
             created_at?: string;
             label?: string;
@@ -11383,12 +11257,30 @@ export interface components {
             credentials?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"][];
             total?: number;
         };
+        "dto.PasskeyListResultDTO": {
+            /** @example 0 */
+            code?: number;
+            data?: components["schemas"]["dto.PasskeyListResponseDTO"];
+            /** @example error details */
+            error?: string;
+            /** @example success */
+            message?: string;
+        };
         "dto.PasskeyOptionsRequestDTO": {
             username?: string;
         };
         "dto.PasskeyOptionsResponseDTO": {
             challenge_token?: string;
             options?: unknown;
+        };
+        "dto.PasskeyOptionsResultDTO": {
+            /** @example 0 */
+            code?: number;
+            data?: components["schemas"]["dto.PasskeyOptionsResponseDTO"];
+            /** @example error details */
+            error?: string;
+            /** @example success */
+            message?: string;
         };
         "dto.PasskeyVerifyRequestDTO": {
             challenge_token: string;
@@ -11635,6 +11527,15 @@ export interface components {
             cleared_passkeys?: boolean;
             cleared_totp?: boolean;
             temporary_password?: string;
+        };
+        "dto.ResetAccessResultDTO": {
+            /** @example 0 */
+            code?: number;
+            data?: components["schemas"]["dto.ResetAccessResponseDTO"];
+            /** @example error details */
+            error?: string;
+            /** @example success */
+            message?: string;
         };
         "dto.RuntimeInfoDTO": {
             /** @example production */
@@ -12006,6 +11907,15 @@ export interface components {
             updated_at?: string;
             user_id?: number;
             username?: string;
+        };
+        "dto.UserResultDTO": {
+            /** @example 0 */
+            code?: number;
+            data?: components["schemas"]["dto.UserDTO"];
+            /** @example error details */
+            error?: string;
+            /** @example success */
+            message?: string;
         };
         "dto.ValidateLLMSettingsResponseDTO": {
             valid?: boolean;
