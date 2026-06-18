@@ -6,15 +6,6 @@ export const enNav: DefaultTheme.NavItem[] = [
   { text: "API Documentation", target: "_blank", link: "/redoc-static.html" },
   {
     text: "User Manual",
-    items: [
-      {
-        text: "Introduction",
-        items: [{ text: "Overview", link: "/user-manual/introduction/" }],
-      },
-      {
-        text: "Features",
-        items: [{ text: "Overview", link: "/user-manual/features/" }],
-      },
-    ],
+    link: "/user-manual/introduction/"
   },
 ];

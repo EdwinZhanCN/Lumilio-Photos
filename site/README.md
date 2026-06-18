@@ -11,6 +11,12 @@ vp run build
 vp run preview
 ```
 
+Refresh the generated API reference from the root workspace:
+
+```bash
+make dto
+```
+
 The VitePress source root is `docs/`. Production output is generated at:
 
 ```text

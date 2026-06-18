@@ -2,7 +2,12 @@ packages:
   - .
 
 allowBuilds:
+  core-js: true
   esbuild: true
 
+minimumReleaseAgeExclude:
+  - '@redocly/cli@2.34.0'
+
 onlyBuiltDependencies:
+  - core-js
   - esbuild

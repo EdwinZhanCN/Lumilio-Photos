@@ -25,6 +25,7 @@
     "vitepress-plugin-mermaid": "^2.0.17"
   },
   "devDependencies": {
+    "@redocly/cli": "^2.34.0",
     "@types/node": "^25.9.3",
     "vite-plus": "^0.1.22",
     "vitepress": "2.0.0-alpha.17"
