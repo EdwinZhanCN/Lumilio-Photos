@@ -7,9 +7,6 @@ import type {
 
 export const DEFAULT_GROUP_KEYS = new Set<string>();
 
-const normalizeVisibleAssets = (assets: Asset[]): Asset[] =>
-  assets.filter((asset) => !asset.is_deleted && !asset.deleted_at);
-
 const parseAssetDate = (value?: string | null): Date => {
   if (!value) return new Date(0);
 
@@ -127,13 +124,12 @@ export const groupAssetsBySort = (
   sortBy: SortByType,
   now: Date = new Date(),
 ): AssetGroup[] => {
-  const visibleAssets = normalizeVisibleAssets(assets);
-  if (visibleAssets.length === 0) {
+  if (assets.length === 0) {
     return [];
   }
 
   const groups: AssetGroup[] = [];
-  visibleAssets.forEach((asset) => {
+  assets.forEach((asset) => {
     const key = getAssetGroupKey(asset, sortBy, now);
     const last = groups[groups.length - 1];
     if (last && last.key === key) {

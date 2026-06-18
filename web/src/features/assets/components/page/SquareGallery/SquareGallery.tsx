@@ -152,6 +152,8 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   isLoading = false,
   columns = 4,
   className = "",
+  emptyStateTitle,
+  emptyStateDescription,
   renderTileCaption,
   render3DCard = false,
 }) => {
@@ -201,7 +203,13 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   });
 
   if (!isLoading && totalAssetCount === 0) {
-    return <EmptyState className={className} />;
+    return (
+      <EmptyState
+        className={className}
+        title={emptyStateTitle}
+        description={emptyStateDescription}
+      />
+    );
   }
 
   return (

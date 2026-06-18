@@ -640,6 +640,9 @@ components:
           $ref: '#/components/schemas/dto.DateRangeDTO'
         filename:
           $ref: '#/components/schemas/dto.FilenameFilterDTO'
+        is_deleted:
+          example: false
+          type: boolean
         lens:
           example: EF 50mm f/1.8
           type: string
@@ -4468,11 +4471,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.UpdateAssetRequestDTO'
-                description: Asset metadata
-                summary: request
+              $ref: '#/components/schemas/dto.UpdateAssetRequestDTO'
+              description: Asset metadata
+              summary: data
         description: Asset metadata
         required: true
       responses:
@@ -4636,11 +4637,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.UpdateDescriptionRequestDTO'
-                description: Description data
-                summary: description
+              $ref: '#/components/schemas/dto.UpdateDescriptionRequestDTO'
+              description: Description data
+              summary: description
         description: Description data
         required: true
       responses:
@@ -4870,11 +4869,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.UpdateLikeRequestDTO'
-                description: Like data
-                summary: like
+              $ref: '#/components/schemas/dto.UpdateLikeRequestDTO'
+              description: Like data
+              summary: like
         description: Like data
         required: true
       responses:
@@ -4959,11 +4956,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.UpdateRatingRequestDTO'
-                description: Rating data
-                summary: rating
+              $ref: '#/components/schemas/dto.UpdateRatingRequestDTO'
+              description: Rating data
+              summary: rating
         description: Rating data
         required: true
       responses:
@@ -5009,11 +5004,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.UpdateRatingAndLikeRequestDTO'
-                description: Rating and like data
-                summary: data
+              $ref: '#/components/schemas/dto.UpdateRatingAndLikeRequestDTO'
+              description: Rating and like data
+              summary: data
         description: Rating and like data
         required: true
       responses:
@@ -5059,11 +5052,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.ReprocessAssetRequestDTO'
-                description: Reprocessing tasks (optional)
-                summary: request
+              $ref: '#/components/schemas/dto.ReprocessAssetRequestDTO'
+              description: Reprocessing tasks (optional)
+              summary: data
         description: Reprocessing tasks (optional)
       responses:
         "200":
@@ -5091,6 +5082,45 @@ paths:
                 $ref: '#/components/schemas/api.ErrorResponse'
           description: Internal Server Error
       summary: Reprocess asset
+      tags:
+      - assets
+  /api/v1/assets/{id}/restore:
+    post:
+      description: Restore a soft-deleted asset from Trash. The original file is not
+        moved.
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.MessageResponseDTO'
+          description: Asset restored successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid asset ID format
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      summary: Restore asset
       tags:
       - assets
   /api/v1/assets/{id}/sidecar:
@@ -5153,11 +5183,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.LumilioSidecarV1DTO'
-                description: Sidecar payload
-                summary: request
+              $ref: '#/components/schemas/dto.LumilioSidecarV1DTO'
+              description: Sidecar payload
+              summary: data
         description: Sidecar payload
         required: true
       responses:
@@ -5422,11 +5450,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.DownloadAssetsRequestDTO'
-                description: Asset IDs to download
-                summary: request
+              $ref: '#/components/schemas/dto.DownloadAssetsRequestDTO'
+              description: Asset IDs to download
+              summary: data
         description: Asset IDs to download
         required: true
       responses:
@@ -5561,11 +5587,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.RebuildAssetIndexesRequestDTO'
-                description: Reindex request
-                summary: request
+              $ref: '#/components/schemas/dto.RebuildAssetIndexesRequestDTO'
+              description: Reindex request
+              summary: data
         description: Reindex request
       responses:
         "200":
@@ -5695,11 +5719,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.AssetQueryRequestDTO'
-                description: Query parameters
-                summary: request
+              $ref: '#/components/schemas/dto.AssetQueryRequestDTO'
+              description: Query parameters
+              summary: data
         description: Query parameters
         required: true
       responses:
@@ -5836,11 +5858,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.SearchAssetsRequestDTO'
-                description: Search parameters
-                summary: request
+              $ref: '#/components/schemas/dto.SearchAssetsRequestDTO'
+              description: Search parameters
+              summary: data
         description: Search parameters
         required: true
       responses:
@@ -5872,11 +5892,9 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.CreateManualStackRequestDTO'
-                description: Asset IDs to stack
-                summary: request
+              $ref: '#/components/schemas/dto.CreateManualStackRequestDTO'
+              description: Asset IDs to stack
+              summary: data
         description: Asset IDs to stack
         required: true
       responses:

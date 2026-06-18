@@ -147,15 +147,19 @@ func (s *assetService) searchAssetsFusedSet(ctx context.Context, params SearchAs
 	return set, true
 }
 
-func (s *assetService) runHydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID) ([]repo.Asset, error) {
+func queryIncludesDeletedAssets(isDeleted *bool) bool {
+	return isDeleted != nil && *isDeleted
+}
+
+func (s *assetService) runHydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error) {
 	if s.hydrateAssetsInOrderFn != nil {
-		return s.hydrateAssetsInOrderFn(ctx, ids)
+		return s.hydrateAssetsInOrderFn(ctx, ids, isDeleted)
 	}
-	return s.hydrateAssetsInOrder(ctx, ids)
+	return s.hydrateAssetsInOrder(ctx, ids, isDeleted)
 }
 
 // hydrateAssetsInOrder fetches asset rows preserving the given id order.
-func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID) ([]repo.Asset, error) {
+func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error) {
 	if len(ids) == 0 {
 		return []repo.Asset{}, nil
 	}
@@ -163,7 +167,13 @@ func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID
 	for i, id := range ids {
 		pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
 	}
-	rows, err := s.queries.GetAssetsByIDs(ctx, pgIDs)
+	var rows []repo.Asset
+	var err error
+	if queryIncludesDeletedAssets(isDeleted) {
+		rows, err = s.queries.GetAssetsByIDsAny(ctx, pgIDs)
+	} else {
+		rows, err = s.queries.GetAssetsByIDs(ctx, pgIDs)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -180,16 +190,16 @@ func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID
 	return out, nil
 }
 
-func (s *assetService) runPageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error) {
+func (s *assetService) runPageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error) {
 	if s.pageAssetsBySortFn != nil {
-		return s.pageAssetsBySortFn(ctx, ids, sortBy, limit, offset)
+		return s.pageAssetsBySortFn(ctx, ids, sortBy, limit, offset, isDeleted)
 	}
-	return s.pageAssetsBySort(ctx, ids, sortBy, limit, offset)
+	return s.pageAssetsBySort(ctx, ids, sortBy, limit, offset, isDeleted)
 }
 
 // pageAssetsBySort orders a membership set by the requested presentation
 // sort (newest first) and returns the requested page of rows.
-func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error) {
+func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -227,5 +237,5 @@ func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, so
 	if offset >= end {
 		return []repo.Asset{}, nil
 	}
-	return s.hydrateAssetsInOrder(ctx, ordered[offset:end])
+	return s.hydrateAssetsInOrder(ctx, ordered[offset:end], isDeleted)
 }

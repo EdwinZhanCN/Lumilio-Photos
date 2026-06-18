@@ -102,6 +102,14 @@ function PhotoPickerContent({
         }
         icon={<ImageIcon className="h-6 w-6 text-primary" />}
         lockedFilterFields={lockedFields}
+        hiddenBulkActions={[
+          "set-rating",
+          "set-liked",
+          "stack-selected",
+          "add-to-album",
+          "download",
+          "delete-assets",
+        ]}
       />
       <div className="custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto">
         <SquareGallery

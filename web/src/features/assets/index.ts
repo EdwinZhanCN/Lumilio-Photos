@@ -3,7 +3,6 @@ export { useAssetsView, useCurrentAssetsView } from "./hooks/useAssetsView";
 // Export removed: useAsset and related hooks are deleted
 export {
   useAssetActions,
-  useAssetActionsSimple,
 } from "./hooks/useAssetActions";
 export {
   useSelection,

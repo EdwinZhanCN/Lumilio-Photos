@@ -24,9 +24,9 @@ header's hard-coded menu. The header should render default actions plus
 page-provided action definitions, and pages should decide which defaults are
 available in their context.
 
-Current implementation scope: complete checklist sections 1-7 first. Section 8
-is a follow-up only; all stack selection behavior remains collapsed-mode and
-whole-stack for now.
+Current implementation scope: checklist sections 1-7 plus 3a are complete.
+Section 8 is a follow-up only; all stack selection behavior remains
+collapsed-mode and whole-stack for now.
 
 ## Current Ownership
 
@@ -135,12 +135,10 @@ Danger actions should use `tone: "danger"` and a confirmation modal.
 separating it below "Remove from current album" so users do not confuse media
 deletion with membership removal.
 
-For the upcoming Trash/Restore work in
-[assets-feature-review.md](assets-feature-review.md) F4, treat `delete-assets`
-as the default "Move to Trash" action once that backend/frontend change lands.
-The Trash page should hide `delete-assets` and provide a page-specific
-`restore-assets` action. Permanent delete is intentionally out of scope for this
-plan and this milestone.
+F4 in [assets-feature-review.md](assets-feature-review.md) now treats
+`delete-assets` as the default "Move to Trash" action. The Trash page hides
+`delete-assets` and provides a page-specific `restore-assets` action. Permanent
+delete is intentionally out of scope for this plan and this milestone.
 
 ## Stack Display And Selection Rules
 
@@ -184,106 +182,107 @@ if the stack UX contract changes.
 
 ## Immediate Implementation Checklist
 
-### 1. Extract Default Bulk Action Model
+### 1. Extract Default Bulk Action Model — ✅ DONE
 
-- [ ] Move fixed menu action definitions out of inline JSX where practical.
-- [ ] Keep the existing rating/liked nested menus, but represent their root ids
+- [x] Move fixed menu action definitions out of inline JSX where practical.
+- [x] Keep the existing rating/liked nested menus, but represent their root ids
       as `set-rating` and `set-liked` for hiding/composition.
-- [ ] Build `AssetsBulkActionContext` from the values already computed in
+- [x] Build `AssetsBulkActionContext` from the values already computed in
       `AssetsPageHeader`:
       - `selectedItemCount`
       - `affectedAssetCount`
       - `resolvedSelectedAssetIds`
       - `selectedAssets`
       - `selection.clear`
-- [ ] Preserve existing confirmation flows for rating/liked/delete.
-- [ ] Preserve existing add-to-album modal and download behavior.
+- [x] Preserve existing confirmation flows for rating/liked/delete.
+- [x] Preserve existing add-to-album modal and download behavior.
 
-### 2. Add Header And Gallery Extension Props
+### 2. Add Header And Gallery Extension Props — ✅ DONE
 
-- [ ] Add `bulkActions` and `hiddenBulkActions` to `AssetsPageHeaderProps`.
-- [ ] Add matching props to `AssetsGalleryPageProps`.
-- [ ] Pass the props from `AssetsGalleryPage` into `AssetsPageHeader`.
-- [ ] Ensure direct users of `AssetsPageHeader` can also pass the same props:
+- [x] Add `bulkActions` and `hiddenBulkActions` to `AssetsPageHeaderProps`.
+- [x] Add matching props to `AssetsGalleryPageProps`.
+- [x] Pass the props from `AssetsGalleryPage` into `AssetsPageHeader`.
+- [x] Ensure direct users of `AssetsPageHeader` can also pass the same props:
       people details, trip details, and `PhotoPicker`.
 
-### 3. Album Details: Remove From Current Album
+### 3. Album Details: Remove From Current Album — ✅ DONE
 
-- [ ] In `AlbumDetails`, create a typed `$api.useMutation("delete",
+- [x] In `AlbumDetails`, create a typed `$api.useMutation("delete",
       "/api/v1/albums/{id}/assets/{assetId}")`.
-- [ ] Pass a custom bulk action to `AssetsGalleryPage`:
+- [x] Pass a custom bulk action to `AssetsGalleryPage`:
       - id: `remove-from-current-album`
       - label: "Remove from this album"
       - icon: `FolderMinus`
       - tone: `danger`
       - confirmation message uses selected item / affected asset counts
       - `onRun` calls the delete mutation for every selected asset id
-- [ ] On success:
+- [x] On success:
       - clear selection
       - invalidate/refetch the current album asset query
       - invalidate/refetch album metadata so `asset_count` updates
       - show success feedback through existing message/toast infrastructure
-- [ ] On error:
+- [x] On error:
       - show an error message
       - keep selection intact so the user can retry
-- [ ] Hide or demote `delete-assets` on album pages. Default starting point:
+- [x] Hide or demote `delete-assets` on album pages. Default starting point:
       `hiddenBulkActions={["delete-assets"]}`.
 
-### 3a. Stack Selected Integration With F3
+### 3a. Stack Selected Integration With F3 — ✅ DONE
 
 This item belongs to the bulk-action refactor but completes the selection-toolbar
 half of [assets-feature-review.md](assets-feature-review.md) F3.
 
-- [ ] Add a custom or default-able `stack-selected` bulk action that is enabled
+- [x] Add a custom or default-able `stack-selected` bulk action that is enabled
       only when at least two affected asset ids are selected.
-- [ ] Run it through the F3 stack mutation hook (`createStack(assetIds)`) rather
+- [x] Run it through the F3 stack mutation hook (`createStack(assetIds)`) rather
       than calling raw client code from `AssetsPageHeader`.
-- [ ] In collapsed mode, preserve the current whole-stack selection behavior:
+- [x] In collapsed mode, preserve the current whole-stack selection behavior:
       selecting a stack browse row passes all stack member ids into
       `createStack`, so the action text/confirmation must make the affected asset
       count visible.
-- [ ] Invalidate/refetch the same asset-list and stack-detail queries described
+- [x] Invalidate/refetch the same asset-list and stack-detail queries described
       by F3 after a stack is created.
-- [ ] Keep "Remove from stack" in the stack detail/overlay flow, not as a generic
+- [x] Keep "Remove from stack" in the stack detail/overlay flow, not as a generic
       bulk action, unless expanded stack mode later exposes individual member
       rows in the gallery.
 
-### 4. PhotoPicker Bulk Menu Policy
+### 4. PhotoPicker Bulk Menu Policy — ✅ DONE
 
-- [ ] Hide bulk actions that mutate library state:
+- [x] Hide bulk actions that mutate library state:
       `set-rating`, `set-liked`, `add-to-album`, `delete-assets`.
-- [ ] Consider hiding `download` too unless there is a concrete picker use case.
-- [ ] Keep `defaultSelectionMode="single"` and the existing auto-select behavior.
-- [ ] Verify the header still supports filter/sort controls needed by the picker.
+- [x] Consider hiding `download` too unless there is a concrete picker use case.
+- [x] Keep `defaultSelectionMode="single"` and the existing auto-select behavior.
+- [x] Verify the header still supports filter/sort controls needed by the picker.
 
-### 5. Other Scoped Surfaces
+### 5. Other Scoped Surfaces — ✅ DONE
 
-- [ ] People details: leave defaults for now, but the new API should make it easy
+- [x] People details: leave defaults for now, but the new API should make it easy
       to add a future `remove-from-person` / `not-this-person` action.
-- [ ] Trip/place details: leave defaults for now; this is a derived location/date
+- [x] Trip/place details: leave defaults for now; this is a derived location/date
       view, not explicit membership.
-- [ ] Utility classifier collections: leave defaults for now; future tag
+- [x] Utility classifier collections: leave defaults for now; future tag
       mutation can add `remove-classifier-tag` or `exclude-from-smart-collection`.
-- [ ] Main assets page: keep the full default action set unchanged.
+- [x] Main assets page: keep the full default action set unchanged, plus the new
+      collapsed-mode `stack-selected` action from F3.
 
-### 6. i18n
+### 6. i18n — ✅ DONE
 
-- [ ] Add extractable strings for new action labels, confirmation title/message,
+- [x] Add extractable strings for new action labels, confirmation title/message,
       success, and error states.
-- [ ] Run i18n extraction/status if strings are added:
+- [x] Run i18n extraction/status if strings are added:
       `cd web && vp exec i18next-cli extract && vp exec i18next-cli status`.
-- [ ] Do not leave new user-facing English literals outside the i18n layer.
+- [x] Do not leave new user-facing English literals outside the i18n layer.
 
-### 7. Tests
+### 7. Tests — ✅ DONE
 
-- [ ] Add or update focused tests for `AssetsPageHeader` action composition:
+- [x] Add or update focused tests for `AssetsPageHeader` action composition:
       hidden defaults, custom action rendering, custom action invocation, and
       confirmation behavior.
-- [ ] Add an album-specific test that verifies "Remove from this album" invokes
+- [x] Add an album-specific test that verifies "Remove from this album" invokes
       the album remove mutation and hides asset delete.
-- [ ] Update `PhotoPicker` tests if hidden bulk action props affect mocked
+- [x] Update `PhotoPicker` tests if hidden bulk action props affect mocked
       `AssetsPageHeader` expectations.
-- [ ] Keep browse item / stack resolution tests unchanged unless the context
+- [x] Keep browse item / stack resolution tests unchanged unless the context
       builder changes behavior; whole-stack selection should remain covered.
 
 ### 8. Stack Expanded Mode Follow-Up

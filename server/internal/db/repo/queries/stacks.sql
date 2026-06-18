@@ -29,6 +29,13 @@ JOIN assets a ON a.asset_id = asm.asset_id
 WHERE asm.stack_id = $1 AND a.is_deleted = false
 ORDER BY asm.position ASC, asm.created_at ASC;
 
+-- name: GetStackMembersAny :many
+SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
+FROM asset_stack_members asm
+JOIN assets a ON a.asset_id = asm.asset_id
+WHERE asm.stack_id = $1
+ORDER BY asm.position ASC, asm.created_at ASC;
+
 -- name: GetStackByAssetID :one
 SELECT asm.stack_id, asm.relation, asm.position
 FROM asset_stack_members asm
@@ -44,6 +51,12 @@ SELECT COUNT(*) as count
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
 WHERE asm.stack_id = $1 AND a.is_deleted = false;
+
+-- name: GetStackMemberCountAny :one
+SELECT COUNT(*) as count
+FROM asset_stack_members asm
+JOIN assets a ON a.asset_id = asm.asset_id
+WHERE asm.stack_id = $1;
 
 -- name: FindCandidatesForStacking :many
 -- Find assets in the same repository that share a base filename pattern

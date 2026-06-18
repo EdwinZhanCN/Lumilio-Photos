@@ -60,6 +60,20 @@ func (h *AssetHandler) loadAsset(c *gin.Context, assetID uuid.UUID) (*repo.Asset
 	return asset, true
 }
 
+func (h *AssetHandler) loadAssetAny(c *gin.Context, assetID uuid.UUID) (*repo.Asset, bool) {
+	asset, err := h.assetService.GetAssetAny(c.Request.Context(), assetID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			api.GinNotFound(c, err, "Asset not found")
+			return nil, false
+		}
+		api.GinInternalError(c, err, "Failed to access asset")
+		return nil, false
+	}
+
+	return asset, true
+}
+
 func (h *AssetHandler) getAuthorizedAsset(c *gin.Context, assetID uuid.UUID, unauthorizedMessage, forbiddenMessage string) (*repo.Asset, bool) {
 	asset, ok := h.loadAsset(c, assetID)
 	if !ok {
@@ -73,8 +87,21 @@ func (h *AssetHandler) getAuthorizedAsset(c *gin.Context, assetID uuid.UUID, una
 	return asset, true
 }
 
+func (h *AssetHandler) getAuthorizedAssetAny(c *gin.Context, assetID uuid.UUID, unauthorizedMessage, forbiddenMessage string) (*repo.Asset, bool) {
+	asset, ok := h.loadAssetAny(c, assetID)
+	if !ok {
+		return nil, false
+	}
+
+	if !ensureOwnerAccess(c, asset.OwnerID, unauthorizedMessage, forbiddenMessage) {
+		return nil, false
+	}
+
+	return asset, true
+}
+
 func (h *AssetHandler) getAuthorizedAssetForMedia(c *gin.Context, assetID uuid.UUID, unauthorizedMessage, forbiddenMessage string) (*repo.Asset, bool) {
-	asset, ok := h.loadAsset(c, assetID)
+	asset, ok := h.loadAssetAny(c, assetID)
 	if !ok {
 		return nil, false
 	}
@@ -84,6 +111,10 @@ func (h *AssetHandler) getAuthorizedAssetForMedia(c *gin.Context, assetID uuid.U
 	}
 
 	return asset, true
+}
+
+func (h *AssetHandler) getAuthorizedAssetForRead(c *gin.Context, assetID uuid.UUID, unauthorizedMessage, forbiddenMessage string) (*repo.Asset, bool) {
+	return h.getAuthorizedAssetAny(c, assetID, unauthorizedMessage, forbiddenMessage)
 }
 
 func (h *AssetHandler) ensureOwnerAccessForMedia(c *gin.Context, ownerID *int32, unauthorizedMessage, forbiddenMessage string) bool {

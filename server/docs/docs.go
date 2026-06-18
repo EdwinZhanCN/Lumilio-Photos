@@ -959,6 +959,10 @@ const docTemplate = `{
                     "filename": {
                         "$ref": "#/components/schemas/dto.FilenameFilterDTO"
                     },
+                    "is_deleted": {
+                        "example": false,
+                        "type": "boolean"
+                    },
                     "lens": {
                         "example": "EF 50mm f/1.8",
                         "type": "string"
@@ -6647,16 +6651,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.DownloadAssetsRequestDTO",
-                                        "summary": "request",
-                                        "description": "Asset IDs to download"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.DownloadAssetsRequestDTO",
+                                "summary": "data",
+                                "description": "Asset IDs to download"
                             }
                         }
                     },
@@ -6873,16 +6870,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RebuildAssetIndexesRequestDTO",
-                                        "summary": "request",
-                                        "description": "Reindex request"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.RebuildAssetIndexesRequestDTO",
+                                "summary": "data",
+                                "description": "Reindex request"
                             }
                         }
                     },
@@ -7093,16 +7083,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.AssetQueryRequestDTO",
-                                        "summary": "request",
-                                        "description": "Query parameters"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.AssetQueryRequestDTO",
+                                "summary": "data",
+                                "description": "Query parameters"
                             }
                         }
                     },
@@ -7321,16 +7304,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.SearchAssetsRequestDTO",
-                                        "summary": "request",
-                                        "description": "Search parameters"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.SearchAssetsRequestDTO",
+                                "summary": "data",
+                                "description": "Search parameters"
                             }
                         }
                     },
@@ -7382,16 +7358,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.CreateManualStackRequestDTO",
-                                        "summary": "request",
-                                        "description": "Asset IDs to stack"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.CreateManualStackRequestDTO",
+                                "summary": "data",
+                                "description": "Asset IDs to stack"
                             }
                         }
                     },
@@ -7664,16 +7633,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.UpdateAssetRequestDTO",
-                                        "summary": "request",
-                                        "description": "Asset metadata"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.UpdateAssetRequestDTO",
+                                "summary": "data",
+                                "description": "Asset metadata"
                             }
                         }
                     },
@@ -7937,16 +7899,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.UpdateDescriptionRequestDTO",
-                                        "summary": "description",
-                                        "description": "Description data"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.UpdateDescriptionRequestDTO",
+                                "summary": "description",
+                                "description": "Description data"
                             }
                         }
                     },
@@ -8319,16 +8274,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.UpdateLikeRequestDTO",
-                                        "summary": "like",
-                                        "description": "Like data"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.UpdateLikeRequestDTO",
+                                "summary": "like",
+                                "description": "Like data"
                             }
                         }
                     },
@@ -8464,16 +8412,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.UpdateRatingRequestDTO",
-                                        "summary": "rating",
-                                        "description": "Rating data"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.UpdateRatingRequestDTO",
+                                "summary": "rating",
+                                "description": "Rating data"
                             }
                         }
                     },
@@ -8546,16 +8487,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.UpdateRatingAndLikeRequestDTO",
-                                        "summary": "data",
-                                        "description": "Rating and like data"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.UpdateRatingAndLikeRequestDTO",
+                                "summary": "data",
+                                "description": "Rating and like data"
                             }
                         }
                     },
@@ -8628,16 +8562,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.ReprocessAssetRequestDTO",
-                                        "summary": "request",
-                                        "description": "Reprocessing tasks (optional)"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.ReprocessAssetRequestDTO",
+                                "summary": "data",
+                                "description": "Reprocessing tasks (optional)"
                             }
                         }
                     },
@@ -8686,6 +8613,68 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Reprocess asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/{id}/restore": {
+            "post": {
+                "description": "Restore a soft-deleted asset from Trash. The original file is not moved.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Asset restored successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID format"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Restore asset",
                 "tags": [
                     "assets"
                 ]
@@ -8780,16 +8769,9 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.LumilioSidecarV1DTO",
-                                        "summary": "request",
-                                        "description": "Sidecar payload"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/dto.LumilioSidecarV1DTO",
+                                "summary": "data",
+                                "description": "Sidecar payload"
                             }
                         }
                     },

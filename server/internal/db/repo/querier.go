@@ -163,6 +163,7 @@ type Querier interface {
 	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]GetAssetAlbumsRow, error)
 	GetAssetByHashAndRepository(ctx context.Context, arg GetAssetByHashAndRepositoryParams) (Asset, error)
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
+	GetAssetByIDAny(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error)
 	GetAssetExifRaw(ctx context.Context, assetID pgtype.UUID) (json.RawMessage, error)
 	// Queries backing the Phase 2 agent tools (producers, transformers,
@@ -184,6 +185,7 @@ type Querier interface {
 	GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error)
 	GetAssetsByHash(ctx context.Context, hash *string) ([]Asset, error)
 	GetAssetsByIDs(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error)
+	GetAssetsByIDsAny(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error)
 	GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerParams) ([]Asset, error)
 	GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAssetsByOwnerAndTypesSortedParams) ([]Asset, error)
 	GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwnerSortedParams) ([]Asset, error)
@@ -288,7 +290,9 @@ type Querier interface {
 	GetStackByAssetID(ctx context.Context, assetID pgtype.UUID) (GetStackByAssetIDRow, error)
 	GetStackByID(ctx context.Context, stackID pgtype.UUID) (AssetStack, error)
 	GetStackMemberCount(ctx context.Context, stackID pgtype.UUID) (int64, error)
+	GetStackMemberCountAny(ctx context.Context, stackID pgtype.UUID) (int64, error)
 	GetStackMembers(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error)
+	GetStackMembersAny(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error)
 	// ============================================================================
 	// Duplicate detection candidate queries
 	// ============================================================================
@@ -388,6 +392,7 @@ type Querier interface {
 	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
 	RepositoryExists(ctx context.Context, path string) (bool, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
+	RestoreAsset(ctx context.Context, assetID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)

@@ -16,7 +16,11 @@ func (b *sqlBuilder) addArg(value any) string {
 
 func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias string) ([]string, error) {
 	a := assetAlias
-	conditions := []string{a + ".is_deleted = false"}
+	isDeleted := false
+	if filter.IsDeleted != nil {
+		isDeleted = *filter.IsDeleted
+	}
+	conditions := []string{fmt.Sprintf("%s.is_deleted = %s", a, builder.addArg(isDeleted))}
 
 	if filter.AssetType != nil {
 		conditions = append(conditions, fmt.Sprintf("%s.type = %s", a, builder.addArg(*filter.AssetType)))

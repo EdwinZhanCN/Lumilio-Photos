@@ -107,6 +107,14 @@ describe("PhotoPicker", () => {
     expect(mocks.AssetsPageHeader.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         lockedFilterFields: ["type"],
+        hiddenBulkActions: [
+          "set-rating",
+          "set-liked",
+          "stack-selected",
+          "add-to-album",
+          "download",
+          "delete-assets",
+        ],
       }),
     );
   });
@@ -159,6 +167,14 @@ describe("PhotoPicker", () => {
     expect(mocks.AssetsPageHeader.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         lockedFilterFields: ["type", "raw"],
+        hiddenBulkActions: [
+          "set-rating",
+          "set-liked",
+          "stack-selected",
+          "add-to-album",
+          "download",
+          "delete-assets",
+        ],
       }),
     );
   });

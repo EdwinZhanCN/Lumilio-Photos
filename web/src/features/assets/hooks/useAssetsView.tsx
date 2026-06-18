@@ -609,8 +609,8 @@ export const useCurrentAssetsSearchView = (
   const { sortBy, pageSize, baseFilter, viewKey, ...viewOptions } = options;
   const rawScopedFilter = useMemo(
     () =>
-      selectFiltersEnabled({ filters: filtersState } as any)
-        ? selectFilterAsAssetFilter({ filters: filtersState } as any)
+      selectFiltersEnabled(filtersState)
+        ? selectFilterAsAssetFilter(filtersState)
         : {},
     [filtersState],
   );
@@ -659,8 +659,8 @@ export const useCurrentAssetsView = (
   const { sortBy, pageSize, baseFilter, viewKey, ...viewOptions } = options;
   const rawScopedFilter = useMemo(
     () =>
-      selectFiltersEnabled({ filters: filtersState } as any)
-        ? selectFilterAsAssetFilter({ filters: filtersState } as any)
+      selectFiltersEnabled(filtersState)
+        ? selectFilterAsAssetFilter(filtersState)
         : {},
     [filtersState],
   );

@@ -15,6 +15,7 @@ import {
   ArrowUpDown,
   Star,
   ImageIcon,
+  Layers2,
 } from "lucide-react";
 import FilterTool, {
   FilterDTO,
@@ -45,17 +46,26 @@ import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
+import { useStackActions } from "@/features/assets/hooks/useStackActions";
 import {
   getBrowseItemAsset,
   resolveBrowseSelectedAssetIds,
   resolveSelectedBrowseItems,
 } from "@/features/assets/utils/browseItems";
+import {
+  isBulkActionHidden,
+  resolveAssetsBulkActions,
+  type AssetsBulkActionContext,
+  type AssetsBulkActionId,
+  type AssetsBulkActionInput,
+  type AssetsBulkActionItem,
+} from "@/features/assets/components/shared/bulkActions";
 
 type ConfirmableBulkAction =
   | { type: "rating"; rating: number }
   | { type: "liked"; liked: boolean };
 
-interface AssetsPageHeaderProps {
+export interface AssetsPageHeaderProps {
   sortBy: SortByType;
   onSortByChange: (sortBy: SortByType) => void;
   onFiltersChange?: (filters: FilterDTO) => void;
@@ -63,6 +73,8 @@ interface AssetsPageHeaderProps {
   icon?: ReactNode;
   browseItems?: BrowseItem[];
   lockedFilterFields?: readonly FilterFieldKey[];
+  bulkActions?: AssetsBulkActionInput;
+  hiddenBulkActions?: readonly AssetsBulkActionId[];
 }
 
 const AssetsPageHeader = ({
@@ -73,10 +85,13 @@ const AssetsPageHeader = ({
   icon,
   browseItems,
   lockedFilterFields,
+  bulkActions,
+  hiddenBulkActions,
 }: AssetsPageHeaderProps) => {
   const { t } = useI18n();
   const selection = useSelection();
   const showMessage = useMessage();
+  const { createStack, isCreatingStack } = useStackActions();
 
   const activeSortByLabel = useMemo(() => {
     switch (sortBy) {
@@ -94,6 +109,9 @@ const AssetsPageHeader = ({
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [confirmableBulkAction, setConfirmableBulkAction] =
     useState<ConfirmableBulkAction | null>(null);
+  const [confirmableCustomAction, setConfirmableCustomAction] =
+    useState<AssetsBulkActionItem | null>(null);
+  const [isRunningCustomAction, setIsRunningCustomAction] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
@@ -308,6 +326,104 @@ const AssetsPageHeader = ({
     );
   }, [selection.enabled, selection.selectedCount, selectedBrowseItems]);
 
+  const bulkActionContext = useMemo<AssetsBulkActionContext>(
+    () => ({
+      selectedItemCount,
+      affectedAssetCount,
+      selectedAssetIds: resolvedSelectedAssetIds,
+      selectedAssets,
+      clearSelection: selection.clear,
+    }),
+    [
+      affectedAssetCount,
+      resolvedSelectedAssetIds,
+      selectedAssets,
+      selectedItemCount,
+      selection.clear,
+    ],
+  );
+
+  const customBulkActions = useMemo(
+    () => resolveAssetsBulkActions(bulkActions, bulkActionContext),
+    [bulkActions, bulkActionContext],
+  );
+
+  const isDefaultActionHidden = useCallback(
+    (actionId: AssetsBulkActionId) =>
+      isBulkActionHidden(actionId, hiddenBulkActions),
+    [hiddenBulkActions],
+  );
+
+  const stackSelectedBulkAction = useMemo<AssetsBulkActionItem>(
+    () => ({
+      id: "stack-selected",
+      label: t("assets.assetsPageHeader.actions.stackSelected", {
+        defaultValue: "Stack selected",
+      }),
+      icon: <Layers2 size={16} />,
+      tone: "info",
+      disabled: affectedAssetCount < 2 || isCreatingStack,
+      requiresConfirmation: true,
+      confirmationTitle: t(
+        "assets.assetsPageHeader.stackConfirm.title",
+        { defaultValue: "Stack selected assets?" },
+      ),
+      confirmationMessage: t(
+        "assets.assetsPageHeader.stackConfirm.message",
+        {
+          count: affectedAssetCount,
+          defaultValue:
+            "{{count}} selected assets will be grouped into one stack.",
+        },
+      ),
+      onRun: async (context) => {
+        if (context.selectedAssetIds.length < 2) return;
+
+        try {
+          await createStack(context.selectedAssetIds);
+          context.clearSelection();
+          showMessage(
+            "success",
+            t("assets.assetsPageHeader.messages.stackSuccess", {
+              count: context.affectedAssetCount,
+            }),
+          );
+        } catch (error) {
+          console.error("Failed to stack selected assets:", error);
+          showMessage(
+            "error",
+            t("assets.assetsPageHeader.messages.stackError"),
+          );
+          throw error;
+        }
+      },
+    }),
+    [
+      affectedAssetCount,
+      createStack,
+      isCreatingStack,
+      showMessage,
+      t,
+    ],
+  );
+
+  const visibleCustomBulkActions = useMemo(
+    () =>
+      customBulkActions.filter(
+        (action) => !isBulkActionHidden(action.id, hiddenBulkActions),
+      ),
+    [customBulkActions, hiddenBulkActions],
+  );
+
+  const hasBulkActionItems =
+    !isDefaultActionHidden("set-rating") ||
+    !isDefaultActionHidden("set-liked") ||
+    !isDefaultActionHidden("stack-selected") ||
+    visibleCustomBulkActions.length > 0 ||
+    !isDefaultActionHidden("add-to-album") ||
+    !isDefaultActionHidden("download") ||
+    !isDefaultActionHidden("delete-assets");
+
   const handleDownloadAll = async () => {
     try {
       await bulkOps.bulkDownload(selectedAssets);
@@ -390,6 +506,33 @@ const AssetsPageHeader = ({
     }
   };
 
+  const executeCustomBulkAction = useCallback(
+    async (action: AssetsBulkActionItem) => {
+      if (action.disabled) return;
+
+      setIsRunningCustomAction(true);
+      try {
+        await action.onRun(bulkActionContext);
+      } finally {
+        setIsRunningCustomAction(false);
+        setConfirmableCustomAction(null);
+      }
+    },
+    [bulkActionContext],
+  );
+
+  const handleCustomBulkActionClick = useCallback(
+    (action: AssetsBulkActionItem) => {
+      if (action.disabled) return;
+      if (action.requiresConfirmation) {
+        setConfirmableCustomAction(action);
+        return;
+      }
+      void executeCustomBulkAction(action);
+    },
+    [executeCustomBulkAction],
+  );
+
   // Close the parent dropdown menu when a menu item is clicked
   const handleDropdownItemClick = () => {
     const elem = document.activeElement;
@@ -426,79 +569,128 @@ const AssetsPageHeader = ({
           defaultValue: "{{count}} selected items.",
         });
 
-  const renderBulkActionItems = () => (
+  const renderDefaultMetadataBulkActionItems = () => (
     <>
-      <li>
-        <details>
-          <summary>
-            <Star size={16} />
-            {t("assets.assetsPageHeader.actions.setRating", {
-              defaultValue: "Set Rating",
-            })}
-          </summary>
-          <ul>
-            {ratingOptions.map((option) => (
-              <li key={option.rating}>
+      {!isDefaultActionHidden("set-rating") && (
+        <li>
+          <details>
+            <summary>
+              <Star size={16} />
+              {t("assets.assetsPageHeader.actions.setRating", {
+                defaultValue: "Set Rating",
+              })}
+            </summary>
+            <ul>
+              {ratingOptions.map((option) => (
+                <li key={option.rating}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmableBulkAction({
+                        type: "rating",
+                        rating: option.rating,
+                      });
+                      handleDropdownItemClick();
+                    }}
+                  >
+                    <span className="min-w-20">{option.label}</span>
+                    <span className="ml-auto opacity-50">
+                      {option.valueLabel}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </li>
+      )}
+      {!isDefaultActionHidden("set-liked") && (
+        <li>
+          <details>
+            <summary>
+              <Heart size={16} />
+              {t("assets.assetsPageHeader.actions.likedMenu", {
+                defaultValue: "Liked",
+              })}
+            </summary>
+            <ul>
+              <li>
                 <button
                   type="button"
                   onClick={() => {
-                    setConfirmableBulkAction({
-                      type: "rating",
-                      rating: option.rating,
-                    });
+                    setConfirmableBulkAction({ type: "liked", liked: true });
                     handleDropdownItemClick();
                   }}
                 >
-                  <span className="min-w-20">{option.label}</span>
-                  <span className="ml-auto opacity-50">
-                    {option.valueLabel}
-                  </span>
+                  {t("assets.assetsPageHeader.actions.like", {
+                    defaultValue: "Liked",
+                  })}
                 </button>
               </li>
-            ))}
-          </ul>
-        </details>
-      </li>
-      <li>
-        <details>
-          <summary>
-            <Heart size={16} />
-            {t("assets.assetsPageHeader.actions.likedMenu", {
-              defaultValue: "Liked",
-            })}
-          </summary>
-          <ul>
-            <li>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmableBulkAction({ type: "liked", liked: true });
-                  handleDropdownItemClick();
-                }}
-              >
-                {t("assets.assetsPageHeader.actions.like", {
-                  defaultValue: "Liked",
-                })}
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmableBulkAction({ type: "liked", liked: false });
-                  handleDropdownItemClick();
-                }}
-              >
-                {t("assets.assetsPageHeader.actions.unlike", {
-                  defaultValue: "Unliked",
-                })}
-              </button>
-            </li>
-          </ul>
-        </details>
-      </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmableBulkAction({ type: "liked", liked: false });
+                    handleDropdownItemClick();
+                  }}
+                >
+                  {t("assets.assetsPageHeader.actions.unlike", {
+                    defaultValue: "Unliked",
+                  })}
+                </button>
+              </li>
+            </ul>
+          </details>
+        </li>
+      )}
     </>
   );
+
+  const renderCustomBulkActionItems = () => (
+    <>
+      {visibleCustomBulkActions.map((action) => (
+        <li key={action.id}>
+          <button
+            type="button"
+            className={
+              action.tone === "danger"
+                ? "text-error focus:bg-error/20"
+                : action.tone === "info"
+                  ? "text-info"
+                  : undefined
+            }
+            disabled={action.disabled || isRunningCustomAction}
+            onClick={() => {
+              handleCustomBulkActionClick(action);
+              handleDropdownItemClick();
+            }}
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        </li>
+      ))}
+    </>
+  );
+
+  const renderStackSelectedBulkActionItem = () =>
+    !isDefaultActionHidden("stack-selected") ? (
+      <li>
+        <button
+          type="button"
+          className="text-info"
+          disabled={stackSelectedBulkAction.disabled || isRunningCustomAction}
+          onClick={() => {
+            handleCustomBulkActionClick(stackSelectedBulkAction);
+            handleDropdownItemClick();
+          }}
+        >
+          {stackSelectedBulkAction.icon}
+          {stackSelectedBulkAction.label}
+        </button>
+      </li>
+    ) : null;
 
   return (
     <>
@@ -603,7 +795,7 @@ const AssetsPageHeader = ({
           </button>
 
           {/* Quick Actions Rocket Menu - Only in selection mode */}
-          {selection.enabled && (
+          {selection.enabled && hasBulkActionItems && (
             <div className="dropdown dropdown-end">
               <div
                 tabIndex={0}
@@ -630,46 +822,58 @@ const AssetsPageHeader = ({
                     count: selection.selectedCount,
                   })}
                 </li>
-                {renderBulkActionItems()}
-                <div className="divider my-1"></div>
-                <li>
-                  <button
-                    type="button"
-                    className="text-info"
-                    onClick={() => {
-                      void handleAddToAlbumClick();
-                      handleDropdownItemClick();
-                    }}
-                  >
-                    <FolderPlus size={16} />
-                    {t("assets.assetsPageHeader.actions.addToAlbum")}
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleDownloadAll();
-                      handleDropdownItemClick();
-                    }}
-                  >
-                    <Download size={16} />
-                    {t("assets.assetsPageHeader.actions.downloadAll")}
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    className="text-error"
-                    onClick={() => {
-                      handleDeleteClick();
-                      handleDropdownItemClick();
-                    }}
-                  >
-                    <Trash2 size={16} />
-                    {t("assets.assetsPageHeader.actions.deleteSelected")}
-                  </button>
-                </li>
+                {renderDefaultMetadataBulkActionItems()}
+                {renderStackSelectedBulkActionItem()}
+                {renderCustomBulkActionItems()}
+                {(!isDefaultActionHidden("add-to-album") ||
+                  !isDefaultActionHidden("download") ||
+                  !isDefaultActionHidden("delete-assets")) && (
+                  <div className="divider my-1"></div>
+                )}
+                {!isDefaultActionHidden("add-to-album") && (
+                  <li>
+                    <button
+                      type="button"
+                      className="text-info"
+                      onClick={() => {
+                        void handleAddToAlbumClick();
+                        handleDropdownItemClick();
+                      }}
+                    >
+                      <FolderPlus size={16} />
+                      {t("assets.assetsPageHeader.actions.addToAlbum")}
+                    </button>
+                  </li>
+                )}
+                {!isDefaultActionHidden("download") && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleDownloadAll();
+                        handleDropdownItemClick();
+                      }}
+                    >
+                      <Download size={16} />
+                      {t("assets.assetsPageHeader.actions.downloadAll")}
+                    </button>
+                  </li>
+                )}
+                {!isDefaultActionHidden("delete-assets") && (
+                  <li>
+                    <button
+                      type="button"
+                      className="text-error"
+                      onClick={() => {
+                        handleDeleteClick();
+                        handleDropdownItemClick();
+                      }}
+                    >
+                      <Trash2 size={16} />
+                      {t("assets.assetsPageHeader.actions.deleteSelected")}
+                    </button>
+                  </li>
+                )}
               </ul>
             </div>
           )}
@@ -766,7 +970,7 @@ const AssetsPageHeader = ({
               </button>
             </li>
 
-            {selection.enabled && (
+            {selection.enabled && hasBulkActionItems && (
               <>
                 <li className="menu-title mt-2 text-xs text-base-content/45">
                   <span>
@@ -783,41 +987,51 @@ const AssetsPageHeader = ({
                       {t("assets.assetsPageHeader.actions.title")}
                     </summary>
                     <ul className="w-full">
-                      {renderBulkActionItems()}
-                      <li>
-                        <button
-                          onClick={() => {
-                            void handleAddToAlbumClick();
-                            handleDropdownItemClick();
-                          }}
-                        >
-                          <FolderPlus size={16} className="text-info" />{" "}
-                          {t("assets.assetsPageHeader.actions.addToAlbum")}
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          onClick={() => {
-                            void handleDownloadAll();
-                            handleDropdownItemClick();
-                          }}
-                        >
-                          <Download size={16} />{" "}
-                          {t("assets.assetsPageHeader.actions.downloadAll")}
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          onClick={() => {
-                            handleDeleteClick();
-                            handleDropdownItemClick();
-                          }}
-                          className="text-error focus:bg-error/20"
-                        >
-                          <Trash2 size={16} />{" "}
-                          {t("assets.assetsPageHeader.actions.deleteSelected")}
-                        </button>
-                      </li>
+                      {renderDefaultMetadataBulkActionItems()}
+                      {renderStackSelectedBulkActionItem()}
+                      {renderCustomBulkActionItems()}
+                      {!isDefaultActionHidden("add-to-album") && (
+                        <li>
+                          <button
+                            onClick={() => {
+                              void handleAddToAlbumClick();
+                              handleDropdownItemClick();
+                            }}
+                          >
+                            <FolderPlus size={16} className="text-info" />{" "}
+                            {t("assets.assetsPageHeader.actions.addToAlbum")}
+                          </button>
+                        </li>
+                      )}
+                      {!isDefaultActionHidden("download") && (
+                        <li>
+                          <button
+                            onClick={() => {
+                              void handleDownloadAll();
+                              handleDropdownItemClick();
+                            }}
+                          >
+                            <Download size={16} />{" "}
+                            {t("assets.assetsPageHeader.actions.downloadAll")}
+                          </button>
+                        </li>
+                      )}
+                      {!isDefaultActionHidden("delete-assets") && (
+                        <li>
+                          <button
+                            onClick={() => {
+                              handleDeleteClick();
+                              handleDropdownItemClick();
+                            }}
+                            className="text-error focus:bg-error/20"
+                          >
+                            <Trash2 size={16} />{" "}
+                            {t(
+                              "assets.assetsPageHeader.actions.deleteSelected",
+                            )}
+                          </button>
+                        </li>
+                      )}
                     </ul>
                   </details>
                 </li>
@@ -886,6 +1100,70 @@ const AssetsPageHeader = ({
           <div
             className="modal-backdrop"
             onClick={() => setConfirmableBulkAction(null)}
+          ></div>
+        </div>
+      )}
+
+      {/* Custom Bulk Action Confirmation Modal */}
+      {confirmableCustomAction && (
+        <div className="modal modal-open">
+          <div
+            className={`modal-box border-t-4 ${
+              confirmableCustomAction.tone === "danger"
+                ? "border-error"
+                : "border-primary"
+            }`}
+          >
+            <div
+              className={`mb-4 flex items-center gap-3 ${
+                confirmableCustomAction.tone === "danger"
+                  ? "text-error"
+                  : "text-primary"
+              }`}
+            >
+              {confirmableCustomAction.icon ?? <AlertTriangle size={24} />}
+              <h3 className="text-lg font-bold">
+                {confirmableCustomAction.confirmationTitle ??
+                  confirmableCustomAction.label}
+              </h3>
+            </div>
+            <p className="py-4 text-sm text-base-content/70">
+              {confirmableCustomAction.confirmationMessage ??
+                renderAffectedAssetHint()}
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                disabled={isRunningCustomAction}
+                onClick={() => setConfirmableCustomAction(null)}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                className={`btn gap-2 ${
+                  confirmableCustomAction.tone === "danger"
+                    ? "btn-error"
+                    : "btn-primary"
+                }`}
+                disabled={isRunningCustomAction}
+                onClick={() => void executeCustomBulkAction(confirmableCustomAction)}
+              >
+                {isRunningCustomAction ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  confirmableCustomAction.icon
+                )}
+                {t("common.confirm", { defaultValue: "Confirm" })}
+              </button>
+            </div>
+          </div>
+          <div
+            className="modal-backdrop"
+            onClick={() => {
+              if (!isRunningCustomAction) {
+                setConfirmableCustomAction(null);
+              }
+            }}
           ></div>
         </div>
       )}

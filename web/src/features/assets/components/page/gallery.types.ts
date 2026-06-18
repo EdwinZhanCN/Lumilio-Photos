@@ -9,4 +9,6 @@ export interface AssetGalleryProps {
   isLoading?: boolean;
   columns?: number;
   className?: string;
+  emptyStateTitle?: string;
+  emptyStateDescription?: string;
 }

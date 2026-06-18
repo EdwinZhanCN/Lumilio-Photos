@@ -1562,7 +1562,7 @@ export interface paths {
             /** @description Asset metadata */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAssetRequestDTO"];
+                    "application/json": components["schemas"]["dto.UpdateAssetRequestDTO"];
                 };
             };
             responses: {
@@ -1886,7 +1886,7 @@ export interface paths {
             /** @description Description data */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateDescriptionRequestDTO"];
+                    "application/json": components["schemas"]["dto.UpdateDescriptionRequestDTO"];
                 };
             };
             responses: {
@@ -2155,7 +2155,7 @@ export interface paths {
             /** @description Like data */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateLikeRequestDTO"];
+                    "application/json": components["schemas"]["dto.UpdateLikeRequestDTO"];
                 };
             };
             responses: {
@@ -2301,7 +2301,7 @@ export interface paths {
             /** @description Rating data */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateRatingRequestDTO"];
+                    "application/json": components["schemas"]["dto.UpdateRatingRequestDTO"];
                 };
             };
             responses: {
@@ -2375,7 +2375,7 @@ export interface paths {
             /** @description Rating and like data */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateRatingAndLikeRequestDTO"];
+                    "application/json": components["schemas"]["dto.UpdateRatingAndLikeRequestDTO"];
                 };
             };
             responses: {
@@ -2450,7 +2450,7 @@ export interface paths {
             /** @description Reprocessing tasks (optional) */
             requestBody?: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.ReprocessAssetRequestDTO"];
+                    "application/json": components["schemas"]["dto.ReprocessAssetRequestDTO"];
                 };
             };
             responses: {
@@ -2482,6 +2482,73 @@ export interface paths {
                     };
                 };
                 /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore asset
+         * @description Restore a soft-deleted asset from Trash. The original file is not moved.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /**
+                     * @description Asset ID (UUID format)
+                     * @example "550e8400-e29b-41d4-a716-446655440000"
+                     */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Asset restored successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
+                    };
+                };
+                /** @description Invalid asset ID format */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2586,7 +2653,7 @@ export interface paths {
             /** @description Sidecar payload */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.LumilioSidecarV1DTO"];
+                    "application/json": components["schemas"]["dto.LumilioSidecarV1DTO"];
                 };
             };
             responses: {
@@ -3034,7 +3101,7 @@ export interface paths {
             /** @description Asset IDs to download */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.DownloadAssetsRequestDTO"];
+                    "application/json": components["schemas"]["dto.DownloadAssetsRequestDTO"];
                 };
             };
             responses: {
@@ -3247,7 +3314,7 @@ export interface paths {
             /** @description Reindex request */
             requestBody?: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RebuildAssetIndexesRequestDTO"];
+                    "application/json": components["schemas"]["dto.RebuildAssetIndexesRequestDTO"];
                 };
             };
             responses: {
@@ -3482,7 +3549,7 @@ export interface paths {
             /** @description Query parameters */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.AssetQueryRequestDTO"];
+                    "application/json": components["schemas"]["dto.AssetQueryRequestDTO"];
                 };
             };
             responses: {
@@ -3690,7 +3757,7 @@ export interface paths {
             /** @description Search parameters */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.SearchAssetsRequestDTO"];
+                    "application/json": components["schemas"]["dto.SearchAssetsRequestDTO"];
                 };
             };
             responses: {
@@ -3752,7 +3819,7 @@ export interface paths {
             /** @description Asset IDs to stack */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.CreateManualStackRequestDTO"];
+                    "application/json": components["schemas"]["dto.CreateManualStackRequestDTO"];
                 };
             };
             responses: {
@@ -8822,6 +8889,8 @@ export interface components {
             camera_model?: string;
             date?: components["schemas"]["dto.DateRangeDTO"];
             filename?: components["schemas"]["dto.FilenameFilterDTO"];
+            /** @example false */
+            is_deleted?: boolean;
             /** @example EF 50mm f/1.8 */
             lens?: string;
             /** @example true */

@@ -139,7 +139,7 @@ LEFT JOIN LATERAL (
     FROM face_results fr
     WHERE fr.asset_id = a.asset_id
 ) face_rel ON true
-WHERE a.asset_id = $1 AND a.is_deleted = false
+WHERE a.asset_id = $1
 `
 
 type GetAssetWithRelationsRow struct {
@@ -238,7 +238,7 @@ SELECT
         WHERE at.asset_id = a.asset_id
     ), '[]'::json) as tags
 FROM assets a
-WHERE a.asset_id = $1 AND a.is_deleted = false
+WHERE a.asset_id = $1
 `
 
 type GetAssetWithTagsRow struct {
@@ -330,7 +330,7 @@ SELECT
         WHERE t.asset_id = a.asset_id
     ), '[]'::json) as thumbnails
 FROM assets a
-WHERE a.asset_id = $1 AND a.is_deleted = false
+WHERE a.asset_id = $1
 `
 
 type GetAssetWithThumbnailsRow struct {

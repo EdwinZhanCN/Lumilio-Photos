@@ -681,6 +681,7 @@ type AssetFilterDTO struct {
 	Liked        *bool              `json:"liked,omitempty" example:"true"`
 	Filename     *FilenameFilterDTO `json:"filename,omitempty"`
 	Date         *DateRangeDTO      `json:"date,omitempty"`
+	IsDeleted    *bool              `json:"is_deleted,omitempty" example:"false"`
 	CameraModel  *string            `json:"camera_model,omitempty" example:"Canon EOS R5"`
 	Lens         *string            `json:"lens,omitempty" example:"EF 50mm f/1.8"`
 	Location     *LocationBBoxDTO   `json:"location,omitempty"`
