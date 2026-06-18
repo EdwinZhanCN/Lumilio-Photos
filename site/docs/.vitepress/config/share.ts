@@ -8,10 +8,7 @@ import { withMermaid } from "vitepress-plugin-mermaid";
 
 
 const mode = process.env.NODE_ENV || 'development'
-const { VITE_BASE_URL } = loadEnv(mode, process.cwd())
-
-console.log('Mode:', process.env.NODE_ENV)
-console.log('VITE_BASE_URL:', VITE_BASE_URL)
+const { VITE_BASE_URL = '/' } = loadEnv(mode, process.cwd())
 
 export const sharedConfig = withMermaid(defineConfig({
     head: [
@@ -37,7 +34,7 @@ export const sharedConfig = withMermaid(defineConfig({
     title: "Lumilio Photos",
     description: "Next-Gen Lightweight High-performance Media Manage Web App",
     appearance: true, // 主题模式，默认浅色且开启切换
-    base: VITE_BASE_URL || '/',
+    base: VITE_BASE_URL,
     lastUpdated: true, // 上次更新
     vite: {
         build: {

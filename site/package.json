@@ -1,14 +1,15 @@
 {
   "name": "lumilio-docs",
   "private": true,
-  "devDependencies": {
-    "@types/node": "^25.9.3",
-    "vitepress": "2.0.0-alpha.17"
-  },
+  "type": "module",
+  "packageManager": "pnpm@11.5.0",
   "scripts": {
-    "docs:dev": "vitepress dev docs",
+    "dev": "vitepress dev docs --host 0.0.0.0",
+    "build": "vitepress build docs",
+    "preview": "vitepress preview docs --host 0.0.0.0",
+    "docs:dev": "vitepress dev docs --host 0.0.0.0",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs --host 0.0.0.0"
   },
   "dependencies": {
     "@braintree/sanitize-url": "^7.1.2",
@@ -22,5 +23,10 @@
     "vitepress-markdown-timeline": "^1.2.2",
     "vitepress-plugin-group-icons": "^1.7.5",
     "vitepress-plugin-mermaid": "^2.0.17"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "vite-plus": "^0.1.22",
+    "vitepress": "2.0.0-alpha.17"
   }
 }
