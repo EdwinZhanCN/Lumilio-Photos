@@ -275,7 +275,10 @@ func TestBuildSemanticSearchBaseSQLDoesNotApplyHardDistanceThreshold(t *testing.
 	if strings.Contains(baseSQL, "<->") {
 		t.Fatalf("semantic search SQL should rank by distance without filtering by distance, got:\n%s", baseSQL)
 	}
-	if len(builder.args) != 2 {
-		t.Fatalf("expected only vector and space arguments, got %d", len(builder.args))
+	if len(builder.args) != 3 {
+		t.Fatalf("expected vector, space, and default trash-state arguments, got %d", len(builder.args))
+	}
+	if builder.args[2] != false {
+		t.Fatalf("expected semantic search to default to non-trash assets, got %v", builder.args[2])
 	}
 }

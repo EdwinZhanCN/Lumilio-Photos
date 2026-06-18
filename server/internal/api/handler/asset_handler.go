@@ -701,7 +701,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 		return
 	}
 
-	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
+	if _, ok := h.getAuthorizedAssetForRead(c, id, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
 		return
 	}
 
@@ -744,7 +744,7 @@ func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 		return
 	}
 
-	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
+	if _, ok := h.getAuthorizedAssetForRead(c, id, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
 		return
 	}
 
@@ -835,10 +835,9 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 // @Summary Update asset edit sidecar
 // @Description Store non-destructive Studio edit data under the asset repository .lumilio directory.
 // @Tags assets
-// @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Param request body dto.LumilioSidecarV1DTO true "Sidecar payload"
+// @Param data body dto.LumilioSidecarV1DTO true "Sidecar payload"
 // @Success 200 {object} dto.AssetSidecarResponseDTO "Asset sidecar saved"
 // @Failure 400 {object} api.ErrorResponse "Invalid asset ID or request body"
 // @Failure 404 {object} api.ErrorResponse "Asset not found"
@@ -1165,9 +1164,8 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 // @Summary Download assets
 // @Description Serve original files for the requested asset IDs as a zip archive.
 // @Tags assets
-// @Accept json
 // @Produce application/zip
-// @Param request body dto.DownloadAssetsRequestDTO true "Asset IDs to download"
+// @Param data body dto.DownloadAssetsRequestDTO true "Asset IDs to download"
 // @Success 200 {file} file "Zip archive"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Authentication required"
@@ -1460,10 +1458,9 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 // @Summary Update asset metadata
 // @Description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).
 // @Tags assets
-// @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Param request body dto.UpdateAssetRequestDTO true "Asset metadata"
+// @Param data body dto.UpdateAssetRequestDTO true "Asset metadata"
 // @Success 200 {object} dto.MessageResponseDTO "Asset updated successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid asset ID or request body"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
@@ -1527,6 +1524,39 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	}
 
 	api.JSONOK(c, dto.MessageResponseDTO{Message: "Asset deleted successfully"})
+}
+
+// RestoreAsset restores an asset from Trash
+// @Summary Restore asset
+// @Description Restore a soft-deleted asset from Trash. The original file is not moved.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {object} dto.MessageResponseDTO "Asset restored successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid asset ID format"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/{id}/restore [post]
+func (h *AssetHandler) RestoreAsset(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAssetAny(c, id, "Authentication required to restore this asset", "You don't have permission to restore this asset"); !ok {
+		return
+	}
+
+	err = h.assetService.RestoreAsset(c.Request.Context(), id)
+	if err != nil {
+		log.Printf("Failed to restore asset: %v", err)
+		api.GinInternalError(c, err, "Failed to restore asset")
+		return
+	}
+
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Asset restored successfully"})
 }
 
 // AddAssetToAlbum adds an asset to an album
@@ -1836,6 +1866,7 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		DateFrom:         dateFrom,
 		DateTo:           dateTo,
 		IsRaw:            filter.RAW,
+		IsDeleted:        filter.IsDeleted,
 		Rating:           filter.Rating,
 		Liked:            filter.Liked,
 		CameraModel:      filter.CameraModel,
@@ -2060,9 +2091,8 @@ func toSearchDebugItemDTOs(debug []service.SearchDebugItem) []dto.SearchDebugIte
 // @Summary Query assets (unified endpoint)
 // @Description Unified endpoint for listing, filtering, and searching assets. Replaces separate /filter and /search endpoints.
 // @Tags assets
-// @Accept json
 // @Produce json
-// @Param request body dto.AssetQueryRequestDTO true "Query parameters"
+// @Param data body dto.AssetQueryRequestDTO true "Query parameters"
 // @Success 200 {object} dto.QueryAssetsResponseDTO "Assets queried successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
@@ -2122,9 +2152,8 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 // @Summary Search assets
 // @Description Search assets with optional top results enhancement and filename fallback.
 // @Tags assets
-// @Accept json
 // @Produce json
-// @Param request body dto.SearchAssetsRequestDTO true "Search parameters"
+// @Param data body dto.SearchAssetsRequestDTO true "Search parameters"
 // @Success 200 {object} dto.SearchAssetsResponseDTO "Assets searched successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
@@ -2230,9 +2259,8 @@ func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
 // @Summary Queue asset index rebuild
 // @Description Queue a background batch that backfills AI indexing for existing photos.
 // @Tags assets
-// @Accept json
 // @Produce json
-// @Param request body dto.RebuildAssetIndexesRequestDTO false "Reindex request"
+// @Param data body dto.RebuildAssetIndexesRequestDTO false "Reindex request"
 // @Success 200 {object} dto.RebuildAssetIndexesResponseDTO "Reindex job queued successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
@@ -2542,7 +2570,6 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 // @Summary Update asset rating
 // @Description Update the rating (0-5) of a specific asset
 // @Tags assets
-// @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param rating body dto.UpdateRatingRequestDTO true "Rating data"
@@ -2588,7 +2615,6 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 // @Summary Update asset like status
 // @Description Update the like/favorite status of a specific asset
 // @Tags assets
-// @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param like body dto.UpdateLikeRequestDTO true "Like data"
@@ -2629,7 +2655,6 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 // @Summary Update asset rating and like status
 // @Description Update both the rating (0-5) and like/favorite status of a specific asset
 // @Tags assets
-// @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param data body dto.UpdateRatingAndLikeRequestDTO true "Rating and like data"
@@ -2675,7 +2700,6 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 // @Summary Update asset description
 // @Description Update the description metadata of an asset
 // @Tags assets
-// @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Param description body dto.UpdateDescriptionRequestDTO true "Description data"
@@ -3491,10 +3515,9 @@ func (h *AssetHandler) checkHashCollisionBeforeEnqueue(ctx context.Context, hash
 // @Summary Reprocess asset
 // @Description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
 // @Tags assets
-// @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Param request body dto.ReprocessAssetRequestDTO false "Reprocessing tasks (optional)"
+// @Param data body dto.ReprocessAssetRequestDTO false "Reprocessing tasks (optional)"
 // @Success 200 {object} dto.ReprocessAssetResponseDTO
 // @Failure 400 {object} api.ErrorResponse
 // @Failure 404 {object} api.ErrorResponse
@@ -3733,11 +3756,11 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 		return
 	}
 
-	if _, ok := h.getAuthorizedAsset(c, assetID, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
+	if _, ok := h.getAuthorizedAssetForRead(c, assetID, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
 		return
 	}
 
-	stackInfo, err := h.stackService.GetStackByAsset(c.Request.Context(), assetID)
+	stackInfo, err := h.stackService.GetStackByAssetAny(c.Request.Context(), assetID)
 	if err != nil {
 		if errors.Is(err, service.ErrStackNotFound) {
 			api.GinNotFound(c, err, "Asset is not in a stack")
@@ -3774,9 +3797,8 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 // @Summary Create manual stack
 // @Description Manually groups the specified assets into a new stack
 // @Tags assets
-// @Accept json
 // @Produce json
-// @Param request body dto.CreateManualStackRequestDTO true "Asset IDs to stack"
+// @Param data body dto.CreateManualStackRequestDTO true "Asset IDs to stack"
 // @Success 201 {object} dto.StackDTO
 // @Failure 400 {object} api.ErrorResponse
 // @Failure 409 {object} api.ErrorResponse

@@ -1,5 +1,6 @@
 import { StateCreator } from "zustand";
 import { FiltersState } from "../types/assets.type";
+import type { AssetFilter } from "../types/assets.type";
 import { mapFilenameModeToDTO } from "../utils/filterUtils";
 
 export interface FiltersSlice {
@@ -164,11 +165,11 @@ export const selectHasActiveFilters = (input: FiltersInput): boolean => {
   return selectActiveFilterCount(input) > 0;
 };
 
-export const selectFilterAsAssetFilter = (input: FiltersInput) => {
+export const selectFilterAsAssetFilter = (input: FiltersInput): AssetFilter => {
   const state = getFiltersState(input);
   if (!state.enabled) return {};
 
-  const filter: any = {};
+  const filter: AssetFilter = {};
 
   if (state.type === "PHOTO" || state.type === "VIDEO") {
     filter.type = state.type;

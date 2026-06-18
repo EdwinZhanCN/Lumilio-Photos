@@ -55,7 +55,7 @@ func TestSearchAssets_FusedSet_TopSubsetAndFullResults(t *testing.T) {
 			require.Equal(t, "red bird", params.Query)
 			return scoredSet(ids...), true
 		},
-		hydrateAssetsInOrderFn: func(ctx context.Context, in []uuid.UUID) ([]repo.Asset, error) {
+		hydrateAssetsInOrderFn: func(ctx context.Context, in []uuid.UUID, _ *bool) ([]repo.Asset, error) {
 			gotTopIDs = in
 			out := make([]repo.Asset, len(in))
 			for i, id := range in {
@@ -63,7 +63,7 @@ func TestSearchAssets_FusedSet_TopSubsetAndFullResults(t *testing.T) {
 			}
 			return out, nil
 		},
-		pageAssetsBySortFn: func(ctx context.Context, in []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error) {
+		pageAssetsBySortFn: func(ctx context.Context, in []uuid.UUID, sortBy string, limit, offset int, _ *bool) ([]repo.Asset, error) {
 			gotSort = sortBy
 			out := make([]repo.Asset, len(in))
 			for i, id := range in {
@@ -100,11 +100,11 @@ func TestSearchAssets_FusedSet_NoTopWhenBelowLimit(t *testing.T) {
 		searchAssetsFusedSetFn: func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool) {
 			return scoredSet(ids...), true
 		},
-		hydrateAssetsInOrderFn: func(ctx context.Context, in []uuid.UUID) ([]repo.Asset, error) {
+		hydrateAssetsInOrderFn: func(ctx context.Context, in []uuid.UUID, _ *bool) ([]repo.Asset, error) {
 			hydrateCalled = true
 			return nil, nil
 		},
-		pageAssetsBySortFn: func(ctx context.Context, in []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error) {
+		pageAssetsBySortFn: func(ctx context.Context, in []uuid.UUID, sortBy string, limit, offset int, _ *bool) ([]repo.Asset, error) {
 			return make([]repo.Asset, len(in)), nil
 		},
 	}
@@ -132,7 +132,7 @@ func TestSearchAssets_FusedSet_SemanticDegradedStillReturnsResults(t *testing.T)
 			set.SemanticDegraded = true
 			return set, true
 		},
-		pageAssetsBySortFn: func(ctx context.Context, in []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error) {
+		pageAssetsBySortFn: func(ctx context.Context, in []uuid.UUID, sortBy string, limit, offset int, _ *bool) ([]repo.Asset, error) {
 			return make([]repo.Asset, len(in)), nil
 		},
 	}

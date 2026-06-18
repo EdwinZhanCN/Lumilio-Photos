@@ -290,7 +290,7 @@ func collectCandidates(rows pgx.Rows, source string) ([]Candidate, error) {
 	return candidates, nil
 }
 
-func HydrateAssets(ctx context.Context, pool *pgxpool.Pool, rankedIDs []uuid.UUID) ([]repo.Asset, error) {
+func HydrateAssets(ctx context.Context, pool *pgxpool.Pool, rankedIDs []uuid.UUID, includeDeleted bool) ([]repo.Asset, error) {
 	if len(rankedIDs) == 0 {
 		return []repo.Asset{}, nil
 	}
@@ -305,12 +305,16 @@ func HydrateAssets(ctx context.Context, pool *pgxpool.Pool, rankedIDs []uuid.UUI
 		return []repo.Asset{}, nil
 	}
 
-	rows, err := pool.Query(ctx, `
+	query := `
 SELECT a.*
 FROM assets a
-WHERE a.asset_id = ANY($1::uuid[])
-  AND a.is_deleted = false
-`, pgIDs)
+WHERE a.asset_id = ANY($1::uuid[])`
+	if !includeDeleted {
+		query += `
+  AND a.is_deleted = false`
+	}
+
+	rows, err := pool.Query(ctx, query, pgIDs)
 	if err != nil {
 		return nil, fmt.Errorf("hydrate ranked assets: %w", err)
 	}

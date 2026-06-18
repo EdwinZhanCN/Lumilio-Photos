@@ -274,6 +274,20 @@ func (q *Queries) GetStackMemberCount(ctx context.Context, stackID pgtype.UUID) 
 	return count, err
 }
 
+const getStackMemberCountAny = `-- name: GetStackMemberCountAny :one
+SELECT COUNT(*) as count
+FROM asset_stack_members asm
+JOIN assets a ON a.asset_id = asm.asset_id
+WHERE asm.stack_id = $1
+`
+
+func (q *Queries) GetStackMemberCountAny(ctx context.Context, stackID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, getStackMemberCountAny, stackID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getStackMembers = `-- name: GetStackMembers :many
 SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
 FROM asset_stack_members asm
@@ -284,6 +298,40 @@ ORDER BY asm.position ASC, asm.created_at ASC
 
 func (q *Queries) GetStackMembers(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error) {
 	rows, err := q.db.Query(ctx, getStackMembers, stackID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AssetStackMember
+	for rows.Next() {
+		var i AssetStackMember
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.StackID,
+			&i.Relation,
+			&i.Position,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStackMembersAny = `-- name: GetStackMembersAny :many
+SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
+FROM asset_stack_members asm
+JOIN assets a ON a.asset_id = asm.asset_id
+WHERE asm.stack_id = $1
+ORDER BY asm.position ASC, asm.created_at ASC
+`
+
+func (q *Queries) GetStackMembersAny(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error) {
+	rows, err := q.db.Query(ctx, getStackMembersAny, stackID)
 	if err != nil {
 		return nil, err
 	}

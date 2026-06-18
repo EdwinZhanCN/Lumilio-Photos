@@ -30,6 +30,7 @@ type Filter struct {
 	DateFrom         *time.Time
 	DateTo           *time.Time
 	IsRaw            *bool
+	IsDeleted        *bool
 	Rating           *int
 	Liked            *bool
 	CameraModel      *string

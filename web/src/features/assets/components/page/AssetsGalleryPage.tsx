@@ -1,7 +1,11 @@
-import { useCallback, useState, useEffect, type ReactNode } from "react";
+import { useCallback, useState, useEffect, useMemo, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
+import type {
+  AssetsBulkActionId,
+  AssetsBulkActionInput,
+} from "@/features/assets/components/shared/bulkActions";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
@@ -20,7 +24,9 @@ import {
   useIsCarouselOpen,
   useSearchQuery,
   useUIActions,
+  useFilterState,
 } from "@/features/assets/selectors";
+import { selectHasActiveFilters } from "@/features/assets/slices/filters.slice";
 import { useI18n } from "@/lib/i18n";
 import { usePreference } from "@/features/settings";
 import type { BrowseGroup } from "@/features/assets";
@@ -36,6 +42,8 @@ type AssetsGalleryPageProps = {
   icon?: ReactNode;
   baseFilter?: AssetFilter;
   lockedFilterFields?: readonly FilterFieldKey[];
+  bulkActions?: AssetsBulkActionInput;
+  hiddenBulkActions?: readonly AssetsBulkActionId[];
   viewKey?: string;
   /** Custom banner rendered between the header and the gallery (album info,
    * person cover, trip map, etc.). Lets scoped collections reuse this page
@@ -48,6 +56,8 @@ export function AssetsGalleryPage({
   icon,
   baseFilter,
   lockedFilterFields,
+  bulkActions,
+  hiddenBulkActions,
   viewKey,
   hero,
 }: AssetsGalleryPageProps = {}) {
@@ -62,9 +72,36 @@ export function AssetsGalleryPage({
   // Selectors
   const sortBy = useSortBy();
   const searchQuery = useSearchQuery();
+  const filtersState = useFilterState();
   const isCarouselOpen = useIsCarouselOpen();
   const { setSortBy } = useUIActions();
   const isSearchActive = searchQuery.trim().length > 0;
+  const hasActiveFilters = selectHasActiveFilters(filtersState);
+  const isTrashView = baseFilter?.is_deleted === true;
+  const emptyState = useMemo(() => {
+    if (isSearchActive) {
+      return {
+        title: t("assets.all.emptySearchTitle"),
+        description: t("assets.all.emptySearchDescription"),
+      };
+    }
+    if (isTrashView) {
+      return {
+        title: t("assets.trash.emptyTitle"),
+        description: t("assets.trash.emptyDescription"),
+      };
+    }
+    if (hasActiveFilters) {
+      return {
+        title: t("assets.all.emptyFilteredTitle"),
+        description: t("assets.all.emptyFilteredDescription"),
+      };
+    }
+    return {
+      title: t("assets.all.emptyTitle"),
+      description: t("assets.all.emptyDescription"),
+    };
+  }, [hasActiveFilters, isSearchActive, isTrashView, t]);
   const currentLayout = assetPage.layout;
   const compactColumns = assetPage.columns;
   const GalleryComponent =
@@ -214,6 +251,8 @@ export function AssetsGalleryPage({
             isLoadingMore={isFetchingNextPage}
             isLoading={isFetching && photoSearchView.resultAssets.length === 0}
             columns={compactColumns}
+            emptyStateTitle={emptyState.title}
+            emptyStateDescription={emptyState.description}
           />
         )}
       </div>
@@ -303,6 +342,8 @@ export function AssetsGalleryPage({
     hasMore: hasNextPage,
     isLoadingMore: isFetchingNextPage,
     columns: compactColumns,
+    emptyStateTitle: emptyState.title,
+    emptyStateDescription: emptyState.description,
   };
 
   return (
@@ -315,6 +356,8 @@ export function AssetsGalleryPage({
         icon={icon}
         browseItems={activeBrowseItems}
         lockedFilterFields={lockedFilterFields}
+        bulkActions={bulkActions}
+        hiddenBulkActions={hiddenBulkActions}
       />
 
       {hero}

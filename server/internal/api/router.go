@@ -24,6 +24,7 @@ type AssetControllerInterface interface {
 	GetWebAudio(c *gin.Context)
 	UpdateAsset(c *gin.Context)
 	DeleteAsset(c *gin.Context)
+	RestoreAsset(c *gin.Context)
 	BatchUploadAssets(c *gin.Context)
 	GetUploadConfig(c *gin.Context)
 	GetUploadProgress(c *gin.Context)
@@ -378,6 +379,7 @@ func NewRouter(
 			assets.HEAD("/:id/thumbnail", assetController.GetAssetThumbnail)
 			assets.PUT("/:id", assetController.UpdateAsset)
 			assets.DELETE("/:id", assetController.DeleteAsset)
+			assets.POST("/:id/restore", assetController.RestoreAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
 			assets.GET("/:id/albums", albumController.GetAssetAlbums)
 

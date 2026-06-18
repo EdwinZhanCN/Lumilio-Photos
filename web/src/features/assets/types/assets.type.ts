@@ -156,7 +156,7 @@ export interface AssetActionsResult {
       updates: Partial<Asset>;
     }>,
   ) => Promise<void>;
-  refreshAsset: (assetId: string) => Promise<void>;
+  refreshAsset: () => Promise<void>;
 }
 
 export interface SelectionResult {

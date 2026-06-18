@@ -5,6 +5,12 @@
   "assets": {
     "all": {
       "asset_not_available": "资源可能在当前视图中不可用。",
+      "emptyDescription": "你添加的照片和视频会显示在这里。",
+      "emptyFilteredDescription": "尝试调整或清除筛选条件以查看更多照片。",
+      "emptyFilteredTitle": "没有符合筛选条件的照片",
+      "emptySearchDescription": "尝试其他搜索词或清除搜索。",
+      "emptySearchTitle": "没有搜索结果",
+      "emptyTitle": "暂无照片",
       "end_of_results": "已无更多结果。",
       "load_error": "加载照片失败。请检查你的网络连接后重试。",
       "loading_assets": "正在加载资源...",
@@ -22,11 +28,12 @@
         "affectsSelected_other": "已选择 {{count}} 项。",
         "applyToItems_one": "应用于 {{count}} 个项目",
         "applyToItems_other": "应用于 {{count}} 个项目",
-        "deleteSelected": "删除所选",
+        "deleteSelected": "移入回收站",
         "downloadAll": "下载全部",
         "like": "喜欢",
         "likedMenu": "已喜欢",
         "setRating": "设置评分",
+        "stackSelected": "堆叠所选",
         "title": "操作",
         "unlike": "取消喜欢",
         "unrated": "未评分"
@@ -50,10 +57,10 @@
       },
       "deleteConfirmModal": {
         "cancelButton": "取消",
-        "deleteButton": "删除资源",
-        "message_one": "这将删除 {{count}} 个资源。",
-        "message_other": "这将删除 {{count}} 个资源。",
-        "title": "确认删除"
+        "deleteButton": "移入回收站",
+        "message_one": "这会将 {{count}} 个资源移入回收站。",
+        "message_other": "这会将 {{count}} 个资源移入回收站。",
+        "title": "将所选资源移入回收站？"
       },
       "messages": {
         "addToAlbumError": "添加到相册失败",
@@ -62,12 +69,15 @@
         "bulkActionError": "更新所选资源失败。",
         "bulkActionSuccess_one": "已更新 {{count}} 个资源。",
         "bulkActionSuccess_other": "已更新 {{count}} 个资源。",
-        "deleteError": "删除资源失败",
-        "deleteSuccess_one": "已删除 {{count}} 个资源。",
-        "deleteSuccess_other": "已删除 {{count}} 个资源。",
+        "deleteError": "移入回收站失败",
+        "deleteSuccess_one": "已将 {{count}} 个资源移入回收站。",
+        "deleteSuccess_other": "已将 {{count}} 个资源移入回收站。",
         "downloadError": "启动下载失败",
         "downloadStart": "下载已开始",
-        "loadAlbumsError": "加载相册失败"
+        "loadAlbumsError": "加载相册失败",
+        "stackError": "堆叠所选资源失败。",
+        "stackSuccess_one": "已堆叠 {{count}} 个资源。",
+        "stackSuccess_other": "已堆叠 {{count}} 个资源。"
       },
       "moreActions": "更多操作",
       "scan": {
@@ -90,6 +100,11 @@
       "sortByOptions": {
         "dateCaptured": "拍摄时间",
         "recentlyAdded": "最近添加"
+      },
+      "stackConfirm": {
+        "message_one": "将 {{count}} 个所选资源组合为一个堆叠。",
+        "message_other": "将 {{count}} 个所选资源组合为一个堆叠。",
+        "title": "堆叠所选资源？"
       }
     },
     "audioInfoView": {
@@ -299,6 +314,25 @@
       },
       "thumbnailAlt": "堆叠成员预览",
       "title": "堆叠详情"
+    },
+    "trash": {
+      "bulkActions": {
+        "restore": {
+          "confirmMessage_one": "这会将 {{count}} 个资源恢复到资源库。",
+          "confirmMessage_other": "这会将 {{count}} 个资源恢复到资源库。",
+          "confirmTitle": "恢复所选资源？",
+          "label_one": "恢复 {{count}} 个资源",
+          "label_other": "恢复 {{count}} 个资源"
+        }
+      },
+      "messages": {
+        "restoreError": "恢复所选资源失败。",
+        "restoreSuccess_one": "已恢复 {{count}} 个资源。",
+        "restoreSuccess_other": "已恢复 {{count}} 个资源。"
+      },
+      "emptyDescription": "移入回收站的项目会显示在这里。",
+      "emptyTitle": "回收站为空",
+      "title": "回收站"
     },
     "videoInfoView": {
       "codec_label": "编码: {{codec}}",
@@ -518,6 +552,17 @@
         "success_one": "已将 {{count}} 张照片加入识别队列。",
         "success_other": "已将 {{count}} 张照片加入识别队列。"
       },
+      "bulkActions": {
+        "removeFromAlbum": {
+          "confirmMessage_one": "将从此相册移除 {{count}} 个所选资源。原始资源仍会保留在资源库中。",
+          "confirmMessage_other": "将从此相册移除 {{count}} 个所选资源。原始资源仍会保留在资源库中。",
+          "confirmTitle": "从此相册移除所选项目？",
+          "error": "从相册移除项目失败。",
+          "label": "从此相册移除",
+          "success_one": "已从此相册移除 {{count}} 个项目。",
+          "success_other": "已从此相册移除 {{count}} 个项目。"
+        }
+      },
       "createdAtLabel": "创建于",
       "fallbackName": "相册",
       "itemsCount_one": "{{count}} 项",
@@ -605,6 +650,10 @@
       "duplicates": {
         "description": "查找并合并重复的照片",
         "title": "重复照片"
+      },
+      "trash": {
+        "description": "查看已移出资源库的资源",
+        "title": "回收站"
       }
     }
   },
@@ -639,13 +688,13 @@
     "viewAll": "查看全部"
   },
   "delete": {
-    "confirm": "删除资源",
-    "confirmMessage": "确定要删除 \"{{filename}}\" 吗？",
-    "confirmTitle": "删除资源",
-    "deleting": "删除中...",
-    "error": "删除资源失败",
-    "softDeleteNote": "这将标记照片为已删除。文件不会被永久删除。",
-    "success": "资源删除成功",
+    "confirm": "移入回收站",
+    "confirmMessage": "将“{{filename}}”移入回收站？",
+    "confirmTitle": "将资源移入回收站",
+    "deleting": "正在移动...",
+    "error": "移入回收站失败",
+    "softDeleteNote": "这会将照片移出资源库。文件不会被永久删除。",
+    "success": "资源已移入回收站",
     "thisAsset": "这张照片"
   },
   "duplicates": {

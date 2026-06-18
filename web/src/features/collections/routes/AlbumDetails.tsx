@@ -4,12 +4,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AlbumIcon, Bird, RefreshCcw } from "lucide-react";
+import { AlbumIcon, Bird, FolderMinus, RefreshCcw } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import type { components } from "@/lib/http-commons/schema";
 import { useWorkingRepository } from "@/features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useMessage } from "@/hooks/util-hooks/useMessage";
+import type {
+  AssetsBulkActionContext,
+  AssetsBulkActionItem,
+} from "@/features/assets/components/shared/bulkActions";
 
 type RebuildAlbumBioClipResponse =
   components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
@@ -17,6 +22,7 @@ type RebuildAlbumBioClipResponse =
 const AlbumAssetsContent = () => {
   const { t, i18n } = useI18n();
   const queryClient = useQueryClient();
+  const showMessage = useMessage();
   const { albumId } = useParams<{ albumId: string }>();
   const { scopedRepositoryId } = useWorkingRepository();
   const [bioClipFeedback, setBioClipFeedback] = useState<{
@@ -44,6 +50,26 @@ const AlbumAssetsContent = () => {
     "post",
     "/api/v1/albums/{id}/bioclip/rebuild",
   );
+  const removeAssetFromAlbumMutation = $api.useMutation(
+    "delete",
+    "/api/v1/albums/{id}/assets/{assetId}",
+  );
+
+  const invalidateAlbumAssets = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key)) return false;
+
+        const path = key[1];
+        return (
+          path === "/api/v1/assets/list" ||
+          path === "/api/v1/assets/search" ||
+          path === "/api/v1/albums/{id}"
+        );
+      },
+    });
+  }, [queryClient]);
 
   const handleRebuildBioClip = useCallback(async () => {
     if (!albumIdNumber || !isBioAlbum) return;
@@ -74,6 +100,70 @@ const AlbumAssetsContent = () => {
       });
     }
   }, [albumIdNumber, isBioAlbum, queryClient, rebuildBioClipMutation, t]);
+
+  const bulkActions = useCallback(
+    (context: AssetsBulkActionContext): AssetsBulkActionItem[] => [
+      {
+        id: "remove-from-current-album",
+        label: t("collections.albumDetails.bulkActions.removeFromAlbum.label", {
+          defaultValue: "Remove from this album",
+        }),
+        icon: <FolderMinus size={16} />,
+        tone: "danger",
+        requiresConfirmation: true,
+        confirmationTitle: t(
+          "collections.albumDetails.bulkActions.removeFromAlbum.confirmTitle",
+          { defaultValue: "Remove selected items from this album?" },
+        ),
+        confirmationMessage: t(
+          "collections.albumDetails.bulkActions.removeFromAlbum.confirmMessage",
+          {
+            count: context.affectedAssetCount,
+            defaultValue:
+              "{{count}} selected assets will be removed from this album. Original assets remain in the library.",
+          },
+        ),
+        disabled: !albumIdNumber,
+        onRun: async (context) => {
+          if (!albumIdNumber || context.selectedAssetIds.length === 0) return;
+
+          try {
+            await Promise.all(
+              context.selectedAssetIds.map((assetId) =>
+                removeAssetFromAlbumMutation.mutateAsync({
+                  params: { path: { id: albumIdNumber, assetId } },
+                  body: {},
+                }),
+              ),
+            );
+            context.clearSelection();
+            await invalidateAlbumAssets();
+            showMessage(
+              "success",
+              t(
+                "collections.albumDetails.bulkActions.removeFromAlbum.success",
+                { count: context.affectedAssetCount },
+              ),
+            );
+          } catch (error) {
+            console.error("Failed to remove selected assets from album:", error);
+            showMessage(
+              "error",
+              t("collections.albumDetails.bulkActions.removeFromAlbum.error"),
+            );
+            throw error;
+          }
+        },
+      },
+    ],
+    [
+      albumIdNumber,
+      invalidateAlbumAssets,
+      removeAssetFromAlbumMutation,
+      showMessage,
+      t,
+    ],
+  );
 
   const hero = (
     <div className="px-4 py-4">
@@ -171,6 +261,8 @@ const AlbumAssetsContent = () => {
       baseFilter={{ album_id: albumIdNumber }}
       viewKey={`album:${albumId}`}
       hero={hero}
+      bulkActions={bulkActions}
+      hiddenBulkActions={["delete-assets"]}
     />
   );
 };

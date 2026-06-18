@@ -1,147 +1,146 @@
 import { useCallback } from "react";
+import type { InfiniteData } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { AssetActionsResult } from "@/features/assets";
-import client from "@/lib/http-commons/client";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
 import { Asset } from "@/lib/assets/types";
 
+type BrowseItemDTO = components["schemas"]["dto.BrowseItemDTO"];
+type QueryAssetsResponseDTO =
+  components["schemas"]["dto.QueryAssetsResponseDTO"];
+type SearchAssetsResponseDTO =
+  components["schemas"]["dto.SearchAssetsResponseDTO"];
+type AssetsListPage = QueryAssetsResponseDTO | SearchAssetsResponseDTO;
+
+const ASSET_LIST_QUERY_PATHS = new Set([
+  "/api/v1/assets/list",
+  "/api/v1/assets/search",
+]);
+
+const isAssetListQuery = (queryKey: unknown): boolean => {
+  if (!Array.isArray(queryKey)) return false;
+  const path = queryKey[1];
+  return typeof path === "string" && ASSET_LIST_QUERY_PATHS.has(path);
+};
+
+const patchBrowseItemAsset = (
+  item: BrowseItemDTO,
+  assetId: string,
+  updateFn: (asset: Asset) => Asset,
+): BrowseItemDTO => {
+  let updated = false;
+  let nextItem = item;
+
+  if (item.asset?.asset_id === assetId) {
+    nextItem = {
+      ...nextItem,
+      asset: updateFn(item.asset as Asset),
+    };
+    updated = true;
+  }
+
+  if (item.stack?.cover_asset?.asset_id === assetId) {
+    nextItem = {
+      ...nextItem,
+      stack: {
+        ...item.stack,
+        cover_asset: updateFn(item.stack.cover_asset as Asset),
+      },
+    };
+    updated = true;
+  }
+
+  return updated ? nextItem : item;
+};
+
+const isSearchAssetsPage = (
+  page: AssetsListPage,
+): page is SearchAssetsResponseDTO =>
+  "result_items" in page ||
+  "top_items" in page ||
+  "results_total_assets" in page;
+
+const patchAssetsListPage = (
+  page: AssetsListPage,
+  assetId: string,
+  updateFn: (asset: Asset) => Asset,
+): AssetsListPage => {
+  const patchBrowseItems = (items?: BrowseItemDTO[]) =>
+    items?.map((item) => patchBrowseItemAsset(item, assetId, updateFn));
+
+  if (isSearchAssetsPage(page)) {
+    return {
+      ...page,
+      result_items: patchBrowseItems(page.result_items),
+      top_items: patchBrowseItems(page.top_items),
+    };
+  }
+
+  return {
+    ...page,
+    items: patchBrowseItems(page.items),
+  };
+};
+
 /**
  * Hook for performing business operations on assets.
- * Now simplified for React 19 architecture:
- * - No manual cache updates (optimistic UI handles immediate feedback)
- * - No snapshot/restore logic
- * - Just API call + invalidateQueries
- *
- * @returns Object containing asset action functions
  */
 export const useAssetActions = (): AssetActionsResult => {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { t } = useI18n();
 
-  // List of API paths that return asset lists (infinite queries)
-  // We strictly match these to avoid accidentally updating unrelated queries
-  const ASSET_LIST_QUERY_PATHS = new Set([
-    "/api/v1/assets/list",
-    "/api/v1/assets/search",
-  ]);
+  const updateRatingMutation = $api.useMutation(
+    "put",
+    "/api/v1/assets/{id}/rating",
+  );
+  const toggleLikeMutation = $api.useMutation("put", "/api/v1/assets/{id}/like");
+  const updateDescriptionMutation = $api.useMutation(
+    "put",
+    "/api/v1/assets/{id}/description",
+  );
+  const deleteAssetMutation = $api.useMutation(
+    "delete",
+    "/api/v1/assets/{id}",
+  );
 
-  /**
-   * Helper to invalidate asset queries
-   */
   const invalidateAssetQueries = useCallback(() => {
     return queryClient.invalidateQueries({
-      predicate: (query) => {
-        const key = query.queryKey;
-        // openapi-react-query keys are typically [method, path, params]
-        if (Array.isArray(key)) {
-          const path = key[1];
-          if (typeof path === 'string') {
-            return ASSET_LIST_QUERY_PATHS.has(path);
-          }
-        }
-        return false;
-      },
+      predicate: (query) => isAssetListQuery(query.queryKey),
     });
   }, [queryClient]);
 
-  /**
-   * Helper to manually update asset in cache without invalidation
-   */
-  const updateAssetInCache = useCallback((assetId: string, updateFn: (asset: Asset) => Asset) => {
-    const updateAssets = (assets: Asset[] | undefined) => {
-      if (!Array.isArray(assets)) return assets;
-      return assets.map((asset: Asset) => {
-        if (asset.asset_id === assetId) {
-          return updateFn(asset);
-        }
-        return asset;
-      });
-    };
-
-    const updateBrowseItems = (items: any[] | undefined) => {
-      if (!Array.isArray(items)) return items;
-      return items.map((item: any) => {
-        if (!item) return item;
-        let updated = false;
-        let newAsset = item.asset;
-        let newStack = item.stack;
-
-        if (item.asset && item.asset.asset_id === assetId) {
-          newAsset = updateFn(item.asset);
-          updated = true;
-        }
-
-        if (item.stack && item.stack.cover_asset && item.stack.cover_asset.asset_id === assetId) {
-          newStack = {
-            ...item.stack,
-            cover_asset: updateFn(item.stack.cover_asset),
-          };
-          updated = true;
-        }
-
-        if (updated) {
-          return {
-            ...item,
-            asset: newAsset,
-            stack: newStack,
-          };
-        }
-        return item;
-      });
-    };
-
-    queryClient.setQueriesData(
-      {
-        predicate: (query) => {
-          const key = query.queryKey;
-          if (Array.isArray(key)) {
-            const path = key[1];
-            if (typeof path === 'string') {
-              return ASSET_LIST_QUERY_PATHS.has(path);
-            }
-          }
-          return false;
+  const updateAssetInCache = useCallback(
+    (assetId: string, updateFn: (asset: Asset) => Asset) => {
+      queryClient.setQueriesData<InfiniteData<AssetsListPage>>(
+        {
+          predicate: (query) => isAssetListQuery(query.queryKey),
         },
-      },
-      (oldData: any) => {
-        if (!oldData) return oldData;
+        (oldData) => {
+          if (!oldData?.pages) return oldData;
 
-        // Handle Infinite Query data structure
-        if (oldData.pages && Array.isArray(oldData.pages)) {
           return {
             ...oldData,
-            pages: oldData.pages.map((page: any) => {
-              return {
-                ...page,
-                assets: updateAssets(page.assets),
-                results: updateAssets(page.results),
-                top_results: updateAssets(page.top_results),
-                items: updateBrowseItems(page.items),
-                result_items: updateBrowseItems(page.result_items),
-                top_items: updateBrowseItems(page.top_items),
-              };
-            }),
+            pages: oldData.pages.map((page) =>
+              patchAssetsListPage(page, assetId, updateFn),
+            ),
           };
-        }
-        return oldData;
-      }
-    );
-  }, [queryClient]);
+        },
+      );
+    },
+    [queryClient],
+  );
 
-  /**
-   * Update asset rating
-   */
   const updateRating = useCallback(
     async (assetId: string, rating: number): Promise<void> => {
       try {
-        await client.PUT("/api/v1/assets/{id}/rating", {
+        await updateRatingMutation.mutateAsync({
           params: { path: { id: assetId } },
           body: { rating },
         });
-
-        // Hybrid Strategy: Manual update for low-risk, high-frequency action
         updateAssetInCache(assetId, (asset) => ({ ...asset, rating }));
       } catch (error) {
         console.error("Failed to update rating:", error);
@@ -149,21 +148,16 @@ export const useAssetActions = (): AssetActionsResult => {
         throw error;
       }
     },
-    [updateAssetInCache, showMessage, t],
+    [showMessage, t, updateAssetInCache, updateRatingMutation],
   );
 
-  /**
-   * Toggle asset like status
-   */
   const toggleLike = useCallback(
     async (assetId: string, isLiked: boolean): Promise<void> => {
       try {
-        await client.PUT("/api/v1/assets/{id}/like", {
+        await toggleLikeMutation.mutateAsync({
           params: { path: { id: assetId } },
           body: { liked: isLiked },
         });
-
-        // Hybrid Strategy: Manual update for low-risk, high-frequency action
         updateAssetInCache(assetId, (asset) => ({ ...asset, liked: isLiked }));
       } catch (error) {
         console.error("Failed to toggle like:", error);
@@ -171,22 +165,16 @@ export const useAssetActions = (): AssetActionsResult => {
         throw error;
       }
     },
-    [updateAssetInCache, showMessage, t],
+    [showMessage, t, toggleLikeMutation, updateAssetInCache],
   );
 
-  /**
-   * Update asset description
-   */
   const updateDescription = useCallback(
     async (assetId: string, description: string): Promise<void> => {
       try {
-        await client.PUT("/api/v1/assets/{id}/description", {
+        await updateDescriptionMutation.mutateAsync({
           params: { path: { id: assetId } },
           body: { description },
         });
-
-        // Hybrid Strategy: Invalidate for higher-risk/lower-frequency action
-        // Ensuring description matches everywhere (e.g. search results) is complex to patch manually
         await invalidateAssetQueries();
         showMessage("success", t("assets.basicInfo.descriptionUpdated"));
       } catch (error) {
@@ -195,19 +183,15 @@ export const useAssetActions = (): AssetActionsResult => {
         throw error;
       }
     },
-    [invalidateAssetQueries, showMessage, t],
+    [invalidateAssetQueries, showMessage, t, updateDescriptionMutation],
   );
 
-  /**
-   * Delete asset
-   */
   const deleteAsset = useCallback(
     async (assetId: string): Promise<void> => {
       try {
-        await client.DELETE("/api/v1/assets/{id}", {
+        await deleteAssetMutation.mutateAsync({
           params: { path: { id: assetId } },
         });
-
         await invalidateAssetQueries();
         showMessage("success", t("delete.success"));
       } catch (error) {
@@ -216,12 +200,9 @@ export const useAssetActions = (): AssetActionsResult => {
         throw error;
       }
     },
-    [invalidateAssetQueries, showMessage, t],
+    [deleteAssetMutation, invalidateAssetQueries, showMessage, t],
   );
 
-  /**
-   * Batch update multiple assets
-   */
   const batchUpdateAssets = useCallback(
     async (
       updates: Array<{
@@ -230,25 +211,26 @@ export const useAssetActions = (): AssetActionsResult => {
       }>,
     ): Promise<void> => {
       try {
-        // Batch API call (looping for now as per original logic)
         await Promise.all(
           updates.map(async ({ assetId, updates: assetUpdates }) => {
             if (assetUpdates.rating !== undefined) {
-              await client.PUT("/api/v1/assets/{id}/rating", {
+              await updateRatingMutation.mutateAsync({
                 params: { path: { id: assetId } },
                 body: { rating: assetUpdates.rating },
               });
             }
             if (assetUpdates.liked !== undefined) {
-              await client.PUT("/api/v1/assets/{id}/like", {
+              await toggleLikeMutation.mutateAsync({
                 params: { path: { id: assetId } },
                 body: { liked: assetUpdates.liked },
               });
             }
             if (assetUpdates.specific_metadata?.description !== undefined) {
-              await client.PUT("/api/v1/assets/{id}/description", {
+              await updateDescriptionMutation.mutateAsync({
                 params: { path: { id: assetId } },
-                body: { description: assetUpdates.specific_metadata.description },
+                body: {
+                  description: assetUpdates.specific_metadata.description,
+                },
               });
             }
           }),
@@ -265,19 +247,19 @@ export const useAssetActions = (): AssetActionsResult => {
         throw error;
       }
     },
-    [invalidateAssetQueries, showMessage, t],
+    [
+      invalidateAssetQueries,
+      showMessage,
+      t,
+      toggleLikeMutation,
+      updateDescriptionMutation,
+      updateRatingMutation,
+    ],
   );
 
-  /**
-   * Refresh asset data
-   */
-  const refreshAsset = useCallback(
-    async (): Promise<void> => {
-      // With the new strategy, refresh usually just means invalidating
-      await invalidateAssetQueries();
-    },
-    [invalidateAssetQueries],
-  );
+  const refreshAsset = useCallback(async (): Promise<void> => {
+    await invalidateAssetQueries();
+  }, [invalidateAssetQueries]);
 
   return {
     updateRating,
@@ -288,9 +270,3 @@ export const useAssetActions = (): AssetActionsResult => {
     refreshAsset,
   };
 };
-
-/**
- * Hook for asset actions that don't require optimistic updates.
- * (This is essentially the same as above now, potentially can be merged or deprecated)
- */
-export const useAssetActionsSimple = useAssetActions;

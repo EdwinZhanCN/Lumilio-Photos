@@ -1,5 +1,6 @@
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
+import AssetsTrash from "@/features/assets/routes/AssetsTrash";
 import { StudioEditMvp } from "@/features/studio/routes/StudioEditMvp";
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
@@ -102,6 +103,14 @@ export const appRoutes = [
   {
     path: "/collections/utilities/:classifierSlug/:assetId",
     element: <UtilityClassifierAlbum />,
+  },
+  {
+    path: "/collections/trash",
+    element: <AssetsTrash />,
+  },
+  {
+    path: "/collections/trash/:assetId",
+    element: <AssetsTrash />,
   },
   {
     path: "/collections/:albumId",

@@ -1,4 +1,4 @@
-import { Copy } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
@@ -33,6 +33,25 @@ export default function UtilitiesRail() {
           <div className="absolute inset-x-0 bottom-0 p-3">
             <p className="text-xs text-base-content/50">
               {t("collections.utilities.duplicates.description")}
+            </p>
+          </div>
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate("/collections/trash")}
+        className="group w-48 shrink-0 cursor-pointer"
+      >
+        <div className="relative aspect-square overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-warning/20 via-warning/10 to-base-200 transition duration-300">
+          <div className="flex h-full flex-col items-center justify-center gap-2">
+            <Trash2 className="size-10 text-warning" strokeWidth={1.5} />
+            <span className="text-sm font-semibold text-warning">
+              {t("collections.utilities.trash.title")}
+            </span>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 p-3">
+            <p className="text-xs text-base-content/50">
+              {t("collections.utilities.trash.description")}
             </p>
           </div>
         </div>

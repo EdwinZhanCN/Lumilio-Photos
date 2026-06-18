@@ -13,7 +13,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	aggregatesearch "server/internal/search"
-	"server/internal/storage"
 	"server/internal/utils/geohash"
 	"strings"
 	"time"
@@ -48,6 +47,7 @@ var (
 // AssetService defines the interface for asset-related operations
 type AssetService interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
+	GetAssetAny(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
 	GetAssetRelations(ctx context.Context, id uuid.UUID) (repo.GetAssetWithRelationsRow, error)
 	GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.RawMessage, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
@@ -56,6 +56,7 @@ type AssetService interface {
 	GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
+	RestoreAsset(ctx context.Context, id uuid.UUID) error
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
 	UpdateAssetMetadataWithExifRaw(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, exifRaw json.RawMessage) error
@@ -125,6 +126,7 @@ type QueryAssetsParams struct {
 	DateFrom         *time.Time
 	DateTo           *time.Time
 	IsRaw            *bool
+	IsDeleted        *bool
 	Rating           *int
 	Liked            *bool
 	CameraModel      *string
@@ -222,8 +224,8 @@ type assetService struct {
 	placeRetriever         *aggregatesearch.TextRetriever
 	queryAssetsUnifiedFn   func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
 	searchAssetsFusedSetFn func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool)
-	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID) ([]repo.Asset, error)
-	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int) ([]repo.Asset, error)
+	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error)
+	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
 }
 
 func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
@@ -298,6 +300,21 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 	return &dbAsset, nil
 }
 
+// GetAssetAny retrieves an asset by ID regardless of Trash state.
+func (s *assetService) GetAssetAny(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return nil, fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	dbAsset, err := s.queries.GetAssetByIDAny(ctx, pgUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get asset: %w", err)
+	}
+
+	return &dbAsset, nil
+}
+
 func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.RawMessage, error) {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
@@ -315,8 +332,8 @@ func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.
 // GetAssetRelations returns a single asset together with its aggregated
 // relations (thumbnails, tags, albums, species predictions, OCR, and face
 // results) in one query. The handler projects this into a typed
-// dto.AssetDetailDTO, honoring the include_* query flags. Excludes soft-deleted
-// assets.
+// dto.AssetDetailDTO, honoring the include_* query flags. Trash state is not
+// filtered here; handler auth decides access.
 func (s *assetService) GetAssetRelations(ctx context.Context, id uuid.UUID) (repo.GetAssetWithRelationsRow, error) {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
@@ -490,43 +507,24 @@ func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
 	return &hash5, &hash7
 }
 
-// DeleteAsset marks an asset as deleted, and move the asset to the trash folder
+// DeleteAsset moves an asset into the app Trash via a database soft-delete.
 func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	asset, err := s.queries.GetAssetByID(ctx, pgUUID)
-	if err != nil {
-		return fmt.Errorf("failed to get asset: %w", err)
-	}
-
-	if asset.StoragePath != nil && strings.TrimSpace(*asset.StoragePath) != "" {
-		repository, err := s.queries.GetRepository(ctx, asset.RepositoryID)
-		if err != nil {
-			return fmt.Errorf("failed to get repository for asset deletion: %w", err)
-		}
-
-		storagePath := strings.TrimSpace(*asset.StoragePath)
-		metadata := &storage.DeleteMetadata{
-			DeletedAt:    time.Now().UTC(),
-			OriginalPath: storagePath,
-			Reason:       "asset_delete",
-			AssetID:      func() *string { s := id.String(); return &s }(),
-		}
-
-		moveErr := storage.NewDirectoryManager().MoveToTrash(repository.Path, storagePath, metadata)
-		if moveErr != nil {
-			if errors.Is(moveErr, os.ErrNotExist) {
-				log.Printf("DeleteAsset: file already missing for asset %s at path %s, continuing soft delete", id.String(), storagePath)
-			} else {
-				return fmt.Errorf("move asset file to trash: %w", moveErr)
-			}
-		}
-	}
-
 	return s.queries.DeleteAsset(ctx, pgUUID)
+}
+
+// RestoreAsset restores an asset from the app Trash.
+func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	return s.queries.RestoreAsset(ctx, pgUUID)
 }
 
 // AddAssetToAlbum adds an asset to an album
@@ -1176,7 +1174,7 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 			// Best Results exists only when the set is larger than the
 			// showcase size; otherwise everything lives in Results.
 			if len(ids) >= params.TopResultsLimit {
-				topResults, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit])
+				topResults, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit], params.IsDeleted)
 				if err != nil {
 					return SearchAssetsResult{}, err
 				}
@@ -1184,7 +1182,7 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 			}
 
 			if params.EnhancementMode != SearchEnhancementModeOnly {
-				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset)
+				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset, params.IsDeleted)
 				if err != nil {
 					return SearchAssetsResult{}, err
 				}
@@ -1282,6 +1280,7 @@ func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filte
 		DateFrom:         params.DateFrom,
 		DateTo:           params.DateTo,
 		IsRaw:            params.IsRaw,
+		IsDeleted:        params.IsDeleted,
 		Rating:           params.Rating,
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
@@ -1369,6 +1368,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		LocationWest:     params.LocationWest,
 		DateFrom:         fromTime,
 		DateTo:           toTime,
+		IsDeleted:        params.IsDeleted,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count assets: %w", err)
@@ -1399,6 +1399,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		SortBy:           sortByPtr,
 		DateFrom:         fromTime,
 		DateTo:           toTime,
+		IsDeleted:        params.IsDeleted,
 		Limit:            int32(params.Limit),
 		Offset:           int32(params.Offset),
 	})
@@ -1543,8 +1544,12 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 	spacePlaceholder := builder.addArg(space.ID)
 
 	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", space.Dimensions, embeddingPlaceholder, space.Dimensions)
+	isDeleted := false
+	if params.IsDeleted != nil {
+		isDeleted = *params.IsDeleted
+	}
 	conditions := []string{
-		"a.is_deleted = false",
+		fmt.Sprintf("a.is_deleted = %s", builder.addArg(isDeleted)),
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
 		"e.is_primary = true",
 	}
@@ -1790,6 +1795,7 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedP
 		out.DateTo = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
 	}
 	out.IsRaw = params.IsRaw
+	out.IsDeleted = params.IsDeleted
 	if params.Rating != nil {
 		rating := int32(*params.Rating)
 		out.Rating = &rating

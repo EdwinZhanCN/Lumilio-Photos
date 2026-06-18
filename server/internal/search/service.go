@@ -146,7 +146,8 @@ func (s *AggregateService) Search(ctx context.Context, req Request) (Response, e
 		rankedIDs = append(rankedIDs, item.assetID)
 	}
 
-	assets, err := HydrateAssets(ctx, s.pool, rankedIDs)
+	includeDeleted := req.Filter.IsDeleted != nil && *req.Filter.IsDeleted
+	assets, err := HydrateAssets(ctx, s.pool, rankedIDs, includeDeleted)
 	if err != nil {
 		return Response{Sources: sourceMetas, TotalCandidates: totalCandidates, CandidatePoolSize: req.TopK}, err
 	}

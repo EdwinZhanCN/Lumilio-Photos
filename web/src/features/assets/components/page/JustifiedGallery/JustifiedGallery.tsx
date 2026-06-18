@@ -127,6 +127,8 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   isLoadingMore,
   isLoading = false,
   className = "",
+  emptyStateTitle,
+  emptyStateDescription,
 }) => {
   const { t, i18n } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -325,7 +327,13 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   });
 
   if (!isLoading && totalAssetCount === 0) {
-    return <EmptyState className={className} />;
+    return (
+      <EmptyState
+        className={className}
+        title={emptyStateTitle}
+        description={emptyStateDescription}
+      />
+    );
   }
 
   return (

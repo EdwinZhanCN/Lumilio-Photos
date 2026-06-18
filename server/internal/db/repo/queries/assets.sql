@@ -9,6 +9,10 @@ RETURNING *;
 SELECT * FROM assets
 WHERE asset_id = $1 AND is_deleted = false;
 
+-- name: GetAssetByIDAny :one
+SELECT * FROM assets
+WHERE asset_id = $1;
+
 -- name: GetAssetsByIDs :many
 SELECT * FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
@@ -16,7 +20,11 @@ WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
 
 -- name: GetAssetExifRaw :one
 SELECT exif_raw FROM assets
-WHERE asset_id = $1 AND is_deleted = false;
+WHERE asset_id = $1;
+
+-- name: GetAssetsByIDsAny :many
+SELECT * FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[]);
 
 -- name: GetAssetsByOwner :many
 SELECT * FROM assets
@@ -82,6 +90,11 @@ WHERE asset_id = sqlc.arg('asset_id');
 -- name: DeleteAsset :exec
 UPDATE assets
 SET is_deleted = true, deleted_at = CURRENT_TIMESTAMP
+WHERE asset_id = $1;
+
+-- name: RestoreAsset :exec
+UPDATE assets
+SET is_deleted = false, deleted_at = NULL
 WHERE asset_id = $1;
 
 -- name: SearchAssets :many
@@ -498,7 +511,7 @@ WHERE is_deleted = false
 -- snapshot cap; callers detect truncation by requesting cap+1.
 SELECT a.asset_id
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
   AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -588,7 +601,7 @@ WITH page_ids AS MATERIALIZED (
       ELSE COALESCE(a.taken_time, a.upload_time)
     END AS sort_time
   FROM assets a
-  WHERE a.is_deleted = false
+  WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
     AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
     AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -691,7 +704,7 @@ ORDER BY p.sort_time DESC, p.asset_id DESC;
 -- Returns total count of assets matching the filters (for pagination)
 SELECT COUNT(*) as count
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
   AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -790,7 +803,7 @@ WITH filtered AS MATERIALIZED (
     asm.position
   FROM assets a
   LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
-  WHERE a.is_deleted = false
+  WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
     AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
     AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -885,7 +898,7 @@ stack_covers AS MATERIALIZED (
     asm.asset_id AS cover_asset_id
   FROM asset_stack_members asm
   JOIN assets a ON a.asset_id = asm.asset_id
-  WHERE a.is_deleted = false
+  WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
   ORDER BY asm.stack_id, asm.position ASC NULLS LAST, asm.asset_id ASC
 ),
 stack_members_all AS MATERIALIZED (
@@ -894,7 +907,7 @@ stack_members_all AS MATERIALIZED (
     ARRAY_AGG(asm.asset_id ORDER BY asm.position ASC NULLS LAST, asm.asset_id ASC)::uuid[] AS member_asset_ids
   FROM asset_stack_members asm
   JOIN assets a ON a.asset_id = asm.asset_id
-  WHERE a.is_deleted = false
+  WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
   GROUP BY asm.stack_id
 ),
 browse_items AS MATERIALIZED (
@@ -947,7 +960,7 @@ WITH filtered AS MATERIALIZED (
     asm.stack_id
   FROM assets a
   LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
-  WHERE a.is_deleted = false
+  WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
     AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
     AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))

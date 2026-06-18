@@ -170,7 +170,7 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 
 			// Best Results exists only when the set exceeds the showcase size.
 			if len(ids) >= params.TopResultsLimit {
-				topAssets, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit])
+				topAssets, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit], params.IsDeleted)
 				if err != nil {
 					return SearchBrowseResult{}, err
 				}
@@ -178,7 +178,7 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 			}
 
 			if params.EnhancementMode != SearchEnhancementModeOnly {
-				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset)
+				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset, params.IsDeleted)
 				if err != nil {
 					return SearchBrowseResult{}, err
 				}
@@ -671,6 +671,7 @@ func (s *assetService) countAssetsUnified(ctx context.Context, params QueryAsset
 		LocationWest:     params.LocationWest,
 		DateFrom:         fromTime,
 		DateTo:           toTime,
+		IsDeleted:        params.IsDeleted,
 	})
 }
 
@@ -703,6 +704,7 @@ func (s *assetService) countCollapsedBrowseItemsUnified(ctx context.Context, par
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
 		LocationWest:     params.LocationWest,
+		IsDeleted:        params.IsDeleted,
 	})
 }
 
@@ -737,6 +739,7 @@ func (s *assetService) getCollapsedBrowseItemsUnified(ctx context.Context, param
 		LocationEast:     params.LocationEast,
 		LocationWest:     params.LocationWest,
 		SortBy:           sortByPtr,
+		IsDeleted:        params.IsDeleted,
 		Offset:           int32(params.Offset),
 		Limit:            int32(params.Limit),
 	})

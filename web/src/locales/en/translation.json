@@ -5,6 +5,12 @@
   "assets": {
     "all": {
       "asset_not_available": "Asset may not be available in the current view.",
+      "emptyDescription": "Photos and videos you add will appear here.",
+      "emptyFilteredDescription": "Try adjusting or clearing your filters to see more photos.",
+      "emptyFilteredTitle": "No photos match your filters",
+      "emptySearchDescription": "Try a different search term or clear the search.",
+      "emptySearchTitle": "No search results",
+      "emptyTitle": "No photos yet",
       "end_of_results": "No more results.",
       "load_error": "Failed to load photos. Check your connection and try again.",
       "loading_assets": "Loading assets...",
@@ -22,11 +28,12 @@
         "affectsSelected_other": "{{count}} selected items.",
         "applyToItems_one": "Apply to {{count}} item",
         "applyToItems_other": "Apply to {{count}} items",
-        "deleteSelected": "Delete Selected",
+        "deleteSelected": "Move to Trash",
         "downloadAll": "Download All",
         "like": "Liked",
         "likedMenu": "Liked",
         "setRating": "Set Rating",
+        "stackSelected": "Stack selected",
         "title": "Actions",
         "unlike": "Unliked",
         "unrated": "Unrated"
@@ -50,10 +57,10 @@
       },
       "deleteConfirmModal": {
         "cancelButton": "Cancel",
-        "deleteButton": "Delete Assets",
-        "message_one": "This will delete {{count}} asset.",
-        "message_other": "This will delete {{count}} assets.",
-        "title": "Confirm Deletion"
+        "deleteButton": "Move to Trash",
+        "message_one": "This will move {{count}} asset to Trash.",
+        "message_other": "This will move {{count}} assets to Trash.",
+        "title": "Move selected assets to Trash?"
       },
       "messages": {
         "addToAlbumError": "Failed to add items to album",
@@ -62,12 +69,15 @@
         "bulkActionError": "Failed to update selected assets.",
         "bulkActionSuccess_one": "Updated {{count}} assets.",
         "bulkActionSuccess_other": "Updated {{count}} assets.",
-        "deleteError": "Failed to delete assets",
-        "deleteSuccess_one": "Deleted {{count}} asset.",
-        "deleteSuccess_other": "Deleted {{count}} assets.",
+        "deleteError": "Failed to move assets to Trash",
+        "deleteSuccess_one": "Moved {{count}} asset to Trash.",
+        "deleteSuccess_other": "Moved {{count}} assets to Trash.",
         "downloadError": "Failed to start download",
         "downloadStart": "Download started",
-        "loadAlbumsError": "Failed to load albums"
+        "loadAlbumsError": "Failed to load albums",
+        "stackError": "Failed to stack selected assets.",
+        "stackSuccess_one": "Stacked {{count}} asset.",
+        "stackSuccess_other": "Stacked {{count}} assets."
       },
       "moreActions": "More actions",
       "scan": {
@@ -90,6 +100,11 @@
       "sortByOptions": {
         "dateCaptured": "Date Captured",
         "recentlyAdded": "Recently Added"
+      },
+      "stackConfirm": {
+        "message_one": "{{count}} selected asset will be grouped into one stack.",
+        "message_other": "{{count}} selected assets will be grouped into one stack.",
+        "title": "Stack selected assets?"
       }
     },
     "audioInfoView": {
@@ -299,6 +314,25 @@
       },
       "thumbnailAlt": "Stack member preview",
       "title": "Stack details"
+    },
+    "trash": {
+      "bulkActions": {
+        "restore": {
+          "confirmMessage_one": "This will restore {{count}} asset to the library.",
+          "confirmMessage_other": "This will restore {{count}} assets to the library.",
+          "confirmTitle": "Restore selected assets?",
+          "label_one": "Restore {{count}} asset",
+          "label_other": "Restore {{count}} assets"
+        }
+      },
+      "messages": {
+        "restoreError": "Failed to restore selected assets.",
+        "restoreSuccess_one": "Restored {{count}} asset.",
+        "restoreSuccess_other": "Restored {{count}} assets."
+      },
+      "emptyDescription": "Items you move to Trash will appear here.",
+      "emptyTitle": "Trash is empty",
+      "title": "Trash"
     },
     "videoInfoView": {
       "codec_label": "Codec: {{codec}}",
@@ -518,6 +552,17 @@
         "success_one": "Queued {{count}} photo for recognition.",
         "success_other": "Queued {{count}} photos for recognition."
       },
+      "bulkActions": {
+        "removeFromAlbum": {
+          "confirmMessage_one": "{{count}} selected asset will be removed from this album. Original assets remain in the library.",
+          "confirmMessage_other": "{{count}} selected assets will be removed from this album. Original assets remain in the library.",
+          "confirmTitle": "Remove selected items from this album?",
+          "error": "Failed to remove items from album.",
+          "label": "Remove from this album",
+          "success_one": "Removed {{count}} item from this album.",
+          "success_other": "Removed {{count}} items from this album."
+        }
+      },
       "createdAtLabel": "Created",
       "fallbackName": "Album",
       "itemsCount_one": "{{count}} item",
@@ -605,6 +650,10 @@
       "duplicates": {
         "description": "Find and merge duplicate photos",
         "title": "Duplicates"
+      },
+      "trash": {
+        "description": "Review assets moved out of the library",
+        "title": "Trash"
       }
     }
   },
@@ -639,13 +688,13 @@
     "viewAll": "View All"
   },
   "delete": {
-    "confirm": "Delete asset",
-    "confirmMessage": "Are you sure you want to delete \"{{filename}}\"?",
-    "confirmTitle": "Delete asset",
-    "deleting": "Deleting...",
-    "error": "Failed to delete asset",
-    "softDeleteNote": "This will mark the photo as deleted. The file will not be permanently removed.",
-    "success": "Asset deleted successfully",
+    "confirm": "Move to Trash",
+    "confirmMessage": "Move \"{{filename}}\" to Trash?",
+    "confirmTitle": "Move asset to Trash",
+    "deleting": "Moving...",
+    "error": "Failed to move asset to Trash",
+    "softDeleteNote": "This will move the photo out of the library. The file will not be permanently removed.",
+    "success": "Asset moved to Trash",
     "thisAsset": "this photo"
   },
   "duplicates": {
