@@ -196,7 +196,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
 	duplicateService := service.NewDuplicateService(queries, pgxPool, appLogger.Named("duplicate"), assetService)
-	authService := service.NewAuthService(queries, pgxPool, appConfig.Auth)
+	authService := service.NewAuthService(queries, pgxPool, appConfig.Auth, appLogger.Named("auth"))
 	albumService := service.NewAlbumService(queries)
 	userService := service.NewUserService(queries, pgxPool)
 

@@ -190,7 +190,7 @@ function NavBar() {
                   <button
                     type="button"
                     onClick={() => {
-                      logout();
+                      void logout();
                       void navigate("/login", { replace: true });
                     }}
                   >

@@ -18,6 +18,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -454,7 +455,8 @@ func (s *AuthService) verifyUserTOTP(ctx context.Context, userID int32, code str
 	}
 
 	if err := s.queries.UpdateUserTOTPLastUsed(ctx, userID); err != nil {
-		fmt.Printf("Warning: failed to update TOTP last-used timestamp for user %d: %v\n", userID, err)
+		s.logger.Warn("failed to update TOTP last-used timestamp",
+			zap.Int32("user_id", userID), zap.Error(err))
 	}
 
 	return nil
