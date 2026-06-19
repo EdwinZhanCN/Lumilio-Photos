@@ -201,6 +201,18 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AddAssetTagRequestDTO": {
+                "properties": {
+                    "tag_name": {
+                        "example": "vacation",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "tag_name"
+                ],
+                "type": "object"
+            },
             "dto.AddAssetToAlbumRequestDTO": {
                 "properties": {
                     "position": {
@@ -996,6 +1008,13 @@ const docTemplate = `{
                         "example": "document",
                         "type": "string"
                     },
+                    "tag_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "tag_source": {
                         "example": "zeroshot",
                         "type": "string"
@@ -1267,11 +1286,27 @@ const docTemplate = `{
                     "confidence": {
                         "type": "number"
                     },
+                    "source": {
+                        "description": "Source identifies who created the tag link, e.g. \"manual\" for\nuser-added tags or \"zeroshot\" for AI-generated ones. Manual tags are\nthe only ones the UI lets the user remove.",
+                        "type": "string"
+                    },
                     "tag_id": {
                         "type": "integer"
                     },
                     "tag_name": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetTagsResponseDTO": {
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetTagDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -4160,6 +4195,32 @@ const docTemplate = `{
                     },
                     "setup_token": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.TagDTO": {
+                "properties": {
+                    "category": {
+                        "type": "string"
+                    },
+                    "tag_id": {
+                        "type": "integer"
+                    },
+                    "tag_name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.TagListResponseDTO": {
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.TagDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -7410,6 +7471,56 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/tags": {
+            "get": {
+                "description": "List all tags or search by name for autocomplete suggestions",
+                "parameters": [
+                    {
+                        "description": "Search query (substring match)",
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Max results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.TagListResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Tags retrieved successfully"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "List/search tags",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/types": {
             "get": {
                 "description": "Retrieve a list of all supported asset types in the system.",
@@ -8903,6 +9014,189 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Get asset stack",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/{id}/tags": {
+            "get": {
+                "description": "Get all tags (manual and AI-generated) attached to an asset",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetTagsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Tags retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get asset tags",
+                "tags": [
+                    "assets"
+                ]
+            },
+            "post": {
+                "description": "Resolve (creating if needed) a tag by name and link it to the asset with the manual source",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AddAssetTagRequestDTO",
+                                        "summary": "request",
+                                        "description": "Tag to add"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Tag to add",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetTagDTO"
+                                }
+                            }
+                        },
+                        "description": "Tag added successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Add a manual tag to an asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/{id}/tags/{tagId}": {
+            "delete": {
+                "description": "Unlink a tag from an asset by tag ID",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tag ID",
+                        "in": "path",
+                        "name": "tagId",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Tag removed successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Remove a tag from an asset",
                 "tags": [
                     "assets"
                 ]

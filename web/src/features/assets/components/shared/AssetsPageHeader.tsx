@@ -141,6 +141,7 @@ const AssetsPageHeader = ({
     }
     if (f.camera_model?.trim()) dto.camera_model = f.camera_model.trim();
     if (f.lens?.trim()) dto.lens = f.lens.trim();
+    if (f.tag_names && f.tag_names.length > 0) dto.tag_names = [...f.tag_names];
     if (f.location) dto.location = { ...f.location };
     return dto;
   }, [filters]);
@@ -181,6 +182,7 @@ const AssetsPageHeader = ({
         date: undefined,
         camera_model: undefined,
         lens: undefined,
+        tag_names: undefined,
         location: undefined,
       };
 
@@ -211,6 +213,10 @@ const AssetsPageHeader = ({
 
       if (newFilters.lens && newFilters.lens.trim()) {
         payload.lens = newFilters.lens.trim();
+      }
+
+      if (newFilters.tag_names && newFilters.tag_names.length > 0) {
+        payload.tag_names = newFilters.tag_names;
       }
 
       if (newFilters.location) {

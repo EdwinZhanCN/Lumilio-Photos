@@ -14,6 +14,13 @@ SELECT * FROM tags
 ORDER BY tag_name ASC
 LIMIT $1 OFFSET $2;
 
+-- name: SearchTagsByName :many
+SELECT * FROM tags
+WHERE sqlc.narg('query')::text IS NULL
+   OR tag_name ILIKE '%' || sqlc.narg('query')::text || '%'
+ORDER BY tag_name ASC
+LIMIT $1;
+
 -- name: GetTagsByCategory :many
 SELECT * FROM tags
 WHERE category = $1

@@ -5,6 +5,7 @@ import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import { useAssetLocationCluster } from "@/features/assets/hooks/useAssetLocationCluster";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
+import TagList from "./TagList";
 import MapComponent from "@/components/MapComponent";
 import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
 import { formatCaptureTime } from "@/lib/utils/formatters";
@@ -196,6 +197,9 @@ export default function PhotoInfoView({
                 <p className="text-sm break-all font-medium">{filename}</p>
               </div>
             </div>
+
+            {/* Tags */}
+            <TagList assetId={asset.asset_id} />
 
             {/* Camera & Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">

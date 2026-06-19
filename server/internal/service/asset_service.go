@@ -74,6 +74,14 @@ type AssetService interface {
 
 	AddTagToAsset(ctx context.Context, assetID uuid.UUID, tagID int, confidence float32, source string) error
 	RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID, tagID int) error
+	// AddManualTagToAsset resolves (creating if needed) a tag by name and links
+	// it to the asset with the "manual" source. Returns the resolved tag.
+	AddManualTagToAsset(ctx context.Context, assetID uuid.UUID, tagName string) (*repo.Tag, error)
+	// GetAssetTags returns all tags linked to an asset (any source) as the raw
+	// JSON aggregate (tag_id, tag_name, category, confidence, source).
+	GetAssetTags(ctx context.Context, assetID uuid.UUID) (json.RawMessage, error)
+	// SearchTags returns tag definitions for autocomplete; empty query lists all.
+	SearchTags(ctx context.Context, query string, limit int) ([]repo.Tag, error)
 
 	CreateThumbnail(ctx context.Context, assetID pgtype.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
@@ -133,6 +141,7 @@ type QueryAssetsParams struct {
 	LensModel        *string
 	TagName          *string
 	TagSource        *string
+	TagNames         []string
 	LocationNorth    *float64
 	LocationSouth    *float64
 	LocationEast     *float64
@@ -592,6 +601,73 @@ func (s *assetService) RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID
 	}
 
 	return s.queries.RemoveTagFromAsset(ctx, params)
+}
+
+// AddManualTagToAsset resolves a tag by name (creating it if absent) and links
+// it to the asset with the manual source and full confidence.
+func (s *assetService) AddManualTagToAsset(ctx context.Context, assetID uuid.UUID, tagName string) (*repo.Tag, error) {
+	name := strings.TrimSpace(tagName)
+	if name == "" {
+		return nil, fmt.Errorf("tag name must not be empty")
+	}
+
+	tag, err := s.GetOrCreateTagByName(ctx, name, "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.AddTagToAsset(ctx, assetID, int(tag.TagID), 1.0, AssetTagSourceUser); err != nil {
+		return nil, err
+	}
+
+	return tag, nil
+}
+
+// GetAssetTags returns the raw JSON tag aggregate for an asset.
+func (s *assetService) GetAssetTags(ctx context.Context, assetID uuid.UUID) (json.RawMessage, error) {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(assetID.String()); err != nil {
+		return nil, fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	row, err := s.queries.GetAssetWithTags(ctx, pgUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	// pgx decodes the json aggregate column into interface{}; normalize to raw
+	// JSON bytes for the caller to unmarshal.
+	switch v := row.Tags.(type) {
+	case nil:
+		return json.RawMessage("[]"), nil
+	case []byte:
+		return json.RawMessage(v), nil
+	case string:
+		return json.RawMessage(v), nil
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil, fmt.Errorf("marshal tags: %w", err)
+		}
+		return json.RawMessage(b), nil
+	}
+}
+
+// SearchTags returns tag definitions matching query (empty lists all), capped at limit.
+func (s *assetService) SearchTags(ctx context.Context, query string, limit int) ([]repo.Tag, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	var q *string
+	if trimmed := strings.TrimSpace(query); trimmed != "" {
+		q = &trimmed
+	}
+
+	return s.queries.SearchTagsByName(ctx, repo.SearchTagsByNameParams{
+		Limit: int32(limit),
+		Query: q,
+	})
 }
 
 // SaveAssetIndex implements the INDEX step: verify asset exists by hash and complete indexing
@@ -1287,6 +1363,7 @@ func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filte
 		LensModel:        params.LensModel,
 		TagName:          params.TagName,
 		TagSource:        params.TagSource,
+		TagNames:         params.TagNames,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1362,6 +1439,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		LensModel:        params.LensModel,
 		TagName:          params.TagName,
 		TagSource:        params.TagSource,
+		TagNames:         params.TagNames,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1392,6 +1470,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		LensModel:        params.LensModel,
 		TagName:          params.TagName,
 		TagSource:        params.TagSource,
+		TagNames:         params.TagNames,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1604,6 +1683,17 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 			  AND t.tag_name = %s%s
 		)`, tagNamePlaceholder, tagSourceCondition))
 	}
+	if len(params.TagNames) > 0 {
+		tagNamesPlaceholder := builder.addArg(params.TagNames)
+		// Match assets carrying every requested tag (AND semantics).
+		conditions = append(conditions, fmt.Sprintf(`(
+			SELECT COUNT(DISTINCT t.tag_name)
+			FROM asset_tags at
+			JOIN tags t ON t.tag_id = at.tag_id
+			WHERE at.asset_id = a.asset_id
+			  AND t.tag_name = ANY(%s::text[])
+		) = cardinality(%s::text[])`, tagNamesPlaceholder, tagNamesPlaceholder))
+	}
 	if params.FilenameValue != nil {
 		filenamePlaceholder := builder.addArg(*params.FilenameValue)
 		switch {
@@ -1782,6 +1872,7 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedP
 	out.PersonID = params.PersonID
 	out.AlbumID = params.AlbumID
 	out.TagName = params.TagName
+	out.TagNames = params.TagNames
 	out.TagSource = params.TagSource
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
 		if parsed, err := uuid.Parse(strings.TrimSpace(*params.RepositoryID)); err == nil {

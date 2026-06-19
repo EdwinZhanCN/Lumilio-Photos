@@ -14,6 +14,7 @@ export interface FiltersSlice {
   setFilterDate: (date: FiltersState["date"]) => void;
   setFilterCameraModel: (cameraModel: string | undefined) => void;
   setFilterLens: (lens: string | undefined) => void;
+  setFilterTagNames: (tagNames: string[] | undefined) => void;
   setFilterLocation: (location: FiltersState["location"]) => void;
   resetFilters: () => void;
   batchUpdateFilters: (updates: Partial<FiltersState>) => void;
@@ -35,6 +36,7 @@ export const createFiltersSlice: StateCreator<
     date: undefined,
     camera_model: undefined,
     lens: undefined,
+    tag_names: undefined,
     location: undefined,
   },
 
@@ -83,6 +85,11 @@ export const createFiltersSlice: StateCreator<
       state.filters.lens = lens;
     }),
 
+  setFilterTagNames: (tagNames) =>
+    set((state) => {
+      state.filters.tag_names = tagNames;
+    }),
+
   setFilterLocation: (location) =>
     set((state) => {
       state.filters.location = location;
@@ -100,6 +107,7 @@ export const createFiltersSlice: StateCreator<
         date: undefined,
         camera_model: undefined,
         lens: undefined,
+        tag_names: undefined,
         location: undefined,
       };
     }),
@@ -155,6 +163,7 @@ export const selectActiveFilterCount = (input: FiltersInput): number => {
     state.date && (state.date.from || state.date.to),
     state.camera_model?.trim(),
     state.lens?.trim(),
+    state.tag_names && state.tag_names.length > 0,
     hasLocationFilter(state.location),
   ];
 
@@ -200,6 +209,9 @@ export const selectFilterAsAssetFilter = (input: FiltersInput): AssetFilter => {
   }
   if (state.lens && state.lens.trim()) {
     filter.lens = state.lens.trim();
+  }
+  if (state.tag_names && state.tag_names.length > 0) {
+    filter.tag_names = [...state.tag_names];
   }
   if (hasLocationFilter(state.location)) {
     filter.location = { ...state.location };

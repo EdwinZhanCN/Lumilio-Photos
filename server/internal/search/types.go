@@ -37,6 +37,7 @@ type Filter struct {
 	LensModel        *string
 	TagName          *string
 	TagSource        *string
+	TagNames         []string
 	LocationNorth    *float64
 	LocationSouth    *float64
 	LocationEast     *float64

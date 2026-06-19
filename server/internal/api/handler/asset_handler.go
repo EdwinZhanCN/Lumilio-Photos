@@ -1873,6 +1873,7 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		LensModel:        filter.Lens,
 		TagName:          filter.TagName,
 		TagSource:        filter.TagSource,
+		TagNames:         filter.TagNames,
 		LocationNorth:    locationNorth,
 		LocationSouth:    locationSouth,
 		LocationEast:     locationEast,
@@ -2734,6 +2735,169 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 	}
 
 	api.JSONOK(c, dto.MessageResponseDTO{Message: "Description updated successfully"})
+}
+
+// GetAssetTags lists the tags attached to an asset
+// @Summary Get asset tags
+// @Description Get all tags (manual and AI-generated) attached to an asset
+// @Tags assets
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Success 200 {object} dto.AssetTagsResponseDTO "Tags retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/{id}/tags [get]
+func (h *AssetHandler) GetAssetTags(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAssetForRead(c, id, "Authentication required to view this asset", "You don't have permission to view this asset"); !ok {
+		return
+	}
+
+	raw, err := h.assetService.GetAssetTags(c.Request.Context(), id)
+	if err != nil {
+		log.Printf("Failed to get asset tags: %v", err)
+		api.GinInternalError(c, err, "Failed to get tags")
+		return
+	}
+
+	tags := []dto.AssetTagDTO{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &tags); err != nil {
+			log.Printf("Failed to decode asset tags: %v", err)
+			api.GinInternalError(c, err, "Failed to decode tags")
+			return
+		}
+	}
+
+	api.JSONOK(c, dto.AssetTagsResponseDTO{Tags: tags})
+}
+
+// AddAssetTag adds a manual tag to an asset
+// @Summary Add a manual tag to an asset
+// @Description Resolve (creating if needed) a tag by name and link it to the asset with the manual source
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Param request body dto.AddAssetTagRequestDTO true "Tag to add"
+// @Success 200 {object} dto.AssetTagDTO "Tag added successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/{id}/tags [post]
+func (h *AssetHandler) AddAssetTag(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	var req dto.AddAssetTagRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset"); !ok {
+		return
+	}
+
+	tag, err := h.assetService.AddManualTagToAsset(c.Request.Context(), id, req.TagName)
+	if err != nil {
+		log.Printf("Failed to add tag to asset: %v", err)
+		api.GinInternalError(c, err, "Failed to add tag")
+		return
+	}
+
+	source := service.AssetTagSourceUser
+	resp := dto.AssetTagDTO{
+		TagID:   tag.TagID,
+		TagName: tag.TagName,
+		Source:  &source,
+	}
+	api.JSONOK(c, resp)
+}
+
+// RemoveAssetTag removes a tag from an asset
+// @Summary Remove a tag from an asset
+// @Description Unlink a tag from an asset by tag ID
+// @Tags assets
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Param tagId path int true "Tag ID"
+// @Success 200 {object} dto.MessageResponseDTO "Tag removed successfully"
+// @Failure 400 {object} api.ErrorResponse "Bad request"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/{id}/tags/{tagId} [delete]
+func (h *AssetHandler) RemoveAssetTag(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	tagID, err := strconv.Atoi(c.Param("tagId"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid tag ID")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset"); !ok {
+		return
+	}
+
+	if err := h.assetService.RemoveTagFromAsset(c.Request.Context(), id, tagID); err != nil {
+		log.Printf("Failed to remove tag from asset: %v", err)
+		api.GinInternalError(c, err, "Failed to remove tag")
+		return
+	}
+
+	api.JSONOK(c, dto.MessageResponseDTO{Message: "Tag removed successfully"})
+}
+
+// ListTags returns tag definitions for autocomplete
+// @Summary List/search tags
+// @Description List all tags or search by name for autocomplete suggestions
+// @Tags assets
+// @Produce json
+// @Param q query string false "Search query (substring match)"
+// @Param limit query int false "Max results" default(20)
+// @Success 200 {object} dto.TagListResponseDTO "Tags retrieved successfully"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/tags [get]
+func (h *AssetHandler) ListTags(c *gin.Context) {
+	query := c.Query("q")
+	limit := 20
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	tags, err := h.assetService.SearchTags(c.Request.Context(), query, limit)
+	if err != nil {
+		log.Printf("Failed to list tags: %v", err)
+		api.GinInternalError(c, err, "Failed to list tags")
+		return
+	}
+
+	items := make([]dto.TagDTO, 0, len(tags))
+	for _, tag := range tags {
+		item := dto.TagDTO{TagID: tag.TagID, TagName: tag.TagName}
+		if tag.Category != nil {
+			item.Category = *tag.Category
+		}
+		items = append(items, item)
+	}
+
+	api.JSONOK(c, dto.TagListResponseDTO{Tags: items})
 }
 
 // GetAssetsByRating gets assets filtered by rating

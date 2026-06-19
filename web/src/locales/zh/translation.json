@@ -210,6 +210,12 @@
       "sectionShell": {
         "enable": "启用"
       },
+      "tagSection": {
+        "loading": "加载中…",
+        "no_results": "没有匹配的标签",
+        "placeholder": "搜索标签…",
+        "title": "标签"
+      },
       "typeSection": {
         "photo": "照片",
         "title": "类型",
@@ -314,6 +320,17 @@
       },
       "thumbnailAlt": "堆叠成员预览",
       "title": "堆叠详情"
+    },
+    "tags": {
+      "add": "添加标签",
+      "addError": "添加标签失败",
+      "create": "新建标签:",
+      "empty": "暂无标签",
+      "loading": "加载中…",
+      "noResults": "没有匹配的标签",
+      "removeError": "移除标签失败",
+      "searchPlaceholder": "更改或添加标签…",
+      "title": "标签"
     },
     "trash": {
       "bulkActions": {

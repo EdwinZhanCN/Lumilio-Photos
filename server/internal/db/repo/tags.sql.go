@@ -141,6 +141,44 @@ func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, erro
 	return items, nil
 }
 
+const searchTagsByName = `-- name: SearchTagsByName :many
+SELECT tag_id, tag_name, category, is_ai_generated FROM tags
+WHERE $2::text IS NULL
+   OR tag_name ILIKE '%' || $2::text || '%'
+ORDER BY tag_name ASC
+LIMIT $1
+`
+
+type SearchTagsByNameParams struct {
+	Limit int32   `db:"limit" json:"limit"`
+	Query *string `db:"query" json:"query"`
+}
+
+func (q *Queries) SearchTagsByName(ctx context.Context, arg SearchTagsByNameParams) ([]Tag, error) {
+	rows, err := q.db.Query(ctx, searchTagsByName, arg.Limit, arg.Query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Tag
+	for rows.Next() {
+		var i Tag
+		if err := rows.Scan(
+			&i.TagID,
+			&i.TagName,
+			&i.Category,
+			&i.IsAiGenerated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTag = `-- name: UpdateTag :one
 UPDATE tags
 SET tag_name = $2, category = $3, is_ai_generated = $4

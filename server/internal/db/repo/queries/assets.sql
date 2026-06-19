@@ -529,6 +529,16 @@ WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
     )
   )
   AND (
+    sqlc.narg('tag_names')::text[] IS NULL
+    OR (
+      SELECT COUNT(DISTINCT t2.tag_name)
+      FROM asset_tags at2
+      JOIN tags t2 ON t2.tag_id = at2.tag_id
+      WHERE at2.asset_id = a.asset_id
+        AND t2.tag_name = ANY(sqlc.narg('tag_names')::text[])
+    ) = cardinality(sqlc.narg('tag_names')::text[])
+  )
+  AND (
     sqlc.narg('person_id')::integer IS NULL
     OR EXISTS (
       SELECT 1
@@ -637,6 +647,16 @@ WITH page_ids AS MATERIALIZED (
           AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
       )
     )
+    AND (
+      sqlc.narg('tag_names')::text[] IS NULL
+      OR (
+        SELECT COUNT(DISTINCT t2.tag_name)
+        FROM asset_tags at2
+        JOIN tags t2 ON t2.tag_id = at2.tag_id
+        WHERE at2.asset_id = a.asset_id
+          AND t2.tag_name = ANY(sqlc.narg('tag_names')::text[])
+      ) = cardinality(sqlc.narg('tag_names')::text[])
+    )
     AND (sqlc.narg('filename_val')::text IS NULL OR
       CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
         WHEN 'matches' THEN a.original_filename ILIKE sqlc.narg('filename_val')
@@ -740,6 +760,16 @@ WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
         AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
     )
   )
+  AND (
+    sqlc.narg('tag_names')::text[] IS NULL
+    OR (
+      SELECT COUNT(DISTINCT t2.tag_name)
+      FROM asset_tags at2
+      JOIN tags t2 ON t2.tag_id = at2.tag_id
+      WHERE at2.asset_id = a.asset_id
+        AND t2.tag_name = ANY(sqlc.narg('tag_names')::text[])
+    ) = cardinality(sqlc.narg('tag_names')::text[])
+  )
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
       WHEN 'matches' THEN a.original_filename ILIKE sqlc.narg('filename_val')
@@ -838,6 +868,16 @@ WITH filtered AS MATERIALIZED (
           AND t.tag_name = sqlc.narg('tag_name')
           AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
       )
+    )
+    AND (
+      sqlc.narg('tag_names')::text[] IS NULL
+      OR (
+        SELECT COUNT(DISTINCT t2.tag_name)
+        FROM asset_tags at2
+        JOIN tags t2 ON t2.tag_id = at2.tag_id
+        WHERE at2.asset_id = a.asset_id
+          AND t2.tag_name = ANY(sqlc.narg('tag_names')::text[])
+      ) = cardinality(sqlc.narg('tag_names')::text[])
     )
     AND (sqlc.narg('filename_val')::text IS NULL OR
       CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
@@ -995,6 +1035,16 @@ WITH filtered AS MATERIALIZED (
           AND t.tag_name = sqlc.narg('tag_name')
           AND (sqlc.narg('tag_source')::text IS NULL OR at.source = sqlc.narg('tag_source'))
       )
+    )
+    AND (
+      sqlc.narg('tag_names')::text[] IS NULL
+      OR (
+        SELECT COUNT(DISTINCT t2.tag_name)
+        FROM asset_tags at2
+        JOIN tags t2 ON t2.tag_id = at2.tag_id
+        WHERE at2.asset_id = a.asset_id
+          AND t2.tag_name = ANY(sqlc.narg('tag_names')::text[])
+      ) = cardinality(sqlc.narg('tag_names')::text[])
     )
     AND (sqlc.narg('filename_val')::text IS NULL OR
       CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')

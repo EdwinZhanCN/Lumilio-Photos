@@ -210,6 +210,12 @@
       "sectionShell": {
         "enable": "Enable"
       },
+      "tagSection": {
+        "loading": "Loading…",
+        "no_results": "No matching tags",
+        "placeholder": "Search tags…",
+        "title": "Tag"
+      },
       "typeSection": {
         "photo": "Photo",
         "title": "Type",
@@ -314,6 +320,17 @@
       },
       "thumbnailAlt": "Stack member preview",
       "title": "Stack details"
+    },
+    "tags": {
+      "add": "Add tag",
+      "addError": "Failed to add tag",
+      "create": "Create new tag:",
+      "empty": "No tags yet",
+      "loading": "Loading…",
+      "noResults": "No matching tags",
+      "removeError": "Failed to remove tag",
+      "searchPlaceholder": "Change or add tags…",
+      "title": "Tags"
     },
     "trash": {
       "bulkActions": {

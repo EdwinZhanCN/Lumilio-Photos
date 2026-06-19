@@ -14,6 +14,10 @@ import (
 // by the zero-shot classifier.
 const AssetTagSourceZeroshot = "zeroshot"
 
+// AssetTagSourceUser is the asset_tags.source value for tags a user adds by
+// hand. It must match the asset_tags_source_check constraint ('user').
+const AssetTagSourceUser = "user"
+
 type AIGeneratedTag struct {
 	Name       string
 	Confidence float32
