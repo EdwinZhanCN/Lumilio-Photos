@@ -325,13 +325,13 @@
           "label_other": "恢复 {{count}} 个资源"
         }
       },
+      "emptyDescription": "移入回收站的项目会显示在这里。",
+      "emptyTitle": "回收站为空",
       "messages": {
         "restoreError": "恢复所选资源失败。",
         "restoreSuccess_one": "已恢复 {{count}} 个资源。",
         "restoreSuccess_other": "已恢复 {{count}} 个资源。"
       },
-      "emptyDescription": "移入回收站的项目会显示在这里。",
-      "emptyTitle": "回收站为空",
       "title": "回收站"
     },
     "videoInfoView": {
@@ -750,6 +750,38 @@
     },
     "summaryLoadError": "加载重复照片摘要失败：{{message}}"
   },
+  "exportModal": {
+    "addToAlbum": "加入相册",
+    "category": {
+      "media": "媒体处理",
+      "metadata": "元数据",
+      "ml": "机器学习"
+    },
+    "downloadOriginal": "下载原文件",
+    "export": "导出",
+    "exportFormat": "导出格式",
+    "exporting": "导出中...",
+    "exportUnavailable": "视频和音频资源不支持格式转换，但仍可下载原文件。",
+    "forceFullRetry": "强制全部重试",
+    "forceFullRetryHint": "忽略之前的状态，重新执行所有处理任务",
+    "format": {
+      "avif": "AVIF",
+      "jpeg": "JPEG（80%）",
+      "png": "PNG",
+      "webp": "WebP（80%）"
+    },
+    "noAsset": "未选中资源，操作已禁用。",
+    "noRetryTasks": "此资源类型没有可重试的任务。",
+    "optional": "可选",
+    "retryProcessing": "重试处理",
+    "retryTitle": "重试处理任务",
+    "selectedCount_one": "已选 {{count}} 项",
+    "selectedCount_other": "已选 {{count}} 项",
+    "studio": "工作室",
+    "submitRetry": "提交重试",
+    "submitting": "提交中...",
+    "viewOriginal": "在新标签页中查看原文件"
+  },
   "footer": {
     "copyright": "© {{year}} Lumilio Photos，由 EdwinZhan 打造"
   },
@@ -1004,7 +1036,7 @@
       "queues": {
         "classify_zeroshot": {
           "description": "在视觉索引完成后匹配已保存的分类相册。",
-          "name": "分类器匹配"
+          "name": "零样本分类"
         },
         "default": {
           "description": "照片图库的后台处理。"
@@ -1031,7 +1063,7 @@
         },
         "process_bioclip": {
           "description": "在启用时添加自然与物种标签。",
-          "name": "自然识别"
+          "name": "BioCLIP 物种识别"
         },
         "process_face": {
           "description": "查找人脸并更新人物分组。",
@@ -1039,7 +1071,7 @@
         },
         "process_ocr": {
           "description": "从图片中提取可搜索文字。",
-          "name": "文字识别"
+          "name": "OCR 文字识别"
         },
         "process_phash": {
           "description": "计算用于重复照片检测的指纹。",
@@ -1047,7 +1079,7 @@
         },
         "process_semantic": {
           "description": "建立用于搜索和 AI 整理的视觉向量。",
-          "name": "视觉搜索索引"
+          "name": "图像语义分析"
         },
         "rebuild_location_clusters": {
           "description": "在媒体位置变化后刷新地点聚类。",
@@ -1314,10 +1346,10 @@
         "semantic": "分析画面语义，用于相似检索和 0 样本识别。"
       },
       "taskNames": {
-        "bioclip": "生物图鉴",
-        "face": "人脸识别",
-        "ocr": "文字识别",
-        "semantic": "语义分析"
+        "bioclip": "BioCLIP 物种识别",
+        "face": "人物识别",
+        "ocr": "OCR 文字识别",
+        "semantic": "图像语义分析"
       },
       "validate": "验证连接",
       "validationError": "LLM 配置验证失败。",
@@ -1459,11 +1491,11 @@
       "runtimeInfoTitle": "运行时配置",
       "taskAvailability": "任务可用性",
       "taskNames": {
-        "bioClipClassify": "BioCLIP 分类",
-        "clipImageEmbed": "CLIP 图像嵌入",
-        "faceDetectAndEmbed": "人脸检测与嵌入",
-        "ocr": "OCR",
-        "semanticTextEmbed": "CLIP 文本嵌入"
+        "bioClipClassify": "BioCLIP 物种识别",
+        "faceDetectAndEmbed": "人物识别",
+        "ocr": "OCR 文字识别",
+        "semanticImageEmbed": "图像语义分析",
+        "semanticTextEmbed": "文本语义分析"
       },
       "unavailable": "不可用",
       "workingRepositoryDescription": "选择支持仓库作用域的页面和操作默认使用哪个仓库。选择全部仓库时保持全局视图。",
@@ -1546,15 +1578,28 @@
     },
     "backToStudio": "返回工作室",
     "develop": {
+      "blacks": "黑色",
+      "clarity": "清晰度",
       "color": "色彩",
+      "contrast": "对比度",
       "detail": "细节",
+      "exposure": "曝光",
       "geometry": "几何",
+      "highlights": "高光",
       "hint": "双击任意滑块重置",
       "light": "光线",
+      "noiseReduction": "降噪",
       "reset": "重置",
       "resetAll": "重置所有调整",
       "rotation": "旋转",
-      "title": "显影工具"
+      "saturation": "饱和度",
+      "shadows": "阴影",
+      "sharpness": "锐度",
+      "temperature": "色温",
+      "tint": "色调",
+      "title": "显影工具",
+      "vibrance": "鲜艳度",
+      "whites": "白色"
     },
     "editor": {
       "before": "原图",

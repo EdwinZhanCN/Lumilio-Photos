@@ -19,6 +19,22 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** label + numeric input + range. Double-click the row resets to default. */
+const SLIDER_I18N_KEYS: Record<string, string> = {
+  exposure: "studio.develop.exposure",
+  contrast: "studio.develop.contrast",
+  highlights: "studio.develop.highlights",
+  shadows: "studio.develop.shadows",
+  whites: "studio.develop.whites",
+  blacks: "studio.develop.blacks",
+  temperature: "studio.develop.temperature",
+  tint: "studio.develop.tint",
+  vibrance: "studio.develop.vibrance",
+  saturation: "studio.develop.saturation",
+  clarity: "studio.develop.clarity",
+  sharpness: "studio.develop.sharpness",
+  noiseReduction: "studio.develop.noiseReduction",
+};
+
 export function SliderRow({
   control,
   value,
@@ -52,7 +68,7 @@ export function SliderRow({
               changed ? "font-medium text-base-content" : "text-base-content/70"
             }`}
           >
-            {label}
+            {t(SLIDER_I18N_KEYS[control.key] ?? `studio.develop.${control.key}`, { defaultValue: label })}
           </span>
           {changed && (
             <span
