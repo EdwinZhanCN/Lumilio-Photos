@@ -90,7 +90,7 @@ export default function ChangePasswordPage(): React.ReactNode {
         },
       });
 
-      logout();
+      void logout();
       void navigate("/login", { replace: true });
     } catch (error) {
       setErrorMessage(
