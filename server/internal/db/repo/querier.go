@@ -399,6 +399,7 @@ type Querier interface {
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
+	SearchTagsByName(ctx context.Context, arg SearchTagsByNameParams) ([]Tag, error)
 	SetBootstrapPhase(ctx context.Context, bootstrapPhase string) (SystemState, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error

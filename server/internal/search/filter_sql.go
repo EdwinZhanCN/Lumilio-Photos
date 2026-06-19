@@ -68,6 +68,17 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 			  AND t.tag_name = %s%s
 		)`, a, tagNamePlaceholder, tagSourceCondition))
 	}
+	if len(filter.TagNames) > 0 {
+		tagNamesPlaceholder := builder.addArg(filter.TagNames)
+		// Match assets carrying every requested tag (AND semantics).
+		conditions = append(conditions, fmt.Sprintf(`(
+			SELECT COUNT(DISTINCT t.tag_name)
+			FROM asset_tags at
+			JOIN tags t ON t.tag_id = at.tag_id
+			WHERE at.asset_id = %s.asset_id
+			  AND t.tag_name = ANY(%s::text[])
+		) = cardinality(%s::text[])`, a, tagNamesPlaceholder, tagNamesPlaceholder))
+	}
 	if filter.FilenameValue != nil {
 		filenamePlaceholder := builder.addArg(*filter.FilenameValue)
 		switch {

@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
+import TagList from "./TagList";
 import { formatCaptureTime } from "@/lib/utils/formatters";
 import type { Asset, VideoSpecificMetadata } from "@/lib/http-commons";
 import { isVideoMetadata } from "@/lib/http-commons";
@@ -170,6 +171,9 @@ export default function VideoInfoView({
                 <p className="text-sm break-all font-medium">{filename}</p>
               </div>
             </div>
+
+            {/* Tags */}
+            <TagList assetId={asset.asset_id} />
 
             {/* Video Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">

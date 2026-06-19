@@ -50,6 +50,12 @@ type AssetControllerInterface interface {
 	GetAssetsByRating(c *gin.Context)        // GET /assets/rating/:rating - Get assets by rating
 	GetLikedAssets(c *gin.Context)           // GET /assets/liked - Get liked assets
 
+	// Tag management operations
+	GetAssetTags(c *gin.Context)   // GET    /assets/:id/tags - List tags on an asset
+	AddAssetTag(c *gin.Context)    // POST   /assets/:id/tags - Add a manual tag to an asset
+	RemoveAssetTag(c *gin.Context) // DELETE /assets/:id/tags/:tagId - Remove a tag from an asset
+	ListTags(c *gin.Context)       // GET    /assets/tags - List/search tag definitions
+
 	// Reprocessing operations
 	ReprocessAsset(c *gin.Context) // POST /assets/:id/reprocess - Reprocess failed or warning assets
 
@@ -391,6 +397,12 @@ func NewRouter(
 			assets.GET("/rating/:rating", assetController.GetAssetsByRating)
 			assets.GET("/liked", assetController.GetLikedAssets)
 			assets.POST("/:id/reprocess", assetController.ReprocessAsset)
+
+			// Tag management routes
+			assets.GET("/tags", assetController.ListTags)
+			assets.GET("/:id/tags", assetController.GetAssetTags)
+			assets.POST("/:id/tags", assetController.AddAssetTag)
+			assets.DELETE("/:id/tags/:tagId", assetController.RemoveAssetTag)
 
 			// Stack routes. Reads use optional auth (handler enforces
 			// per-asset ownership); mutations require authentication.

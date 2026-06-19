@@ -4,12 +4,13 @@ import DefaultTheme from "vitepress/theme";
 import "./style.css";
 import Layout from "./Layout.vue";
 import "virtual:group-icons.css";
-import { Search } from "@lucide/vue";
+import { Search, Plus } from "@lucide/vue";
 
 export default {
     extends: DefaultTheme,
     Layout,
     enhanceApp({ app, router, siteData }) {
         app.component("Search", Search);
+        app.component("Plus", Plus);
     },
 } satisfies Theme;

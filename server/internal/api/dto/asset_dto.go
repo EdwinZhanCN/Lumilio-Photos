@@ -307,6 +307,32 @@ type AssetTagDTO struct {
 	TagID      int32    `json:"tag_id"`
 	TagName    string   `json:"tag_name"`
 	Confidence *float64 `json:"confidence,omitempty"`
+	// Source identifies who created the tag link, e.g. "manual" for
+	// user-added tags or "zeroshot" for AI-generated ones. Manual tags are
+	// the only ones the UI lets the user remove.
+	Source *string `json:"source,omitempty"`
+}
+
+// AddAssetTagRequestDTO is the body for adding a manual tag to an asset.
+type AddAssetTagRequestDTO struct {
+	TagName string `json:"tag_name" binding:"required" example:"vacation"`
+}
+
+// AssetTagsResponseDTO is the list of tags attached to an asset.
+type AssetTagsResponseDTO struct {
+	Tags []AssetTagDTO `json:"tags"`
+}
+
+// TagDTO is a tag definition used for autocomplete/suggestions.
+type TagDTO struct {
+	TagID    int32  `json:"tag_id"`
+	TagName  string `json:"tag_name"`
+	Category string `json:"category,omitempty"`
+}
+
+// TagListResponseDTO is a flat list of tag definitions.
+type TagListResponseDTO struct {
+	Tags []TagDTO `json:"tags"`
 }
 
 // AssetAlbumRefDTO mirrors one entry of the `albums` aggregate built by
@@ -687,6 +713,7 @@ type AssetFilterDTO struct {
 	Location     *LocationBBoxDTO   `json:"location,omitempty"`
 	TagName      *string            `json:"tag_name,omitempty" example:"document"`
 	TagSource    *string            `json:"tag_source,omitempty" example:"zeroshot"`
+	TagNames     []string           `json:"tag_names,omitempty"`
 }
 
 // FilterAssetsRequestDTO represents the request structure for filtering assets

@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
+import TagList from "./TagList";
 import { formatCaptureTime } from "@/lib/utils/formatters";
 import type { Asset, AudioSpecificMetadata } from "@/lib/http-commons";
 import { isAudioMetadata } from "@/lib/http-commons";
@@ -174,6 +175,9 @@ export default function AudioInfoView({
                 <p className="text-sm break-all font-medium">{filename}</p>
               </div>
             </div>
+
+            {/* Tags */}
+            <TagList assetId={asset.asset_id} />
 
             {/* Music Metadata */}
             {(title !== "-" || artist !== "-" || album !== "-") && (

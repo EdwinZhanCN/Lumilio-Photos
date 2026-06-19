@@ -77,7 +77,8 @@ LEFT JOIN LATERAL (
         jsonb_build_object(
             'tag_id', tg.tag_id,
             'tag_name', tg.tag_name,
-            'confidence', at.confidence
+            'confidence', at.confidence,
+            'source', at.source
         )
         ORDER BY tg.tag_name ASC, tg.tag_id ASC
     ) AS tags

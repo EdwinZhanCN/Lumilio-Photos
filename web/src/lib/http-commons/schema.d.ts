@@ -2779,6 +2779,177 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/{id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get asset tags
+         * @description Get all tags (manual and AI-generated) attached to an asset
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tags retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetTagsResponseDTO"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add a manual tag to an asset
+         * @description Resolve (creating if needed) a tag by name and link it to the asset with the manual source
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Tag to add */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.AddAssetTagRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Tag added successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetTagDTO"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/tags/{tagId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a tag from an asset
+         * @description Unlink a tag from an asset by tag ID
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                    /** @description Tag ID */
+                    tagId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tag removed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/{id}/thumbnail": {
         parameters: {
             query?: never;
@@ -3852,6 +4023,59 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List/search tags
+         * @description List all tags or search by name for autocomplete suggestions
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Search query (substring match) */
+                    q?: string;
+                    /** @description Max results */
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tags retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.TagListResponseDTO"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8644,6 +8868,10 @@ export interface components {
             /** @example 2023-01-01T00:00:00Z */
             recorded_time?: string;
         };
+        "dto.AddAssetTagRequestDTO": {
+            /** @example vacation */
+            tag_name: string;
+        };
         "dto.AddAssetToAlbumRequestDTO": {
             position?: number;
         };
@@ -8906,6 +9134,7 @@ export interface components {
             repository_id?: string;
             /** @example document */
             tag_name?: string;
+            tag_names?: string[];
             /** @example zeroshot */
             tag_source?: string;
             /**
@@ -9027,8 +9256,17 @@ export interface components {
         };
         "dto.AssetTagDTO": {
             confidence?: number;
+            /**
+             * @description Source identifies who created the tag link, e.g. "manual" for
+             *     user-added tags or "zeroshot" for AI-generated ones. Manual tags are
+             *     the only ones the UI lets the user remove.
+             */
+            source?: string;
             tag_id?: number;
             tag_name?: string;
+        };
+        "dto.AssetTagsResponseDTO": {
+            tags?: components["schemas"]["dto.AssetTagDTO"][];
         };
         "dto.AssetThumbnailDTO": {
             mime_type?: string;
@@ -10207,6 +10445,14 @@ export interface components {
             otpauth_uri?: string;
             secret?: string;
             setup_token?: string;
+        };
+        "dto.TagDTO": {
+            category?: string;
+            tag_id?: number;
+            tag_name?: string;
+        };
+        "dto.TagListResponseDTO": {
+            tags?: components["schemas"]["dto.TagDTO"][];
         };
         "dto.UpdateAgentPinLayoutRequest": {
             layouts: components["schemas"]["dto.AgentPinLayoutItemDTO"][];

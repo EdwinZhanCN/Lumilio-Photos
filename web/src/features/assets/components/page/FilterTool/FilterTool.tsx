@@ -1,8 +1,14 @@
 import { ListFilterIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 import { useI18n } from "@/lib/i18n";
 import MapComponent from "@/components/MapComponent";
+import TagPickerMenu, {
+  type TagPickerItem,
+} from "@/features/assets/components/shared/TagPickerMenu";
+
+type TagOption = components["schemas"]["dto.TagDTO"];
 
 /* =========================
    Types
@@ -37,6 +43,7 @@ export interface FilterDTO {
   date?: DateRange;
   camera_model?: string;
   lens?: string;
+  tag_names?: string[];
 
   // Extended field to represent spatial filtering
   location?: LocationBBox;
@@ -119,6 +126,8 @@ function isFieldActive(dto: FilterDTO, field: FilterFieldKey): boolean {
       return !!dto.camera_model?.trim();
     case "lens":
       return !!dto.lens?.trim();
+    case "tag_names":
+      return !!dto.tag_names && dto.tag_names.length > 0;
     case "location":
       return !!dto.location && !isZeroBBox(dto.location);
   }
@@ -159,6 +168,9 @@ function buildLockedInitialDTO(
   }
   if (lockedFieldSet.has("lens") && isFieldActive(initial, "lens")) {
     dto.lens = initial.lens!.trim();
+  }
+  if (lockedFieldSet.has("tag_names") && isFieldActive(initial, "tag_names")) {
+    dto.tag_names = [...initial.tag_names!];
   }
   if (lockedFieldSet.has("location") && isFieldActive(initial, "location")) {
     dto.location = { ...initial.location! };
@@ -919,6 +931,62 @@ const LensSection = memo(function LensSection({
   );
 });
 
+const TagSection = memo(function TagSection({
+  filterDisabled,
+  enabled,
+  onEnabledChange,
+  value,
+  onValueChange,
+}: {
+  filterDisabled: boolean;
+  enabled: boolean;
+  onEnabledChange: (v: boolean) => void;
+  value: string[];
+  onValueChange: (v: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const [query, setQuery] = useState("");
+  const active = enabled && !filterDisabled;
+
+  const tagsQuery = $api.useQuery(
+    "get",
+    "/api/v1/assets/tags",
+    { params: { query: { q: query, limit: 20 } } },
+    { enabled: active, staleTime: 30_000 },
+  );
+  const options: TagOption[] = tagsQuery.data?.tags ?? [];
+  const selected = new Set(value);
+  const suggestions: TagPickerItem[] = options
+    .filter((tag) => tag.tag_name && !selected.has(tag.tag_name))
+    .map((tag) => ({ id: tag.tag_id ?? tag.tag_name!, name: tag.tag_name! }));
+  const checked: TagPickerItem[] = value.map((name) => ({ id: name, name }));
+
+  return (
+    <SectionShell
+      title={t("assets.filterTool.tagSection.title")}
+      enabled={enabled}
+      onToggle={onEnabledChange}
+      disabled={filterDisabled}
+    >
+      <TagPickerMenu
+        query={query}
+        onQueryChange={setQuery}
+        placeholder={t("assets.filterTool.tagSection.placeholder")}
+        loading={tagsQuery.isFetching}
+        loadingText={t("assets.filterTool.tagSection.loading")}
+        noResultsText={t("assets.filterTool.tagSection.no_results")}
+        checked={checked}
+        suggestions={active ? suggestions : []}
+        onToggleChecked={(item) =>
+          onValueChange(value.filter((name) => name !== item.name))
+        }
+        onSelectSuggestion={(item) => onValueChange([...value, item.name])}
+        className="max-h-52"
+      />
+    </SectionShell>
+  );
+});
+
 /* =========================
    Main component
    ========================= */
@@ -1018,6 +1086,12 @@ export default function FilterTool({
   const [lensEnabled, setLensEnabled] = useState<boolean>(!!initialDTO.lens);
   const [lens, setLens] = useState<string>(initialDTO.lens ?? "");
 
+  // Tag (multi-select)
+  const [tagEnabled, setTagEnabled] = useState<boolean>(
+    !!initialDTO.tag_names && initialDTO.tag_names.length > 0,
+  );
+  const [tagNames, setTagNames] = useState<string[]>(initialDTO.tag_names ?? []);
+
   useEffect(() => {
     if (lastSyncedInitialHashRef.current === initialHash) return;
     lastSyncedInitialHashRef.current = initialHash;
@@ -1055,6 +1129,9 @@ export default function FilterTool({
 
     setLensEnabled(!!next.lens);
     setLens(next.lens ?? "");
+
+    setTagEnabled(!!next.tag_names && next.tag_names.length > 0);
+    setTagNames(next.tag_names ?? []);
   }, [hasLockedInitialFilters, initialDTO, initialHash]);
 
   // Options hook
@@ -1078,6 +1155,7 @@ export default function FilterTool({
     if (locationEnabled && !isZeroBBox(location)) count++;
     if (cameraModelEnabled && cameraModel) count++;
     if (lensEnabled && lens) count++;
+    if (tagEnabled && tagNames.length > 0) count++;
     return count;
   }, [
     filterEnabled,
@@ -1096,6 +1174,8 @@ export default function FilterTool({
     cameraModel,
     lensEnabled,
     lens,
+    tagEnabled,
+    tagNames,
     hasLockedInitialFilters,
   ]);
 
@@ -1127,6 +1207,9 @@ export default function FilterTool({
       dto.camera_model = cameraModel;
     }
     if (filterEnabled && lensEnabled && lens) dto.lens = lens;
+    if (filterEnabled && tagEnabled && tagNames.length > 0) {
+      dto.tag_names = tagNames;
+    }
     return mergeLockedInitialDTO(dto, initialDTO, lockedFieldSet);
   }, [
     filterEnabled,
@@ -1151,6 +1234,8 @@ export default function FilterTool({
     cameraModel,
     lensEnabled,
     lens,
+    tagEnabled,
+    tagNames,
     initialDTO,
     initialHash,
     lockedFieldSet,
@@ -1220,6 +1305,11 @@ export default function FilterTool({
     setLensEnabled(isFieldLocked("lens") && isFieldActive(initialDTO, "lens"));
     setLens(initialDTO.lens ?? "");
 
+    setTagEnabled(
+      isFieldLocked("tag_names") && isFieldActive(initialDTO, "tag_names"),
+    );
+    setTagNames(initialDTO.tag_names ?? []);
+
     if (!autoApply) {
       onChange?.(buildLockedInitialDTO(initialDTO, lockedFieldSet));
     }
@@ -1249,6 +1339,7 @@ export default function FilterTool({
   const locationLocked = isFieldLocked("location");
   const cameraModelLocked = isFieldLocked("camera_model");
   const lensLocked = isFieldLocked("lens");
+  const tagLocked = isFieldLocked("tag_names");
 
   return (
     <div className={`dropdown dropdown-end ${open ? "dropdown-open" : ""}`} ref={rootRef}>
@@ -1382,6 +1473,14 @@ export default function FilterTool({
               onValueChange={setLens}
               items={lensItems}
               loading={loadingOptions}
+            />
+
+            <TagSection
+              filterDisabled={!filtersEnabled || tagLocked}
+              enabled={tagEnabled}
+              onEnabledChange={setTagEnabled}
+              value={tagNames}
+              onValueChange={setTagNames}
             />
           </div>
 
