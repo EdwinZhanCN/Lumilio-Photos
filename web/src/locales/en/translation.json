@@ -325,13 +325,13 @@
           "label_other": "Restore {{count}} assets"
         }
       },
+      "emptyDescription": "Items you move to Trash will appear here.",
+      "emptyTitle": "Trash is empty",
       "messages": {
         "restoreError": "Failed to restore selected assets.",
         "restoreSuccess_one": "Restored {{count}} asset.",
         "restoreSuccess_other": "Restored {{count}} assets."
       },
-      "emptyDescription": "Items you move to Trash will appear here.",
-      "emptyTitle": "Trash is empty",
       "title": "Trash"
     },
     "videoInfoView": {
@@ -750,6 +750,38 @@
       "recoverableBytes": "Reclaimable space"
     },
     "summaryLoadError": "Failed to load duplicate summary: {{message}}"
+  },
+  "exportModal": {
+    "addToAlbum": "Add to album",
+    "category": {
+      "media": "Media Processing",
+      "metadata": "Metadata",
+      "ml": "Machine Learning"
+    },
+    "downloadOriginal": "Download Original",
+    "export": "Export",
+    "exportFormat": "Export Format",
+    "exporting": "Exporting...",
+    "exportUnavailable": "Export conversion is unavailable for video and audio assets. You can still download the original file.",
+    "forceFullRetry": "Force full retry",
+    "forceFullRetryHint": "Re-run all processing tasks regardless of previous status",
+    "format": {
+      "avif": "AVIF",
+      "jpeg": "JPEG (80%)",
+      "png": "PNG",
+      "webp": "WebP (80%)"
+    },
+    "noAsset": "No asset selected. Actions are disabled.",
+    "noRetryTasks": "No retry tasks are available for this asset type.",
+    "optional": "Optional",
+    "retryProcessing": "Retry Processing",
+    "retryTitle": "Retry Processing Tasks",
+    "selectedCount_one": "{{count}} selected",
+    "selectedCount_other": "{{count}} selected",
+    "studio": "Studio",
+    "submitRetry": "Submit Retry",
+    "submitting": "Submitting...",
+    "viewOriginal": "View Original in New Tab"
   },
   "footer": {
     "copyright": "© {{year}} Lumilio Photos, Brought to you by EdwinZhan"
@@ -1463,9 +1495,9 @@
       "taskAvailability": "Task availability",
       "taskNames": {
         "bioClipClassify": "BioCLIP classify",
-        "clipImageEmbed": "CLIP image embed",
         "faceDetectAndEmbed": "Face detect & embed",
         "ocr": "OCR",
+        "semanticImageEmbed": "settings.serverSettings.taskNames.semanticImageEmbed",
         "semanticTextEmbed": "CLIP text embed"
       },
       "unavailable": "Unavailable",
@@ -1549,15 +1581,28 @@
     },
     "backToStudio": "Back to Studio",
     "develop": {
-      "color": "studio.develop.color",
+      "blacks": "Blacks",
+      "clarity": "Clarity",
+      "color": "Color",
+      "contrast": "Contrast",
       "detail": "Detail",
+      "exposure": "Exposure",
       "geometry": "Geometry",
+      "highlights": "Highlights",
       "hint": "Double-click to reset",
-      "light": "studio.develop.light",
+      "light": "Light",
+      "noiseReduction": "Noise Reduction",
       "reset": "Reset",
       "resetAll": "Reset all adjustments",
       "rotation": "Rotation",
-      "title": "Develop"
+      "saturation": "Saturation",
+      "shadows": "Shadows",
+      "sharpness": "Sharpness",
+      "temperature": "Temperature",
+      "tint": "Tint",
+      "title": "Develop",
+      "vibrance": "Vibrance",
+      "whites": "Whites"
     },
     "editor": {
       "before": "Before",

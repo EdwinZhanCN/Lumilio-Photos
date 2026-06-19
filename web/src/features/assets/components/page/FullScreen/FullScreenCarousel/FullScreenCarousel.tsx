@@ -8,6 +8,7 @@ import {
   useTransition,
 } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Virtual, Navigation, Pagination } from "swiper/modules";
 import {
@@ -23,6 +24,7 @@ import {
   Trash2,
   X,
   ImageOff,
+  Plus,
 } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 import ExportModal from "@/components/ExportModal";
@@ -39,6 +41,7 @@ import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import MediaViewer from "../../../shared/MediaViewer";
 import type { Asset, components } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
+import type { Album } from "@/lib/albums/types";
 import {
   type ParsedSpeciesPrediction,
   type TaxonomyRank,
@@ -311,6 +314,74 @@ const FullScreenCarousel = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const { t } = useI18n();
   const { toggleLike, deleteAsset } = useAssetActions();
+  const navigate = useNavigate();
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
+  const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
+  const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
+  const addToAlbumMutation = $api.useMutation(
+    "post",
+    "/api/v1/albums/{id}/assets/{assetId}",
+  );
+
+  const handleOpenStudio = useCallback(
+    (asset: Asset) => {
+      navigate(`/studio?assetId=${asset.asset_id}`);
+    },
+    [navigate],
+  );
+
+  const handleAddToAlbum = useCallback(
+    async (_asset: Asset) => {
+      setIsLoadingAlbums(true);
+      try {
+        const response = await listAlbumsMutation.mutateAsync({
+          params: { query: { limit: 50 } },
+        });
+        if (response?.albums) {
+          setAlbums(response.albums);
+        }
+        const modal = document.getElementById(
+          "album_picker_modal",
+        ) as HTMLDialogElement | null;
+        modal?.showModal();
+      } catch {
+        setAlbums([]);
+        const modal = document.getElementById(
+          "album_picker_modal",
+        ) as HTMLDialogElement | null;
+        modal?.showModal();
+      } finally {
+        setIsLoadingAlbums(false);
+      }
+    },
+    [listAlbumsMutation],
+  );
+
+  const handleSelectAlbum = useCallback(
+    async (albumId: number) => {
+      if (!currentAsset?.asset_id) return;
+      setIsAddingToAlbum(true);
+      try {
+        await addToAlbumMutation.mutateAsync({
+          params: {
+            path: { id: albumId, assetId: currentAsset.asset_id },
+          },
+          body: {},
+        });
+        const modal = document.getElementById(
+          "album_picker_modal",
+        ) as HTMLDialogElement | null;
+        modal?.close();
+      } catch {
+        // silently fail — album picker stays open for retry
+      } finally {
+        setIsAddingToAlbum(false);
+      }
+    },
+    [currentAsset, addToAlbumMutation],
+  );
+
   const fieldGuideAssetQuery = $api.useQuery(
     "get",
     "/api/v1/assets/{id}",
@@ -722,7 +793,11 @@ const FullScreenCarousel = ({
       )}
 
       {/* Export modal */}
-      <ExportModal asset={currentAsset} />
+      <ExportModal
+        asset={currentAsset}
+        onOpenStudio={handleOpenStudio}
+        onAddToAlbum={handleAddToAlbum}
+      />
 
       {/* Delete confirmation modal */}
       <dialog id="delete_confirm_modal" className="modal">
@@ -752,6 +827,65 @@ const FullScreenCarousel = ({
               >
                 {isDeleting ? "" : <Trash2 className="w-4 h-4 mr-2" />}
                 {isDeleting ? t("delete.deleting") : t("delete.confirm")}
+              </button>
+            </form>
+          </div>
+        </div>
+      </dialog>
+
+      {/* Add to Album picker */}
+      <dialog id="album_picker_modal" className="modal">
+        <div className="modal-box">
+          <form method="dialog">
+            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">
+              <X />
+            </button>
+          </form>
+          <h3 className="font-bold text-lg mb-4">
+            {t("assets.assetsPageHeader.addToAlbumModal.title", {
+              defaultValue: "Add to Album",
+            })}
+          </h3>
+
+          {isLoadingAlbums ? (
+            <div className="flex justify-center py-12">
+              <span className="loading loading-spinner loading-md text-primary" />
+            </div>
+          ) : albums.length > 0 ? (
+            <ul className="menu bg-base-200/50 rounded-box">
+              {albums.map((album) => (
+                <li key={album.album_id}>
+                  <button
+                    className="flex items-center gap-3"
+                    onClick={() => handleSelectAlbum(album.album_id!)}
+                    disabled={isAddingToAlbum}
+                  >
+                    <div className="size-10 rounded-box overflow-hidden bg-base-300 flex-shrink-0 flex items-center justify-center opacity-40">
+                      <Plus size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="font-medium text-sm truncate">
+                        {album.album_name}
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-12 opacity-50">
+              <p>
+                {t("assets.assetsPageHeader.addToAlbumModal.noAlbumsFound", {
+                  defaultValue: "No albums found",
+                })}
+              </p>
+            </div>
+          )}
+
+          <div className="modal-action">
+            <form method="dialog">
+              <button className="btn btn-ghost btn-sm">
+                {t("common.cancel")}
               </button>
             </form>
           </div>

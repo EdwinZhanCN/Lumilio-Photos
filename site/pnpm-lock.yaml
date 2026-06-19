@@ -11,6 +11,9 @@ importers:
       '@braintree/sanitize-url':
         specifier: ^7.1.2
         version: 7.1.2
+      '@lucide/vue':
+        specifier: ^1.20.0
+        version: 1.20.0(vue@3.5.38)
       cytoscape:
         specifier: ^3.34.0
         version: 3.34.0
@@ -277,6 +280,11 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+
+  '@lucide/vue@1.20.0':
+    resolution: {integrity: sha512-fy0XKdMPSGhhmfTp6evMN69ts7AJnopqflzbYM60a6vbnINhD5H/PbT+VeO9EQCHfSxQQiYBwUcBflbfKU57ng==}
+    peerDependencies:
+      vue: '>=3.0.1'
 
   '@mermaid-js/mermaid-mindmap@9.3.0':
     resolution: {integrity: sha512-IhtYSVBBRYviH1Ehu8gk69pMDF8DSRqXBRDMWrEfHoaMruHeaP2DXA3PBnuwsMaCdPQhlUUcy/7DBLAEIXvCAw==}
@@ -2278,6 +2286,10 @@ snapshots:
       import-meta-resolve: 4.2.0
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
+
+  '@lucide/vue@1.20.0(vue@3.5.38)':
+    dependencies:
+      vue: 3.5.38
 
   '@mermaid-js/mermaid-mindmap@9.3.0':
     dependencies:

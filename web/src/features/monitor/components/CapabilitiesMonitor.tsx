@@ -53,7 +53,7 @@ export function CapabilitiesMonitor() {
   const mlTasks = [
     {
       key: "clip-image",
-      label: t("settings.serverSettings.taskNames.clipImageEmbed"),
+      label: t("settings.serverSettings.taskNames.semanticImageEmbed"),
       capability: capabilities.ml.tasks.clipImageEmbed,
     },
     {

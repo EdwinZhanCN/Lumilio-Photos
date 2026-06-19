@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import PhotoPicker from "@/components/PhotoPicker";
 import { useI18n } from "@/lib/i18n";
 import { StudioHome } from "@/features/studio/home/StudioHome";
@@ -20,10 +21,22 @@ type StudioView = "home" | "picker" | "editor";
  */
 export function StudioEditMvp(): React.JSX.Element {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState<StudioView>("home");
-  const [assetId, setAssetId] = useState<string | null>(null);
+  const [assetId, setAssetId] = useState<string | null>(
+    () => searchParams.get("assetId"),
+  );
   const [focusBorder, setFocusBorder] = useState(false);
   const [recent, setRecent] = useState<RecentEditRecord[]>(() => readRecentEdits());
+
+  // If provided via search param, skip to editor
+  useEffect(() => {
+    const urlAssetId = searchParams.get("assetId");
+    if (urlAssetId) {
+      setAssetId(urlAssetId);
+      setView("editor");
+    }
+  }, [searchParams]);
 
   const openPicker = useCallback((withBorder: boolean) => {
     setFocusBorder(withBorder);
