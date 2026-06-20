@@ -7,6 +7,7 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/search"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/jackc/pgx/v5"
@@ -87,7 +88,7 @@ func (s *ocrService) SaveOCRResults(ctx context.Context, assetID pgtype.UUID, oc
 		}
 	}
 
-	fullText := strings.Join(texts, " ")
+	fullText := search.TokenizeForSearch(strings.Join(texts, " "))
 	if err := s.queries.UpdateOCRFullText(ctx, repo.UpdateOCRFullTextParams{
 		AssetID:  assetID,
 		FullText: fullText,
@@ -116,20 +117,31 @@ func (s *ocrService) GetOCRResults(ctx context.Context, assetID pgtype.UUID) (*O
 	}, nil
 }
 
-// SearchAssetsByText searches assets by text content using BM25 on the
-// asset-level full_text column. The pg_textsearch <@> operator returns a
-// negative BM25 distance (lower = more relevant); we order ascending so the
-// best matches come first.
 func (s *ocrService) SearchAssetsByText(ctx context.Context, searchText string, limit, offset int, minConfidence float32) ([]repo.Asset, error) {
+	tokenized := search.TokenizeQuery(searchText)
+	if tokenized == "" {
+		return []repo.Asset{}, nil
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("search assets by OCR text: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "SET LOCAL pg_trgm.word_similarity_threshold = 0.15"); err != nil {
+		return nil, fmt.Errorf("search assets by OCR text: set threshold: %w", err)
+	}
+
 	query := `
 SELECT a.*
 FROM ocr_results r
 JOIN assets a ON a.asset_id = r.asset_id
-WHERE r.full_text <@> $1 < 'Infinity'
-ORDER BY r.full_text <@> $1 ASC, a.asset_id DESC
+WHERE r.full_text %> $1
+ORDER BY word_similarity($1, r.full_text) DESC, a.asset_id DESC
 LIMIT $2 OFFSET $3
 `
-	rows, err := s.pool.Query(ctx, query, searchText, limit, offset)
+	rows, err := tx.Query(ctx, query, tokenized, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("search assets by OCR text: %w", err)
 	}
@@ -138,6 +150,10 @@ LIMIT $2 OFFSET $3
 	assets, err := pgx.CollectRows(rows, pgx.RowToStructByName[repo.Asset])
 	if err != nil {
 		return nil, fmt.Errorf("scan OCR search results: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("search assets by OCR text: commit: %w", err)
 	}
 	return assets, nil
 }

@@ -378,7 +378,7 @@
       "recovery": {
         "continue": "继续",
         "copyAll": "复制全部",
-        "cta": "完成并打开仪表盘",
+        "cta": "继续设置存储",
         "download": "下载",
         "downloaded": "已下载",
         "savedConfirm": "我已将恢复码保存在安全位置",
@@ -386,11 +386,17 @@
         "title": "保存管理员恢复码",
         "warning": "每个恢复码只能使用一次。请将其保存在安全的地方——如果你丢失了 Passkey 和身份验证器，这是恢复访问的唯一方式。"
       },
+      "repository": {
+        "submit": "创建并打开控制台",
+        "subtitle": "选择照片存储位置。此设置将作为未来仓库的默认值。",
+        "title": "设置主存储"
+      },
       "sidebarNote": "此向导只会出现一次，直到首个管理员创建完成。",
       "step": {
         "admin": "管理员账户",
         "passkey": "Passkey",
         "recovery": "恢复码",
+        "repository": "存储",
         "totp": "身份验证器",
         "welcome": "欢迎"
       },
@@ -414,6 +420,7 @@
         "cta": "开始设置",
         "inviteBody": "设置完成后再邀请家庭成员。",
         "inviteTitle": "稍后邀请其他人",
+        "languageRegion": "语言与地区",
         "localBody": "所有内容只存储在这台服务器上。",
         "localTitle": "你的数据留在本地",
         "secureBody": "管理员可选择 Passkey 或身份验证器应用作为第二重验证。",

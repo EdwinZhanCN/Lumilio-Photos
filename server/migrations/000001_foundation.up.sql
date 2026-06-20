@@ -2,8 +2,6 @@
 -- Extensions and global schema objects required by Lumilio Photos.
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE EXTENSION IF NOT EXISTS pg_textsearch;
-CREATE EXTENSION IF NOT EXISTS zhparser;
 
 --
 -- Name: album_type; Type: TYPE; Schema: public; Owner: -
@@ -128,30 +126,3 @@ END;
 $$;
 
 
---
--- Name: chinese_zh; Type: TEXT SEARCH CONFIGURATION; Schema: public; Owner: -
---
-
-CREATE TEXT SEARCH CONFIGURATION public.chinese_zh (
-    PARSER = public.zhparser );
-
-ALTER TEXT SEARCH CONFIGURATION public.chinese_zh
-    ADD MAPPING FOR a WITH simple;
-
-ALTER TEXT SEARCH CONFIGURATION public.chinese_zh
-    ADD MAPPING FOR e WITH simple;
-
-ALTER TEXT SEARCH CONFIGURATION public.chinese_zh
-    ADD MAPPING FOR i WITH simple;
-
-ALTER TEXT SEARCH CONFIGURATION public.chinese_zh
-    ADD MAPPING FOR j WITH simple;
-
-ALTER TEXT SEARCH CONFIGURATION public.chinese_zh
-    ADD MAPPING FOR l WITH simple;
-
-ALTER TEXT SEARCH CONFIGURATION public.chinese_zh
-    ADD MAPPING FOR n WITH simple;
-
-ALTER TEXT SEARCH CONFIGURATION public.chinese_zh
-    ADD MAPPING FOR v WITH simple;
