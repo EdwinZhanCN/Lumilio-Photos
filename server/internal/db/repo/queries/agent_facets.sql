@@ -14,11 +14,16 @@ WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
   AND a.is_deleted = false;
 
 -- name: AgentFacetTimeHistogram :many
--- granularity is 'month' or 'year'; bucket labels are YYYY-MM or YYYY.
+-- granularity is 'hour', 'day', 'month' or 'year'.
 SELECT
     to_char(
         date_trunc(sqlc.arg('granularity')::text, COALESCE(a.taken_time, a.upload_time)),
-        CASE WHEN sqlc.arg('granularity')::text = 'year' THEN 'YYYY' ELSE 'YYYY-MM' END
+        CASE
+            WHEN sqlc.arg('granularity')::text = 'hour' THEN 'YYYY-MM-DD HH24:00'
+            WHEN sqlc.arg('granularity')::text = 'day' THEN 'YYYY-MM-DD'
+            WHEN sqlc.arg('granularity')::text = 'year' THEN 'YYYY'
+            ELSE 'YYYY-MM'
+        END
     ) AS bucket,
     COUNT(*) AS count
 FROM assets a

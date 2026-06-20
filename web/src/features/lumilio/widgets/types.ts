@@ -21,6 +21,7 @@ export interface WidgetProps {
   /** Total members of the underlying set, as known when rendered. */
   count: number;
   title?: string;
+  params?: Record<string, unknown>;
 }
 
 /** A widget type registration. Adding a widget = registering one of these;

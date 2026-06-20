@@ -20,15 +20,16 @@ type AgentRefDTO struct {
 
 // AgentRefFacetsDTO mirrors ref.FacetSummary for the wire.
 type AgentRefFacetsDTO struct {
-	Count      int                 `json:"count"`
-	DateRange  *AgentDateRangeDTO  `json:"date_range,omitempty"`
-	Histogram  []AgentFacetBucket  `json:"histogram,omitempty"`
-	Types      map[string]int      `json:"types,omitempty"`
-	TopPlaces  []AgentNameCountDTO `json:"top_places,omitempty"`
-	TopPeople  []AgentNameCountDTO `json:"top_people,omitempty"`
-	Cameras    []AgentNameCountDTO `json:"cameras,omitempty"`
-	LikedCount int                 `json:"liked_count,omitempty"`
-	RatingDist []int               `json:"rating_dist,omitempty"`
+	Count                int                 `json:"count"`
+	DateRange            *AgentDateRangeDTO  `json:"date_range,omitempty"`
+	Histogram            []AgentFacetBucket  `json:"histogram,omitempty"`
+	HistogramGranularity string              `json:"histogram_granularity,omitempty" example:"day" enums:"hour,day,month,year"`
+	Types                map[string]int      `json:"types,omitempty"`
+	TopPlaces            []AgentNameCountDTO `json:"top_places,omitempty"`
+	TopPeople            []AgentNameCountDTO `json:"top_people,omitempty"`
+	Cameras              []AgentNameCountDTO `json:"cameras,omitempty"`
+	LikedCount           int                 `json:"liked_count,omitempty"`
+	RatingDist           []int               `json:"rating_dist,omitempty"`
 }
 
 // AgentDateRangeDTO spans the snapshot's capture times.
@@ -67,15 +68,16 @@ type AgentPinLayoutDTO struct {
 // AgentPinDTO is a pinned widget on the agent board: a durable ref snapshot
 // plus widget type and grid placement.
 type AgentPinDTO struct {
-	PinID     string            `json:"pin_id" example:"7d4df41e-9aa2-4d44-9a3d-111111111111"`
-	Title     string            `json:"title" example:"Kyoto 2025"`
-	Widget    string            `json:"widget" example:"asset_grid"`
-	Mode      string            `json:"mode" example:"frozen" enums:"frozen,live"`
-	Count     int               `json:"count" example:"24"`
-	Summary   string            `json:"summary,omitempty"`
-	Truncated bool              `json:"truncated,omitempty"`
-	Layout    AgentPinLayoutDTO `json:"layout"`
-	CreatedAt time.Time         `json:"created_at"`
+	PinID     string             `json:"pin_id" example:"7d4df41e-9aa2-4d44-9a3d-111111111111"`
+	Title     string             `json:"title" example:"Kyoto 2025"`
+	Widget    string             `json:"widget" example:"asset_grid"`
+	Mode      string             `json:"mode" example:"frozen" enums:"frozen,live"`
+	Count     int                `json:"count" example:"24"`
+	Summary   string             `json:"summary,omitempty"`
+	Truncated bool               `json:"truncated,omitempty"`
+	Layout    AgentPinLayoutDTO  `json:"layout"`
+	Facets    *AgentRefFacetsDTO `json:"facets,omitempty"`
+	CreatedAt time.Time          `json:"created_at"`
 }
 
 // CreateAgentPinRequest pins a session ref onto the board.
@@ -108,10 +110,11 @@ func ToAgentRefFacetsDTO(s *ref.FacetSummary) *AgentRefFacetsDTO {
 		return nil
 	}
 	out := &AgentRefFacetsDTO{
-		Count:      s.Count,
-		Types:      s.Types,
-		LikedCount: s.LikedCount,
-		RatingDist: s.RatingDist,
+		Count:                s.Count,
+		HistogramGranularity: s.HistogramGranularity,
+		Types:                s.Types,
+		LikedCount:           s.LikedCount,
+		RatingDist:           s.RatingDist,
 	}
 	if s.DateRange != nil {
 		out.DateRange = &AgentDateRangeDTO{From: s.DateRange.From, To: s.DateRange.To}

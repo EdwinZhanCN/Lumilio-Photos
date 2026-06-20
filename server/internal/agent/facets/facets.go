@@ -18,8 +18,8 @@ const (
 	topPlaces  = 5
 	topPeople  = 5
 	topCameras = 3
-	// yearGranularityThreshold switches the time histogram from month to
-	// year buckets when the snapshot spans more than this many years.
+	// yearGranularityThreshold switches multi-month histograms to year
+	// buckets when the snapshot spans more than this many years.
 	yearGranularityThreshold = 3
 )
 
@@ -45,10 +45,9 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	granularity := "month"
 	if overview.DateFrom.Valid && overview.DateTo.Valid {
 		summary.DateRange = &ref.DateRange{From: overview.DateFrom.Time, To: overview.DateTo.Time}
-		if overview.DateTo.Time.Sub(overview.DateFrom.Time) > yearGranularityThreshold*365*24*time.Hour {
-			granularity = "year"
-		}
+		granularity = chooseHistogramGranularity(overview.DateFrom.Time, overview.DateTo.Time)
 	}
+	summary.HistogramGranularity = granularity
 
 	if buckets, err := queries.AgentFacetTimeHistogram(ctx, repo.AgentFacetTimeHistogramParams{
 		Granularity: granularity,
@@ -111,6 +110,21 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	}
 
 	return summary, nil
+}
+
+func chooseHistogramGranularity(from, to time.Time) string {
+	fromYear, fromMonth, fromDay := from.Date()
+	toYear, toMonth, toDay := to.Date()
+	if fromYear == toYear && fromMonth == toMonth && fromDay == toDay {
+		return "hour"
+	}
+	if fromYear == toYear && fromMonth == toMonth {
+		return "day"
+	}
+	if to.Sub(from) > yearGranularityThreshold*365*24*time.Hour {
+		return "year"
+	}
+	return "month"
 }
 
 func toNameCounts[T any](rows []T, extract func(T) (string, int64)) []ref.NameCount {

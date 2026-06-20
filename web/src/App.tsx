@@ -1,7 +1,14 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
+import {
+  BrowserRouter,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
+import { ChatDock } from "@/features/lumilio/components/Chat/ChatDock";
 import {
   appRoutes,
   bootstrapRoutes,
@@ -31,6 +38,9 @@ const queryClient = new QueryClient();
 
 function AppShellLayout(): React.ReactNode {
   const { t } = useI18n();
+  const location = useLocation();
+  // The /lumilio board embeds its own dock; everywhere else gets the global FAB.
+  const showAgentDock = location.pathname !== "/lumilio";
 
   return (
     <div className="flex h-screen flex-col">
@@ -54,6 +64,7 @@ function AppShellLayout(): React.ReactNode {
           </p>
         </div>
       </footer>
+      {showAgentDock && <ChatDock variant="fab" />}
     </div>
   );
 }

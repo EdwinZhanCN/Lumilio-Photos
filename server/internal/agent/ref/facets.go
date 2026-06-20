@@ -8,14 +8,16 @@ import "time"
 // through SanitizeUserText before they land here. Serialized size budget is
 // roughly 600 tokens — keep top-N limits small.
 type FacetSummary struct {
-	Count      int            `json:"count"`
-	DateRange  *DateRange     `json:"date_range,omitempty"`
-	Histogram  []Bucket       `json:"histogram,omitempty"`
-	Types      map[string]int `json:"types,omitempty"`
-	TopPlaces  []NameCount    `json:"top_places,omitempty"`
-	TopPeople  []NameCount    `json:"top_people,omitempty"`
-	Cameras    []NameCount    `json:"cameras,omitempty"`
-	LikedCount int            `json:"liked_count,omitempty"`
+	Count     int        `json:"count"`
+	DateRange *DateRange `json:"date_range,omitempty"`
+	Histogram []Bucket   `json:"histogram,omitempty"`
+	// HistogramGranularity is one of hour, day, month or year.
+	HistogramGranularity string         `json:"histogram_granularity,omitempty"`
+	Types                map[string]int `json:"types,omitempty"`
+	TopPlaces            []NameCount    `json:"top_places,omitempty"`
+	TopPeople            []NameCount    `json:"top_people,omitempty"`
+	Cameras              []NameCount    `json:"cameras,omitempty"`
+	LikedCount           int            `json:"liked_count,omitempty"`
 	// RatingDist counts assets per rating 0..5; omitted when all zero.
 	RatingDist []int `json:"rating_dist,omitempty"`
 }
@@ -26,8 +28,9 @@ type DateRange struct {
 	To   time.Time `json:"to"`
 }
 
-// Bucket is one time-histogram bin. Bucket labels are "2025-04" (month
-// granularity) or "2025" (year granularity for ranges over three years).
+// Bucket is one adaptive time-histogram bin. Bucket labels match the
+// granularity: hour "2025-09-28 14:00", day "2025-09-28", month "2025-09",
+// or year "2025".
 type Bucket struct {
 	Bucket string `json:"bucket"`
 	Count  int    `json:"count"`

@@ -16,8 +16,8 @@ export type AgentRefAssetsDTO = Schemas["dto.AgentRefAssetsDTO"];
 export interface RefPayload {
   refId: string;
   count: number;
-  widget?: "asset_grid";
-  params?: { title?: string };
+  widget?: string;
+  params?: { title?: string; [key: string]: unknown };
 }
 
 export interface SideChannelError {
@@ -132,8 +132,9 @@ export interface WidgetBlock {
   id: string;
   refId: string;
   count: number;
-  widget: "asset_grid";
+  widget: string;
   title?: string;
+  params?: Record<string, unknown>;
 }
 
 /** Inline confirmation card for an interrupted (paused) agent run. */

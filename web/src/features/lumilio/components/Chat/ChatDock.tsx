@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronUp, Maximize2, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -24,12 +24,9 @@ interface ChatDockProps {
   /** "embedded" = in-flow panel (Lumilio board page); "fab" = bottom-right FAB
    * whose expanded panel portals above gallery/carousel. */
   variant?: "embedded" | "fab";
-  /** Hide the collapsed FAB trigger (e.g. while the carousel is open and renders
-   * its own trigger) while keeping the dock mounted so the panel can still open. */
-  hideTrigger?: boolean;
 }
 
-export function ChatDock({ variant = "embedded", hideTrigger = false }: ChatDockProps) {
+export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const { t } = useI18n();
   const [fabHovered, setFabHovered] = useState(false);
   const collapsedOverride = useDockStore((s) => s.collapsedOverride);
@@ -96,9 +93,14 @@ export function ChatDock({ variant = "embedded", hideTrigger = false }: ChatDock
 
   const header = (
     <header
-      className="flex cursor-pointer items-center gap-3 border-b border-base-300 px-3 py-2"
+      className="flex cursor-pointer items-center gap-2 border-b border-base-300 px-3 py-2"
       onClick={toggleCollapsed}
     >
+      <LumilioAvatar
+        start={isGenerating}
+        size={0.13}
+        className="shrink-0"
+      />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-base-content">
           {t("lumilio.dock.title", "Lumilio Agent")}
@@ -126,6 +128,17 @@ export function ChatDock({ variant = "embedded", hideTrigger = false }: ChatDock
           </span>
         </div>
       </div>
+      {variant === "fab" && (
+        <Link
+          to="/lumilio"
+          className="btn btn-ghost btn-sm btn-circle shrink-0 text-base-content/60"
+          title={t("lumilio.dock.openBoard", "Open full board")}
+          aria-label={t("lumilio.dock.openBoard", "Open full board")}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Maximize2 size={16} strokeWidth={1.8} />
+        </Link>
+      )}
       {messages.length > 0 && (
         <button
           type="button"
@@ -204,36 +217,59 @@ export function ChatDock({ variant = "embedded", hideTrigger = false }: ChatDock
     </>
   );
 
-  // ── FAB variant: collapsed button + portaled expanded panel ──────────────
+  // ── FAB variant: morphing pill ⇄ portaled expanded panel ──────────────────
+  // The collapsed pill carries the avatar; expanding grows it into the panel
+  // (whose header also shows the avatar), so the avatar stays put and morphs.
   if (variant === "fab") {
-    if (collapsed) {
-      if (hideTrigger) return null;
-      return (
-        <button
-          type="button"
-          onMouseEnter={() => setFabHovered(true)}
-          onMouseLeave={() => setFabHovered(false)}
-          className="fixed bottom-20 right-4 z-40 flex w-12 justify-center transition-transform hover:scale-110"
-          aria-controls="lumilio-chat-dock-panel"
-          aria-expanded={false}
-          title={toggleLabel}
-          onClick={toggleCollapsed}
-        >
-          <LumilioAvatar start={fabHovered || isGenerating} size={0.2} />
-        </button>
-      );
-    }
-
     return createPortal(
-      <section className="fixed bottom-4 right-4 z-[10000] flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-2">
+      <section className="fixed bottom-10 left-1/2 z-[10000] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2">
+        {/* Expanded: panel + input */}
         <div
-          id="lumilio-chat-dock-panel"
-          className="overflow-hidden rounded-box border border-base-300 bg-base-100/95 shadow-2xl backdrop-blur"
+          aria-hidden={collapsed}
+          inert={collapsed ? true : undefined}
+          className={`flex origin-bottom flex-col gap-2 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out ${
+            collapsed
+              ? "pointer-events-none max-h-0 translate-y-2 scale-[0.98] opacity-0"
+              : "max-h-[80vh] translate-y-0 scale-100 opacity-100"
+          }`}
         >
-          {header}
-          {body}
+          <div
+            id="lumilio-chat-dock-panel"
+            className="overflow-hidden rounded-box border border-base-300 bg-base-100/95 backdrop-blur"
+          >
+            {header}
+            {body}
+          </div>
+          {inputArea}
         </div>
-        {inputArea}
+
+        {/* Collapsed: morphing avatar pill */}
+        <div
+          aria-hidden={!collapsed}
+          inert={!collapsed ? true : undefined}
+          className={`flex justify-center overflow-hidden transition-[max-height,opacity,transform] duration-[250ms] ease-out ${
+            collapsed
+              ? "max-h-16 translate-y-0 opacity-100"
+              : "pointer-events-none max-h-0 translate-y-2 opacity-0"
+          }`}
+        >
+          <button
+            type="button"
+            onMouseEnter={() => setFabHovered(true)}
+            onMouseLeave={() => setFabHovered(false)}
+            className="btn h-auto min-h-0 items-center gap-1.5 rounded-full border border-base-300 bg-base-100/95 py-1.5 pl-2 pr-4 hover:bg-base-100"
+            aria-controls="lumilio-chat-dock-panel"
+            aria-expanded={false}
+            title={toggleLabel}
+            onClick={toggleCollapsed}
+          >
+            <LumilioAvatar start={fabHovered || isGenerating} size={0.13} />
+            <span className="text-sm font-semibold">
+              {t("lumilio.dock.title", "Lumilio Agent")}
+            </span>
+            {statusDot}
+          </button>
+        </div>
       </section>,
       document.body,
     );

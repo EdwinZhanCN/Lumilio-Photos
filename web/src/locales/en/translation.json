@@ -881,6 +881,7 @@
       "collapse": "Collapse chat",
       "conversation": "Conversation",
       "expand": "Expand chat",
+      "openBoard": "Open full board",
       "ready": "Ready",
       "replyCount_one": "{{count}} reply",
       "replyCount_other": "{{count}} replies",
@@ -916,11 +917,48 @@
       "resultSet": "Result set"
     },
     "widgets": {
+      "facets": {
+        "cameras": "Cameras",
+        "people": "People",
+        "places": "Places",
+        "timeline": "Timeline",
+        "types": "Types"
+      },
+      "metadataUnavailable": "This widget's summary is unavailable.",
+      "metrics": {
+        "assets": "Assets",
+        "liked": "Liked",
+        "range": "Range",
+        "rated": "Rated"
+      },
       "pin": "Pin to board",
       "pinned": "Pinned to board",
       "pinUnavailable": "This widget's photos are unavailable.",
       "refExpired": "These results have expired. Ask Lumilio to run the search again.",
       "resultsTitle": "Photos from Lumilio",
+      "storyline": {
+        "assets": "{{count}} assets",
+        "assets_one": "{{count}} asset",
+        "assets_other": "{{count}} assets",
+        "sequence": "Sequence preview"
+      },
+      "storylineUnavailable": "This storyline is unavailable.",
+      "timeline": {
+        "assets": "{{count}} assets",
+        "assets_one": "{{count}} asset",
+        "assets_other": "{{count}} assets",
+        "focusedPeriod": "Focused period",
+        "granularity": {
+          "day": "By day",
+          "hour": "By hour",
+          "month": "By month",
+          "year": "By year"
+        },
+        "preview": "Preview",
+        "range": "Range",
+        "rhythm": "Rhythm"
+      },
+      "timelineUnavailable": "This timeline is unavailable.",
       "viewAll_one": "View all {{count}} photos",
       "viewAll_other": "View all {{count}} photos"
     }
@@ -1184,10 +1222,6 @@
     "title": "System Status"
   },
   "navbar": {
-    "agent": {
-      "label": "Lumilio Agent",
-      "open": "Open Lumilio Agent"
-    },
     "notifications": {
       "clear": "Clear all messages",
       "empty": "No messages yet.",

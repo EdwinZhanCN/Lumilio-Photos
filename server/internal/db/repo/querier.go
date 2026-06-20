@@ -24,7 +24,7 @@ type Querier interface {
 	// sanitized in Go before reaching the LLM — never here.
 	AgentFacetOverview(ctx context.Context, assetIds []pgtype.UUID) (AgentFacetOverviewRow, error)
 	AgentFacetRatingDist(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetRatingDistRow, error)
-	// granularity is 'month' or 'year'; bucket labels are YYYY-MM or YYYY.
+	// granularity is 'hour', 'day', 'month' or 'year'.
 	AgentFacetTimeHistogram(ctx context.Context, arg AgentFacetTimeHistogramParams) ([]AgentFacetTimeHistogramRow, error)
 	AgentFacetTopPeople(ctx context.Context, arg AgentFacetTopPeopleParams) ([]AgentFacetTopPeopleRow, error)
 	AgentFacetTopPlaces(ctx context.Context, arg AgentFacetTopPlacesParams) ([]AgentFacetTopPlacesRow, error)
