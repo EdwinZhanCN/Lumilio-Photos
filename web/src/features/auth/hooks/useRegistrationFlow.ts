@@ -60,7 +60,9 @@ function getApiMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function useRegistrationFlow(): RegistrationFlowState {
+export function useRegistrationFlow(options?: {
+  onComplete?: () => void;
+}): RegistrationFlowState {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { completeAuth, isAuthenticated } = useAuth();
@@ -188,6 +190,10 @@ export function useRegistrationFlow(): RegistrationFlowState {
 
   // Skipping TOTP skips all MFA — the account stays password-only.
   const handleSkipTotp = () => {
+    if (options?.onComplete) {
+      options.onComplete();
+      return;
+    }
     void navigate(redirectTo, { replace: true });
   };
 
@@ -219,6 +225,10 @@ export function useRegistrationFlow(): RegistrationFlowState {
   };
 
   const handleFinish = () => {
+    if (options?.onComplete) {
+      options.onComplete();
+      return;
+    }
     void navigate(redirectTo, { replace: true });
   };
 

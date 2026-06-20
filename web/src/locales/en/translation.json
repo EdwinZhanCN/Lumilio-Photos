@@ -378,7 +378,7 @@
       "recovery": {
         "continue": "Continue",
         "copyAll": "Copy all",
-        "cta": "Finish & open dashboard",
+        "cta": "Continue to storage setup",
         "download": "Download",
         "downloaded": "Downloaded",
         "savedConfirm": "I’ve saved my recovery codes somewhere safe",
@@ -386,11 +386,17 @@
         "title": "Save admin recovery codes",
         "warning": "Each code works once. Store them somewhere safe — they’re the only way back in if you lose your passkey and authenticator."
       },
+      "repository": {
+        "submit": "Create & open dashboard",
+        "subtitle": "Choose where Lumilio stores photos. This becomes the default for future repositories.",
+        "title": "Set up primary storage"
+      },
       "sidebarNote": "This wizard appears only once — until the first administrator is created.",
       "step": {
         "admin": "Admin account",
         "passkey": "Passkey",
         "recovery": "Recovery codes",
+        "repository": "Storage",
         "totp": "Authenticator",
         "welcome": "Welcome"
       },
@@ -414,6 +420,7 @@
         "cta": "Begin setup",
         "inviteBody": "Add household members once setup is complete.",
         "inviteTitle": "Invite others later",
+        "languageRegion": "Language & Region",
         "localBody": "Everything is stored on this server only.",
         "localTitle": "Your data stays home",
         "secureBody": "Passkey or authenticator app — pick one as the second factor.",

@@ -1,7 +1,10 @@
-import React, { useState, type FormEvent } from "react";
+import React, { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowRight,
+  CheckCircle,
   Fingerprint,
+  FolderPlus,
+  Globe,
   HardDrive,
   KeyRound,
   Server,
@@ -11,10 +14,15 @@ import {
   UserCog,
   Users,
   User,
-  type LucideIcon,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { $api } from "@/lib/http-commons/queryClient";
+import { SUPPORTED_LANGUAGES } from "@/lib/i18n.tsx";
 import { useI18n } from "@/lib/i18n.tsx";
+import { usePreference } from "@/features/settings/preferences.ts";
 import { useRegistrationFlow } from "../hooks/useRegistrationFlow.ts";
+import { setupStatusQueryKey, useSetupStatus } from "../hooks/useSetupStatus.ts";
 import {
   PASSWORD_HINT,
   USERNAME_HINT,
@@ -38,13 +46,15 @@ import {
   type StepperStep,
 } from "../components/ui.tsx";
 
-const STEP_CONFIG: Array<{ key: string; icon: LucideIcon }> = [
-  { key: "welcome", icon: Server },
-  { key: "admin", icon: UserCog },
-  { key: "totp", icon: Smartphone },
-  { key: "passkey", icon: Fingerprint },
-  { key: "recovery", icon: KeyRound },
+const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "en", label: "English" },
+  { value: "zh", label: "中文" },
 ];
+
+const REGION_OPTIONS_KEYS = [
+  { value: "china", labelKey: "settings.regionOptions.china", fallback: "China" },
+  { value: "other", labelKey: "settings.regionOptions.other", fallback: "Other" },
+] as const;
 
 const FLOW_INDEX: Record<string, number> = {
   credentials: 1,
@@ -53,9 +63,41 @@ const FLOW_INDEX: Record<string, number> = {
   recovery: 4,
 };
 
+function apiMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object") {
+    const record = error as { message?: string; error?: string };
+    return record.message || record.error || fallback;
+  }
+  return fallback;
+}
+
 const BootstrapWizard: React.FC = () => {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const setupQuery = useSetupStatus();
+  const createRepoMutation = $api.useMutation("post", "/api/v1/repositories");
+
   const [welcomed, setWelcomed] = useState(false);
+  const [mfaComplete, setMfaComplete] = useState(false);
+  const [language, setLanguage] = usePreference("language");
+  const [region, setRegion] = usePreference("region");
+
+  // Repository form state
+  const defaults = setupQuery.data?.repository_defaults;
+  const [repoName, setRepoName] = useState("Primary Storage");
+  const [repoRoot, setRepoRoot] = useState("");
+  const [strategy, setStrategy] = useState("date");
+  const [duplicateHandling, setDuplicateHandling] = useState("rename");
+
+  useEffect(() => {
+    if (!defaults) return;
+    setRepoRoot((current) => current || defaults.default_root || "");
+    setStrategy(defaults.strategy || "date");
+    setDuplicateHandling(defaults.duplicate_handling || "rename");
+  }, [defaults]);
+
   const {
     step,
     username,
@@ -77,43 +119,43 @@ const BootstrapWizard: React.FC = () => {
     handleCompleteTotp,
     handleSkipTotp,
     handleFinish,
-  } = useRegistrationFlow();
+  } = useRegistrationFlow({ onComplete: () => setMfaComplete(true) });
 
   const appName = t("app.name", { defaultValue: "Lumilio Photos" });
-  const current = welcomed ? (FLOW_INDEX[step] ?? 1) : 0;
+
+  // Step mapping: 0=welcome, 1-4=registration flow, 5=repository
+  const current = mfaComplete ? 5 : welcomed ? (FLOW_INDEX[step] ?? 1) : 0;
+
   const localizedSteps: StepperStep[] = [
     {
       key: "welcome",
       label: t("auth.bootstrap.step.welcome", { defaultValue: "Welcome" }),
-      icon: Server,
+      icon: Globe,
     },
     {
       key: "admin",
-      label: t("auth.bootstrap.step.admin", {
-        defaultValue: "Admin account",
-      }),
+      label: t("auth.bootstrap.step.admin", { defaultValue: "Admin account" }),
       icon: UserCog,
     },
     {
       key: "totp",
-      label: t("auth.bootstrap.step.totp", {
-        defaultValue: "Authenticator",
-      }),
+      label: t("auth.bootstrap.step.totp", { defaultValue: "Authenticator" }),
       icon: Smartphone,
     },
     {
       key: "passkey",
-      label: t("auth.bootstrap.step.passkey", {
-        defaultValue: "Passkey",
-      }),
+      label: t("auth.bootstrap.step.passkey", { defaultValue: "Passkey" }),
       icon: Fingerprint,
     },
     {
       key: "recovery",
-      label: t("auth.bootstrap.step.recovery", {
-        defaultValue: "Recovery codes",
-      }),
+      label: t("auth.bootstrap.step.recovery", { defaultValue: "Recovery codes" }),
       icon: KeyRound,
+    },
+    {
+      key: "repository",
+      label: t("auth.bootstrap.step.repository", { defaultValue: "Storage" }),
+      icon: HardDrive,
     },
   ];
 
@@ -123,33 +165,54 @@ const BootstrapWizard: React.FC = () => {
     } as FormEvent<HTMLFormElement>);
   };
 
+  const canSubmitRepo = useMemo(
+    () => repoName.trim() !== "" && repoRoot.trim() !== "" && !createRepoMutation.isPending,
+    [createRepoMutation.isPending, repoName, repoRoot],
+  );
+
+  const submitRepo = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canSubmitRepo) return;
+    await createRepoMutation.mutateAsync({
+      body: {
+        name: repoName.trim(),
+        role: "primary",
+        root: repoRoot.trim(),
+        storage_strategy: strategy,
+        duplicate_handling: duplicateHandling,
+      },
+    });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: setupStatusQueryKey }),
+      queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/assets/indexing/repositories"] }),
+    ]);
+    void navigate("/", { replace: true });
+  };
+
+  const repoError = createRepoMutation.error
+    ? apiMessage(
+        createRepoMutation.error,
+        t("auth.primaryRepository.error", { defaultValue: "Failed to create the primary repository." }),
+      )
+    : null;
+
   const features: Array<[typeof ShieldCheck, string, string]> = [
     [
       ShieldCheck,
-      t("auth.bootstrap.welcome.secureTitle", {
-        defaultValue: "Secured by default",
-      }),
+      t("auth.bootstrap.welcome.secureTitle", { defaultValue: "Secured by default" }),
       t("auth.bootstrap.welcome.secureBody", {
         defaultValue: "Passkey or authenticator app — pick one as the second factor.",
       }),
     ],
     [
       HardDrive,
-      t("auth.bootstrap.welcome.localTitle", {
-        defaultValue: "Your data stays home",
-      }),
-      t("auth.bootstrap.welcome.localBody", {
-        defaultValue: "Everything is stored on this server only.",
-      }),
+      t("auth.bootstrap.welcome.localTitle", { defaultValue: "Your data stays home" }),
+      t("auth.bootstrap.welcome.localBody", { defaultValue: "Everything is stored on this server only." }),
     ],
     [
       Users,
-      t("auth.bootstrap.welcome.inviteTitle", {
-        defaultValue: "Invite others later",
-      }),
-      t("auth.bootstrap.welcome.inviteBody", {
-        defaultValue: "Add household members once setup is complete.",
-      }),
+      t("auth.bootstrap.welcome.inviteTitle", { defaultValue: "Invite others later" }),
+      t("auth.bootstrap.welcome.inviteBody", { defaultValue: "Add household members once setup is complete." }),
     ],
   ];
 
@@ -163,9 +226,7 @@ const BootstrapWizard: React.FC = () => {
               <Brand appName={appName} size={32} />
               <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-base-200 px-2.5 py-1 text-[0.68rem] font-medium uppercase tracking-wide text-base-content/55">
                 <Sparkles size={12} />{" "}
-                {t("auth.bootstrap.firstRun", {
-                  defaultValue: "First-run setup",
-                })}
+                {t("auth.bootstrap.firstRun", { defaultValue: "First-run setup" })}
               </div>
               <div className="mt-7">
                 <Stepper steps={localizedSteps} current={current} />
@@ -173,20 +234,20 @@ const BootstrapWizard: React.FC = () => {
             </div>
             <p className="mt-8 text-xs leading-relaxed text-base-content/40">
               {t("auth.bootstrap.sidebarNote", {
-                defaultValue:
-                  "This wizard appears only once — until the first administrator is created.",
+                defaultValue: "This wizard appears only once — until the first administrator is created.",
               })}
             </p>
           </aside>
 
           {/* content */}
           <section className="p-7 sm:p-9">
-            {displayError && (
+            {displayError && current < 5 && (
               <div className="mb-5">
                 <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
               </div>
             )}
 
+            {/* Step 0: Welcome + Language/Region */}
             {current === 0 && (
               <div className="flex max-w-md flex-col gap-5">
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-base-200 text-base-content">
@@ -194,17 +255,62 @@ const BootstrapWizard: React.FC = () => {
                 </div>
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tight text-base-content">
-                    {t("auth.bootstrap.welcome.title", {
-                      defaultValue: "Welcome to Lumilio Photos",
-                    })}
+                    {t("auth.bootstrap.welcome.title", { defaultValue: "Welcome to Lumilio Photos" })}
                   </h1>
                   <p className="mt-2 text-sm leading-relaxed text-base-content/55">
                     {t("auth.bootstrap.welcome.body", {
                       defaultValue:
-                        "Your server is up and running, but no administrator exists yet. Let’s create the first admin account and lock it down with two-factor authentication.",
+                        "Your server is up and running, but no administrator exists yet. Let's create the first admin account and lock it down with two-factor authentication.",
                     })}
                   </p>
                 </div>
+
+                {/* Language & Region */}
+                <div className="flex flex-col gap-3 rounded-xl border border-base-200 px-4 py-3.5">
+                  <div className="flex items-center gap-2 text-sm font-medium text-base-content">
+                    <Globe size={16} className="text-base-content/45" />
+                    {t("auth.bootstrap.welcome.languageRegion", {
+                      defaultValue: "Language & Region",
+                    })}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-base-content/55">
+                        {t("settings.language", { defaultValue: "Language" })}
+                      </span>
+                      <select
+                        className="select select-bordered select-sm w-full"
+                        value={language}
+                        onChange={(e) =>
+                          setLanguage(e.target.value as (typeof SUPPORTED_LANGUAGES)[number])
+                        }
+                      >
+                        {LANGUAGE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-base-content/55">
+                        {t("settings.region", { defaultValue: "Region" })}
+                      </span>
+                      <select
+                        className="select select-bordered select-sm w-full"
+                        value={region}
+                        onChange={(e) => setRegion(e.target.value as "china" | "other")}
+                      >
+                        {REGION_OPTIONS_KEYS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {t(opt.labelKey, { defaultValue: opt.fallback })}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
                 <dl className="grid gap-2.5">
                   {features.map(([Icon, title, body]) => (
                     <div
@@ -231,38 +337,29 @@ const BootstrapWizard: React.FC = () => {
                   className="self-start px-6"
                   onClick={() => setWelcomed(true)}
                 >
-                  {t("auth.bootstrap.welcome.cta", {
-                    defaultValue: "Begin setup",
-                  })}
+                  {t("auth.bootstrap.welcome.cta", { defaultValue: "Begin setup" })}
                 </Btn>
               </div>
             )}
 
+            {/* Step 1: Admin account */}
             {current === 1 && (
               <div className="max-w-md">
                 <CardHead
-                  title={t("auth.bootstrap.admin.title", {
-                    defaultValue: "Create the administrator",
-                  })}
+                  title={t("auth.bootstrap.admin.title", { defaultValue: "Create the administrator" })}
                   sub={t("auth.bootstrap.admin.subtitle", {
                     defaultValue: "This account can manage the server, libraries, and members.",
                   })}
                 />
                 <form className="mt-5 flex flex-col gap-4" onSubmit={handleStartRegistration}>
                   <Field
-                    label={t("auth.register.username", {
-                      defaultValue: "Admin username",
-                    })}
-                    hint={t("auth.register.usernameHint", {
-                      defaultValue: USERNAME_HINT,
-                    })}
+                    label={t("auth.register.username", { defaultValue: "Admin username" })}
+                    hint={t("auth.register.usernameHint", { defaultValue: USERNAME_HINT })}
                   >
                     <TextInput
                       icon={User}
                       type="text"
-                      placeholder={t("auth.register.usernamePlaceholder", {
-                        defaultValue: "admin",
-                      })}
+                      placeholder={t("auth.register.usernamePlaceholder", { defaultValue: "admin" })}
                       value={username}
                       onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
                       pattern={USERNAME_PATTERN}
@@ -273,21 +370,15 @@ const BootstrapWizard: React.FC = () => {
                     />
                   </Field>
                   <PasswordField
-                    label={t("auth.register.password", {
-                      defaultValue: "Password",
-                    })}
-                    hint={t("auth.register.passwordHint", {
-                      defaultValue: PASSWORD_HINT,
-                    })}
+                    label={t("auth.register.password", { defaultValue: "Password" })}
+                    hint={t("auth.register.passwordHint", { defaultValue: PASSWORD_HINT })}
                     value={password}
                     onChange={setPassword}
                     meter
                     autoComplete="new-password"
                   />
                   <PasswordField
-                    label={t("auth.register.confirmPassword", {
-                      defaultValue: "Confirm password",
-                    })}
+                    label={t("auth.register.confirmPassword", { defaultValue: "Confirm password" })}
                     hint={t("auth.register.confirmPasswordHint", {
                       defaultValue: "Passwords must match exactly.",
                     })}
@@ -300,22 +391,19 @@ const BootstrapWizard: React.FC = () => {
                     inputRef={confirmPasswordRef}
                   />
                   <Btn type="submit" variant="neutral" loading={isBusy} className="self-start px-6">
-                    {t("auth.bootstrap.admin.submit", {
-                      defaultValue: "Create admin & continue",
-                    })}
+                    {t("auth.bootstrap.admin.submit", { defaultValue: "Create admin & continue" })}
                   </Btn>
                 </form>
               </div>
             )}
 
+            {/* Step 2: TOTP */}
             {current === 2 && totpSetup && (
               <div className="max-w-md">
                 <CardHead
                   icon={Smartphone}
                   tone="primary"
-                  title={t("auth.bootstrap.totp.title", {
-                    defaultValue: "Add an authenticator app",
-                  })}
+                  title={t("auth.bootstrap.totp.title", { defaultValue: "Add an authenticator app" })}
                   sub={t("auth.bootstrap.totp.subtitle", {
                     defaultValue: "Optional — scan and verify to enable an authenticator app.",
                   })}
@@ -329,9 +417,7 @@ const BootstrapWizard: React.FC = () => {
                     onVerify={submitTotp}
                     invalid={Boolean(displayError)}
                     busy={isBusy}
-                    verifyLabel={t("auth.register.verifyAndEnable", {
-                      defaultValue: "Verify & enable",
-                    })}
+                    verifyLabel={t("auth.register.verifyAndEnable", { defaultValue: "Verify & enable" })}
                   />
                 </div>
                 <button
@@ -340,21 +426,18 @@ const BootstrapWizard: React.FC = () => {
                   disabled={isBusy}
                   className="mt-3 text-sm font-medium text-base-content/45 hover:text-base-content/70"
                 >
-                  {t("auth.bootstrap.totp.skip", {
-                    defaultValue: "Skip for now",
-                  })}
+                  {t("auth.bootstrap.totp.skip", { defaultValue: "Skip for now" })}
                 </button>
               </div>
             )}
 
+            {/* Step 3: Passkey */}
             {current === 3 && (
               <div className="max-w-md">
                 <CardHead
                   icon={Fingerprint}
                   tone="primary"
-                  title={t("auth.bootstrap.passkey.title", {
-                    defaultValue: "Add an admin passkey",
-                  })}
+                  title={t("auth.bootstrap.passkey.title", { defaultValue: "Add an admin passkey" })}
                   sub={t("auth.bootstrap.passkey.subtitle", {
                     defaultValue: "Optional — a fast, phishing-resistant way to sign in as admin.",
                   })}
@@ -367,9 +450,7 @@ const BootstrapWizard: React.FC = () => {
                     loading={isBusy}
                     onClick={() => void handleCreatePasskey()}
                   >
-                    {t("auth.bootstrap.passkey.action", {
-                      defaultValue: "Create admin passkey",
-                    })}
+                    {t("auth.bootstrap.passkey.action", { defaultValue: "Create admin passkey" })}
                   </Btn>
                 </div>
                 <button
@@ -378,13 +459,12 @@ const BootstrapWizard: React.FC = () => {
                   disabled={isBusy}
                   className="mt-3 text-sm font-medium text-base-content/45 hover:text-base-content/70"
                 >
-                  {t("auth.bootstrap.passkey.skip", {
-                    defaultValue: "Skip for now",
-                  })}
+                  {t("auth.bootstrap.passkey.skip", { defaultValue: "Skip for now" })}
                 </button>
               </div>
             )}
 
+            {/* Step 4: Recovery codes */}
             {current === 4 && (
               <div className="max-w-md">
                 <CardHead
@@ -401,10 +481,10 @@ const BootstrapWizard: React.FC = () => {
                   <RecoveryCodesPanel
                     codes={recoveryCodes}
                     confirmLabel={t("auth.bootstrap.recovery.cta", {
-                      defaultValue: "Finish & open dashboard",
+                      defaultValue: "Continue to storage setup",
                     })}
                     checkboxLabel={t("auth.register.recoverySavedConfirm", {
-                      defaultValue: "I’ve saved my recovery codes somewhere safe",
+                      defaultValue: "I've saved my recovery codes somewhere safe",
                     })}
                     onConfirm={handleFinish}
                   />
@@ -412,9 +492,112 @@ const BootstrapWizard: React.FC = () => {
               </div>
             )}
 
+            {/* Step 5: Primary repository */}
+            {current === 5 && (
+              <div className="max-w-md">
+                <CardHead
+                  icon={HardDrive}
+                  title={t("auth.bootstrap.repository.title", {
+                    defaultValue: "Set up primary storage",
+                  })}
+                  sub={t("auth.bootstrap.repository.subtitle", {
+                    defaultValue:
+                      "Choose where Lumilio stores photos. This becomes the default for future repositories.",
+                  })}
+                />
+
+                {repoError && (
+                  <div className="mt-4">
+                    <InlineError>{repoError}</InlineError>
+                  </div>
+                )}
+
+                <form
+                  className="mt-5 flex flex-col gap-4"
+                  onSubmit={(e) => void submitRepo(e)}
+                >
+                  <Field
+                    label={t("auth.primaryRepository.name", { defaultValue: "Name" })}
+                  >
+                    <TextInput
+                      icon={FolderPlus}
+                      type="text"
+                      value={repoName}
+                      onChange={(e) => setRepoName(e.target.value)}
+                      disabled={createRepoMutation.isPending}
+                      required
+                    />
+                  </Field>
+
+                  <Field
+                    label={t("auth.primaryRepository.root", { defaultValue: "Storage root" })}
+                    hint={t("auth.primaryRepository.rootHint", {
+                      defaultValue:
+                        "Set by server configuration. The primary repository is created at <root>/primary.",
+                    })}
+                  >
+                    <TextInput
+                      icon={HardDrive}
+                      type="text"
+                      value={repoRoot}
+                      readOnly
+                      tabIndex={-1}
+                      className="bg-base-200 font-mono text-sm"
+                    />
+                  </Field>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-base-content/70">
+                        {t("auth.primaryRepository.strategy", { defaultValue: "Storage strategy" })}
+                      </span>
+                      <select
+                        className="select select-bordered select-sm w-full"
+                        value={strategy}
+                        onChange={(e) => setStrategy(e.target.value)}
+                        disabled={createRepoMutation.isPending}
+                      >
+                        <option value="date">date</option>
+                        <option value="flat">flat</option>
+                        <option value="cas">cas</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-base-content/70">
+                        {t("auth.primaryRepository.duplicates", { defaultValue: "Duplicates" })}
+                      </span>
+                      <select
+                        className="select select-bordered select-sm w-full"
+                        value={duplicateHandling}
+                        onChange={(e) => setDuplicateHandling(e.target.value)}
+                        disabled={createRepoMutation.isPending}
+                      >
+                        <option value="rename">rename</option>
+                        <option value="uuid">uuid</option>
+                        <option value="overwrite">overwrite</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <Btn
+                    type="submit"
+                    variant="neutral"
+                    icon={CheckCircle}
+                    loading={createRepoMutation.isPending}
+                    disabled={!canSubmitRepo}
+                    className="self-start px-6"
+                  >
+                    {t("auth.bootstrap.repository.submit", {
+                      defaultValue: "Create & open dashboard",
+                    })}
+                  </Btn>
+                </form>
+              </div>
+            )}
+
             {/* mobile progress */}
             <div className="mt-7 flex items-center gap-1.5 md:hidden">
-              {STEP_CONFIG.map((s, i) => (
+              {localizedSteps.map((s, i) => (
                 <span
                   key={s.key}
                   className={
