@@ -663,10 +663,10 @@ CREATE INDEX ocr_results_asset_id_idx ON public.ocr_results USING btree (asset_i
 
 
 --
--- Name: ocr_results_bm25_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: ocr_results_trgm_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX ocr_results_bm25_idx ON public.ocr_results USING bm25 (full_text) WITH (text_config='public.chinese_zh');
+CREATE INDEX ocr_results_trgm_idx ON public.ocr_results USING gin (full_text gin_trgm_ops);
 
 
 --

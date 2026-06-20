@@ -166,20 +166,25 @@ func (r *TextRetriever) CountQuery(ctx context.Context, builder *sqlBuilder, req
 }
 
 func (r *TextRetriever) retrieveOCR(ctx context.Context, req Request) ([]Candidate, error) {
+	tokenized := TokenizeQuery(req.Query)
+	if tokenized == "" {
+		return nil, nil
+	}
+
 	builder := &sqlBuilder{}
-	queryPlaceholder := builder.addArg(req.Query)
+	queryPlaceholder := builder.addArg(tokenized)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
 		return nil, err
 	}
 	conditions = append(conditions,
-		fmt.Sprintf("r.full_text <@> %s < 'Infinity'", queryPlaceholder))
+		fmt.Sprintf("r.full_text %%> %s", queryPlaceholder))
 	limitPlaceholder := builder.addArg(req.TopK)
 
 	query := fmt.Sprintf(`
 SELECT
   a.asset_id,
-  (-(r.full_text <@> %s))::float8 AS raw_score
+  word_similarity(%s, r.full_text)::float8 AS raw_score
 FROM ocr_results r
 JOIN assets a ON a.asset_id = r.asset_id
 WHERE %s
@@ -187,23 +192,46 @@ ORDER BY raw_score DESC, a.asset_id DESC
 LIMIT %s
 `, queryPlaceholder, joinConditions(conditions), limitPlaceholder)
 
-	rows, err := r.pool.Query(ctx, query, builder.args...)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ocr retrieve begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "SET LOCAL pg_trgm.word_similarity_threshold = 0.15"); err != nil {
+		return nil, fmt.Errorf("ocr retrieve set threshold: %w", err)
+	}
+
+	rows, err := tx.Query(ctx, query, builder.args...)
 	if err != nil {
 		return nil, fmt.Errorf("ocr retrieve: %w", err)
 	}
 	defer rows.Close()
 
-	return collectCandidates(rows, SourceOCR)
+	candidates, err := collectCandidates(rows, SourceOCR)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("ocr retrieve commit: %w", err)
+	}
+	return candidates, nil
 }
 
 func (r *TextRetriever) ocrCountQuery(builder *sqlBuilder, req Request) (string, error) {
-	queryPlaceholder := builder.addArg(req.Query)
+	tokenized := TokenizeQuery(req.Query)
+	if tokenized == "" {
+		return "SELECT NULL::uuid AS asset_id WHERE false", nil
+	}
+
+	queryPlaceholder := builder.addArg(tokenized)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
 		return "", err
 	}
 	conditions = append(conditions,
-		fmt.Sprintf("r.full_text <@> %s < 'Infinity'", queryPlaceholder))
+		fmt.Sprintf("r.full_text %%> %s", queryPlaceholder))
 
 	return fmt.Sprintf(`
 SELECT a.asset_id

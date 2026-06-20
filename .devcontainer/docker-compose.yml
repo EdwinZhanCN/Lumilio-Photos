@@ -24,8 +24,6 @@ services:
             - maintenance_work_mem=256MB
             - -c
             - max_parallel_maintenance_workers=4
-            - -c
-            - shared_preload_libraries=pg_textsearch
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
             interval: 10s
