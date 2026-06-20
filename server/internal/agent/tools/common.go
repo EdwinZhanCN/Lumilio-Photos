@@ -116,6 +116,9 @@ func RegisterAll() {
 	RegisterInspect()
 	// Terminals
 	RegisterShow()
+	RegisterShowFacets()
+	RegisterShowTimeline()
+	RegisterShowStoryline()
 	RegisterBulkLike()
 	RegisterCreateAlbum()
 	RegisterAddToAlbum()

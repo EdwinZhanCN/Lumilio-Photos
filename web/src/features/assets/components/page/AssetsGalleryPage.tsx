@@ -11,7 +11,6 @@ import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery
 import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { SearchFAB } from "@/features/assets/components/page/SearchFAB";
-import { ChatDock } from "@/features/lumilio/components/Chat/ChatDock";
 import { useDockStore } from "@/features/lumilio/state/dockStore";
 import { useGalleryContextContributor } from "@/features/lumilio/contributors/useGalleryContextContributor";
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
@@ -418,7 +417,6 @@ export function AssetsGalleryPage({
           </div>
         ))}
       {!isCarouselOpen && !dockExpanded && <SearchFAB />}
-      <ChatDock variant="fab" hideTrigger={isCarouselOpen} />
     </div>
   );
 }

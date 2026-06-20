@@ -296,6 +296,9 @@ const docTemplate = `{
                     "created_at": {
                         "type": "string"
                     },
+                    "facets": {
+                        "$ref": "#/components/schemas/dto.AgentRefFacetsDTO"
+                    },
                     "layout": {
                         "$ref": "#/components/schemas/dto.AgentPinLayoutDTO"
                     },
@@ -438,6 +441,16 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    },
+                    "histogram_granularity": {
+                        "enum": [
+                            "hour",
+                            "day",
+                            "month",
+                            "year"
+                        ],
+                        "example": "day",
+                        "type": "string"
                     },
                     "liked_count": {
                         "type": "integer"
@@ -5380,6 +5393,56 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Delete Agent Pin",
+                "tags": [
+                    "agent"
+                ]
+            },
+            "get": {
+                "description": "Get metadata and facet summary for a pinned widget. Frozen pins serve the stored snapshot; live pins replay their plan before facets are computed.",
+                "parameters": [
+                    {
+                        "description": "Pin ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AgentPinDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Pin not found"
+                    }
+                },
+                "summary": "Get Agent Pin Metadata",
                 "tags": [
                     "agent"
                 ]

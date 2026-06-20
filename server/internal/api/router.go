@@ -148,6 +148,7 @@ type AgentControllerInterface interface {
 	GetRefAssets(c *gin.Context)    // GET /agent/refs/:id/assets - Hydrate a ref page in snapshot order
 	CreatePin(c *gin.Context)       // POST /agent/pins - Pin a ref as a durable board widget
 	ListPins(c *gin.Context)        // GET /agent/pins - List board widgets
+	GetPin(c *gin.Context)          // GET /agent/pins/:id - Get pinned widget metadata with facets
 	GetPinAssets(c *gin.Context)    // GET /agent/pins/:id/assets - Hydrate a pinned widget
 	UpdatePinLayout(c *gin.Context) // PATCH /agent/pins/layout - Persist board layout
 	DeletePin(c *gin.Context)       // DELETE /agent/pins/:id - Remove a board widget
@@ -500,6 +501,7 @@ func NewRouter(
 			agent.GET("/refs/:id/assets", agentController.GetRefAssets)
 			agent.POST("/pins", agentController.CreatePin)
 			agent.GET("/pins", agentController.ListPins)
+			agent.GET("/pins/:id", agentController.GetPin)
 			agent.GET("/pins/:id/assets", agentController.GetPinAssets)
 			agent.PATCH("/pins/layout", agentController.UpdatePinLayout)
 			agent.DELETE("/pins/:id", agentController.DeletePin)

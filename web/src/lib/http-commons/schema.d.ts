@@ -345,7 +345,51 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Agent Pin Metadata
+         * @description Get metadata and facet summary for a pinned widget. Frozen pins serve the stored snapshot; live pins replay their plan before facets are computed.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AgentPinDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /**
@@ -8910,6 +8954,7 @@ export interface components {
             /** @example 24 */
             count?: number;
             created_at?: string;
+            facets?: components["schemas"]["dto.AgentRefFacetsDTO"];
             layout?: components["schemas"]["dto.AgentPinLayoutDTO"];
             /**
              * @example frozen
@@ -8964,6 +9009,11 @@ export interface components {
             count?: number;
             date_range?: components["schemas"]["dto.AgentDateRangeDTO"];
             histogram?: components["schemas"]["dto.AgentFacetBucket"][];
+            /**
+             * @example day
+             * @enum {string}
+             */
+            histogram_granularity?: "hour" | "day" | "month" | "year";
             liked_count?: number;
             rating_dist?: number[];
             top_people?: components["schemas"]["dto.AgentNameCountDTO"][];

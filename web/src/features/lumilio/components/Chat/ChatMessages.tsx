@@ -67,6 +67,7 @@ function WidgetBlockView({ block }: { block: WidgetBlock }) {
         variant="inline"
         count={block.count}
         title={block.title}
+        params={block.params}
       />
       <div className="mt-1">
         <PinButton

@@ -128,7 +128,12 @@ const agentFacetTimeHistogram = `-- name: AgentFacetTimeHistogram :many
 SELECT
     to_char(
         date_trunc($1::text, COALESCE(a.taken_time, a.upload_time)),
-        CASE WHEN $1::text = 'year' THEN 'YYYY' ELSE 'YYYY-MM' END
+        CASE
+            WHEN $1::text = 'hour' THEN 'YYYY-MM-DD HH24:00'
+            WHEN $1::text = 'day' THEN 'YYYY-MM-DD'
+            WHEN $1::text = 'year' THEN 'YYYY'
+            ELSE 'YYYY-MM'
+        END
     ) AS bucket,
     COUNT(*) AS count
 FROM assets a
@@ -148,7 +153,7 @@ type AgentFacetTimeHistogramRow struct {
 	Count  int64  `db:"count" json:"count"`
 }
 
-// granularity is 'month' or 'year'; bucket labels are YYYY-MM or YYYY.
+// granularity is 'hour', 'day', 'month' or 'year'.
 func (q *Queries) AgentFacetTimeHistogram(ctx context.Context, arg AgentFacetTimeHistogramParams) ([]AgentFacetTimeHistogramRow, error) {
 	rows, err := q.db.Query(ctx, agentFacetTimeHistogram, arg.Granularity, arg.AssetIds)
 	if err != nil {

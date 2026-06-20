@@ -93,8 +93,12 @@ type DataPayload struct {
 	Params map[string]any `json:"params,omitempty"`
 }
 
-// WidgetAssetGrid is the only widget type in Phase 1.
-const WidgetAssetGrid = "asset_grid"
+const (
+	WidgetAssetGrid      = "asset_grid"
+	WidgetFacetDashboard = "facet_dashboard"
+	WidgetTimeline       = "timeline"
+	WidgetStoryline      = "storyline"
+)
 
 // RetrieverSearch is the single-retriever search surface the producer tools
 // wrap: the retriever's own ranking becomes the ref snapshot order (no RRF

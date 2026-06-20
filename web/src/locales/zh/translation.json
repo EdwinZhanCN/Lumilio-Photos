@@ -879,6 +879,7 @@
       "collapse": "折叠对话",
       "conversation": "对话",
       "expand": "展开对话",
+      "openBoard": "打开完整面板",
       "ready": "就绪",
       "replyCount_one": "{{count}} 条回复",
       "replyCount_other": "{{count}} 条回复",
@@ -914,11 +915,48 @@
       "resultSet": "结果集"
     },
     "widgets": {
+      "facets": {
+        "cameras": "相机",
+        "people": "人物",
+        "places": "地点",
+        "timeline": "时间线",
+        "types": "类型"
+      },
+      "metadataUnavailable": "该小组件的摘要暂不可用。",
+      "metrics": {
+        "assets": "资源",
+        "liked": "喜欢",
+        "range": "范围",
+        "rated": "已评分"
+      },
       "pin": "固定到看板",
       "pinned": "已固定到看板",
       "pinUnavailable": "该小组件的照片暂不可用。",
       "refExpired": "这些结果已过期，请让 Lumilio 重新查询。",
       "resultsTitle": "来自 Lumilio 的照片",
+      "storyline": {
+        "assets": "{{count}} 个资源",
+        "assets_one": "{{count}} 个资源",
+        "assets_other": "{{count}} 个资源",
+        "sequence": "序列预览"
+      },
+      "storylineUnavailable": "该故事线暂不可用。",
+      "timeline": {
+        "assets": "{{count}} 个资源",
+        "assets_one": "{{count}} 个资源",
+        "assets_other": "{{count}} 个资源",
+        "focusedPeriod": "焦点时间段",
+        "granularity": {
+          "day": "按天",
+          "hour": "按小时",
+          "month": "按月",
+          "year": "按年"
+        },
+        "preview": "预览",
+        "range": "范围",
+        "rhythm": "节奏"
+      },
+      "timelineUnavailable": "该时间线暂不可用。",
       "viewAll_other": "查看全部 {{count}} 张照片"
     }
   },
@@ -1181,10 +1219,6 @@
     "title": "系统状态"
   },
   "navbar": {
-    "agent": {
-      "label": "Lumilio Agent",
-      "open": "打开 Lumilio Agent"
-    },
     "notifications": {
       "clear": "清空消息",
       "empty": "暂无消息。",
