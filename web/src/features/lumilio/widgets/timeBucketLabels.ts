@@ -34,25 +34,40 @@ export function compressFacetBuckets(buckets: FacetBucket[], maxBuckets: number)
   return out;
 }
 
-export function shortTimeBucket(bucket: string | undefined, granularity: FacetGranularity): string {
+export function shortTimeBucket(
+  bucket: string | undefined,
+  granularity: FacetGranularity,
+  locale?: string,
+): string {
   if (!bucket) return "";
   const date = parseBucketDate(bucket, granularity);
   if (!date) return bucket;
   if (granularity === "hour") {
-    return new Intl.DateTimeFormat(undefined, { hour: "numeric" }).format(date).replace(/\s/g, "");
+    return new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(date).replace(/\s/g, "");
   }
   if (granularity === "day") {
-    return new Intl.DateTimeFormat(undefined, { day: "numeric" }).format(date);
+    return new Intl.DateTimeFormat(locale, { day: "numeric" }).format(date);
   }
   if (granularity === "month") {
-    return new Intl.DateTimeFormat(undefined, { month: "short" }).format(date);
+    return new Intl.DateTimeFormat(locale, { month: "short" }).format(date);
   }
-  return new Intl.DateTimeFormat(undefined, { year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(locale, { year: "numeric" }).format(date);
+}
+
+/** Start instant of a histogram bucket, used to place assets onto the
+ * timeline by nearest capture time. */
+export function bucketStartDate(
+  bucket: string | undefined,
+  granularity: FacetGranularity,
+): Date | null {
+  if (!bucket) return null;
+  return parseBucketDate(bucket, granularity);
 }
 
 export function formatTimeBucketTitle(
   bucket: string | undefined,
   granularity: FacetGranularity,
+  locale?: string,
 ): string {
   if (!bucket) return "";
   const date = parseBucketDate(bucket, granularity);
@@ -65,7 +80,7 @@ export function formatTimeBucketTitle(
         : granularity === "month"
           ? { year: "numeric", month: "short" }
           : { year: "numeric" };
-  return new Intl.DateTimeFormat(undefined, options).format(date);
+  return new Intl.DateTimeFormat(locale, options).format(date);
 }
 
 function parseBucketDate(bucket: string, granularity: FacetGranularity): Date | null {

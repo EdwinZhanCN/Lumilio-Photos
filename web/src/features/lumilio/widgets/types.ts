@@ -1,15 +1,15 @@
 import type { ComponentType } from "react";
 import type { components } from "@/lib/http-commons/schema";
 
-export type AgentPinDTO =
-  components["schemas"]["dto.AgentPinDTO"];
+export type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 
 /** Where a widget's assets hydrate from: a session ref (chat) or a durable
  * pin (board). Widget components never receive asset data directly — they
  * fetch it themselves through the hydration APIs. */
 export type WidgetSource =
   | { kind: "ref"; refId: string; threadId: string }
-  | { kind: "pin"; pinId: string };
+  | { kind: "pin"; pinId: string }
+  | { kind: "mock"; mockId: string };
 
 /** Render contexts: inline (inside a chat message) renders a compact
  * preview; board fills its react-grid-layout cell. */
