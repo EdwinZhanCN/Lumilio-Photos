@@ -1,12 +1,12 @@
-//go:build !unix
+//go:build !unix && !windows
 
 package supervisor
 
 import "fmt"
 
-// InstanceLock is a no-op placeholder on platforms without flock. The desktop
-// target is macOS (unix); this stub only exists so the package compiles when
-// cross-compiled for other GOOS values.
+// InstanceLock is a no-op placeholder on platforms with neither flock (Unix) nor
+// an exclusive CreateFile handle (Windows). This stub only exists so the package
+// compiles when cross-compiled for other GOOS values.
 type InstanceLock struct{}
 
 // AcquireLock is unsupported off unix and always errors so the caller does not

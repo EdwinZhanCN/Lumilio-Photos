@@ -101,6 +101,42 @@ needs a paid Apple Developer account — a clean future upgrade to the same DMG.
 > so a cask install of an ad-hoc app hits the same Gatekeeper prompt as the DMG —
 > all maintenance, no UX benefit.
 
+## Build (Windows installer)
+
+The Windows bundle follows the same model as macOS — Go binary + bundled native
+runtime (PostgreSQL, ffmpeg, exiftool) + libvips DLLs, no `wails3 build` — but
+with platform-specific runtime wiring in the supervisor:
+
+- **PostgreSQL over loopback TCP** instead of a Unix socket (Windows has no
+  reliable Unix-socket support). The cluster binds `listen_addresses =
+  'localhost'` and trusts loopback hosts only, so it is unreachable from the
+  network — the same "no password over a local-only channel" model as the macOS
+  socket. See `supervisor/postgres.go` (`TCP`/`Host`) and `usePGTCP()`.
+- **Single-instance lock** via an exclusive `CreateFile` handle
+  (`supervisor/lock_windows.go`) in place of `flock`.
+- **Resource layout** `<InstallDir>\lumilio-photos.exe` with assets under
+  `<InstallDir>\resources` (see `ResourcesDir`), and `.exe` suffixes on the
+  bundled tool names.
+
+Only `vector` (pgvector) and `pg_trgm` (contrib) are required by the migrations,
+so the Windows PostgreSQL bundle is EnterpriseDB's binaries + a pgvector build
+(no zhparser/pg_textsearch).
+
+```powershell
+# 1. Fetch ffmpeg/exiftool + the libvips SDK (headers/import-libs/DLLs):
+desktop\scripts\fetch-resources-windows.ps1
+# 2. Stage PostgreSQL 17 + pgvector into resources\postgres\17\windows-amd64\
+#    (see .github/workflows/release-desktop.yml for the EDB + MSVC pgvector build).
+# 3. Build the bundle and NSIS installer (requires MinGW gcc + makensis on PATH):
+desktop\scripts\build-windows.ps1 -MakeInstaller -Version 0.0.0
+# → desktop\build\windows\Lumilio-Photos-Setup-0.0.0.exe
+```
+
+Both platforms are built and published from `.github/workflows/release-desktop.yml`
+on a `v*` tag push (or manual dispatch). The Windows installer is unsigned;
+first launch may show a SmartScreen prompt (Authenticode signing is a clean
+future upgrade).
+
 ## Status / remaining work
 
 Implemented: supervisor (PG lifecycle, typed config/secrets generation,

@@ -12,11 +12,21 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"server/app"
 	serverconfig "server/config"
 )
+
+// pgLoopbackHost is the loopback address the bundled PostgreSQL binds (and
+// clients connect to) when running in TCP mode on platforms without Unix sockets
+// (Windows).
+const pgLoopbackHost = "127.0.0.1"
+
+// usePGTCP reports whether the bundled PostgreSQL must use loopback TCP instead
+// of a Unix socket. Windows PostgreSQL cannot rely on Unix sockets.
+func usePGTCP() bool { return runtime.GOOS == "windows" }
 
 const (
 	dbUser     = "lumilio"
@@ -129,6 +139,15 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 
+	// On Windows the cluster binds loopback TCP (no Unix socket support); the DB
+	// host clients connect to is the loopback address there and the socket
+	// directory elsewhere.
+	tcp := usePGTCP()
+	dbHost := paths.SocketDir()
+	if tcp {
+		dbHost = pgLoopbackHost
+	}
+
 	pg := NewPostgres(PostgresOptions{
 		BinDir:       pgBinDir(resources),
 		DataDir:      paths.PGData,
@@ -138,6 +157,8 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		User:         dbUser,
 		DBName:       dbName,
 		PasswordFile: paths.DBPasswordFile(),
+		TCP:          tcp,
+		Host:         pgLoopbackHost,
 		Logf:         s.logf,
 	})
 	s.pg = pg
@@ -168,7 +189,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		WebRoot:       bundledWebRoot(resources),
 		LogDir:        paths.Logs,
 		StoragePath:   storagePath,
-		SocketDir:     paths.SocketDir(),
+		SocketDir:     dbHost,
 		PGPort:        pgPort,
 		DBUser:        dbUser,
 		DBName:        dbName,

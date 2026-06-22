@@ -1,0 +1,98 @@
+name: CI
+
+# Build, lint, and test the three components on every push and pull request:
+#   - server  (Go API, CGO: libvips + libraw)
+#   - web     (React + TypeScript, Vite+ / `vp`)
+#   - desktop (Wails v3 macOS app + in-process server; CGO: libvips + libraw)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Homebrew's libraw_r.pc emits `-Xpreprocessor`, which Go's cgo flag allowlist
+  # rejects unless explicitly permitted. Mirrors the root Makefile.
+  CGO_LDFLAGS_ALLOW: -Xpreprocessor
+  CGO_CFLAGS_ALLOW: -Xpreprocessor
+
+jobs:
+  server:
+    name: server (go test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native dependencies (libvips, libraw, media tools)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libvips-dev libraw-dev \
+            ffmpeg libimage-exiftool-perl
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Test
+        working-directory: server
+        run: go test ./...
+
+  web:
+    name: web (check, lint, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Vite+ (vp)
+        run: |
+          curl -fsSL https://vite.plus | bash
+          echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        working-directory: web
+        run: vp install
+
+      - name: Type-check, lint, and test
+        working-directory: web
+        run: |
+          vp check --no-fmt --no-lint
+          vp lint
+          vp test
+
+  desktop:
+    name: desktop (go build + test)
+    # The desktop app is a macOS (Wails v3) target, so build/test it on macOS
+    # where the platform toolchain and native deps match the shipped artifact.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native dependencies (libvips, libraw)
+        run: brew install vips libraw pkg-config
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+
+      - name: Build
+        working-directory: desktop
+        run: go build ./...
+
+      - name: Test
+        working-directory: desktop
+        # The PostgreSQL lifecycle smoke test auto-skips when no PG is present.
+        run: go test ./...

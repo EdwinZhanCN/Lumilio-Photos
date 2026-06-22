@@ -1,0 +1,243 @@
+name: Release Desktop
+
+# Build the desktop app for macOS (DMG) and Windows (NSIS installer) and publish
+# them to a GitHub Release. Triggered by pushing a v* tag; also runnable manually
+# (workflow_dispatch) for testing the build without publishing.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version string for manual builds (no leading v)
+        default: "0.0.0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    name: Resolve metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - id: v
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Build the React SPA once on Linux (where Vite+/`vp` installs cleanly) and
+  # share it with the Windows packaging job, which has no reliable `vp` install.
+  web-dist:
+    name: Web bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install Vite+ (vp)
+        run: |
+          curl -fsSL https://vite.plus | bash
+          echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+      - name: Build
+        working-directory: web
+        run: |
+          vp install
+          vp build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          if-no-files-found: error
+
+  # Relocatable PostgreSQL 17 + pgvector (+ pg_textsearch + zhparser) for macOS,
+  # reused via the existing build-postgres workflow.
+  postgres-macos:
+    name: PostgreSQL (macOS)
+    uses: ./.github/workflows/build-postgres.yml
+
+  macos:
+    name: macOS DMG (${{ matrix.arch }})
+    needs: [meta, postgres-macos]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon only: the Intel resource bundle (ffmpeg/exiftool) needs
+          # pinned checksums that are not yet wired up. Tracked as follow-up.
+          - arch: arm64
+            runner: macos-15
+            platform: darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      LUMILIO_VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Vite+ (vp)
+        run: |
+          curl -fsSL https://vite.plus | bash
+          echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+
+      - name: Install build tools (libvips, dylibbundler, create-dmg)
+        run: brew install vips libraw dylibbundler create-dmg
+
+      - name: Stage bundled PostgreSQL
+        uses: actions/download-artifact@v4
+        with:
+          name: postgres-${{ matrix.platform }}
+          path: desktop/resources
+
+      - name: Fetch bundled media tools (ffmpeg, exiftool)
+        run: desktop/scripts/fetch-resources.sh
+
+      - name: Build app bundle + DMG
+        run: desktop/scripts/build-macos.sh ${{ matrix.arch }} --dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumilio-photos-${{ matrix.platform }}-dmg
+          path: desktop/build/Lumilio-Photos-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+
+  # Relocatable PostgreSQL 17 + pgvector for Windows: EnterpriseDB binaries plus a
+  # pgvector build against them with MSVC. Only `vector` and `pg_trgm` (contrib,
+  # ships with PG) are required by the migrations, so zhparser/pg_textsearch are
+  # not bundled on Windows.
+  postgres-windows:
+    name: PostgreSQL (Windows)
+    runs-on: windows-latest
+    env:
+      PG_VERSION: "17.5-1"
+      PG_MAJOR: "17"
+      PGVECTOR_VERSION: "v0.8.0"
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Download EnterpriseDB PostgreSQL binaries
+        shell: pwsh
+        run: |
+          $url = "https://get.enterprisedb.com/postgresql/postgresql-$env:PG_VERSION-windows-x64-binaries.zip"
+          Invoke-WebRequest -Uri $url -OutFile pg.zip
+          Expand-Archive -Path pg.zip -DestinationPath pgroot -Force
+          # Archive extracts to pgroot\pgsql\
+          echo "PGROOT=$PWD\pgroot\pgsql" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build and install pgvector (MSVC)
+        shell: cmd
+        run: |
+          git clone --branch %PGVECTOR_VERSION% --depth 1 https://github.com/pgvector/pgvector.git
+          cd pgvector
+          set "PGROOT=%PGROOT%"
+          nmake /NOLOGO /F Makefile.win
+          nmake /NOLOGO /F Makefile.win install
+
+      - name: Stage relocatable bundle
+        shell: pwsh
+        run: |
+          $dest = "postgres\$env:PG_MAJOR\windows-amd64"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          foreach ($d in @("bin", "lib", "share")) {
+            Copy-Item (Join-Path $env:PGROOT $d) (Join-Path $dest $d) -Recurse -Force
+          }
+          if (-not (Test-Path "$dest\lib\vector.dll")) {
+            throw "pgvector (vector.dll) was not installed into the bundle"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: postgres-windows-amd64
+          path: postgres/
+          if-no-files-found: error
+
+  windows:
+    name: Windows installer
+    needs: [meta, web-dist, postgres-windows]
+    runs-on: windows-latest
+    env:
+      LUMILIO_VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+
+      - name: Install NSIS and MinGW (CGO compiler)
+        shell: pwsh
+        run: |
+          choco install -y nsis
+          choco install -y mingw
+          echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
+
+      - name: Stage prebuilt web bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+      - name: Stage bundled PostgreSQL
+        uses: actions/download-artifact@v4
+        with:
+          name: postgres-windows-amd64
+          path: desktop/resources
+
+      - name: Fetch bundled media tools + libvips SDK
+        shell: pwsh
+        run: desktop/scripts/fetch-resources-windows.ps1
+
+      - name: Build app bundle + installer
+        shell: pwsh
+        run: desktop/scripts/build-windows.ps1 -MakeInstaller -Version $env:LUMILIO_VERSION
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumilio-photos-windows-amd64-installer
+          path: desktop/build/windows/Lumilio-Photos-Setup-*.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [meta, macos, windows]
+    if: needs.meta.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: lumilio-photos-*
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Lumilio Photos ${{ needs.meta.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/*.dmg
+            dist/*.exe

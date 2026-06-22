@@ -19,6 +19,22 @@ on:
       scws_version:
         description: SCWS version for zhparser
         default: "1.2.3"
+  # Reusable so the desktop release workflow can build + stage the macOS
+  # PostgreSQL bundle without a separate manual dispatch.
+  workflow_call:
+    inputs:
+      pg_version:
+        type: string
+        default: "17.5"
+      pgvector_version:
+        type: string
+        default: "v0.8.0"
+      pg_textsearch_version:
+        type: string
+        default: "v1.3.0"
+      scws_version:
+        type: string
+        default: "1.2.3"
 
 jobs:
   build:

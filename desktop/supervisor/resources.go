@@ -9,9 +9,10 @@ import (
 
 // ResourcesDir resolves the directory that holds bundled runtime assets
 // (PostgreSQL, ffmpeg, exiftool). LUMILIO_RESOURCES_DIR overrides it for local
-// development, where there is no .app bundle; otherwise it is derived from the
-// executable location, which on macOS is <App>.app/Contents/MacOS/<bin> →
-// ../Resources.
+// development, where there is no installed bundle; otherwise it is derived from
+// the executable location:
+//   - macOS:   <App>.app/Contents/MacOS/<bin> → ../Resources
+//   - Windows: <InstallDir>/lumilio-photos.exe → <InstallDir>/resources
 func ResourcesDir() (string, error) {
 	if v := os.Getenv("LUMILIO_RESOURCES_DIR"); v != "" {
 		return v, nil
@@ -22,6 +23,9 @@ func ResourcesDir() (string, error) {
 	}
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
+	}
+	if runtime.GOOS == "windows" {
+		return filepath.Clean(filepath.Join(filepath.Dir(exe), "resources")), nil
 	}
 	return filepath.Clean(filepath.Join(filepath.Dir(exe), "..", "Resources")), nil
 }
@@ -51,15 +55,15 @@ func resolveToolPath(candidate string) string {
 }
 
 func bundledExifTool(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "exiftool", "exiftool"))
+	return resolveToolPath(filepath.Join(resources, "exiftool", withExeSuffix("exiftool")))
 }
 
 func bundledFFmpeg(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "ffmpeg", "ffmpeg"))
+	return resolveToolPath(filepath.Join(resources, "ffmpeg", withExeSuffix("ffmpeg")))
 }
 
 func bundledFFprobe(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "ffmpeg", "ffprobe"))
+	return resolveToolPath(filepath.Join(resources, "ffmpeg", withExeSuffix("ffprobe")))
 }
 
 // bundledVipsHome returns the bundle-local libvips prefix if dynamic modules
