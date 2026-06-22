@@ -1,13 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Images, X } from "lucide-react";
-import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { AgentRefAssetsDTO } from "../types";
+import { isMockWidgetSource } from "./mockWidgetData";
 import type { WidgetProps } from "./types";
 import { useWidgetAssetsInfinite, useWidgetAssetsPreview } from "./useWidgetAssets";
+import { WidgetAssetThumbnail } from "./WidgetAssetThumbnail";
 
 const INLINE_PREVIEW_COUNT = 8;
 const PAGE_SIZE = 60;
@@ -25,16 +26,8 @@ export function AssetGridWidget({ source, variant, count, title }: WidgetProps) 
 
   return (
     <div className="my-3">
-      {title && (
-        <div className="text-sm font-medium text-base-content/80 mb-2">
-          {title}
-        </div>
-      )}
-      <InlinePreview
-        source={source}
-        count={count}
-        onOpen={() => setExpanded(true)}
-      />
+      {title && <div className="text-sm font-medium text-base-content/80 mb-2">{title}</div>}
+      <InlinePreview source={source} count={count} onOpen={() => setExpanded(true)} />
       <button
         className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 text-xs font-medium rounded-full border border-primary/30 text-primary hover:bg-primary/10 transition-all"
         onClick={() => setExpanded(true)}
@@ -43,12 +36,7 @@ export function AssetGridWidget({ source, variant, count, title }: WidgetProps) 
         {t("lumilio.widgets.viewAll", "View all {{count}} photos", { count })}
       </button>
       {expanded && (
-        <GridModal
-          source={source}
-          count={count}
-          title={title}
-          onClose={() => setExpanded(false)}
-        />
+        <GridModal source={source} count={count} title={title} onClose={() => setExpanded(false)} />
       )}
     </div>
   );
@@ -60,10 +48,7 @@ function InlinePreview({
   onOpen,
 }: Pick<WidgetProps, "source" | "count"> & { onOpen: () => void }) {
   const { t } = useI18n();
-  const { assets, isLoading, isError } = useWidgetAssetsPreview(
-    source,
-    INLINE_PREVIEW_COUNT,
-  );
+  const { assets, isLoading, isError } = useWidgetAssetsPreview(source, INLINE_PREVIEW_COUNT);
 
   if (isError) {
     return (
@@ -79,24 +64,20 @@ function InlinePreview({
   return (
     <div className="grid grid-cols-4 gap-1 max-w-md rounded-xl overflow-hidden">
       {isLoading
-        ? Array.from({ length: Math.min(count, INLINE_PREVIEW_COUNT) }).map(
-            (_, i) => (
-              <div key={i} className="aspect-square bg-base-200 animate-pulse" />
-            ),
-          )
+        ? Array.from({ length: Math.min(count, INLINE_PREVIEW_COUNT) }).map((_, i) => (
+            <div key={i} className="aspect-square bg-base-200 animate-pulse" />
+          ))
         : assets.map((asset, i) => {
-            const isLastTile =
-              i === INLINE_PREVIEW_COUNT - 1 && count > INLINE_PREVIEW_COUNT;
+            const isLastTile = i === INLINE_PREVIEW_COUNT - 1 && count > INLINE_PREVIEW_COUNT;
             return (
               <button
                 key={asset.asset_id}
                 className="relative aspect-square overflow-hidden cursor-pointer"
                 onClick={onOpen}
               >
-                <img
-                  src={assetUrls.getThumbnailUrl(asset.asset_id!, "small")}
-                  alt=""
-                  loading="lazy"
+                <WidgetAssetThumbnail
+                  asset={asset}
+                  source={source}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
                 />
                 {isLastTile && (
@@ -116,6 +97,7 @@ function BoardGrid({ source, count }: WidgetProps) {
   const { t } = useI18n();
   const [carouselAssetId, setCarouselAssetId] = useState<string>();
   const query = useWidgetAssetsInfinite(source, PAGE_SIZE);
+  const canOpenCarousel = !isMockWidgetSource(source);
 
   const assets = useMemo<Asset[]>(
     () =>
@@ -126,10 +108,7 @@ function BoardGrid({ source, count }: WidgetProps) {
   );
 
   const slideIndex = useMemo(
-    () =>
-      carouselAssetId
-        ? assets.findIndex((a) => a.asset_id === carouselAssetId)
-        : -1,
+    () => (carouselAssetId ? assets.findIndex((a) => a.asset_id === carouselAssetId) : -1),
     [assets, carouselAssetId],
   );
 
@@ -150,10 +129,7 @@ function BoardGrid({ source, count }: WidgetProps) {
   if (query.isError) {
     return (
       <div className="h-full flex items-center justify-center text-xs text-base-content/50 p-3 text-center">
-        {t(
-          "lumilio.widgets.pinUnavailable",
-          "This widget's photos are unavailable.",
-        )}
+        {t("lumilio.widgets.pinUnavailable", "This widget's photos are unavailable.")}
       </div>
     );
   }
@@ -164,13 +140,18 @@ function BoardGrid({ source, count }: WidgetProps) {
         {assets.map((asset) => (
           <button
             key={asset.asset_id}
-            className="aspect-square overflow-hidden cursor-pointer"
-            onClick={() => setCarouselAssetId(asset.asset_id)}
+            className={
+              canOpenCarousel
+                ? "aspect-square overflow-hidden cursor-pointer"
+                : "aspect-square overflow-hidden cursor-default"
+            }
+            onClick={() => {
+              if (canOpenCarousel) setCarouselAssetId(asset.asset_id);
+            }}
           >
-            <img
-              src={assetUrls.getThumbnailUrl(asset.asset_id!, "small")}
-              alt=""
-              loading="lazy"
+            <WidgetAssetThumbnail
+              asset={asset}
+              source={source}
               className="w-full h-full object-cover hover:opacity-85 transition-opacity"
             />
           </button>
@@ -208,6 +189,7 @@ function GridModal({
   const { t } = useI18n();
   const [carouselAssetId, setCarouselAssetId] = useState<string>();
   const query = useWidgetAssetsInfinite(source, PAGE_SIZE);
+  const canOpenCarousel = !isMockWidgetSource(source);
 
   const assets = useMemo<Asset[]>(
     () =>
@@ -218,10 +200,7 @@ function GridModal({
   );
 
   const slideIndex = useMemo(
-    () =>
-      carouselAssetId
-        ? assets.findIndex((a) => a.asset_id === carouselAssetId)
-        : -1,
+    () => (carouselAssetId ? assets.findIndex((a) => a.asset_id === carouselAssetId) : -1),
     [assets, carouselAssetId],
   );
 
@@ -246,9 +225,7 @@ function GridModal({
           <h3 className="font-semibold text-base-content flex items-center gap-2">
             <Images size={18} strokeWidth={1.5} className="text-primary" />
             {title ?? t("lumilio.widgets.resultsTitle", "Photos from Lumilio")}
-            <span className="text-sm font-normal text-base-content/50">
-              {count}
-            </span>
+            <span className="text-sm font-normal text-base-content/50">{count}</span>
           </h3>
           <button className="btn btn-sm btn-ghost btn-circle" onClick={onClose}>
             <X size={18} />
@@ -260,13 +237,18 @@ function GridModal({
             {assets.map((asset) => (
               <button
                 key={asset.asset_id}
-                className="aspect-square overflow-hidden cursor-pointer"
-                onClick={() => setCarouselAssetId(asset.asset_id)}
+                className={
+                  canOpenCarousel
+                    ? "aspect-square overflow-hidden cursor-pointer"
+                    : "aspect-square overflow-hidden cursor-default"
+                }
+                onClick={() => {
+                  if (canOpenCarousel) setCarouselAssetId(asset.asset_id);
+                }}
               >
-                <img
-                  src={assetUrls.getThumbnailUrl(asset.asset_id!, "small")}
-                  alt=""
-                  loading="lazy"
+                <WidgetAssetThumbnail
+                  asset={asset}
+                  source={source}
                   className="w-full h-full object-cover hover:opacity-85 transition-opacity"
                 />
               </button>

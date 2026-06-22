@@ -921,20 +921,54 @@
       "emptyResult": "没有匹配的照片",
       "resultSet": "结果集"
     },
+    "widgetLibrary": {
+      "backToLumilio": "返回 Lumilio",
+      "board": "看板",
+      "catalog": "小组件",
+      "datasets": {
+        "travelDay": "京都一日游",
+        "travelMonth": "九月相册",
+        "archiveYears": "家庭归档"
+      },
+      "inline": "内联",
+      "open": "小组件库",
+      "stat": {
+        "assets": "资源",
+        "granularity": "分桶",
+        "people": "人物",
+        "places": "地点"
+      },
+      "subtitle": "用模拟数据预览每个 Lumilio 智能体小组件。",
+      "title": "小组件库",
+      "widgets": {
+        "assetGrid": {
+          "label": "资源网格",
+          "blurb": "一组照片：内联是紧凑网格，看板上是可无限滚动的网格。"
+        },
+        "facetDashboard": {
+          "label": "概览面板",
+          "blurb": "专辑式概览：封面、时间范围、人物、地点和相机。"
+        },
+        "timeline": {
+          "label": "自适应时间线",
+          "blurb": "可拖动的时间之河——横向拖动即可聚焦每个时刻。"
+        },
+        "storyline": {
+          "label": "故事线",
+          "blurb": "Instagram 风格的故事播放器，适合旅行与时刻。"
+        }
+      }
+    },
     "widgets": {
       "facets": {
         "cameras": "相机",
         "people": "人物",
         "places": "地点",
-        "timeline": "时间线",
         "types": "类型"
       },
       "metadataUnavailable": "该小组件的摘要暂不可用。",
       "metrics": {
-        "assets": "资源",
-        "liked": "喜欢",
-        "range": "范围",
-        "rated": "已评分"
+        "assets": "资源"
       },
       "pin": "固定到看板",
       "pinned": "已固定到看板",
@@ -942,26 +976,26 @@
       "refExpired": "这些结果已过期，请让 Lumilio 重新查询。",
       "resultsTitle": "来自 Lumilio 的照片",
       "storyline": {
-        "assets": "{{count}} 个资源",
         "assets_one": "{{count}} 个资源",
         "assets_other": "{{count}} 个资源",
-        "sequence": "序列预览"
+        "next": "下一张",
+        "prev": "上一张",
+        "story": "故事"
       },
       "storylineUnavailable": "该故事线暂不可用。",
       "timeline": {
-        "assets": "{{count}} 个资源",
         "assets_one": "{{count}} 个资源",
         "assets_other": "{{count}} 个资源",
-        "focusedPeriod": "焦点时间段",
         "granularity": {
           "day": "按天",
           "hour": "按小时",
           "month": "按月",
           "year": "按年"
         },
+        "noPreview": "这个时段暂无预览",
         "preview": "预览",
-        "range": "范围",
-        "rhythm": "节奏"
+        "scrub": "拖动以浏览时间线",
+        "scrubHint": "拖动浏览"
       },
       "timelineUnavailable": "该时间线暂不可用。",
       "viewAll_other": "查看全部 {{count}} 张照片"

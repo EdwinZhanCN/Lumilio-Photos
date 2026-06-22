@@ -16,6 +16,10 @@ export function getWidget(type: string): WidgetDefinition | undefined {
   return registry.get(type);
 }
 
+export function listWidgets(): WidgetDefinition[] {
+  return Array.from(registry.values());
+}
+
 registerWidget({
   type: "asset_grid",
   Component: AssetGridWidget,
