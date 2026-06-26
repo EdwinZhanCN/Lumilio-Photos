@@ -19,7 +19,7 @@ CREATE TABLE public.agent_pins (
     pin_id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id integer NOT NULL,
     title text DEFAULT ''::text NOT NULL,
-    widget text DEFAULT 'asset_grid'::text NOT NULL,
+    widget text DEFAULT 'cover_card'::text NOT NULL,
     mode text DEFAULT 'frozen'::text NOT NULL,
     plan jsonb DEFAULT '{}'::jsonb NOT NULL,
     summary text DEFAULT ''::text NOT NULL,

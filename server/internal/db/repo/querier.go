@@ -179,6 +179,7 @@ type Querier interface {
 	// returns ordered asset ids only (capture time desc). The limit is the ref
 	// snapshot cap; callers detect truncation by requesting cap+1.
 	GetAssetIDsUnified(ctx context.Context, arg GetAssetIDsUnifiedParams) ([]pgtype.UUID, error)
+	GetAssetQualityScore(ctx context.Context, assetID pgtype.UUID) (AssetQualityScore, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
@@ -377,8 +378,9 @@ type Querier interface {
 	MergeFaceClustersForDuplicate(ctx context.Context, arg MergeFaceClustersForDuplicateParams) error
 	MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error)
 	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
-	// rank(by=quality) ascending, using the featured-selector heuristic
-	// (rating, liked, resolution); callers reverse for descending order.
+	// rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
+	// head when available, falling back to the legacy heuristic (rating, liked,
+	// resolution) for unscored assets. Callers reverse for descending order.
 	RankAssetIDsByQuality(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
 	// rank(by=time) ascending; callers reverse for descending order.
 	RankAssetIDsByTime(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
@@ -406,6 +408,8 @@ type Querier interface {
 	SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error)
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
 	UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLayoutParams) error
+	UpdateAgentPinTitle(ctx context.Context, arg UpdateAgentPinTitleParams) error
+	UpdateAgentPinWidget(ctx context.Context, arg UpdateAgentPinWidgetParams) error
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
@@ -444,6 +448,8 @@ type Querier interface {
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpdateUserTOTPLastUsed(ctx context.Context, userID int32) error
 	UpdateUserWebAuthnCredentialUsage(ctx context.Context, arg UpdateUserWebAuthnCredentialUsageParams) (UserWebauthnCredential, error)
+	// Asset quality scores: per-asset aesthetic score from MLP head on SigLIP.
+	UpsertAssetQualityScore(ctx context.Context, arg UpsertAssetQualityScoreParams) (AssetQualityScore, error)
 	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
 	UpsertCloudSyncCursor(ctx context.Context, arg UpsertCloudSyncCursorParams) error
 	// Unified embeddings table queries

@@ -234,19 +234,22 @@ func (q *Queries) GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByP
 }
 
 const rankAssetIDsByQuality = `-- name: RankAssetIDsByQuality :many
-SELECT asset_id
+SELECT a.asset_id
 FROM assets a
-WHERE asset_id = ANY($1::uuid[])
-  AND is_deleted = false
-ORDER BY (
-    0.45 * COALESCE(a.rating, 0)::float8 / 5.0
-  + 0.20 * (CASE WHEN a.liked THEN 1.0 ELSE 0.0 END)
-  + 0.35 * LEAST(COALESCE(a.width, 0)::float8 * COALESCE(a.height, 0)::float8 / 24000000.0, 1.0)
-) ASC, asset_id ASC
+LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
+WHERE a.asset_id = ANY($1::uuid[])
+  AND a.is_deleted = false
+ORDER BY COALESCE(
+    aqs.score,
+    1.0 + 0.45 * COALESCE(a.rating, 0)::float8 / 5.0
+        + 0.20 * (CASE WHEN a.liked THEN 1.0 ELSE 0.0 END)
+        + 0.35 * LEAST(COALESCE(a.width, 0)::float8 * COALESCE(a.height, 0)::float8 / 24000000.0, 1.0)
+) ASC, a.asset_id ASC
 `
 
-// rank(by=quality) ascending, using the featured-selector heuristic
-// (rating, liked, resolution); callers reverse for descending order.
+// rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
+// head when available, falling back to the legacy heuristic (rating, liked,
+// resolution) for unscored assets. Callers reverse for descending order.
 func (q *Queries) RankAssetIDsByQuality(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error) {
 	rows, err := q.db.Query(ctx, rankAssetIDsByQuality, assetIds)
 	if err != nil {

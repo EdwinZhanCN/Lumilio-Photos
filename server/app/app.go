@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
+	"os"
 	"strings"
 	"time"
 
@@ -357,6 +359,17 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 			serverErr <- err
 		}
 	}()
+
+	// Conditionally start a pprof server on a separate port (env-gated).
+	// Set LUMILIO_PPROF_ADDR=:6060 to enable CPU/heap/goroutine profiling.
+	if pprofAddr := os.Getenv("LUMILIO_PPROF_ADDR"); pprofAddr != "" {
+		go func() {
+			appLogger.Info("pprof server listening", zap.String("addr", pprofAddr))
+			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+				appLogger.Warn("pprof server stopped", zap.Error(err))
+			}
+		}()
+	}
 
 	select {
 	case err := <-serverErr:

@@ -294,6 +294,16 @@
         }
       }
     },
+    "pin": {
+      "backToLumilio": "返回 Lumilio",
+      "badge": "已固定结果",
+      "count_one": "{{count}} 张照片",
+      "count_other": "{{count}} 张照片",
+      "defaultTitle": "智能助手结果",
+      "expired": "该结果已过期。请让 Lumilio 重新运行查询。",
+      "modeFrozen": "已冻结",
+      "modeLive": "实时"
+    },
     "stackCarousel": {
       "error": "堆叠资源暂时不可用。",
       "errorHint": "请稍后重试。",
@@ -858,8 +868,12 @@
       "notConfigured": "Lumilio Agent 尚未配置。请在 设置 > AI 中完成 provider、model 与 API key。"
     },
     "board": {
-      "empty": "还没有固定任何内容。在底部 dock 里让 Lumilio 找照片，然后把结果固定到这个看板。",
-      "remove": "从看板移除",
+      "empty": "让 Lumilio 帮你找照片，然后把任意结果固定到这里，作为实时小组件。",
+      "emptyHint": "试试“给我看去年夏天的海滩照片”",
+      "emptyTitle": "看板还是空的",
+      "interactionHint": "拖拽移动 · 用视图按钮切换展示 · ⋯ 菜单调尺寸",
+      "tidy": "整理",
+      "tidyHint": "向上收拢看板",
       "unknownWidget": "未知的小组件类型：{{type}}",
       "untitled": "未命名"
     },
@@ -895,6 +909,7 @@
       "usageHint": "上次模型调用：{{prompt}} 上下文 + {{completion}} 输出 tokens"
     },
     "input": {
+      "modePrompt": "在「{{mode}}」模式下继续…",
       "prompt": "向 Lumilio Agent 提问...",
       "send": "发送"
     },
@@ -907,98 +922,90 @@
     "mention": {
       "album": "相册",
       "camera": "相机",
-      "commands": "命令",
       "lens": "镜头",
       "mention": "提及",
+      "navigate": "切换",
       "noResults": "无结果",
       "person": "人物",
-      "pin": "固定项"
+      "pin": "固定项",
+      "quickActions": "快捷操作",
+      "select": "选择"
     },
     "messages": {
       "thinking": "思考中..."
+    },
+    "mode": {
+      "clear": "清除模式"
+    },
+    "quickActions": {
+      "analyze": {
+        "description": "发现拍摄习惯和趋势",
+        "label": "分析",
+        "template": "分析我的拍摄习惯和趋势"
+      },
+      "curate": {
+        "description": "选出最好的照片",
+        "label": "精选",
+        "template": "帮我精选最近最好的照片"
+      },
+      "organize": {
+        "description": "分组归类和打标签，创建相册",
+        "label": "整理",
+        "template": "帮我整理最近的照片"
+      },
+      "review": {
+        "description": "回顾一段时间的摄影历程",
+        "label": "回顾",
+        "template": "帮我回顾一下今年的摄影历程"
+      }
     },
     "tools": {
       "emptyResult": "没有匹配的照片",
       "resultSet": "结果集"
     },
-    "widgetLibrary": {
-      "backToLumilio": "返回 Lumilio",
-      "board": "看板",
-      "catalog": "小组件",
-      "datasets": {
-        "travelDay": "京都一日游",
-        "travelMonth": "九月相册",
-        "archiveYears": "家庭归档"
-      },
-      "inline": "内联",
-      "open": "小组件库",
-      "stat": {
-        "assets": "资源",
-        "granularity": "分桶",
-        "people": "人物",
-        "places": "地点"
-      },
-      "subtitle": "用模拟数据预览每个 Lumilio 智能体小组件。",
-      "title": "小组件库",
-      "widgets": {
-        "assetGrid": {
-          "label": "资源网格",
-          "blurb": "一组照片：内联是紧凑网格，看板上是可无限滚动的网格。"
-        },
-        "facetDashboard": {
-          "label": "概览面板",
-          "blurb": "专辑式概览：封面、时间范围、人物、地点和相机。"
-        },
-        "timeline": {
-          "label": "自适应时间线",
-          "blurb": "可拖动的时间之河——横向拖动即可聚焦每个时刻。"
-        },
-        "storyline": {
-          "label": "故事线",
-          "blurb": "Instagram 风格的故事播放器，适合旅行与时刻。"
-        }
-      }
-    },
     "widgets": {
-      "facets": {
-        "cameras": "相机",
-        "people": "人物",
-        "places": "地点",
-        "types": "类型"
+      "frozen": "已冻结",
+      "live": "实时",
+      "menu": {
+        "more": "更多",
+        "remove": "移除",
+        "rename": "重命名",
+        "renameHint": "双击重命名",
+        "size": "尺寸"
       },
-      "metadataUnavailable": "该小组件的摘要暂不可用。",
-      "metrics": {
-        "assets": "资源"
+      "mosaic": {
+        "overflow": "+{{value}}"
       },
+      "photos": "张照片",
       "pin": "固定到看板",
       "pinned": "已固定到看板",
-      "pinUnavailable": "该小组件的照片暂不可用。",
-      "refExpired": "这些结果已过期，请让 Lumilio 重新查询。",
       "resultsTitle": "来自 Lumilio 的照片",
-      "storyline": {
-        "assets_one": "{{count}} 个资源",
-        "assets_other": "{{count}} 个资源",
-        "next": "下一张",
-        "prev": "上一张",
-        "story": "故事"
+      "stat": {
+        "images": "图片",
+        "liked": "喜欢",
+        "likedLabel": "喜欢的照片",
+        "newDelta_other": "新增 {{count}} 张",
+        "videos": "视频"
       },
-      "storylineUnavailable": "该故事线暂不可用。",
+      "state": {
+        "empty": "这里没有照片",
+        "error": "加载失败",
+        "retry": "重试"
+      },
       "timeline": {
-        "assets_one": "{{count}} 个资源",
-        "assets_other": "{{count}} 个资源",
-        "granularity": {
-          "day": "按天",
-          "hour": "按小时",
-          "month": "按月",
-          "year": "按年"
-        },
-        "noPreview": "这个时段暂无预览",
-        "preview": "预览",
-        "scrub": "拖动以浏览时间线",
-        "scrubHint": "拖动浏览"
+        "byDay": "按天",
+        "byHour": "按小时",
+        "byMonth": "按月",
+        "byYear": "按年",
+        "noData": "暂无时间线数据"
       },
-      "timelineUnavailable": "该时间线暂不可用。",
-      "viewAll_other": "查看全部 {{count}} 张照片"
+      "view": {
+        "cover": "封面",
+        "mosaic": "拼图",
+        "number": "数值",
+        "spark": "时间线",
+        "switcher": "切换视图"
+      }
     }
   },
   "manage": {
@@ -1057,6 +1064,7 @@
     "adminOnlyDescription": "处理活动与运行时诊断仅对管理员开放。",
     "adminOnlyTitle": "需要管理员权限",
     "ml": {
+      "allIndexed": "全部已索引",
       "bioAlbumCoverage": "生物图鉴相册覆盖率",
       "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
       "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",

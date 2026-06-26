@@ -70,7 +70,7 @@ type AgentPinLayoutDTO struct {
 type AgentPinDTO struct {
 	PinID     string             `json:"pin_id" example:"7d4df41e-9aa2-4d44-9a3d-111111111111"`
 	Title     string             `json:"title" example:"Kyoto 2025"`
-	Widget    string             `json:"widget" example:"asset_grid"`
+	Widget    string             `json:"widget" example:"cover_card"`
 	Mode      string             `json:"mode" example:"frozen" enums:"frozen,live"`
 	Count     int                `json:"count" example:"24"`
 	Summary   string             `json:"summary,omitempty"`
@@ -85,7 +85,7 @@ type CreateAgentPinRequest struct {
 	RefID    string             `json:"ref_id" binding:"required"`
 	ThreadID string             `json:"thread_id" binding:"required"`
 	Title    string             `json:"title,omitempty"`
-	Widget   string             `json:"widget,omitempty" example:"asset_grid"`
+	Widget   string             `json:"widget,omitempty" example:"cover_card"`
 	Mode     string             `json:"mode,omitempty" enums:"frozen,live"`
 	Layout   *AgentPinLayoutDTO `json:"layout,omitempty"`
 }
@@ -93,6 +93,13 @@ type CreateAgentPinRequest struct {
 // UpdateAgentPinLayoutRequest persists board layout changes in bulk.
 type UpdateAgentPinLayoutRequest struct {
 	Layouts []AgentPinLayoutItemDTO `json:"layouts" binding:"required"`
+}
+
+// UpdateAgentPinRequest patches a single pin. Both fields are optional: title
+// renames the widget; widget switches which view the pinned ref renders through.
+type UpdateAgentPinRequest struct {
+	Title  *string `json:"title,omitempty" example:"Kyoto 2025"`
+	Widget *string `json:"widget,omitempty" example:"number_card"`
 }
 
 // AgentPinLayoutItemDTO is one pin's new grid cell.

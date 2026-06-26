@@ -44,7 +44,14 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 
 	granularity := "month"
 	if overview.DateFrom.Valid && overview.DateTo.Valid {
-		summary.DateRange = &ref.DateRange{From: overview.DateFrom.Time, To: overview.DateTo.Time}
+		summary.DateRange = &ref.DateRange{
+			From: overview.DateFrom.Time.UTC(),
+			To:   overview.DateTo.Time.UTC(),
+		}
+		if cm := overview.CaptureOffsetMinutes; cm != 0 {
+			offset := int16(cm)
+			summary.DateRange.OffsetMinutes = &offset
+		}
 		granularity = chooseHistogramGranularity(overview.DateFrom.Time, overview.DateTo.Time)
 	}
 	summary.HistogramGranularity = granularity

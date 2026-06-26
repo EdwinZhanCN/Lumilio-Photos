@@ -32,6 +32,7 @@ func (w *ReindexAssetsWorker) Work(ctx context.Context, job *river.Job[ReindexAs
 		RepositoryID: args.RepositoryID,
 		Tasks:        tasks,
 		Limit:        args.Limit,
+		Offset:       args.Offset,
 		MissingOnly:  args.MissingOnly,
 	})
 }

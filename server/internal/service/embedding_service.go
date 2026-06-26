@@ -19,6 +19,7 @@ const embeddingDistanceMetricL2 = "l2"
 // EmbeddingService interface defines the contract for embedding operations.
 type EmbeddingService interface {
 	SaveEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string, vector []float32, isPrimary bool) error
+	SaveAestheticScore(ctx context.Context, assetID pgtype.UUID, score float32, modelVersion string) error
 	GetEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) (repo.Embedding, error)
 	GetAssetEmbeddingInfo(ctx context.Context, assetID pgtype.UUID) (map[EmbeddingType]EmbeddingInfo, error)
 	DeleteEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) error
@@ -113,6 +114,19 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		return fmt.Errorf("commit embedding transaction: %w", err)
 	}
 
+	return nil
+}
+
+// SaveAestheticScore upserts a per-asset aesthetic quality score.
+func (e *embeddingService) SaveAestheticScore(ctx context.Context, assetID pgtype.UUID, score float32, modelVersion string) error {
+	_, err := e.queries.UpsertAssetQualityScore(ctx, repo.UpsertAssetQualityScoreParams{
+		AssetID:      assetID,
+		Score:        score,
+		ModelVersion: modelVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert aesthetic score: %w", err)
+	}
 	return nil
 }
 

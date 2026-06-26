@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
@@ -7,16 +8,20 @@ import {
 
 interface ContextChipsProps {
   contributions: ContextContribution[];
+  /** Rendered before the context chips, in the same row (e.g. the mode pill).
+   * When present the row shows even if there are no context contributions. */
+  leading?: ReactNode;
 }
 
-export function ContextChips({ contributions }: ContextChipsProps) {
+export function ContextChips({ contributions, leading }: ContextChipsProps) {
   const { t } = useI18n();
   const exclude = useContextStore((s) => s.exclude);
 
-  if (contributions.length === 0) return null;
+  if (!leading && contributions.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-2.5 text-xs">
+      {leading}
       {contributions.map((item) => (
         <span
           key={item.id}

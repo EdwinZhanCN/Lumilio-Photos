@@ -439,7 +439,65 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Agent Pin
+         * @description Patch one pinned widget. Send title to rename it, widget to switch which view it renders through; both are optional.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Pin update */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAgentPinRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/v1/agent/pins/{id}/assets": {
@@ -708,11 +766,14 @@ export interface paths {
         };
         /**
          * Get Available Tools
-         * @description Get list of all registered agent tools
+         * @description Get the agent tools visible in the given quick-action mode. An empty or unknown mode returns the full toolset.
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Quick-action mode */
+                    mode?: "review" | "organize" | "analyze" | "curate";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -8967,7 +9028,7 @@ export interface components {
             /** @example Kyoto 2025 */
             title?: string;
             truncated?: boolean;
-            /** @example asset_grid */
+            /** @example cover_card */
             widget?: string;
         };
         "dto.AgentPinLayoutDTO": {
@@ -9494,7 +9555,7 @@ export interface components {
             ref_id: string;
             thread_id: string;
             title?: string;
-            /** @example asset_grid */
+            /** @example cover_card */
             widget?: string;
         };
         "dto.CreateAlbumRequestDTO": {
@@ -10507,6 +10568,12 @@ export interface components {
         "dto.UpdateAgentPinLayoutRequest": {
             layouts: components["schemas"]["dto.AgentPinLayoutItemDTO"][];
         };
+        "dto.UpdateAgentPinRequest": {
+            /** @example Kyoto 2025 */
+            title?: string;
+            /** @example number_card */
+            widget?: string;
+        };
         "dto.UpdateAlbumRequestDTO": {
             album_name?: string;
             /** @enum {string} */
@@ -10632,6 +10699,8 @@ export interface components {
         "handler.AgentChatRequest": {
             context?: components["schemas"]["inject.ContextItem"][];
             mentions?: components["schemas"]["inject.MentionItem"][];
+            /** @enum {string} */
+            mode?: "review" | "organize" | "analyze" | "curate";
             query: string;
             thread_id?: string;
         };

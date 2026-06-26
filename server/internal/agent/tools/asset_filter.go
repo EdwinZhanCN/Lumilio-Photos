@@ -19,17 +19,18 @@ import (
 
 // AssetFilterInput defines how the LLM calls filter_assets.
 type AssetFilterInput struct {
-	DateFrom string `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
-	DateTo   string `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
-	Type     string `json:"type,omitempty" jsonschema:"enum=PHOTO,enum=VIDEO,enum=AUDIO,description=Asset type"`
-	Filename string `json:"filename,omitempty" jsonschema:"description=Filename substring to search for"`
-	Raw      *bool  `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
-	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by exact rating (0-5)"`
-	Liked    *bool  `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
-	Place    string `json:"place,omitempty" jsonschema:"description=Place name to match against the library's location clusters (e.g. Kyoto, Tokyo Tower)"`
-	Camera   string `json:"camera,omitempty" jsonschema:"description=Camera model substring (e.g. Nikon Z8)"`
-	Lens     string `json:"lens,omitempty" jsonschema:"description=Lens model substring"`
-	AlbumID  *int   `json:"album_id,omitempty" jsonschema:"description=Filter to assets in this album id"`
+	DateFrom string   `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
+	DateTo   string   `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
+	Type     string   `json:"type,omitempty" jsonschema:"enum=PHOTO,enum=VIDEO,enum=AUDIO,description=Asset type"`
+	Filename string   `json:"filename,omitempty" jsonschema:"description=Filename substring to search for"`
+	Raw      *bool    `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
+	Rating   *int     `json:"rating,omitempty" jsonschema:"description=Filter by exact rating (0-5)"`
+	Liked    *bool    `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
+	Place    string   `json:"place,omitempty" jsonschema:"description=Place name to match against the library's location clusters (e.g. Kyoto, Tokyo Tower)"`
+	Camera   string   `json:"camera,omitempty" jsonschema:"description=Camera model substring (e.g. Nikon Z8)"`
+	Lens     string   `json:"lens,omitempty" jsonschema:"description=Lens model substring"`
+	AlbumID  *int     `json:"album_id,omitempty" jsonschema:"description=Filter to assets in this album id"`
+	TagNames []string `json:"tag_names,omitempty" jsonschema:"description=Tag names to filter by (AND semantics — assets must have all listed tags)"`
 }
 
 // RegisterFilterAssets registers the filter_assets producer: metadata
@@ -38,9 +39,9 @@ type AssetFilterInput struct {
 func RegisterFilterAssets() {
 	info := &schema.ToolInfo{
 		Name: "filter_assets",
-		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked, place, camera, lens, album). " +
+		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked, place, camera, lens, album, tags). " +
 			"Returns a ref: a handle for the matching set. Pass the ref to other tools " +
-			"(combine, describe, show, bulk_like_assets) to work with the set.",
+			"(combine, describe, show, bulk_like_assets, tag_assets) to work with the set.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
@@ -146,6 +147,9 @@ func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams,
 		albumID := int32(*input.AlbumID)
 		params.AlbumID = &albumID
 	}
+	if len(input.TagNames) > 0 {
+		params.TagNames = input.TagNames
+	}
 	return &params, nil
 }
 
@@ -168,6 +172,8 @@ func filterHint(input *AssetFilterInput) string {
 		return strings.ToLower(input.Type)
 	case input.Liked != nil && *input.Liked:
 		return "liked"
+	case len(input.TagNames) > 0:
+		return input.TagNames[0]
 	default:
 		return "filter"
 	}
@@ -207,6 +213,9 @@ func filterPlanParams(input *AssetFilterInput) map[string]string {
 	}
 	if input.AlbumID != nil {
 		params["album_id"] = fmt.Sprintf("%d", *input.AlbumID)
+	}
+	if len(input.TagNames) > 0 {
+		params["tag_names"] = strings.Join(input.TagNames, ",")
 	}
 	return params
 }

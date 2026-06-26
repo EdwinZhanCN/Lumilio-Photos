@@ -53,6 +53,7 @@ func NewAgentHandler(agentService core.AgentService, refStore ref.Store, queries
 type AgentChatRequest struct {
 	ThreadID string               `json:"thread_id,omitempty"`
 	Query    string               `json:"query" binding:"required"`
+	Mode     string               `json:"mode,omitempty" enums:"review,organize,analyze,curate"`
 	Context  []inject.ContextItem `json:"context,omitempty"`
 	Mentions []inject.MentionItem `json:"mentions,omitempty"`
 }
@@ -116,7 +117,7 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 	}
 
 	// 获取 Agent 迭代器
-	iter := h.agentService.AskAgent(c.Request.Context(), int32(user.UserID), threadID, req.Query, prepared.InstructionExtras, sideChannel)
+	iter := h.agentService.AskAgent(c.Request.Context(), int32(user.UserID), threadID, req.Query, prepared.InstructionExtras, req.Mode, sideChannel)
 
 	// 发送会话信息事件
 	sessionInfo := map[string]any{"thread_id": threadID}
@@ -530,13 +531,14 @@ type ToolInfoResponse struct {
 
 // GetTools returns list of available tools
 // @Summary Get Available Tools
-// @Description Get list of all registered agent tools
+// @Description Get the agent tools visible in the given quick-action mode. An empty or unknown mode returns the full toolset.
 // @Tags agent
 // @Produce json
+// @Param mode query string false "Quick-action mode" Enums(review, organize, analyze, curate)
 // @Success 200 {array} ToolInfoResponse
 // @Router /api/v1/agent/tools [get]
 func (h *AgentHandler) GetTools(c *gin.Context) {
-	tools := h.agentService.GetAvailableTools()
+	tools := h.agentService.GetToolsByMode(c.Query("mode"))
 
 	result := make([]ToolInfoResponse, 0, len(tools))
 	for _, tool := range tools {

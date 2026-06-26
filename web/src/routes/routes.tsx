@@ -15,7 +15,6 @@ import Duplicates from "@/features/collections/routes/Duplicates";
 import UtilityClassifierAlbum from "@/features/collections/routes/UtilityClassifierAlbum";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
-import WidgetLibrary from "@/features/lumilio/routes/WidgetLibrary";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import MFAPage from "@/features/auth/routes/MFAPage.tsx";
 import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
@@ -156,10 +155,6 @@ export const appRoutes = [
   {
     path: "/lumilio",
     element: <LumilioChatPage />,
-  },
-  {
-    path: "/lumilio/widgets",
-    element: <WidgetLibrary />,
   },
   // {
   //   path: "/portfolio",

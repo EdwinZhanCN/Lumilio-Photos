@@ -233,6 +233,54 @@ func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 	api.JSONOK(c, api.SuccessResponse{Message: "Pin layout updated"})
 }
 
+// UpdatePin patches a single board widget: rename it and/or switch which view
+// the pinned ref renders through.
+// @Summary Update Agent Pin
+// @Description Patch one pinned widget. Send title to rename it, widget to switch which view it renders through; both are optional.
+// @Tags agent
+// @Accept json
+// @Produce json
+// @Param id path string true "Pin ID"
+// @Param request body dto.UpdateAgentPinRequest true "Pin update"
+// @Success 200 {object} api.SuccessResponse
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Router /api/v1/agent/pins/{id} [patch]
+func (h *AgentHandler) UpdatePin(c *gin.Context) {
+	var req dto.UpdateAgentPinRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	pinID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinNotFound(c, err, "Pin not found")
+		return
+	}
+	if req.Title != nil {
+		if err := h.pins.UpdateTitle(c.Request.Context(), int32(user.UserID), pinID, *req.Title); err != nil {
+			api.GinInternalError(c, err, "Failed to update pin title")
+			return
+		}
+	}
+	if req.Widget != nil {
+		if err := h.pins.UpdateWidget(c.Request.Context(), int32(user.UserID), pinID, *req.Widget); err != nil {
+			if errors.Is(err, pins.ErrUnknownWidget) {
+				api.GinBadRequest(c, err, "Unknown widget view")
+				return
+			}
+			api.GinInternalError(c, err, "Failed to update pin widget")
+			return
+		}
+	}
+	api.JSONOK(c, api.SuccessResponse{Message: "Pin updated"})
+}
+
 // DeletePin removes a board widget.
 // @Summary Delete Agent Pin
 // @Description Remove a pinned widget from the board.

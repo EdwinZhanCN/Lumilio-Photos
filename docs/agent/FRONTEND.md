@@ -45,12 +45,18 @@ vp lint
 vp test
 ```
 
-For i18n (internationalization), every string literal should be extractable via `i18next-cli`. After changes, run following commands to extract and check translations:
+For i18n (internationalization), every user-facing string literal must go through the i18n layer. The workflow is **extract-then-fill — never hand-edit translation JSON structure**:
+
+1. **Write code first**: use `t("dotted.key", "English default")` with an inline default. The default doubles as the en value and tells the extractor the key exists.
+2. **Extract**: run `vp exec i18next-cli extract` — scans `src/**/*.{ts,tsx}` and creates/updates keys in `src/locales/{en,zh}/translation.json` automatically.
+3. **Fill zh**: open `src/locales/zh/translation.json`, translate any new/empty keys. Verify with `vp exec i18next-cli status` (must reach 100%).
 
 ```bash
-vp exec i18next-cli extract
-vp exec i18next-cli status
+vp exec i18next-cli extract    # step 2: auto-generate keys from code
+vp exec i18next-cli status     # step 3: verify zh coverage (must be 100%)
 ```
+
+**Do NOT** manually add keys, restructure JSON nesting, or delete keys by hand in `translation.json`. The extractor is the single source of truth for key structure; manual edits will be overwritten or cause drift. Only fill values for keys the extractor has created.
 
 ## Source Layout
 

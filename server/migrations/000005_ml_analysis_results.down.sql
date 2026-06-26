@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS public.asset_quality_scores CASCADE;
 DROP TABLE IF EXISTS public.classifier_definitions CASCADE;
 DROP TABLE IF EXISTS public.species_predictions CASCADE;
 DROP TABLE IF EXISTS public.face_cluster_members CASCADE;
