@@ -42,7 +42,8 @@ type SampleInput struct {
 func RegisterRank() {
 	info := &schema.ToolInfo{
 		Name: "rank",
-		Desc: "Reorder a ref by time (capture date), quality (rating/liked/resolution heuristic) or " +
+		Desc: "Reorder a ref by time (capture date), quality (aesthetic score from SigLIP MLP head, " +
+			"falling back to rating/liked/resolution for unscored assets) or " +
 			"relevance (restore search ranking; only valid for search-produced refs). Returns a new ref.",
 	}
 

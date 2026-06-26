@@ -17,8 +17,9 @@ import (
 // the frontend hydrates assets through GET /api/v1/agent/refs/{id}/assets,
 // so the displayed set is exactly the snapshot the agent operated on.
 type ShowInput struct {
-	RefID string `json:"ref_id" jsonschema:"description=Ref of the asset set to display"`
-	Title string `json:"title,omitempty" jsonschema:"description=Optional short caption shown above the widget, in the user's language"`
+	RefID  string `json:"ref_id" jsonschema:"description=Ref of the asset set to display,required"`
+	Title  string `json:"title,omitempty" jsonschema:"description=Optional title for the widget"`
+	Widget string `json:"widget,omitempty" jsonschema:"description=Initial view to render (the user can switch it on the board),enum=cover_card,enum=number_card,enum=spark_card,enum=mosaic_card,default=cover_card"`
 }
 
 // ShowOutput confirms the render request to the LLM.
@@ -27,63 +28,25 @@ type ShowOutput struct {
 	Error   *ref.Error `json:"error,omitempty"`
 }
 
-// RegisterShow registers the photo-grid terminal (INV-1 — the model never
-// enumerates photos in text).
+// RegisterShow registers the single terminal "show" tool (INV-1 — the model
+// never enumerates photos in text). The optional widget param selects the
+// render style; it defaults to cover_card when omitted.
 func RegisterShow() {
 	info := &schema.ToolInfo{
 		Name: "show",
-		Desc: "Display the assets in a ref to the user as a photo grid. " +
-			"Use widget tools rather than describing or listing photos in text.",
+		Desc: "Display the assets in a ref to the user as a widget. " +
+			"Use this tool rather than describing or listing photos in text. " +
+			"The widget param is only the initial view (the user can switch it on the board): " +
+			"set it to \"number_card\" for a compact count/stat view, otherwise omit for a cover card.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
 		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *ShowInput) (*ShowOutput, error) {
-			return showWidget(deps, info.Name, input.RefID, input.Title, core.WidgetAssetGrid)
-		})
-	})
-}
-
-// RegisterShowFacets renders aggregate facets for a ref.
-func RegisterShowFacets() {
-	info := &schema.ToolInfo{
-		Name: "show_facets",
-		Desc: "Display a ref as an aggregate dashboard: count, date range, histogram, type distribution, top places, people and cameras. " +
-			"Use this when the user asks for an overview or wants to understand a collection before opening individual photos.",
-	}
-
-	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *ShowInput) (*ShowOutput, error) {
-			return showWidget(deps, info.Name, input.RefID, input.Title, core.WidgetFacetDashboard)
-		})
-	})
-}
-
-// RegisterShowTimeline renders the ref's capture-time distribution.
-func RegisterShowTimeline() {
-	info := &schema.ToolInfo{
-		Name: "show_timeline",
-		Desc: "Display a ref as a chronological timeline using the collection's time histogram. " +
-			"Use this for trips, seasons, yearly reviews, or any request where time flow matters.",
-	}
-
-	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *ShowInput) (*ShowOutput, error) {
-			return showWidget(deps, info.Name, input.RefID, input.Title, core.WidgetTimeline)
-		})
-	})
-}
-
-// RegisterShowStoryline renders representative assets as a visual sequence.
-func RegisterShowStoryline() {
-	info := &schema.ToolInfo{
-		Name: "show_storyline",
-		Desc: "Display the leading assets in a ref as a compact visual storyline. " +
-			"For better stories, first rank/sample/top the ref into the intended sequence, then call this tool.",
-	}
-
-	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *ShowInput) (*ShowOutput, error) {
-			return showWidget(deps, info.Name, input.RefID, input.Title, core.WidgetStoryline)
+			widget := input.Widget
+			if widget == "" {
+				widget = core.WidgetCoverCard
+			}
+			return showWidget(deps, info.Name, input.RefID, input.Title, widget)
 		})
 	})
 }

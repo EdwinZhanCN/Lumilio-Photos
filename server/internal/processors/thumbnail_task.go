@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
+
+	"go.uber.org/zap"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -13,6 +16,14 @@ import (
 
 // ProcessThumbnailTask handles thumbnail generation for photos and videos; waveform for audio.
 func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.ThumbnailArgs) error {
+	start := time.Now()
+	defer func() {
+		ap.logger.Debug("thumbnail_task",
+			zap.String("asset_id", args.AssetID.String()),
+			zap.String("type", string(args.AssetType)),
+			zap.Duration("duration", time.Since(start)),
+		)
+	}()
 	asset, repository, err := ap.loadAssetAndRepo(ctx, args.AssetID)
 	if err != nil {
 		return err

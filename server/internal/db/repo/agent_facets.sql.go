@@ -61,17 +61,19 @@ SELECT
     COUNT(*) AS total,
     MIN(COALESCE(a.taken_time, a.upload_time))::timestamptz AS date_from,
     MAX(COALESCE(a.taken_time, a.upload_time))::timestamptz AS date_to,
-    COUNT(*) FILTER (WHERE a.liked = true) AS liked_count
+    COUNT(*) FILTER (WHERE a.liked = true) AS liked_count,
+    MIN(a.capture_offset_minutes)::smallint AS capture_offset_minutes
 FROM assets a
 WHERE a.asset_id = ANY($1::uuid[])
   AND a.is_deleted = false
 `
 
 type AgentFacetOverviewRow struct {
-	Total      int64              `db:"total" json:"total"`
-	DateFrom   pgtype.Timestamptz `db:"date_from" json:"date_from"`
-	DateTo     pgtype.Timestamptz `db:"date_to" json:"date_to"`
-	LikedCount int64              `db:"liked_count" json:"liked_count"`
+	Total                int64              `db:"total" json:"total"`
+	DateFrom             pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo               pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	LikedCount           int64              `db:"liked_count" json:"liked_count"`
+	CaptureOffsetMinutes int16              `db:"capture_offset_minutes" json:"capture_offset_minutes"`
 }
 
 // Facet aggregates over a ref snapshot (agent describe tool / hydration API).
@@ -86,6 +88,7 @@ func (q *Queries) AgentFacetOverview(ctx context.Context, assetIds []pgtype.UUID
 		&i.DateFrom,
 		&i.DateTo,
 		&i.LikedCount,
+		&i.CaptureOffsetMinutes,
 	)
 	return i, err
 }

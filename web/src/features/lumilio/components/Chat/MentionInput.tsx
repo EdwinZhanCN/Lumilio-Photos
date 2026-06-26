@@ -14,7 +14,9 @@ import {
   Pin,
   Camera,
   Aperture,
-  Slash,
+  AtSign,
+  Sparkles,
+  ChevronRight,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -25,17 +27,22 @@ import {
   type MentionPayload,
   type MentionType,
 } from "../../mentions/mentionSources";
-import { SLASH_MACROS, type SlashMacro } from "../../slash/slashMacros";
+import { useSlashMacros, type SlashMacro } from "../../slash/slashMacros";
 
 const MAX_TEXTAREA_HEIGHT = 140;
 
-const TYPE_ICON: Record<MentionType, ReactNode> = {
-  person: <User size={15} />,
-  album: <FolderOpen size={15} />,
-  pin: <Pin size={15} />,
-  camera: <Camera size={15} />,
-  lens: <Aperture size={15} />,
+/** Per-type icon + theme-token chip styling for the command palette.
+ * Colors are daisyUI semantic tokens only (no hardcoded values); the class
+ * strings are literal so Tailwind's JIT keeps them. */
+const TYPE_STYLE: Record<MentionType, { icon: ReactNode; chip: string }> = {
+  person: { icon: <User size={14} />, chip: "bg-primary/15 text-primary" },
+  album: { icon: <FolderOpen size={14} />, chip: "bg-secondary/15 text-secondary" },
+  pin: { icon: <Pin size={14} />, chip: "bg-accent/15 text-accent" },
+  camera: { icon: <Camera size={14} />, chip: "bg-info/15 text-info" },
+  lens: { icon: <Aperture size={14} />, chip: "bg-success/15 text-success" },
 };
+
+const MACRO_CHIP = "bg-primary/15 text-primary";
 
 /** Two-level mention machine, mirroring the legacy RichInput phases:
  *  IDLE → (type "@") → "type"  → (pick type) → "entity"
@@ -76,6 +83,10 @@ interface MentionInputProps {
   isGenerating: boolean;
   disabled?: boolean;
   placeholder?: string;
+  /** Sticky agent mode owned by the parent (null = free mode). */
+  activeMode: string | null;
+  /** Set/clear the sticky mode (e.g. picking a quick action). */
+  onSetMode: (mode: string | null) => void;
   onSubmit: (query: string, mentions: MentionPayload[]) => void;
 }
 
@@ -83,9 +94,12 @@ export function MentionInput({
   isGenerating,
   disabled = false,
   placeholder,
+  activeMode,
+  onSetMode,
   onSubmit,
 }: MentionInputProps) {
   const { t } = useI18n();
+  const SLASH_MACROS = useSlashMacros();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingCaretRef = useRef<number | null>(null);
 
@@ -115,12 +129,7 @@ export function MentionInput({
         cameras: filterOptionsQuery.data?.camera_models ?? [],
         lenses: filterOptionsQuery.data?.lenses ?? [],
       }),
-    [
-      peopleQuery.data,
-      albumsQuery.data,
-      pinsQuery.data,
-      filterOptionsQuery.data,
-    ],
+    [peopleQuery.data, albumsQuery.data, pinsQuery.data, filterOptionsQuery.data],
   );
 
   const mentionTypes = useMemo<{ type: MentionType; label: string }[]>(
@@ -153,7 +162,7 @@ export function MentionInput({
       ).map((macro) => ({ kind: "macro" as const, macro }));
     }
     return [];
-  }, [menu, mentionTypes, sources]);
+  }, [menu, mentionTypes, sources, SLASH_MACROS]);
 
   const menuOpen = menu.kind !== "idle";
   const safeIndex = items.length ? Math.min(selectedIndex, items.length - 1) : 0;
@@ -201,6 +210,49 @@ export function MentionInput({
     syncMenu();
   }, [syncMenu]);
 
+  /** Insert a trigger char at the caret and open its menu — used by the
+   * toolbar buttons so they share the exact typing flow (type-to-filter,
+   * caret tracking) instead of a separate code path. */
+  const openTrigger = useCallback(
+    (char: "@" | "/") => {
+      if (disabled) return;
+      const el = textareaRef.current;
+      const caret = el?.selectionStart ?? value.length;
+      const needsSpace = caret > 0 && !/\s/.test(value[caret - 1] ?? "");
+      const insert = `${needsSpace ? " " : ""}${char}`;
+      const triggerIdx = caret + insert.length - 1;
+      setValue(value.slice(0, caret) + insert + value.slice(caret));
+      pendingCaretRef.current = triggerIdx + 1;
+      setMenu(
+        char === "/"
+          ? { kind: "command", start: triggerIdx, query: "" }
+          : { kind: "type", start: triggerIdx, query: "" },
+      );
+      setSelectedIndex(0);
+    },
+    [disabled, value],
+  );
+
+  /** Close the menu; when `strip`, also remove the in-progress trigger token
+   * (so Escape cancels the "@…" / "/…" the user was composing). */
+  const closeMenu = useCallback(
+    (strip: boolean) => {
+      setMenu((m) => {
+        if (strip && m.kind !== "idle") {
+          const ch = value[m.start];
+          if (ch === "@" || ch === "/") {
+            const caret = textareaRef.current?.selectionStart ?? value.length;
+            const end = Math.max(caret, m.start + 1);
+            setValue(value.slice(0, m.start) + value.slice(end));
+            pendingCaretRef.current = m.start;
+          }
+        }
+        return { kind: "idle" };
+      });
+    },
+    [value],
+  );
+
   const submit = useCallback(() => {
     const text = value.replace(/\s+/g, " ").trim();
     if (!text || disabled || isGenerating) return;
@@ -228,30 +280,45 @@ export function MentionInput({
         return;
       }
 
-      // Second level (entity) or command: replace the trigger token with the
-      // chosen label (entity) or the expanded template (command).
+      // Quick action: set the sticky mode (parent-owned). Strip the "/query"
+      // trigger token; never insert a template — picking a mode only constrains
+      // the agent, the user types their own request.
+      if (item.kind === "macro") {
+        onSetMode(item.macro.mode);
+        if (menu.kind === "command" && value[menu.start] === "/") {
+          const caret = textareaRef.current?.selectionStart ?? value.length;
+          setValue(value.slice(0, menu.start) + value.slice(caret));
+          pendingCaretRef.current = menu.start;
+        }
+        setMenu({ kind: "idle" });
+        return;
+      }
+
+      // Second level (entity): replace the trigger token with the chosen label.
       const start = menu.start;
       const caret = textareaRef.current?.selectionStart ?? value.length;
       const before = value.slice(0, start);
       const after = value.slice(caret);
-      const inserted =
-        item.kind === "entity"
-          ? `@${item.entity.label} `
-          : `${item.macro.template} `;
+      const inserted = `@${item.entity.label} `;
       setValue(before + inserted + after);
       pendingCaretRef.current = before.length + inserted.length;
-      if (item.kind === "entity") {
-        setMentions((prev) =>
-          prev.some(
-            (m) => m.id === item.entity.id && m.type === item.entity.type,
-          )
-            ? prev
-            : [...prev, { type: item.entity.type, id: item.entity.id, label: item.entity.label }],
-        );
-      }
+      setMentions((prev) =>
+        prev.some(
+          (m) => m.id === item.entity.id && m.type === item.entity.type,
+        )
+          ? prev
+          : [
+              ...prev,
+              {
+                type: item.entity.type,
+                id: item.entity.id,
+                label: item.entity.label,
+              },
+            ],
+      );
       setMenu({ kind: "idle" });
     },
-    [menu, value],
+    [menu, value, onSetMode],
   );
 
   const handleKeyDown = useCallback(
@@ -259,7 +326,7 @@ export function MentionInput({
       if (menuOpen) {
         if (e.key === "Escape") {
           e.preventDefault();
-          setMenu({ kind: "idle" });
+          closeMenu(true);
           return;
         }
         if (items.length > 0) {
@@ -289,89 +356,126 @@ export function MentionInput({
         submit();
       }
     },
-    [menuOpen, items, safeIndex, choose, submit],
+    [menuOpen, items, safeIndex, choose, submit, closeMenu],
   );
+
+  const activeModeLabel = SLASH_MACROS.find((m) => m.mode === activeMode)?.label;
+  const resolvedPlaceholder =
+    placeholder ??
+    (activeMode
+      ? t("lumilio.input.modePrompt", {
+          defaultValue: "Continue in {{mode}} mode…",
+          mode: activeModeLabel ?? activeMode,
+        })
+      : t("lumilio.input.prompt"));
 
   const menuHeader =
     menu.kind === "command"
-      ? t("lumilio.mention.commands", "Commands")
+      ? t("lumilio.mention.quickActions", "Quick Actions")
       : menu.kind === "entity"
         ? mentionTypes.find((m) => m.type === menu.activeType)?.label
         : t("lumilio.mention.mention", "Mention");
 
+  const canSend = !disabled && !isGenerating && value.trim().length > 0;
+
   return (
     <div className="relative">
       {menuOpen && (
-        <div className="absolute bottom-full left-0 z-50 mb-1.5 w-full overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-xl">
-          <div className="flex justify-between border-b border-base-300 bg-base-200 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-base-content/60">
-            <span>{menuHeader}</span>
-            <span className="font-mono">Tab</span>
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-full overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-2xl shadow-base-content/10">
+          <div className="px-3 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-wider text-base-content/45">
+            {menuHeader}
           </div>
           {items.length === 0 && (
-            <div className="px-3 py-3 text-center text-sm text-base-content/50">
+            <div className="px-3 py-4 text-center text-sm text-base-content/45">
               {t("lumilio.mention.noResults", "No results")}
             </div>
           )}
-          <ul className="max-h-56 overflow-y-auto py-1">
-            {items.map((item, index) => {
-              const active = index === safeIndex;
-              const key =
-                item.kind === "type"
-                  ? `t:${item.type}`
-                  : item.kind === "entity"
-                    ? `e:${item.entity.type}:${item.entity.id}`
-                    : `c:${item.macro.id}`;
-              const icon =
-                item.kind === "macro" ? (
-                  <Slash size={15} />
-                ) : item.kind === "type" ? (
-                  TYPE_ICON[item.type]
-                ) : (
-                  TYPE_ICON[item.entity.type]
-                );
-              const label =
-                item.kind === "type"
-                  ? item.label
-                  : item.kind === "entity"
-                    ? item.entity.label
-                    : item.macro.label;
-              const desc = item.kind === "macro" ? item.macro.description : null;
-              return (
-                <li key={key}>
-                  <button
-                    type="button"
-                    className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm ${
-                      active
-                        ? "bg-primary text-primary-content"
-                        : "text-base-content hover:bg-base-200"
-                    }`}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      choose(item);
-                    }}
-                  >
-                    <span className={active ? "" : "text-base-content/50"}>
-                      {icon}
-                    </span>
-                    <span className="flex-1 truncate font-medium">{label}</span>
-                    {item.kind === "type" && (
-                      <span className="opacity-50">›</span>
-                    )}
-                    {desc && (
-                      <span className="ml-2 truncate text-xs opacity-60">
-                        {desc}
+          {items.length > 0 && (
+            <ul className="max-h-64 overflow-y-auto px-1.5 pb-1.5">
+              {items.map((item, index) => {
+                const active = index === safeIndex;
+                const style =
+                  item.kind === "macro"
+                    ? { icon: <Sparkles size={14} />, chip: MACRO_CHIP }
+                    : item.kind === "type"
+                      ? TYPE_STYLE[item.type]
+                      : TYPE_STYLE[item.entity.type];
+                const key =
+                  item.kind === "type"
+                    ? `t:${item.type}`
+                    : item.kind === "entity"
+                      ? `e:${item.entity.type}:${item.entity.id}`
+                      : `c:${item.macro.id}`;
+                const label =
+                  item.kind === "type"
+                    ? item.label
+                    : item.kind === "entity"
+                      ? item.entity.label
+                      : item.macro.label;
+                const desc =
+                  item.kind === "macro" ? item.macro.description : null;
+                return (
+                  <li key={key}>
+                    <button
+                      type="button"
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                        active ? "bg-base-200" : "hover:bg-base-200/60"
+                      }`}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        choose(item);
+                      }}
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${style.chip}`}
+                      >
+                        {style.icon}
                       </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-base-content">
+                          {label}
+                        </span>
+                        {desc && (
+                          <span className="block truncate text-xs text-base-content/50">
+                            {desc}
+                          </span>
+                        )}
+                      </span>
+                      {item.kind === "type" && (
+                        <ChevronRight
+                          size={15}
+                          className="shrink-0 text-base-content/30"
+                        />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="flex items-center gap-3 border-t border-base-300 bg-base-200/40 px-3 py-1.5 text-[11px] text-base-content/45">
+            <span className="flex items-center gap-1">
+              <kbd className="kbd kbd-xs">↑</kbd>
+              <kbd className="kbd kbd-xs">↓</kbd>
+              {t("lumilio.mention.navigate", "Navigate")}
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="kbd kbd-xs">↵</kbd>
+              {t("lumilio.mention.select", "Select")}
+            </span>
+            <span className="ml-auto flex items-center gap-1">
+              <kbd className="kbd kbd-xs">esc</kbd>
+            </span>
+          </div>
         </div>
       )}
 
-      <div className="flex items-end gap-2 rounded-box border border-base-300 bg-base-100 px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary">
+      <div
+        className={`overflow-hidden rounded-box border bg-base-100 transition-colors focus-within:border-primary ${
+          menuOpen ? "border-primary/50" : "border-base-300"
+        }`}
+      >
         <textarea
           ref={textareaRef}
           rows={1}
@@ -384,18 +488,47 @@ export function MentionInput({
             if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key))
               syncMenu();
           }}
-          placeholder={placeholder ?? t("lumilio.input.prompt")}
-          className="max-h-[140px] min-h-9 flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed outline-none placeholder:text-base-content/40 disabled:opacity-60"
+          placeholder={resolvedPlaceholder}
+          className="block max-h-[140px] min-h-[2.5rem] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm leading-relaxed outline-none placeholder:text-base-content/40 disabled:opacity-60"
         />
-        <button
-          type="button"
-          className="btn btn-primary btn-circle btn-sm shrink-0"
-          aria-label={t("lumilio.input.send", "Send")}
-          disabled={disabled || isGenerating || value.trim().length === 0}
-          onClick={submit}
-        >
-          <Send size={16} strokeWidth={1.8} />
-        </button>
+        <div className="flex items-center gap-0.5 px-2 pb-2 pt-0.5">
+          <button
+            type="button"
+            className={`btn btn-ghost btn-sm btn-circle ${
+              activeMode
+                ? "text-primary"
+                : "text-base-content/45 hover:text-base-content"
+            }`}
+            disabled={disabled}
+            aria-pressed={Boolean(activeMode)}
+            title={t("lumilio.mention.quickActions", "Quick Actions")}
+            onClick={() => openTrigger("/")}
+          >
+            <Sparkles size={17} strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-circle text-base-content/45 hover:text-base-content"
+            disabled={disabled}
+            title={t("lumilio.mention.mention", "Mention")}
+            onClick={() => openTrigger("@")}
+          >
+            <AtSign size={17} strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm btn-circle ml-auto"
+            aria-label={t("lumilio.input.send", "Send")}
+            disabled={!canSend}
+            onClick={submit}
+          >
+            {isGenerating ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <Send size={16} strokeWidth={1.8} />
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

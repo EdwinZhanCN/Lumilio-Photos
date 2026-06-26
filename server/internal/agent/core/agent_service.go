@@ -25,13 +25,17 @@ type LLMConfigProvider interface {
 type AgentService interface {
 	// AskAgent 执行 Agent 查询或开启新会话。userID 与 threadID 共同构成 ref 作用域（INV-4）。
 	// instructionExtras is appended to the agent instruction (context/mention bindings).
-	AskAgent(ctx context.Context, userID int32, threadID, query, instructionExtras string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
+	// mode selects a tool subset: "review" | "organize" | "analyze" | "curate" | "" (full).
+	AskAgent(ctx context.Context, userID int32, threadID, query, instructionExtras, mode string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
 
 	// ResumeAgent 恢复中断的会话
 	ResumeAgent(ctx context.Context, userID int32, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error)
 
 	// GetAvailableTools 列出所有可用工具
 	GetAvailableTools() []*schema.ToolInfo
+
+	// GetToolsByMode 列出某个 quick-action mode 下可见的工具；空/未知 mode 返回全量。
+	GetToolsByMode(mode string) []*schema.ToolInfo
 }
 
 type agentService struct {
@@ -60,6 +64,10 @@ func (s *agentService) GetAvailableTools() []*schema.ToolInfo {
 	return s.registry.GetAllToolInfos()
 }
 
+func (s *agentService) GetToolsByMode(mode string) []*schema.ToolInfo {
+	return s.registry.GetToolInfosByMode(mode)
+}
+
 func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatModel, error) {
 	cfg, err := s.configProvider.GetLLMConfig(ctx)
 	if err != nil {
@@ -69,9 +77,10 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 	return llm.NewChatModel(ctx, cfg)
 }
 
-// buildAgent 构建 Agent 实例。AskAgent 和 ResumeAgent 必须使用完全相同的配置
-// （全量工具集），否则 checkpoint 恢复后工具集对不齐。
-func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID string, instructionExtras string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
+// buildAgent 构建 Agent 实例。mode 为空时返回全量工具集（自由模式）；非空时
+// 只实例化该 mode 允许的工具子集（渐进式披露）。checkpoint 恢复用当前请求的
+// mode 重建 agent——旧工具调用结果已在消息历史中，不影响恢复。
+func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID string, instructionExtras, mode string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
 	deps := &ToolDependencies{
 		Queries:     s.queries,
 		SideChannel: sideChannel,
@@ -81,7 +90,7 @@ func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID st
 		ThreadID:    threadID,
 	}
 
-	tools, err := s.registry.GetAllTools(ctx, deps)
+	tools, err := s.registry.GetToolsByMode(ctx, deps, mode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tools: %w", err)
 	}
@@ -133,7 +142,7 @@ func (s *agentService) buildAgent(ctx context.Context, userID int32, threadID st
 		&adk.ChatModelAgentConfig{
 			Name:        "Photo Asset Assistant",
 			Description: "Agent for managing photo assets with filtering and search capabilities",
-			Instruction: buildInstruction(today, ledger) + instructionExtras,
+			Instruction: buildInstruction(today, ledger, mode) + instructionExtras,
 			Model:       chatModel,
 			ToolsConfig: adk.ToolsConfig{
 				ToolsNodeConfig: compose.ToolsNodeConfig{
@@ -155,22 +164,53 @@ const summarizeTriggerTokens = 60000
 // The ref ledger (one line per active ref) is rebuilt every turn from the
 // store, so resumed conversations keep their handles without the model
 // having to remember them.
-func buildInstruction(today string, ledger []*ref.Ref) string {
+//
+// The instruction deliberately gives NO concrete ref id example: models will
+// parrot a literal like "r3_kyoto" straight back as a fabricated ref. Instead
+// it states the contract — refs come only from tool receipts and must never be
+// invented — and the rule that a producer tool (filter/search) must run before
+// any consumer tool (describe/rank/show/…) can act on a ref.
+func buildInstruction(today string, ledger []*ref.Ref, mode string) string {
+	hasRefs := len(ledger) > 0
+	refAvailability := "At the start of a conversation you hold no refs."
+	if hasRefs {
+		refAvailability = "The refs you currently hold are listed under \"Active refs\" below."
+	}
+
 	instruction := fmt.Sprintf(
-		"You are a helpful assistant for managing the user's photo library. Today is %s.\n"+
-			"Tools return refs: server-side handles like r3_kyoto that stand for a set of photos. "+
-			"Always pass refs between tools instead of describing photos; check the count in each tool receipt before acting on a ref, "+
-			"and tell the user when a result is empty. "+
-			"Use the show tool to display results to the user — never enumerate photos in text. "+
-			"Never mention ref ids or other internal identifiers to the user; speak about results in plain language. "+
-			"Respond in the user's language.",
+		"You are a helpful assistant for managing the user's photo library. Today is %s.\n\n"+
+			"WORKING WITH PHOTOS (refs):\n"+
+			"- A \"ref\" is an opaque server-side handle (an id plus a count) that stands for a set of photos. "+
+			"You receive a ref only inside a tool's result.\n"+
+			"- Never invent, guess, hand-write, recall from memory, or edit a ref id. "+
+			"Only use a ref id that a tool returned earlier in THIS conversation, or one listed under \"Active refs\" below. "+
+			"%s\n"+
+			"- To obtain a ref, first call a producer tool (filter_assets, or a search_* tool). "+
+			"Only after a producer returns a ref can the other tools (describe, rank, top, sample, show, tag_assets, …) act on it. "+
+			"If you need photos and hold no suitable ref, call filter_assets or a search tool first — "+
+			"never call describe/show/rank/etc. with a ref you were not given.\n"+
+			"- Pass refs between tools instead of describing photos in text. "+
+			"Read the count in each tool receipt before acting on a ref, and tell the user when a result is empty.\n\n"+
+			"TALKING TO THE USER:\n"+
+			"- Use the show tool to display photos — never enumerate or list photos in text.\n"+
+			"- Never mention ref ids or other internal identifiers to the user; speak about results in plain language.\n"+
+			"- Respond in the user's language.\n\n"+
+			"ORGANIZING:\n"+
+			"- When the user wants to organize or label photos, use the tag_assets tool to add or remove tags on a ref.\n"+
+			"- After showing a result the user seems interested in, offer to pin it to their board so they can revisit it later.\n\n"+
+			"CHOOSING A SHOW WIDGET (by intent): number_card for a pure count or statistic, "+
+			"cover_card for browsing a collection by its cover photo, spark_card for a time distribution, "+
+			"mosaic_card for a visual thumbnail collage. When in doubt, use cover_card."+
+			"%s",
 		today,
+		refAvailability,
+		ModeInstruction(mode),
 	)
 
-	if len(ledger) > 0 {
+	if hasRefs {
 		var b strings.Builder
 		b.WriteString(instruction)
-		b.WriteString("\n\nActive refs from earlier in this conversation:\n")
+		b.WriteString("\n\nActive refs from earlier in this conversation (use these exact ids; do not alter them):\n")
 		for _, r := range ledger {
 			summary := r.Summary
 			if summary == "" {
@@ -183,13 +223,13 @@ func buildInstruction(today string, ledger []*ref.Ref) string {
 	return instruction
 }
 
-func (s *agentService) AskAgent(ctx context.Context, userID int32, threadID, query, instructionExtras string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
+func (s *agentService) AskAgent(ctx context.Context, userID int32, threadID, query, instructionExtras, mode string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
 	var sideChannel chan<- *SideChannelEvent
 	if len(sideChannels) > 0 && sideChannels[0] != nil {
 		sideChannel = sideChannels[0]
 	}
 
-	agent, err := s.buildAgent(ctx, userID, threadID, instructionExtras, sideChannel)
+	agent, err := s.buildAgent(ctx, userID, threadID, instructionExtras, mode, sideChannel)
 	if err != nil {
 		// 在异步迭代器中返回错误
 		iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
@@ -217,7 +257,7 @@ func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID s
 		sideChannel = sideChannels[0]
 	}
 
-	agent, err := s.buildAgent(ctx, userID, threadID, "", sideChannel)
+	agent, err := s.buildAgent(ctx, userID, threadID, "", "", sideChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build agent for resume: %w", err)
 	}

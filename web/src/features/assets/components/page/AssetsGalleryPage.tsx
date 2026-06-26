@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useMemo, type ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import type {
   AssetsBulkActionId,
@@ -18,6 +18,7 @@ import {
   useCurrentAssetsView,
   useCurrentAssetsSearchView,
 } from "@/features/assets/hooks/useAssetsView";
+import { usePinAssetsView } from "@/features/assets/hooks/usePinAssetsView";
 import {
   useSortBy,
   useIsCarouselOpen,
@@ -44,6 +45,9 @@ type AssetsGalleryPageProps = {
   bulkActions?: AssetsBulkActionInput;
   hiddenBulkActions?: readonly AssetsBulkActionId[];
   viewKey?: string;
+  /** When set, the gallery switches to pin-driven mode and hydrates assets
+   * from the saved agent result (pin) instead of the normal browse view. */
+  pinId?: string;
   /** Custom banner rendered between the header and the gallery (album info,
    * person cover, trip map, etc.). Lets scoped collections reuse this page
    * instead of hand-rolling header + carousel + search. */
@@ -58,12 +62,14 @@ export function AssetsGalleryPage({
   bulkActions,
   hiddenBulkActions,
   viewKey,
+  pinId,
   hero,
 }: AssetsGalleryPageProps = {}) {
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { t } = useI18n();
   const [assetPage] = usePreference("assetPage");
+  const isPinMode = Boolean(pinId);
 
   // Hide the search FAB while the agent dock is expanded (the panel sits over it).
   const dockExpanded = useDockStore((s) => s.collapsedOverride) === false;
@@ -74,7 +80,7 @@ export function AssetsGalleryPage({
   const filtersState = useFilterState();
   const isCarouselOpen = useIsCarouselOpen();
   const { setSortBy } = useUIActions();
-  const isSearchActive = searchQuery.trim().length > 0;
+  const isSearchActive = !isPinMode && searchQuery.trim().length > 0;
   const hasActiveFilters = selectHasActiveFilters(filtersState);
   const isTrashView = baseFilter?.is_deleted === true;
   const emptyState = useMemo(() => {
@@ -106,6 +112,15 @@ export function AssetsGalleryPage({
   const GalleryComponent =
     currentLayout === "compact" ? SquareGallery : JustifiedGallery;
 
+  const pinView = usePinAssetsView(pinId);
+  const standardView = useCurrentAssetsView({
+    withGroups: true,
+    sortBy,
+    baseFilter,
+    viewKey,
+    disabled: isPinMode,
+  });
+
   const {
     assets: allAssets,
     browseGroups,
@@ -114,20 +129,17 @@ export function AssetsGalleryPage({
     isLoading: isFetching,
     isLoadingMore: isFetchingNextPage,
     fetchMore: fetchNextPage,
+    refetch: refetchView,
     hasMore: hasNextPage,
     isFetched,
     error,
-  } = useCurrentAssetsView({
-    withGroups: true,
-    sortBy,
-    baseFilter,
-    viewKey,
-  });
+  } = isPinMode ? pinView : standardView;
   const photoSearchView = useCurrentAssetsSearchView({
     withGroups: false,
     sortBy,
     baseFilter,
     viewKey: viewKey ? `${viewKey}:search` : undefined,
+    disabled: isPinMode,
   });
   const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(
     null,
@@ -307,6 +319,21 @@ export function AssetsGalleryPage({
     activeBrowseItems,
   ]);
 
+  // Pin expired/deleted: the metadata lookup failed (typically 404). Retry
+  // can't recover a missing pin, so offer a way back to Lumilio instead.
+  if (isPinMode && pinView.isExpired) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
+        <AlertTriangle className="size-8 text-warning" />
+        <p className="max-w-md text-base-content/70">{t("assets.pin.expired")}</p>
+        <Link to="/lumilio" className="btn btn-sm btn-outline gap-1.5">
+          <ArrowLeft className="size-4" />
+          {t("assets.pin.backToLumilio")}
+        </Link>
+      </div>
+    );
+  }
+
   // Render an inline error rather than throwing, so a transient API failure
   // doesn't trigger the full-screen ErrorBoundary and lock the user out.
   if (error && !isSearchActive) {
@@ -320,7 +347,13 @@ export function AssetsGalleryPage({
         </p>
         <button
           className="btn btn-sm btn-outline"
-          onClick={() => fetchNextPage()}
+          onClick={() => {
+            if (isPinMode) {
+              void refetchView();
+            } else {
+              void fetchNextPage();
+            }
+          }}
         >
           {t("common.retry", { defaultValue: "Retry" })}
         </button>

@@ -325,7 +325,7 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "widget": {
-                        "example": "asset_grid",
+                        "example": "cover_card",
                         "type": "string"
                     }
                 },
@@ -1810,7 +1810,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "widget": {
-                        "example": "asset_grid",
+                        "example": "cover_card",
                         "type": "string"
                     }
                 },
@@ -4253,6 +4253,19 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.UpdateAgentPinRequest": {
+                "properties": {
+                    "title": {
+                        "example": "Kyoto 2025",
+                        "type": "string"
+                    },
+                    "widget": {
+                        "example": "number_card",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UpdateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
@@ -4620,6 +4633,15 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    },
+                    "mode": {
+                        "enum": [
+                            "review",
+                            "organize",
+                            "analyze",
+                            "curate"
+                        ],
+                        "type": "string"
                     },
                     "query": {
                         "type": "string"
@@ -5446,6 +5468,86 @@ const docTemplate = `{
                 "tags": [
                     "agent"
                 ]
+            },
+            "patch": {
+                "description": "Patch one pinned widget. Send title to rename it, widget to switch which view it renders through; both are optional.",
+                "parameters": [
+                    {
+                        "description": "Pin ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateAgentPinRequest",
+                                        "summary": "request",
+                                        "description": "Pin update"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Pin update",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Pin not found"
+                    }
+                },
+                "summary": "Update Agent Pin",
+                "tags": [
+                    "agent"
+                ]
             }
         },
         "/api/v1/agent/pins/{id}/assets": {
@@ -5656,7 +5758,23 @@ const docTemplate = `{
         },
         "/api/v1/agent/tools": {
             "get": {
-                "description": "Get list of all registered agent tools",
+                "description": "Get the agent tools visible in the given quick-action mode. An empty or unknown mode returns the full toolset.",
+                "parameters": [
+                    {
+                        "description": "Quick-action mode",
+                        "in": "query",
+                        "name": "mode",
+                        "schema": {
+                            "enum": [
+                                "review",
+                                "organize",
+                                "analyze",
+                                "curate"
+                            ],
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {

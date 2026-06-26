@@ -20,7 +20,20 @@ type ProcessSemanticArgs struct {
 func (ProcessSemanticArgs) Kind() string { return "process_semantic" }
 
 func (ProcessSemanticArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+	return river.InsertOpts{
+		MaxAttempts: MLProcessMaxAttempts,
+		// Dedupe concurrent reindex/retry fan-out per asset: an equivalent job
+		// still available/running/completed in the table is silently skipped
+		// (Insert returns UniqueSkippedAsDuplicate=true, nil error). Default
+		// ByState includes completed, so overlapping full-rebuild chains collapse
+		// to one job per asset instead of racing the non-transactional OCR/face
+		// save paths. ByArgs also keys on PreprocessVersion, so bumping the
+		// version re-allows a re-run.
+		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
+			ByPeriod: 1 * time.Hour,
+		},
+	}
 }
 
 const (
@@ -39,7 +52,20 @@ type ZeroshotClassifyArgs struct {
 func (ZeroshotClassifyArgs) Kind() string { return "classify_zeroshot" }
 
 func (ZeroshotClassifyArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+	return river.InsertOpts{
+		MaxAttempts: MLProcessMaxAttempts,
+		// Dedupe concurrent reindex/retry fan-out per asset: an equivalent job
+		// still available/running/completed in the table is silently skipped
+		// (Insert returns UniqueSkippedAsDuplicate=true, nil error). Default
+		// ByState includes completed, so overlapping full-rebuild chains collapse
+		// to one job per asset instead of racing the non-transactional OCR/face
+		// save paths. ByArgs also keys on PreprocessVersion, so bumping the
+		// version re-allows a re-run.
+		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
+			ByPeriod: 1 * time.Hour,
+		},
+	}
 }
 
 // ProcessBioClipArgs is the River job payload for BioCLIP classification.
@@ -52,7 +78,20 @@ type ProcessBioClipArgs struct {
 func (ProcessBioClipArgs) Kind() string { return "process_bioclip" }
 
 func (ProcessBioClipArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+	return river.InsertOpts{
+		MaxAttempts: MLProcessMaxAttempts,
+		// Dedupe concurrent reindex/retry fan-out per asset: an equivalent job
+		// still available/running/completed in the table is silently skipped
+		// (Insert returns UniqueSkippedAsDuplicate=true, nil error). Default
+		// ByState includes completed, so overlapping full-rebuild chains collapse
+		// to one job per asset instead of racing the non-transactional OCR/face
+		// save paths. ByArgs also keys on PreprocessVersion, so bumping the
+		// version re-allows a re-run.
+		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
+			ByPeriod: 1 * time.Hour,
+		},
+	}
 }
 
 // AssetRetryPayload is the River job payload for selective retry of asset processing tasks
@@ -83,7 +122,20 @@ type ProcessOcrArgs struct {
 func (ProcessOcrArgs) Kind() string { return "process_ocr" }
 
 func (ProcessOcrArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+	return river.InsertOpts{
+		MaxAttempts: MLProcessMaxAttempts,
+		// Dedupe concurrent reindex/retry fan-out per asset: an equivalent job
+		// still available/running/completed in the table is silently skipped
+		// (Insert returns UniqueSkippedAsDuplicate=true, nil error). Default
+		// ByState includes completed, so overlapping full-rebuild chains collapse
+		// to one job per asset instead of racing the non-transactional OCR/face
+		// save paths. ByArgs also keys on PreprocessVersion, so bumping the
+		// version re-allows a re-run.
+		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
+			ByPeriod: 1 * time.Hour,
+		},
+	}
 }
 
 // ProcessFaceArgs is the River job payload for face detection and recognition.
@@ -96,14 +148,30 @@ type ProcessFaceArgs struct {
 func (ProcessFaceArgs) Kind() string { return "process_face" }
 
 func (ProcessFaceArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+	return river.InsertOpts{
+		MaxAttempts: MLProcessMaxAttempts,
+		// Dedupe concurrent reindex/retry fan-out per asset: an equivalent job
+		// still available/running/completed in the table is silently skipped
+		// (Insert returns UniqueSkippedAsDuplicate=true, nil error). Default
+		// ByState includes completed, so overlapping full-rebuild chains collapse
+		// to one job per asset instead of racing the non-transactional OCR/face
+		// save paths. ByArgs also keys on PreprocessVersion, so bumping the
+		// version re-allows a re-run.
+		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
+			ByPeriod: 1 * time.Hour,
+		},
+	}
 }
 
 // ReindexAssetsArgs queues a batch backfill for existing photo indexing tasks.
+// Offset advances across self-chained full-rebuild pages (MissingOnly=false);
+// it is ignored for missing-only backfills.
 type ReindexAssetsArgs struct {
 	RepositoryID *string  `json:"repositoryId,omitempty"`
 	Tasks        []string `json:"tasks,omitempty"`
 	Limit        int      `json:"limit,omitempty"`
+	Offset       int      `json:"offset,omitempty"`
 	MissingOnly  bool     `json:"missingOnly,omitempty"`
 }
 

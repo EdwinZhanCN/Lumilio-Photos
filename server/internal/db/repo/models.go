@@ -175,6 +175,14 @@ type Asset struct {
 	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
 }
 
+type AssetQualityScore struct {
+	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	Score        float32            `db:"score" json:"score"`
+	ModelVersion string             `db:"model_version" json:"model_version"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type AssetStack struct {
 	StackID   pgtype.UUID        `db:"stack_id" json:"stack_id"`
 	StackKind string             `db:"stack_kind" json:"stack_kind"`

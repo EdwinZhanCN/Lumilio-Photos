@@ -42,17 +42,20 @@ WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
 ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
 
 -- name: RankAssetIDsByQuality :many
--- rank(by=quality) ascending, using the featured-selector heuristic
--- (rating, liked, resolution); callers reverse for descending order.
-SELECT asset_id
+-- rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
+-- head when available, falling back to the legacy heuristic (rating, liked,
+-- resolution) for unscored assets. Callers reverse for descending order.
+SELECT a.asset_id
 FROM assets a
-WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
-  AND is_deleted = false
-ORDER BY (
-    0.45 * COALESCE(a.rating, 0)::float8 / 5.0
-  + 0.20 * (CASE WHEN a.liked THEN 1.0 ELSE 0.0 END)
-  + 0.35 * LEAST(COALESCE(a.width, 0)::float8 * COALESCE(a.height, 0)::float8 / 24000000.0, 1.0)
-) ASC, asset_id ASC;
+LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
+WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.is_deleted = false
+ORDER BY COALESCE(
+    aqs.score,
+    1.0 + 0.45 * COALESCE(a.rating, 0)::float8 / 5.0
+        + 0.20 * (CASE WHEN a.liked THEN 1.0 ELSE 0.0 END)
+        + 0.35 * LEAST(COALESCE(a.width, 0)::float8 * COALESCE(a.height, 0)::float8 / 24000000.0, 1.0)
+) ASC, a.asset_id ASC;
 
 -- name: AgentLookupAlbums :many
 -- lookup_albums entity resolver: albums matching a title query.

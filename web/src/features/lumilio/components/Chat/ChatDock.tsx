@@ -1,6 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, Maximize2, RotateCcw } from "lucide-react";
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  FolderTree,
+  History,
+  Maximize2,
+  RotateCcw,
+  Sparkles,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -8,7 +19,7 @@ import { LumilioAvatar } from "../LumilioAvatar/LumilioAvatar";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useContextStore } from "../../state/contextStore";
 import { useDockStore } from "../../state/dockStore";
-import { QUICK_ASKS } from "../../slash/slashMacros";
+import { useSlashMacros } from "../../slash/slashMacros";
 import type { MentionPayload } from "../../mentions/mentionSources";
 import { ChatMessages } from "./ChatMessages";
 import { MentionInput } from "./MentionInput";
@@ -20,6 +31,15 @@ function formatTokens(count: number): string {
   return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
 }
 
+/** Per-mode glyph, reused by the empty-state cards and the sticky mode pill so
+ * a mode reads the same wherever it appears. */
+const MODE_ICON: Record<string, LucideIcon> = {
+  review: History,
+  organize: FolderTree,
+  analyze: BarChart3,
+  curate: Sparkles,
+};
+
 interface ChatDockProps {
   /** "embedded" = in-flow panel (Lumilio board page); "fab" = bottom-right FAB
    * whose expanded panel portals above gallery/carousel. */
@@ -28,7 +48,12 @@ interface ChatDockProps {
 
 export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const { t } = useI18n();
+  const QUICK_ACTIONS = useSlashMacros();
   const [fabHovered, setFabHovered] = useState(false);
+  // Sticky agent mode: set once (empty-state chip, "/" menu, or Plus button),
+  // kept across turns until the user clears it. Single source of truth for the
+  // tool-subset constraint sent with every message.
+  const [activeMode, setActiveMode] = useState<string | null>(null);
   const collapsedOverride = useDockStore((s) => s.collapsedOverride);
   const setCollapsedOverride = useDockStore((s) => s.setCollapsed);
 
@@ -70,14 +95,23 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const handleSubmit = useCallback(
     (value: string, mentions: MentionPayload[]) => {
       setCollapsedOverride(false);
+      // Mode is sticky — read it here, don't clear it on send.
       void sendMessage(value, {
         context: snapshotForSend(),
         mentions,
+        mode: activeMode ?? undefined,
       });
       clearExclusions();
     },
-    [sendMessage, snapshotForSend, clearExclusions, setCollapsedOverride],
+    [sendMessage, snapshotForSend, clearExclusions, setCollapsedOverride, activeMode],
   );
+
+  const modeLabels: Record<string, string> = {
+    review: t("lumilio.quickActions.review.label", "Review"),
+    organize: t("lumilio.quickActions.organize.label", "Organize"),
+    analyze: t("lumilio.quickActions.analyze.label", "Analyze"),
+    curate: t("lumilio.quickActions.curate.label", "Curate"),
+  };
 
   const toggleLabel = collapsed
     ? t("lumilio.dock.expand", "Expand chat")
@@ -184,19 +218,45 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         </div>
       )}
       {messages.length === 0 ? (
-        <div className="flex min-h-32 flex-col items-center justify-center gap-3 px-3 py-6 text-center text-sm text-base-content/50">
-          <p>{t("lumilio.chat.empty")}</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {QUICK_ASKS.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                className="btn btn-ghost btn-xs rounded-full border border-base-300"
-                onClick={() => handleSubmit(prompt, [])}
-              >
-                {prompt}
-              </button>
-            ))}
+        <div className="flex flex-col items-center gap-4 px-4 py-7">
+          <LumilioAvatar size={0.3} />
+          <p className="text-center text-sm text-base-content/55">
+            {t("lumilio.chat.empty")}
+          </p>
+          <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+            {QUICK_ACTIONS.map((action) => {
+              const active = activeMode === action.mode;
+              const Icon = MODE_ICON[action.mode] ?? Sparkles;
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  aria-pressed={active}
+                  className={`group flex items-start gap-2.5 rounded-xl border p-3 text-left transition-colors ${
+                    active
+                      ? "border-primary bg-primary/5"
+                      : "border-base-300 hover:border-primary/40 hover:bg-base-200/50"
+                  }`}
+                  onClick={() =>
+                    setActiveMode((cur) =>
+                      cur === action.mode ? null : action.mode,
+                    )
+                  }
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Icon size={16} strokeWidth={1.8} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-base-content">
+                      {action.label}
+                    </span>
+                    <span className="block text-xs leading-snug text-base-content/55">
+                      {action.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : (
@@ -205,13 +265,33 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
     </div>
   );
 
+  const ModePillIcon = activeMode ? MODE_ICON[activeMode] ?? Sparkles : null;
+  const modePill =
+    activeMode && ModePillIcon ? (
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+        <ModePillIcon size={11} strokeWidth={2} />
+        {modeLabels[activeMode] ?? activeMode}
+        <button
+          type="button"
+          className="ml-0.5 opacity-60 hover:opacity-100"
+          onClick={() => setActiveMode(null)}
+          title={t("lumilio.mode.clear", "Clear mode")}
+          aria-label={t("lumilio.mode.clear", "Clear mode")}
+        >
+          <X size={11} />
+        </button>
+      </span>
+    ) : undefined;
+
   const inputArea = (
     <>
-      <ContextChips contributions={activeContributions} />
+      <ContextChips contributions={activeContributions} leading={modePill} />
       <MentionInput
         isGenerating={isGenerating}
         disabled={Boolean(agentDisabledReason)}
         placeholder={agentDisabledReason ?? undefined}
+        activeMode={activeMode}
+        onSetMode={setActiveMode}
         onSubmit={handleSubmit}
       />
     </>

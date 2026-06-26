@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -24,6 +25,14 @@ import (
 
 // ProcessMetadataTask handles EXIF/ffprobe metadata extraction only.
 func (ap *AssetProcessor) ProcessMetadataTask(ctx context.Context, args jobs.MetadataArgs) error {
+	start := time.Now()
+	defer func() {
+		ap.logger.Debug("metadata_task",
+			zap.String("asset_id", args.AssetID.String()),
+			zap.String("type", string(args.AssetType)),
+			zap.Duration("duration", time.Since(start)),
+		)
+	}()
 	asset, _, err := ap.loadAssetAndRepo(ctx, args.AssetID)
 	if err != nil {
 		return err

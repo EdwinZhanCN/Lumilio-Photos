@@ -294,6 +294,16 @@
         }
       }
     },
+    "pin": {
+      "backToLumilio": "Back to Lumilio",
+      "badge": "Pinned result",
+      "count_one": "{{count}} photo",
+      "count_other": "{{count}} photos",
+      "defaultTitle": "Agent result",
+      "expired": "This result has expired. Ask Lumilio to re-run the query.",
+      "modeFrozen": "Frozen",
+      "modeLive": "Live"
+    },
     "stackCarousel": {
       "error": "Stack assets are temporarily unavailable.",
       "errorHint": "Try again in a moment.",
@@ -860,7 +870,11 @@
     },
     "board": {
       "empty": "Nothing pinned yet. Ask Lumilio in the dock, then pin a result to keep it on this board.",
-      "remove": "Remove from board",
+      "emptyHint": "Try “Show my beach photos from last summer”",
+      "emptyTitle": "Your board is empty",
+      "interactionHint": "Drag to move · use the View buttons to switch the look · the ⋯ menu sets size",
+      "tidy": "Tidy",
+      "tidyHint": "Compact the board upward",
       "unknownWidget": "Unknown widget type: {{type}}",
       "untitled": "Untitled"
     },
@@ -897,6 +911,7 @@
       "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens"
     },
     "input": {
+      "modePrompt": "Continue in {{mode}} mode…",
       "prompt": "Ask Lumilio Agent...",
       "send": "Send"
     },
@@ -909,99 +924,91 @@
     "mention": {
       "album": "Album",
       "camera": "Camera",
-      "commands": "Commands",
       "lens": "Lens",
       "mention": "Mention",
+      "navigate": "Navigate",
       "noResults": "No results",
       "person": "Person",
-      "pin": "Pin"
+      "pin": "Pin",
+      "quickActions": "Quick Actions",
+      "select": "Select"
     },
     "messages": {
       "thinking": "Thinking..."
+    },
+    "mode": {
+      "clear": "Clear mode"
+    },
+    "quickActions": {
+      "analyze": {
+        "description": "Discover shooting habits and trends",
+        "label": "Analyze",
+        "template": "Analyze my shooting habits and trends"
+      },
+      "curate": {
+        "description": "Pick the best photos",
+        "label": "Curate",
+        "template": "Help me curate the best photos from recent uploads"
+      },
+      "organize": {
+        "description": "Group and tag photos, create albums",
+        "label": "Organize",
+        "template": "Help me organize my recent photos"
+      },
+      "review": {
+        "description": "Review a period of your photography journey",
+        "label": "Review",
+        "template": "Help me review my photography journey this year"
+      }
     },
     "tools": {
       "emptyResult": "No matching photos",
       "resultSet": "Result set"
     },
-    "widgetLibrary": {
-      "backToLumilio": "Back to Lumilio",
-      "board": "Board",
-      "catalog": "Widgets",
-      "datasets": {
-        "archiveYears": "Family archive",
-        "travelDay": "Kyoto day trip",
-        "travelMonth": "September album"
-      },
-      "inline": "Inline",
-      "open": "Widget Library",
-      "stat": {
-        "assets": "assets",
-        "granularity": "buckets",
-        "people": "people",
-        "places": "places"
-      },
-      "subtitle": "Preview every Lumilio agent widget against mock data.",
-      "title": "Widget Library",
-      "widgets": {
-        "assetGrid": {
-          "blurb": "A photo set: a compact grid inline, an infinite grid on the board.",
-          "label": "Asset grid"
-        },
-        "facetDashboard": {
-          "blurb": "An album-style overview: cover, range, people, places and camera.",
-          "label": "Facet dashboard"
-        },
-        "storyline": {
-          "blurb": "An Instagram-style story player for trips and moments.",
-          "label": "Storyline"
-        },
-        "timeline": {
-          "blurb": "A draggable time-river — scrub across it to bring each moment into focus.",
-          "label": "Adaptive timeline"
-        }
-      }
-    },
     "widgets": {
-      "facets": {
-        "cameras": "Cameras",
-        "people": "People",
-        "places": "Places",
-        "types": "Types"
+      "frozen": "Frozen",
+      "live": "Live",
+      "menu": {
+        "more": "More",
+        "remove": "Remove",
+        "rename": "Rename",
+        "renameHint": "Double-click to rename",
+        "size": "Size"
       },
-      "metadataUnavailable": "This widget's summary is unavailable.",
-      "metrics": {
-        "assets": "Assets"
+      "mosaic": {
+        "overflow": "+{{value}}"
       },
+      "photos": "photos",
       "pin": "Pin to board",
       "pinned": "Pinned to board",
-      "pinUnavailable": "This widget's photos are unavailable.",
-      "refExpired": "These results have expired. Ask Lumilio to run the search again.",
       "resultsTitle": "Photos from Lumilio",
-      "storyline": {
-        "assets_one": "{{count}} asset",
-        "assets_other": "{{count}} assets",
-        "next": "Next",
-        "prev": "Previous",
-        "story": "Story"
+      "stat": {
+        "images": "images",
+        "liked": "liked",
+        "likedLabel": "liked photos",
+        "newDelta_one": "+{{count}} new",
+        "newDelta_other": "+{{count}} new",
+        "videos": "videos"
       },
-      "storylineUnavailable": "This storyline is unavailable.",
+      "state": {
+        "empty": "No photos here",
+        "error": "Couldn't load",
+        "retry": "Retry"
+      },
       "timeline": {
-        "assets_one": "{{count}} asset",
-        "assets_other": "{{count}} assets",
-        "granularity": {
-          "day": "By day",
-          "hour": "By hour",
-          "month": "By month",
-          "year": "By year"
-        },
-        "noPreview": "No preview for this period",
-        "preview": "Preview",
-        "scrub": "Drag to explore the timeline",
-        "scrubHint": "Drag to explore"
+        "byDay": "by day",
+        "byHour": "by hour",
+        "byMonth": "by month",
+        "byYear": "by year",
+        "noData": "No timeline data"
       },
-      "timelineUnavailable": "This timeline is unavailable.",
-      "viewAll_one": "View all {{count}} photos",
-      "viewAll_other": "View all {{count}} photos"
+      "view": {
+        "cover": "Cover",
+        "mosaic": "Mosaic",
+        "number": "Stat",
+        "spark": "Timeline",
+        "switcher": "Switch view"
+      }
     }
   },
   "manage": {
@@ -1060,6 +1067,7 @@
     "adminOnlyDescription": "Processing activity and runtime diagnostics are only available to administrators.",
     "adminOnlyTitle": "Admin access required",
     "ml": {
+      "allIndexed": "All indexed",
       "bioAlbumCoverage": "Bio album species coverage",
       "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
       "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",

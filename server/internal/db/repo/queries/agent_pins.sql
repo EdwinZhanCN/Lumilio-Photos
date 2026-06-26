@@ -17,6 +17,16 @@ UPDATE agent_pins
 SET layout_x = $3, layout_y = $4, layout_w = $5, layout_h = $6, updated_at = NOW()
 WHERE pin_id = $1 AND user_id = $2;
 
+-- name: UpdateAgentPinTitle :exec
+UPDATE agent_pins
+SET title = $3, updated_at = NOW()
+WHERE pin_id = $1 AND user_id = $2;
+
+-- name: UpdateAgentPinWidget :exec
+UPDATE agent_pins
+SET widget = $3, updated_at = NOW()
+WHERE pin_id = $1 AND user_id = $2;
+
 -- name: DeleteAgentPin :exec
 DELETE FROM agent_pins
 WHERE pin_id = $1 AND user_id = $2;

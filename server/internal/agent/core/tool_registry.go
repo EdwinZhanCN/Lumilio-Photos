@@ -89,16 +89,107 @@ type ErrorInfo struct {
 type DataPayload struct {
 	RefID  string         `json:"refId"`
 	Count  int            `json:"count"`
-	Widget string         `json:"widget,omitempty"` // e.g. WidgetAssetGrid
+	Widget string         `json:"widget,omitempty"` // e.g. WidgetCoverCard
 	Params map[string]any `json:"params,omitempty"`
 }
 
 const (
-	WidgetAssetGrid      = "asset_grid"
-	WidgetFacetDashboard = "facet_dashboard"
-	WidgetTimeline       = "timeline"
-	WidgetStoryline      = "storyline"
+	WidgetCoverCard  = "cover_card"
+	WidgetNumberCard = "number_card"
+	WidgetSparkCard  = "spark_card"
+	WidgetMosaicCard = "mosaic_card"
 )
+
+// knownWidgets is the set of valid view identifiers a pin may render through.
+// A widget is just the currently selected view over a pinned ref, so callers
+// validate user-supplied view choices against this set before persisting.
+var knownWidgets = map[string]bool{
+	WidgetCoverCard:  true,
+	WidgetNumberCard: true,
+	WidgetSparkCard:  true,
+	WidgetMosaicCard: true,
+}
+
+// IsKnownWidget reports whether view is a registered widget/view identifier.
+func IsKnownWidget(view string) bool {
+	return knownWidgets[view]
+}
+
+// modeToolSets maps a quick-action mode to the set of tool names the agent
+// may see in that mode. An empty or unknown mode yields the full toolset
+// (free / default mode). Tools outside the set are never instantiated, so
+// the model cannot call or even observe them — progressive disclosure at
+// the registry level.
+var modeToolSets = map[string]map[string]bool{
+	"review": {
+		"filter_assets": true,
+		"search_people": true,
+		"lookup_people": true,
+		"describe":      true,
+		"sample":        true,
+		"rank":          true,
+		"show":          true,
+	},
+	"organize": {
+		"filter_assets":   true,
+		"search_semantic": true,
+		"search_people":   true,
+		"lookup_people":   true,
+		"lookup_albums":   true,
+		"describe":        true,
+		"combine":         true,
+		"tag_assets":      true,
+		"create_album":    true,
+		"add_to_album":    true,
+		"show":            true,
+	},
+	"analyze": {
+		"filter_assets":   true,
+		"search_semantic": true,
+		"search_text":     true,
+		"search_people":   true,
+		"lookup_people":   true,
+		"describe":        true,
+		"inspect":         true,
+		"peek":            true,
+		"combine":         true,
+		"show":            true,
+	},
+	"curate": {
+		"filter_assets":   true,
+		"search_semantic": true,
+		"search_people":   true,
+		"lookup_people":   true,
+		"combine":         true,
+		"rank":            true,
+		"top":             true,
+		"sample":          true,
+		"describe":        true,
+		"show":            true,
+	},
+}
+
+// modeInstructionExtras appends a mode-specific behaviour prompt after the
+// base instruction. Empty for free mode.
+var modeInstructionExtras = map[string]string{
+	"review": "You are in REVIEW MODE. Help the user review a period of their photography: " +
+		"use filter to scope the time range, describe to understand the overall picture, " +
+		"sample(spread_over_time) to pick representative photos, then show and give a narrative summary. " +
+		"Focus on timeline and memory narrative. Do not organize or modify photos.",
+	"organize": "You are in ORGANIZE MODE. Help the user group and archive photos: " +
+		"use filter/describe to understand the full picture, reason about sensible groupings " +
+		"(by place/time/people), then use tag_assets to label and create_album to organize. " +
+		"Proactively suggest an organization plan and state your intent before each step.",
+	"analyze": "You are in ANALYZE MODE. Help the user discover shooting habits and trends: " +
+		"use filter to scope, describe for aggregate distributions, inspect for gear details. " +
+		"Give data-driven insights (most-used focal length, peak shooting periods, style shifts) " +
+		"and use show to present supporting photos.",
+	"curate": "You are in CURATE MODE. Help the user pick the best photos: " +
+		"use filter to build a candidate pool, rank(quality) to sort (quality is based on the SigLIP " +
+		"aesthetic model score 1-10; scores cluster in the 5-7 range with median ~5.5-6, " +
+		"7+ is already a good photo and 8+ is extremely rare), top to trim. " +
+		"Watch for diversity — avoid burst/duplicate picks. Give brief selection rationale and show the result.",
+}
 
 // RetrieverSearch is the single-retriever search surface the producer tools
 // wrap: the retriever's own ranking becomes the ref snapshot order (no RRF
@@ -199,4 +290,73 @@ func (r *ToolRegistry) GetAllToolInfos() []*schema.ToolInfo {
 		infos = append(infos, info)
 	}
 	return infos
+}
+
+// GetToolsByMode instantiates only the tools allowed in the given mode. An
+// empty or unknown mode returns the full toolset (free mode).
+func (r *ToolRegistry) GetToolsByMode(ctx context.Context, deps *ToolDependencies, mode string) ([]tool.BaseTool, error) {
+	if mode == "" {
+		return r.GetAllTools(ctx, deps)
+	}
+	toolSet, ok := modeToolSets[mode]
+	if !ok {
+		return r.GetAllTools(ctx, deps)
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(toolSet))
+	for name := range r.factories {
+		if toolSet[name] {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	tools := make([]tool.BaseTool, 0, len(names))
+	for _, name := range names {
+		t, err := r.factories[name](ctx, deps)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tool %s: %w", name, err)
+		}
+		tools = append(tools, t)
+	}
+	return tools, nil
+}
+
+// GetToolInfosByMode returns metadata for the tools allowed in the given
+// mode. Empty or unknown mode returns all tool infos.
+func (r *ToolRegistry) GetToolInfosByMode(mode string) []*schema.ToolInfo {
+	if mode == "" {
+		return r.GetAllToolInfos()
+	}
+	toolSet, ok := modeToolSets[mode]
+	if !ok {
+		return r.GetAllToolInfos()
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var infos []*schema.ToolInfo
+	for name, info := range r.infos {
+		if toolSet[name] {
+			infos = append(infos, info)
+		}
+	}
+	return infos
+}
+
+// ModeInstruction returns the mode-specific prompt fragment, or "" for
+// free mode.
+func ModeInstruction(mode string) string {
+	if mode == "" {
+		return ""
+	}
+	extra, ok := modeInstructionExtras[mode]
+	if !ok {
+		return ""
+	}
+	return "\n" + extra
 }

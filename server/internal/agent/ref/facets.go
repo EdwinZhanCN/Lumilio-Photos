@@ -23,9 +23,13 @@ type FacetSummary struct {
 }
 
 // DateRange spans min/max capture time of the snapshot.
+// Fields are time.Time (RFC3339, always UTC) plus the capture timezone offset
+// in minutes from UTC (e.g. +480 for CST). The agent can reconstruct local
+// time as From.Add(time.Duration(OffsetMinutes)*time.Minute).
 type DateRange struct {
-	From time.Time `json:"from"`
-	To   time.Time `json:"to"`
+	From          time.Time `json:"from"`
+	To            time.Time `json:"to"`
+	OffsetMinutes *int16    `json:"offset_minutes,omitempty"`
 }
 
 // Bucket is one adaptive time-histogram bin. Bucket labels match the

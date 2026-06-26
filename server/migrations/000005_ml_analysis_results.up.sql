@@ -748,3 +748,26 @@ ALTER TABLE ONLY public.face_cluster_members
 ALTER TABLE ONLY public.face_clusters
     ADD CONSTRAINT face_clusters_representative_face_id_fkey FOREIGN KEY (representative_face_id) REFERENCES public.face_items(id) ON DELETE SET NULL;
 
+
+--
+-- Name: asset_quality_scores; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.asset_quality_scores (
+    asset_id uuid NOT NULL,
+    score real NOT NULL,
+    model_version character varying(100) DEFAULT 'v1'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT asset_quality_scores_pkey PRIMARY KEY (asset_id),
+    CONSTRAINT asset_quality_scores_asset_id_fkey FOREIGN KEY (asset_id) REFERENCES public.assets(asset_id) ON DELETE CASCADE,
+    CONSTRAINT chk_aesthetic_score_range CHECK (((score >= 1.0) AND (score <= 10.0)))
+);
+
+
+--
+-- Name: asset_quality_scores asset_quality_scores_asset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+-- FK defined inline above; no additional ALTER needed.
+

@@ -72,6 +72,14 @@ func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[Process
 		return fmt.Errorf("failed to save embedding: %w", err)
 	}
 
+	if score, ok := embedding.AestheticScoreValue(); ok {
+		if err := w.EmbeddingService.SaveAestheticScore(ctx, pgUUID, score, embedding.ModelID); err != nil {
+			// Best-effort: log but don't fail the job — the embedding itself
+			// was saved successfully and the score can be backfilled later.
+			return fmt.Errorf("failed to save aesthetic score: %w", err)
+		}
+	}
+
 	// Chain zero-shot classification now that the embedding exists. This
 	// also doubles as backfill: re-running the semantic index over the library
 	// reclassifies every asset. Best-effort: a failed enqueue must not force a

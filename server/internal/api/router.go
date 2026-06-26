@@ -151,6 +151,7 @@ type AgentControllerInterface interface {
 	GetPin(c *gin.Context)          // GET /agent/pins/:id - Get pinned widget metadata with facets
 	GetPinAssets(c *gin.Context)    // GET /agent/pins/:id/assets - Hydrate a pinned widget
 	UpdatePinLayout(c *gin.Context) // PATCH /agent/pins/layout - Persist board layout
+	UpdatePin(c *gin.Context)       // PATCH /agent/pins/:id - Rename a board widget or switch its view
 	DeletePin(c *gin.Context)       // DELETE /agent/pins/:id - Remove a board widget
 }
 
@@ -504,6 +505,7 @@ func NewRouter(
 			agent.GET("/pins/:id", agentController.GetPin)
 			agent.GET("/pins/:id/assets", agentController.GetPinAssets)
 			agent.PATCH("/pins/layout", agentController.UpdatePinLayout)
+			agent.PATCH("/pins/:id", agentController.UpdatePin)
 			agent.DELETE("/pins/:id", agentController.DeletePin)
 		}
 	}
