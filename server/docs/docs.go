@@ -1049,6 +1049,10 @@ const docTemplate = `{
                         "example": 123,
                         "type": "integer"
                     },
+                    "person_id": {
+                        "example": 42,
+                        "type": "integer"
+                    },
                     "rating": {
                         "example": 5,
                         "maximum": 5,

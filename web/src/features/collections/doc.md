@@ -42,13 +42,13 @@ flowchart TD
     HUB --> PR["PeopleRail"] -.->|people feature| PERSON["PersonDetails"]
 ```
 
-[AlbumDetails](./routes/AlbumDetails.tsx) and [UtilityClassifierAlbum](./routes/UtilityClassifierAlbum.tsx) render through the
-shared [AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx) orchestrator. [TripDetails](./routes/TripDetails.tsx) still
-hand-rolls the same layers (its own provider + header + gallery), reusing only
-the [CollectionTitle](@/components/collection) / [MetaStatRow](@/components/collection) pieces — folding it into the
-orchestrator is still pending. Album detail carries an *editable* hero (title
-+ edit modal); trips and classifier albums show a title/stat header but no
-edit, because they have no entity to mutate. [Duplicates](./routes/Duplicates.tsx) is the one
+[AlbumDetails](./routes/AlbumDetails.tsx), [TripDetails](./routes/TripDetails.tsx) and [UtilityClassifierAlbum](./routes/UtilityClassifierAlbum.tsx)
+all render through the shared [AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx) orchestrator, differing
+only by injection points: album scopes by `{ album_id }`, trip by
+`{ location(bbox), date }`, classifier by `{ tag_name, tag_source }`. Album
+detail carries an *editable* hero — [CollectionHero](@/components/collection) composed with
+[AlbumFormModal](./components/AlbumFormModal.tsx); trips and classifier albums pass no `hero` and expose
+no edit, because they have no entity to mutate. [Duplicates](./routes/Duplicates.tsx) is the one
 review-style page, not an asset grid.
 
 ## Decisions

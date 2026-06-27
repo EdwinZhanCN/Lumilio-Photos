@@ -9254,6 +9254,8 @@ export interface components {
             location?: components["schemas"]["dto.LocationBBoxDTO"];
             /** @example 123 */
             owner_id?: number;
+            /** @example 42 */
+            person_id?: number;
             /** @example 5 */
             rating?: number;
             /** @example true */
