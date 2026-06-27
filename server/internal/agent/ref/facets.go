@@ -17,9 +17,29 @@ type FacetSummary struct {
 	TopPlaces            []NameCount    `json:"top_places,omitempty"`
 	TopPeople            []NameCount    `json:"top_people,omitempty"`
 	Cameras              []NameCount    `json:"cameras,omitempty"`
-	LikedCount           int            `json:"liked_count,omitempty"`
+	// FocalLengths and Lenses are the most-used gear settings (top-N), so the
+	// agent can answer "most-used focal length / lens" without per-asset inspect.
+	FocalLengths []NameCount `json:"focal_lengths,omitempty"`
+	Lenses       []NameCount `json:"lenses,omitempty"`
+	LikedCount   int         `json:"liked_count,omitempty"`
 	// RatingDist counts assets per rating 0..5; omitted when all zero.
 	RatingDist []int `json:"rating_dist,omitempty"`
+	// Quality summarizes the aesthetic-score distribution; omitted when no
+	// asset in the set is scored.
+	Quality *QualityStats `json:"quality,omitempty"`
+}
+
+// QualityStats is the aesthetic-score distribution over a ref. Percentiles are
+// computed over scored assets only; Unscored counts the rest of the snapshot.
+// Scores run 1-10 and cluster in the 5-7 range — read percentiles as the
+// shape of the set, not as pass/fail grades.
+type QualityStats struct {
+	Scored   int     `json:"scored"`
+	Unscored int     `json:"unscored"`
+	P25      float64 `json:"p25"`
+	P50      float64 `json:"p50"`
+	P75      float64 `json:"p75"`
+	P90      float64 `json:"p90"`
 }
 
 // DateRange spans min/max capture time of the snapshot.

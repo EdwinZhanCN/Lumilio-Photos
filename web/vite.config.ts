@@ -1,6 +1,7 @@
 import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { docts } from "@edwinzhancn/docts/vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,7 +58,7 @@ export default defineConfig({
       "Cross-Origin-Embedder-Policy": "credentialless",
     },
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), docts({ root: "src" })],
 
   build: {
     target: "esnext",
@@ -78,6 +79,21 @@ export default defineConfig({
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
       "src/lib/http-commons/openapi-fetch/**",
+    ],
+    jsPlugins: ["@edwinzhancn/docts/oxlint"],
+    rules: {
+      "docts/link-needs-import": "error",
+    },
+    overrides: [
+      {
+        // doc.ts imports back {@link} references and nothing else — tsc counts
+        // a {@link} as a use, the linter's no-unused-vars does not.
+        files: ["**/doc.ts"],
+        rules: {
+          "no-unused-vars": "off",
+          "eslint/no-unused-vars": "off",
+        },
+      },
     ],
     options: {
       typeAware: true,

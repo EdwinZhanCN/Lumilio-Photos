@@ -16,6 +16,7 @@ import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkel
 import { JustifiedGallery } from "@/features/assets";
 import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n.tsx";
+import { CollectionTitle, MetaStat, MetaStatRow } from "@/components/collection";
 import type { AssetViewDefinition } from "@/features/assets/types/assets.type";
 import type { CityTripGroup } from "../hooks/useCityTrips";
 import { useCityTrips } from "../hooks/useCityTrips";
@@ -154,29 +155,15 @@ const TripAssetsContent = ({ trip }: { trip: CityTripGroup }) => {
           <div
             className={`transition-all duration-500 ease-in-out ${isScrolled ? "max-h-0 opacity-0 -translate-y-2" : "max-h-20 opacity-100 translate-y-0"}`}
           >
-            <div className="flex items-baseline gap-4">
-              <h1 className="truncate text-4xl font-black tracking-tight text-primary">
-                {trip.displayTitle}
-              </h1>
-            </div>
+            <CollectionTitle title={trip.displayTitle} />
           </div>
 
-          <div
-            className={`flex items-center gap-6 transition-all duration-500 ease-in-out ${isScrolled ? "mt-0 text-[10px] opacity-60" : "mt-6 text-xs opacity-40"}`}
-          >
-            <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              <span className="text-primary text-[8px]">●</span>
-              <span>
-                {t("collections.itemsCount", { count: trip.photoCount })}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              <span className="text-primary text-[8px]">●</span>
-              <span>
-                {formatDateRange(trip.startTime, trip.endTime, locale)}
-              </span>
-            </div>
-          </div>
+          <MetaStatRow dense={isScrolled} className={isScrolled ? "mt-0" : "mt-6"}>
+            <MetaStat>
+              {t("collections.itemsCount", { count: trip.photoCount })}
+            </MetaStat>
+            <MetaStat>{formatDateRange(trip.startTime, trip.endTime, locale)}</MetaStat>
+          </MetaStatRow>
         </div>
       </div>
 

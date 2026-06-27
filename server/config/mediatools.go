@@ -6,7 +6,7 @@ package config
 // build sets these to binaries shipped inside the app bundle, where there is no
 // system PATH to rely on.
 //
-// See docs/agent/exec-plans/active/desktop-wails-v3.md → "Native Dependencies
+// See site/docs/internal/agent/exec-plans/active/desktop-wails-v3.md → "Native Dependencies
 // Bundling → Track B".
 type ToolsConfig struct {
 	ExifToolPath string `toml:"exiftool_path"`

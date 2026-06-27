@@ -79,6 +79,36 @@ GROUP BY 1
 ORDER BY count DESC
 LIMIT sqlc.arg('top_n');
 
+-- name: AgentFacetTopFocalLengths :many
+-- Most-used focal lengths over a ref snapshot, rounded to whole millimetres so
+-- 34.9mm and 35mm collapse into one bucket. The regex guards the numeric cast.
+SELECT t.name::text AS name, t.count AS count FROM (
+    SELECT
+        (round((a.specific_metadata ->> 'focal_length')::numeric)::text || 'mm') AS name,
+        COUNT(*) AS count
+    FROM assets a
+    WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+      AND a.is_deleted = false
+      AND a.specific_metadata ->> 'focal_length' ~ '^[0-9]+(\.[0-9]+)?$'
+    GROUP BY 1
+) t
+WHERE t.name <> '0mm'
+ORDER BY t.count DESC
+LIMIT sqlc.arg('top_n');
+
+-- name: AgentFacetTopLenses :many
+SELECT
+    (a.specific_metadata ->> 'lens_model')::text AS name,
+    COUNT(*) AS count
+FROM assets a
+WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.is_deleted = false
+  AND a.specific_metadata ->> 'lens_model' IS NOT NULL
+  AND a.specific_metadata ->> 'lens_model' <> ''
+GROUP BY 1
+ORDER BY count DESC
+LIMIT sqlc.arg('top_n');
+
 -- name: AgentFacetRatingDist :many
 SELECT COALESCE(a.rating, 0) AS rating, COUNT(*) AS count
 FROM assets a
@@ -86,3 +116,17 @@ WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
   AND a.is_deleted = false
 GROUP BY 1
 ORDER BY 1;
+
+-- name: AgentFacetQualityStats :one
+-- Aesthetic-score distribution (percentiles) over a ref snapshot, for the
+-- describe tool. Unscored assets are excluded from the percentiles;
+-- scored_count lets callers report how many of the ref's assets carry a score.
+-- Percentiles are NULL when nothing in the set is scored.
+SELECT
+    COUNT(*) AS scored_count,
+    COALESCE(percentile_cont(0.25) WITHIN GROUP (ORDER BY score), 0)::real AS p25,
+    COALESCE(percentile_cont(0.50) WITHIN GROUP (ORDER BY score), 0)::real AS p50,
+    COALESCE(percentile_cont(0.75) WITHIN GROUP (ORDER BY score), 0)::real AS p75,
+    COALESCE(percentile_cont(0.90) WITHIN GROUP (ORDER BY score), 0)::real AS p90
+FROM asset_quality_scores
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[]);

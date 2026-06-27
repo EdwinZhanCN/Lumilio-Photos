@@ -3,6 +3,9 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
 
+minimumReleaseAgeExclude:
+  - '@edwinzhancn/docts@0.1.0'
+
 # Route transitive Vite/Vitest consumers through the Vite+ alpha packages.
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@0.1.23

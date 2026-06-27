@@ -45,6 +45,18 @@ WHERE a.is_deleted = false
   AND e.embedding_type = 'phash'
   AND e.is_primary = true;
 
+-- name: GetPHashEmbeddingsByAssetIDs :many
+-- Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
+-- a specific asset set, for the agent dedupe tool's in-memory similarity graph.
+SELECT a.asset_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+FROM assets a
+JOIN embeddings e ON e.asset_id = a.asset_id
+WHERE a.is_deleted = false
+  AND a.type = 'PHOTO'
+  AND a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND e.embedding_type = 'phash'
+  AND e.is_primary = true;
+
 -- ============================================================================
 -- Duplicate group lifecycle
 -- ============================================================================

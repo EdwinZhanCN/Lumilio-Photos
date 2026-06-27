@@ -44,7 +44,7 @@
 ### 4. 清理与文档
 
 - 删除使用点：`components/LumilioChat/LumilioInput.tsx` 与 barrel `components/LumilioChat/index.ts`（`LumilioStatus` 若再无引用一并删除）。
-- **RichInput 目录保留不删**（`components/RichInput/`，自包含、无外部引用），作为未来恢复 mention/@people、slash 的基础；在 [agent-ref-system.md](docs/agent/exec-plans/active/agent-ref-system.md) 增补一行记录"RichInput 暂时下线，dock 用纯输入；恢复 mention 注入是后续项"，同时在 [tech-debt-tracker.md](docs/agent/exec-plans/tech-debt-tracker.md) 登记。
+- **RichInput 目录保留不删**（`components/RichInput/`，自包含、无外部引用），作为未来恢复 mention/@people、slash 的基础；在 [agent-ref-system.md](site/docs/internal/agent/exec-plans/active/agent-ref-system.md) 增补一行记录"RichInput 暂时下线，dock 用纯输入；恢复 mention 注入是后续项"，同时在 [tech-debt-tracker.md](site/docs/internal/agent/exec-plans/tech-debt-tracker.md) 登记。
 - i18n：新增 dock 文案 key（如 `lumilio.dock.ready`、`lumilio.dock.collapse`、`lumilio.chat.newConversation` 复用），跑 `vp exec i18next-cli extract` 后补 zh/en 值（沿用本仓库流程，不手编结构）。
 
 ## 验证

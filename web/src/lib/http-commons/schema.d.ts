@@ -9048,6 +9048,20 @@ export interface components {
             x?: number;
             y?: number;
         };
+        "dto.AgentQualityStatsDTO": {
+            /** @example 5.1 */
+            p25?: number;
+            /** @example 5.7 */
+            p50?: number;
+            /** @example 6.3 */
+            p75?: number;
+            /** @example 7 */
+            p90?: number;
+            /** @example 318 */
+            scored?: number;
+            /** @example 2 */
+            unscored?: number;
+        };
         "dto.AgentRefAssetsDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
             pagination?: components["schemas"]["dto.PaginationDTO"];
@@ -9069,13 +9083,16 @@ export interface components {
             cameras?: components["schemas"]["dto.AgentNameCountDTO"][];
             count?: number;
             date_range?: components["schemas"]["dto.AgentDateRangeDTO"];
+            focal_lengths?: components["schemas"]["dto.AgentNameCountDTO"][];
             histogram?: components["schemas"]["dto.AgentFacetBucket"][];
             /**
              * @example day
              * @enum {string}
              */
             histogram_granularity?: "hour" | "day" | "month" | "year";
+            lenses?: components["schemas"]["dto.AgentNameCountDTO"][];
             liked_count?: number;
+            quality?: components["schemas"]["dto.AgentQualityStatsDTO"];
             rating_dist?: number[];
             top_people?: components["schemas"]["dto.AgentNameCountDTO"][];
             top_places?: components["schemas"]["dto.AgentNameCountDTO"][];

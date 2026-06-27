@@ -44,7 +44,7 @@ backend annotation/DTO edits.
   has **none** of those fields. So the documented `include_*` params return data
   that is invisible to the typed client — any frontend consumer must `as`-cast,
   which is exactly the anti-pattern called out in
-  [FRONTEND.md](docs/agent/FRONTEND.md)/[BACKEND.md](docs/agent/BACKEND.md)
+  [FRONTEND.md](site/docs/internal/agent/FRONTEND.md)/[BACKEND.md](site/docs/internal/agent/BACKEND.md)
   ("the contract is the bug, not the frontend").
 
 This is the headline backend defect: the endpoint's real response shape is

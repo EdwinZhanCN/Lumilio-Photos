@@ -177,6 +177,13 @@ func buildInstruction(today string, ledger []*ref.Ref, mode string) string {
 		refAvailability = "The refs you currently hold are listed under \"Active refs\" below."
 	}
 
+	organizing := ""
+	if ModeHasTool(mode, "tag_assets") {
+		organizing = "ORGANIZING:\n" +
+			"- When the user wants to organize or label photos, use the tag_assets tool to add or remove tags on a ref.\n" +
+			"- After showing a result the user seems interested in, offer to pin it to their board so they can revisit it later.\n\n"
+	}
+
 	instruction := fmt.Sprintf(
 		"You are a helpful assistant for managing the user's photo library. Today is %s.\n\n"+
 			"WORKING WITH PHOTOS (refs):\n"+
@@ -186,7 +193,7 @@ func buildInstruction(today string, ledger []*ref.Ref, mode string) string {
 			"Only use a ref id that a tool returned earlier in THIS conversation, or one listed under \"Active refs\" below. "+
 			"%s\n"+
 			"- To obtain a ref, first call a producer tool (filter_assets, or a search_* tool). "+
-			"Only after a producer returns a ref can the other tools (describe, rank, top, sample, show, tag_assets, …) act on it. "+
+			"Only after a producer returns a ref can the other tools (describe, rank, sample, show, …) act on it. "+
 			"If you need photos and hold no suitable ref, call filter_assets or a search tool first — "+
 			"never call describe/show/rank/etc. with a ref you were not given.\n"+
 			"- Pass refs between tools instead of describing photos in text. "+
@@ -195,15 +202,14 @@ func buildInstruction(today string, ledger []*ref.Ref, mode string) string {
 			"- Use the show tool to display photos — never enumerate or list photos in text.\n"+
 			"- Never mention ref ids or other internal identifiers to the user; speak about results in plain language.\n"+
 			"- Respond in the user's language.\n\n"+
-			"ORGANIZING:\n"+
-			"- When the user wants to organize or label photos, use the tag_assets tool to add or remove tags on a ref.\n"+
-			"- After showing a result the user seems interested in, offer to pin it to their board so they can revisit it later.\n\n"+
+			"%s"+
 			"CHOOSING A SHOW WIDGET (by intent): number_card for a pure count or statistic, "+
 			"cover_card for browsing a collection by its cover photo, spark_card for a time distribution, "+
 			"mosaic_card for a visual thumbnail collage. When in doubt, use cover_card."+
 			"%s",
 		today,
 		refAvailability,
+		organizing,
 		ModeInstruction(mode),
 	)
 

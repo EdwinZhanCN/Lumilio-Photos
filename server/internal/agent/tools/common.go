@@ -110,6 +110,7 @@ func RegisterAll() {
 	RegisterRank()
 	RegisterTop()
 	RegisterSample()
+	RegisterDedupe()
 	// Observers
 	RegisterDescribe()
 	RegisterPeek()

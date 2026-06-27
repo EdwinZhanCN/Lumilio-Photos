@@ -2,7 +2,7 @@
 // system. Agent tools exchange ordered asset-ID snapshots through short
 // ref ids instead of inlining asset data into the LLM context; the frontend
 // hydrates refs over HTTP, so asset data never crosses the model boundary.
-// See docs/agent/exec-plans/active/agent-ref-system.md for the contracts
+// See site/docs/internal/agent/exec-plans/active/agent-ref-system.md for the contracts
 // and invariants this package enforces.
 package ref
 

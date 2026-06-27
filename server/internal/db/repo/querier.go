@@ -17,15 +17,27 @@ type Querier interface {
 	AddStackMember(ctx context.Context, arg AddStackMemberParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
 	AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error)
+	// Capture times for a set of assets, for the sample tool's distribution
+	// summary. Order is irrelevant; bucketing happens in Go.
+	AgentCapturedTimes(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.Timestamptz, error)
 	AgentFacetCameraCounts(ctx context.Context, arg AgentFacetCameraCountsParams) ([]AgentFacetCameraCountsRow, error)
 	// Facet aggregates over a ref snapshot (agent describe tool / hydration API).
 	// Every query takes the materialized asset id array; results feed
 	// ref.FacetSummary. User-content strings (labels, names, camera models) are
 	// sanitized in Go before reaching the LLM — never here.
 	AgentFacetOverview(ctx context.Context, assetIds []pgtype.UUID) (AgentFacetOverviewRow, error)
+	// Aesthetic-score distribution (percentiles) over a ref snapshot, for the
+	// describe tool. Unscored assets are excluded from the percentiles;
+	// scored_count lets callers report how many of the ref's assets carry a score.
+	// Percentiles are NULL when nothing in the set is scored.
+	AgentFacetQualityStats(ctx context.Context, assetIds []pgtype.UUID) (AgentFacetQualityStatsRow, error)
 	AgentFacetRatingDist(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetRatingDistRow, error)
 	// granularity is 'hour', 'day', 'month' or 'year'.
 	AgentFacetTimeHistogram(ctx context.Context, arg AgentFacetTimeHistogramParams) ([]AgentFacetTimeHistogramRow, error)
+	// Most-used focal lengths over a ref snapshot, rounded to whole millimetres so
+	// 34.9mm and 35mm collapse into one bucket. The regex guards the numeric cast.
+	AgentFacetTopFocalLengths(ctx context.Context, arg AgentFacetTopFocalLengthsParams) ([]AgentFacetTopFocalLengthsRow, error)
+	AgentFacetTopLenses(ctx context.Context, arg AgentFacetTopLensesParams) ([]AgentFacetTopLensesRow, error)
 	AgentFacetTopPeople(ctx context.Context, arg AgentFacetTopPeopleParams) ([]AgentFacetTopPeopleRow, error)
 	AgentFacetTopPlaces(ctx context.Context, arg AgentFacetTopPlacesParams) ([]AgentFacetTopPlacesRow, error)
 	AgentFacetTypeCounts(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetTypeCountsRow, error)
@@ -35,7 +47,9 @@ type Querier interface {
 	AgentLookupAlbums(ctx context.Context, arg AgentLookupAlbumsParams) ([]AgentLookupAlbumsRow, error)
 	// lookup_people entity resolver: named face clusters matching a name query.
 	AgentLookupPeople(ctx context.Context, arg AgentLookupPeopleParams) ([]AgentLookupPeopleRow, error)
-	// peek observer: minimal per-asset fields; snapshot order restored in Go.
+	// peek observer: minimal per-asset fields plus place + people; snapshot order
+	// restored in Go. place/people are correlated subqueries so each asset stays a
+	// single row (no fan-out from the cluster joins).
 	AgentPeekAssets(ctx context.Context, assetIds []pgtype.UUID) ([]AgentPeekAssetsRow, error)
 	// Applies merged rating/liked/description on top of the existing keeper values.
 	// Rating uses MAX, liked is OR'd, description is set only when keeper currently
@@ -267,6 +281,9 @@ type Querier interface {
 	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
 	GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]OcrTextItem, error)
 	GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOCRTextItemsByAssetWithLimitParams) ([]OcrTextItem, error)
+	// Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
+	// a specific asset set, for the agent dedupe tool's in-memory similarity graph.
+	GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []pgtype.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error)
 	GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error)
 	// Lightweight photo locations for map clustering/rendering.
 	GetPhotoMapPoints(ctx context.Context, arg GetPhotoMapPointsParams) ([]GetPhotoMapPointsRow, error)

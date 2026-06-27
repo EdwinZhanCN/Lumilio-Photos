@@ -398,6 +398,55 @@ func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID 
 	return items, nil
 }
 
+const getPHashEmbeddingsByAssetIDs = `-- name: GetPHashEmbeddingsByAssetIDs :many
+SELECT a.asset_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+FROM assets a
+JOIN embeddings e ON e.asset_id = a.asset_id
+WHERE a.is_deleted = false
+  AND a.type = 'PHOTO'
+  AND a.asset_id = ANY($1::uuid[])
+  AND e.embedding_type = 'phash'
+  AND e.is_primary = true
+`
+
+type GetPHashEmbeddingsByAssetIDsRow struct {
+	AssetID    pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	FileSize   int64              `db:"file_size" json:"file_size"`
+	TakenTime  pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
+	UploadTime pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
+	Rating     *int32             `db:"rating" json:"rating"`
+	Vector     *pgvector.Vector   `db:"vector" json:"vector"`
+}
+
+// Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
+// a specific asset set, for the agent dedupe tool's in-memory similarity graph.
+func (q *Queries) GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []pgtype.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error) {
+	rows, err := q.db.Query(ctx, getPHashEmbeddingsByAssetIDs, assetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPHashEmbeddingsByAssetIDsRow
+	for rows.Next() {
+		var i GetPHashEmbeddingsByAssetIDsRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.FileSize,
+			&i.TakenTime,
+			&i.UploadTime,
+			&i.Rating,
+			&i.Vector,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStackMembershipForRepository = `-- name: GetStackMembershipForRepository :many
 
 SELECT asm.asset_id, asm.stack_id

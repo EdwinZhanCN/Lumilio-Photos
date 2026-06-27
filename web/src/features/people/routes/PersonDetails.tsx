@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Users, UserRound, Check } from "lucide-react";
+import { Users, UserRound, Pencil } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import {
@@ -19,6 +19,8 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { usePersonAssetsView } from "../hooks/usePersonAssetsView";
 import { usePersonDetails } from "../hooks/usePeople";
 import { assetUrls } from "@/lib/assets/assetUrls";
+import { CollectionTitle, MetaStat, MetaStatRow } from "@/components/collection";
+import PersonRenameModal from "../components/PersonRenameModal";
 
 const PersonAssetsContent = () => {
   const { t, i18n } = useI18n();
@@ -32,7 +34,7 @@ const PersonAssetsContent = () => {
   const { setSortBy } = useUIActions();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [draftName, setDraftName] = useState("");
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const personIdNumber = personId ? Number(personId) : 0;
 
@@ -43,10 +45,6 @@ const PersonAssetsContent = () => {
     renamePerson,
     isRenaming,
   } = usePersonDetails(personIdNumber || undefined, scopedRepositoryId);
-
-  useEffect(() => {
-    setDraftName(person?.name ?? "");
-  }, [person?.name, person?.person_id]);
 
   const {
     assets,
@@ -102,14 +100,13 @@ const PersonAssetsContent = () => {
     setIsScrolled(e.currentTarget.scrollTop > 60);
   }, []);
 
-  const handleRename = useCallback(async () => {
-    const nextName = draftName.trim();
-    if (!nextName || nextName === person?.name) {
-      return;
-    }
-
-    await renamePerson(nextName);
-  }, [draftName, person?.name, renamePerson]);
+  const handleRename = useCallback(
+    async (nextName: string) => {
+      if (!nextName || nextName === person?.name) return;
+      await renamePerson(nextName);
+    },
+    [person?.name, renamePerson],
+  );
 
   if (error || personError) {
     return (
@@ -166,14 +163,10 @@ const PersonAssetsContent = () => {
                     <div className="h-10 w-56 animate-pulse rounded-lg bg-base-300" />
                   ) : (
                     <>
-                      <div className="flex items-baseline gap-4">
-                        <h1 className="truncate text-4xl font-black tracking-tight text-primary">
-                          {displayName}
-                        </h1>
-                        <span className="badge badge-ghost font-mono text-xs opacity-50">
-                          {t("people.details.personCode", { id: personId })}
-                        </span>
-                      </div>
+                      <CollectionTitle
+                        title={displayName}
+                        code={t("people.details.personCode", { id: personId })}
+                      />
                       <p className="mt-2 max-w-2xl text-sm text-base-content/60">
                         {person?.is_confirmed
                           ? t("people.details.confirmedHint")
@@ -184,61 +177,33 @@ const PersonAssetsContent = () => {
                 </div>
               </div>
 
-              <div className="flex w-full max-w-md items-center gap-2">
-                <input
-                  value={draftName}
-                  onChange={(event) => setDraftName(event.target.value)}
-                  placeholder={t("people.details.renamePlaceholder")}
-                  className="input input-bordered w-full"
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleRename}
-                  disabled={isRenaming || !draftName.trim()}
-                >
-                  {isRenaming ? (
-                    <span className="loading loading-spinner loading-sm" />
-                  ) : (
-                    <Check className="size-4" />
-                  )}
-                  {t("people.details.save")}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm gap-1.5 rounded-full"
+                onClick={() => setIsRenameOpen(true)}
+              >
+                <Pencil className="size-3.5" />
+                {t("people.details.renameAction", "Rename")}
+              </button>
             </div>
           </div>
 
-          <div
-            className={`flex items-center gap-6 transition-all duration-500 ease-in-out ${isScrolled ? "mt-0 text-[10px] opacity-60" : "mt-6 text-xs opacity-40"}`}
-          >
-            <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              <span className="text-primary text-[8px]">●</span>
-              <span>
-                {t("people.membersCount", {
-                  count: person?.member_count || 0,
-                })}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              <span className="text-primary text-[8px]">●</span>
-              <span>
-                {t("people.photosCount", {
-                  count: person?.asset_count || 0,
-                })}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              <span className="text-primary text-[8px]">●</span>
-              <span>
-                {t("people.details.updatedLabel")}{" "}
-                {person?.updated_at
-                  ? new Date(person.updated_at).toLocaleDateString(
-                      i18n.resolvedLanguage || i18n.language,
-                    )
-                  : ""}
-              </span>
-            </div>
-          </div>
+          <MetaStatRow dense={isScrolled} className={isScrolled ? "mt-0" : "mt-6"}>
+            <MetaStat>
+              {t("people.membersCount", { count: person?.member_count || 0 })}
+            </MetaStat>
+            <MetaStat>
+              {t("people.photosCount", { count: person?.asset_count || 0 })}
+            </MetaStat>
+            <MetaStat>
+              {t("people.details.updatedLabel")}{" "}
+              {person?.updated_at
+                ? new Date(person.updated_at).toLocaleDateString(
+                    i18n.resolvedLanguage || i18n.language,
+                  )
+                : ""}
+            </MetaStat>
+          </MetaStatRow>
         </div>
       </div>
 
@@ -286,6 +251,14 @@ const PersonAssetsContent = () => {
           )}
         </>
       )}
+
+      <PersonRenameModal
+        open={isRenameOpen}
+        currentName={person?.name ?? ""}
+        isSaving={isRenaming}
+        onClose={() => setIsRenameOpen(false)}
+        onSubmit={handleRename}
+      />
     </div>
   );
 };

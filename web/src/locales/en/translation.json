@@ -304,6 +304,7 @@
       "modeFrozen": "Frozen",
       "modeLive": "Live"
     },
+    "pinTrailLabel": "Selection",
     "stackCarousel": {
       "error": "Stack assets are temporarily unavailable.",
       "errorHint": "Try again in a moment.",
@@ -576,6 +577,7 @@
     "updateSuccess_other": "Updated {{count}} items."
   },
   "collections": {
+    "album": "Album",
     "albumDetails": {
       "albumCode": "ALBUM #{{id}}",
       "bioClip": {
@@ -602,6 +604,13 @@
       "itemsCount_one": "{{count}} item",
       "itemsCount_other": "{{count}} items"
     },
+    "albumForm": {
+      "editTitle": "Edit album",
+      "save": "Save changes",
+      "saveError": "Failed to save album.",
+      "saving": "Saving..."
+    },
+    "albums": "Albums",
     "coverAlt": "Album cover image",
     "coverAltWithName": "Cover image for album {{albumName}}",
     "createModal": {
@@ -646,6 +655,7 @@
     "itemsCount_one": "{{count}} item",
     "itemsCount_other": "{{count}} items",
     "messages": {
+      "createError": "Failed to create album.",
       "deleteError": "Failed to delete albums",
       "deleteSuccess": "Albums deleted successfully",
       "loadAlbumsError": "Failed to load albums: {{message}}",
@@ -665,6 +675,7 @@
       "places": "Places",
       "utilities": "Utilities"
     },
+    "title": "Collections",
     "untitled": "Untitled Album",
     "utilities": {
       "classifiers": {
@@ -701,6 +712,7 @@
     "copy": "Copy",
     "delete": "Delete",
     "done": "Done",
+    "edit": "Edit",
     "emptyState": {
       "description": "Items will appear here when available.",
       "title": "Nothing here yet"
@@ -938,6 +950,9 @@
     },
     "mode": {
       "clear": "Clear mode"
+    },
+    "nav": {
+      "board": "Board"
     },
     "quickActions": {
       "analyze": {
@@ -1270,6 +1285,9 @@
     },
     "title": "System Status"
   },
+  "nav": {
+    "home": "Home"
+  },
   "navbar": {
     "notifications": {
       "clear": "Clear all messages",
@@ -1288,8 +1306,11 @@
     "details": {
       "confirmedHint": "This person has been named and confirmed.",
       "loadError": "Failed to load person details: {{error}}",
+      "nameLabel": "Name",
       "personCode": "PERSON {{id}}",
+      "renameAction": "Rename",
       "renamePlaceholder": "Name this person",
+      "renameTitle": "Rename person",
       "save": "Save",
       "unconfirmedHint": "This person is still unnamed. Give them a name when you are confident.",
       "updatedLabel": "Updated"
