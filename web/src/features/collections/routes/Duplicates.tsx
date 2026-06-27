@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useWorkingRepository } from "@/features/settings";
@@ -295,6 +296,15 @@ const DuplicateGroupCard = ({ group, status }: DuplicateGroupCardProps) => {
 
 function DuplicatesContent() {
   const { t } = useI18n();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    {
+      label: t("collections.sections.utilities", "Utilities"),
+      to: "/collections/utilities",
+    },
+    { label: t("duplicates.pageTitle", "Duplicates") },
+  ]);
   const showMessage = useMessage();
   const { repositories, repositoriesQuery, scopedRepositoryId } =
     useWorkingRepository();

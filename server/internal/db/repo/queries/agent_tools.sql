@@ -42,17 +42,20 @@ WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
 ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
 
 -- name: RankAssetIDsByQuality :many
--- rank(by=quality) ascending, using the featured-selector heuristic
--- (rating, liked, resolution); callers reverse for descending order.
-SELECT asset_id
+-- rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
+-- head when available, falling back to the legacy heuristic (rating, liked,
+-- resolution) for unscored assets. Callers reverse for descending order.
+SELECT a.asset_id
 FROM assets a
-WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
-  AND is_deleted = false
-ORDER BY (
-    0.45 * COALESCE(a.rating, 0)::float8 / 5.0
-  + 0.20 * (CASE WHEN a.liked THEN 1.0 ELSE 0.0 END)
-  + 0.35 * LEAST(COALESCE(a.width, 0)::float8 * COALESCE(a.height, 0)::float8 / 24000000.0, 1.0)
-) ASC, asset_id ASC;
+LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
+WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.is_deleted = false
+ORDER BY COALESCE(
+    aqs.score,
+    1.0 + 0.45 * COALESCE(a.rating, 0)::float8 / 5.0
+        + 0.20 * (CASE WHEN a.liked THEN 1.0 ELSE 0.0 END)
+        + 0.35 * LEAST(COALESCE(a.width, 0)::float8 * COALESCE(a.height, 0)::float8 / 24000000.0, 1.0)
+) ASC, a.asset_id ASC;
 
 -- name: AgentLookupAlbums :many
 -- lookup_albums entity resolver: albums matching a title query.
@@ -77,10 +80,41 @@ WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
   AND is_deleted = false;
 
 -- name: AgentPeekAssets :many
--- peek observer: minimal per-asset fields; snapshot order restored in Go.
-SELECT asset_id, original_filename, type,
-       COALESCE(taken_time, upload_time)::timestamptz AS captured_at,
-       rating, liked
+-- peek observer: minimal per-asset fields plus place + people; snapshot order
+-- restored in Go. place/people are correlated subqueries so each asset stays a
+-- single row (no fan-out from the cluster joins).
+SELECT
+    a.asset_id,
+    a.original_filename,
+    a.type,
+    COALESCE(a.taken_time, a.upload_time)::timestamptz AS captured_at,
+    a.rating,
+    a.liked,
+    COALESCE((
+        SELECT COALESCE(lc.label, lc.city, lc.region, lc.country)
+        FROM location_cluster_assets lca
+        JOIN location_clusters lc ON lc.cluster_id = lca.cluster_id
+        WHERE lca.asset_id = a.asset_id
+          AND COALESCE(lc.label, lc.city, lc.region, lc.country) IS NOT NULL
+        LIMIT 1
+    ), '')::text AS place,
+    (
+        SELECT array_agg(DISTINCT fc.cluster_name)
+        FROM face_items fi
+        JOIN face_cluster_members fcm ON fcm.face_id = fi.id
+        JOIN face_clusters fc ON fc.cluster_id = fcm.cluster_id
+        WHERE fi.asset_id = a.asset_id
+          AND fc.cluster_name IS NOT NULL
+          AND fc.cluster_name <> ''
+    )::text[] AS people
+FROM assets a
+WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.is_deleted = false;
+
+-- name: AgentCapturedTimes :many
+-- Capture times for a set of assets, for the sample tool's distribution
+-- summary. Order is irrelevant; bucketing happens in Go.
+SELECT COALESCE(taken_time, upload_time)::timestamptz AS captured_at
 FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
   AND is_deleted = false;

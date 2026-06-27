@@ -294,6 +294,17 @@
         }
       }
     },
+    "pin": {
+      "backToLumilio": "Back to Lumilio",
+      "badge": "Pinned result",
+      "count_one": "{{count}} photo",
+      "count_other": "{{count}} photos",
+      "defaultTitle": "Agent result",
+      "expired": "This result has expired. Ask Lumilio to re-run the query.",
+      "modeFrozen": "Frozen",
+      "modeLive": "Live"
+    },
+    "pinTrailLabel": "Selection",
     "stackCarousel": {
       "error": "Stack assets are temporarily unavailable.",
       "errorHint": "Try again in a moment.",
@@ -566,6 +577,7 @@
     "updateSuccess_other": "Updated {{count}} items."
   },
   "collections": {
+    "album": "Album",
     "albumDetails": {
       "albumCode": "ALBUM #{{id}}",
       "bioClip": {
@@ -592,6 +604,13 @@
       "itemsCount_one": "{{count}} item",
       "itemsCount_other": "{{count}} items"
     },
+    "albumForm": {
+      "editTitle": "Edit album",
+      "save": "Save changes",
+      "saveError": "Failed to save album.",
+      "saving": "Saving..."
+    },
+    "albums": "Albums",
     "coverAlt": "Album cover image",
     "coverAltWithName": "Cover image for album {{albumName}}",
     "createModal": {
@@ -636,6 +655,7 @@
     "itemsCount_one": "{{count}} item",
     "itemsCount_other": "{{count}} items",
     "messages": {
+      "createError": "Failed to create album.",
       "deleteError": "Failed to delete albums",
       "deleteSuccess": "Albums deleted successfully",
       "loadAlbumsError": "Failed to load albums: {{message}}",
@@ -644,10 +664,10 @@
     "newAlbum": "New Album",
     "places": {
       "empty": "No trips with location data yet.",
-      "exploreAll": "Explore all locations",
-      "loadError": "Failed to load trip: {{error}}",
       "mapView": "Map",
-      "mapViewTitle": "Places Map"
+      "mapViewTitle": "Places Map",
+      "tripFallback": "Trip",
+      "tripNotFound": "Trip not found."
     },
     "sections": {
       "albums": "Albums",
@@ -655,28 +675,24 @@
       "places": "Places",
       "utilities": "Utilities"
     },
+    "title": "Collections",
     "untitled": "Untitled Album",
     "utilities": {
       "classifiers": {
         "documents": {
-          "description": "Zero-shot document matches",
           "title": "Documents"
         },
         "illustration": {
-          "description": "Artwork and drawn images",
           "title": "Illustration"
         },
         "receipts": {
-          "description": "Receipts, bills, and invoices",
           "title": "Receipts"
         }
       },
       "duplicates": {
-        "description": "Find and merge duplicate photos",
         "title": "Duplicates"
       },
       "trash": {
-        "description": "Review assets moved out of the library",
         "title": "Trash"
       }
     }
@@ -691,6 +707,7 @@
     "copy": "Copy",
     "delete": "Delete",
     "done": "Done",
+    "edit": "Edit",
     "emptyState": {
       "description": "Items will appear here when available.",
       "title": "Nothing here yet"
@@ -860,7 +877,11 @@
     },
     "board": {
       "empty": "Nothing pinned yet. Ask Lumilio in the dock, then pin a result to keep it on this board.",
-      "remove": "Remove from board",
+      "emptyHint": "Try “Show my beach photos from last summer”",
+      "emptyTitle": "Your board is empty",
+      "interactionHint": "Drag to move · use the View buttons to switch the look · the ⋯ menu sets size",
+      "tidy": "Tidy",
+      "tidyHint": "Compact the board upward",
       "unknownWidget": "Unknown widget type: {{type}}",
       "untitled": "Untitled"
     },
@@ -888,6 +909,7 @@
       "collapse": "Collapse chat",
       "conversation": "Conversation",
       "expand": "Expand chat",
+      "openBoard": "Open full board",
       "ready": "Ready",
       "replyCount_one": "{{count}} reply",
       "replyCount_other": "{{count}} replies",
@@ -896,6 +918,7 @@
       "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens"
     },
     "input": {
+      "modePrompt": "Continue in {{mode}} mode…",
       "prompt": "Ask Lumilio Agent...",
       "send": "Send"
     },
@@ -908,28 +931,94 @@
     "mention": {
       "album": "Album",
       "camera": "Camera",
-      "commands": "Commands",
       "lens": "Lens",
       "mention": "Mention",
+      "navigate": "Navigate",
       "noResults": "No results",
       "person": "Person",
-      "pin": "Pin"
+      "pin": "Pin",
+      "quickActions": "Quick Actions",
+      "select": "Select"
     },
     "messages": {
       "thinking": "Thinking..."
+    },
+    "mode": {
+      "clear": "Clear mode"
+    },
+    "nav": {
+      "board": "Board"
+    },
+    "quickActions": {
+      "analyze": {
+        "description": "Discover shooting habits and trends",
+        "label": "Analyze",
+        "template": "Analyze my shooting habits and trends"
+      },
+      "curate": {
+        "description": "Pick the best photos",
+        "label": "Curate",
+        "template": "Help me curate the best photos from recent uploads"
+      },
+      "organize": {
+        "description": "Group and tag photos, create albums",
+        "label": "Organize",
+        "template": "Help me organize my recent photos"
+      },
+      "review": {
+        "description": "Review a period of your photography journey",
+        "label": "Review",
+        "template": "Help me review my photography journey this year"
+      }
     },
     "tools": {
       "emptyResult": "No matching photos",
       "resultSet": "Result set"
     },
     "widgets": {
+      "frozen": "Frozen",
+      "live": "Live",
+      "menu": {
+        "more": "More",
+        "remove": "Remove",
+        "rename": "Rename",
+        "renameHint": "Double-click to rename",
+        "size": "Size"
+      },
+      "mosaic": {
+        "overflow": "+{{value}}"
+      },
+      "photos": "photos",
       "pin": "Pin to board",
       "pinned": "Pinned to board",
-      "pinUnavailable": "This widget's photos are unavailable.",
-      "refExpired": "These results have expired. Ask Lumilio to run the search again.",
       "resultsTitle": "Photos from Lumilio",
-      "viewAll_one": "View all {{count}} photos",
-      "viewAll_other": "View all {{count}} photos"
+      "stat": {
+        "images": "images",
+        "liked": "liked",
+        "likedLabel": "liked photos",
+        "newDelta_one": "+{{count}} new",
+        "newDelta_other": "+{{count}} new",
+        "videos": "videos"
+      },
+      "state": {
+        "empty": "No photos here",
+        "error": "Couldn't load",
+        "retry": "Retry"
+      },
+      "timeline": {
+        "byDay": "by day",
+        "byHour": "by hour",
+        "byMonth": "by month",
+        "byYear": "by year",
+        "noData": "No timeline data"
+      },
+      "view": {
+        "cover": "Cover",
+        "mosaic": "Mosaic",
+        "number": "Stat",
+        "spark": "Timeline",
+        "switcher": "Switch view"
+      }
     }
   },
   "manage": {
@@ -988,6 +1077,7 @@
     "adminOnlyDescription": "Processing activity and runtime diagnostics are only available to administrators.",
     "adminOnlyTitle": "Admin access required",
     "ml": {
+      "allIndexed": "All indexed",
       "bioAlbumCoverage": "Bio album species coverage",
       "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
       "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
@@ -1190,11 +1280,10 @@
     },
     "title": "System Status"
   },
+  "nav": {
+    "home": "Home"
+  },
   "navbar": {
-    "agent": {
-      "label": "Lumilio Agent",
-      "open": "Open Lumilio Agent"
-    },
     "notifications": {
       "clear": "Clear all messages",
       "empty": "No messages yet.",
@@ -1211,9 +1300,11 @@
   "people": {
     "details": {
       "confirmedHint": "This person has been named and confirmed.",
-      "loadError": "Failed to load person details: {{error}}",
+      "nameLabel": "Name",
       "personCode": "PERSON {{id}}",
+      "renameAction": "Rename",
       "renamePlaceholder": "Name this person",
+      "renameTitle": "Rename person",
       "save": "Save",
       "unconfirmedHint": "This person is still unnamed. Give them a name when you are confident.",
       "updatedLabel": "Updated"

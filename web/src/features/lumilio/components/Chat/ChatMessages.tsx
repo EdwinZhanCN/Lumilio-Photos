@@ -3,8 +3,7 @@ import { Markdown } from "../LumilioMarkdown/Markdown";
 import { ReasoningBlock } from "../blocks/ReasoningBlock";
 import { ToolCallBlock } from "../blocks/ToolCallBlock";
 import { ConfirmBlock } from "../blocks/ConfirmBlock";
-import { getWidget } from "../../widgets/registry";
-import { PinButton } from "../../widgets/PinButton";
+import { InlineWidgetCard } from "../../widgets/chrome/InlineWidgetCard";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { Block, ChatMessage, WidgetBlock } from "../../types";
@@ -14,13 +13,7 @@ interface ChatMessagesProps {
   isGenerating: boolean;
 }
 
-function BlockView({
-  block,
-  isAnimating = false,
-}: {
-  block: Block;
-  isAnimating?: boolean;
-}) {
+function BlockView({ block, isAnimating = false }: { block: Block; isAnimating?: boolean }) {
   switch (block.kind) {
     case "text":
       return (
@@ -41,42 +34,20 @@ function BlockView({
   }
 }
 
-/** Renders a chat widget through the registry and offers pinning it to the
- * board. The widget hydrates from the session ref. */
+/** Renders a chat widget inline and offers pinning it to the board. The widget
+ * hydrates from the session ref; the View switcher (in the card footer) lets the
+ * user retarget the agent's initial view before pinning. */
 function WidgetBlockView({ block }: { block: WidgetBlock }) {
-  const { t } = useI18n();
   const threadId = useLumilioChatStore((s) => s.threadId);
-  const definition = getWidget(block.widget);
-
-  if (!definition) {
-    return (
-      <div className="my-2 text-xs text-base-content/50">
-        {t("lumilio.board.unknownWidget", "Unknown widget type: {{type}}", {
-          type: block.widget,
-        })}
-      </div>
-    );
-  }
   if (!threadId) return null;
-
-  const Component = definition.Component;
   return (
-    <div>
-      <Component
-        source={{ kind: "ref", refId: block.refId, threadId }}
-        variant="inline"
-        count={block.count}
-        title={block.title}
-      />
-      <div className="mt-1">
-        <PinButton
-          refId={block.refId}
-          threadId={threadId}
-          widget={block.widget}
-          title={block.title}
-        />
-      </div>
-    </div>
+    <InlineWidgetCard
+      refId={block.refId}
+      threadId={threadId}
+      widget={block.widget}
+      count={block.count}
+      title={block.title}
+    />
   );
 }
 
@@ -91,10 +62,7 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
   }, [messages]);
 
   const last = messages[messages.length - 1];
-  const showSpinner =
-    isGenerating &&
-    last?.role === "assistant" &&
-    last.blocks.length === 0;
+  const showSpinner = isGenerating && last?.role === "assistant" && last.blocks.length === 0;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
@@ -117,11 +85,7 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
         return (
           <div key={message.id} className="w-full">
             {message.blocks.map((block) => (
-              <BlockView
-                key={block.id}
-                block={block}
-                isAnimating={isGenerating && isLastMessage}
-              />
+              <BlockView key={block.id} block={block} isAnimating={isGenerating && isLastMessage} />
             ))}
           </div>
         );

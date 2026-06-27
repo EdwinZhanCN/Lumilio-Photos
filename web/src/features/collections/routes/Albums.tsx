@@ -12,22 +12,36 @@ import {
 } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
+import { LoadMoreButton } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useWorkingRepository } from "@/features/settings";
 import { CollectionsProvider, useCollections } from "../CollectionsProvider";
-import CreateAlbumModal from "../components/CreateAlbumModal";
+import AlbumFormModal from "../components/AlbumFormModal";
 import { ImgStackGrid } from "../components/ImgStackGrid";
 import { useAlbums } from "../hooks/useAlbums";
 
 function AlbumsContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    { label: t("collections.albums", "Albums") },
+  ]);
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { scopedRepositoryId } = useWorkingRepository();
-  const { selectedAlbumIds, isSelectionMode, dispatch } = useCollections();
+  const {
+    selectedAlbumIds,
+    isSelectionMode,
+    isCreateModalOpen,
+    isEditModalOpen,
+    albumToEdit,
+    dispatch,
+  } = useCollections();
   const deleteAlbumMutation = $api.useMutation("delete", "/api/v1/albums/{id}");
   const {
     data,
@@ -143,20 +157,23 @@ function AlbumsContent() {
         />
 
         {hasNextPage && (
-          <div className="flex min-h-[100px] justify-center p-8">
-            <button
-              type="button"
-              onClick={() => fetchNextPage()}
-              disabled={isFetchingNextPage}
-              className="btn btn-outline btn-wide"
-            >
-              {isFetchingNextPage ? t("common.loading") : t("common.loadMore")}
-            </button>
-          </div>
+          <LoadMoreButton
+            onClick={() => fetchNextPage()}
+            loading={isFetchingNextPage}
+          />
         )}
       </div>
 
-      <CreateAlbumModal />
+      <AlbumFormModal
+        open={isCreateModalOpen || isEditModalOpen}
+        mode={isEditModalOpen ? "edit" : "create"}
+        album={albumToEdit}
+        onClose={() =>
+          dispatch({
+            type: isEditModalOpen ? "CLOSE_EDIT_MODAL" : "CLOSE_CREATE_MODAL",
+          })
+        }
+      />
 
       {isDeleteConfirmOpen && (
         <div className="modal modal-open">

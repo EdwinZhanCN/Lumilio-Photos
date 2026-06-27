@@ -714,6 +714,7 @@ type AssetFilterDTO struct {
 	TagName      *string            `json:"tag_name,omitempty" example:"document"`
 	TagSource    *string            `json:"tag_source,omitempty" example:"zeroshot"`
 	TagNames     []string           `json:"tag_names,omitempty"`
+	PersonID     *int32             `json:"person_id,omitempty" example:"42"`
 }
 
 // FilterAssetsRequestDTO represents the request structure for filtering assets

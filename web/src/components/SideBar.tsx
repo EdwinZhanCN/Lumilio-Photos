@@ -32,10 +32,7 @@ function SideBar() {
           </Link>
         </li>
         <li>
-          <Link
-            to="/assets/"
-            className={location.pathname.startsWith("/assets") ? "active" : ""}
-          >
+          <Link to="/assets/" className={location.pathname.startsWith("/assets") ? "active" : ""}>
             <Image className="size-5" />
             {t("sidebar.assets")}
           </Link>
@@ -43,9 +40,7 @@ function SideBar() {
         <li>
           <Link
             to="/collections"
-            className={
-              location.pathname.startsWith("/collections") ? "active" : ""
-            }
+            className={location.pathname.startsWith("/collections") ? "active" : ""}
           >
             <LibraryBig className="size-5" />
             {t("sidebar.collections")}
@@ -64,10 +59,7 @@ function SideBar() {
           </Link>
         </li> */}
         <li>
-          <Link
-            to="/manage"
-            className={location.pathname.startsWith("/manage") ? "active" : ""}
-          >
+          <Link to="/manage" className={location.pathname.startsWith("/manage") ? "active" : ""}>
             <Folders className="size-5" />
             {t("sidebar.manage")}
           </Link>

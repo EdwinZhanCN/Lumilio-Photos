@@ -4,7 +4,9 @@ import (
 	"errors"
 	"strconv"
 
+	"server/internal/agent/facets"
 	"server/internal/agent/pins"
+	"server/internal/agent/ref"
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/db/repo"
@@ -83,6 +85,48 @@ func (h *AgentHandler) ListPins(c *gin.Context) {
 	for _, pin := range rows {
 		out = append(out, toAgentPinDTO(pin))
 	}
+	api.JSONOK(c, out)
+}
+
+// GetPin returns pinned widget metadata with facets.
+// @Summary Get Agent Pin Metadata
+// @Description Get metadata and facet summary for a pinned widget. Frozen pins serve the stored snapshot; live pins replay their plan before facets are computed.
+// @Tags agent
+// @Produce json
+// @Param id path string true "Pin ID"
+// @Success 200 {object} dto.AgentPinDTO
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Router /api/v1/agent/pins/{id} [get]
+func (h *AgentHandler) GetPin(c *gin.Context) {
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	pinID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinNotFound(c, err, "Pin not found")
+		return
+	}
+
+	pin, ids, err := h.pins.AssetIDs(c.Request.Context(), int32(user.UserID), pinID)
+	if err != nil {
+		api.GinNotFound(c, err, "Pin not found")
+		return
+	}
+
+	facetSummary, err := facets.Build(c.Request.Context(), h.queries, &ref.Ref{
+		ID:       pinID.String(),
+		AssetIDs: ids,
+	})
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to compute pin facets")
+		return
+	}
+
+	out := toAgentPinDTO(pin)
+	out.Count = len(ids)
+	out.Facets = dto.ToAgentRefFacetsDTO(facetSummary)
 	api.JSONOK(c, out)
 }
 
@@ -187,6 +231,54 @@ func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 		}
 	}
 	api.JSONOK(c, api.SuccessResponse{Message: "Pin layout updated"})
+}
+
+// UpdatePin patches a single board widget: rename it and/or switch which view
+// the pinned ref renders through.
+// @Summary Update Agent Pin
+// @Description Patch one pinned widget. Send title to rename it, widget to switch which view it renders through; both are optional.
+// @Tags agent
+// @Accept json
+// @Produce json
+// @Param id path string true "Pin ID"
+// @Param request body dto.UpdateAgentPinRequest true "Pin update"
+// @Success 200 {object} api.SuccessResponse
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Router /api/v1/agent/pins/{id} [patch]
+func (h *AgentHandler) UpdatePin(c *gin.Context) {
+	var req dto.UpdateAgentPinRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	pinID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinNotFound(c, err, "Pin not found")
+		return
+	}
+	if req.Title != nil {
+		if err := h.pins.UpdateTitle(c.Request.Context(), int32(user.UserID), pinID, *req.Title); err != nil {
+			api.GinInternalError(c, err, "Failed to update pin title")
+			return
+		}
+	}
+	if req.Widget != nil {
+		if err := h.pins.UpdateWidget(c.Request.Context(), int32(user.UserID), pinID, *req.Widget); err != nil {
+			if errors.Is(err, pins.ErrUnknownWidget) {
+				api.GinBadRequest(c, err, "Unknown widget view")
+				return
+			}
+			api.GinInternalError(c, err, "Failed to update pin widget")
+			return
+		}
+	}
+	api.JSONOK(c, api.SuccessResponse{Message: "Pin updated"})
 }
 
 // DeletePin removes a board widget.

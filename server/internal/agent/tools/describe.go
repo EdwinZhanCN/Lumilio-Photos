@@ -34,7 +34,8 @@ func RegisterDescribe() {
 	info := &schema.ToolInfo{
 		Name: "describe",
 		Desc: "Summarize a ref: count, date range, time histogram, type distribution, " +
-			"top places, top people, cameras, liked/rating stats. " +
+			"top places, top people, cameras, focal lengths, lenses, liked/rating stats, and " +
+			"(when assets are scored) the aesthetic-quality distribution as percentiles. " +
 			"Use this to verify a set matches the user's intent before showing or mutating it.",
 	}
 

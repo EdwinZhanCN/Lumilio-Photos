@@ -35,6 +35,10 @@ func (s *pHashEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.UUID, emb
 	return nil
 }
 
+func (s *pHashEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
+	return nil
+}
+
 func (s *pHashEmbeddingStub) GetEmbedding(context.Context, pgtype.UUID, service.EmbeddingType, string) (repo.Embedding, error) {
 	panic("not implemented")
 }

@@ -11,6 +11,7 @@ import AlbumDetails from "@/features/collections/routes/AlbumDetails";
 import MapView from "@/features/collections/routes/MapView";
 import TripDetails from "@/features/collections/routes/TripDetails";
 import People from "@/features/collections/routes/People";
+import Utilities from "@/features/collections/routes/Utilities";
 import Duplicates from "@/features/collections/routes/Duplicates";
 import UtilityClassifierAlbum from "@/features/collections/routes/UtilityClassifierAlbum";
 import PersonDetails from "@/features/people/routes/PersonDetails";
@@ -91,6 +92,10 @@ export const appRoutes = [
   {
     path: "/collections/people",
     element: <People />,
+  },
+  {
+    path: "/collections/utilities",
+    element: <Utilities />,
   },
   {
     path: "/collections/utilities/duplicates",

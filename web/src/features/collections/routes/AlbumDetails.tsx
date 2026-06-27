@@ -9,6 +9,9 @@ import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import type { components } from "@/lib/http-commons/schema";
 import { useWorkingRepository } from "@/features/settings";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
+import { CollectionHero, MetaStat } from "@/components/collection";
+import AlbumFormModal from "../components/AlbumFormModal";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import type {
@@ -25,6 +28,7 @@ const AlbumAssetsContent = () => {
   const showMessage = useMessage();
   const { albumId } = useParams<{ albumId: string }>();
   const { scopedRepositoryId } = useWorkingRepository();
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [bioClipFeedback, setBioClipFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -45,6 +49,12 @@ const AlbumAssetsContent = () => {
   );
   const album = albumQuery.data as Album | undefined;
   const isAlbumLoading = albumQuery.isLoading;
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    { label: t("collections.albums", "Albums"), to: "/collections/albums" },
+    { label: album?.album_name || t("collections.albumDetails.fallbackName", "Album") },
+  ]);
   const isBioAlbum = album?.album_type === "bio";
   const rebuildBioClipMutation = $api.useMutation(
     "post",
@@ -166,92 +176,80 @@ const AlbumAssetsContent = () => {
   );
 
   const hero = (
-    <div className="px-4 py-4">
-      <div className="flex items-baseline gap-4">
-        {isAlbumLoading && !album ? (
-          <div className="h-10 w-64 animate-pulse rounded-lg bg-base-300" />
-        ) : (
-          <>
-            <h1 className="text-4xl font-black tracking-tight text-primary">
-              {album?.album_name || t("collections.untitled")}
-            </h1>
-            <span className="badge badge-ghost font-mono text-xs opacity-50">
-              {t("collections.albumDetails.albumCode", { id: albumId })}
-            </span>
-            {isBioAlbum && (
-              <span className="badge badge-primary gap-1.5">
-                <Bird className="size-3.5" />
-                {t("collections.albumDetails.bioClip.badge")}
-              </span>
-            )}
-          </>
-        )}
-      </div>
+    <CollectionHero
+      loading={isAlbumLoading && !album}
+      title={album?.album_name || t("collections.untitled")}
+      code={t("collections.albumDetails.albumCode", { id: albumId })}
+      badges={
+        isBioAlbum && (
+          <span className="badge badge-primary gap-1.5">
+            <Bird className="size-3.5" />
+            {t("collections.albumDetails.bioClip.badge")}
+          </span>
+        )
+      }
+      description={album?.description}
+      edit={{
+        onOpen: () => setIsEditOpen(true),
+        label: t("common.edit", "Edit"),
+        modal: (
+          <AlbumFormModal
+            open={isEditOpen}
+            mode="edit"
+            album={album}
+            onClose={() => setIsEditOpen(false)}
+          />
+        ),
+      }}
+      stats={
+        <>
+          <MetaStat loading={isAlbumLoading && !album}>
+            {t("collections.albumDetails.itemsCount", {
+              count: album?.asset_count || 0,
+            })}
+          </MetaStat>
+          <MetaStat loading={isAlbumLoading && !album} skeletonWidth="w-24">
+            {t("collections.albumDetails.createdAtLabel")}{" "}
+            {album?.created_at
+              ? new Date(album.created_at).toLocaleDateString(
+                  i18n.resolvedLanguage || i18n.language,
+                )
+              : ""}
+          </MetaStat>
 
-      {album?.description && (
-        <p className="mt-3 max-w-3xl leading-relaxed text-base-content/70 line-clamp-2">
-          {album.description}
-        </p>
-      )}
-
-      <div className="mt-6 flex items-center gap-6 text-xs opacity-40">
-        <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-          <span className="text-[8px] text-primary">●</span>
-          {isAlbumLoading && !album ? (
-            <div className="h-3 w-16 animate-pulse rounded bg-base-300" />
-          ) : (
-            <span>
-              {t("collections.albumDetails.itemsCount", {
-                count: album?.asset_count || 0,
-              })}
-            </span>
+          {isBioAlbum && (
+            <button
+              type="button"
+              className="btn btn-primary btn-xs gap-1.5"
+              onClick={handleRebuildBioClip}
+              disabled={rebuildBioClipMutation.isPending}
+            >
+              {rebuildBioClipMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <RefreshCcw className="size-3.5" />
+              )}
+              {rebuildBioClipMutation.isPending
+                ? t("collections.albumDetails.bioClip.running")
+                : t("collections.albumDetails.bioClip.action")}
+            </button>
           )}
-        </div>
-        <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-          <span className="text-[8px] text-primary">●</span>
-          {isAlbumLoading && !album ? (
-            <div className="h-3 w-24 animate-pulse rounded bg-base-300" />
-          ) : (
-            <span>
-              {t("collections.albumDetails.createdAtLabel")}{" "}
-              {album?.created_at
-                ? new Date(album.created_at).toLocaleDateString(
-                    i18n.resolvedLanguage || i18n.language,
-                  )
-                : ""}
-            </span>
-          )}
-        </div>
-
-        {isBioAlbum && (
-          <button
-            type="button"
-            className="btn btn-primary btn-xs gap-1.5"
-            onClick={handleRebuildBioClip}
-            disabled={rebuildBioClipMutation.isPending}
+        </>
+      }
+      footer={
+        bioClipFeedback && (
+          <div
+            className={`alert mt-4 max-w-xl py-2 text-sm ${
+              bioClipFeedback.tone === "success"
+                ? "alert-success"
+                : "alert-error"
+            }`}
           >
-            {rebuildBioClipMutation.isPending ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : (
-              <RefreshCcw className="size-3.5" />
-            )}
-            {rebuildBioClipMutation.isPending
-              ? t("collections.albumDetails.bioClip.running")
-              : t("collections.albumDetails.bioClip.action")}
-          </button>
-        )}
-      </div>
-
-      {bioClipFeedback && (
-        <div
-          className={`alert mt-4 max-w-xl py-2 text-sm ${
-            bioClipFeedback.tone === "success" ? "alert-success" : "alert-error"
-          }`}
-        >
-          {bioClipFeedback.message}
-        </div>
-      )}
-    </div>
+            {bioClipFeedback.message}
+          </div>
+        )
+      }
+    />
   );
 
   return (

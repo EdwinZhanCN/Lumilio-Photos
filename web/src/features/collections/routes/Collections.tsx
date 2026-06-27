@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   Album,
-  AlertTriangle,
   ArrowRight,
   LibraryBig,
   MapPin,
@@ -11,6 +10,8 @@ import {
 } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
+import { CollectionErrorAlert } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useWorkingRepository } from "@/features/settings";
 import { usePeople } from "@/features/people/hooks/usePeople";
@@ -24,6 +25,10 @@ import { useCityTrips } from "../hooks/useCityTrips";
 function CollectionsContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections") },
+  ]);
   const { scopedRepositoryId } = useWorkingRepository();
   const {
     data,
@@ -57,31 +62,25 @@ function CollectionsContent() {
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">
         <div className="space-y-6">
           {isAlbumsError && (
-            <div className="alert alert-warning">
-              <AlertTriangle className="size-5" />
-              <span>
-                {t("collections.messages.loadAlbumsError", {
-                  message:
-                    albumsError instanceof Error
-                      ? albumsError.message
-                      : t("home.errors.unknown"),
-                })}
-              </span>
-            </div>
+            <CollectionErrorAlert
+              message={t("collections.messages.loadAlbumsError", {
+                message:
+                  albumsError instanceof Error
+                    ? albumsError.message
+                    : t("home.errors.unknown"),
+              })}
+            />
           )}
 
           {isPeopleError && (
-            <div className="alert alert-warning">
-              <AlertTriangle className="size-5" />
-              <span>
-                {t("collections.messages.loadPeopleError", {
-                  message:
-                    peopleError instanceof Error
-                      ? peopleError.message
-                      : t("home.errors.unknown"),
-                })}
-              </span>
-            </div>
+            <CollectionErrorAlert
+              message={t("collections.messages.loadPeopleError", {
+                message:
+                  peopleError instanceof Error
+                    ? peopleError.message
+                    : t("home.errors.unknown"),
+              })}
+            />
           )}
 
           <section className="space-y-4">
@@ -94,6 +93,14 @@ function CollectionsContent() {
                   {t("collections.sections.utilities")}
                 </h2>
               </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm rounded-full"
+                onClick={() => navigate("/collections/utilities")}
+              >
+                {t("common.viewAll")}
+                <ArrowRight className="size-4" />
+              </button>
             </div>
 
             <UtilitiesRail />

@@ -76,7 +76,7 @@ func (s *Service) CreateFromRef(ctx context.Context, params CreateParams) (repo.
 	}
 	widget := params.Widget
 	if widget == "" {
-		widget = core.WidgetAssetGrid
+		widget = core.WidgetCoverCard
 	}
 
 	planJSON, err := json.Marshal(r.Plan)
@@ -135,6 +135,32 @@ func (s *Service) UpdateLayout(ctx context.Context, userID int32, pinID uuid.UUI
 		LayoutY: int32(layout.Y),
 		LayoutW: int32(layout.W),
 		LayoutH: int32(layout.H),
+	})
+}
+
+// ErrUnknownWidget rejects switching a pin to an unregistered view.
+var ErrUnknownWidget = errors.New("unknown widget view")
+
+// UpdateWidget switches which view a pin renders through. The widget is just
+// the selected view over the same pinned ref, so this only validates the view
+// is registered and rewrites the column — no snapshot or plan changes.
+func (s *Service) UpdateWidget(ctx context.Context, userID int32, pinID uuid.UUID, widget string) error {
+	if !core.IsKnownWidget(widget) {
+		return ErrUnknownWidget
+	}
+	return s.queries.UpdateAgentPinWidget(ctx, repo.UpdateAgentPinWidgetParams{
+		PinID:  pgtype.UUID{Bytes: pinID, Valid: true},
+		UserID: userID,
+		Widget: widget,
+	})
+}
+
+// UpdateTitle renames one pin.
+func (s *Service) UpdateTitle(ctx context.Context, userID int32, pinID uuid.UUID, title string) error {
+	return s.queries.UpdateAgentPinTitle(ctx, repo.UpdateAgentPinTitleParams{
+		PinID:  pgtype.UUID{Bytes: pinID, Valid: true},
+		UserID: userID,
+		Title:  title,
 	})
 }
 
@@ -267,6 +293,17 @@ func (s *Service) replayFilter(ctx context.Context, params map[string]string) ([
 		if n, err := strconv.Atoi(v); err == nil {
 			albumID := int32(n)
 			q.AlbumID = &albumID
+		}
+	}
+	if v := params["tag_names"]; v != "" {
+		tagNames := make([]string, 0, strings.Count(v, ",")+1)
+		for _, part := range strings.Split(v, ",") {
+			if name := strings.TrimSpace(part); name != "" {
+				tagNames = append(tagNames, name)
+			}
+		}
+		if len(tagNames) > 0 {
+			q.TagNames = tagNames
 		}
 	}
 	rows, err := s.queries.GetAssetIDsUnified(ctx, q)

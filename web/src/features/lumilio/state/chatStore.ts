@@ -30,6 +30,7 @@ interface LumilioChatStore {
     options?: {
       context?: ContextContribution[];
       mentions?: MentionPayload[];
+      mode?: string;
     },
   ) => Promise<void>;
   confirmInterrupt: (interruptId: string, approved: boolean) => Promise<void>;
@@ -103,6 +104,9 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
           {
             query: trimmed,
             thread_id: get().threadId ?? "",
+            ...(options?.mode
+              ? { mode: options.mode as "review" | "organize" | "analyze" | "curate" }
+              : {}),
             ...(contextPayload && contextPayload.length > 0
               ? { context: contextPayload }
               : {}),

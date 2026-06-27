@@ -35,8 +35,8 @@ type PeekOutput struct {
 func RegisterPeek() {
 	info := &schema.ToolInfo{
 		Name: "peek",
-		Desc: "Look at the first few assets of a ref (one line each: date, filename, type, rating). " +
-			"Budgeted at 10 rows — use describe for aggregate views of large sets.",
+		Desc: "Look at the first few assets of a ref (one line each: date, filename, type, rating, " +
+			"place, people). Budgeted at 10 rows — use describe for aggregate views of large sets.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
@@ -90,6 +90,12 @@ func RegisterPeek() {
 				if row.Liked != nil && *row.Liked {
 					parts = append(parts, "liked")
 				}
+				if row.Place != "" {
+					parts = append(parts, "@"+ref.SanitizeUserText(row.Place, ref.MaxFacetValueLen))
+				}
+				if people := sanitizePeople(row.People); people != "" {
+					parts = append(parts, people)
+				}
 				byID[uuid.UUID(row.AssetID.Bytes)] = peekRow{line: strings.Join(parts, " · ")}
 			}
 
@@ -106,4 +112,34 @@ func RegisterPeek() {
 			return &PeekOutput{RefID: r.ID, Lines: lines}, nil
 		})
 	})
+}
+
+const maxPeekPeople = 3
+
+// sanitizePeople renders up to maxPeekPeople named people for one peek line,
+// each passed through SanitizeUserText (names are user content, INV-7). Returns
+// "" when no one is named so the caller can skip the segment.
+func sanitizePeople(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	cleaned := make([]string, 0, maxPeekPeople)
+	for _, name := range names {
+		name = ref.SanitizeUserText(name, ref.MaxFacetValueLen)
+		if name == "" {
+			continue
+		}
+		cleaned = append(cleaned, name)
+		if len(cleaned) == maxPeekPeople {
+			break
+		}
+	}
+	if len(cleaned) == 0 {
+		return ""
+	}
+	out := "with " + strings.Join(cleaned, ", ")
+	if len(names) > len(cleaned) {
+		out += " +"
+	}
+	return out
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -38,12 +39,30 @@ type SampleInput struct {
 	Strategy string `json:"strategy,omitempty" jsonschema:"enum=random,enum=spread_over_time,description=random (default) or spread_over_time for an even chronological spread"`
 }
 
+// SampleOutput is the sample tool's receipt plus a time distribution of the
+// drawn assets, so the model can judge whether the sample is chronologically
+// representative without a follow-up describe.
+type SampleOutput struct {
+	Receipt      *ref.ToolReceipt `json:"receipt,omitempty"`
+	Distribution []SampleBucket   `json:"distribution,omitempty"`
+	Error        *ref.Error       `json:"error,omitempty"`
+}
+
+// SampleBucket is one equal-width time bin of the sampled set.
+type SampleBucket struct {
+	Bucket string `json:"bucket"`
+	Count  int    `json:"count"`
+}
+
 // RegisterRank registers the rank transformer.
 func RegisterRank() {
 	info := &schema.ToolInfo{
 		Name: "rank",
-		Desc: "Reorder a ref by time (capture date), quality (rating/liked/resolution heuristic) or " +
-			"relevance (restore search ranking; only valid for search-produced refs). Returns a new ref.",
+		Desc: "Reorder a ref by time (capture date), quality (aesthetic score from SigLIP MLP head, " +
+			"falling back to rating/liked/resolution for unscored assets) or " +
+			"relevance (restore search ranking; only valid for search-produced refs). Returns a new ref. " +
+			"Quality scores run 1-10 but cluster in the 5-7 range (median ~5.5-6); 7+ is already a good " +
+			"photo and 8+ is extremely rare — treat 5/10 as average, not a failing grade.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
@@ -176,11 +195,12 @@ func RegisterSample() {
 	info := &schema.ToolInfo{
 		Name: "sample",
 		Desc: "Pick n members of a ref: random, or spread_over_time for an even chronological spread " +
-			"(good for 'a look across the year').",
+			"(good for 'a look across the year'). Returns the new ref plus a time distribution of the " +
+			"drawn assets so you can see whether the sample is chronologically representative.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *SampleInput) (*RefToolOutput, error) {
+		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *SampleInput) (*SampleOutput, error) {
 			start := time.Now()
 			execID := newExecutionID()
 			sendRunning(deps, info.Name, execID, "Sampling...", input)
@@ -188,17 +208,17 @@ func RegisterSample() {
 			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
-				return errorOutput(refErr), nil
+				return &SampleOutput{Error: refErr}, nil
 			}
 			if input.N <= 0 {
 				refErr := ref.InvalidArgument("n must be positive")
 				sendError(deps, info.Name, execID, start, refErr)
-				return errorOutput(refErr), nil
+				return &SampleOutput{Error: refErr}, nil
 			}
 			if r.Count() == 0 {
 				refErr := ref.EmptySet(r.ID)
 				sendError(deps, info.Name, execID, start, refErr)
-				return errorOutput(refErr), nil
+				return &SampleOutput{Error: refErr}, nil
 			}
 
 			strategy := input.Strategy
@@ -215,13 +235,13 @@ func RegisterSample() {
 				if err != nil {
 					refErr := ref.Internal("sample query")
 					sendError(deps, info.Name, execID, start, refErr)
-					return errorOutput(refErr), nil
+					return &SampleOutput{Error: refErr}, nil
 				}
 				sampled = sampleSpread(fromPgUUIDs(rows), input.N)
 			default:
 				refErr := ref.InvalidArgument(fmt.Sprintf("strategy %q is not one of random, spread_over_time", input.Strategy))
 				sendError(deps, info.Name, execID, start, refErr)
-				return errorOutput(refErr), nil
+				return &SampleOutput{Error: refErr}, nil
 			}
 
 			summary := fmt.Sprintf("sample(%s, %d, %s) → %d assets", r.ID, input.N, strategy, len(sampled))
@@ -234,9 +254,68 @@ func RegisterSample() {
 				false,
 			)
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: out.ID, Count: out.Count()})
-			return receiptOutput(out, summary), nil
+			return &SampleOutput{
+				Receipt:      &ref.ToolReceipt{RefID: out.ID, Count: out.Count(), Summary: summary},
+				Distribution: sampleDistribution(ctx, deps, sampled),
+			}, nil
 		})
 	})
+}
+
+// sampleDistribution buckets the sampled assets' capture times into up to
+// maxSampleBuckets equal-width bins. It degrades to nil on query failure — the
+// distribution is an optional hint, never load-bearing.
+func sampleDistribution(ctx context.Context, deps *core.ToolDependencies, sampled []uuid.UUID) []SampleBucket {
+	if len(sampled) == 0 {
+		return nil
+	}
+	rows, err := deps.Queries.AgentCapturedTimes(ctx, toPgUUIDs(sampled))
+	if err != nil {
+		return nil
+	}
+	times := make([]time.Time, 0, len(rows))
+	for _, t := range rows {
+		if t.Valid {
+			times = append(times, t.Time.UTC())
+		}
+	}
+	return bucketTimes(times, min(len(sampled), maxSampleBuckets))
+}
+
+const maxSampleBuckets = 6
+
+// bucketTimes splits times into nbins equal-width chronological bins, labelled
+// by each bin's start (day labels for spans under ~90 days, month otherwise).
+func bucketTimes(times []time.Time, nbins int) []SampleBucket {
+	if len(times) == 0 {
+		return nil
+	}
+	sort.Slice(times, func(i, j int) bool { return times[i].Before(times[j]) })
+	minT, maxT := times[0], times[len(times)-1]
+	span := maxT.Sub(minT)
+	if span <= 0 || nbins <= 1 {
+		return []SampleBucket{{Bucket: minT.Format("2006-01-02"), Count: len(times)}}
+	}
+	if nbins > maxSampleBuckets {
+		nbins = maxSampleBuckets
+	}
+	layout := "2006-01-02"
+	if span > 90*24*time.Hour {
+		layout = "2006-01"
+	}
+	width := span / time.Duration(nbins)
+	buckets := make([]SampleBucket, nbins)
+	for i := range buckets {
+		buckets[i].Bucket = minT.Add(time.Duration(i) * width).Format(layout)
+	}
+	for _, t := range times {
+		idx := int(t.Sub(minT) / width)
+		if idx >= nbins {
+			idx = nbins - 1
+		}
+		buckets[idx].Count++
+	}
+	return buckets
 }
 
 func isSearchPlan(op string) bool {

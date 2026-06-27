@@ -151,7 +151,6 @@ export const LumilioAvatar: React.FC<LumilioAvatarProps> = ({
             <div className="pyramid-wall left" />
             <div className="pyramid-wall right" />
             <div className="bottom" />
-            <div className="shadow" />
           </div>
         </div>
       </div>

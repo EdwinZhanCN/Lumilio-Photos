@@ -184,3 +184,37 @@ func (q *Queries) UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLa
 	)
 	return err
 }
+
+const updateAgentPinTitle = `-- name: UpdateAgentPinTitle :exec
+UPDATE agent_pins
+SET title = $3, updated_at = NOW()
+WHERE pin_id = $1 AND user_id = $2
+`
+
+type UpdateAgentPinTitleParams struct {
+	PinID  pgtype.UUID `db:"pin_id" json:"pin_id"`
+	UserID int32       `db:"user_id" json:"user_id"`
+	Title  string      `db:"title" json:"title"`
+}
+
+func (q *Queries) UpdateAgentPinTitle(ctx context.Context, arg UpdateAgentPinTitleParams) error {
+	_, err := q.db.Exec(ctx, updateAgentPinTitle, arg.PinID, arg.UserID, arg.Title)
+	return err
+}
+
+const updateAgentPinWidget = `-- name: UpdateAgentPinWidget :exec
+UPDATE agent_pins
+SET widget = $3, updated_at = NOW()
+WHERE pin_id = $1 AND user_id = $2
+`
+
+type UpdateAgentPinWidgetParams struct {
+	PinID  pgtype.UUID `db:"pin_id" json:"pin_id"`
+	UserID int32       `db:"user_id" json:"user_id"`
+	Widget string      `db:"widget" json:"widget"`
+}
+
+func (q *Queries) UpdateAgentPinWidget(ctx context.Context, arg UpdateAgentPinWidgetParams) error {
+	_, err := q.db.Exec(ctx, updateAgentPinWidget, arg.PinID, arg.UserID, arg.Widget)
+	return err
+}

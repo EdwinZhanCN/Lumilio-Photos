@@ -14,7 +14,7 @@ import (
 //
 // It deliberately mirrors the ref store's lifecycle philosophy: TTL-bound
 // working memory, not a chat-history product. Transcripts die with the
-// session (ADR in docs/agent/exec-plans/active/agent-ref-system.md); the
+// session (ADR in site/docs/internal/agent/exec-plans/active/agent-ref-system.md); the
 // durable artifacts of a conversation are pins, not logs.
 type ConversationStore struct {
 	mu    sync.Mutex
