@@ -53,7 +53,17 @@ export function BoardTile({ pin, onRename, onViewChange, onSize, onRemove }: Boa
   const retry = () =>
     void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/agent/pins/{id}"] });
   const activate = () => {
-    if (pinId) void navigate(`/assets?pin=${pinId}`);
+    if (!pinId) return;
+    // Carry the board origin so the library can offer a "back to board" crumb.
+    // It is router state (not a path segment) because the board isn't a URL
+    // parent of /assets — it's where the user came from.
+    void navigate(`/assets?pin=${pinId}`, {
+      state: {
+        from: "/lumilio",
+        fromLabel: t("lumilio.nav.board", "Board"),
+        label: pin.title ?? undefined,
+      },
+    });
   };
 
   let body;

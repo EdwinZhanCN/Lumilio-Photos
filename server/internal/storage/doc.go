@@ -41,5 +41,5 @@
 // bootstrap "dirs_ready" gate has a single owner. Until that lands, root
 // directory creation and repository-creation policy are still partly performed
 // by the setup flow and the HTTP handlers. See
-// docs/agent/exec-plans/active/config-settings-bootstrap-refactor.md.
+// site/docs/internal/agent/exec-plans/active/config-settings-bootstrap-refactor.md.
 package storage

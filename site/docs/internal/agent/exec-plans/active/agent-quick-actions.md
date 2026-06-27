@@ -344,23 +344,26 @@ flowchart LR
 - [x] `rank` 工具描述诚实化（明确 quality 来源是 SigLIP aesthetic head）
 - [x] 重构索引按钮始终可见（全部已索引时仍可强制重跑）
 
-### Phase 1 — 后端 mode → 工具子集过滤（核心）
+### Phase 1 — 后端 mode → 工具子集过滤（核心，已完成 ✅）
 
-- [ ] `server/internal/agent/core/tool_registry.go`:
-  - 新增 `modeTools map[string]map[string]bool`（mode → 工具名集合）。
-  - 新增 `GetToolsByMode(ctx, deps, mode)` 方法：mode 为空时返回全量（`GetAllTools`），否则只实例化该 mode 的工具子集。
-  - 新增 `modeInstructions map[string]string`（mode → 模式 prompt 片段）。
-- [ ] `server/internal/agent/core/agent_service.go`:
+- [x] `server/internal/agent/core/tool_registry.go`:
+  - `modeToolSets map[string]map[string]bool`（mode → 工具名集合）。
+  - `GetToolsByMode(ctx, deps, mode)`：mode 为空/未知返回全量（`GetAllTools`），否则只实例化该 mode 的工具子集。
+  - `modeInstructionExtras map[string]string` + `ModeInstruction(mode)`（mode → 模式 prompt 片段，`\n` 前缀以便追加）。
+  - 另加 `GetToolInfosByMode(mode)` 供工具内省端点按 mode 过滤元数据。
+- [x] `server/internal/agent/core/agent_service.go`:
   - `AskAgent` 签名增加 `mode string` 参数。
   - `buildAgent` 增加 `mode` 参数：`registry.GetToolsByMode(ctx, deps, mode)` 替代 `GetAllTools`；`buildInstruction(today, ledger, mode)` 追加模式 prompt。
-  - `buildInstruction` 增加 `mode` 参数，查 `modeInstructions` 追加片段。
-- [ ] `server/internal/api/handler/agent_handler.go`:
-  - `AskAgent` handler 从请求体解析 `mode` 字段，传入 service。
-- [ ] `server/internal/api/dto/agent_dto.go`:
-  - `AskAgentRequest` 增加 `Mode string` 字段。
-- [ ] OpenAPI 注解 + `make dto`。
+  - `buildInstruction` 增加 `mode` 参数，经 `ModeInstruction` 追加片段。
+  - `AgentService` 接口加 `GetToolsByMode(mode)`，转发到 registry。
+- [x] `server/internal/api/handler/agent_handler.go`:
+  - `AgentChatRequest.Mode`（`enums:"review,organize,analyze,curate"`）解析并透传给 service。
+  - `GetTools` handler 读 `?mode=` query → 返回受限子集（验收端点）。
+- [x] DTO：mode 字段落在 handler 内的 `AgentChatRequest`（非独立 `AskAgentRequest`，命名偏差无影响）。
+- [x] OpenAPI 注解 + `make dto`（swagger/schema/redoc 已重新生成，含 mode 枚举）。
+- [x] `tool_registry_test.go`：表驱动单测覆盖 mode 子集成员/大小、free-only 工具不泄漏、空/未知 mode 回退全量、`ModeInstruction` 行为。
 
-**验收**: 不同 mode 的请求，agent 看到不同的工具集（通过 `/api/v1/agent/tools?mode=curate` 验证）；mode="" 返回全量。
+**验收 ✅**: `/api/v1/agent/tools?mode=curate` 返回受限子集、mode="" 返回全量；`make server-test` + 新单测全绿。
 
 ### Phase 2 — 前端 Quick Action 系统
 
@@ -392,35 +395,24 @@ flowchart LR
 
 **验收**: `/`、Plus 按钮、空状态 chip 三入口都设粘性 mode（单一 pill，跨多轮保持，X 退出）；带 mode 的请求发往 agent，受限工具集执行；quality gate（`vp check`/`vp lint`/`vp test`）全绿。
 
-### Phase 3 — 工具反馈增强（非阻断优化，可延后）
+### Phase 3 — 工具反馈增强（非阻断优化，已完成 ✅）
 
 减少长链路中的冗余工具调用。
 
-- [ ] `describe` 增加 quality 维度 facet（**分位数统计，不做离散桶**）:
-  - 背景：SigLIP MLP head 美学分数集中在 5-7 区间（中位数 ~5.5-6，7+ 已是好照片，8+ 极罕见，训练集 max 8.06）。Hard cutoff（如 ≥8=high）过于激进——绝大多数照片会挤进同一桶。
-  - 方案：`facets.Build` 查询 `asset_quality_scores` 返回**分位数统计**，让 LLM 自己推理分布含义：
-    ```sql
-    SELECT
-      percentile_cont(0.25) WITHIN GROUP (ORDER BY score) AS p25,
-      percentile_cont(0.50) WITHIN GROUP (ORDER BY score) AS p50,
-      percentile_cont(0.75) WITHIN GROUP (ORDER BY score) AS p75,
-      percentile_cont(0.90) WITHIN GROUP (ORDER BY score) AS p90,
-      COUNT(*) AS scored_count
-    FROM asset_quality_scores WHERE asset_id = ANY($1)
-    ```
-  - 返回形如 `{scored: 318, unscored: 2, p25: 5.1, p50: 5.7, p75: 6.3, p90: 7.0}`——LLM 能推理"这个集合 p90 到了 7.0，比中位数高不少，top 10% 确实不错"。
-  - 这和 describe 返回 time histogram 是同一设计哲学：给分布形状，不做主观判断。
-  - curate 模式下 agent 一次 describe 就能评估候选池质量，省去 rank→top→peek 的间接探测。
-- [ ] `rank` 工具描述补充分数分布上下文:
-  - 现有描述只说"1-10"，LLM 可能误以为 5/10 是不及格。补充："分数集中在 5-7 区间，中位数约 5.5-6，7+ 已是好照片，8+ 极罕见。"
-- [ ] `peek` 每行增加 place + person_names:
-  - `AgentPeekAssets` 查询 JOIN place + person，返回行追加地点和人物。
-  - organize 模式下 agent peek 就能验证分组正确性，省去额外 describe。
-- [ ] `sample` 返回附带分布摘要:
-  - SampleOutput 增加可选 `distribution` 字段（时间跨度 + 每个区间采样数）。
-  - review 模式下 agent 一次 sample 就能判断采样代表性。
+- [x] `describe` 增加 quality 维度 facet（**分位数统计，不做离散桶**）:
+  - `AgentFacetQualityStats` SQL 用 `percentile_cont` 返回 p25/p50/p75/p90 + scored_count（百分位用 `COALESCE(...,0)::real` 包裹避免空集 NULL 扫描错）。
+  - `ref.FacetSummary.Quality *QualityStats`（scored/unscored/p25..p90，分数 round 到 1 位）；`facets.Build` 在 `ScoredCount>0` 时填入，否则省略。
+  - 经 describe 输出（FacetSummary 直接内嵌）+ 水合 API DTO（`AgentQualityStatsDTO`）双通道暴露。
+  - describe 工具描述补充"aesthetic-quality distribution as percentiles"。
+- [x] `rank` 工具描述补充分数分布上下文（5-7 区间、中位数 ~5.5-6、7+ 好照片、8+ 极罕见，5/10 是平均不是不及格）。
+- [x] `peek` 每行增加 place + person_names:
+  - `AgentPeekAssets` 用相关子查询取 place（`COALESCE(...,'')` 单行）+ people（`array_agg(DISTINCT cluster_name)`），不 fan-out。
+  - peek 行追加 `@place` 和 `with A, B, C +`（`sanitizePeople` 限 3 人 + 溢出标记，名字过 SanitizeUserText / INV-7）。
+- [x] `sample` 返回附带分布摘要:
+  - 新增 `SampleOutput`（receipt + `distribution []SampleBucket`）替代共享 `RefToolOutput`。
+  - `AgentCapturedTimes` 取采样集捕获时间，`bucketTimes` 在 Go 侧分 ≤6 个等宽时间桶（>90 天用月标签，否则日标签）；查询失败降级为 nil（非 load-bearing）。
 
-**验收**: curate 模式 describe 直接返回 quality 分布；organize 模式 peek 显示地点；review 模式 sample 显示分布。
+**验收 ✅**: describe 返回 `quality` 分位数、peek 行显示 `@地点`+`with 人物`、sample 返回 `distribution`；`make dto`(quality DTO 入 swagger/schema)、`make server-test`、`make web-test` 全绿；新增 `transformers_test.go`(bucketTimes/sanitizePeople 单测)。
 
 ## 6. 文件级变更清单
 
@@ -433,13 +425,19 @@ flowchart LR
 | `server/internal/service/embedding_service.go` | +SaveAestheticScore 接口/实现 | ✅ |
 | `server/internal/queue/ml_semantic_worker.go` | 存 embedding 时同步存 score | ✅ |
 | `server/internal/agent/tools/transformers.go` | rank 描述诚实化 | ✅ |
-| `server/internal/agent/core/tool_registry.go` | +modeTools / modeInstructions / GetToolsByMode | Phase 1 |
-| `server/internal/agent/core/agent_service.go` | AskAgent/buildAgent/buildInstruction 增加 mode | Phase 1 |
-| `server/internal/api/handler/agent_handler.go` | 解析 mode 参数 | Phase 1 |
-| `server/internal/api/dto/agent_dto.go` | AskAgentRequest +Mode | Phase 1 |
-| `server/internal/agent/facets/facets.go` | quality 分位数 facet（查 asset_quality_scores percentile_cont） | Phase 3 |
-| `server/internal/agent/tools/transformers.go` | rank 描述补充分数分布上下文 + sample 返回分布 | Phase 3 |
-| `server/internal/agent/tools/peek.go` | peek 行 +place +person | Phase 3 |
+| `server/internal/agent/core/tool_registry.go` | +modeToolSets / modeInstructionExtras / GetToolsByMode / GetToolInfosByMode / ModeInstruction | ✅ |
+| `server/internal/agent/core/tool_registry_test.go` | mode 过滤 + ModeInstruction 单测 | ✅ |
+| `server/internal/agent/core/agent_service.go` | AskAgent/buildAgent/buildInstruction 增加 mode + GetToolsByMode | ✅ |
+| `server/internal/api/handler/agent_handler.go` | AgentChatRequest.Mode 解析 + GetTools 按 mode 过滤 | ✅ |
+| `server/internal/db/repo/queries/agent_facets.sql` | +AgentFacetQualityStats（percentile_cont 分位数） | ✅ |
+| `server/internal/db/repo/queries/agent_tools.sql` | AgentPeekAssets +place/people 子查询 + AgentCapturedTimes | ✅ |
+| `server/internal/agent/ref/facets.go` | +QualityStats 类型 + FacetSummary.Quality | ✅ |
+| `server/internal/agent/facets/facets.go` | quality 分位数 facet（查 asset_quality_scores percentile_cont） | ✅ |
+| `server/internal/api/dto/agent_dto.go` | +AgentQualityStatsDTO + 映射 | ✅ |
+| `server/internal/agent/tools/describe.go` | 描述补充 quality 分布 | ✅ |
+| `server/internal/agent/tools/transformers.go` | rank 描述补充分数分布上下文 + sample 返回分布(SampleOutput/bucketTimes) | ✅ |
+| `server/internal/agent/tools/peek.go` | peek 行 +place +person(sanitizePeople) | ✅ |
+| `server/internal/agent/tools/transformers_test.go` | bucketTimes / sanitizePeople 单测 | ✅ |
 
 ### 前端
 | 文件 | 变更 | 状态 |

@@ -304,6 +304,7 @@
       "modeFrozen": "已冻结",
       "modeLive": "实时"
     },
+    "pinTrailLabel": "所选内容",
     "stackCarousel": {
       "error": "堆叠资源暂时不可用。",
       "errorHint": "请稍后重试。",
@@ -576,6 +577,7 @@
     "updateSuccess_other": "已更新 {{count}} 个项目。"
   },
   "collections": {
+    "album": "",
     "albumDetails": {
       "albumCode": "相册 #{{id}}",
       "bioClip": {
@@ -602,6 +604,13 @@
       "itemsCount_one": "{{count}} 项",
       "itemsCount_other": "{{count}} 项"
     },
+    "albumForm": {
+      "editTitle": "编辑相册",
+      "save": "保存更改",
+      "saveError": "保存相册失败。",
+      "saving": "保存中…"
+    },
+    "albums": "",
     "coverAlt": "相册封面图",
     "coverAltWithName": "相册 {{albumName}} 的封面图",
     "createModal": {
@@ -646,6 +655,7 @@
     "itemsCount_one": "{{count}} 项",
     "itemsCount_other": "{{count}} 项",
     "messages": {
+      "createError": "创建相册失败。",
       "deleteError": "删除相册失败",
       "deleteSuccess": "相册删除成功",
       "loadAlbumsError": "加载相册失败：{{message}}",
@@ -665,6 +675,7 @@
       "places": "地点",
       "utilities": "工具"
     },
+    "title": "",
     "untitled": "未命名相册",
     "utilities": {
       "classifiers": {
@@ -701,6 +712,7 @@
     "copy": "复制",
     "delete": "删除",
     "done": "完成",
+    "edit": "编辑",
     "emptyState": {
       "description": "去管理页面上传资源吧！",
       "title": "这里还没有内容"
@@ -936,6 +948,9 @@
     },
     "mode": {
       "clear": "清除模式"
+    },
+    "nav": {
+      "board": "看板"
     },
     "quickActions": {
       "analyze": {
@@ -1267,6 +1282,9 @@
     },
     "title": "系统状态"
   },
+  "nav": {
+    "home": ""
+  },
   "navbar": {
     "notifications": {
       "clear": "清空消息",
@@ -1285,8 +1303,11 @@
     "details": {
       "confirmedHint": "这个人物已经确认并命名。",
       "loadError": "加载人物详情失败：{{error}}",
+      "nameLabel": "名称",
       "personCode": "人物 {{id}}",
+      "renameAction": "重命名",
       "renamePlaceholder": "为这个人物命名",
+      "renameTitle": "重命名人物",
       "save": "保存",
       "unconfirmedHint": "这个人物还未命名，确认后可以直接填写名字。",
       "updatedLabel": "更新于"

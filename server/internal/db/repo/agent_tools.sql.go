@@ -12,6 +12,35 @@ import (
 	"server/internal/db/dbtypes"
 )
 
+const agentCapturedTimes = `-- name: AgentCapturedTimes :many
+SELECT COALESCE(taken_time, upload_time)::timestamptz AS captured_at
+FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND is_deleted = false
+`
+
+// Capture times for a set of assets, for the sample tool's distribution
+// summary. Order is irrelevant; bucketing happens in Go.
+func (q *Queries) AgentCapturedTimes(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.Timestamptz, error) {
+	rows, err := q.db.Query(ctx, agentCapturedTimes, assetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.Timestamptz
+	for rows.Next() {
+		var captured_at pgtype.Timestamptz
+		if err := rows.Scan(&captured_at); err != nil {
+			return nil, err
+		}
+		items = append(items, captured_at)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const agentInspectAssets = `-- name: AgentInspectAssets :many
 SELECT asset_id, type, specific_metadata
 FROM assets
@@ -143,12 +172,33 @@ func (q *Queries) AgentLookupPeople(ctx context.Context, arg AgentLookupPeoplePa
 }
 
 const agentPeekAssets = `-- name: AgentPeekAssets :many
-SELECT asset_id, original_filename, type,
-       COALESCE(taken_time, upload_time)::timestamptz AS captured_at,
-       rating, liked
-FROM assets
-WHERE asset_id = ANY($1::uuid[])
-  AND is_deleted = false
+SELECT
+    a.asset_id,
+    a.original_filename,
+    a.type,
+    COALESCE(a.taken_time, a.upload_time)::timestamptz AS captured_at,
+    a.rating,
+    a.liked,
+    COALESCE((
+        SELECT COALESCE(lc.label, lc.city, lc.region, lc.country)
+        FROM location_cluster_assets lca
+        JOIN location_clusters lc ON lc.cluster_id = lca.cluster_id
+        WHERE lca.asset_id = a.asset_id
+          AND COALESCE(lc.label, lc.city, lc.region, lc.country) IS NOT NULL
+        LIMIT 1
+    ), '')::text AS place,
+    (
+        SELECT array_agg(DISTINCT fc.cluster_name)
+        FROM face_items fi
+        JOIN face_cluster_members fcm ON fcm.face_id = fi.id
+        JOIN face_clusters fc ON fc.cluster_id = fcm.cluster_id
+        WHERE fi.asset_id = a.asset_id
+          AND fc.cluster_name IS NOT NULL
+          AND fc.cluster_name <> ''
+    )::text[] AS people
+FROM assets a
+WHERE a.asset_id = ANY($1::uuid[])
+  AND a.is_deleted = false
 `
 
 type AgentPeekAssetsRow struct {
@@ -158,9 +208,13 @@ type AgentPeekAssetsRow struct {
 	CapturedAt       pgtype.Timestamptz `db:"captured_at" json:"captured_at"`
 	Rating           *int32             `db:"rating" json:"rating"`
 	Liked            *bool              `db:"liked" json:"liked"`
+	Place            string             `db:"place" json:"place"`
+	People           []string           `db:"people" json:"people"`
 }
 
-// peek observer: minimal per-asset fields; snapshot order restored in Go.
+// peek observer: minimal per-asset fields plus place + people; snapshot order
+// restored in Go. place/people are correlated subqueries so each asset stays a
+// single row (no fan-out from the cluster joins).
 func (q *Queries) AgentPeekAssets(ctx context.Context, assetIds []pgtype.UUID) ([]AgentPeekAssetsRow, error) {
 	rows, err := q.db.Query(ctx, agentPeekAssets, assetIds)
 	if err != nil {
@@ -177,6 +231,8 @@ func (q *Queries) AgentPeekAssets(ctx context.Context, assetIds []pgtype.UUID) (
 			&i.CapturedAt,
 			&i.Rating,
 			&i.Liked,
+			&i.Place,
+			&i.People,
 		); err != nil {
 			return nil, err
 		}

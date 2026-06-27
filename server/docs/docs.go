@@ -375,6 +375,35 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.AgentQualityStatsDTO": {
+                "properties": {
+                    "p25": {
+                        "example": 5.1,
+                        "type": "number"
+                    },
+                    "p50": {
+                        "example": 5.7,
+                        "type": "number"
+                    },
+                    "p75": {
+                        "example": 6.3,
+                        "type": "number"
+                    },
+                    "p90": {
+                        "example": 7,
+                        "type": "number"
+                    },
+                    "scored": {
+                        "example": 318,
+                        "type": "integer"
+                    },
+                    "unscored": {
+                        "example": 2,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AgentRefAssetsDTO": {
                 "properties": {
                     "assets": {
@@ -435,6 +464,13 @@ const docTemplate = `{
                     "date_range": {
                         "$ref": "#/components/schemas/dto.AgentDateRangeDTO"
                     },
+                    "focal_lengths": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AgentNameCountDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "histogram": {
                         "items": {
                             "$ref": "#/components/schemas/dto.AgentFacetBucket"
@@ -452,8 +488,18 @@ const docTemplate = `{
                         "example": "day",
                         "type": "string"
                     },
+                    "lenses": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AgentNameCountDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "liked_count": {
                         "type": "integer"
+                    },
+                    "quality": {
+                        "$ref": "#/components/schemas/dto.AgentQualityStatsDTO"
                     },
                     "rating_dist": {
                         "items": {

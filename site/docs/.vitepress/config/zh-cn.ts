@@ -10,6 +10,14 @@ export const zhcnConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
         search: {
             provider: 'local',
             options: {
+                // Keep internal/ engineering docs out of the search index even
+                // though VitePress still builds them. Pairs with `search: false`
+                // frontmatter and their absence from nav/sidebar.
+                _render(src, env, md) {
+                    if ((env as any).frontmatter?.search === false) return ''
+                    if ((env as any).relativePath?.startsWith('internal/')) return ''
+                    return md.render(src, env)
+                },
                 locales: {
                     zh: {
                         translations: {

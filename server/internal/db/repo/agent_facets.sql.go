@@ -93,6 +93,42 @@ func (q *Queries) AgentFacetOverview(ctx context.Context, assetIds []pgtype.UUID
 	return i, err
 }
 
+const agentFacetQualityStats = `-- name: AgentFacetQualityStats :one
+SELECT
+    COUNT(*) AS scored_count,
+    COALESCE(percentile_cont(0.25) WITHIN GROUP (ORDER BY score), 0)::real AS p25,
+    COALESCE(percentile_cont(0.50) WITHIN GROUP (ORDER BY score), 0)::real AS p50,
+    COALESCE(percentile_cont(0.75) WITHIN GROUP (ORDER BY score), 0)::real AS p75,
+    COALESCE(percentile_cont(0.90) WITHIN GROUP (ORDER BY score), 0)::real AS p90
+FROM asset_quality_scores
+WHERE asset_id = ANY($1::uuid[])
+`
+
+type AgentFacetQualityStatsRow struct {
+	ScoredCount int64   `db:"scored_count" json:"scored_count"`
+	P25         float32 `db:"p25" json:"p25"`
+	P50         float32 `db:"p50" json:"p50"`
+	P75         float32 `db:"p75" json:"p75"`
+	P90         float32 `db:"p90" json:"p90"`
+}
+
+// Aesthetic-score distribution (percentiles) over a ref snapshot, for the
+// describe tool. Unscored assets are excluded from the percentiles;
+// scored_count lets callers report how many of the ref's assets carry a score.
+// Percentiles are NULL when nothing in the set is scored.
+func (q *Queries) AgentFacetQualityStats(ctx context.Context, assetIds []pgtype.UUID) (AgentFacetQualityStatsRow, error) {
+	row := q.db.QueryRow(ctx, agentFacetQualityStats, assetIds)
+	var i AgentFacetQualityStatsRow
+	err := row.Scan(
+		&i.ScoredCount,
+		&i.P25,
+		&i.P50,
+		&i.P75,
+		&i.P90,
+	)
+	return i, err
+}
+
 const agentFacetRatingDist = `-- name: AgentFacetRatingDist :many
 SELECT COALESCE(a.rating, 0) AS rating, COUNT(*) AS count
 FROM assets a
@@ -167,6 +203,98 @@ func (q *Queries) AgentFacetTimeHistogram(ctx context.Context, arg AgentFacetTim
 	for rows.Next() {
 		var i AgentFacetTimeHistogramRow
 		if err := rows.Scan(&i.Bucket, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const agentFacetTopFocalLengths = `-- name: AgentFacetTopFocalLengths :many
+SELECT t.name::text AS name, t.count AS count FROM (
+    SELECT
+        (round((a.specific_metadata ->> 'focal_length')::numeric)::text || 'mm') AS name,
+        COUNT(*) AS count
+    FROM assets a
+    WHERE a.asset_id = ANY($1::uuid[])
+      AND a.is_deleted = false
+      AND a.specific_metadata ->> 'focal_length' ~ '^[0-9]+(\.[0-9]+)?$'
+    GROUP BY 1
+) t
+WHERE t.name <> '0mm'
+ORDER BY t.count DESC
+LIMIT $2
+`
+
+type AgentFacetTopFocalLengthsParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	TopN     int32         `db:"top_n" json:"top_n"`
+}
+
+type AgentFacetTopFocalLengthsRow struct {
+	Name  string `db:"name" json:"name"`
+	Count int64  `db:"count" json:"count"`
+}
+
+// Most-used focal lengths over a ref snapshot, rounded to whole millimetres so
+// 34.9mm and 35mm collapse into one bucket. The regex guards the numeric cast.
+func (q *Queries) AgentFacetTopFocalLengths(ctx context.Context, arg AgentFacetTopFocalLengthsParams) ([]AgentFacetTopFocalLengthsRow, error) {
+	rows, err := q.db.Query(ctx, agentFacetTopFocalLengths, arg.AssetIds, arg.TopN)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentFacetTopFocalLengthsRow
+	for rows.Next() {
+		var i AgentFacetTopFocalLengthsRow
+		if err := rows.Scan(&i.Name, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const agentFacetTopLenses = `-- name: AgentFacetTopLenses :many
+SELECT
+    (a.specific_metadata ->> 'lens_model')::text AS name,
+    COUNT(*) AS count
+FROM assets a
+WHERE a.asset_id = ANY($1::uuid[])
+  AND a.is_deleted = false
+  AND a.specific_metadata ->> 'lens_model' IS NOT NULL
+  AND a.specific_metadata ->> 'lens_model' <> ''
+GROUP BY 1
+ORDER BY count DESC
+LIMIT $2
+`
+
+type AgentFacetTopLensesParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	TopN     int32         `db:"top_n" json:"top_n"`
+}
+
+type AgentFacetTopLensesRow struct {
+	Name  string `db:"name" json:"name"`
+	Count int64  `db:"count" json:"count"`
+}
+
+func (q *Queries) AgentFacetTopLenses(ctx context.Context, arg AgentFacetTopLensesParams) ([]AgentFacetTopLensesRow, error) {
+	rows, err := q.db.Query(ctx, agentFacetTopLenses, arg.AssetIds, arg.TopN)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentFacetTopLensesRow
+	for rows.Next() {
+		var i AgentFacetTopLensesRow
+		if err := rows.Scan(&i.Name, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

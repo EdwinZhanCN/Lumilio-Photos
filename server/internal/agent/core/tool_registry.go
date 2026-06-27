@@ -137,6 +137,7 @@ var modeToolSets = map[string]map[string]bool{
 		"lookup_people":   true,
 		"lookup_albums":   true,
 		"describe":        true,
+		"peek":            true,
 		"combine":         true,
 		"tag_assets":      true,
 		"create_album":    true,
@@ -164,6 +165,7 @@ var modeToolSets = map[string]map[string]bool{
 		"rank":            true,
 		"top":             true,
 		"sample":          true,
+		"dedupe":          true,
 		"describe":        true,
 		"show":            true,
 	},
@@ -181,9 +183,10 @@ var modeInstructionExtras = map[string]string{
 		"(by place/time/people), then use tag_assets to label and create_album to organize. " +
 		"Proactively suggest an organization plan and state your intent before each step.",
 	"analyze": "You are in ANALYZE MODE. Help the user discover shooting habits and trends: " +
-		"use filter to scope, describe for aggregate distributions, inspect for gear details. " +
-		"Give data-driven insights (most-used focal length, peak shooting periods, style shifts) " +
-		"and use show to present supporting photos.",
+		"use filter to scope, describe for aggregate distributions (cameras, focal lengths, lenses, " +
+		"places, time histogram), inspect for per-photo gear details. " +
+		"Give data-driven insights (most-used focal length, peak shooting periods, how gear/lens and " +
+		"location choices shift over time) and use show to present supporting photos.",
 	"curate": "You are in CURATE MODE. Help the user pick the best photos: " +
 		"use filter to build a candidate pool, rank(quality) to sort (quality is based on the SigLIP " +
 		"aesthetic model score 1-10; scores cluster in the 5-7 range with median ~5.5-6, " +
@@ -346,6 +349,21 @@ func (r *ToolRegistry) GetToolInfosByMode(mode string) []*schema.ToolInfo {
 		}
 	}
 	return infos
+}
+
+// ModeHasTool reports whether a tool is visible in the given mode. An empty or
+// unknown mode is the full toolset, so every tool is available. Used by the
+// instruction builder so static guidance never names a tool the current mode
+// has filtered out.
+func ModeHasTool(mode, name string) bool {
+	if mode == "" {
+		return true
+	}
+	toolSet, ok := modeToolSets[mode]
+	if !ok {
+		return true
+	}
+	return toolSet[name]
 }
 
 // ModeInstruction returns the mode-specific prompt fragment, or "" for

@@ -20,16 +20,30 @@ type AgentRefDTO struct {
 
 // AgentRefFacetsDTO mirrors ref.FacetSummary for the wire.
 type AgentRefFacetsDTO struct {
-	Count                int                 `json:"count"`
-	DateRange            *AgentDateRangeDTO  `json:"date_range,omitempty"`
-	Histogram            []AgentFacetBucket  `json:"histogram,omitempty"`
-	HistogramGranularity string              `json:"histogram_granularity,omitempty" example:"day" enums:"hour,day,month,year"`
-	Types                map[string]int      `json:"types,omitempty"`
-	TopPlaces            []AgentNameCountDTO `json:"top_places,omitempty"`
-	TopPeople            []AgentNameCountDTO `json:"top_people,omitempty"`
-	Cameras              []AgentNameCountDTO `json:"cameras,omitempty"`
-	LikedCount           int                 `json:"liked_count,omitempty"`
-	RatingDist           []int               `json:"rating_dist,omitempty"`
+	Count                int                   `json:"count"`
+	DateRange            *AgentDateRangeDTO    `json:"date_range,omitempty"`
+	Histogram            []AgentFacetBucket    `json:"histogram,omitempty"`
+	HistogramGranularity string                `json:"histogram_granularity,omitempty" example:"day" enums:"hour,day,month,year"`
+	Types                map[string]int        `json:"types,omitempty"`
+	TopPlaces            []AgentNameCountDTO   `json:"top_places,omitempty"`
+	TopPeople            []AgentNameCountDTO   `json:"top_people,omitempty"`
+	Cameras              []AgentNameCountDTO   `json:"cameras,omitempty"`
+	FocalLengths         []AgentNameCountDTO   `json:"focal_lengths,omitempty"`
+	Lenses               []AgentNameCountDTO   `json:"lenses,omitempty"`
+	LikedCount           int                   `json:"liked_count,omitempty"`
+	RatingDist           []int                 `json:"rating_dist,omitempty"`
+	Quality              *AgentQualityStatsDTO `json:"quality,omitempty"`
+}
+
+// AgentQualityStatsDTO mirrors ref.QualityStats for the wire: the aesthetic
+// score distribution over a ref (percentiles over scored assets only).
+type AgentQualityStatsDTO struct {
+	Scored   int     `json:"scored" example:"318"`
+	Unscored int     `json:"unscored" example:"2"`
+	P25      float64 `json:"p25" example:"5.1"`
+	P50      float64 `json:"p50" example:"5.7"`
+	P75      float64 `json:"p75" example:"6.3"`
+	P90      float64 `json:"p90" example:"7"`
 }
 
 // AgentDateRangeDTO spans the snapshot's capture times.
@@ -132,6 +146,18 @@ func ToAgentRefFacetsDTO(s *ref.FacetSummary) *AgentRefFacetsDTO {
 	out.TopPlaces = toAgentNameCounts(s.TopPlaces)
 	out.TopPeople = toAgentNameCounts(s.TopPeople)
 	out.Cameras = toAgentNameCounts(s.Cameras)
+	out.FocalLengths = toAgentNameCounts(s.FocalLengths)
+	out.Lenses = toAgentNameCounts(s.Lenses)
+	if s.Quality != nil {
+		out.Quality = &AgentQualityStatsDTO{
+			Scored:   s.Quality.Scored,
+			Unscored: s.Quality.Unscored,
+			P25:      s.Quality.P25,
+			P50:      s.Quality.P50,
+			P75:      s.Quality.P75,
+			P90:      s.Quality.P90,
+		}
+	}
 	return out
 }
 

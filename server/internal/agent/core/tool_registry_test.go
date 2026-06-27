@@ -70,6 +70,41 @@ func TestGetToolInfosByModeEmptyOrUnknownReturnsAll(t *testing.T) {
 	}
 }
 
+func TestModeHasTool(t *testing.T) {
+	if !ModeHasTool("", "tag_assets") {
+		t.Error("free mode should have every tool")
+	}
+	if !ModeHasTool("nonsense", "tag_assets") {
+		t.Error("unknown mode should fall back to full toolset")
+	}
+	if ModeHasTool("curate", "tag_assets") {
+		t.Error("curate must not expose tag_assets")
+	}
+	if !ModeHasTool("organize", "peek") {
+		t.Error("organize should expose peek (place/person grouping verification)")
+	}
+	if !ModeHasTool("curate", "dedupe") {
+		t.Error("curate should expose dedupe")
+	}
+}
+
+func TestBuildInstructionGatesToolMentions(t *testing.T) {
+	// curate excludes tag_assets → no ORGANIZING/tag_assets guidance.
+	curate := buildInstruction("Mon, 2026-01-01", nil, "curate")
+	if strings.Contains(curate, "tag_assets") {
+		t.Error("curate instruction must not mention tag_assets")
+	}
+	// organize includes tag_assets → guidance present.
+	organize := buildInstruction("Mon, 2026-01-01", nil, "organize")
+	if !strings.Contains(organize, "tag_assets") {
+		t.Error("organize instruction should mention tag_assets")
+	}
+	// `top` was removed from the producer/consumer example list everywhere.
+	if strings.Contains(curate, " top,") || strings.Contains(organize, " top,") {
+		t.Error("instruction example list should no longer name top")
+	}
+}
+
 func TestModeInstruction(t *testing.T) {
 	if got := ModeInstruction(""); got != "" {
 		t.Errorf("free mode instruction = %q, want empty", got)

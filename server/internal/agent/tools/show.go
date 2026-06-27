@@ -36,8 +36,10 @@ func RegisterShow() {
 		Name: "show",
 		Desc: "Display the assets in a ref to the user as a widget. " +
 			"Use this tool rather than describing or listing photos in text. " +
-			"The widget param is only the initial view (the user can switch it on the board): " +
-			"set it to \"number_card\" for a compact count/stat view, otherwise omit for a cover card.",
+			"The widget param is only the initial view (the user can switch it on the board), chosen by intent: " +
+			"\"number_card\" for a pure count or statistic, \"cover_card\" for browsing a collection by its cover photo, " +
+			"\"spark_card\" for a time distribution, \"mosaic_card\" for a visual thumbnail collage. " +
+			"When in doubt, omit it for a cover card.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {

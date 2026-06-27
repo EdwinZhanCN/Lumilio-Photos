@@ -50,7 +50,7 @@ import (
 
 // shutdownTimeout bounds how long graceful shutdown (HTTP drain + queue drain)
 // may take before the process exits anyway. Mirrors the desktop shutdown budget
-// in docs/agent/exec-plans/active/desktop-wails-v3.md.
+// in site/docs/internal/agent/exec-plans/active/desktop-wails-v3.md.
 const shutdownTimeout = 10 * time.Second
 
 // Run boots the API server from an already-resolved configuration and blocks
