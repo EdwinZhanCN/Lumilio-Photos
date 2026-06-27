@@ -46,12 +46,22 @@ func TestMLProcessArgsInsertOpts(t *testing.T) {
 		"bioclip":  ProcessBioClipArgs{}.InsertOpts(),
 		"ocr":      ProcessOcrArgs{}.InsertOpts(),
 		"face":     ProcessFaceArgs{}.InsertOpts(),
+		"zeroshot": ZeroshotClassifyArgs{}.InsertOpts(),
 	}
 
 	for name, opts := range tests {
 		t.Run(name, func(t *testing.T) {
 			if opts.MaxAttempts != MLProcessMaxAttempts {
 				t.Fatalf("expected max attempts %d, got %d", MLProcessMaxAttempts, opts.MaxAttempts)
+			}
+			// ML jobs must be unique by args so that overlapping reindex/retry
+			// fan-out collapses to one job per asset instead of racing the
+			// non-transactional OCR/face save paths.
+			if !opts.UniqueOpts.ByArgs {
+				t.Fatalf("expected %s jobs to be unique by args", name)
+			}
+			if opts.UniqueOpts.ByPeriod == 0 {
+				t.Fatalf("expected %s jobs to use uniqueness by period", name)
 			}
 		})
 	}

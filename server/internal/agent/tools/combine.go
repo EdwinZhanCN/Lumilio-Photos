@@ -64,10 +64,7 @@ func RegisterCombine() {
 				combined = combined[:ref.MaxSnapshotSize]
 			}
 
-			summary := fmt.Sprintf("%s(%s) → %d assets", input.Op, strings.Join(input.Refs, ", "), len(combined))
-			if len(combined) == 0 {
-				summary += " (empty set)"
-			}
+			summary := combineSummary(input.Op, input.Refs, operands, len(combined))
 			r := deps.RefStore.Create(
 				deps.Scope(),
 				ref.Plan{Op: info.Name, Params: map[string]string{"op": input.Op}, Parents: input.Refs},
@@ -80,6 +77,29 @@ func RegisterCombine() {
 			return receiptOutput(r, summary), nil
 		})
 	})
+}
+
+// combineSummary spells out each operand's size and how the result relates to
+// the base set, so the model can tell which operand constrained an intersect or
+// diff instead of guessing from a bare result count.
+func combineSummary(op string, refIDs []string, operands []*ref.Ref, resultCount int) string {
+	labels := make([]string, len(operands))
+	for i, o := range operands {
+		labels[i] = fmt.Sprintf("%s[%d]", refIDs[i], o.Count())
+	}
+	summary := fmt.Sprintf("%s(%s) → %d assets", op, strings.Join(labels, ", "), resultCount)
+
+	base := operands[0].Count()
+	switch op {
+	case "intersect":
+		summary += fmt.Sprintf(" (in all; %d of base %s dropped)", base-resultCount, refIDs[0])
+	case "diff":
+		summary += fmt.Sprintf(" (%d of base %s excluded)", base-resultCount, refIDs[0])
+	}
+	if resultCount == 0 {
+		summary += " (empty set)"
+	}
+	return summary
 }
 
 // combineSnapshots applies the set operation with explicit order semantics:

@@ -48,17 +48,3 @@ export function getUtilityClassifierTitle(
       return t("collections.utilities.classifiers.illustration.title");
   }
 }
-
-export function getUtilityClassifierDescription(
-  t: (key: string) => string,
-  slug: UtilityClassifierSlug,
-) {
-  switch (slug) {
-    case "documents":
-      return t("collections.utilities.classifiers.documents.description");
-    case "receipts":
-      return t("collections.utilities.classifiers.receipts.description");
-    case "illustration":
-      return t("collections.utilities.classifiers.illustration.description");
-  }
-}

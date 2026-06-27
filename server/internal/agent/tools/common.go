@@ -110,6 +110,7 @@ func RegisterAll() {
 	RegisterRank()
 	RegisterTop()
 	RegisterSample()
+	RegisterDedupe()
 	// Observers
 	RegisterDescribe()
 	RegisterPeek()
@@ -119,4 +120,5 @@ func RegisterAll() {
 	RegisterBulkLike()
 	RegisterCreateAlbum()
 	RegisterAddToAlbum()
+	RegisterTagAssets()
 }

@@ -345,7 +345,51 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Agent Pin Metadata
+         * @description Get metadata and facet summary for a pinned widget. Frozen pins serve the stored snapshot; live pins replay their plan before facets are computed.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AgentPinDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /**
@@ -395,7 +439,65 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Agent Pin
+         * @description Patch one pinned widget. Send title to rename it, widget to switch which view it renders through; both are optional.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Pin update */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAgentPinRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/v1/agent/pins/{id}/assets": {
@@ -664,11 +766,14 @@ export interface paths {
         };
         /**
          * Get Available Tools
-         * @description Get list of all registered agent tools
+         * @description Get the agent tools visible in the given quick-action mode. An empty or unknown mode returns the full toolset.
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Quick-action mode */
+                    mode?: "review" | "organize" | "analyze" | "curate";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -8910,6 +9015,7 @@ export interface components {
             /** @example 24 */
             count?: number;
             created_at?: string;
+            facets?: components["schemas"]["dto.AgentRefFacetsDTO"];
             layout?: components["schemas"]["dto.AgentPinLayoutDTO"];
             /**
              * @example frozen
@@ -8922,7 +9028,7 @@ export interface components {
             /** @example Kyoto 2025 */
             title?: string;
             truncated?: boolean;
-            /** @example asset_grid */
+            /** @example cover_card */
             widget?: string;
         };
         "dto.AgentPinLayoutDTO": {
@@ -8941,6 +9047,20 @@ export interface components {
             w?: number;
             x?: number;
             y?: number;
+        };
+        "dto.AgentQualityStatsDTO": {
+            /** @example 5.1 */
+            p25?: number;
+            /** @example 5.7 */
+            p50?: number;
+            /** @example 6.3 */
+            p75?: number;
+            /** @example 7 */
+            p90?: number;
+            /** @example 318 */
+            scored?: number;
+            /** @example 2 */
+            unscored?: number;
         };
         "dto.AgentRefAssetsDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
@@ -8963,8 +9083,16 @@ export interface components {
             cameras?: components["schemas"]["dto.AgentNameCountDTO"][];
             count?: number;
             date_range?: components["schemas"]["dto.AgentDateRangeDTO"];
+            focal_lengths?: components["schemas"]["dto.AgentNameCountDTO"][];
             histogram?: components["schemas"]["dto.AgentFacetBucket"][];
+            /**
+             * @example day
+             * @enum {string}
+             */
+            histogram_granularity?: "hour" | "day" | "month" | "year";
+            lenses?: components["schemas"]["dto.AgentNameCountDTO"][];
             liked_count?: number;
+            quality?: components["schemas"]["dto.AgentQualityStatsDTO"];
             rating_dist?: number[];
             top_people?: components["schemas"]["dto.AgentNameCountDTO"][];
             top_places?: components["schemas"]["dto.AgentNameCountDTO"][];
@@ -9126,6 +9254,8 @@ export interface components {
             location?: components["schemas"]["dto.LocationBBoxDTO"];
             /** @example 123 */
             owner_id?: number;
+            /** @example 42 */
+            person_id?: number;
             /** @example 5 */
             rating?: number;
             /** @example true */
@@ -9444,7 +9574,7 @@ export interface components {
             ref_id: string;
             thread_id: string;
             title?: string;
-            /** @example asset_grid */
+            /** @example cover_card */
             widget?: string;
         };
         "dto.CreateAlbumRequestDTO": {
@@ -10457,6 +10587,12 @@ export interface components {
         "dto.UpdateAgentPinLayoutRequest": {
             layouts: components["schemas"]["dto.AgentPinLayoutItemDTO"][];
         };
+        "dto.UpdateAgentPinRequest": {
+            /** @example Kyoto 2025 */
+            title?: string;
+            /** @example number_card */
+            widget?: string;
+        };
         "dto.UpdateAlbumRequestDTO": {
             album_name?: string;
             /** @enum {string} */
@@ -10582,6 +10718,8 @@ export interface components {
         "handler.AgentChatRequest": {
             context?: components["schemas"]["inject.ContextItem"][];
             mentions?: components["schemas"]["inject.MentionItem"][];
+            /** @enum {string} */
+            mode?: "review" | "organize" | "analyze" | "curate";
             query: string;
             thread_id?: string;
         };

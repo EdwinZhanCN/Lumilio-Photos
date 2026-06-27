@@ -5,6 +5,7 @@ import ErrorFallBack from "@/components/ErrorFallBack";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AssetsProvider } from "@/features/assets";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import {
   findUtilityClassifier,
@@ -17,18 +18,33 @@ export default function UtilityClassifierAlbum() {
   const { t } = useI18n();
   const classifier = findUtilityClassifier(classifierSlug);
 
+  const baseFilter: AssetFilter = useMemo(
+    () => ({
+      tag_name: classifier?.tagName,
+      tag_source: "zeroshot",
+    }),
+    [classifier?.tagName],
+  );
+
+  useBreadcrumbs(
+    classifier
+      ? [
+          { label: t("sidebar.home", "Home"), to: "/" },
+          { label: t("sidebar.collections", "Collections"), to: "/collections" },
+          {
+            label: t("collections.sections.utilities", "Utilities"),
+            to: "/collections/utilities",
+          },
+          { label: getUtilityClassifierTitle(t, classifier.slug) },
+        ]
+      : [],
+  );
+
   if (!classifier) {
     return <Navigate to="/collections" replace />;
   }
 
   const Icon = classifier.icon;
-  const baseFilter: AssetFilter = useMemo(
-    () => ({
-      tag_name: classifier.tagName,
-      tag_source: "zeroshot",
-    }),
-    [classifier.tagName],
-  );
   const basePath = `/collections/utilities/${classifier.slug}`;
 
   return (

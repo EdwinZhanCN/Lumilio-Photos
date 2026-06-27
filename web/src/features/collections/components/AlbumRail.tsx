@@ -1,5 +1,7 @@
 import { Album as AlbumIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
+import Rail from "./Rail";
+import RailCard from "./RailCard";
 import type { Album } from "./ImgStackGrid/ImgStackGrid";
 
 type AlbumRailProps = {
@@ -8,20 +10,6 @@ type AlbumRailProps = {
   onAlbumClick?: (album: Album) => void;
 };
 
-const AlbumRailSkeleton = () => (
-  <div className="flex gap-4 overflow-x-auto pb-2">
-    {Array.from({ length: 4 }).map((_, index) => (
-      <div key={index} className="w-48 shrink-0">
-        <div className="aspect-square animate-pulse rounded-[1.75rem] bg-base-300/70" />
-        <div className="mt-3 space-y-2 px-1">
-          <div className="h-4 w-28 animate-pulse rounded bg-base-300/70" />
-          <div className="h-3 w-16 animate-pulse rounded bg-base-300/50" />
-        </div>
-      </div>
-    ))}
-  </div>
-);
-
 export default function AlbumRail({
   albums,
   loading = false,
@@ -29,49 +17,30 @@ export default function AlbumRail({
 }: AlbumRailProps) {
   const { t } = useI18n();
 
-  if (loading) {
-    return <AlbumRailSkeleton />;
-  }
-
-  if (albums.length === 0) {
-    return (
-      <div className="rounded-[1.75rem] border border-dashed border-base-300 px-6 py-8 text-sm text-base-content/60">
-        {t("collections.emptyAlbums")}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
+    <Rail
+      loading={loading}
+      isEmpty={albums.length === 0}
+      empty={
+        <div className="rounded-[1.75rem] border border-dashed border-base-300 px-6 py-8 text-sm text-base-content/60">
+          {t("collections.emptyAlbums")}
+        </div>
+      }
+    >
       {albums.map((album) => (
-        <button
+        <RailCard
           key={album.id}
-          type="button"
+          media={{
+            kind: "photo",
+            src: album.coverImages?.[0],
+            fallbackIcon: AlbumIcon,
+          }}
+          title={album.name}
+          subtitle={t("collections.itemsCount", { count: album.imageCount })}
           onClick={() => onAlbumClick?.(album)}
-          className="group w-48 shrink-0 cursor-pointer text-left"
-        >
-          <div className="relative aspect-square overflow-hidden rounded-[1.75rem] bg-base-200 transition duration-300">
-            {album.coverImages?.[0] ? (
-              <img
-                src={album.coverImages[0]}
-                alt={album.name}
-                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03] cursor-pointer"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center bg-gradient-to-br from-base-200 via-base-300/70 to-base-200">
-                <AlbumIcon className="size-12 text-base-content/35" />
-              </div>
-            )}
-          </div>
-          <div className="mt-3 space-y-1 px-1">
-            <p className="truncate text-base font-semibold">{album.name}</p>
-            <p className="text-sm text-base-content/55">
-              {t("collections.itemsCount", { count: album.imageCount })}
-            </p>
-          </div>
-        </button>
+          className="w-48"
+        />
       ))}
-    </div>
+    </Rail>
   );
 }

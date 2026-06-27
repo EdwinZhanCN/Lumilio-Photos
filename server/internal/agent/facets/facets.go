@@ -6,6 +6,7 @@ package facets
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"server/internal/agent/ref"
@@ -18,8 +19,9 @@ const (
 	topPlaces  = 5
 	topPeople  = 5
 	topCameras = 3
-	// yearGranularityThreshold switches the time histogram from month to
-	// year buckets when the snapshot spans more than this many years.
+	topGear    = 5
+	// yearGranularityThreshold switches multi-month histograms to year
+	// buckets when the snapshot spans more than this many years.
 	yearGranularityThreshold = 3
 )
 
@@ -44,11 +46,17 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 
 	granularity := "month"
 	if overview.DateFrom.Valid && overview.DateTo.Valid {
-		summary.DateRange = &ref.DateRange{From: overview.DateFrom.Time, To: overview.DateTo.Time}
-		if overview.DateTo.Time.Sub(overview.DateFrom.Time) > yearGranularityThreshold*365*24*time.Hour {
-			granularity = "year"
+		summary.DateRange = &ref.DateRange{
+			From: overview.DateFrom.Time.UTC(),
+			To:   overview.DateTo.Time.UTC(),
 		}
+		if cm := overview.CaptureOffsetMinutes; cm != 0 {
+			offset := int16(cm)
+			summary.DateRange.OffsetMinutes = &offset
+		}
+		granularity = chooseHistogramGranularity(overview.DateFrom.Time, overview.DateTo.Time)
 	}
+	summary.HistogramGranularity = granularity
 
 	if buckets, err := queries.AgentFacetTimeHistogram(ctx, repo.AgentFacetTimeHistogramParams{
 		Granularity: granularity,
@@ -94,6 +102,24 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		})
 	}
 
+	if focals, err := queries.AgentFacetTopFocalLengths(ctx, repo.AgentFacetTopFocalLengthsParams{
+		AssetIds: assetIDs,
+		TopN:     topGear,
+	}); err == nil {
+		summary.FocalLengths = toNameCounts(focals, func(row repo.AgentFacetTopFocalLengthsRow) (string, int64) {
+			return row.Name, row.Count
+		})
+	}
+
+	if lenses, err := queries.AgentFacetTopLenses(ctx, repo.AgentFacetTopLensesParams{
+		AssetIds: assetIDs,
+		TopN:     topGear,
+	}); err == nil {
+		summary.Lenses = toNameCounts(lenses, func(row repo.AgentFacetTopLensesRow) (string, int64) {
+			return row.Name, row.Count
+		})
+	}
+
 	if ratings, err := queries.AgentFacetRatingDist(ctx, assetIDs); err == nil && len(ratings) > 0 {
 		dist := make([]int, 6)
 		nonZero := false
@@ -110,7 +136,39 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		}
 	}
 
+	if q, err := queries.AgentFacetQualityStats(ctx, assetIDs); err == nil && q.ScoredCount > 0 {
+		summary.Quality = &ref.QualityStats{
+			Scored:   int(q.ScoredCount),
+			Unscored: r.Count() - int(q.ScoredCount),
+			P25:      round1(q.P25),
+			P50:      round1(q.P50),
+			P75:      round1(q.P75),
+			P90:      round1(q.P90),
+		}
+	}
+
 	return summary, nil
+}
+
+// round1 rounds a score to one decimal place — the percentiles are presented
+// to the model as distribution shape, so sub-decimal precision is just noise.
+func round1(v float32) float64 {
+	return math.Round(float64(v)*10) / 10
+}
+
+func chooseHistogramGranularity(from, to time.Time) string {
+	fromYear, fromMonth, fromDay := from.Date()
+	toYear, toMonth, toDay := to.Date()
+	if fromYear == toYear && fromMonth == toMonth && fromDay == toDay {
+		return "hour"
+	}
+	if fromYear == toYear && fromMonth == toMonth {
+		return "day"
+	}
+	if to.Sub(from) > yearGranularityThreshold*365*24*time.Hour {
+		return "year"
+	}
+	return "month"
 }
 
 func toNameCounts[T any](rows []T, extract func(T) (string, int64)) []ref.NameCount {

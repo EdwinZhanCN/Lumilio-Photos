@@ -296,6 +296,9 @@ const docTemplate = `{
                     "created_at": {
                         "type": "string"
                     },
+                    "facets": {
+                        "$ref": "#/components/schemas/dto.AgentRefFacetsDTO"
+                    },
                     "layout": {
                         "$ref": "#/components/schemas/dto.AgentPinLayoutDTO"
                     },
@@ -322,7 +325,7 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "widget": {
-                        "example": "asset_grid",
+                        "example": "cover_card",
                         "type": "string"
                     }
                 },
@@ -370,6 +373,35 @@ const docTemplate = `{
                 "required": [
                     "pin_id"
                 ],
+                "type": "object"
+            },
+            "dto.AgentQualityStatsDTO": {
+                "properties": {
+                    "p25": {
+                        "example": 5.1,
+                        "type": "number"
+                    },
+                    "p50": {
+                        "example": 5.7,
+                        "type": "number"
+                    },
+                    "p75": {
+                        "example": 6.3,
+                        "type": "number"
+                    },
+                    "p90": {
+                        "example": 7,
+                        "type": "number"
+                    },
+                    "scored": {
+                        "example": 318,
+                        "type": "integer"
+                    },
+                    "unscored": {
+                        "example": 2,
+                        "type": "integer"
+                    }
+                },
                 "type": "object"
             },
             "dto.AgentRefAssetsDTO": {
@@ -432,6 +464,13 @@ const docTemplate = `{
                     "date_range": {
                         "$ref": "#/components/schemas/dto.AgentDateRangeDTO"
                     },
+                    "focal_lengths": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AgentNameCountDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "histogram": {
                         "items": {
                             "$ref": "#/components/schemas/dto.AgentFacetBucket"
@@ -439,8 +478,28 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
+                    "histogram_granularity": {
+                        "enum": [
+                            "hour",
+                            "day",
+                            "month",
+                            "year"
+                        ],
+                        "example": "day",
+                        "type": "string"
+                    },
+                    "lenses": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AgentNameCountDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "liked_count": {
                         "type": "integer"
+                    },
+                    "quality": {
+                        "$ref": "#/components/schemas/dto.AgentQualityStatsDTO"
                     },
                     "rating_dist": {
                         "items": {
@@ -988,6 +1047,10 @@ const docTemplate = `{
                     },
                     "owner_id": {
                         "example": 123,
+                        "type": "integer"
+                    },
+                    "person_id": {
+                        "example": 42,
                         "type": "integer"
                     },
                     "rating": {
@@ -1797,7 +1860,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "widget": {
-                        "example": "asset_grid",
+                        "example": "cover_card",
                         "type": "string"
                     }
                 },
@@ -4240,6 +4303,19 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.UpdateAgentPinRequest": {
+                "properties": {
+                    "title": {
+                        "example": "Kyoto 2025",
+                        "type": "string"
+                    },
+                    "widget": {
+                        "example": "number_card",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UpdateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
@@ -4607,6 +4683,15 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    },
+                    "mode": {
+                        "enum": [
+                            "review",
+                            "organize",
+                            "analyze",
+                            "curate"
+                        ],
+                        "type": "string"
                     },
                     "query": {
                         "type": "string"
@@ -5383,6 +5468,136 @@ const docTemplate = `{
                 "tags": [
                     "agent"
                 ]
+            },
+            "get": {
+                "description": "Get metadata and facet summary for a pinned widget. Frozen pins serve the stored snapshot; live pins replay their plan before facets are computed.",
+                "parameters": [
+                    {
+                        "description": "Pin ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AgentPinDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Pin not found"
+                    }
+                },
+                "summary": "Get Agent Pin Metadata",
+                "tags": [
+                    "agent"
+                ]
+            },
+            "patch": {
+                "description": "Patch one pinned widget. Send title to rename it, widget to switch which view it renders through; both are optional.",
+                "parameters": [
+                    {
+                        "description": "Pin ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateAgentPinRequest",
+                                        "summary": "request",
+                                        "description": "Pin update"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Pin update",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Pin not found"
+                    }
+                },
+                "summary": "Update Agent Pin",
+                "tags": [
+                    "agent"
+                ]
             }
         },
         "/api/v1/agent/pins/{id}/assets": {
@@ -5593,7 +5808,23 @@ const docTemplate = `{
         },
         "/api/v1/agent/tools": {
             "get": {
-                "description": "Get list of all registered agent tools",
+                "description": "Get the agent tools visible in the given quick-action mode. An empty or unknown mode returns the full toolset.",
+                "parameters": [
+                    {
+                        "description": "Quick-action mode",
+                        "in": "query",
+                        "name": "mode",
+                        "schema": {
+                            "enum": [
+                                "review",
+                                "organize",
+                                "analyze",
+                                "curate"
+                            ],
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {

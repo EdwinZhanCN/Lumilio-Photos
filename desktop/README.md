@@ -3,7 +3,7 @@
 A macOS desktop build that bundles a private PostgreSQL 17 runtime and runs the
 existing Go API server **in-process**, reusing the same bootstrap (`server/app`)
 and the same React UI over HTTP. See the full design in
-`docs/agent/exec-plans/active/desktop-wails-v3.md`.
+`site/docs/internal/agent/exec-plans/active/desktop-wails-v3.md`.
 
 ## Architecture
 

@@ -1,7 +1,14 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
+import {
+  BrowserRouter,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
+import { ChatDock } from "@/features/lumilio/components/Chat/ChatDock";
 import {
   appRoutes,
   bootstrapRoutes,
@@ -26,35 +33,43 @@ import {
 } from "./features/auth";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { UploadProvider } from "@/features/upload";
+import { BreadcrumbProvider, Breadcrumbs } from "@/components/breadcrumbs";
 
 const queryClient = new QueryClient();
 
 function AppShellLayout(): React.ReactNode {
   const { t } = useI18n();
+  const location = useLocation();
+  // The /lumilio board embeds its own dock; everywhere else gets the global FAB.
+  const showAgentDock = location.pathname !== "/lumilio";
 
   return (
-    <div className="flex h-screen flex-col">
-      <div className="bg-base-100 shadow">
-        <NavBar />
+    <BreadcrumbProvider>
+      <div className="flex h-screen flex-col">
+        <div className="bg-base-100 shadow">
+          <NavBar />
+        </div>
+        <div className="flex flex-1 overflow-hidden">
+          <div className="w-auto bg-base-200 shadow-lg">
+            <SideBar />
+          </div>
+          <div id="app-scroll-container" className="flex-1 overflow-y-auto overflow-x-hidden">
+            <Breadcrumbs className="sticky top-0 z-10 bg-base-100/80 backdrop-blur" />
+            <Outlet />
+          </div>
+        </div>
+        <footer className="bg-base-100 text-base-content text-xs">
+          <div className="container mx-auto py-0.5">
+            <p className="text-center">
+              {t("footer.copyright", {
+                year: new Date().getFullYear(),
+              })}
+            </p>
+          </div>
+        </footer>
+        {showAgentDock && <ChatDock variant="fab" />}
       </div>
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-auto bg-base-200 shadow-lg">
-          <SideBar />
-        </div>
-        <div id="app-scroll-container" className="flex-1 overflow-y-auto overflow-x-hidden">
-          <Outlet />
-        </div>
-      </div>
-      <footer className="bg-base-100 text-base-content text-xs">
-        <div className="container mx-auto py-0.5">
-          <p className="text-center">
-            {t("footer.copyright", {
-              year: new Date().getFullYear(),
-            })}
-          </p>
-        </div>
-      </footer>
-    </div>
+    </BreadcrumbProvider>
   );
 }
 

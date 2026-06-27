@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
-import { AlertTriangle, Loader2, RefreshCw, Users } from "lucide-react";
+import { Loader2, RefreshCw, Users } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import { CollectionErrorAlert, LoadMoreButton } from "@/components/collection";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import {
@@ -19,6 +21,11 @@ function PeopleContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const showMessage = useMessage();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    { label: t("collections.sections.people", "People") },
+  ]);
   const { scopedRepositoryId } = useWorkingRepository();
   const [limit, setLimit] = useState(PAGE_SIZE);
   const { people, total, isLoading, isError, error, isFetching } = usePeople({
@@ -75,17 +82,12 @@ function PeopleContent() {
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">
         <div className="space-y-6">
           {isError && (
-            <div className="alert alert-warning">
-              <AlertTriangle className="size-5" />
-              <span>
-                {t("collections.messages.loadPeopleError", {
-                  message:
-                    error instanceof Error
-                      ? error.message
-                      : t("home.errors.unknown"),
-                })}
-              </span>
-            </div>
+            <CollectionErrorAlert
+              message={t("collections.messages.loadPeopleError", {
+                message:
+                  error instanceof Error ? error.message : t("home.errors.unknown"),
+              })}
+            />
           )}
 
           <PeopleCollectionGrid
@@ -99,16 +101,11 @@ function PeopleContent() {
           />
 
           {total > people.length && (
-            <div className="flex justify-center">
-              <button
-                type="button"
-                className="btn btn-outline btn-wide"
-                onClick={() => setLimit((current) => current + PAGE_SIZE)}
-                disabled={isFetching}
-              >
-                {isFetching ? t("common.loading") : t("common.loadMore")}
-              </button>
-            </div>
+            <LoadMoreButton
+              onClick={() => setLimit((current) => current + PAGE_SIZE)}
+              loading={isFetching}
+              className=""
+            />
           )}
         </div>
       </div>

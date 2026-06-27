@@ -20,15 +20,30 @@ type AgentRefDTO struct {
 
 // AgentRefFacetsDTO mirrors ref.FacetSummary for the wire.
 type AgentRefFacetsDTO struct {
-	Count      int                 `json:"count"`
-	DateRange  *AgentDateRangeDTO  `json:"date_range,omitempty"`
-	Histogram  []AgentFacetBucket  `json:"histogram,omitempty"`
-	Types      map[string]int      `json:"types,omitempty"`
-	TopPlaces  []AgentNameCountDTO `json:"top_places,omitempty"`
-	TopPeople  []AgentNameCountDTO `json:"top_people,omitempty"`
-	Cameras    []AgentNameCountDTO `json:"cameras,omitempty"`
-	LikedCount int                 `json:"liked_count,omitempty"`
-	RatingDist []int               `json:"rating_dist,omitempty"`
+	Count                int                   `json:"count"`
+	DateRange            *AgentDateRangeDTO    `json:"date_range,omitempty"`
+	Histogram            []AgentFacetBucket    `json:"histogram,omitempty"`
+	HistogramGranularity string                `json:"histogram_granularity,omitempty" example:"day" enums:"hour,day,month,year"`
+	Types                map[string]int        `json:"types,omitempty"`
+	TopPlaces            []AgentNameCountDTO   `json:"top_places,omitempty"`
+	TopPeople            []AgentNameCountDTO   `json:"top_people,omitempty"`
+	Cameras              []AgentNameCountDTO   `json:"cameras,omitempty"`
+	FocalLengths         []AgentNameCountDTO   `json:"focal_lengths,omitempty"`
+	Lenses               []AgentNameCountDTO   `json:"lenses,omitempty"`
+	LikedCount           int                   `json:"liked_count,omitempty"`
+	RatingDist           []int                 `json:"rating_dist,omitempty"`
+	Quality              *AgentQualityStatsDTO `json:"quality,omitempty"`
+}
+
+// AgentQualityStatsDTO mirrors ref.QualityStats for the wire: the aesthetic
+// score distribution over a ref (percentiles over scored assets only).
+type AgentQualityStatsDTO struct {
+	Scored   int     `json:"scored" example:"318"`
+	Unscored int     `json:"unscored" example:"2"`
+	P25      float64 `json:"p25" example:"5.1"`
+	P50      float64 `json:"p50" example:"5.7"`
+	P75      float64 `json:"p75" example:"6.3"`
+	P90      float64 `json:"p90" example:"7"`
 }
 
 // AgentDateRangeDTO spans the snapshot's capture times.
@@ -67,15 +82,16 @@ type AgentPinLayoutDTO struct {
 // AgentPinDTO is a pinned widget on the agent board: a durable ref snapshot
 // plus widget type and grid placement.
 type AgentPinDTO struct {
-	PinID     string            `json:"pin_id" example:"7d4df41e-9aa2-4d44-9a3d-111111111111"`
-	Title     string            `json:"title" example:"Kyoto 2025"`
-	Widget    string            `json:"widget" example:"asset_grid"`
-	Mode      string            `json:"mode" example:"frozen" enums:"frozen,live"`
-	Count     int               `json:"count" example:"24"`
-	Summary   string            `json:"summary,omitempty"`
-	Truncated bool              `json:"truncated,omitempty"`
-	Layout    AgentPinLayoutDTO `json:"layout"`
-	CreatedAt time.Time         `json:"created_at"`
+	PinID     string             `json:"pin_id" example:"7d4df41e-9aa2-4d44-9a3d-111111111111"`
+	Title     string             `json:"title" example:"Kyoto 2025"`
+	Widget    string             `json:"widget" example:"cover_card"`
+	Mode      string             `json:"mode" example:"frozen" enums:"frozen,live"`
+	Count     int                `json:"count" example:"24"`
+	Summary   string             `json:"summary,omitempty"`
+	Truncated bool               `json:"truncated,omitempty"`
+	Layout    AgentPinLayoutDTO  `json:"layout"`
+	Facets    *AgentRefFacetsDTO `json:"facets,omitempty"`
+	CreatedAt time.Time          `json:"created_at"`
 }
 
 // CreateAgentPinRequest pins a session ref onto the board.
@@ -83,7 +99,7 @@ type CreateAgentPinRequest struct {
 	RefID    string             `json:"ref_id" binding:"required"`
 	ThreadID string             `json:"thread_id" binding:"required"`
 	Title    string             `json:"title,omitempty"`
-	Widget   string             `json:"widget,omitempty" example:"asset_grid"`
+	Widget   string             `json:"widget,omitempty" example:"cover_card"`
 	Mode     string             `json:"mode,omitempty" enums:"frozen,live"`
 	Layout   *AgentPinLayoutDTO `json:"layout,omitempty"`
 }
@@ -91,6 +107,13 @@ type CreateAgentPinRequest struct {
 // UpdateAgentPinLayoutRequest persists board layout changes in bulk.
 type UpdateAgentPinLayoutRequest struct {
 	Layouts []AgentPinLayoutItemDTO `json:"layouts" binding:"required"`
+}
+
+// UpdateAgentPinRequest patches a single pin. Both fields are optional: title
+// renames the widget; widget switches which view the pinned ref renders through.
+type UpdateAgentPinRequest struct {
+	Title  *string `json:"title,omitempty" example:"Kyoto 2025"`
+	Widget *string `json:"widget,omitempty" example:"number_card"`
 }
 
 // AgentPinLayoutItemDTO is one pin's new grid cell.
@@ -108,10 +131,11 @@ func ToAgentRefFacetsDTO(s *ref.FacetSummary) *AgentRefFacetsDTO {
 		return nil
 	}
 	out := &AgentRefFacetsDTO{
-		Count:      s.Count,
-		Types:      s.Types,
-		LikedCount: s.LikedCount,
-		RatingDist: s.RatingDist,
+		Count:                s.Count,
+		HistogramGranularity: s.HistogramGranularity,
+		Types:                s.Types,
+		LikedCount:           s.LikedCount,
+		RatingDist:           s.RatingDist,
 	}
 	if s.DateRange != nil {
 		out.DateRange = &AgentDateRangeDTO{From: s.DateRange.From, To: s.DateRange.To}
@@ -122,6 +146,18 @@ func ToAgentRefFacetsDTO(s *ref.FacetSummary) *AgentRefFacetsDTO {
 	out.TopPlaces = toAgentNameCounts(s.TopPlaces)
 	out.TopPeople = toAgentNameCounts(s.TopPeople)
 	out.Cameras = toAgentNameCounts(s.Cameras)
+	out.FocalLengths = toAgentNameCounts(s.FocalLengths)
+	out.Lenses = toAgentNameCounts(s.Lenses)
+	if s.Quality != nil {
+		out.Quality = &AgentQualityStatsDTO{
+			Scored:   s.Quality.Scored,
+			Unscored: s.Quality.Unscored,
+			P25:      s.Quality.P25,
+			P50:      s.Quality.P50,
+			P75:      s.Quality.P75,
+			P90:      s.Quality.P90,
+		}
+	}
 	return out
 }
 

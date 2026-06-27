@@ -10,6 +10,7 @@ import type {
   AssetsBulkActionItem,
 } from "@/features/assets/components/shared/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
@@ -25,6 +26,15 @@ const HIDDEN_TRASH_BULK_ACTIONS = [
 
 const AssetsTrashContent = () => {
   const { t } = useI18n();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    {
+      label: t("collections.sections.utilities", "Utilities"),
+      to: "/collections/utilities",
+    },
+    { label: t("assets.trash.title", "Trash") },
+  ]);
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const restoreAssetMutation = $api.useMutation(

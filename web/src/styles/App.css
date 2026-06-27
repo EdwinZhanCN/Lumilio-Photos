@@ -225,6 +225,23 @@
     animation: fadeInX 0.3s ease-in-out;
 }
 
+/* Agent widget board: pulsing "live" dot on LiveBadge. */
+@keyframes lumpulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.4;
+        transform: scale(0.78);
+    }
+}
+
+.lumilio-livedot {
+    animation: lumpulse 1.4s ease-in-out infinite;
+}
+
 /* Search button active / animation styles */
 .search-btn {
     transition:

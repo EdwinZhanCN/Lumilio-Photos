@@ -193,11 +193,11 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                 </div>
               </div>
 
-              {remaining > 0 && (
+              <div className="flex items-center gap-2">
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => {
-                    setReindexAll(false);
+                    setReindexAll(remaining === 0);
                     setReindexModal({ taskKey: key, taskLabel: label });
                   }}
                   disabled={
@@ -213,7 +213,12 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                   />
                   {t("monitor.ml.reindex")}
                 </button>
-              )}
+                {remaining === 0 && (
+                  <span className="text-xs text-base-content/40">
+                    {t("monitor.ml.allIndexed", "All indexed")}
+                  </span>
+                )}
+              </div>
             </section>
           );
         })}

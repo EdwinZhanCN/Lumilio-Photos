@@ -1,13 +1,12 @@
 .lumen-avatar {
     margin: 0;
     position: relative;
-    /* Box tightly wraps the visible pyramid + shadow (measured 11.11em x 17.78em,
-       centered on the box center). The pyramid is drawn with fixed-em borders and
-       3D transforms, so it is unaffected by this box size and stays centered —
-       this just stops the old 20em box from reserving ~4.4em of empty space on
-       every side, which made parent positioning (right/align) counter-intuitive. */
-    width: 12em;
-    height: 18.5em;
+    /* Square box (1:1) so the avatar aligns like an icon in flex rows. The
+       visible pyramid measures ~11.11em x 14.03em; 14em square wraps its height
+       with even horizontal slack. The pyramid's intrinsic 3D render sits 1.45em
+       above center, so .pyramid-gyro is nudged down by that amount to center it. */
+    width: 14em;
+    height: 14em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -54,6 +53,10 @@
     perspective-origin: 50% 5em;
     -webkit-perspective: 50em;
     -webkit-perspective-origin: 50% 5em;
+    /* Nudge the 3D scene up so the visible pyramid is vertically centered in
+       the square box (its rendered triangle sits ~1.25em below box center). */
+    transform: translateY(-1.25em);
+    -webkit-transform: translateY(-1.25em);
 }
 
 .lumen-avatar .pyramid-axis {
@@ -127,18 +130,6 @@
     -webkit-transform: rotateX(90deg) translateY(5em);
     transform-origin: bottom center;
     -webkit-transform-origin: bottom center;
-}
-
-.lumen-avatar .shadow {
-    width: 10em;
-    height: 10em;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 50%;
-    position: absolute;
-    bottom: -8em;
-    left: 0;
-    transform: rotateX(90deg);
-    -webkit-transform: rotateX(90deg);
 }
 
 .lumen-avatar h1 {

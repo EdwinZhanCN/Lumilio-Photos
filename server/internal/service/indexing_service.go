@@ -54,6 +54,7 @@ type ReindexAssetsInput struct {
 	RepositoryID *string
 	Tasks        []AssetIndexingTask
 	Limit        int
+	Offset       int
 	MissingOnly  bool
 }
 
@@ -119,6 +120,9 @@ func normalizeReindexAssetsInput(input ReindexAssetsInput) ReindexAssetsInput {
 	}
 	if input.Limit > maxIndexingBatchSize {
 		input.Limit = maxIndexingBatchSize
+	}
+	if input.Offset < 0 {
+		input.Offset = 0
 	}
 	if input.Tasks == nil {
 		input.Tasks = []AssetIndexingTask{}
@@ -347,7 +351,48 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		zap.Int("failed_assets", failedAssets),
 		zap.Any("tasks", enabledTasks),
 	)
+
+	// Full rebuilds page through the entire library: a full batch means more
+	// assets likely remain, so enqueue the next page (offset += limit). The
+	// single-worker reindex_assets queue processes pages serially. Missing-only
+	// backfills are intentionally one-shot because their result set shrinks as
+	// downstream ML jobs complete, which would make offset pagination skip or
+	// reprocess assets; callers re-trigger to make further progress.
+	if nextOffset, hasMore := nextReindexPageOffset(input.MissingOnly, len(candidates), input.Limit, input.Offset); hasMore {
+		if _, err := s.queueClient.Insert(ctx, jobs.ReindexAssetsArgs{
+			RepositoryID: input.RepositoryID,
+			Tasks:        indexingTasksToStrings(enabledTasks),
+			Limit:        input.Limit,
+			Offset:       nextOffset,
+			MissingOnly:  false,
+		}, &river.InsertOpts{Queue: "reindex_assets"}); err != nil {
+			s.logger.Warn("reindex failed to enqueue next page",
+				zap.String("operation", "reindex.process"),
+				zap.Int("next_offset", nextOffset),
+				zap.Int("limit", input.Limit),
+				zap.Error(err),
+			)
+			return fmt.Errorf("enqueue reindex next page: %w", err)
+		}
+		s.logger.Info("reindex enqueued next page",
+			zap.String("operation", "reindex.process"),
+			zap.Int("next_offset", nextOffset),
+			zap.Int("limit", input.Limit),
+		)
+	}
 	return nil
+}
+
+// nextReindexPageOffset computes the offset for a chained full-rebuild page.
+// It returns hasMore=false when the batch did not fill (last page reached) or
+// when the run is missing-only. Missing-only backfills stay one-shot because
+// their candidate set shrinks asynchronously as downstream ML jobs finish, so
+// offset pagination would skip or reprocess assets.
+func nextReindexPageOffset(missingOnly bool, candidateCount, limit, currentOffset int) (nextOffset int, hasMore bool) {
+	if missingOnly || limit <= 0 || candidateCount < limit {
+		return 0, false
+	}
+	return currentOffset + limit, true
 }
 
 func (s *assetIndexingService) collectReindexCandidates(
@@ -380,7 +425,7 @@ func (s *assetIndexingService) collectReindexCandidates(
 		assets, err := s.queries.ListPhotoAssetsForIndexingBatch(ctx, repo.ListPhotoAssetsForIndexingBatchParams{
 			RepositoryID: repositoryUUID,
 			Limit:        int32(input.Limit),
-			Offset:       0,
+			Offset:       int32(input.Offset),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("list photo assets for indexing: %w", err)
@@ -474,22 +519,31 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 
 	queued := 0
 	if candidate.tasks[AssetIndexingTaskSemanticImage] {
-		if err := s.enqueueSemanticTask(ctx, candidate.asset.AssetID); err != nil {
+		inserted, err := s.enqueueSemanticTask(ctx, candidate.asset.AssetID)
+		if err != nil {
 			return queued, err
 		}
-		queued++
+		if inserted {
+			queued++
+		}
 	}
 	if candidate.tasks[AssetIndexingTaskOCR] {
-		if err := s.enqueueOCRTask(ctx, candidate.asset.AssetID); err != nil {
+		inserted, err := s.enqueueOCRTask(ctx, candidate.asset.AssetID)
+		if err != nil {
 			return queued, err
 		}
-		queued++
+		if inserted {
+			queued++
+		}
 	}
 	if candidate.tasks[AssetIndexingTaskFaceRecognition] {
-		if err := s.enqueueFaceTask(ctx, candidate.asset.AssetID); err != nil {
+		inserted, err := s.enqueueFaceTask(ctx, candidate.asset.AssetID)
+		if err != nil {
 			return queued, err
 		}
-		queued++
+		if inserted {
+			queued++
+		}
 	}
 
 	return queued, nil
@@ -498,43 +552,43 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 func (s *assetIndexingService) enqueueSemanticTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
-) error {
-	_, err := s.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
+) (bool, error) {
+	res, err := s.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
 		AssetID:           assetID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
 	}, &river.InsertOpts{Queue: "process_semantic"})
 	if err != nil {
-		return fmt.Errorf("enqueue semantic job: %w", err)
+		return false, fmt.Errorf("enqueue semantic job: %w", err)
 	}
-	return nil
+	return !res.UniqueSkippedAsDuplicate, nil
 }
 
 func (s *assetIndexingService) enqueueOCRTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
-) error {
-	_, err := s.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
+) (bool, error) {
+	res, err := s.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
 		AssetID:           assetID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
 	}, &river.InsertOpts{Queue: "process_ocr"})
 	if err != nil {
-		return fmt.Errorf("enqueue OCR job: %w", err)
+		return false, fmt.Errorf("enqueue OCR job: %w", err)
 	}
-	return nil
+	return !res.UniqueSkippedAsDuplicate, nil
 }
 
 func (s *assetIndexingService) enqueueFaceTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
-) error {
-	_, err := s.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
+) (bool, error) {
+	res, err := s.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
 		AssetID:           assetID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
 	}, &river.InsertOpts{Queue: "process_face"})
 	if err != nil {
-		return fmt.Errorf("enqueue face job: %w", err)
+		return false, fmt.Errorf("enqueue face job: %w", err)
 	}
-	return nil
+	return !res.UniqueSkippedAsDuplicate, nil
 }
 
 func (s *assetIndexingService) countPendingQueueJobs(ctx context.Context, queueName string) int64 {

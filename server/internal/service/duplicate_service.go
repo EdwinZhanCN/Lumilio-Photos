@@ -12,6 +12,7 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/utils/phash"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -603,16 +604,7 @@ func pickRecommendedKeeper(members []*detectionAsset) uuid.UUID {
 // vectorToPHash reconstructs the 64-bit perceptual hash from the 0/1 float
 // vector stored in `embeddings.vector` (see phashToVector in phash_worker.go).
 func vectorToPHash(vec []float32) (uint64, bool) {
-	if len(vec) != 64 {
-		return 0, false
-	}
-	var out uint64
-	for i := 0; i < 64; i++ {
-		if vec[i] >= 0.5 {
-			out |= uint64(1) << uint(i)
-		}
-	}
-	return out, true
+	return phash.FromVector(vec)
 }
 
 func determineComponentMethod(methods map[string]struct{}) string {

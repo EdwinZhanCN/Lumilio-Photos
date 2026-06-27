@@ -122,6 +122,7 @@ export const applySideEvent = (
           count: event.data.count ?? 0,
           widget: event.data.widget ?? "asset_grid",
           title: event.data.params?.title,
+          params: event.data.params,
         },
       ];
     }

@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Folder, Moon, Sun } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
-import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
 import {
   useResolvedThemeMode,
   useThemePreference,
@@ -14,7 +12,6 @@ import MessageCenter from "@/components/MessageCenter";
 import NavbarUploadQueue from "@/features/upload/components/NavbarUploadQueue";
 
 function NavBar() {
-  const [isLumilioHovered, setIsLumilioHovered] = useState(false);
   const { t } = useI18n();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -83,27 +80,6 @@ function NavBar() {
             </span>
           )}
         </label>
-      </div>
-
-      <div className="flex flex-1 justify-center">
-        <div
-          className="tooltip tooltip-bottom"
-          data-tip={t("navbar.agent.open")}
-        >
-          <Link
-            to="/lumilio"
-            className="inline-flex items-center justify-center rounded-full p-1"
-            aria-label={t("navbar.agent.label")}
-            onMouseEnter={() => setIsLumilioHovered(true)}
-            onMouseLeave={() => setIsLumilioHovered(false)}
-          >
-            <LumilioAvatar
-              className="mb-2"
-              size={0.2}
-              start={isLumilioHovered}
-            />
-          </Link>
-        </div>
       </div>
 
       <div className="flex flex-1 justify-end">

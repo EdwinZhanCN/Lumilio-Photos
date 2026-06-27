@@ -92,4 +92,4 @@ Before finishing UI work, check:
 
 ## Design Debt
 
-Track durable design debt in `docs/agent/exec-plans/tech-debt-tracker.md`, not in scattered TODOs that do not identify a path or user impact.
+Track durable design debt in `site/docs/internal/agent/exec-plans/tech-debt-tracker.md`, not in scattered TODOs that do not identify a path or user impact.

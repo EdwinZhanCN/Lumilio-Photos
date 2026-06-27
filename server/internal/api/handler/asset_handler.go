@@ -1874,6 +1874,7 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		TagName:          filter.TagName,
 		TagSource:        filter.TagSource,
 		TagNames:         filter.TagNames,
+		PersonID:         filter.PersonID,
 		LocationNorth:    locationNorth,
 		LocationSouth:    locationSouth,
 		LocationEast:     locationEast,

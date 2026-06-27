@@ -3,8 +3,10 @@ package processors
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"server/internal/db/repo"
 	"server/internal/sourcing"
@@ -14,6 +16,13 @@ import (
 // SourceMaterializer for validation, staging→inbox commit, asset creation, and pipeline enqueuing.
 // Audit logging is handled by the materializer.
 func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*repo.Asset, error) {
+	start := time.Now()
+	defer func() {
+		ap.logger.Debug("ingest_task",
+			zap.String("filename", task.FileName),
+			zap.Duration("duration", time.Since(start)),
+		)
+	}()
 	// Resolve owner from upload payload (upload-specific concern)
 	var ownerIDPtr *int32
 	if task.UserID != "" && task.UserID != "anonymous" {

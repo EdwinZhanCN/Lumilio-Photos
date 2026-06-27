@@ -84,6 +84,10 @@ func (s *semanticWorkerEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.
 	return nil
 }
 
+func (s *semanticWorkerEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
+	return nil
+}
+
 func (s *semanticWorkerEmbeddingStub) ResolveDefaultSearchSpace(context.Context, service.EmbeddingType, string, int) (repo.EmbeddingSpace, error) {
 	panic("not implemented")
 }
