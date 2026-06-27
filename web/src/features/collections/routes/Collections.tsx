@@ -93,6 +93,14 @@ function CollectionsContent() {
                   {t("collections.sections.utilities")}
                 </h2>
               </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm rounded-full"
+                onClick={() => navigate("/collections/utilities")}
+              >
+                {t("common.viewAll")}
+                <ArrowRight className="size-4" />
+              </button>
             </div>
 
             <UtilitiesRail />

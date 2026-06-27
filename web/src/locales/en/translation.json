@@ -664,10 +664,10 @@
     "newAlbum": "New Album",
     "places": {
       "empty": "No trips with location data yet.",
-      "exploreAll": "Explore all locations",
-      "loadError": "Failed to load trip: {{error}}",
       "mapView": "Map",
-      "mapViewTitle": "Places Map"
+      "mapViewTitle": "Places Map",
+      "tripFallback": "Trip",
+      "tripNotFound": "Trip not found."
     },
     "sections": {
       "albums": "Albums",
@@ -680,24 +680,19 @@
     "utilities": {
       "classifiers": {
         "documents": {
-          "description": "Zero-shot document matches",
           "title": "Documents"
         },
         "illustration": {
-          "description": "Artwork and drawn images",
           "title": "Illustration"
         },
         "receipts": {
-          "description": "Receipts, bills, and invoices",
           "title": "Receipts"
         }
       },
       "duplicates": {
-        "description": "Find and merge duplicate photos",
         "title": "Duplicates"
       },
       "trash": {
-        "description": "Review assets moved out of the library",
         "title": "Trash"
       }
     }
@@ -1305,7 +1300,6 @@
   "people": {
     "details": {
       "confirmedHint": "This person has been named and confirmed.",
-      "loadError": "Failed to load person details: {{error}}",
       "nameLabel": "Name",
       "personCode": "PERSON {{id}}",
       "renameAction": "Rename",

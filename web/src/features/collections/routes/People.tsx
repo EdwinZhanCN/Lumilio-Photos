@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Users } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import { CollectionErrorAlert, LoadMoreButton } from "@/components/collection";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import {
@@ -20,6 +21,11 @@ function PeopleContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const showMessage = useMessage();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    { label: t("collections.sections.people", "People") },
+  ]);
   const { scopedRepositoryId } = useWorkingRepository();
   const [limit, setLimit] = useState(PAGE_SIZE);
   const { people, total, isLoading, isError, error, isFetching } = usePeople({

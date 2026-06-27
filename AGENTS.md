@@ -12,18 +12,29 @@ This file is the short entry point for humans and coding agents working in Lumil
 
 The system is local-first: preserve original media, keep repository/storage semantics explicit, make ML/AI optional, and prefer boring configuration that boots cleanly in Docker and local dev.
 
-## Documentation (MUST READ BEFORE ANY CHANGES)
+## Documentation
+
+### MUST READ BEFORE ANY CHANGES
 
 - `site/docs/internal/agent/architecture.md`: system map, backend/frontend boundaries, config/runtime notes.
 - `site/docs/internal/agent/BACKEND.md`: backend runtime, package map, config, queues, storage, API contracts.
 - `site/docs/internal/agent/FRONTEND.md`: frontend runtime, toolchain, routes, state boundaries, API usage.
 - `site/docs/internal/agent/DESIGN.md`: product and interface guidance for app work.
 - `site/docs/internal/agent/core-beliefs.md`: decision principles for product and engineering tradeoffs.
-- `site/docs/internal/agent/exec-plans/active/`: current execution plans.
-- `site/docs/internal/agent/exec-plans/completed/`: completed execution records.
 - `site/docs/internal/agent/exec-plans/tech-debt-tracker.md`: small known debt that should not be forgotten.
 - `site/docs/internal/agent/vite-plus.md`: frontend Vite+ setup and command mapping.
+- `site/docs/internal/agent/docts.md`: the `doc.ts` architecture-doc convention (`@module` + `{@link}` backed by `import type`) and the `docts/link-needs-import` lint rule.
 - `site/docs/internal/frontend/`: frontend architecture (composition trees, data-flow seams, ADRs). Start at `internal/frontend/architecture.md`.
+
+### TRACK THE CHANGES
+
+- `site/docs/internal/agent/exec-plans/active/`: current execution plans.
+- `site/docs/internal/agent/exec-plans/completed/`: completed execution records.
+
+### READ BEFORE YOU MAKE ANY PLANS
+
+- `site/docs/internal/agent/PLAN-MODE.md`: plan mode description
+
 
 ## Usage Rules
 
@@ -39,3 +50,4 @@ The system is local-first: preserve original media, keep repository/storage sema
 - i18n keys are **extract-then-fill, never hand-written**: write `t("key", "default")` in code → run `vp exec i18next-cli extract` → fill zh values in the generated JSON. Do NOT manually add/restructure/delete keys in `translation.json`. See [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) for details.
 - Frontend server state belongs in TanStack Query; feature-local interactive UI state can use Zustand; Context is for cross-cutting app state.
 - Keep generated files generated. If a generated artifact changes, include the command that produced it in your notes.
+- Document a feature with a `doc.ts` at its root (`@module` comment, markdown prose, `{@link}` to real symbols). Every `{@link X}` MUST be `import type`-d in the same file — tsc plus the `docts/link-needs-import` rule enforce it. The sibling `doc.md` is generated; never hand-edit it. See [docts.md](site/docs/internal/agent/docts.md).
