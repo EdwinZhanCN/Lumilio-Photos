@@ -52,6 +52,9 @@ type AssetsGalleryPageProps = {
    * person cover, trip map, etc.). Lets scoped collections reuse this page
    * instead of hand-rolling header + carousel + search. */
   hero?: ReactNode;
+  /** Whether scoped search (FAB + search view) is available. Off for views
+   * whose data source can't be searched. */
+  searchEnabled?: boolean;
 };
 
 export function AssetsGalleryPage({
@@ -64,6 +67,7 @@ export function AssetsGalleryPage({
   viewKey,
   pinId,
   hero,
+  searchEnabled = true,
 }: AssetsGalleryPageProps = {}) {
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
@@ -80,7 +84,8 @@ export function AssetsGalleryPage({
   const filtersState = useFilterState();
   const isCarouselOpen = useIsCarouselOpen();
   const { setSortBy } = useUIActions();
-  const isSearchActive = !isPinMode && searchQuery.trim().length > 0;
+  const isSearchActive =
+    !isPinMode && searchEnabled && searchQuery.trim().length > 0;
   const hasActiveFilters = selectHasActiveFilters(filtersState);
   const isTrashView = baseFilter?.is_deleted === true;
   const emptyState = useMemo(() => {
@@ -121,6 +126,10 @@ export function AssetsGalleryPage({
     disabled: isPinMode,
   });
 
+  // Pin mode hydrates from a saved agent result; otherwise the standard browse
+  // view scoped by `baseFilter`.
+  const activeView = isPinMode ? pinView : standardView;
+
   const {
     assets: allAssets,
     browseGroups,
@@ -133,13 +142,13 @@ export function AssetsGalleryPage({
     hasMore: hasNextPage,
     isFetched,
     error,
-  } = isPinMode ? pinView : standardView;
+  } = activeView;
   const photoSearchView = useCurrentAssetsSearchView({
     withGroups: false,
     sortBy,
     baseFilter,
     viewKey: viewKey ? `${viewKey}:search` : undefined,
-    disabled: isPinMode,
+    disabled: isPinMode || !searchEnabled,
   });
   const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(
     null,
@@ -449,7 +458,7 @@ export function AssetsGalleryPage({
             </div>
           </div>
         ))}
-      {!isCarouselOpen && !dockExpanded && <SearchFAB />}
+      {!isCarouselOpen && !dockExpanded && searchEnabled && <SearchFAB />}
     </div>
   );
 }

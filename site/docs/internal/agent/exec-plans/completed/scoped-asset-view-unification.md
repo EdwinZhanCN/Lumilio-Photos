@@ -14,20 +14,25 @@ This is the frontend half of a long-standing design. The reusable hero pieces
 (`AlbumFormModal`) already exist; what's missing is the convergence onto the
 orchestrator plus the two seams (`CollectionHero`, `viewOverride`).
 
-## Current State (verified 2026-06-27)
+## Current State (completed 2026-06-27)
 
 | Page | Renders through | Hero | Status |
 | --- | --- | --- | --- |
-| Album details | `AssetsGalleryPage` | inline `CollectionTitle` + `MetaStatRow` | ✅ on orchestrator, hero not extracted |
-| Classifier/smart album | `AssetsGalleryPage` | none | ✅ on orchestrator |
+| Album details | `AssetsGalleryPage` | `CollectionHero` + `AlbumFormModal` | ✅ converged |
+| Classifier/smart album | `AssetsGalleryPage` | none | ✅ converged |
 | Trash | assets feature view | none | tracked by `assets-feature-review.md` F4 |
-| Trip/place details | **hand-rolled** (`AssetsProvider` + `AssetsPageHeader` + `useAssetsView` + gallery) | inline `CollectionTitle` + `MetaStatRow` | ❌ not converged |
-| Person details (people feature) | hand-rolled | inline | ❌ not converged + backend-blocked |
+| Trip/place details | `AssetsGalleryPage` (`baseFilter={ location(bbox), date }`) | none | ✅ converged |
+| Person details (people feature) | `AssetsGalleryPage` (`baseFilter={ person_id }`) | `CollectionHero` + `PersonRenameModal` | ✅ converged |
 
-So album and classifier views already share the orchestrator; trips and people
-do not. No `CollectionHero` component exists yet — pages wire the title/stat
-pieces by hand. The `bulkActions` / `hiddenBulkActions` injection point already
-landed via `assets-bulk-actions.md`.
+All five scoped views now render through the `AssetsGalleryPage` orchestrator.
+`CollectionHero` is extracted and consumed by album + person. The backend
+`person_id` filter collapsed person onto a plain `baseFilter` —
+`usePersonAssetsView` is deleted and person search is re-enabled. The
+`viewOverride` seam was added in step 3 but, once person collapsed, had **zero
+consumers**, so it was removed rather than left as a speculative escape hatch:
+every scope is now expressible as an `AssetFilterDTO` `baseFilter`. The
+`bulkActions` / `hiddenBulkActions` injection point landed earlier via
+`assets-bulk-actions.md`.
 
 ## The Six Injection Points
 
@@ -73,44 +78,44 @@ the `viewOverride` is deleted, and the table collapses to one shape.
 
 ### 1. Extract `CollectionHero`
 
-- [ ] New `web/src/components/collection/CollectionHero.tsx`: composes
+- [x] New `web/src/components/collection/CollectionHero.tsx`: composes
       `CollectionTitle` (+ optional mono code badge), `MetaStatRow`, and an edit
       button that opens a page-supplied `editModal`.
-- [ ] Props shape (names may change): `title`, `code?`, `stats: MetaStat[]`,
+- [x] Props shape (names may change): `title`, `code?`, `stats: MetaStat[]`,
       `cover?`, `editModal?: ReactNode` (or `onEdit` + render-prop).
-- [ ] Export from `web/src/components/collection/index.ts`.
+- [x] Export from `web/src/components/collection/index.ts`.
 
 ### 2. Album details → `CollectionHero`
 
-- [ ] Replace `AlbumDetails`' inline title/stat assembly with `CollectionHero`,
+- [x] Replace `AlbumDetails`' inline title/stat assembly with `CollectionHero`,
       passing `AlbumFormModal` as `editModal`.
-- [ ] No behavior change; this is the reference consumer.
+- [x] No behavior change; this is the reference consumer.
 
 ### 3. Add the `viewOverride` seam to `AssetsGalleryPage`
 
-- [ ] Add `viewOverride?` to `AssetsGalleryPageProps`: when present, the page
+- [x] Add `viewOverride?` to `AssetsGalleryPageProps`: when present, the page
       uses it as the data source instead of `useAssetsView(baseFilter)`; sort and
       search still come from the provider.
-- [ ] Keep `baseFilter` the default path; `viewOverride` is the escape hatch.
+- [x] Keep `baseFilter` the default path; `viewOverride` is the escape hatch.
 
 ### 4. Trip details → orchestrator
 
-- [ ] Migrate `TripDetails` to `AssetsGalleryPage` with
+- [x] Migrate `TripDetails` to `AssetsGalleryPage` with
       `baseFilter={ location(bbox), date }`, no hero, default bulk actions.
-- [ ] Delete the hand-rolled provider/header/gallery wiring once parity is
+- [x] Delete the hand-rolled provider/header/gallery wiring once parity is
       confirmed.
 
 ### 5. Person details → orchestrator + seam
 
-- [ ] Migrate `PersonDetails` (people feature) to `AssetsGalleryPage` with
+- [x] Migrate `PersonDetails` (people feature) to `AssetsGalleryPage` with
       `viewOverride={usePersonAssetsView(personId)}`, `hero={CollectionHero}` +
       `PersonRenameModal`, `search` disabled.
 
 ### 6. Backend: `AssetFilterDTO.person_id` (unblocks the collapse)
 
-- [ ] Add `person_id` to `AssetFilterDTO` and `/assets/list` filtering; run
+- [x] Add `person_id` to `AssetFilterDTO` and `/assets/list` filtering; run
       `make dto`.
-- [ ] Switch person to `baseFilter={person_id}`, delete `usePersonAssetsView`
+- [x] Switch person to `baseFilter={person_id}`, delete `usePersonAssetsView`
       and the `viewOverride`, re-enable scoped search. Five pages now differ only
       by the table above with no `viewOverride` column.
 
@@ -143,12 +148,20 @@ Manual: album/trip/person/classifier/trash all browse with synchronized
 sort+search, album/person show an editable hero, trips/classifier/trash show no
 edit, and person search re-enables only after step 6.
 
-## Open Questions
+## Resolved Questions
 
-- `CollectionHero` API: render-prop `editModal` vs `onEdit` + controlled modal
-  state owned by the page?
-- Should `viewOverride` be a hook result or a plain `{ data, isLoading,
-  fetchNextPage }` object, to keep `AssetsGalleryPage` agnostic to TanStack
-  Query specifics?
-- Is trip scope better expressed as a real `baseFilter` (bbox+date) end to end,
-  or does it also need a `viewOverride` until the assets list supports bbox?
+- `CollectionHero` API: settled on a single **`edit?: { onOpen, modal, label? }`**
+  prop. The page owns the open/close state; the button trigger and the modal node
+  always travel together so they can't drift apart (an earlier split of separate
+  `onEdit` + `editModal` props had no enforced pairing). No render-prop.
+  Trip-style scroll-collapse (`dense`) was dropped; the orchestrator renders the
+  hero statically between header and gallery, matching album.
+- `viewOverride` shape: while it existed it was a plain **`AssetsViewResult`** (the
+  same object every view hook already returns), so the page needed no special
+  casing. But once the backend `person_id` filter collapsed person onto a
+  `baseFilter`, the seam had **zero consumers** and was removed — every scope is
+  now an `AssetFilterDTO` `baseFilter`. If a future scope genuinely can't be
+  expressed as a filter, re-add the seam then rather than carry it speculatively.
+- Trip scope: expressed as a real **`baseFilter={ location(bbox), date }`** end to
+  end. `AssetFilterDTO` already carried `location`/`date`, so no `viewOverride`
+  was ever needed for trips.

@@ -43,13 +43,13 @@
  *     HUB --> PR["PeopleRail"] -.->|people feature| PERSON["PersonDetails"]
  * ```
  *
- * {@link AlbumDetails} and {@link UtilityClassifierAlbum} render through the
- * shared {@link AssetsGalleryPage} orchestrator. {@link TripDetails} still
- * hand-rolls the same layers (its own provider + header + gallery), reusing only
- * the {@link CollectionTitle} / {@link MetaStatRow} pieces — folding it into the
- * orchestrator is still pending. Album detail carries an *editable* hero (title
- * + edit modal); trips and classifier albums show a title/stat header but no
- * edit, because they have no entity to mutate. {@link Duplicates} is the one
+ * {@link AlbumDetails}, {@link TripDetails} and {@link UtilityClassifierAlbum}
+ * all render through the shared {@link AssetsGalleryPage} orchestrator, differing
+ * only by injection points: album scopes by `{ album_id }`, trip by
+ * `{ location(bbox), date }`, classifier by `{ tag_name, tag_source }`. Album
+ * detail carries an *editable* hero — {@link CollectionHero} composed with
+ * {@link AlbumFormModal}; trips and classifier albums pass no `hero` and expose
+ * no edit, because they have no entity to mutate. {@link Duplicates} is the one
  * review-style page, not an asset grid.
  *
  * ## Decisions
@@ -78,7 +78,7 @@ import type {
 } from "./hooks/useDuplicates.ts";
 import type { UTILITY_CLASSIFIERS } from "./utils/utilityClassifiers.ts";
 import type { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage.tsx";
-import type { CollectionTitle, MetaStatRow } from "@/components/collection";
+import type { CollectionHero } from "@/components/collection";
 import type Collections from "./routes/Collections.tsx";
 import type AlbumDetails from "./routes/AlbumDetails.tsx";
 import type TripDetails from "./routes/TripDetails.tsx";
