@@ -5,6 +5,7 @@ import { MapIcon } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import MapComponent, { type PhotoLocation } from "@/components/MapComponent";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useWorkingRepository } from "@/features/settings";
 import { useMapPhotoAssets } from "@/features/home/hooks/useMapPhotoAssets";
@@ -14,6 +15,11 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 function MapViewContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    { label: t("collections.sections.places", "Places") },
+  ]);
   const { scopedRepositoryId } = useWorkingRepository();
 
   const {

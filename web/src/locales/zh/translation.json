@@ -664,10 +664,10 @@
     "newAlbum": "新建相册",
     "places": {
       "empty": "暂无旅行记录。",
-      "exploreAll": "探索所有地点",
-      "loadError": "加载旅行记录失败：{{error}}",
       "mapView": "地图",
-      "mapViewTitle": "地点地图"
+      "mapViewTitle": "地点地图",
+      "tripFallback": "行程",
+      "tripNotFound": "未找到该行程。"
     },
     "sections": {
       "albums": "相册",
@@ -680,24 +680,19 @@
     "utilities": {
       "classifiers": {
         "documents": {
-          "description": "0 样本文档识别",
           "title": "文档"
         },
         "illustration": {
-          "description": "插画、绘画和图像作品",
           "title": "插画"
         },
         "receipts": {
-          "description": "收据、账单和发票",
           "title": "收据"
         }
       },
       "duplicates": {
-        "description": "查找并合并重复的照片",
         "title": "重复照片"
       },
       "trash": {
-        "description": "查看已移出资源库的资源",
         "title": "回收站"
       }
     }
@@ -1302,7 +1297,6 @@
   "people": {
     "details": {
       "confirmedHint": "这个人物已经确认并命名。",
-      "loadError": "加载人物详情失败：{{error}}",
       "nameLabel": "名称",
       "personCode": "人物 {{id}}",
       "renameAction": "重命名",

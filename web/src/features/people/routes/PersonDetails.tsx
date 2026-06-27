@@ -5,6 +5,7 @@ import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useWorkingRepository } from "@/features/settings";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePersonDetails } from "../hooks/usePeople";
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -37,6 +38,12 @@ const PersonAssetsContent = () => {
   );
 
   const displayName = person?.name || t("people.unnamed");
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    { label: t("collections.sections.people", "People"), to: "/collections/people" },
+    { label: displayName },
+  ]);
   const coverUrl =
     person?.person_id && person.cover_face_image_path
       ? assetUrls.getPersonCoverUrl(person.person_id, scopedRepositoryId)
