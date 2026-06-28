@@ -35,11 +35,13 @@
  * ordinary assets and stacks in one flattened browse model so selection,
  * carousel positioning, and gallery tiles can share behavior.
  *
- * {@link usePinAssetsView} is the agent-board adapter. It hydrates
- * `/api/v1/agent/pins/{id}/assets` into {@link PinAssetsViewResult}, which is
- * shaped like {@link AssetsViewResult} for rendering, but its source currently
- * supports only snapshot pagination. It does not consume the ordinary library
- * sort, filter, or search state.
+ * {@link usePinAssetsView} is the agent-board full-gallery adapter. It reads
+ * `/api/v1/agent/pins/{id}/assets/list` and
+ * `/api/v1/agent/pins/{id}/assets/search`, returning the same
+ * {@link PinAssetsViewResult}/{@link AssetsViewResult} browse shape as library
+ * views while constraining the backend query to the pin asset set. The older
+ * `GET /api/v1/agent/pins/{id}/assets` hydration endpoint remains a lightweight
+ * snapshot-order API for board previews.
  *
  * ## Composition
  *
@@ -67,16 +69,16 @@
  * keeps URL-backed carousel navigation in sync.
  * {@link AssetsPageHeader} owns route-level controls; {@link JustifiedGallery}
  * and {@link SquareGallery} render the browse model; {@link FullScreenCarousel}
- * inspects the current flattened asset set; {@link SearchFAB} only applies to
- * sources that support the ordinary library search query.
+ * inspects the current flattened asset set; {@link SearchFAB} writes to the
+ * shared search state and the selected source hook decides how to execute it.
  *
  * ## Decisions
  *
  * Browse items are the shared asset-set surface. Source adapters may all return
- * {@link AssetsViewResult}, but controls must remain capability-aware: a library
- * view can sort, filter, search, and scan repositories; an agent pin/ref view is
- * a snapshot-hydration source unless the backend contract grows those query
- * semantics.
+ * {@link AssetsViewResult}, but controls must remain capability-aware: library
+ * and pin views can sort, filter, and search through source-scoped backend
+ * queries, while repository scan remains a library maintenance action and is
+ * hidden for pin/ref contexts.
  *
  * Selection stores browse item ids, not raw asset ids. Bulk actions call
  * {@link resolveBrowseSelectedAssetIds} so stacks can choose whether an action

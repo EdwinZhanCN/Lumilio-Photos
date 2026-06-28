@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useMemo, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { AlertTriangle, ArrowLeft, Pin } from "lucide-react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import type {
   AssetsBulkActionId,
@@ -37,6 +37,11 @@ import {
 import type { AssetFilter } from "@/features/assets/types/assets.type";
 import type { FilterFieldKey } from "@/features/assets/components/page/FilterTool/FilterTool";
 
+type PinNavigationOrigin = {
+  from?: string;
+  fromLabel?: string;
+};
+
 type AssetsGalleryPageProps = {
   title?: string;
   icon?: ReactNode;
@@ -70,6 +75,8 @@ export function AssetsGalleryPage({
   searchEnabled = true,
 }: AssetsGalleryPageProps = {}) {
   const { assetId } = useParams<{ assetId: string }>();
+  const location = useLocation();
+  const pinOrigin = (location.state ?? null) as PinNavigationOrigin | null;
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { t } = useI18n();
   const [assetPage] = usePreference("assetPage");
@@ -84,8 +91,7 @@ export function AssetsGalleryPage({
   const filtersState = useFilterState();
   const isCarouselOpen = useIsCarouselOpen();
   const { setSortBy } = useUIActions();
-  const isSearchActive =
-    !isPinMode && searchEnabled && searchQuery.trim().length > 0;
+  const isSearchActive = searchEnabled && searchQuery.trim().length > 0;
   const hasActiveFilters = selectHasActiveFilters(filtersState);
   const isTrashView = baseFilter?.is_deleted === true;
   const emptyState = useMemo(() => {
@@ -117,7 +123,13 @@ export function AssetsGalleryPage({
   const GalleryComponent =
     currentLayout === "compact" ? SquareGallery : JustifiedGallery;
 
-  const pinView = usePinAssetsView(pinId);
+  const pinView = usePinAssetsView(pinId, {
+    sortBy,
+    baseFilter,
+    viewKey,
+    searchQuery,
+    searchEnabled,
+  });
   const standardView = useCurrentAssetsView({
     withGroups: true,
     sortBy,
@@ -150,6 +162,7 @@ export function AssetsGalleryPage({
     viewKey: viewKey ? `${viewKey}:search` : undefined,
     disabled: isPinMode || !searchEnabled,
   });
+  const activeSearchView = isPinMode ? pinView : photoSearchView;
   const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(
     null,
   );
@@ -162,14 +175,14 @@ export function AssetsGalleryPage({
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const topResultsBrowseGroups = photoSearchView.topResultsBrowseGroups;
-  const searchResultBrowseGroups = photoSearchView.resultBrowseGroups;
+  const topResultsBrowseGroups = activeSearchView.topResultsBrowseGroups;
+  const searchResultBrowseGroups = activeSearchView.resultBrowseGroups;
   const activeBrowseGroups = isSearchActive ? [] : browseGroups;
   const activeBrowseItems = isSearchActive
-    ? photoSearchView.browseItems
+    ? activeSearchView.browseItems
     : flatBrowseItems;
   const activeBrowseAssets = isSearchActive
-    ? photoSearchView.browseAssets
+    ? activeSearchView.browseAssets
     : flatAssets;
 
   // Gallery selection becomes agent context. Selection state stores browse item
@@ -223,7 +236,7 @@ export function AssetsGalleryPage({
 
     return (
       <div className="space-y-6">
-        {photoSearchView.topResultsMeta.degraded && (
+        {activeSearchView.topResultsMeta.degraded && (
           <div className="px-4">
             <div className="alert alert-info border border-info/20 bg-info/10 text-info-content">
               <span>
@@ -249,7 +262,7 @@ export function AssetsGalleryPage({
           </div>
         )}
 
-        {photoSearchView.topResults.length > 0 && (
+        {activeSearchView.topResults.length > 0 && (
           <GalleryComponent
             key={`search-top:${currentLayout}`}
             browseGroups={topResultsBrowseGroups}
@@ -261,7 +274,7 @@ export function AssetsGalleryPage({
           />
         )}
 
-        {(!error || photoSearchView.resultAssets.length > 0) && (
+        {(!error || activeSearchView.resultAssets.length > 0) && (
           <GalleryComponent
             key={`search-results:${currentLayout}`}
             browseGroups={searchResultBrowseGroups}
@@ -269,7 +282,7 @@ export function AssetsGalleryPage({
             onLoadMore={handleLoadMore}
             hasMore={hasNextPage}
             isLoadingMore={isFetchingNextPage}
-            isLoading={isFetching && photoSearchView.resultAssets.length === 0}
+            isLoading={isFetching && activeSearchView.resultAssets.length === 0}
             columns={compactColumns}
             emptyStateTitle={emptyState.title}
             emptyStateDescription={emptyState.description}
@@ -328,6 +341,43 @@ export function AssetsGalleryPage({
     activeBrowseItems,
   ]);
 
+  const pinHeader = useMemo(() => {
+    if (!isPinMode) {
+      return { title: undefined, subtitle: undefined, icon: undefined };
+    }
+
+    const pin = pinView.pin;
+    const resolvedTitle =
+      pin?.title ||
+      t("assets.pin.defaultTitle", { defaultValue: "Agent result" });
+    const metaParts: string[] = [];
+
+    if (pin?.mode) {
+      metaParts.push(
+        pin.mode === "live"
+          ? t("assets.pin.modeLive")
+          : t("assets.pin.modeFrozen"),
+      );
+    }
+    if ((pin?.count ?? 0) > 0) {
+      metaParts.push(t("assets.pin.count", { count: pin?.count ?? 0 }));
+    }
+
+    const metaLine = metaParts.join(" · ");
+    const summary = pin?.summary?.trim();
+    const resolvedSubtitle = summary
+      ? metaLine
+        ? `${metaLine} — ${summary}`
+        : summary
+      : metaLine || undefined;
+
+    return {
+      title: resolvedTitle,
+      subtitle: resolvedSubtitle,
+      icon: <Pin className="h-6 w-6 text-primary" />,
+    };
+  }, [isPinMode, pinView.pin, t]);
+
   // Pin expired/deleted: the metadata lookup failed (typically 404). Retry
   // can't recover a missing pin, so offer a way back to Lumilio instead.
   if (isPinMode && pinView.isExpired) {
@@ -335,9 +385,12 @@ export function AssetsGalleryPage({
       <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
         <AlertTriangle className="size-8 text-warning" />
         <p className="max-w-md text-base-content/70">{t("assets.pin.expired")}</p>
-        <Link to="/lumilio" className="btn btn-sm btn-outline gap-1.5">
+        <Link
+          to={pinOrigin?.from ?? "/lumilio"}
+          className="btn btn-sm btn-outline gap-1.5"
+        >
           <ArrowLeft className="size-4" />
-          {t("assets.pin.backToLumilio")}
+          {pinOrigin?.fromLabel ?? t("assets.pin.backToLumilio")}
         </Link>
       </div>
     );
@@ -373,7 +426,7 @@ export function AssetsGalleryPage({
   const showEndOfResults =
     !hasNextPage &&
     (isSearchActive
-      ? photoSearchView.resultAssets.length > 0
+      ? activeSearchView.resultAssets.length > 0
       : allAssets.length > 0);
 
   const browseGalleryProps: AssetGalleryProps = {
@@ -393,12 +446,14 @@ export function AssetsGalleryPage({
         sortBy={sortBy}
         onSortByChange={setSortBy}
         onFiltersChange={() => {}}
-        title={title}
-        icon={icon}
+        title={isPinMode ? pinHeader.title : title}
+        subtitle={isPinMode ? pinHeader.subtitle : undefined}
+        icon={isPinMode ? pinHeader.icon : icon}
         browseItems={activeBrowseItems}
         lockedFilterFields={lockedFilterFields}
         bulkActions={bulkActions}
         hiddenBulkActions={hiddenBulkActions}
+        capabilities={{ showScan: !isPinMode }}
       />
 
       {hero}

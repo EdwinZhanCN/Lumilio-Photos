@@ -19,6 +19,7 @@ const (
 var ErrEmptyQuery = errors.New("aggregate search query is empty")
 
 type Filter struct {
+	AssetIDs         []uuid.UUID
 	RepositoryID     *uuid.UUID
 	PersonID         *int32
 	AssetType        *string

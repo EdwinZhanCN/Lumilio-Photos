@@ -322,7 +322,7 @@ const FullScreenCarousel = ({
 
   const handleOpenStudio = useCallback(
     (asset: Asset) => {
-      navigate(`/studio?assetId=${asset.asset_id}`);
+      void navigate(`/studio?assetId=${asset.asset_id}`);
     },
     [navigate],
   );

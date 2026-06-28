@@ -512,6 +512,7 @@ WHERE is_deleted = false
 SELECT a.asset_id
 FROM assets a
 WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
+  AND (sqlc.narg('asset_ids')::uuid[] IS NULL OR a.asset_id = ANY(sqlc.narg('asset_ids')::uuid[]))
   AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -612,6 +613,7 @@ WITH page_ids AS MATERIALIZED (
     END AS sort_time
   FROM assets a
   WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
+    AND (sqlc.narg('asset_ids')::uuid[] IS NULL OR a.asset_id = ANY(sqlc.narg('asset_ids')::uuid[]))
     AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
     AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -725,6 +727,7 @@ ORDER BY p.sort_time DESC, p.asset_id DESC;
 SELECT COUNT(*) as count
 FROM assets a
 WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
+  AND (sqlc.narg('asset_ids')::uuid[] IS NULL OR a.asset_id = ANY(sqlc.narg('asset_ids')::uuid[]))
   AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -834,6 +837,7 @@ WITH filtered AS MATERIALIZED (
   FROM assets a
   LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
   WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
+    AND (sqlc.narg('asset_ids')::uuid[] IS NULL OR a.asset_id = ANY(sqlc.narg('asset_ids')::uuid[]))
     AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
     AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
@@ -939,6 +943,7 @@ stack_covers AS MATERIALIZED (
   FROM asset_stack_members asm
   JOIN assets a ON a.asset_id = asm.asset_id
   WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
+    AND (sqlc.narg('asset_ids')::uuid[] IS NULL OR a.asset_id = ANY(sqlc.narg('asset_ids')::uuid[]))
   ORDER BY asm.stack_id, asm.position ASC NULLS LAST, asm.asset_id ASC
 ),
 stack_members_all AS MATERIALIZED (
@@ -948,6 +953,7 @@ stack_members_all AS MATERIALIZED (
   FROM asset_stack_members asm
   JOIN assets a ON a.asset_id = asm.asset_id
   WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
+    AND (sqlc.narg('asset_ids')::uuid[] IS NULL OR a.asset_id = ANY(sqlc.narg('asset_ids')::uuid[]))
   GROUP BY asm.stack_id
 ),
 browse_items AS MATERIALIZED (
@@ -1001,6 +1007,7 @@ WITH filtered AS MATERIALIZED (
   FROM assets a
   LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
   WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
+    AND (sqlc.narg('asset_ids')::uuid[] IS NULL OR a.asset_id = ANY(sqlc.narg('asset_ids')::uuid[]))
     AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
     AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))

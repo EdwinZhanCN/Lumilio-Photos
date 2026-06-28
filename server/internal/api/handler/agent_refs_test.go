@@ -30,7 +30,7 @@ func TestResolveRefScopeIsolation(t *testing.T) {
 	owner := ref.Scope{UserID: 1, ThreadID: "thread-a"}
 	r := store.Create(owner, ref.Plan{Op: "filter_assets"}, "test", "", []uuid.UUID{uuid.New()}, false)
 
-	h := NewAgentHandler(nil, store, nil, nil)
+	h := NewAgentHandler(nil, store, nil, nil, nil)
 
 	cases := map[string]string{
 		"cross user":     "/api/v1/agent/refs/" + r.ID + "?thread_id=thread-a",
@@ -58,7 +58,7 @@ func TestResolveRefHappyPathRefreshesScope(t *testing.T) {
 	owner := ref.Scope{UserID: 1, ThreadID: "thread-a"}
 	created := store.Create(owner, ref.Plan{Op: "filter_assets"}, "test", "", []uuid.UUID{uuid.New(), uuid.New()}, false)
 
-	h := NewAgentHandler(nil, store, nil, nil)
+	h := NewAgentHandler(nil, store, nil, nil, nil)
 	c, _ := refTestContext(t, 1, "/api/v1/agent/refs/"+created.ID+"?thread_id=thread-a")
 	c.Params = gin.Params{{Key: "id", Value: created.ID}}
 

@@ -205,99 +205,100 @@ const countAssetsUnified = `-- name: CountAssetsUnified :one
 SELECT COUNT(*) as count
 FROM assets a
 WHERE a.is_deleted = COALESCE($1::boolean, false)
-  AND ($2::text IS NULL OR a.original_filename ILIKE '%' || $2 || '%')
-  AND ($3::text IS NULL OR a.type = $3)
-  AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
-  AND ($5::integer IS NULL OR a.owner_id = $5)
-  AND ($6::uuid IS NULL OR a.repository_id = $6)
-  AND (
-    $7::integer IS NULL
-    OR EXISTS (
-      SELECT 1
-      FROM face_cluster_members fcm
-      JOIN face_items fi_person ON fi_person.id = fcm.face_id
-      WHERE fcm.cluster_id = $7
-        AND fi_person.asset_id = a.asset_id
-    )
-  )
+  AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
+  AND ($3::text IS NULL OR a.original_filename ILIKE '%' || $3 || '%')
+  AND ($4::text IS NULL OR a.type = $4)
+  AND ($5::text[] IS NULL OR a.type = ANY($5::text[]))
+  AND ($6::integer IS NULL OR a.owner_id = $6)
+  AND ($7::uuid IS NULL OR a.repository_id = $7)
   AND (
     $8::integer IS NULL
     OR EXISTS (
       SELECT 1
-      FROM album_assets aa
-      WHERE aa.asset_id = a.asset_id
-        AND aa.album_id = $8
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = $8
+        AND fi_person.asset_id = a.asset_id
     )
   )
   AND (
-    $9::text IS NULL
+    $9::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = $9
+    )
+  )
+  AND (
+    $10::text IS NULL
     OR EXISTS (
       SELECT 1
       FROM asset_tags at
       JOIN tags t ON t.tag_id = at.tag_id
       WHERE at.asset_id = a.asset_id
-        AND t.tag_name = $9
-        AND ($10::text IS NULL OR at.source = $10)
+        AND t.tag_name = $10
+        AND ($11::text IS NULL OR at.source = $11)
     )
   )
   AND (
-    $11::text[] IS NULL
+    $12::text[] IS NULL
     OR (
       SELECT COUNT(DISTINCT t2.tag_name)
       FROM asset_tags at2
       JOIN tags t2 ON t2.tag_id = at2.tag_id
       WHERE at2.asset_id = a.asset_id
-        AND t2.tag_name = ANY($11::text[])
-    ) = cardinality($11::text[])
+        AND t2.tag_name = ANY($12::text[])
+    ) = cardinality($12::text[])
   )
-  AND ($12::text IS NULL OR
-    CASE COALESCE($13::text, 'contains')
-      WHEN 'matches' THEN a.original_filename ILIKE $12
-      WHEN 'starts_with' THEN a.original_filename ILIKE $12 || '%'
-      WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $12
-      ELSE a.original_filename ILIKE '%' || $12 || '%'
+  AND ($13::text IS NULL OR
+    CASE COALESCE($14::text, 'contains')
+      WHEN 'matches' THEN a.original_filename ILIKE $13
+      WHEN 'starts_with' THEN a.original_filename ILIKE $13 || '%'
+      WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $13
+      ELSE a.original_filename ILIKE '%' || $13 || '%'
     END
   )
-  AND ($14::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $14)
-  AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $15)
-  AND ($16::boolean IS NULL OR
+  AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $15)
+  AND ($16::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $16)
+  AND ($17::boolean IS NULL OR
     CASE
-      WHEN $16 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      WHEN $17 = true THEN a.specific_metadata->>'is_raw' = 'true'
       ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
     END
   )
-  AND ($17::integer IS NULL OR
+  AND ($18::integer IS NULL OR
     CASE
-      WHEN $17 = 0 THEN a.rating IS NULL OR a.rating = 0
-      ELSE a.rating = $17
+      WHEN $18 = 0 THEN a.rating IS NULL OR a.rating = 0
+      ELSE a.rating = $18
     END
   )
-  AND ($18::boolean IS NULL OR
+  AND ($19::boolean IS NULL OR
     CASE
-      WHEN $18 = false THEN a.liked IS NULL OR a.liked = false
+      WHEN $19 = false THEN a.liked IS NULL OR a.liked = false
       ELSE a.liked = true
     END
   )
-  AND ($19::text IS NULL OR a.specific_metadata->>'camera_model' = $19)
-  AND ($20::text IS NULL OR a.specific_metadata->>'lens_model' = $20)
+  AND ($20::text IS NULL OR a.specific_metadata->>'camera_model' = $20)
+  AND ($21::text IS NULL OR a.specific_metadata->>'lens_model' = $21)
   AND (
-    $21::float8 IS NULL
-    OR $22::float8 IS NULL
+    $22::float8 IS NULL
     OR $23::float8 IS NULL
     OR $24::float8 IS NULL
+    OR $25::float8 IS NULL
     OR (
     a.gps_latitude IS NOT NULL
     AND a.gps_longitude IS NOT NULL
     AND a.gps_latitude
-      BETWEEN LEAST($22::float8, $21::float8)
-      AND GREATEST($22::float8, $21::float8)
+      BETWEEN LEAST($23::float8, $22::float8)
+      AND GREATEST($23::float8, $22::float8)
     AND (
       CASE
-        WHEN $24::float8 <= $23::float8 THEN
-          a.gps_longitude BETWEEN $24::float8 AND $23::float8
+        WHEN $25::float8 <= $24::float8 THEN
+          a.gps_longitude BETWEEN $25::float8 AND $24::float8
         ELSE
-          a.gps_longitude >= $24::float8
-          OR a.gps_longitude <= $23::float8
+          a.gps_longitude >= $25::float8
+          OR a.gps_longitude <= $24::float8
       END
     )
     )
@@ -306,6 +307,7 @@ WHERE a.is_deleted = COALESCE($1::boolean, false)
 
 type CountAssetsUnifiedParams struct {
 	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
+	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
 	Query            *string            `db:"query" json:"query"`
 	AssetType        *string            `db:"asset_type" json:"asset_type"`
 	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
@@ -336,6 +338,7 @@ type CountAssetsUnifiedParams struct {
 func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countAssetsUnified,
 		arg.IsDeleted,
+		arg.AssetIds,
 		arg.Query,
 		arg.AssetType,
 		arg.AssetTypes,
@@ -373,99 +376,100 @@ WITH filtered AS MATERIALIZED (
   FROM assets a
   LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
-    AND ($2::text IS NULL OR a.original_filename ILIKE '%' || $2 || '%')
-    AND ($3::text IS NULL OR a.type = $3)
-    AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
-    AND ($5::integer IS NULL OR a.owner_id = $5)
-    AND ($6::uuid IS NULL OR a.repository_id = $6)
-    AND (
-      $7::integer IS NULL
-      OR EXISTS (
-        SELECT 1
-        FROM face_cluster_members fcm
-        JOIN face_items fi_person ON fi_person.id = fcm.face_id
-        WHERE fcm.cluster_id = $7
-          AND fi_person.asset_id = a.asset_id
-      )
-    )
+    AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
+    AND ($3::text IS NULL OR a.original_filename ILIKE '%' || $3 || '%')
+    AND ($4::text IS NULL OR a.type = $4)
+    AND ($5::text[] IS NULL OR a.type = ANY($5::text[]))
+    AND ($6::integer IS NULL OR a.owner_id = $6)
+    AND ($7::uuid IS NULL OR a.repository_id = $7)
     AND (
       $8::integer IS NULL
       OR EXISTS (
         SELECT 1
-        FROM album_assets aa
-        WHERE aa.asset_id = a.asset_id
-          AND aa.album_id = $8
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = $8
+          AND fi_person.asset_id = a.asset_id
       )
     )
     AND (
-      $9::text IS NULL
+      $9::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $9
+      )
+    )
+    AND (
+      $10::text IS NULL
       OR EXISTS (
         SELECT 1
         FROM asset_tags at
         JOIN tags t ON t.tag_id = at.tag_id
         WHERE at.asset_id = a.asset_id
-          AND t.tag_name = $9
-          AND ($10::text IS NULL OR at.source = $10)
+          AND t.tag_name = $10
+          AND ($11::text IS NULL OR at.source = $11)
       )
     )
     AND (
-      $11::text[] IS NULL
+      $12::text[] IS NULL
       OR (
         SELECT COUNT(DISTINCT t2.tag_name)
         FROM asset_tags at2
         JOIN tags t2 ON t2.tag_id = at2.tag_id
         WHERE at2.asset_id = a.asset_id
-          AND t2.tag_name = ANY($11::text[])
-      ) = cardinality($11::text[])
+          AND t2.tag_name = ANY($12::text[])
+      ) = cardinality($12::text[])
     )
-    AND ($12::text IS NULL OR
-      CASE COALESCE($13::text, 'contains')
-        WHEN 'matches' THEN a.original_filename ILIKE $12
-        WHEN 'starts_with' THEN a.original_filename ILIKE $12 || '%'
-        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $12
-        ELSE a.original_filename ILIKE '%' || $12 || '%'
+    AND ($13::text IS NULL OR
+      CASE COALESCE($14::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE $13
+        WHEN 'starts_with' THEN a.original_filename ILIKE $13 || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $13
+        ELSE a.original_filename ILIKE '%' || $13 || '%'
       END
     )
-    AND ($14::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $14)
-    AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $15)
-    AND ($16::boolean IS NULL OR
+    AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $15)
+    AND ($16::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $16)
+    AND ($17::boolean IS NULL OR
       CASE
-        WHEN $16 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        WHEN $17 = true THEN a.specific_metadata->>'is_raw' = 'true'
         ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
       END
     )
-    AND ($17::integer IS NULL OR
+    AND ($18::integer IS NULL OR
       CASE
-        WHEN $17 = 0 THEN a.rating IS NULL OR a.rating = 0
-        ELSE a.rating = $17
+        WHEN $18 = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = $18
       END
     )
-    AND ($18::boolean IS NULL OR
+    AND ($19::boolean IS NULL OR
       CASE
-        WHEN $18 = false THEN a.liked IS NULL OR a.liked = false
+        WHEN $19 = false THEN a.liked IS NULL OR a.liked = false
         ELSE a.liked = true
       END
     )
-    AND ($19::text IS NULL OR a.specific_metadata->>'camera_model' = $19)
-    AND ($20::text IS NULL OR a.specific_metadata->>'lens_model' = $20)
+    AND ($20::text IS NULL OR a.specific_metadata->>'camera_model' = $20)
+    AND ($21::text IS NULL OR a.specific_metadata->>'lens_model' = $21)
     AND (
-      $21::float8 IS NULL
-      OR $22::float8 IS NULL
+      $22::float8 IS NULL
       OR $23::float8 IS NULL
       OR $24::float8 IS NULL
+      OR $25::float8 IS NULL
       OR (
         a.gps_latitude IS NOT NULL
         AND a.gps_longitude IS NOT NULL
         AND a.gps_latitude
-          BETWEEN LEAST($22::float8, $21::float8)
-          AND GREATEST($22::float8, $21::float8)
+          BETWEEN LEAST($23::float8, $22::float8)
+          AND GREATEST($23::float8, $22::float8)
         AND (
           CASE
-            WHEN $24::float8 <= $23::float8 THEN
-              a.gps_longitude BETWEEN $24::float8 AND $23::float8
+            WHEN $25::float8 <= $24::float8 THEN
+              a.gps_longitude BETWEEN $25::float8 AND $24::float8
             ELSE
-              a.gps_longitude >= $24::float8
-              OR a.gps_longitude <= $23::float8
+              a.gps_longitude >= $25::float8
+              OR a.gps_longitude <= $24::float8
           END
         )
       )
@@ -481,6 +485,7 @@ FROM (
 
 type CountCollapsedBrowseItemsUnifiedParams struct {
 	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
+	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
 	Query            *string            `db:"query" json:"query"`
 	AssetType        *string            `db:"asset_type" json:"asset_type"`
 	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
@@ -509,6 +514,7 @@ type CountCollapsedBrowseItemsUnifiedParams struct {
 func (q *Queries) CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countCollapsedBrowseItemsUnified,
 		arg.IsDeleted,
+		arg.AssetIds,
 		arg.Query,
 		arg.AssetType,
 		arg.AssetTypes,
@@ -891,97 +897,99 @@ const getAssetIDsUnified = `-- name: GetAssetIDsUnified :many
 SELECT a.asset_id
 FROM assets a
 WHERE a.is_deleted = COALESCE($1::boolean, false)
-  AND ($2::text IS NULL OR a.original_filename ILIKE '%' || $2 || '%')
-  AND ($3::text IS NULL OR a.type = $3)
-  AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
-  AND ($5::integer IS NULL OR a.owner_id = $5)
-  AND ($6::uuid IS NULL OR a.repository_id = $6)
+  AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
+  AND ($3::text IS NULL OR a.original_filename ILIKE '%' || $3 || '%')
+  AND ($4::text IS NULL OR a.type = $4)
+  AND ($5::text[] IS NULL OR a.type = ANY($5::text[]))
+  AND ($6::integer IS NULL OR a.owner_id = $6)
+  AND ($7::uuid IS NULL OR a.repository_id = $7)
   AND (
-    $7::text IS NULL
+    $8::text IS NULL
     OR EXISTS (
       SELECT 1
       FROM asset_tags at
       JOIN tags t ON t.tag_id = at.tag_id
       WHERE at.asset_id = a.asset_id
-        AND t.tag_name = $7
-        AND ($8::text IS NULL OR at.source = $8)
+        AND t.tag_name = $8
+        AND ($9::text IS NULL OR at.source = $9)
     )
   )
   AND (
-    $9::text[] IS NULL
+    $10::text[] IS NULL
     OR (
       SELECT COUNT(DISTINCT t2.tag_name)
       FROM asset_tags at2
       JOIN tags t2 ON t2.tag_id = at2.tag_id
       WHERE at2.asset_id = a.asset_id
-        AND t2.tag_name = ANY($9::text[])
-    ) = cardinality($9::text[])
-  )
-  AND (
-    $10::integer IS NULL
-    OR EXISTS (
-      SELECT 1
-      FROM face_cluster_members fcm
-      JOIN face_items fi_person ON fi_person.id = fcm.face_id
-      WHERE fcm.cluster_id = $10
-        AND fi_person.asset_id = a.asset_id
-    )
+        AND t2.tag_name = ANY($10::text[])
+    ) = cardinality($10::text[])
   )
   AND (
     $11::integer IS NULL
     OR EXISTS (
       SELECT 1
-      FROM album_assets aa
-      WHERE aa.asset_id = a.asset_id
-        AND aa.album_id = $11
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = $11
+        AND fi_person.asset_id = a.asset_id
     )
   )
-  AND ($12::text IS NULL OR
-    CASE COALESCE($13::text, 'contains')
-      WHEN 'matches' THEN a.original_filename ILIKE $12
-      WHEN 'starts_with' THEN a.original_filename ILIKE $12 || '%'
-      WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $12
-      ELSE a.original_filename ILIKE '%' || $12 || '%'
+  AND (
+    $12::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = $12
+    )
+  )
+  AND ($13::text IS NULL OR
+    CASE COALESCE($14::text, 'contains')
+      WHEN 'matches' THEN a.original_filename ILIKE $13
+      WHEN 'starts_with' THEN a.original_filename ILIKE $13 || '%'
+      WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $13
+      ELSE a.original_filename ILIKE '%' || $13 || '%'
     END
   )
-  AND ($14::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $14)
-  AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $15)
-  AND ($16::boolean IS NULL OR
+  AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $15)
+  AND ($16::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $16)
+  AND ($17::boolean IS NULL OR
     CASE
-      WHEN $16 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      WHEN $17 = true THEN a.specific_metadata->>'is_raw' = 'true'
       ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
     END
   )
-  AND ($17::integer IS NULL OR
+  AND ($18::integer IS NULL OR
     CASE
-      WHEN $17 = 0 THEN a.rating IS NULL OR a.rating = 0
-      ELSE a.rating = $17
+      WHEN $18 = 0 THEN a.rating IS NULL OR a.rating = 0
+      ELSE a.rating = $18
     END
   )
-  AND ($18::boolean IS NULL OR
+  AND ($19::boolean IS NULL OR
     CASE
-      WHEN $18 = false THEN a.liked IS NULL OR a.liked = false
+      WHEN $19 = false THEN a.liked IS NULL OR a.liked = false
       ELSE a.liked = true
     END
   )
-  AND ($19::text IS NULL OR a.specific_metadata->>'camera_model' = $19)
-  AND ($20::text IS NULL OR a.specific_metadata->>'lens_model' = $20)
+  AND ($20::text IS NULL OR a.specific_metadata->>'camera_model' = $20)
+  AND ($21::text IS NULL OR a.specific_metadata->>'lens_model' = $21)
   AND (
-    $21::text IS NULL
+    $22::text IS NULL
     OR EXISTS (
       SELECT 1
       FROM location_cluster_assets lca
       JOIN location_clusters lc ON lc.cluster_id = lca.cluster_id
       WHERE lca.asset_id = a.asset_id
-        AND lc.search_vector @@ plainto_tsquery('simple', $21)
+        AND lc.search_vector @@ plainto_tsquery('simple', $22)
     )
   )
 ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-LIMIT $22
+LIMIT $23
 `
 
 type GetAssetIDsUnifiedParams struct {
 	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
+	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
 	Query            *string            `db:"query" json:"query"`
 	AssetType        *string            `db:"asset_type" json:"asset_type"`
 	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
@@ -1015,6 +1023,7 @@ type GetAssetIDsUnifiedParams struct {
 func (q *Queries) GetAssetIDsUnified(ctx context.Context, arg GetAssetIDsUnifiedParams) ([]pgtype.UUID, error) {
 	rows, err := q.db.Query(ctx, getAssetIDsUnified,
 		arg.IsDeleted,
+		arg.AssetIds,
 		arg.Query,
 		arg.AssetType,
 		arg.AssetTypes,
@@ -2080,99 +2089,100 @@ WITH page_ids AS MATERIALIZED (
     END AS sort_time
   FROM assets a
   WHERE a.is_deleted = COALESCE($2::boolean, false)
-    AND ($3::text IS NULL OR a.original_filename ILIKE '%' || $3 || '%')
-    AND ($4::text IS NULL OR a.type = $4)
-    AND ($5::text[] IS NULL OR a.type = ANY($5::text[]))
-    AND ($6::integer IS NULL OR a.owner_id = $6)
-    AND ($7::uuid IS NULL OR a.repository_id = $7)
-    AND (
-      $8::integer IS NULL
-      OR EXISTS (
-        SELECT 1
-        FROM face_cluster_members fcm
-        JOIN face_items fi_person ON fi_person.id = fcm.face_id
-        WHERE fcm.cluster_id = $8
-          AND fi_person.asset_id = a.asset_id
-      )
-    )
+    AND ($3::uuid[] IS NULL OR a.asset_id = ANY($3::uuid[]))
+    AND ($4::text IS NULL OR a.original_filename ILIKE '%' || $4 || '%')
+    AND ($5::text IS NULL OR a.type = $5)
+    AND ($6::text[] IS NULL OR a.type = ANY($6::text[]))
+    AND ($7::integer IS NULL OR a.owner_id = $7)
+    AND ($8::uuid IS NULL OR a.repository_id = $8)
     AND (
       $9::integer IS NULL
       OR EXISTS (
         SELECT 1
-        FROM album_assets aa
-        WHERE aa.asset_id = a.asset_id
-          AND aa.album_id = $9
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = $9
+          AND fi_person.asset_id = a.asset_id
       )
     )
     AND (
-      $10::text IS NULL
+      $10::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $10
+      )
+    )
+    AND (
+      $11::text IS NULL
       OR EXISTS (
         SELECT 1
         FROM asset_tags at
         JOIN tags t ON t.tag_id = at.tag_id
         WHERE at.asset_id = a.asset_id
-          AND t.tag_name = $10
-          AND ($11::text IS NULL OR at.source = $11)
+          AND t.tag_name = $11
+          AND ($12::text IS NULL OR at.source = $12)
       )
     )
     AND (
-      $12::text[] IS NULL
+      $13::text[] IS NULL
       OR (
         SELECT COUNT(DISTINCT t2.tag_name)
         FROM asset_tags at2
         JOIN tags t2 ON t2.tag_id = at2.tag_id
         WHERE at2.asset_id = a.asset_id
-          AND t2.tag_name = ANY($12::text[])
-      ) = cardinality($12::text[])
+          AND t2.tag_name = ANY($13::text[])
+      ) = cardinality($13::text[])
     )
-    AND ($13::text IS NULL OR
-      CASE COALESCE($14::text, 'contains')
-        WHEN 'matches' THEN a.original_filename ILIKE $13
-        WHEN 'starts_with' THEN a.original_filename ILIKE $13 || '%'
-        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $13
-        ELSE a.original_filename ILIKE '%' || $13 || '%'
+    AND ($14::text IS NULL OR
+      CASE COALESCE($15::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE $14
+        WHEN 'starts_with' THEN a.original_filename ILIKE $14 || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $14
+        ELSE a.original_filename ILIKE '%' || $14 || '%'
       END
     )
-    AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $15)
-    AND ($16::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $16)
-    AND ($17::boolean IS NULL OR
+    AND ($16::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $16)
+    AND ($17::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $17)
+    AND ($18::boolean IS NULL OR
       CASE
-        WHEN $17 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        WHEN $18 = true THEN a.specific_metadata->>'is_raw' = 'true'
         ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
       END
     )
-    AND ($18::integer IS NULL OR
+    AND ($19::integer IS NULL OR
       CASE
-        WHEN $18 = 0 THEN a.rating IS NULL OR a.rating = 0
-        ELSE a.rating = $18
+        WHEN $19 = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = $19
       END
     )
-    AND ($19::boolean IS NULL OR
+    AND ($20::boolean IS NULL OR
       CASE
-        WHEN $19 = false THEN a.liked IS NULL OR a.liked = false
+        WHEN $20 = false THEN a.liked IS NULL OR a.liked = false
         ELSE a.liked = true
       END
     )
-    AND ($20::text IS NULL OR a.specific_metadata->>'camera_model' = $20)
-    AND ($21::text IS NULL OR a.specific_metadata->>'lens_model' = $21)
+    AND ($21::text IS NULL OR a.specific_metadata->>'camera_model' = $21)
+    AND ($22::text IS NULL OR a.specific_metadata->>'lens_model' = $22)
     AND (
-      $22::float8 IS NULL
-      OR $23::float8 IS NULL
+      $23::float8 IS NULL
       OR $24::float8 IS NULL
       OR $25::float8 IS NULL
+      OR $26::float8 IS NULL
       OR (
         a.gps_latitude IS NOT NULL
         AND a.gps_longitude IS NOT NULL
         AND a.gps_latitude
-          BETWEEN LEAST($23::float8, $22::float8)
-          AND GREATEST($23::float8, $22::float8)
+          BETWEEN LEAST($24::float8, $23::float8)
+          AND GREATEST($24::float8, $23::float8)
         AND (
           CASE
-            WHEN $25::float8 <= $24::float8 THEN
-              a.gps_longitude BETWEEN $25::float8 AND $24::float8
+            WHEN $26::float8 <= $25::float8 THEN
+              a.gps_longitude BETWEEN $26::float8 AND $25::float8
             ELSE
-              a.gps_longitude >= $25::float8
-              OR a.gps_longitude <= $24::float8
+              a.gps_longitude >= $26::float8
+              OR a.gps_longitude <= $25::float8
           END
         )
       )
@@ -2180,7 +2190,7 @@ WITH page_ids AS MATERIALIZED (
   ORDER BY
     sort_time DESC,
     a.asset_id DESC
-  LIMIT $27 OFFSET $26
+  LIMIT $28 OFFSET $27
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -2191,6 +2201,7 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 type GetAssetsUnifiedParams struct {
 	SortBy           *string            `db:"sort_by" json:"sort_by"`
 	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
+	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
 	Query            *string            `db:"query" json:"query"`
 	AssetType        *string            `db:"asset_type" json:"asset_type"`
 	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
@@ -2224,6 +2235,7 @@ func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedPara
 	rows, err := q.db.Query(ctx, getAssetsUnified,
 		arg.SortBy,
 		arg.IsDeleted,
+		arg.AssetIds,
 		arg.Query,
 		arg.AssetType,
 		arg.AssetTypes,
@@ -2427,99 +2439,100 @@ WITH filtered AS MATERIALIZED (
   FROM assets a
   LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
-    AND ($2::text IS NULL OR a.original_filename ILIKE '%' || $2 || '%')
-    AND ($3::text IS NULL OR a.type = $3)
-    AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
-    AND ($5::integer IS NULL OR a.owner_id = $5)
-    AND ($6::uuid IS NULL OR a.repository_id = $6)
-    AND (
-      $7::integer IS NULL
-      OR EXISTS (
-        SELECT 1
-        FROM face_cluster_members fcm
-        JOIN face_items fi_person ON fi_person.id = fcm.face_id
-        WHERE fcm.cluster_id = $7
-          AND fi_person.asset_id = a.asset_id
-      )
-    )
+    AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
+    AND ($3::text IS NULL OR a.original_filename ILIKE '%' || $3 || '%')
+    AND ($4::text IS NULL OR a.type = $4)
+    AND ($5::text[] IS NULL OR a.type = ANY($5::text[]))
+    AND ($6::integer IS NULL OR a.owner_id = $6)
+    AND ($7::uuid IS NULL OR a.repository_id = $7)
     AND (
       $8::integer IS NULL
       OR EXISTS (
         SELECT 1
-        FROM album_assets aa
-        WHERE aa.asset_id = a.asset_id
-          AND aa.album_id = $8
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = $8
+          AND fi_person.asset_id = a.asset_id
       )
     )
     AND (
-      $9::text IS NULL
+      $9::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $9
+      )
+    )
+    AND (
+      $10::text IS NULL
       OR EXISTS (
         SELECT 1
         FROM asset_tags at
         JOIN tags t ON t.tag_id = at.tag_id
         WHERE at.asset_id = a.asset_id
-          AND t.tag_name = $9
-          AND ($10::text IS NULL OR at.source = $10)
+          AND t.tag_name = $10
+          AND ($11::text IS NULL OR at.source = $11)
       )
     )
     AND (
-      $11::text[] IS NULL
+      $12::text[] IS NULL
       OR (
         SELECT COUNT(DISTINCT t2.tag_name)
         FROM asset_tags at2
         JOIN tags t2 ON t2.tag_id = at2.tag_id
         WHERE at2.asset_id = a.asset_id
-          AND t2.tag_name = ANY($11::text[])
-      ) = cardinality($11::text[])
+          AND t2.tag_name = ANY($12::text[])
+      ) = cardinality($12::text[])
     )
-    AND ($12::text IS NULL OR
-      CASE COALESCE($13::text, 'contains')
-        WHEN 'matches' THEN a.original_filename ILIKE $12
-        WHEN 'starts_with' THEN a.original_filename ILIKE $12 || '%'
-        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $12
-        ELSE a.original_filename ILIKE '%' || $12 || '%'
+    AND ($13::text IS NULL OR
+      CASE COALESCE($14::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE $13
+        WHEN 'starts_with' THEN a.original_filename ILIKE $13 || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $13
+        ELSE a.original_filename ILIKE '%' || $13 || '%'
       END
     )
-    AND ($14::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $14)
-    AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $15)
-    AND ($16::boolean IS NULL OR
+    AND ($15::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $15)
+    AND ($16::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $16)
+    AND ($17::boolean IS NULL OR
       CASE
-        WHEN $16 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        WHEN $17 = true THEN a.specific_metadata->>'is_raw' = 'true'
         ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
       END
     )
-    AND ($17::integer IS NULL OR
+    AND ($18::integer IS NULL OR
       CASE
-        WHEN $17 = 0 THEN a.rating IS NULL OR a.rating = 0
-        ELSE a.rating = $17
+        WHEN $18 = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = $18
       END
     )
-    AND ($18::boolean IS NULL OR
+    AND ($19::boolean IS NULL OR
       CASE
-        WHEN $18 = false THEN a.liked IS NULL OR a.liked = false
+        WHEN $19 = false THEN a.liked IS NULL OR a.liked = false
         ELSE a.liked = true
       END
     )
-    AND ($19::text IS NULL OR a.specific_metadata->>'camera_model' = $19)
-    AND ($20::text IS NULL OR a.specific_metadata->>'lens_model' = $20)
+    AND ($20::text IS NULL OR a.specific_metadata->>'camera_model' = $20)
+    AND ($21::text IS NULL OR a.specific_metadata->>'lens_model' = $21)
     AND (
-      $21::float8 IS NULL
-      OR $22::float8 IS NULL
+      $22::float8 IS NULL
       OR $23::float8 IS NULL
       OR $24::float8 IS NULL
+      OR $25::float8 IS NULL
       OR (
         a.gps_latitude IS NOT NULL
         AND a.gps_longitude IS NOT NULL
         AND a.gps_latitude
-          BETWEEN LEAST($22::float8, $21::float8)
-          AND GREATEST($22::float8, $21::float8)
+          BETWEEN LEAST($23::float8, $22::float8)
+          AND GREATEST($23::float8, $22::float8)
         AND (
           CASE
-            WHEN $24::float8 <= $23::float8 THEN
-              a.gps_longitude BETWEEN $24::float8 AND $23::float8
+            WHEN $25::float8 <= $24::float8 THEN
+              a.gps_longitude BETWEEN $25::float8 AND $24::float8
             ELSE
-              a.gps_longitude >= $24::float8
-              OR a.gps_longitude <= $23::float8
+              a.gps_longitude >= $25::float8
+              OR a.gps_longitude <= $24::float8
           END
         )
       )
@@ -2532,6 +2545,7 @@ stack_covers AS MATERIALIZED (
   FROM asset_stack_members asm
   JOIN assets a ON a.asset_id = asm.asset_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
+    AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
   ORDER BY asm.stack_id, asm.position ASC NULLS LAST, asm.asset_id ASC
 ),
 stack_members_all AS MATERIALIZED (
@@ -2541,6 +2555,7 @@ stack_members_all AS MATERIALIZED (
   FROM asset_stack_members asm
   JOIN assets a ON a.asset_id = asm.asset_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
+    AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
   GROUP BY asm.stack_id
 ),
 browse_items AS MATERIALIZED (
@@ -2567,13 +2582,13 @@ paged AS (
     bi.member_asset_ids,
     bi.matched_asset_ids,
     CASE
-      WHEN $25::text = 'recently_added' THEN cover.upload_time
+      WHEN $26::text = 'recently_added' THEN cover.upload_time
       ELSE COALESCE(cover.taken_time, cover.upload_time)
     END AS sort_time
   FROM browse_items bi
   JOIN assets cover ON cover.asset_id = bi.cover_asset_id
   ORDER BY sort_time DESC, cover.asset_id DESC
-  LIMIT $27 OFFSET $26
+  LIMIT $28 OFFSET $27
 )
 SELECT
   p.item_type,
@@ -2589,6 +2604,7 @@ ORDER BY p.sort_time DESC, p.cover_asset_id DESC
 
 type GetCollapsedBrowseItemsUnifiedParams struct {
 	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
+	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
 	Query            *string            `db:"query" json:"query"`
 	AssetType        *string            `db:"asset_type" json:"asset_type"`
 	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
@@ -2629,6 +2645,7 @@ type GetCollapsedBrowseItemsUnifiedRow struct {
 func (q *Queries) GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error) {
 	rows, err := q.db.Query(ctx, getCollapsedBrowseItemsUnified,
 		arg.IsDeleted,
+		arg.AssetIds,
 		arg.Query,
 		arg.AssetType,
 		arg.AssetTypes,

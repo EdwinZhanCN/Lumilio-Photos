@@ -5668,6 +5668,200 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/agent/pins/{id}/assets/list": {
+            "post": {
+                "description": "Query a pinned widget with the same list/filter/sort semantics as the assets gallery. Snapshot-order hydration remains available through GET /agent/pins/{id}/assets.",
+                "parameters": [
+                    {
+                        "description": "Pin ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetQueryRequestDTO",
+                                        "summary": "data",
+                                        "description": "Query parameters"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Query parameters",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.QueryAssetsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Pin assets queried successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Pin not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Semantic search unavailable"
+                    }
+                },
+                "summary": "Query Agent Pin Assets",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/api/v1/agent/pins/{id}/assets/search": {
+            "post": {
+                "description": "Search a pinned widget with optional top results enhancement and filename fallback, constrained to the pin's asset set.",
+                "parameters": [
+                    {
+                        "description": "Pin ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.SearchAssetsRequestDTO",
+                                        "summary": "data",
+                                        "description": "Search parameters"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Search parameters",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.SearchAssetsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Pin assets searched successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Pin not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Search Agent Pin Assets",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
         "/api/v1/agent/refs/{id}": {
             "get": {
                 "description": "Get metadata and facet summary for an agent ref. Refs are scoped to the requesting user and thread.",

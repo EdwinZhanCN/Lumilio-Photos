@@ -19,6 +19,7 @@ import (
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/db/repo"
+	"server/internal/service"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/gin-gonic/gin"
@@ -37,15 +38,17 @@ type AgentHandler struct {
 	refStore     ref.Store
 	queries      *repo.Queries
 	pins         *pins.Service
+	assetService service.AssetService
 }
 
 // NewAgentHandler creates a new agent handler
-func NewAgentHandler(agentService core.AgentService, refStore ref.Store, queries *repo.Queries, pinService *pins.Service) *AgentHandler {
+func NewAgentHandler(agentService core.AgentService, refStore ref.Store, queries *repo.Queries, pinService *pins.Service, assetService service.AssetService) *AgentHandler {
 	return &AgentHandler{
 		agentService: agentService,
 		refStore:     refStore,
 		queries:      queries,
 		pins:         pinService,
+		assetService: assetService,
 	}
 }
 
