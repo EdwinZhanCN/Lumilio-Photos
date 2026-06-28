@@ -70,11 +70,15 @@ export interface AssetsPageHeaderProps {
   onSortByChange: (sortBy: SortByType) => void;
   onFiltersChange?: (filters: FilterDTO) => void;
   title?: string;
+  subtitle?: string;
   icon?: ReactNode;
   browseItems?: BrowseItem[];
   lockedFilterFields?: readonly FilterFieldKey[];
   bulkActions?: AssetsBulkActionInput;
   hiddenBulkActions?: readonly AssetsBulkActionId[];
+  capabilities?: {
+    showScan?: boolean;
+  };
 }
 
 const AssetsPageHeader = ({
@@ -82,11 +86,13 @@ const AssetsPageHeader = ({
   onSortByChange,
   onFiltersChange,
   title,
+  subtitle,
   icon,
   browseItems,
   lockedFilterFields,
   bulkActions,
   hiddenBulkActions,
+  capabilities,
 }: AssetsPageHeaderProps) => {
   const { t } = useI18n();
   const selection = useSelection();
@@ -120,6 +126,7 @@ const AssetsPageHeader = ({
   const { repositories, selectedRepository, scopeLabel } =
     useWorkingRepository();
   const { scanRepositories, isScanning } = useRepositoryScan();
+  const showScan = capabilities?.showScan ?? true;
 
   // Hydrate FilterTool from global filters (single source of truth)
   const inboundDTO = useMemo(() => {
@@ -702,6 +709,7 @@ const AssetsPageHeader = ({
     <>
       <PageHeader
         title={title ?? tabTitle}
+        subtitle={subtitle}
         icon={icon ?? <ImageIcon className="w-6 h-6 text-primary" />}
         className="sticky top-0 z-40 bg-base-100 border-b border-base-200"
       >
@@ -761,24 +769,26 @@ const AssetsPageHeader = ({
             lockedFields={lockedFilterFields}
           />
 
-          <button
-            type="button"
-            className="btn btn-sm btn-soft btn-info gap-2 rounded-full"
-            onClick={handleScanCurrentLibrary}
-            disabled={isScanning || repositories.length === 0}
-            title={t("assets.assetsPageHeader.scan.title", {
-              scope: scopeLabel,
-            })}
-          >
-            {isScanning ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : (
-              <RefreshCcwDot className="h-4 w-4" />
-            )}
-            <span className="hidden xl:inline text-xs font-medium">
-              {t("assets.assetsPageHeader.scan.label")}
-            </span>
-          </button>
+          {showScan && (
+            <button
+              type="button"
+              className="btn btn-sm btn-soft btn-info gap-2 rounded-full"
+              onClick={handleScanCurrentLibrary}
+              disabled={isScanning || repositories.length === 0}
+              title={t("assets.assetsPageHeader.scan.title", {
+                scope: scopeLabel,
+              })}
+            >
+              {isScanning ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <RefreshCcwDot className="h-4 w-4" />
+              )}
+              <span className="hidden xl:inline text-xs font-medium">
+                {t("assets.assetsPageHeader.scan.label")}
+              </span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -959,22 +969,24 @@ const AssetsPageHeader = ({
                   : t("assets.assetsPageHeader.selectionMode.enter")}
               </button>
             </li>
-            <li>
-              <button
-                onClick={() => {
-                  void handleScanCurrentLibrary();
-                  handleDropdownItemClick();
-                }}
-                disabled={isScanning || repositories.length === 0}
-              >
-                {isScanning ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <RefreshCcwDot size={16} />
-                )}
-                {t("assets.assetsPageHeader.scan.label")}
-              </button>
-            </li>
+            {showScan && (
+              <li>
+                <button
+                  onClick={() => {
+                    void handleScanCurrentLibrary();
+                    handleDropdownItemClick();
+                  }}
+                  disabled={isScanning || repositories.length === 0}
+                >
+                  {isScanning ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <RefreshCcwDot size={16} />
+                  )}
+                  {t("assets.assetsPageHeader.scan.label")}
+                </button>
+              </li>
+            )}
 
             {selection.enabled && hasBulkActionItems && (
               <>

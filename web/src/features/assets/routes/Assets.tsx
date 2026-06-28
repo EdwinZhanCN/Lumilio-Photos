@@ -5,8 +5,11 @@ import { WorkerProvider } from "@/contexts/WorkerProvider";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
-import { PinAssetsHero } from "@/features/assets/components/page/PinAssetsHero";
+
+type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 
 interface AssetsOrigin {
   from?: string;
@@ -25,6 +28,13 @@ const Assets = () => {
   // agent board). Show a back-crumb to wherever we came from; fall back to the
   // board when the origin state is missing (e.g. on hard refresh / deep-link).
   const origin = (location.state ?? null) as AssetsOrigin | null;
+  const pinMetaQuery = $api.useQuery(
+    "get",
+    "/api/v1/agent/pins/{id}",
+    { params: { path: { id: pin ?? "" } } },
+    { enabled: isPinMode, retry: false, staleTime: 60_000 },
+  );
+  const pinMeta = pinMetaQuery.data as AgentPinDTO | undefined;
   useBreadcrumbs(
     isPinMode
       ? [
@@ -32,7 +42,12 @@ const Assets = () => {
             label: origin?.fromLabel ?? t("lumilio.nav.board", "Board"),
             to: origin?.from ?? "/lumilio",
           },
-          { label: origin?.label ?? t("assets.pinTrailLabel", "Selection") },
+          {
+            label:
+              pinMeta?.title ??
+              origin?.label ??
+              t("assets.pinTrailLabel", "Selection"),
+          },
         ]
       : [],
   );
@@ -59,10 +74,7 @@ const Assets = () => {
         syncUrl={isPinMode}
       >
         <WorkerProvider>
-          <AssetsGalleryPage
-            pinId={pin ?? undefined}
-            hero={isPinMode ? <PinAssetsHero pinId={pin as string} /> : undefined}
-          />
+          <AssetsGalleryPage pinId={pin ?? undefined} />
         </WorkerProvider>
       </AssetsProvider>
     </ErrorBoundary>

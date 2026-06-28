@@ -34,11 +34,13 @@ arrays of assets. [createBrowseGroupsFromBrowseItemDTOs](./utils/browseItems.ts)
 ordinary assets and stacks in one flattened browse model so selection,
 carousel positioning, and gallery tiles can share behavior.
 
-[usePinAssetsView](./hooks/usePinAssetsView.tsx) is the agent-board adapter. It hydrates
-`/api/v1/agent/pins/{id}/assets` into [PinAssetsViewResult](./hooks/usePinAssetsView.tsx), which is
-shaped like [AssetsViewResult](./types/assets.type.ts) for rendering, but its source currently
-supports only snapshot pagination. It does not consume the ordinary library
-sort, filter, or search state.
+[usePinAssetsView](./hooks/usePinAssetsView.tsx) is the agent-board full-gallery adapter. It reads
+`/api/v1/agent/pins/{id}/assets/list` and
+`/api/v1/agent/pins/{id}/assets/search`, returning the same
+[PinAssetsViewResult](./hooks/usePinAssetsView.tsx)/[AssetsViewResult](./types/assets.type.ts) browse shape as library
+views while constraining the backend query to the pin asset set. The older
+`GET /api/v1/agent/pins/{id}/assets` hydration endpoint remains a lightweight
+snapshot-order API for board previews.
 
 ## Composition
 
@@ -66,16 +68,16 @@ contributes visible selection to Lumilio context via
 keeps URL-backed carousel navigation in sync.
 [AssetsPageHeader](./components/shared/AssetsPageHeader.tsx) owns route-level controls; [JustifiedGallery](./components/page/JustifiedGallery/JustifiedGallery.tsx)
 and [SquareGallery](./components/page/SquareGallery/SquareGallery.tsx) render the browse model; [FullScreenCarousel](./components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx)
-inspects the current flattened asset set; [SearchFAB](./components/page/SearchFAB.tsx) only applies to
-sources that support the ordinary library search query.
+inspects the current flattened asset set; [SearchFAB](./components/page/SearchFAB.tsx) writes to the
+shared search state and the selected source hook decides how to execute it.
 
 ## Decisions
 
 Browse items are the shared asset-set surface. Source adapters may all return
-[AssetsViewResult](./types/assets.type.ts), but controls must remain capability-aware: a library
-view can sort, filter, search, and scan repositories; an agent pin/ref view is
-a snapshot-hydration source unless the backend contract grows those query
-semantics.
+[AssetsViewResult](./types/assets.type.ts), but controls must remain capability-aware: library
+and pin views can sort, filter, and search through source-scoped backend
+queries, while repository scan remains a library maintenance action and is
+hidden for pin/ref contexts.
 
 Selection stores browse item ids, not raw asset ids. Bulk actions call
 [resolveBrowseSelectedAssetIds](./utils/browseItems.ts) so stacks can choose whether an action

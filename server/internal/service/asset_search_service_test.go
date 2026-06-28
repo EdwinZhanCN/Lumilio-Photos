@@ -38,6 +38,26 @@ func scoredSet(ids ...uuid.UUID) fusedSearchSet {
 	return fusedSearchSet{Members: members, Sources: []string{"embedding", "filename"}}
 }
 
+func TestAssetSetSourceFlowsIntoSearchFilters(t *testing.T) {
+	ids := []uuid.UUID{uuid.New(), uuid.New()}
+	params := QueryAssetsParams{
+		Query: "sunset",
+		Source: &AssetSetSource{
+			Kind:     AssetSetSourcePin,
+			AssetIDs: ids,
+		},
+	}
+
+	filter, err := buildAggregateSearchFilter(params)
+	require.NoError(t, err)
+	require.Equal(t, ids, filter.AssetIDs)
+
+	filenameParams := filenameMembershipParams(params)
+	require.Len(t, filenameParams.AssetIds, len(ids))
+	require.Equal(t, ids[0], uuid.UUID(filenameParams.AssetIds[0].Bytes))
+	require.Equal(t, ids[1], uuid.UUID(filenameParams.AssetIds[1].Bytes))
+}
+
 // Best Results is the confidence-ordered Top-N subset of the fused set;
 // Results is the whole set under the presentation sort — a literal superset.
 func TestSearchAssets_FusedSet_TopSubsetAndFullResults(t *testing.T) {

@@ -22,6 +22,9 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 	}
 	conditions := []string{fmt.Sprintf("%s.is_deleted = %s", a, builder.addArg(isDeleted))}
 
+	if filter.AssetIDs != nil {
+		conditions = append(conditions, fmt.Sprintf("%s.asset_id = ANY(%s::uuid[])", a, builder.addArg(filter.AssetIDs)))
+	}
 	if filter.AssetType != nil {
 		conditions = append(conditions, fmt.Sprintf("%s.type = %s", a, builder.addArg(*filter.AssetType)))
 	}

@@ -286,6 +286,7 @@ func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, p
 		DateFrom:         params.DateFrom,
 		DateTo:           params.DateTo,
 		IsRaw:            params.IsRaw,
+		IsDeleted:        params.IsDeleted,
 		Rating:           params.Rating,
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
@@ -299,6 +300,7 @@ func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, p
 		LocationWest:     params.LocationWest,
 		SortBy:           params.SortBy,
 		StackMode:        params.StackMode,
+		Source:           params.Source,
 		Limit:            aggregateCandidatePoolSize(params.Limit, params.Offset),
 		Offset:           0,
 	})
@@ -650,6 +652,7 @@ func (s *assetService) countAssetsUnified(ctx context.Context, params QueryAsset
 		return 0, err
 	}
 	return s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
+		AssetIds:         assetSetSourcePgUUIDs(params.Source),
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,
 		RepositoryID:     repoUUID,
@@ -684,6 +687,7 @@ func (s *assetService) countCollapsedBrowseItemsUnified(ctx context.Context, par
 		return 0, err
 	}
 	return s.queries.CountCollapsedBrowseItemsUnified(ctx, repo.CountCollapsedBrowseItemsUnifiedParams{
+		AssetIds:         assetSetSourcePgUUIDs(params.Source),
 		Query:            queryPtr,
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,
@@ -719,6 +723,7 @@ func (s *assetService) getCollapsedBrowseItemsUnified(ctx context.Context, param
 	}
 	sortByPtr := normalizeSortByPointer(params.SortBy)
 	return s.queries.GetCollapsedBrowseItemsUnified(ctx, repo.GetCollapsedBrowseItemsUnifiedParams{
+		AssetIds:         assetSetSourcePgUUIDs(params.Source),
 		Query:            queryPtr,
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,

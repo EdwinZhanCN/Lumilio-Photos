@@ -565,6 +565,181 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/pins/{id}/assets/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Query Agent Pin Assets
+         * @description Query a pinned widget with the same list/filter/sort semantics as the assets gallery. Snapshot-order hydration remains available through GET /agent/pins/{id}/assets.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Query parameters */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.AssetQueryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Pin assets queried successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.QueryAssetsResponseDTO"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Semantic search unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/pins/{id}/assets/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Agent Pin Assets
+         * @description Search a pinned widget with optional top results enhancement and filename fallback, constrained to the pin's asset set.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pin ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Search parameters */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.SearchAssetsRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Pin assets searched successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.SearchAssetsResponseDTO"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Pin not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/pins/layout": {
         parameters: {
             query?: never;

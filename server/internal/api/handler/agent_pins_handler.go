@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"log"
 	"strconv"
 
 	"server/internal/agent/facets"
@@ -10,6 +11,7 @@ import (
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/db/repo"
+	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -196,6 +198,164 @@ func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 		Total:      len(ids),
 		Pagination: dto.PaginationDTO{Limit: limit, Offset: offset},
 	})
+}
+
+func (h *AgentHandler) resolvePinAssetSource(c *gin.Context) (*service.AssetSetSource, bool) {
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return nil, false
+	}
+	pinID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinNotFound(c, err, "Pin not found")
+		return nil, false
+	}
+
+	_, ids, err := h.pins.AssetIDs(c.Request.Context(), int32(user.UserID), pinID)
+	if err != nil {
+		api.GinNotFound(c, err, "Pin not found")
+		return nil, false
+	}
+
+	return &service.AssetSetSource{
+		Kind:                  service.AssetSetSourcePin,
+		AssetIDs:              ids,
+		PreserveSnapshotOrder: true,
+	}, true
+}
+
+// QueryPinAssets queries a pinned widget using the normal assets browse contract.
+// @Summary Query Agent Pin Assets
+// @Description Query a pinned widget with the same list/filter/sort semantics as the assets gallery. Snapshot-order hydration remains available through GET /agent/pins/{id}/assets.
+// @Tags agent
+// @Accept json
+// @Produce json
+// @Param id path string true "Pin ID"
+// @Param data body dto.AssetQueryRequestDTO true "Query parameters"
+// @Success 200 {object} dto.QueryAssetsResponseDTO "Pin assets queried successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/agent/pins/{id}/assets/list [post]
+func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
+	if h.assetService == nil {
+		api.GinInternalError(c, errors.New("asset service unavailable"), "Failed to query pin assets")
+		return
+	}
+
+	var req dto.AssetQueryRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	source, ok := h.resolvePinAssetSource(c)
+	if !ok {
+		return
+	}
+
+	normalizeAssetQueryPagination(&req.Pagination)
+	if err := validateAssetQuerySearchType(req.SearchType); err != nil {
+		api.GinBadRequest(c, err, "Search type must be 'filename' or 'semantic'")
+		return
+	}
+	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
+		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
+		return
+	}
+	if err := validateStackMode(req.StackMode); err != nil {
+		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		return
+	}
+	if req.SearchType == "" {
+		req.SearchType = "filename"
+	}
+
+	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	params = applyAssetOwnershipScope(c, params)
+	params.Source = source
+
+	result, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
+	if err != nil {
+		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
+			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
+			return
+		}
+		log.Printf("Failed to query pin assets: %v", err)
+		api.GinInternalError(c, err, "Failed to query pin assets")
+		return
+	}
+
+	api.JSONOK(c, toQueryBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
+}
+
+// SearchPinAssets searches inside a pinned widget using the normal assets search contract.
+// @Summary Search Agent Pin Assets
+// @Description Search a pinned widget with optional top results enhancement and filename fallback, constrained to the pin's asset set.
+// @Tags agent
+// @Accept json
+// @Produce json
+// @Param id path string true "Pin ID"
+// @Param data body dto.SearchAssetsRequestDTO true "Search parameters"
+// @Success 200 {object} dto.SearchAssetsResponseDTO "Pin assets searched successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/agent/pins/{id}/assets/search [post]
+func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
+	if h.assetService == nil {
+		api.GinInternalError(c, errors.New("asset service unavailable"), "Failed to search pin assets")
+		return
+	}
+
+	var req dto.SearchAssetsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	source, ok := h.resolvePinAssetSource(c)
+	if !ok {
+		return
+	}
+
+	normalizeAssetQueryPagination(&req.Pagination)
+	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
+		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
+		return
+	}
+	if err := validateStackMode(req.StackMode); err != nil {
+		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		return
+	}
+	if err := validateSearchEnhancementMode(req.EnhancementMode); err != nil {
+		api.GinBadRequest(c, err, "Enhancement mode must be 'auto', 'off', or 'only'")
+		return
+	}
+	if req.EnhancementMode == "" {
+		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
+	}
+
+	params := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	params = applyAssetOwnershipScope(c, params)
+	params.Source = source
+
+	result, err := h.assetService.SearchBrowseItems(c.Request.Context(), service.SearchAssetsParams{
+		QueryAssetsParams: params,
+		EnhancementMode:   service.SearchEnhancementMode(req.EnhancementMode),
+		TopResultsLimit:   req.TopResultsLimit,
+		Debug:             req.Debug,
+	})
+	if err != nil {
+		log.Printf("Failed to search pin assets: %v", err)
+		api.GinInternalError(c, err, "Failed to search pin assets")
+		return
+	}
+
+	api.JSONOK(c, toSearchBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
 }
 
 // UpdatePinLayout persists board layout changes.

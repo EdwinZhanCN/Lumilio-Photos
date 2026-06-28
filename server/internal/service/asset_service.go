@@ -148,8 +148,26 @@ type QueryAssetsParams struct {
 	LocationWest     *float64
 	SortBy           string
 	StackMode        string
+	Source           *AssetSetSource
 	Limit            int
 	Offset           int
+}
+
+type AssetSetSourceKind string
+
+const (
+	AssetSetSourceLibrary AssetSetSourceKind = "library"
+	AssetSetSourcePin     AssetSetSourceKind = "pin"
+	AssetSetSourceRef     AssetSetSourceKind = "ref"
+)
+
+// AssetSetSource scopes a query to an internally resolved asset set.
+// Handlers construct this after source-specific authorization; it is not a
+// public asset filter DTO field.
+type AssetSetSource struct {
+	Kind                  AssetSetSourceKind
+	AssetIDs              []uuid.UUID
+	PreserveSnapshotOrder bool
 }
 
 type SearchEnhancementMode string
@@ -1218,6 +1236,36 @@ func cloneStringSlice(values []string) []string {
 	return cloned
 }
 
+func cloneUUIDSlice(values []uuid.UUID) []uuid.UUID {
+	if len(values) == 0 {
+		return []uuid.UUID{}
+	}
+	cloned := make([]uuid.UUID, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func assetSetSourceUUIDs(source *AssetSetSource) []uuid.UUID {
+	if source == nil {
+		return nil
+	}
+	return cloneUUIDSlice(source.AssetIDs)
+}
+
+func assetSetSourcePgUUIDs(source *AssetSetSource) []pgtype.UUID {
+	if source == nil {
+		return nil
+	}
+	ids := make([]pgtype.UUID, 0, len(source.AssetIDs))
+	for _, id := range source.AssetIDs {
+		if id == uuid.Nil {
+			continue
+		}
+		ids = append(ids, pgtype.UUID{Bytes: id, Valid: true})
+	}
+	return ids
+}
+
 func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
 	if s.queryAssetsUnifiedFn != nil {
 		return s.queryAssetsUnifiedFn(ctx, params)
@@ -1345,6 +1393,7 @@ func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filte
 		repositoryID = &parsed
 	}
 	return aggregatesearch.Filter{
+		AssetIDs:         assetSetSourceUUIDs(params.Source),
 		RepositoryID:     repositoryID,
 		PersonID:         params.PersonID,
 		AssetType:        params.AssetType,
@@ -1420,9 +1469,11 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		s := "date_captured"
 		sortByPtr = &s
 	}
+	sourceAssetIDs := assetSetSourcePgUUIDs(params.Source)
 
 	// Get total count
 	countResult, err := s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
+		AssetIds:         sourceAssetIDs,
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,
 		RepositoryID:     repoUUID,
@@ -1454,6 +1505,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 
 	// Get assets
 	assets, err := s.queries.GetAssetsUnified(ctx, repo.GetAssetsUnifiedParams{
+		AssetIds:         sourceAssetIDs,
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,
 		RepositoryID:     repoUUID,
@@ -1633,6 +1685,9 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 		"e.is_primary = true",
 	}
 
+	if params.Source != nil {
+		conditions = append(conditions, fmt.Sprintf("a.asset_id = ANY(%s::uuid[])", builder.addArg(assetSetSourceUUIDs(params.Source))))
+	}
 	if params.AssetType != nil {
 		conditions = append(conditions, fmt.Sprintf("a.type = %s", builder.addArg(*params.AssetType)))
 	}
@@ -1860,6 +1915,7 @@ func (s *assetService) SearchAssetIDsOCR(ctx context.Context, query string, maxR
 // channel of the Results tier.
 func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedParams {
 	out := repo.GetAssetIDsUnifiedParams{Limit: fusedSetCap}
+	out.AssetIds = assetSetSourcePgUUIDs(params.Source)
 	if params.Query != "" {
 		operator := "contains"
 		filename := params.Query

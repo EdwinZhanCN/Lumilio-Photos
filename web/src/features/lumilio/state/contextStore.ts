@@ -27,6 +27,17 @@ export const useContextStore = create<ContextStore>((set, get) => ({
 
   register: (contribution) =>
     set((state) => {
+      const current = state.contributions.get(contribution.id);
+      if (
+        current &&
+        current.type === contribution.type &&
+        current.label === contribution.label &&
+        current.assetIds.length === contribution.assetIds.length &&
+        current.assetIds.every((id, index) => id === contribution.assetIds[index])
+      ) {
+        return state;
+      }
+
       const next = new Map(state.contributions);
       next.set(contribution.id, contribution);
       return { contributions: next };
@@ -34,6 +45,10 @@ export const useContextStore = create<ContextStore>((set, get) => ({
 
   unregister: (id) =>
     set((state) => {
+      if (!state.contributions.has(id) && !state.excluded.has(id)) {
+        return state;
+      }
+
       const next = new Map(state.contributions);
       next.delete(id);
       const excluded = new Set(state.excluded);

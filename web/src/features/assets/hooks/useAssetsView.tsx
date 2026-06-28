@@ -49,7 +49,7 @@ type SearchAssetsRequestDTO =
 type SearchAssetsResponseDTO =
   components["schemas"]["dto.SearchAssetsResponseDTO"];
 
-type SearchTopResultsMeta = {
+export type SearchTopResultsMeta = {
   enabled: boolean;
   degraded: boolean;
   reason?: string;
@@ -82,7 +82,7 @@ type PhotoSearchViewResult = AssetsViewResult & {
   topResultsMeta: SearchTopResultsMeta;
 };
 
-const DEFAULT_TOP_RESULTS_META: SearchTopResultsMeta = {
+export const DEFAULT_TOP_RESULTS_META: SearchTopResultsMeta = {
   enabled: false,
   degraded: false,
   source_types: [],
@@ -118,8 +118,8 @@ const EMPTY_PHOTO_SEARCH_VIEW_RESULT: PhotoSearchViewResult = {
 // Apple Photos-style two-tier search: Top Results is a small, high-precision
 // showcase (aggregate relevance order); the Results tier below carries the
 // full relevance set sorted by capture time.
-const TOP_RESULTS_LIMIT = 9;
-const DEFAULT_ASSET_TYPES: AssetMediaType[] = ["photos", "videos"];
+export const TOP_RESULTS_LIMIT = 9;
+export const DEFAULT_ASSET_TYPES: AssetMediaType[] = ["photos", "videos"];
 
 const getApiMimeTypes = (
   mediaTypes: AssetMediaType[],
@@ -159,7 +159,7 @@ const mergeUniqueAssets = (...assetCollections: Asset[][]): Asset[] => {
   return merged;
 };
 
-const normalizeTopResultsMeta = (
+export const normalizeTopResultsMeta = (
   meta?: SearchAssetsResponseDTO["top_results_meta"],
 ): SearchTopResultsMeta => ({
   enabled: Boolean(meta?.enabled),
@@ -168,7 +168,7 @@ const normalizeTopResultsMeta = (
   source_types: meta?.source_types ?? [],
 });
 
-const normalizeSearchSortBy = (
+export const normalizeSearchSortBy = (
   sortBy?: AssetViewDefinition["sortBy"],
 ): SearchAssetsRequestDTO["sort_by"] => {
   switch (sortBy) {
@@ -196,7 +196,7 @@ const useDefinitionFilter = (definition: AssetViewDefinition): AssetFilter => {
   }, [definition.filter, scopedRepositoryId]);
 };
 
-const buildApiFilter = (
+export const buildApiFilter = (
   definition: AssetViewDefinition,
   effectiveFilter: AssetFilter,
 ): AssetFilter => {

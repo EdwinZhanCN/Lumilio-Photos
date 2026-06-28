@@ -280,7 +280,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	userController := handler.NewUserHandler(userService)
 	queueController := handler.NewQueueHandler(pgxPool)
 	statsController := handler.NewStatsHandler(queries)
-	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins)
+	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)

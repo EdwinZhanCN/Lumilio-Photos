@@ -29,7 +29,7 @@ func TestStreamAgentEvents_Success(t *testing.T) {
 	req := httptest.NewRequest("POST", "/api/v1/agent/chat", nil)
 	c.Request = req
 
-	handler := NewAgentHandler(nil, nil, nil, nil)
+	handler := NewAgentHandler(nil, nil, nil, nil, nil)
 
 	// Create Eino iterator pair
 	iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
@@ -95,7 +95,7 @@ func TestStreamAgentEvents_ClientDisconnect(t *testing.T) {
 	req = req.WithContext(ctx)
 	c.Request = req
 
-	handler := NewAgentHandler(nil, nil, nil, nil)
+	handler := NewAgentHandler(nil, nil, nil, nil, nil)
 
 	// Create Eino iterator pair
 	iter, _ := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
