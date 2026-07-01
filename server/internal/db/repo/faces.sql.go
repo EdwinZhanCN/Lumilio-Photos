@@ -111,10 +111,34 @@ func (q *Queries) CountIncrementalFaceNeighbors(ctx context.Context, arg CountIn
 	return column_1, err
 }
 
+const countPersonFacesScoped = `-- name: CountPersonFacesScoped :one
+SELECT COUNT(*)::bigint
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fcm.cluster_id = $1
+  AND COALESCE(a.is_deleted, false) = false
+  AND ($2::uuid IS NULL OR a.repository_id = $2)
+  AND ($3::integer IS NULL OR a.owner_id = $3)
+`
+
+type CountPersonFacesScopedParams struct {
+	ClusterID    int32       `db:"cluster_id" json:"cluster_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) CountPersonFacesScoped(ctx context.Context, arg CountPersonFacesScopedParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPersonFacesScoped, arg.ClusterID, arg.RepositoryID, arg.OwnerID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createFaceCluster = `-- name: CreateFaceCluster :one
 INSERT INTO face_clusters (cluster_name, representative_face_id, confidence_score, is_confirmed)
 VALUES ($1, $2, $3, $4)
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
 `
 
 type CreateFaceClusterParams struct {
@@ -141,6 +165,8 @@ func (q *Queries) CreateFaceCluster(ctx context.Context, arg CreateFaceClusterPa
 		&i.IsConfirmed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
 	)
 	return i, err
 }
@@ -385,7 +411,7 @@ func (q *Queries) DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UU
 }
 
 const getAllFaceClusters = `-- name: GetAllFaceClusters :many
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
 ORDER BY is_confirmed DESC, member_count DESC
 `
 
@@ -407,6 +433,8 @@ func (q *Queries) GetAllFaceClusters(ctx context.Context) ([]FaceCluster, error)
 			&i.IsConfirmed,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsHidden,
+			&i.HiddenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -485,7 +513,7 @@ func (q *Queries) GetClusterMergeCandidates(ctx context.Context, arg GetClusterM
 }
 
 const getConfirmedFaceClusters = `-- name: GetConfirmedFaceClusters :many
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
 WHERE is_confirmed = true
 ORDER BY cluster_name ASC
 `
@@ -508,6 +536,8 @@ func (q *Queries) GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, 
 			&i.IsConfirmed,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsHidden,
+			&i.HiddenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -571,7 +601,7 @@ func (q *Queries) GetFaceClusterAssignmentsForScope(ctx context.Context, arg Get
 }
 
 const getFaceClusterByFaceID = `-- name: GetFaceClusterByFaceID :one
-SELECT fc.cluster_id, fc.cluster_name, fc.representative_face_id, fc.confidence_score, fc.member_count, fc.is_confirmed, fc.created_at, fc.updated_at FROM face_clusters fc
+SELECT fc.cluster_id, fc.cluster_name, fc.representative_face_id, fc.confidence_score, fc.member_count, fc.is_confirmed, fc.created_at, fc.updated_at, fc.is_hidden, fc.hidden_at FROM face_clusters fc
 JOIN face_cluster_members fcm ON fc.cluster_id = fcm.cluster_id
 WHERE fcm.face_id = $1
 `
@@ -588,12 +618,14 @@ func (q *Queries) GetFaceClusterByFaceID(ctx context.Context, faceID int32) (Fac
 		&i.IsConfirmed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
 	)
 	return i, err
 }
 
 const getFaceClusterByID = `-- name: GetFaceClusterByID :one
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
 WHERE cluster_id = $1
 `
 
@@ -609,12 +641,14 @@ func (q *Queries) GetFaceClusterByID(ctx context.Context, clusterID int32) (Face
 		&i.IsConfirmed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
 	)
 	return i, err
 }
 
 const getFaceClusterByRepresentative = `-- name: GetFaceClusterByRepresentative :one
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
 WHERE representative_face_id = $1
 `
 
@@ -630,6 +664,8 @@ func (q *Queries) GetFaceClusterByRepresentative(ctx context.Context, representa
 		&i.IsConfirmed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
 	)
 	return i, err
 }
@@ -938,6 +974,51 @@ func (q *Queries) GetFaceEmbeddingsForClustering(ctx context.Context, arg GetFac
 		return nil, err
 	}
 	return items, nil
+}
+
+const getFaceForCorrectionScoped = `-- name: GetFaceForCorrectionScoped :one
+SELECT
+    fi.id,
+    fi.asset_id,
+    fi.confidence,
+    fi.face_image_path,
+    a.repository_id,
+    a.owner_id
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fi.id = $1
+  AND COALESCE(a.is_deleted, false) = false
+  AND ($2::uuid IS NULL OR a.repository_id = $2)
+  AND ($3::integer IS NULL OR a.owner_id = $3)
+`
+
+type GetFaceForCorrectionScopedParams struct {
+	FaceID       int32       `db:"face_id" json:"face_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+}
+
+type GetFaceForCorrectionScopedRow struct {
+	ID            int32       `db:"id" json:"id"`
+	AssetID       pgtype.UUID `db:"asset_id" json:"asset_id"`
+	Confidence    float32     `db:"confidence" json:"confidence"`
+	FaceImagePath *string     `db:"face_image_path" json:"face_image_path"`
+	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetFaceForCorrectionScoped(ctx context.Context, arg GetFaceForCorrectionScopedParams) (GetFaceForCorrectionScopedRow, error) {
+	row := q.db.QueryRow(ctx, getFaceForCorrectionScoped, arg.FaceID, arg.RepositoryID, arg.OwnerID)
+	var i GetFaceForCorrectionScopedRow
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.Confidence,
+		&i.FaceImagePath,
+		&i.RepositoryID,
+		&i.OwnerID,
+	)
+	return i, err
 }
 
 const getFaceItemByID = `-- name: GetFaceItemByID :one
@@ -1332,6 +1413,58 @@ func (q *Queries) GetIncrementalFaceNeighbors(ctx context.Context, arg GetIncrem
 	return items, nil
 }
 
+const getManualFaceClusterMembershipsForScope = `-- name: GetManualFaceClusterMembershipsForScope :many
+SELECT
+    fcm.face_id,
+    fcm.cluster_id,
+    fcm.similarity_score,
+    fcm.confidence
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE COALESCE(fcm.is_manual, false) = true
+  AND COALESCE(a.is_deleted, false) = false
+  AND ($1::uuid IS NULL OR a.repository_id = $1::uuid)
+  AND ($2::integer IS NULL OR a.owner_id = $2::integer)
+`
+
+type GetManualFaceClusterMembershipsForScopeParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+}
+
+type GetManualFaceClusterMembershipsForScopeRow struct {
+	FaceID          int32   `db:"face_id" json:"face_id"`
+	ClusterID       int32   `db:"cluster_id" json:"cluster_id"`
+	SimilarityScore float32 `db:"similarity_score" json:"similarity_score"`
+	Confidence      float32 `db:"confidence" json:"confidence"`
+}
+
+func (q *Queries) GetManualFaceClusterMembershipsForScope(ctx context.Context, arg GetManualFaceClusterMembershipsForScopeParams) ([]GetManualFaceClusterMembershipsForScopeRow, error) {
+	rows, err := q.db.Query(ctx, getManualFaceClusterMembershipsForScope, arg.RepositoryID, arg.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetManualFaceClusterMembershipsForScopeRow
+	for rows.Next() {
+		var i GetManualFaceClusterMembershipsForScopeRow
+		if err := rows.Scan(
+			&i.FaceID,
+			&i.ClusterID,
+			&i.SimilarityScore,
+			&i.Confidence,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getNearestAssignedFaceCluster = `-- name: GetNearestAssignedFaceCluster :one
 SELECT
     fcm.cluster_id,
@@ -1383,6 +1516,62 @@ func (q *Queries) GetNearestAssignedFaceCluster(ctx context.Context, arg GetNear
 	)
 	var i GetNearestAssignedFaceClusterRow
 	err := row.Scan(&i.ClusterID, &i.FaceID, &i.Similarity)
+	return i, err
+}
+
+const getPersonFaceScoped = `-- name: GetPersonFaceScoped :one
+SELECT
+    fi.id,
+    fi.asset_id,
+    fi.confidence,
+    fi.is_primary,
+    fi.face_image_path,
+    a.repository_id,
+    a.owner_id
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fcm.cluster_id = $1
+  AND fi.id = $2
+  AND COALESCE(a.is_deleted, false) = false
+  AND ($3::uuid IS NULL OR a.repository_id = $3)
+  AND ($4::integer IS NULL OR a.owner_id = $4)
+`
+
+type GetPersonFaceScopedParams struct {
+	ClusterID    int32       `db:"cluster_id" json:"cluster_id"`
+	FaceID       int32       `db:"face_id" json:"face_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+}
+
+type GetPersonFaceScopedRow struct {
+	ID            int32       `db:"id" json:"id"`
+	AssetID       pgtype.UUID `db:"asset_id" json:"asset_id"`
+	Confidence    float32     `db:"confidence" json:"confidence"`
+	IsPrimary     *bool       `db:"is_primary" json:"is_primary"`
+	FaceImagePath *string     `db:"face_image_path" json:"face_image_path"`
+	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScopedParams) (GetPersonFaceScopedRow, error) {
+	row := q.db.QueryRow(ctx, getPersonFaceScoped,
+		arg.ClusterID,
+		arg.FaceID,
+		arg.RepositoryID,
+		arg.OwnerID,
+	)
+	var i GetPersonFaceScopedRow
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.Confidence,
+		&i.IsPrimary,
+		&i.FaceImagePath,
+		&i.RepositoryID,
+		&i.OwnerID,
+	)
 	return i, err
 }
 
@@ -1697,6 +1886,84 @@ func (q *Queries) GetUnclusteredFacesInScope(ctx context.Context, arg GetUnclust
 	return items, nil
 }
 
+const listPersonFacesScoped = `-- name: ListPersonFacesScoped :many
+SELECT
+    fi.id,
+    fi.asset_id,
+    fi.confidence,
+    fi.is_primary,
+    fi.face_image_path,
+    COALESCE(fcm.is_manual, false) AS is_manual,
+    a.original_filename,
+    a.taken_time,
+    a.upload_time
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fcm.cluster_id = $1
+  AND COALESCE(a.is_deleted, false) = false
+  AND ($2::uuid IS NULL OR a.repository_id = $2)
+  AND ($3::integer IS NULL OR a.owner_id = $3)
+ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
+LIMIT $5 OFFSET $4
+`
+
+type ListPersonFacesScopedParams struct {
+	ClusterID    int32       `db:"cluster_id" json:"cluster_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	Offset       int32       `db:"offset" json:"offset"`
+	Limit        int32       `db:"limit" json:"limit"`
+}
+
+type ListPersonFacesScopedRow struct {
+	ID               int32              `db:"id" json:"id"`
+	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	Confidence       float32            `db:"confidence" json:"confidence"`
+	IsPrimary        *bool              `db:"is_primary" json:"is_primary"`
+	FaceImagePath    *string            `db:"face_image_path" json:"face_image_path"`
+	IsManual         bool               `db:"is_manual" json:"is_manual"`
+	OriginalFilename string             `db:"original_filename" json:"original_filename"`
+	TakenTime        pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
+	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
+}
+
+func (q *Queries) ListPersonFacesScoped(ctx context.Context, arg ListPersonFacesScopedParams) ([]ListPersonFacesScopedRow, error) {
+	rows, err := q.db.Query(ctx, listPersonFacesScoped,
+		arg.ClusterID,
+		arg.RepositoryID,
+		arg.OwnerID,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPersonFacesScopedRow
+	for rows.Next() {
+		var i ListPersonFacesScopedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AssetID,
+			&i.Confidence,
+			&i.IsPrimary,
+			&i.FaceImagePath,
+			&i.IsManual,
+			&i.OriginalFilename,
+			&i.TakenTime,
+			&i.UploadTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const mergeFaceClusters = `-- name: MergeFaceClusters :exec
 UPDATE face_cluster_members
 SET cluster_id = $1
@@ -1710,6 +1977,23 @@ type MergeFaceClustersParams struct {
 
 func (q *Queries) MergeFaceClusters(ctx context.Context, arg MergeFaceClustersParams) error {
 	_, err := q.db.Exec(ctx, mergeFaceClusters, arg.ClusterID, arg.ClusterID_2)
+	return err
+}
+
+const moveClusterMembersToClusterManual = `-- name: MoveClusterMembersToClusterManual :exec
+UPDATE face_cluster_members
+SET cluster_id = $1,
+    is_manual = true
+WHERE cluster_id = $2
+`
+
+type MoveClusterMembersToClusterManualParams struct {
+	TargetClusterID int32 `db:"target_cluster_id" json:"target_cluster_id"`
+	SourceClusterID int32 `db:"source_cluster_id" json:"source_cluster_id"`
+}
+
+func (q *Queries) MoveClusterMembersToClusterManual(ctx context.Context, arg MoveClusterMembersToClusterManualParams) error {
+	_, err := q.db.Exec(ctx, moveClusterMembersToClusterManual, arg.TargetClusterID, arg.SourceClusterID)
 	return err
 }
 
@@ -1860,7 +2144,7 @@ SET
     is_confirmed = $4,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $1
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
 `
 
 type UpdateFaceClusterParams struct {
@@ -1887,6 +2171,8 @@ func (q *Queries) UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterPa
 		&i.IsConfirmed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
 	)
 	return i, err
 }

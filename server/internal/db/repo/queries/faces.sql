@@ -374,6 +374,90 @@ UPDATE face_cluster_members
 SET cluster_id = $1
 WHERE cluster_id = $2;
 
+-- name: ListPersonFacesScoped :many
+SELECT
+    fi.id,
+    fi.asset_id,
+    fi.confidence,
+    fi.is_primary,
+    fi.face_image_path,
+    COALESCE(fcm.is_manual, false) AS is_manual,
+    a.original_filename,
+    a.taken_time,
+    a.upload_time
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fcm.cluster_id = sqlc.arg('cluster_id')
+  AND COALESCE(a.is_deleted, false) = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: CountPersonFacesScoped :one
+SELECT COUNT(*)::bigint
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fcm.cluster_id = sqlc.arg('cluster_id')
+  AND COALESCE(a.is_deleted, false) = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'));
+
+-- name: GetPersonFaceScoped :one
+SELECT
+    fi.id,
+    fi.asset_id,
+    fi.confidence,
+    fi.is_primary,
+    fi.face_image_path,
+    a.repository_id,
+    a.owner_id
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fcm.cluster_id = sqlc.arg('cluster_id')
+  AND fi.id = sqlc.arg('face_id')
+  AND COALESCE(a.is_deleted, false) = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'));
+
+-- name: GetFaceForCorrectionScoped :one
+SELECT
+    fi.id,
+    fi.asset_id,
+    fi.confidence,
+    fi.face_image_path,
+    a.repository_id,
+    a.owner_id
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fi.id = sqlc.arg('face_id')
+  AND COALESCE(a.is_deleted, false) = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'));
+
+-- name: GetManualFaceClusterMembershipsForScope :many
+SELECT
+    fcm.face_id,
+    fcm.cluster_id,
+    fcm.similarity_score,
+    fcm.confidence
+FROM face_cluster_members fcm
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE COALESCE(fcm.is_manual, false) = true
+  AND COALESCE(a.is_deleted, false) = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id')::uuid)
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id')::integer);
+
+-- name: MoveClusterMembersToClusterManual :exec
+UPDATE face_cluster_members
+SET cluster_id = sqlc.arg('target_cluster_id'),
+    is_manual = true
+WHERE cluster_id = sqlc.arg('source_cluster_id');
+
 -- name: GetClusterMergeCandidates :many
 WITH pair_scores AS (
     SELECT

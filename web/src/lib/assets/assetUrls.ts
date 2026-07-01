@@ -43,15 +43,10 @@ export const assetUrls = {
     if (params.maxWidth != null) search.set("max_width", String(params.maxWidth));
     if (params.maxHeight != null) search.set("max_height", String(params.maxHeight));
     if (params.filename) search.set("filename", params.filename);
-    return withMediaToken(
-      `${baseURL}/api/v1/assets/${id}/export?${search.toString()}`,
-    );
+    return withMediaToken(`${baseURL}/api/v1/assets/${id}/export?${search.toString()}`);
   },
 
-  getThumbnailUrl(
-    id: string,
-    size: "small" | "medium" | "large" = "small",
-  ): string {
+  getThumbnailUrl(id: string, size: "small" | "medium" | "large" = "small"): string {
     return withMediaToken(`${baseURL}/api/v1/assets/${id}/thumbnail?size=${size}`);
   },
 
@@ -71,6 +66,21 @@ export const assetUrls = {
 
     const suffix = search.toString();
     const url = `${baseURL}/api/v1/people/${id}/cover${suffix ? `?${suffix}` : ""}`;
+    return withMediaToken(url);
+  },
+
+  getFaceCropUrl(
+    personId: number | string,
+    faceId: number | string,
+    repositoryId?: string,
+  ): string {
+    const search = new URLSearchParams();
+    if (repositoryId) {
+      search.set("repository_id", repositoryId);
+    }
+
+    const suffix = search.toString();
+    const url = `${baseURL}/api/v1/people/${personId}/faces/${faceId}/crop${suffix ? `?${suffix}` : ""}`;
     return withMediaToken(url);
   },
 };

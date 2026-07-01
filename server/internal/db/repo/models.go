@@ -343,6 +343,8 @@ type FaceCluster struct {
 	IsConfirmed          *bool              `db:"is_confirmed" json:"is_confirmed"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	IsHidden             bool               `db:"is_hidden" json:"is_hidden"`
+	HiddenAt             pgtype.Timestamptz `db:"hidden_at" json:"hidden_at"`
 }
 
 type FaceClusterMember struct {

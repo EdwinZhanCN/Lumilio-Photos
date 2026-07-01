@@ -1,4 +1,4 @@
-import { UserRound } from "lucide-react";
+import { EyeOff, UserRound } from "lucide-react";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { PersonSummaryList } from "@/features/people/people.types";
@@ -69,6 +69,12 @@ export default function PeopleCollectionGrid({
                 <div className="flex h-full items-center justify-center bg-gradient-to-br from-base-200 via-base-300/70 to-base-200">
                   <UserRound className="size-12 text-base-content/35" />
                 </div>
+              )}
+              {person.is_hidden && (
+                <span className="badge badge-neutral badge-sm absolute left-2 top-2 gap-1 border-none bg-base-content/70 text-base-100">
+                  <EyeOff className="size-3" />
+                  {t("people.hidden.badge", "Hidden")}
+                </span>
               )}
             </div>
             <div className="mt-3 space-y-1 px-1">

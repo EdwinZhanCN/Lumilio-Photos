@@ -113,6 +113,13 @@ type PeopleControllerInterface interface {
 	GetPersonCover(c *gin.Context)
 	UpdatePerson(c *gin.Context)
 	ListPersonAssets(c *gin.Context)
+	ListPersonFaces(c *gin.Context)
+	GetPersonFaceCrop(c *gin.Context)
+	MergePeople(c *gin.Context)
+	MoveFace(c *gin.Context)
+	RemoveFace(c *gin.Context)
+	SetPersonCover(c *gin.Context)
+	SetPersonHidden(c *gin.Context)
 }
 
 type LocationControllerInterface interface {
@@ -440,6 +447,13 @@ func NewRouter(
 			people.GET("/:id/cover", peopleController.GetPersonCover)
 			people.PATCH("/:id", authController.AuthMiddleware(), peopleController.UpdatePerson)
 			people.POST("/:id/assets/list", peopleController.ListPersonAssets)
+			people.GET("/:id/faces", peopleController.ListPersonFaces)
+			people.GET("/:id/faces/:faceId/crop", peopleController.GetPersonFaceCrop)
+			people.POST("/:id/merge", authController.AuthMiddleware(), peopleController.MergePeople)
+			people.POST("/:id/faces/:faceId/move", authController.AuthMiddleware(), peopleController.MoveFace)
+			people.POST("/:id/faces/:faceId/remove", authController.AuthMiddleware(), peopleController.RemoveFace)
+			people.PUT("/:id/cover", authController.AuthMiddleware(), peopleController.SetPersonCover)
+			people.PUT("/:id/hidden", authController.AuthMiddleware(), peopleController.SetPersonHidden)
 		}
 
 		// Duplicate detection routes (Utilities Rail). Auth is required for

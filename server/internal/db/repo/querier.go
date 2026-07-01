@@ -82,6 +82,7 @@ type Querier interface {
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
+	CountPersonFacesScoped(ctx context.Context, arg CountPersonFacesScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error)
 	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
@@ -260,6 +261,7 @@ type Querier interface {
 	GetFaceClusteringCandidates(ctx context.Context, arg GetFaceClusteringCandidatesParams) ([]GetFaceClusteringCandidatesRow, error)
 	GetFaceDemographics(ctx context.Context, confidence float32) ([]GetFaceDemographicsRow, error)
 	GetFaceEmbeddingsForClustering(ctx context.Context, arg GetFaceEmbeddingsForClusteringParams) ([]GetFaceEmbeddingsForClusteringRow, error)
+	GetFaceForCorrectionScoped(ctx context.Context, arg GetFaceForCorrectionScopedParams) (GetFaceForCorrectionScopedRow, error)
 	GetFaceItemByID(ctx context.Context, id int32) (FaceItem, error)
 	GetFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]FaceItem, error)
 	GetFaceItemsByAssetWithLimit(ctx context.Context, arg GetFaceItemsByAssetWithLimitParams) ([]FaceItem, error)
@@ -275,6 +277,7 @@ type Querier interface {
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
+	GetManualFaceClusterMembershipsForScope(ctx context.Context, arg GetManualFaceClusterMembershipsForScopeParams) ([]GetManualFaceClusterMembershipsForScopeRow, error)
 	GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error)
 	GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error)
 	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
@@ -285,6 +288,7 @@ type Querier interface {
 	// a specific asset set, for the agent dedupe tool's in-memory similarity graph.
 	GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []pgtype.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error)
 	GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error)
+	GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScopedParams) (GetPersonFaceScopedRow, error)
 	// Lightweight photo locations for map clustering/rendering.
 	GetPhotoMapPoints(ctx context.Context, arg GetPhotoMapPointsParams) ([]GetPhotoMapPointsRow, error)
 	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (GetPrimaryEmbeddingRow, error)
@@ -361,6 +365,7 @@ type Querier interface {
 	ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]ListPHashEmbeddingsForRepositoryRow, error)
 	ListPendingLocationClusters(ctx context.Context, arg ListPendingLocationClustersParams) ([]LocationCluster, error)
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
+	ListPersonFacesScoped(ctx context.Context, arg ListPersonFacesScopedParams) ([]ListPersonFacesScopedRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
 	ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error)
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
@@ -394,6 +399,7 @@ type Querier interface {
 	// Used only for exact duplicates where bounding boxes match by construction.
 	MergeFaceClustersForDuplicate(ctx context.Context, arg MergeFaceClustersForDuplicateParams) error
 	MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error)
+	MoveClusterMembersToClusterManual(ctx context.Context, arg MoveClusterMembersToClusterManualParams) error
 	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
 	// rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
 	// head when available, falling back to the legacy heuristic (rating, liked,
@@ -420,6 +426,7 @@ type Querier interface {
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SearchTagsByName(ctx context.Context, arg SearchTagsByNameParams) ([]Tag, error)
 	SetBootstrapPhase(ctx context.Context, bootstrapPhase string) (SystemState, error)
+	SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
 	SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error)

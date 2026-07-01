@@ -1,18 +1,41 @@
-import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useWorkingRepository } from "@/features/settings";
 import type {
   FaceClusterRebuildResponse,
   ListPeopleResponse,
+  ListPersonFacesResponse,
+  PersonCorrectionResponse,
   PersonDetail,
+  PersonFaceList,
   PersonSummaryList,
   UpdatePersonRequest,
 } from "../people.types";
+
+/**
+ * Invalidate every query whose results can change after a people correction:
+ * the people list/detail, the per-person face list, and asset list/search
+ * queries (person filters and gallery membership can shift).
+ */
+function invalidatePeopleQueries(queryClient: QueryClient): Promise<unknown> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/people"] }),
+    queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/people/{id}"] }),
+    queryClient.invalidateQueries({
+      queryKey: ["get", "/api/v1/people/{id}/faces"],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["post", "/api/v1/people/{id}/assets/list"],
+    }),
+    queryClient.invalidateQueries({ queryKey: ["post", "/api/v1/assets/list"] }),
+  ]);
+}
 
 export type UsePeopleOptions = {
   limit?: number;
   offset?: number;
   repositoryId?: string;
+  includeHidden?: boolean;
 };
 
 export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
@@ -26,6 +49,7 @@ export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
   const repositoryId = options.repositoryId ?? scopedRepositoryId;
   const limit = options.limit ?? 24;
   const offset = options.offset ?? 0;
+  const includeHidden = options.includeHidden ?? false;
 
   const query = $api.useQuery(
     "get",
@@ -34,6 +58,7 @@ export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
       params: {
         query: {
           repository_id: repositoryId,
+          include_hidden: includeHidden,
           limit,
           offset,
         },
@@ -143,5 +168,174 @@ export function usePersonDetails(
         } satisfies UpdatePersonRequest,
       }),
     isRenaming: renameMutation.isPending,
+  };
+}
+
+export function usePersonFaces(
+  personId?: number,
+  options: { repositoryId?: string; limit?: number; offset?: number } = {},
+): UseQueryResult<ListPersonFacesResponse, unknown> & {
+  faces: PersonFaceList;
+  total: number;
+} {
+  const { scopedRepositoryId } = useWorkingRepository();
+  const repositoryId = options.repositoryId ?? scopedRepositoryId;
+  const limit = options.limit ?? 60;
+  const offset = options.offset ?? 0;
+
+  const query = $api.useQuery(
+    "get",
+    "/api/v1/people/{id}/faces",
+    {
+      params: {
+        path: { id: personId ?? 0 },
+        query: {
+          repository_id: repositoryId,
+          limit,
+          offset,
+        },
+      },
+    },
+    {
+      enabled: Boolean(personId && personId > 0),
+      refetchOnWindowFocus: false,
+    },
+  ) as UseQueryResult<ListPersonFacesResponse, unknown>;
+
+  return {
+    ...query,
+    faces: query.data?.faces ?? [],
+    total: query.data?.total ?? 0,
+  };
+}
+
+export function useMergePeople(repositoryId?: string): {
+  mergePeople: (
+    targetPersonId: number,
+    sourcePersonIds: number[],
+  ) => Promise<PersonCorrectionResponse>;
+  isMerging: boolean;
+} {
+  const { scopedRepositoryId } = useWorkingRepository();
+  const queryClient = useQueryClient();
+  const scopedId = repositoryId ?? scopedRepositoryId;
+
+  const mutation = $api.useMutation("post", "/api/v1/people/{id}/merge", {
+    onSuccess: () => invalidatePeopleQueries(queryClient),
+  });
+
+  return {
+    mergePeople: (targetPersonId, sourcePersonIds) =>
+      mutation.mutateAsync({
+        params: {
+          path: { id: targetPersonId },
+          query: scopedId ? { repository_id: scopedId } : {},
+        },
+        body: { source_person_ids: sourcePersonIds },
+      }) as Promise<PersonCorrectionResponse>,
+    isMerging: mutation.isPending,
+  };
+}
+
+export function useMoveFace(repositoryId?: string): {
+  moveFace: (
+    personId: number,
+    faceId: number,
+    targetPersonId: number,
+  ) => Promise<PersonCorrectionResponse>;
+  isMoving: boolean;
+} {
+  const { scopedRepositoryId } = useWorkingRepository();
+  const queryClient = useQueryClient();
+  const scopedId = repositoryId ?? scopedRepositoryId;
+
+  const mutation = $api.useMutation("post", "/api/v1/people/{id}/faces/{faceId}/move", {
+    onSuccess: () => invalidatePeopleQueries(queryClient),
+  });
+
+  return {
+    moveFace: (personId, faceId, targetPersonId) =>
+      mutation.mutateAsync({
+        params: {
+          path: { id: personId, faceId },
+          query: scopedId ? { repository_id: scopedId } : {},
+        },
+        body: { target_person_id: targetPersonId },
+      }) as Promise<PersonCorrectionResponse>,
+    isMoving: mutation.isPending,
+  };
+}
+
+export function useRemoveFaceFromPerson(repositoryId?: string): {
+  removeFace: (personId: number, faceId: number) => Promise<PersonCorrectionResponse>;
+  isRemoving: boolean;
+} {
+  const { scopedRepositoryId } = useWorkingRepository();
+  const queryClient = useQueryClient();
+  const scopedId = repositoryId ?? scopedRepositoryId;
+
+  const mutation = $api.useMutation("post", "/api/v1/people/{id}/faces/{faceId}/remove", {
+    onSuccess: () => invalidatePeopleQueries(queryClient),
+  });
+
+  return {
+    removeFace: (personId, faceId) =>
+      mutation.mutateAsync({
+        params: {
+          path: { id: personId, faceId },
+          query: scopedId ? { repository_id: scopedId } : {},
+        },
+      }) as Promise<PersonCorrectionResponse>,
+    isRemoving: mutation.isPending,
+  };
+}
+
+export function useSetPersonCover(repositoryId?: string): {
+  setPersonCover: (personId: number, faceId: number) => Promise<PersonCorrectionResponse>;
+  isSettingCover: boolean;
+} {
+  const { scopedRepositoryId } = useWorkingRepository();
+  const queryClient = useQueryClient();
+  const scopedId = repositoryId ?? scopedRepositoryId;
+
+  const mutation = $api.useMutation("put", "/api/v1/people/{id}/cover", {
+    onSuccess: () => invalidatePeopleQueries(queryClient),
+  });
+
+  return {
+    setPersonCover: (personId, faceId) =>
+      mutation.mutateAsync({
+        params: {
+          path: { id: personId },
+          query: scopedId ? { repository_id: scopedId } : {},
+        },
+        body: { face_id: faceId },
+      }) as Promise<PersonCorrectionResponse>,
+    isSettingCover: mutation.isPending,
+  };
+}
+
+export function useSetPersonHidden(repositoryId?: string): {
+  setPersonHidden: (personId: number, hidden: boolean) => Promise<PersonCorrectionResponse>;
+  isUpdatingHidden: boolean;
+} {
+  const { scopedRepositoryId } = useWorkingRepository();
+  const queryClient = useQueryClient();
+  const scopedId = repositoryId ?? scopedRepositoryId;
+
+  const mutation = $api.useMutation("put", "/api/v1/people/{id}/hidden", {
+    onSuccess: () => invalidatePeopleQueries(queryClient),
+  });
+
+  return {
+    setPersonHidden: (personId, hidden) =>
+      mutation.mutateAsync({
+        params: {
+          path: { id: personId },
+          query: scopedId ? { repository_id: scopedId } : {},
+        },
+        body: { hidden },
+      }) as Promise<PersonCorrectionResponse>,
+    isUpdatingHidden: mutation.isPending,
   };
 }

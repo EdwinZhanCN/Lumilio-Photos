@@ -296,7 +296,6 @@
     },
     "pin": {
       "backToLumilio": "返回 Lumilio",
-      "badge": "已固定结果",
       "count_one": "{{count}} 张照片",
       "count_other": "{{count}} 张照片",
       "defaultTitle": "智能助手结果",
@@ -577,7 +576,7 @@
     "updateSuccess_other": "已更新 {{count}} 个项目。"
   },
   "collections": {
-    "album": "",
+    "album": "相册",
     "albumDetails": {
       "albumCode": "相册 #{{id}}",
       "bioClip": {
@@ -610,7 +609,7 @@
       "saveError": "保存相册失败。",
       "saving": "保存中…"
     },
-    "albums": "",
+    "albums": "相册",
     "coverAlt": "相册封面图",
     "coverAltWithName": "相册 {{albumName}} 的封面图",
     "createModal": {
@@ -675,7 +674,7 @@
       "places": "地点",
       "utilities": "工具"
     },
-    "title": "",
+    "title": "合集",
     "untitled": "未命名相册",
     "utilities": {
       "classifiers": {
@@ -1278,7 +1277,7 @@
     "title": "系统状态"
   },
   "nav": {
-    "home": ""
+    "home": "首页"
   },
   "navbar": {
     "notifications": {
@@ -1295,26 +1294,90 @@
     }
   },
   "people": {
+    "cover": {
+      "error": "设置封面失败：{{message}}",
+      "success": "封面已更新"
+    },
     "details": {
       "confirmedHint": "这个人物已经确认并命名。",
+      "editAction": "编辑",
       "nameLabel": "名称",
       "personCode": "人物 {{id}}",
-      "renameAction": "重命名",
       "renamePlaceholder": "为这个人物命名",
-      "renameTitle": "重命名人物",
       "save": "保存",
       "unconfirmedHint": "这个人物还未命名，确认后可以直接填写名字。",
       "updatedLabel": "更新于"
     },
+    "edit": {
+      "tabs": {
+        "faces": "人脸",
+        "info": "信息",
+        "merge": "合并"
+      },
+      "title": "编辑人物"
+    },
+    "faces": {
+      "actions": "人脸操作",
+      "clearSelection": "清除",
+      "count_other": "{{count}} 张人脸",
+      "empty": "该人物暂无检测到的人脸。",
+      "missingCrop": "无裁剪图",
+      "move": "移动到其他人物",
+      "remove": "从该人物移除",
+      "selectAll": "全选",
+      "selectedCount_other": "已选择 {{count}} 张",
+      "selectionMode": {
+        "enter": "选择",
+        "exit": "完成"
+      },
+      "setCover": "设为封面",
+      "title": "人脸"
+    },
+    "hidden": {
+      "allTab": "全部",
+      "badge": "已隐藏",
+      "error": "更新人物失败：{{message}}",
+      "hiddenToast": "已隐藏该人物",
+      "settingDescription": "从默认人物网格中隐藏该人物，不会改变照片或人脸关联。",
+      "settingTitle": "隐藏",
+      "unhiddenToast": "已恢复该人物",
+      "visibleTab": "显示中"
+    },
     "membersCount_one": "{{count}} 张脸",
     "membersCount_other": "{{count}} 张脸",
+    "merge": {
+      "confirm": "合并",
+      "description": "所选人物将被合并到 {{name}}。照片仍保留在库中，人物筛选可能会变化。",
+      "error": "合并人物失败：{{message}}",
+      "selectedCount_other": "已选择 {{count}} 个",
+      "success": "已合并人物",
+      "title": "合并人物"
+    },
+    "moveFace": {
+      "bulkConfirm": "移动所选",
+      "bulkDescription": "选择这些人脸所属的人物。",
+      "bulkError": "移动人脸失败：{{message}}",
+      "bulkSuccess_other": "已移动 {{count}} 张人脸",
+      "bulkTitle": "移动所选人脸"
+    },
     "photosCount_one": "{{count}} 张照片",
     "photosCount_other": "{{count}} 张照片",
+    "picker": {
+      "empty": "没有匹配的人物",
+      "searchPlaceholder": "搜索人物"
+    },
     "rebuild": {
       "action": "重建",
       "error": "重建人物失败：{{message}}",
       "running": "重建中...",
       "success": "已从 {{faces}} 张脸重建 {{clusters}} 个人物聚类（噪声 {{noise}}）。"
+    },
+    "removeFace": {
+      "bulkConfirm": "移除所选",
+      "bulkDescription": "所选人脸将不再与此人物关联。原始照片不会被修改。",
+      "bulkError": "移除人脸失败：{{message}}",
+      "bulkSuccess_other": "已移除 {{count}} 张人脸",
+      "bulkTitle": "移除所选人脸"
     },
     "unnamed": "未命名"
   },
