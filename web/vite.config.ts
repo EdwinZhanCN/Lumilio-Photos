@@ -80,6 +80,7 @@ export default defineConfig({
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
       "src/lib/http-commons/openapi-fetch/**",
+      "src/lib/http-commons/openapi-react-query/**",
     ],
     jsPlugins: ["@edwinzhancn/docts/oxlint"],
     rules: {
@@ -110,6 +111,7 @@ export default defineConfig({
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
       "src/lib/http-commons/openapi-fetch/**",
+      "src/lib/http-commons/openapi-react-query/**",
     ],
     semi: true,
     singleQuote: false,

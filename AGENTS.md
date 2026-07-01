@@ -47,6 +47,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 - Runtime app defaults belong in TOML (`server/config/server*.toml`). Env files are for bootstrap, machine-specific overrides, and secrets.
 - Do not commit secrets. `LUMILIO_SECRET_KEY` is a key file path, not raw secret text.
 - Go code must be formatted with `gofmt`. TypeScript should follow Vite+ lint/fmt rules and prefer `@/...` imports.
+- `vp fmt` writes files by default. Generated/vendored frontend artifacts must stay excluded through `web/vite.config.ts` `fmt.ignorePatterns` (notably `src/wasm/**`, `src/features/*/doc.md`, and generated OpenAPI/client code).
 - i18n keys are **extract-then-fill, never hand-written**: write `t("key", "default")` in code → run `vp exec i18next-cli extract` → fill zh values in the generated JSON. Do NOT manually add/restructure/delete keys in `translation.json`. See [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) for details.
 - Frontend server state belongs in TanStack Query; feature-local interactive UI state can use Zustand; Context is for cross-cutting app state.
 - Keep generated files generated. If a generated artifact changes, include the command that produced it in your notes.

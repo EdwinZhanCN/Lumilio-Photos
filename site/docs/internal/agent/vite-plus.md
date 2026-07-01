@@ -12,6 +12,11 @@ Docs are local at `web/node_modules/vite-plus/docs` or online at https://viteplu
 - [ ] Prefer the repo gate `make web-test`. If intentionally scoped to `web/`,
       run the same sequence directly: `vp check --no-fmt --no-lint`, `vp lint`,
       then `vp test`.
+- [ ] Treat `vp fmt` as a write command. Use `vp fmt --check` for a dry run.
+      Keep generated/vendored artifacts out of formatting through
+      `web/vite.config.ts` `fmt.ignorePatterns`: generated `doc.md`, WASM
+      bundles, OpenAPI schema, and vendored OpenAPI client helpers should only
+      change through their generator or source update flow.
 - [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
