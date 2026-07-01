@@ -5,9 +5,7 @@ export const ASSETS_STATE_STORAGE_KEY = "lumilio.settings.assets_state";
 export const ASSETS_STATE_STORAGE_VERSION = 2 as const;
 export const LEGACY_ASSETS_STATE_STORAGE_KEY = "assets_state_v1";
 
-export type SettingsTruthSource =
-  | "web_local_preference"
-  | "server_runtime_capability";
+export type SettingsTruthSource = "web_local_preference" | "server_runtime_capability";
 
 export interface SettingRegistryEntry {
   path: string;

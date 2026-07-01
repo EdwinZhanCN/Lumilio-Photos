@@ -1,10 +1,6 @@
 const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 
-export function encodeGeohash(
-  latitude: number,
-  longitude: number,
-  precision = 7,
-): string | null {
+export function encodeGeohash(latitude: number, longitude: number, precision = 7): string | null {
   if (
     !Number.isFinite(latitude) ||
     !Number.isFinite(longitude) ||

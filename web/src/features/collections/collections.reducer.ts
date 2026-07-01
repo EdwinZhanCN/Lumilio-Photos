@@ -29,9 +29,7 @@ export function collectionsReducer(
     case "DESELECT_ALBUM":
       return {
         ...state,
-        selectedAlbumIds: state.selectedAlbumIds.filter(
-          (id) => id !== action.payload,
-        ),
+        selectedAlbumIds: state.selectedAlbumIds.filter((id) => id !== action.payload),
       };
     case "CLEAR_SELECTION":
       return {

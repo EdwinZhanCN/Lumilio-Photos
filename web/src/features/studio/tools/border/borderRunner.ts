@@ -1,14 +1,7 @@
 import { isExifBorderMode, normalizeParams } from "./types";
 import { hasSufficientExif, type BorderExif } from "./exifInfo";
-import {
-  renderExifBorder,
-  type ExifBorderInput,
-  type ExifBorderMode,
-} from "./exifBorderRenderer";
-import {
-  renderBasicBorder,
-  type BasicBorderMode,
-} from "./basicBorders";
+import { renderExifBorder, type ExifBorderInput, type ExifBorderMode } from "./exifBorderRenderer";
+import { renderBasicBorder, type BasicBorderMode } from "./basicBorders";
 
 type ProgressHelpers = {
   reportProgress?: (processed: number, total: number) => void;
@@ -37,9 +30,7 @@ async function runExifBorderTransform(
 
   const exif = (rawParams.exif as BorderExif | undefined) ?? {};
   const brandText =
-    typeof rawParams.brandText === "string" && rawParams.brandText
-      ? rawParams.brandText
-      : null;
+    typeof rawParams.brandText === "string" && rawParams.brandText ? rawParams.brandText : null;
   const logo =
     typeof ImageBitmap !== "undefined" && rawParams.logo instanceof ImageBitmap
       ? rawParams.logo

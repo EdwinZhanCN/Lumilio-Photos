@@ -1,7 +1,4 @@
-import {
-  fetchEventSource,
-  type EventSourceMessage,
-} from "@microsoft/fetch-event-source";
+import { fetchEventSource, type EventSourceMessage } from "@microsoft/fetch-event-source";
 import { getToken } from "@/lib/http-commons/auth";
 import type {
   AgentChatRequest,
@@ -92,8 +89,7 @@ export async function streamAgent(
       const data = parsePayload(message);
       switch (eventType) {
         case "session_info": {
-          const threadId = (data as { thread_id?: string } | undefined)
-            ?.thread_id;
+          const threadId = (data as { thread_id?: string } | undefined)?.thread_id;
           if (threadId) callbacks.onSessionInfo(threadId);
           break;
         }

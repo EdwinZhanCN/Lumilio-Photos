@@ -74,10 +74,7 @@ export default function CloudTab() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const providers = useMemo(
-    () => providersQuery.data?.providers ?? [],
-    [providersQuery.data],
-  );
+  const providers = useMemo(() => providersQuery.data?.providers ?? [], [providersQuery.data]);
   const credentials = useMemo(
     () => credentialsQuery.data?.credentials ?? [],
     [credentialsQuery.data],
@@ -185,7 +182,9 @@ export default function CloudTab() {
       await disconnectCredential.mutateAsync({ params: { path: { id: credential.id ?? "" } } });
       setSuccessMsg(t("settings.cloud.messages.disconnected"));
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.disconnectFailed"));
+      setErrorMsg(
+        error instanceof Error ? error.message : t("settings.cloud.errors.disconnectFailed"),
+      );
     }
   };
 
@@ -209,7 +208,9 @@ export default function CloudTab() {
         setIsAddOpen(true);
       }
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.reconnectFailed"));
+      setErrorMsg(
+        error instanceof Error ? error.message : t("settings.cloud.errors.reconnectFailed"),
+      );
     }
   };
 
@@ -234,7 +235,8 @@ export default function CloudTab() {
     if (!field.name) return null;
     const id = `cloud-field-${field.name}`;
     const value = values[field.name] ?? "";
-    const onChange = (next: string) => setValues((current) => ({ ...current, [field.name!]: next }));
+    const onChange = (next: string) =>
+      setValues((current) => ({ ...current, [field.name!]: next }));
 
     return (
       <label key={field.name} className="form-control w-full" htmlFor={id}>
@@ -266,7 +268,9 @@ export default function CloudTab() {
             required={field.required}
           />
         )}
-        {field.help_text && <span className="mt-1 text-xs text-base-content/55">{field.help_text}</span>}
+        {field.help_text && (
+          <span className="mt-1 text-xs text-base-content/55">{field.help_text}</span>
+        )}
       </label>
     );
   };
@@ -357,7 +361,13 @@ export default function CloudTab() {
           ))
         )}
         <SettingsRow
-          icon={busyLoading ? <span className="loading loading-spinner loading-xs" /> : <PlusIcon className="size-4" />}
+          icon={
+            busyLoading ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <PlusIcon className="size-4" />
+            )
+          }
           iconColor="bg-primary text-primary-content"
           label={t("settings.cloud.addCredential")}
           onClick={providers.length === 0 ? undefined : openModal}
@@ -380,9 +390,12 @@ export default function CloudTab() {
                 <p className="mt-1 text-sm text-base-content/65">
                   {pendingChallenge
                     ? (pendingChallenge.description ??
-                      t("settings.cloud.verifyDescription", { name: pendingCredential?.display_name }))
+                      t("settings.cloud.verifyDescription", {
+                        name: pendingCredential?.display_name,
+                      }))
                     : selectedProvider
-                      ? (selectedProvider.security_note ?? t("settings.cloud.providerFormDescription"))
+                      ? (selectedProvider.security_note ??
+                        t("settings.cloud.providerFormDescription"))
                       : t("settings.cloud.providerDescription")}
                 </p>
               </div>
@@ -469,7 +482,12 @@ export default function CloudTab() {
             {pendingChallenge && (
               <form onSubmit={handleVerify} className="space-y-4">
                 {(pendingChallenge.fields ?? []).map((field) =>
-                  renderField(field, challengeValues, setChallengeValues, verifyChallenge.isPending),
+                  renderField(
+                    field,
+                    challengeValues,
+                    setChallengeValues,
+                    verifyChallenge.isPending,
+                  ),
                 )}
                 <div className="modal-action">
                   <button
@@ -488,7 +506,9 @@ export default function CloudTab() {
                       verifyChallenge.isPending
                     }
                   >
-                    {verifyChallenge.isPending && <span className="loading loading-spinner loading-xs" />}
+                    {verifyChallenge.isPending && (
+                      <span className="loading loading-spinner loading-xs" />
+                    )}
                     {t("settings.cloud.verify")}
                   </button>
                 </div>

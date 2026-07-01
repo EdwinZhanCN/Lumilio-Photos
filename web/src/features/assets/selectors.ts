@@ -5,38 +5,31 @@ import { useCallback } from "react";
 import { SortByType } from "./types/assets.type";
 
 // ===== Selection Selectors =====
-export const useSelectionEnabled = () =>
-  useAssetsStore((s) => s.selection.enabled);
+export const useSelectionEnabled = () => useAssetsStore((s) => s.selection.enabled);
 
-export const useSelectedIds = () =>
-  useAssetsStore((s) => s.selection.selectedIds);
+export const useSelectedIds = () => useAssetsStore((s) => s.selection.selectedIds);
 
-export const useSelectedCount = () =>
-  useAssetsStore((s) => s.selection.selectedIds.size);
+export const useSelectedCount = () => useAssetsStore((s) => s.selection.selectedIds.size);
 
 export const useIsAssetSelected = (assetId: string) =>
   useAssetsStore((s) => s.selection.selectedIds.has(assetId));
 
-export const useSelectionMode = () =>
-  useAssetsStore((s) => s.selection.selectionMode);
+export const useSelectionMode = () => useAssetsStore((s) => s.selection.selectionMode);
 
 export const useSortBy = (): SortByType => useAssetsStore((s) => s.ui.sortBy);
 
 export const useSearchQuery = () => useAssetsStore((s) => s.ui.searchQuery);
 
-export const useIsCarouselOpen = () =>
-  useAssetsStore((s) => s.ui.isCarouselOpen);
+export const useIsCarouselOpen = () => useAssetsStore((s) => s.ui.isCarouselOpen);
 
 export const useActiveAssetId = () => useAssetsStore((s) => s.ui.activeAssetId);
 
 // ===== Filter Selectors =====
 export const useFiltersEnabled = () => useAssetsStore((s) => s.filters.enabled);
 
-export const useActiveFilterCount = () =>
-  useAssetsStore((s) => selectActiveFilterCount(s.filters));
+export const useActiveFilterCount = () => useAssetsStore((s) => selectActiveFilterCount(s.filters));
 
-export const useFilterState = () =>
-  useAssetsStore(useShallow((s) => s.filters));
+export const useFilterState = () => useAssetsStore(useShallow((s) => s.filters));
 
 // ===== Actions (stable references) =====
 export const useSelectionActions = () =>

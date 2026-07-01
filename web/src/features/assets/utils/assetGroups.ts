@@ -1,9 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Asset } from "@/lib/assets/types";
-import type {
-  AssetGroup,
-  SortByType,
-} from "@/features/assets/types/assets.type";
+import type { AssetGroup, SortByType } from "@/features/assets/types/assets.type";
 
 export const DEFAULT_GROUP_KEYS = new Set<string>();
 
@@ -52,10 +49,7 @@ const getCalendarParts = (date: Date, offsetMinutes?: number): CalendarParts => 
   };
 };
 
-const createBoundaryDate = (
-  parts: CalendarParts,
-  useUTC: boolean,
-): Date => {
+const createBoundaryDate = (parts: CalendarParts, useUTC: boolean): Date => {
   if (useUTC) {
     return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
   }
@@ -73,11 +67,7 @@ const addDays = (date: Date, days: number, useUTC: boolean): Date => {
   return next;
 };
 
-const buildDateGroupKey = (
-  assetDate: Date,
-  now: Date,
-  offsetMinutes?: number,
-): string => {
+const buildDateGroupKey = (assetDate: Date, now: Date, offsetMinutes?: number): string => {
   const useUTC = typeof offsetMinutes === "number";
   const assetParts = getCalendarParts(assetDate, offsetMinutes);
   const nowParts = getCalendarParts(now, offsetMinutes);
@@ -107,11 +97,7 @@ const buildDateGroupKey = (
   }
 };
 
-const getAssetGroupKey = (
-  asset: Asset,
-  sortBy: SortByType,
-  now: Date,
-): string => {
+const getAssetGroupKey = (asset: Asset, sortBy: SortByType, now: Date): string => {
   const sortDate = getSortDate(asset, sortBy);
   const captureOffsetMinutes =
     sortBy === "date_captured" ? asset.capture_offset_minutes : undefined;
@@ -146,9 +132,7 @@ export const groupAssetsBySort = (
   return groups;
 };
 
-export const mergeAdjacentAssetGroups = (
-  ...collections: AssetGroup[][]
-): AssetGroup[] => {
+export const mergeAdjacentAssetGroups = (...collections: AssetGroup[][]): AssetGroup[] => {
   const merged: AssetGroup[] = [];
 
   collections.forEach((collection) => {
@@ -184,11 +168,7 @@ export const getViewerTimeZone = () => {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 };
 
-export const formatAssetGroupLabel = (
-  key: string,
-  t: TFunction,
-  locale: string,
-) => {
+export const formatAssetGroupLabel = (key: string, t: TFunction, locale: string) => {
   switch (key) {
     case "date:today":
       return t("assets.groups.today", { defaultValue: "Today" });

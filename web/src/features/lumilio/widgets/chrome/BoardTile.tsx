@@ -70,7 +70,15 @@ export function BoardTile({ pin, onRename, onViewChange, onSize, onRemove }: Boa
   if (data.state === "loading") body = <LoadingState view={view} size={size} />;
   else if (data.state === "error") body = <ErrorState size={size} onRetry={retry} />;
   else if (data.state === "empty") body = <EmptyState size={size} />;
-  else body = <View data={data} size={size} ctx={view === "cover_card" ? "glass" : "board"} source={source} />;
+  else
+    body = (
+      <View
+        data={data}
+        size={size}
+        ctx={view === "cover_card" ? "glass" : "board"}
+        source={source}
+      />
+    );
 
   const isGlass = view === "cover_card" && data.state === "ready";
 

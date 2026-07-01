@@ -4,8 +4,7 @@ import type { components } from "@/lib/http-commons/schema.d.ts";
 
 type Schemas = components["schemas"];
 
-type FocalLengthDistributionResponse =
-  Schemas["handler.FocalLengthDistributionResponse"];
+type FocalLengthDistributionResponse = Schemas["handler.FocalLengthDistributionResponse"];
 type CameraLensStatsResponse = Schemas["handler.CameraLensStatsResponse"];
 type TimeDistributionResponse = Schemas["handler.TimeDistributionResponse"];
 type HeatmapResponse = Schemas["handler.HeatmapResponse"];
@@ -38,9 +37,7 @@ interface UsePhotoStatsReturn {
  * @param options - Configuration options
  * @returns Statistics data and loading states
  */
-export function usePhotoStats(
-  options: UsePhotoStatsOptions = {},
-): UsePhotoStatsReturn {
+export function usePhotoStats(options: UsePhotoStatsOptions = {}): UsePhotoStatsReturn {
   const {
     autoFetch = true,
     cameraLensLimit = 10,
@@ -48,22 +45,20 @@ export function usePhotoStats(
     repositoryId,
   } = options;
 
-  const [focalLengthData, setFocalLengthData] =
-    useState<FocalLengthDistributionResponse | null>(null);
-  const [cameraLensData, setCameraLensData] =
-    useState<CameraLensStatsResponse | null>(null);
-  const [timeDistributionData, setTimeDistributionData] =
-    useState<TimeDistributionResponse | null>(null);
+  const [focalLengthData, setFocalLengthData] = useState<FocalLengthDistributionResponse | null>(
+    null,
+  );
+  const [cameraLensData, setCameraLensData] = useState<CameraLensStatsResponse | null>(null);
+  const [timeDistributionData, setTimeDistributionData] = useState<TimeDistributionResponse | null>(
+    null,
+  );
   const [heatmapData, setHeatmapData] = useState<HeatmapResponse | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { mutateAsync: fetchFocalLength } = $api.useMutation(
-    "get",
-    "/api/v1/stats/focal-length",
-  );
+  const { mutateAsync: fetchFocalLength } = $api.useMutation("get", "/api/v1/stats/focal-length");
   const { mutateAsync: fetchCameraLensStats } = $api.useMutation(
     "get",
     "/api/v1/stats/camera-lens",
@@ -91,31 +86,30 @@ export function usePhotoStats(
     setError(null);
 
     try {
-      const [focalResponse, cameraLensResponse, timeResponse, yearsResponse] =
-        await Promise.all([
-          fetchFocalLength({
-            params: { query: repositoryScope },
-          }),
-          fetchCameraLensStats({
-            params: {
-              query: {
-                limit: cameraLensLimit,
-                ...repositoryScope,
-              },
+      const [focalResponse, cameraLensResponse, timeResponse, yearsResponse] = await Promise.all([
+        fetchFocalLength({
+          params: { query: repositoryScope },
+        }),
+        fetchCameraLensStats({
+          params: {
+            query: {
+              limit: cameraLensLimit,
+              ...repositoryScope,
             },
-          }),
-          fetchTimeDistribution({
-            params: {
-              query: {
-                type: timeDistributionType,
-                ...repositoryScope,
-              },
+          },
+        }),
+        fetchTimeDistribution({
+          params: {
+            query: {
+              type: timeDistributionType,
+              ...repositoryScope,
             },
-          }),
-          fetchAvailableYears({
-            params: { query: repositoryScope },
-          }),
-        ]);
+          },
+        }),
+        fetchAvailableYears({
+          params: { query: repositoryScope },
+        }),
+      ]);
 
       const focalData = focalResponse as FocalLengthDistributionResponse | undefined;
       if (focalData) {
@@ -161,8 +155,7 @@ export function usePhotoStats(
         }
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch statistics";
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch statistics";
       setError(errorMessage);
       console.error("Error fetching photo stats:", err);
     } finally {
@@ -199,8 +192,7 @@ export function usePhotoStats(
           setHeatmapData(heatmapData);
         }
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to fetch heatmap";
+        const errorMessage = err instanceof Error ? err.message : "Failed to fetch heatmap";
         setError(errorMessage);
         console.error("Error fetching heatmap:", err);
       } finally {

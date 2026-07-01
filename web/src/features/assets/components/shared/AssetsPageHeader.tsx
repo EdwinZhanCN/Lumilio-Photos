@@ -25,19 +25,9 @@ import {
   mapFilenameModeToDTO,
   mapFilenameOperatorToMode,
 } from "@/features/assets/utils/filterUtils";
-import {
-  useSelection,
-  useBulkAssetOperations,
-} from "@/features/assets/hooks/useSelection";
+import { useSelection, useBulkAssetOperations } from "@/features/assets/hooks/useSelection";
 import { BrowseItem, SortByType } from "@/features/assets/types/assets.type";
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react";
+import { useCallback, useMemo, useRef, useEffect, useState, ReactNode } from "react";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
@@ -61,9 +51,7 @@ import {
   type AssetsBulkActionItem,
 } from "@/features/assets/components/shared/bulkActions";
 
-type ConfirmableBulkAction =
-  | { type: "rating"; rating: number }
-  | { type: "liked"; liked: boolean };
+type ConfirmableBulkAction = { type: "rating"; rating: number } | { type: "liked"; liked: boolean };
 
 export interface AssetsPageHeaderProps {
   sortBy: SortByType;
@@ -113,8 +101,9 @@ const AssetsPageHeader = ({
   const { batchUpdateFilters } = useFilterActions();
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [confirmableBulkAction, setConfirmableBulkAction] =
-    useState<ConfirmableBulkAction | null>(null);
+  const [confirmableBulkAction, setConfirmableBulkAction] = useState<ConfirmableBulkAction | null>(
+    null,
+  );
   const [confirmableCustomAction, setConfirmableCustomAction] =
     useState<AssetsBulkActionItem | null>(null);
   const [isRunningCustomAction, setIsRunningCustomAction] = useState(false);
@@ -123,8 +112,7 @@ const AssetsPageHeader = ({
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
   const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
-  const { repositories, selectedRepository, scopeLabel } =
-    useWorkingRepository();
+  const { repositories, selectedRepository, scopeLabel } = useWorkingRepository();
   const { scanRepositories, isScanning } = useRepositoryScan();
   const showScan = capabilities?.showScan ?? true;
 
@@ -153,10 +141,7 @@ const AssetsPageHeader = ({
     return dto;
   }, [filters]);
 
-  const inboundHash = useMemo(
-    () => JSON.stringify(inboundDTO || {}),
-    [inboundDTO],
-  );
+  const inboundHash = useMemo(() => JSON.stringify(inboundDTO || {}), [inboundDTO]);
 
   const tabTitle = useMemo(() => {
     return t("assets.all.title");
@@ -267,19 +252,10 @@ const AssetsPageHeader = ({
     } catch (error) {
       showMessage(
         "error",
-        error instanceof Error
-          ? error.message
-          : t("assets.assetsPageHeader.scan.failed"),
+        error instanceof Error ? error.message : t("assets.assetsPageHeader.scan.failed"),
       );
     }
-  }, [
-    repositories,
-    scanRepositories,
-    scopeLabel,
-    selectedRepository,
-    showMessage,
-    t,
-  ]);
+  }, [repositories, scanRepositories, scopeLabel, selectedRepository, showMessage, t]);
 
   const handleDeleteClick = () => {
     setIsDeleteConfirmOpen(true);
@@ -305,30 +281,21 @@ const AssetsPageHeader = ({
 
   const selectedBrowseItems = useMemo(() => {
     if (!effectiveBrowseItems || effectiveBrowseItems.length === 0) return [];
-    return resolveSelectedBrowseItems(
-      selection.selectedIds,
-      effectiveBrowseItems,
-    );
+    return resolveSelectedBrowseItems(selection.selectedIds, effectiveBrowseItems);
   }, [effectiveBrowseItems, selection.selectedIds]);
 
   const resolvedSelectedAssetIds = useMemo(
     () =>
-      resolveBrowseSelectedAssetIds(
-        selection.selectedIds,
-        effectiveBrowseItems,
-        {
-          stackMode: "whole-stack",
-        },
-      ),
+      resolveBrowseSelectedAssetIds(selection.selectedIds, effectiveBrowseItems, {
+        stackMode: "whole-stack",
+      }),
     [effectiveBrowseItems, selection.selectedIds],
   );
 
   const bulkOps = useBulkAssetOperations(resolvedSelectedAssetIds);
   const affectedAssetCount = resolvedSelectedAssetIds.length;
-  const selectedItemCount =
-    selectedBrowseItems.length || selection.selectedCount;
-  const showAffectedAssetCount =
-    affectedAssetCount > 0 && affectedAssetCount !== selectedItemCount;
+  const selectedItemCount = selectedBrowseItems.length || selection.selectedCount;
+  const showAffectedAssetCount = affectedAssetCount > 0 && affectedAssetCount !== selectedItemCount;
 
   // Compute selected assets for operations that need the object (e.g. download filename)
   // We use useMemo to avoid re-calculation on every render
@@ -362,8 +329,7 @@ const AssetsPageHeader = ({
   );
 
   const isDefaultActionHidden = useCallback(
-    (actionId: AssetsBulkActionId) =>
-      isBulkActionHidden(actionId, hiddenBulkActions),
+    (actionId: AssetsBulkActionId) => isBulkActionHidden(actionId, hiddenBulkActions),
     [hiddenBulkActions],
   );
 
@@ -377,18 +343,13 @@ const AssetsPageHeader = ({
       tone: "info",
       disabled: affectedAssetCount < 2 || isCreatingStack,
       requiresConfirmation: true,
-      confirmationTitle: t(
-        "assets.assetsPageHeader.stackConfirm.title",
-        { defaultValue: "Stack selected assets?" },
-      ),
-      confirmationMessage: t(
-        "assets.assetsPageHeader.stackConfirm.message",
-        {
-          count: affectedAssetCount,
-          defaultValue:
-            "{{count}} selected assets will be grouped into one stack.",
-        },
-      ),
+      confirmationTitle: t("assets.assetsPageHeader.stackConfirm.title", {
+        defaultValue: "Stack selected assets?",
+      }),
+      confirmationMessage: t("assets.assetsPageHeader.stackConfirm.message", {
+        count: affectedAssetCount,
+        defaultValue: "{{count}} selected assets will be grouped into one stack.",
+      }),
       onRun: async (context) => {
         if (context.selectedAssetIds.length < 2) return;
 
@@ -403,28 +364,16 @@ const AssetsPageHeader = ({
           );
         } catch (error) {
           console.error("Failed to stack selected assets:", error);
-          showMessage(
-            "error",
-            t("assets.assetsPageHeader.messages.stackError"),
-          );
+          showMessage("error", t("assets.assetsPageHeader.messages.stackError"));
           throw error;
         }
       },
     }),
-    [
-      affectedAssetCount,
-      createStack,
-      isCreatingStack,
-      showMessage,
-      t,
-    ],
+    [affectedAssetCount, createStack, isCreatingStack, showMessage, t],
   );
 
   const visibleCustomBulkActions = useMemo(
-    () =>
-      customBulkActions.filter(
-        (action) => !isBulkActionHidden(action.id, hiddenBulkActions),
-      ),
+    () => customBulkActions.filter((action) => !isBulkActionHidden(action.id, hiddenBulkActions)),
     [customBulkActions, hiddenBulkActions],
   );
 
@@ -440,10 +389,7 @@ const AssetsPageHeader = ({
   const handleDownloadAll = async () => {
     try {
       await bulkOps.bulkDownload(selectedAssets);
-      showMessage(
-        "success",
-        t("assets.assetsPageHeader.messages.downloadStart"),
-      );
+      showMessage("success", t("assets.assetsPageHeader.messages.downloadStart"));
     } catch {
       showMessage("error", t("assets.assetsPageHeader.messages.downloadError"));
     }
@@ -488,10 +434,7 @@ const AssetsPageHeader = ({
         setAlbums(response.albums || []);
       }
     } catch {
-      showMessage(
-        "error",
-        t("assets.assetsPageHeader.messages.loadAlbumsError"),
-      );
+      showMessage("error", t("assets.assetsPageHeader.messages.loadAlbumsError"));
     } finally {
       setIsLoadingAlbums(false);
     }
@@ -510,10 +453,7 @@ const AssetsPageHeader = ({
       setIsAlbumModalOpen(false);
       selection.clear();
     } catch {
-      showMessage(
-        "error",
-        t("assets.assetsPageHeader.messages.addToAlbumError"),
-      );
+      showMessage("error", t("assets.assetsPageHeader.messages.addToAlbumError"));
     } finally {
       setIsAddingToAlbum(false);
     }
@@ -574,8 +514,7 @@ const AssetsPageHeader = ({
       ? t("assets.assetsPageHeader.actions.affectsAssets", {
           selectedCount: selectedItemCount,
           assetCount: affectedAssetCount,
-          defaultValue:
-            "{{selectedCount}} selected items will affect {{assetCount}} assets.",
+          defaultValue: "{{selectedCount}} selected items will affect {{assetCount}} assets.",
         })
       : t("assets.assetsPageHeader.actions.affectsSelected", {
           count: selectedItemCount,
@@ -607,9 +546,7 @@ const AssetsPageHeader = ({
                     }}
                   >
                     <span className="min-w-20">{option.label}</span>
-                    <span className="ml-auto opacity-50">
-                      {option.valueLabel}
-                    </span>
+                    <span className="ml-auto opacity-50">{option.valueLabel}</span>
                   </button>
                 </li>
               ))}
@@ -729,11 +666,7 @@ const AssetsPageHeader = ({
         <div className="items-center gap-2 hidden lg:flex">
           {/* Sort By Dropdown */}
           <div className="dropdown">
-            <div
-              tabIndex={0}
-              role="button"
-              className="btn btn-sm btn-soft btn-info rounded-full"
-            >
+            <div tabIndex={0} role="button" className="btn btn-sm btn-soft btn-info rounded-full">
               <FunnelIcon className="size-4" />
               {t("assets.assetsPageHeader.sortBy", {
                 sortBy: activeSortByLabel,
@@ -843,9 +776,7 @@ const AssetsPageHeader = ({
                 {renderCustomBulkActionItems()}
                 {(!isDefaultActionHidden("add-to-album") ||
                   !isDefaultActionHidden("download") ||
-                  !isDefaultActionHidden("delete-assets")) && (
-                  <div className="divider my-1"></div>
-                )}
+                  !isDefaultActionHidden("delete-assets")) && <div className="divider my-1"></div>}
                 {!isDefaultActionHidden("add-to-album") && (
                   <li>
                     <button
@@ -1044,9 +975,7 @@ const AssetsPageHeader = ({
                             className="text-error focus:bg-error/20"
                           >
                             <Trash2 size={16} />{" "}
-                            {t(
-                              "assets.assetsPageHeader.actions.deleteSelected",
-                            )}
+                            {t("assets.assetsPageHeader.actions.deleteSelected")}
                           </button>
                         </li>
                       )}
@@ -1074,11 +1003,7 @@ const AssetsPageHeader = ({
         <div className="modal modal-open">
           <div className="modal-box border-t-4 border-primary">
             <div className="mb-4 flex items-center gap-3 text-primary">
-              {confirmableBulkAction.type === "rating" ? (
-                <Star size={24} />
-              ) : (
-                <Heart size={24} />
-              )}
+              {confirmableBulkAction.type === "rating" ? <Star size={24} /> : <Heart size={24} />}
               <h3 className="text-lg font-bold">
                 {confirmableBulkAction.type === "rating"
                   ? t("assets.assetsPageHeader.bulkConfirm.ratingTitle", {
@@ -1100,14 +1025,9 @@ const AssetsPageHeader = ({
                     })}
               </h3>
             </div>
-            <p className="py-4 text-sm text-base-content/70">
-              {renderAffectedAssetHint()}
-            </p>
+            <p className="py-4 text-sm text-base-content/70">{renderAffectedAssetHint()}</p>
             <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setConfirmableBulkAction(null)}
-              >
+              <button className="btn btn-ghost" onClick={() => setConfirmableBulkAction(null)}>
                 {t("common.cancel")}
               </button>
               <button className="btn btn-primary" onClick={confirmBulkAction}>
@@ -1115,10 +1035,7 @@ const AssetsPageHeader = ({
               </button>
             </div>
           </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => setConfirmableBulkAction(null)}
-          ></div>
+          <div className="modal-backdrop" onClick={() => setConfirmableBulkAction(null)}></div>
         </div>
       )}
 
@@ -1127,27 +1044,21 @@ const AssetsPageHeader = ({
         <div className="modal modal-open">
           <div
             className={`modal-box border-t-4 ${
-              confirmableCustomAction.tone === "danger"
-                ? "border-error"
-                : "border-primary"
+              confirmableCustomAction.tone === "danger" ? "border-error" : "border-primary"
             }`}
           >
             <div
               className={`mb-4 flex items-center gap-3 ${
-                confirmableCustomAction.tone === "danger"
-                  ? "text-error"
-                  : "text-primary"
+                confirmableCustomAction.tone === "danger" ? "text-error" : "text-primary"
               }`}
             >
               {confirmableCustomAction.icon ?? <AlertTriangle size={24} />}
               <h3 className="text-lg font-bold">
-                {confirmableCustomAction.confirmationTitle ??
-                  confirmableCustomAction.label}
+                {confirmableCustomAction.confirmationTitle ?? confirmableCustomAction.label}
               </h3>
             </div>
             <p className="py-4 text-sm text-base-content/70">
-              {confirmableCustomAction.confirmationMessage ??
-                renderAffectedAssetHint()}
+              {confirmableCustomAction.confirmationMessage ?? renderAffectedAssetHint()}
             </p>
             <div className="modal-action">
               <button
@@ -1159,9 +1070,7 @@ const AssetsPageHeader = ({
               </button>
               <button
                 className={`btn gap-2 ${
-                  confirmableCustomAction.tone === "danger"
-                    ? "btn-error"
-                    : "btn-primary"
+                  confirmableCustomAction.tone === "danger" ? "btn-error" : "btn-primary"
                 }`}
                 disabled={isRunningCustomAction}
                 onClick={() => void executeCustomBulkAction(confirmableCustomAction)}
@@ -1207,10 +1116,7 @@ const AssetsPageHeader = ({
               )}
             </p>
             <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setIsDeleteConfirmOpen(false)}
-              >
+              <button className="btn btn-ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
                 {t("assets.assetsPageHeader.deleteConfirmModal.cancelButton")}
               </button>
               <button className="btn btn-error gap-2" onClick={confirmDelete}>
@@ -1219,10 +1125,7 @@ const AssetsPageHeader = ({
               </button>
             </div>
           </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => setIsDeleteConfirmOpen(false)}
-          ></div>
+          <div className="modal-backdrop" onClick={() => setIsDeleteConfirmOpen(false)}></div>
         </div>
       )}
 
@@ -1272,10 +1175,7 @@ const AssetsPageHeader = ({
                       <div className="size-10 rounded-box overflow-hidden bg-base-300 flex-shrink-0">
                         {album.cover_asset_id ? (
                           <img
-                            src={assetUrls.getThumbnailUrl(
-                              album.cover_asset_id,
-                              "small",
-                            )}
+                            src={assetUrls.getThumbnailUrl(album.cover_asset_id, "small")}
                             className="size-full object-cover"
                             alt=""
                           />
@@ -1286,14 +1186,11 @@ const AssetsPageHeader = ({
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm truncate">
-                          {album.album_name}
-                        </div>
+                        <div className="font-semibold text-sm truncate">{album.album_name}</div>
                         <div className="text-xs opacity-50">
-                          {t(
-                            "assets.assetsPageHeader.addToAlbumModal.itemCount",
-                            { count: album.asset_count || 0 },
-                          )}
+                          {t("assets.assetsPageHeader.addToAlbumModal.itemCount", {
+                            count: album.asset_count || 0,
+                          })}
                         </div>
                       </div>
                       <button
@@ -1308,27 +1205,19 @@ const AssetsPageHeader = ({
                 </ul>
               ) : (
                 <div className="text-center py-12 opacity-50">
-                  <p>
-                    {t("assets.assetsPageHeader.addToAlbumModal.noAlbumsFound")}
-                  </p>
+                  <p>{t("assets.assetsPageHeader.addToAlbumModal.noAlbumsFound")}</p>
                 </div>
               )}
             </div>
 
             {/* Footer */}
             <div className="border-t border-base-200 px-5 py-3 shrink-0">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setIsAlbumModalOpen(false)}
-              >
+              <button className="btn btn-ghost btn-sm" onClick={() => setIsAlbumModalOpen(false)}>
                 {t("common.cancel")}
               </button>
             </div>
           </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => setIsAlbumModalOpen(false)}
-          ></div>
+          <div className="modal-backdrop" onClick={() => setIsAlbumModalOpen(false)}></div>
         </div>
       )}
     </>

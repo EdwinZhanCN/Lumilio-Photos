@@ -67,9 +67,7 @@ export function CoverView({ data, size, source }: ViewBodyProps) {
         <div className={`truncate font-extrabold leading-tight drop-shadow ${titleSize}`}>
           {heading}
         </div>
-        <div
-          className={`mt-0.5 flex items-center gap-2.5 font-medium text-white/85 ${metaSize}`}
-        >
+        <div className={`mt-0.5 flex items-center gap-2.5 font-medium text-white/85 ${metaSize}`}>
           <span className="font-semibold tabular-nums">
             {size === "s"
               ? fmt(data.count, locale)

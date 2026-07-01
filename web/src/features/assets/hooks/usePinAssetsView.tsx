@@ -1,8 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type {
-  InfiniteData,
-  UseInfiniteQueryResult,
-} from "@tanstack/react-query";
+import type { InfiniteData, UseInfiniteQueryResult } from "@tanstack/react-query";
 import {
   buildApiFilter,
   DEFAULT_ASSET_TYPES,
@@ -13,7 +10,10 @@ import {
   type SearchTopResultsMeta,
 } from "@/features/assets/hooks/useAssetsView";
 import { useFilterState } from "@/features/assets/selectors";
-import { selectFilterAsAssetFilter, selectFiltersEnabled } from "@/features/assets/slices/filters.slice";
+import {
+  selectFilterAsAssetFilter,
+  selectFiltersEnabled,
+} from "@/features/assets/slices/filters.slice";
 import type {
   AssetGroup,
   AssetsViewResult,
@@ -38,14 +38,10 @@ import type { Asset } from "@/lib/assets/types";
 
 type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 type AssetFilterDTO = components["schemas"]["dto.AssetFilterDTO"];
-type AssetQueryRequestDTO =
-  components["schemas"]["dto.AssetQueryRequestDTO"];
-type QueryAssetsResponseDTO =
-  components["schemas"]["dto.QueryAssetsResponseDTO"];
-type SearchAssetsRequestDTO =
-  components["schemas"]["dto.SearchAssetsRequestDTO"];
-type SearchAssetsResponseDTO =
-  components["schemas"]["dto.SearchAssetsResponseDTO"];
+type AssetQueryRequestDTO = components["schemas"]["dto.AssetQueryRequestDTO"];
+type QueryAssetsResponseDTO = components["schemas"]["dto.QueryAssetsResponseDTO"];
+type SearchAssetsRequestDTO = components["schemas"]["dto.SearchAssetsRequestDTO"];
+type SearchAssetsResponseDTO = components["schemas"]["dto.SearchAssetsResponseDTO"];
 
 const PAGE_SIZE = 60;
 
@@ -105,16 +101,12 @@ export function usePinAssetsView(
   const enabled = Boolean(pinId);
   const pageSize = options.pageSize ?? PAGE_SIZE;
   const sortBy = options.sortBy ?? "date_captured";
-  const queryText =
-    options.searchEnabled === false ? "" : (options.searchQuery?.trim() ?? "");
+  const queryText = options.searchEnabled === false ? "" : (options.searchQuery?.trim() ?? "");
   const isSearchActive = queryText.length > 0;
   const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
   const filtersState = useFilterState();
   const rawScopedFilter = useMemo(
-    () =>
-      selectFiltersEnabled(filtersState)
-        ? selectFilterAsAssetFilter(filtersState)
-        : {},
+    () => (selectFiltersEnabled(filtersState) ? selectFilterAsAssetFilter(filtersState) : {}),
     [filtersState],
   );
   const scopedFilter = useMemo(
@@ -181,9 +173,7 @@ export function usePinAssetsView(
           items: payload?.items,
         });
         const hasMore =
-          typeof total === "number"
-            ? offset + loadedCount < total
-            : loadedCount >= pageSize;
+          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
         return hasMore ? offset + pageSize : undefined;
       },
     },
@@ -226,9 +216,7 @@ export function usePinAssetsView(
           items: payload?.result_items,
         });
         const hasMore =
-          typeof total === "number"
-            ? offset + loadedCount < total
-            : loadedCount >= pageSize;
+          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
         return hasMore ? offset + pageSize : undefined;
       },
     },
@@ -255,16 +243,10 @@ export function usePinAssetsView(
   }, [listQuery.data?.pageParams, listQuery.dataUpdatedAt, sortBy]);
 
   const listBrowseGroups = useMemo(
-    () =>
-      mergeAdjacentBrowseGroups(
-        ...listPages.map((page) => page.browseGroups),
-      ),
+    () => mergeAdjacentBrowseGroups(...listPages.map((page) => page.browseGroups)),
     [listPages],
   );
-  const listBrowseItems = useMemo(
-    () => flattenBrowseGroups(listBrowseGroups),
-    [listBrowseGroups],
-  );
+  const listBrowseItems = useMemo(() => flattenBrowseGroups(listBrowseGroups), [listBrowseGroups]);
   const listBrowseAssets = useMemo(
     () => flattenBrowseGroupsToAssets(listBrowseGroups),
     [listBrowseGroups],
@@ -314,10 +296,7 @@ export function usePinAssetsView(
     [resultBrowseGroups],
   );
   const resultGroups = useMemo<AssetGroup[]>(
-    () =>
-      resultAssets.length > 0
-        ? [{ key: "pin-search:results", assets: resultAssets }]
-        : [],
+    () => (resultAssets.length > 0 ? [{ key: "pin-search:results", assets: resultAssets }] : []),
     [resultAssets],
   );
   const searchBrowseItems = useMemo(
@@ -354,10 +333,8 @@ export function usePinAssetsView(
     return JSON.stringify(activeError) ?? "Unknown error";
   }, [activeError, enabled]);
 
-  const listLastPage =
-    listPages.length > 0 ? listPages[listPages.length - 1] : undefined;
-  const searchLastPage =
-    searchPages.length > 0 ? searchPages[searchPages.length - 1] : undefined;
+  const listLastPage = listPages.length > 0 ? listPages[listPages.length - 1] : undefined;
+  const searchLastPage = searchPages.length > 0 ? searchPages[searchPages.length - 1] : undefined;
   const pageInfo = useMemo(() => {
     const lastPage = isSearchActive ? searchLastPage : listLastPage;
     return {

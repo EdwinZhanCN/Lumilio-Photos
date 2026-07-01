@@ -32,21 +32,13 @@ export class CoordinateConverter {
    * If outside China, no conversion is needed
    */
   private static isOutOfChina(longitude: number, latitude: number): boolean {
-    return (
-      longitude < 72.004 ||
-      longitude > 137.8347 ||
-      latitude < 0.8293 ||
-      latitude > 55.8271
-    );
+    return longitude < 72.004 || longitude > 137.8347 || latitude < 0.8293 || latitude > 55.8271;
   }
 
   /**
    * Transform latitude component
    */
-  private static transformLatitude(
-    longitude: number,
-    latitude: number,
-  ): number {
+  private static transformLatitude(longitude: number, latitude: number): number {
     let ret =
       -100.0 +
       2.0 * longitude +
@@ -56,15 +48,12 @@ export class CoordinateConverter {
       0.2 * Math.sqrt(Math.abs(longitude));
 
     ret +=
-      ((20.0 * Math.sin(6.0 * longitude * this.PI) +
-        20.0 * Math.sin(2.0 * longitude * this.PI)) *
+      ((20.0 * Math.sin(6.0 * longitude * this.PI) + 20.0 * Math.sin(2.0 * longitude * this.PI)) *
         2.0) /
       3.0;
 
     ret +=
-      ((20.0 * Math.sin(latitude * this.PI) +
-        40.0 * Math.sin((latitude / 3.0) * this.PI)) *
-        2.0) /
+      ((20.0 * Math.sin(latitude * this.PI) + 40.0 * Math.sin((latitude / 3.0) * this.PI)) * 2.0) /
       3.0;
 
     ret +=
@@ -79,10 +68,7 @@ export class CoordinateConverter {
   /**
    * Transform longitude component
    */
-  private static transformLongitude(
-    longitude: number,
-    latitude: number,
-  ): number {
+  private static transformLongitude(longitude: number, latitude: number): number {
     let ret =
       300.0 +
       longitude +
@@ -92,14 +78,12 @@ export class CoordinateConverter {
       0.1 * Math.sqrt(Math.abs(longitude));
 
     ret +=
-      ((20.0 * Math.sin(6.0 * longitude * this.PI) +
-        20.0 * Math.sin(2.0 * longitude * this.PI)) *
+      ((20.0 * Math.sin(6.0 * longitude * this.PI) + 20.0 * Math.sin(2.0 * longitude * this.PI)) *
         2.0) /
       3.0;
 
     ret +=
-      ((20.0 * Math.sin(longitude * this.PI) +
-        40.0 * Math.sin((longitude / 3.0) * this.PI)) *
+      ((20.0 * Math.sin(longitude * this.PI) + 40.0 * Math.sin((longitude / 3.0) * this.PI)) *
         2.0) /
       3.0;
 
@@ -132,9 +116,7 @@ export class CoordinateConverter {
     magic = 1 - this.EE * magic * magic;
     const sqrtmagic = Math.sqrt(magic);
 
-    dlat =
-      (dlat * 180.0) /
-      (((this.A * (1 - this.EE)) / (magic * sqrtmagic)) * this.PI);
+    dlat = (dlat * 180.0) / (((this.A * (1 - this.EE)) / (magic * sqrtmagic)) * this.PI);
     dlng = (dlng * 180.0) / ((this.A / sqrtmagic) * Math.cos(radlat) * this.PI);
 
     const convertedLatitude = latitude + dlat;
@@ -178,10 +160,7 @@ export class CoordinateConverter {
 
     const a =
       Math.sin(deltaLatRad / 2) * Math.sin(deltaLatRad / 2) +
-      Math.cos(lat1Rad) *
-        Math.cos(lat2Rad) *
-        Math.sin(deltaLngRad / 2) *
-        Math.sin(deltaLngRad / 2);
+      Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(deltaLngRad / 2) * Math.sin(deltaLngRad / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -244,10 +223,7 @@ export class CoordinateConverter {
  * @param latitude WGS-84 latitude (GPS latitude)
  * @returns GCJ-02 coordinates for Gaode Map
  */
-export function convertToGaodeCoordinates(
-  longitude: number,
-  latitude: number,
-): Coordinate {
+export function convertToGaodeCoordinates(longitude: number, latitude: number): Coordinate {
   return CoordinateConverter.wgs84ToGcj02(longitude, latitude);
 }
 
@@ -257,20 +233,14 @@ export function convertToGaodeCoordinates(
  * @param latitude GCJ-02 latitude (Gaode Map latitude)
  * @returns Approximate WGS-84 coordinates
  */
-export function convertFromGaodeCoordinates(
-  longitude: number,
-  latitude: number,
-): Coordinate {
+export function convertFromGaodeCoordinates(longitude: number, latitude: number): Coordinate {
   return CoordinateConverter.gcj02ToWgs84(longitude, latitude);
 }
 
 /**
  * Check if coordinates need conversion (if in China)
  */
-export function needsCoordinateConversion(
-  longitude: number,
-  latitude: number,
-): boolean {
+export function needsCoordinateConversion(longitude: number, latitude: number): boolean {
   return !CoordinateConverter["isOutOfChina"](longitude, latitude);
 }
 
@@ -321,9 +291,7 @@ export function coordinateToArray(coord: Coordinate): [number, number] {
 /**
  * Format coordinate conversion result for display
  */
-export function formatConversionResult(
-  result: CoordinateConversionResult,
-): string {
+export function formatConversionResult(result: CoordinateConversionResult): string {
   return `
 Original (WGS-84): ${result.original.latitude.toFixed(6)}, ${result.original.longitude.toFixed(6)}
 Converted (GCJ-02): ${result.converted.latitude.toFixed(6)}, ${result.converted.longitude.toFixed(6)}

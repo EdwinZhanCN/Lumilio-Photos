@@ -3,10 +3,7 @@ import FileDropZone from "./FileDropZone";
 
 import { useUploadContext } from "@/features/upload";
 import { useUploadConfig } from "@/features/upload/hooks/useUploadQueries";
-import {
-  validateFile,
-  getValidationErrorMessage,
-} from "@/lib/utils/validate-file.ts";
+import { validateFile, getValidationErrorMessage } from "@/lib/utils/validate-file.ts";
 import { getAcceptString } from "@/lib/utils/accept-file-extensions.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { Upload, Info, FolderPlus, FolderUp, X } from "lucide-react";
@@ -15,8 +12,7 @@ import { useWorkingRepository } from "@/features/settings";
 
 function UnifiedUploadSection(): React.JSX.Element {
   const { t } = useI18n(); // Initialize useI18n
-  const { state, addFiles, clearFiles, uploadFiles, isProcessing } =
-    useUploadContext();
+  const { state, addFiles, clearFiles, uploadFiles, isProcessing } = useUploadContext();
 
   const { files } = state;
   const fileCount = files.length;
@@ -77,10 +73,7 @@ function UnifiedUploadSection(): React.JSX.Element {
     });
 
     if (validFiles.length === 0) {
-      showMessage(
-        "error",
-        t("upload.UnifiedUploadSection.no_valid_files_selected"),
-      );
+      showMessage("error", t("upload.UnifiedUploadSection.no_valid_files_selected"));
       return;
     }
 
@@ -89,10 +82,7 @@ function UnifiedUploadSection(): React.JSX.Element {
 
   const handleClear = () => {
     if (isProcessing) {
-      showMessage(
-        "error",
-        t("upload.UnifiedUploadSection.cannot_clear_while_processing"),
-      );
+      showMessage("error", t("upload.UnifiedUploadSection.cannot_clear_while_processing"));
       return;
     }
     clearFiles();
@@ -103,26 +93,17 @@ function UnifiedUploadSection(): React.JSX.Element {
 
   const handleUpload = async () => {
     if (fileCount === 0) {
-      showMessage(
-        "info",
-        t("upload.UnifiedUploadSection.no_files_selected_for_upload"),
-      );
+      showMessage("info", t("upload.UnifiedUploadSection.no_files_selected_for_upload"));
       return;
     }
     await uploadFiles();
   };
 
   return (
-    <section
-      id="unified-upload-section"
-      className="container mx-auto px-4 py-8 max-w-5xl"
-    >
+    <section id="unified-upload-section" className="container mx-auto px-4 py-8 max-w-5xl">
       {/* Main Drop Zone with integrated info */}
       <div className="relative">
-        <FileDropZone
-          fileInputRef={fileInputRef}
-          onFilesDropped={(files) => handleFiles(files)}
-        >
+        <FileDropZone fileInputRef={fileInputRef} onFilesDropped={(files) => handleFiles(files)}>
           <div className="space-y-4">
             <Upload className="mx-auto h-16 w-16 text-base-content/30" />
             <div>
@@ -130,9 +111,7 @@ function UnifiedUploadSection(): React.JSX.Element {
                 {t("upload.UnifiedUploadSection.drag_drop_or_click")}
               </p>
               <p className="text-sm text-base-content/50 mt-2">
-                {t(
-                  "upload.UnifiedUploadSection.supported_file_types_description",
-                )}
+                {t("upload.UnifiedUploadSection.supported_file_types_description")}
               </p>
             </div>
           </div>
@@ -193,9 +172,7 @@ function UnifiedUploadSection(): React.JSX.Element {
               <span className="truncate text-sm font-semibold text-base-content">
                 {uploadTargetName}
               </span>
-              <span className="badge badge-outline badge-sm">
-                {uploadTargetMode}
-              </span>
+              <span className="badge badge-outline badge-sm">{uploadTargetMode}</span>
             </div>
             <p
               className="mt-1 truncate text-xs text-base-content/55"

@@ -1,11 +1,7 @@
 import React from "react";
 import { Frame, Loader2, Wand2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import {
-  BorderPanel,
-  isExifBorderMode,
-  normalizeParams,
-} from "@/features/studio/tools/border";
+import { BorderPanel, isExifBorderMode, normalizeParams } from "@/features/studio/tools/border";
 import type { BorderExifSummary } from "@/features/studio/tools/border/BorderPanel";
 import { SectionHeader } from "./SectionHeader";
 
@@ -43,8 +39,7 @@ export function BorderToolSection({
 
   // EXIF-driven modes can't be applied without sufficient EXIF on the asset.
   const mode = normalizeParams(value).mode;
-  const exifBlocked =
-    isExifBorderMode(mode) && !(exifSummary?.available ?? false);
+  const exifBlocked = isExifBorderMode(mode) && !(exifSummary?.available ?? false);
   const applyDisabled = disabled || isApplying || exifBlocked;
 
   return (

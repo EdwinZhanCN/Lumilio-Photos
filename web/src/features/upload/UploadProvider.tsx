@@ -56,37 +56,31 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_DRAGGING", payload: false });
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent, handleFiles?: (files: FileList) => void) => {
-      e.preventDefault();
-      dispatch({ type: "SET_DRAGGING", payload: false });
-      const droppedFiles = e.dataTransfer?.files;
-      if (handleFiles && droppedFiles?.length) {
-        handleFiles(droppedFiles);
-      }
-    },
-    [],
-  );
+  const handleDrop = useCallback((e: React.DragEvent, handleFiles?: (files: FileList) => void) => {
+    e.preventDefault();
+    dispatch({ type: "SET_DRAGGING", payload: false });
+    const droppedFiles = e.dataTransfer?.files;
+    if (handleFiles && droppedFiles?.length) {
+      handleFiles(droppedFiles);
+    }
+  }, []);
 
   /**
    * Add files to the upload queue
    * @param files - Files to add
    */
-  const addFiles = useCallback(
-    async (files: File[]) => {
-      if (files.length === 0) return;
+  const addFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
 
-      // Add files with empty preview strings initially
-      dispatch({
-        type: "ADD_FILES",
-        payload: {
-          files,
-          previews: files.map(() => ""),
-        },
-      });
-    },
-    [],
-  );
+    // Add files with empty preview strings initially
+    dispatch({
+      type: "ADD_FILES",
+      payload: {
+        files,
+        previews: files.map(() => ""),
+      },
+    });
+  }, []);
 
   const clearFiles = useCallback(() => {
     dispatch({ type: "CLEAR_FILES" });
@@ -94,10 +88,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const uploadFiles = useCallback(async () => {
     if (!state.files.length) {
-      showMessage(
-        "info",
-        t("upload.UploadProvider.no_files_selected_for_upload_message"),
-      );
+      showMessage("info", t("upload.UploadProvider.no_files_selected_for_upload_message"));
       return;
     }
 
@@ -106,9 +97,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "CLEAR_FILES" });
     } catch (error) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : t("upload.UploadProvider.upload_failed_generic");
+        error instanceof Error ? error.message : t("upload.UploadProvider.upload_failed_generic");
       showMessage("error", errorMessage);
     }
   }, [state.files, uploadProcess, showMessage, t]);
@@ -123,8 +112,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       addFiles,
       clearFiles,
       uploadFiles,
-      isProcessing:
-        uploadProcess.isGeneratingHashCodes || uploadProcess.isUploading,
+      isProcessing: uploadProcess.isGeneratingHashCodes || uploadProcess.isUploading,
       uploadProgress: uploadProcess.uploadProgress,
       hashcodeProgress: uploadProcess.hashcodeProgress,
       isGeneratingHashCodes: uploadProcess.isGeneratingHashCodes,
@@ -150,9 +138,5 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return (
-    <UploadContext.Provider value={contextValue}>
-      {children}
-    </UploadContext.Provider>
-  );
+  return <UploadContext.Provider value={contextValue}>{children}</UploadContext.Provider>;
 }

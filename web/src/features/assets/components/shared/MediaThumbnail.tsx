@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Music, Video, Headphones, Check } from "lucide-react";
-import {
-  isVideo,
-  isAudio,
-  formatDuration,
-  getAssetAriaLabel,
-} from "@/lib/utils/mediaTypes";
+import { isVideo, isAudio, formatDuration, getAssetAriaLabel } from "@/lib/utils/mediaTypes";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 
@@ -109,9 +104,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   const selectionTint = isSelectionMode ? (
     <div
       className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-200 ${
-        isSelected
-          ? "bg-primary/14"
-          : "bg-gradient-to-b from-black/20 via-transparent to-black/10"
+        isSelected ? "bg-primary/14" : "bg-gradient-to-b from-black/20 via-transparent to-black/10"
       }`}
     />
   ) : null;
@@ -165,15 +158,10 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         {effectiveSrc && !imageFailed && (
           <img
             src={effectiveSrc}
-            alt={
-              asset.original_filename ||
-              t("assets.mediaThumbnail.asset_alt_text")
-            }
+            alt={asset.original_filename || t("assets.mediaThumbnail.asset_alt_text")}
             className={`h-full w-full object-cover transition-all duration-300 ease-out ${
               imageLoaded ? "opacity-100" : "opacity-0"
-            } ${
-              isSelectionMode || isSelected ? "" : "group-hover:scale-[1.03]"
-            }`}
+            } ${isSelectionMode || isSelected ? "" : "group-hover:scale-[1.03]"}`}
             loading="lazy"
             onLoad={() =>
               setImageState({
@@ -191,9 +179,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
           <div className="absolute left-3 top-3 z-20">
             <div className="flex items-center gap-1 rounded-full border border-white/15 bg-black/55 px-2.5 py-1 text-xs text-white backdrop-blur-sm">
               <Video className="w-3 h-3" />
-              <span className="sr-only">
-                {t("assets.mediaThumbnail.video_sr_only")}
-              </span>
+              <span className="sr-only">{t("assets.mediaThumbnail.video_sr_only")}</span>
             </div>
           </div>
         )}
@@ -246,9 +232,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         <div className="absolute left-3 top-3 z-20">
           <div className="flex items-center gap-1 rounded-full border border-white/15 bg-black/25 px-2.5 py-1 text-xs text-white/90 backdrop-blur-sm">
             <Headphones className="w-3 h-3" />
-            <span className="sr-only">
-              {t("assets.mediaThumbnail.audio_sr_only")}
-            </span>
+            <span className="sr-only">{t("assets.mediaThumbnail.audio_sr_only")}</span>
           </div>
         </div>
 
@@ -260,11 +244,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
             {asset.original_filename?.replace(/\.[^/.]+$/, "") ||
               t("assets.mediaThumbnail.audio_file_fallback")}
           </div>
-          {duration && (
-            <div className="text-xs opacity-80 mt-1">
-              {formatDuration(duration)}
-            </div>
-          )}
+          {duration && <div className="text-xs opacity-80 mt-1">{formatDuration(duration)}</div>}
         </div>
         {isSelected && (
           <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-br from-primary/16 via-primary/8 to-transparent" />
@@ -293,14 +273,10 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       <div className="text-center">
         <div className="text-xs">{t("assets.mediaThumbnail.no_preview")}</div>
         <div className="text-xs opacity-60">
-          {asset.mime_type ||
-            asset.type ||
-            t("assets.mediaThumbnail.unknown_mime_fallback")}
+          {asset.mime_type || asset.type || t("assets.mediaThumbnail.unknown_mime_fallback")}
         </div>
       </div>
-      {isSelected && (
-        <div className="pointer-events-none absolute inset-0 z-10 bg-primary/10" />
-      )}
+      {isSelected && <div className="pointer-events-none absolute inset-0 z-10 bg-primary/10" />}
     </div>
   );
 };

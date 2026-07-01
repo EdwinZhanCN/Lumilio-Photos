@@ -1,11 +1,7 @@
 /// <reference lib="webworker" />
 
 import { JustifiedLayout } from "@immich/justified-layout-wasm";
-import type {
-  LayoutBox,
-  LayoutConfig,
-  LayoutResult,
-} from "@/lib/layout/justifiedLayout";
+import type { LayoutBox, LayoutConfig, LayoutResult } from "@/lib/layout/justifiedLayout";
 
 interface LayoutRequestPayload {
   requestId: number;

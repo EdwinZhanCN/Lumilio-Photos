@@ -1,13 +1,6 @@
 import React, { createContext, useReducer, useEffect, ReactNode, useRef } from "react";
 import { authReducer, initialState } from "./auth.reducer";
-import {
-  AuthAction,
-  AuthResponse,
-  AuthState,
-  LoginResult,
-  MFAMethod,
-  User,
-} from "./auth.type.ts";
+import { AuthAction, AuthResponse, AuthState, LoginResult, MFAMethod, User } from "./auth.type.ts";
 import { getToken, getRefreshToken, removeToken, saveToken } from "@/lib/http-commons/auth.ts";
 import { $api } from "@/lib/http-commons/queryClient";
 import { ensureMediaToken, getMediaTokenRefreshIntervalMs } from "@/lib/assets/mediaAccess.ts";

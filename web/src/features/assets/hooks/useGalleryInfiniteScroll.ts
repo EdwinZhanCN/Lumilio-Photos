@@ -1,8 +1,6 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 
-export function getScrollParent(
-  element: HTMLElement | null,
-): HTMLElement | null {
+export function getScrollParent(element: HTMLElement | null): HTMLElement | null {
   if (!element || typeof window === "undefined") return null;
   let current = element.parentElement;
   while (current) {
@@ -18,10 +16,7 @@ export function getScrollParent(
 /** Keep in sync with IntersectionObserver rootMargin below */
 const ROOT_MARGIN = "1200px 0px";
 
-function sentinelShouldPrefetch(
-  sentinel: HTMLElement,
-  root: HTMLElement | null,
-): boolean {
+function sentinelShouldPrefetch(sentinel: HTMLElement, root: HTMLElement | null): boolean {
   const rect = sentinel.getBoundingClientRect();
   const margin = 1200;
   if (root) {

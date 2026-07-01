@@ -84,8 +84,7 @@ export default function NavbarUploadQueue() {
     [state.files],
   );
 
-  const sourceItems =
-    fileProgress.length > 0 ? fileProgress : pendingSelectionItems;
+  const sourceItems = fileProgress.length > 0 ? fileProgress : pendingSelectionItems;
 
   const orderedItems = useMemo(
     () =>
@@ -100,9 +99,7 @@ export default function NavbarUploadQueue() {
   const activeCount = orderedItems.filter(
     (item) => item.status === "pending" || item.status === "uploading",
   ).length;
-  const failedCount = orderedItems.filter(
-    (item) => item.status === "failed",
-  ).length;
+  const failedCount = orderedItems.filter((item) => item.status === "failed").length;
 
   useEffect(() => {
     if (orderedItems.length === 0) {
@@ -110,12 +107,7 @@ export default function NavbarUploadQueue() {
       return;
     }
 
-    if (
-      state.files.length > 0 ||
-      activeCount > 0 ||
-      isProcessing ||
-      failedCount > 0
-    ) {
+    if (state.files.length > 0 || activeCount > 0 || isProcessing || failedCount > 0) {
       setIsVisible(true);
       return;
     }
@@ -126,13 +118,7 @@ export default function NavbarUploadQueue() {
     }, RECENTLY_FINISHED_VISIBILITY_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [
-    activeCount,
-    failedCount,
-    isProcessing,
-    orderedItems.length,
-    state.files.length,
-  ]);
+  }, [activeCount, failedCount, isProcessing, orderedItems.length, state.files.length]);
 
   if (!isVisible || orderedItems.length === 0) {
     return (
@@ -159,18 +145,10 @@ export default function NavbarUploadQueue() {
 
   return (
     <div className="dropdown dropdown-end">
-      <button
-        type="button"
-        tabIndex={0}
-        className="btn btn-ghost gap-2 rounded-full"
-      >
+      <button type="button" tabIndex={0} className="btn btn-ghost gap-2 rounded-full">
         {leadingIcon}
-        <span className="badge badge-primary badge-sm">
-          {orderedItems.length}
-        </span>
-        {failedCount > 0 && (
-          <span className="badge badge-error badge-sm">{failedCount}</span>
-        )}
+        <span className="badge badge-primary badge-sm">{orderedItems.length}</span>
+        {failedCount > 0 && <span className="badge badge-error badge-sm">{failedCount}</span>}
       </button>
 
       <div className="dropdown-content z-30 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-base-300 bg-base-100 shadow-xl">
@@ -178,13 +156,9 @@ export default function NavbarUploadQueue() {
           <div>
             <h3 className="font-semibold">{t("upload.NavbarQueue.title")}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-              <span>
-                {t("upload.NavbarQueue.active", { count: activeCount })}
-              </span>
+              <span>{t("upload.NavbarQueue.active", { count: activeCount })}</span>
               {failedCount > 0 && (
-                <span>
-                  {t("upload.NavbarQueue.failed", { count: failedCount })}
-                </span>
+                <span>{t("upload.NavbarQueue.failed", { count: failedCount })}</span>
               )}
             </div>
           </div>
@@ -196,10 +170,7 @@ export default function NavbarUploadQueue() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p
-                      className="truncate text-sm font-medium"
-                      title={item.fileName}
-                    >
+                    <p className="truncate text-sm font-medium" title={item.fileName}>
                       {item.fileName}
                     </p>
                     {item.isChunked && (
@@ -209,17 +180,12 @@ export default function NavbarUploadQueue() {
                     )}
                   </div>
                   {item.error && (
-                    <p
-                      className="mt-1 truncate text-xs text-error"
-                      title={item.error}
-                    >
+                    <p className="mt-1 truncate text-xs text-error" title={item.error}>
                       {item.error}
                     </p>
                   )}
                 </div>
-                <span
-                  className={`badge badge-sm ${getStatusBadgeClass(item.status)}`}
-                >
+                <span className={`badge badge-sm ${getStatusBadgeClass(item.status)}`}>
                   {getStatusLabel(t, item.status)}
                 </span>
               </div>
@@ -239,13 +205,8 @@ export default function NavbarUploadQueue() {
         </ul>
 
         <div className="space-y-3 border-t border-base-300 px-4 py-3">
-          <p className="text-xs text-base-content/60">
-            {t("upload.NavbarQueue.backgroundHint")}
-          </p>
-          <Link
-            to="/manage"
-            className="btn btn-primary btn-sm w-full rounded-full"
-          >
+          <p className="text-xs text-base-content/60">{t("upload.NavbarQueue.backgroundHint")}</p>
+          <Link to="/manage" className="btn btn-primary btn-sm w-full rounded-full">
             {t("upload.NavbarQueue.openPage")}
           </Link>
         </div>

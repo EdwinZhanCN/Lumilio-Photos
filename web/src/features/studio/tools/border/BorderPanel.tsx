@@ -34,7 +34,10 @@ export const BorderPanel: React.FC<{
   const tabs: Array<{ mode: BorderParams["mode"]; label: string }> = [
     { mode: "COLORED", label: t("studio.tools.border.modeColored", { defaultValue: "Colored" }) },
     { mode: "FROSTED", label: t("studio.tools.border.modeFrosted", { defaultValue: "Frosted" }) },
-    { mode: "VIGNETTE", label: t("studio.tools.border.modeVignette", { defaultValue: "Vignette" }) },
+    {
+      mode: "VIGNETTE",
+      label: t("studio.tools.border.modeVignette", { defaultValue: "Vignette" }),
+    },
     {
       mode: "FROSTED_INFO",
       label: t("studio.tools.border.modeFrostedInfo", { defaultValue: "Frosted Info" }),
@@ -94,13 +97,10 @@ export const BorderPanel: React.FC<{
 
       {(p.mode === "FROSTED" || p.mode === "FROSTED_INFO") && (
         <div className="space-y-2">
-          {p.mode === "FROSTED_INFO" && (
-            <ExifReadout summary={exifSummary} t={t} />
-          )}
+          {p.mode === "FROSTED_INFO" && <ExifReadout summary={exifSummary} t={t} />}
 
           <label className="label">
-            {t("studio.tools.border.blur", { defaultValue: "Blur" })}:{" "}
-            {p.blur_sigma.toFixed(1)}
+            {t("studio.tools.border.blur", { defaultValue: "Blur" })}: {p.blur_sigma.toFixed(1)}
           </label>
           <input
             className="range range-primary"
@@ -126,9 +126,7 @@ export const BorderPanel: React.FC<{
             max={100}
             value={p.brightness_adjustment}
             disabled={disabled}
-            onChange={(e) =>
-              update({ brightness_adjustment: Number(e.target.value) })
-            }
+            onChange={(e) => update({ brightness_adjustment: Number(e.target.value) })}
           />
 
           <label className="label">

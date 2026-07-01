@@ -89,9 +89,7 @@ export default function ServerTab() {
                   label: getRepositoryLabel(repository),
                 })),
               ]}
-              onChange={(nextRepositoryId) =>
-                setWorkingRepositoryId(nextRepositoryId || null)
-              }
+              onChange={(nextRepositoryId) => setWorkingRepositoryId(nextRepositoryId || null)}
               ariaLabel={t("settings.serverSettings.workingRepositoryLabel", {
                 defaultValue: "Current application repository",
               })}

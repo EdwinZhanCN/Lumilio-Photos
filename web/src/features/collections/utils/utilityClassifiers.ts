@@ -1,9 +1,4 @@
-import {
-  FileText,
-  Palette,
-  ReceiptText,
-  type LucideIcon,
-} from "lucide-react";
+import { FileText, Palette, ReceiptText, type LucideIcon } from "lucide-react";
 
 export type UtilityClassifierSlug = "documents" | "receipts" | "illustration";
 
@@ -35,10 +30,7 @@ export function findUtilityClassifier(slug?: string) {
   return UTILITY_CLASSIFIERS.find((classifier) => classifier.slug === slug);
 }
 
-export function getUtilityClassifierTitle(
-  t: (key: string) => string,
-  slug: UtilityClassifierSlug,
-) {
+export function getUtilityClassifierTitle(t: (key: string) => string, slug: UtilityClassifierSlug) {
   switch (slug) {
     case "documents":
       return t("collections.utilities.classifiers.documents.title");

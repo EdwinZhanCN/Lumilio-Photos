@@ -64,9 +64,7 @@ export const createSelectionSlice: StateCreator<
     set((state) => {
       state.selection.selectedIds.delete(assetId);
       state.selection.lastSelectedId =
-        state.selection.selectedIds.size > 0
-          ? state.selection.lastSelectedId
-          : undefined;
+        state.selection.selectedIds.size > 0 ? state.selection.lastSelectedId : undefined;
     }),
 
   selectAll: (assetIds) =>
@@ -92,7 +90,7 @@ type SelectionInput = SelectionSlice | SelectionState;
 
 // Helper to normalize input - handles both slice shape and direct state shape
 const getSelectionState = (input: SelectionInput): SelectionState => {
-  if ('selection' in input && input.selection && 'selectedIds' in input.selection) {
+  if ("selection" in input && input.selection && "selectedIds" in input.selection) {
     return input.selection;
   }
   return input as SelectionState;
@@ -113,10 +111,7 @@ export const selectSelectedCount = (input: SelectionInput): number => {
   return state.selectedIds.size;
 };
 
-export const selectIsSelected = (
-  input: SelectionInput,
-  assetId: string,
-): boolean => {
+export const selectIsSelected = (input: SelectionInput, assetId: string): boolean => {
   const state = getSelectionState(input);
   return state.selectedIds.has(assetId);
 };
@@ -124,9 +119,7 @@ export const selectIsSelected = (
 // Alias for hooks that use this name
 export const selectIsAssetSelected = selectIsSelected;
 
-export const selectSelectionMode = (
-  input: SelectionInput,
-): "single" | "multiple" => {
+export const selectSelectionMode = (input: SelectionInput): "single" | "multiple" => {
   const state = getSelectionState(input);
   return state.selectionMode;
 };

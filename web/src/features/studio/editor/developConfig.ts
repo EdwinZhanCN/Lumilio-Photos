@@ -1,9 +1,4 @@
-import {
-  Focus,
-  Palette,
-  Sun,
-  type LucideIcon,
-} from "lucide-react";
+import { Focus, Palette, Sun, type LucideIcon } from "lucide-react";
 import {
   DEFAULT_STUDIO_ADJUSTMENTS,
   type StudioEditAdjustments,
@@ -95,29 +90,17 @@ export const DEVELOP_GROUPS: DevelopGroup[] = [
 ];
 
 /** True when the control differs from its (zero) default within step tolerance. */
-export function isControlModified(
-  control: AdjustmentControl,
-  value: number,
-): boolean {
+export function isControlModified(control: AdjustmentControl, value: number): boolean {
   const def = DEFAULT_STUDIO_ADJUSTMENTS[control.key];
   const tolerance = control.step < 1 ? 0.0001 : 0.5;
   return Math.abs(value - def) > tolerance;
 }
 
 /** True when any control in the group is modified. */
-export function isGroupModified(
-  group: DevelopGroup,
-  adjustments: StudioEditAdjustments,
-): boolean {
-  return group.controls.some((control) =>
-    isControlModified(control, adjustments[control.key]),
-  );
+export function isGroupModified(group: DevelopGroup, adjustments: StudioEditAdjustments): boolean {
+  return group.controls.some((control) => isControlModified(control, adjustments[control.key]));
 }
 
 export function isGeometryModified(adjustments: StudioEditAdjustments): boolean {
-  return (
-    adjustments.rotation !== 0 ||
-    adjustments.flipHorizontal ||
-    adjustments.flipVertical
-  );
+  return adjustments.rotation !== 0 || adjustments.flipHorizontal || adjustments.flipVertical;
 }

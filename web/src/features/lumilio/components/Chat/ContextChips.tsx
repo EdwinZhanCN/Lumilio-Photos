@@ -1,10 +1,7 @@
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import {
-  useContextStore,
-  type ContextContribution,
-} from "../../state/contextStore";
+import { useContextStore, type ContextContribution } from "../../state/contextStore";
 
 interface ContextChipsProps {
   contributions: ContextContribution[];
@@ -23,10 +20,7 @@ export function ContextChips({ contributions, leading }: ContextChipsProps) {
     <div className="flex flex-wrap items-center gap-1.5 px-2.5 text-xs">
       {leading}
       {contributions.map((item) => (
-        <span
-          key={item.id}
-          className="badge badge-ghost badge-sm gap-1 pr-1 font-normal"
-        >
+        <span key={item.id} className="badge badge-ghost badge-sm gap-1 pr-1 font-normal">
           {item.label}
           <button
             type="button"

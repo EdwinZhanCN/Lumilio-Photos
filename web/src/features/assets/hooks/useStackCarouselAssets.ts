@@ -20,9 +20,7 @@ const unwrapAssetResponse = (response: unknown): Asset | undefined => {
   return undefined;
 };
 
-export const normalizeStackMembers = (
-  members: StackMemberDTO[],
-): StackMemberDTO[] =>
+export const normalizeStackMembers = (members: StackMemberDTO[]): StackMemberDTO[] =>
   [...members].sort((left, right) => {
     const leftPosition = left.position ?? Number.MAX_SAFE_INTEGER;
     const rightPosition = right.position ?? Number.MAX_SAFE_INTEGER;
@@ -57,23 +55,15 @@ export const resolveStackCarouselAssets = async (
         },
       });
 
-
-
       return unwrapAssetResponse(response.data);
     }),
   );
 
   return assets
-    .flatMap((result) =>
-      result.status === "fulfilled" && result.value ? [result.value] : [],
-    )
+    .flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []))
     .filter((asset, index, collection) => {
       if (!asset.asset_id) return false;
-      return (
-        collection.findIndex(
-          (candidate) => candidate.asset_id === asset.asset_id,
-        ) === index
-      );
+      return collection.findIndex((candidate) => candidate.asset_id === asset.asset_id) === index;
     });
 };
 

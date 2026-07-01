@@ -1,18 +1,7 @@
-import {
-  MapContainer,
-  Marker,
-  Popup,
-  Rectangle,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, Marker, Popup, Rectangle, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L, { DivIcon, LatLngExpression, LatLngTuple } from "leaflet";
-import Supercluster, {
-  type BBox,
-  type ClusterFeature,
-  type PointFeature,
-} from "supercluster";
+import Supercluster, { type BBox, type ClusterFeature, type PointFeature } from "supercluster";
 import { usePreference } from "@/features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,8 +14,7 @@ import { Asset } from "@/lib/assets/types";
 // @ts-expect-error
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
@@ -83,19 +71,14 @@ type MapViewport = {
 
 const isClusterResult = (feature: ClusterResult): feature is MapCluster => {
   const properties = feature.properties as Partial<ClusterProperties>;
-  return (
-    properties.cluster === true && typeof properties.cluster_id === "number"
-  );
+  return properties.cluster === true && typeof properties.cluster_id === "number";
 };
 
 const isSameBBox = (left: BBox, right: BBox): boolean =>
   left.every((value, index) => Math.abs(value - right[index]) < 1e-6);
 
 // Create custom photo marker icon
-const createPhotoMarkerIcon = (
-  thumbnailUrl?: string,
-  size: number = 40,
-): DivIcon => {
+const createPhotoMarkerIcon = (thumbnailUrl?: string, size: number = 40): DivIcon => {
   return L.divIcon({
     html: `
       <div class="photo-marker" style="
@@ -178,12 +161,7 @@ function MapViewportWatcher({ onViewportChange }: MapViewportWatcherProps) {
   const emitViewport = useCallback(() => {
     const bounds = map.getBounds();
     onViewportChange({
-      bbox: [
-        bounds.getWest(),
-        bounds.getSouth(),
-        bounds.getEast(),
-        bounds.getNorth(),
-      ],
+      bbox: [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
       zoom: map.getZoom(),
     });
   }, [map, onViewportChange]);
@@ -249,10 +227,7 @@ function ClusterMarker({ cluster, clusterIndex, maxZoom }: ClusterMarkerProps) {
       icon={createClusterMarkerIcon(count)}
       eventHandlers={{
         click: () => {
-          const expansionZoom = Math.min(
-            clusterIndex.getClusterExpansionZoom(clusterId),
-            maxZoom,
-          );
+          const expansionZoom = Math.min(clusterIndex.getClusterExpansionZoom(clusterId), maxZoom);
           map.flyTo([lat, lng], expansionZoom, { duration: 0.35 });
         },
       }}
@@ -333,16 +308,8 @@ function MapComponent({
       return null;
     }
 
-    const southWest = convertCoordinatesForMap(
-      boundsOverlay.west,
-      boundsOverlay.south,
-      isChina,
-    );
-    const northEast = convertCoordinatesForMap(
-      boundsOverlay.east,
-      boundsOverlay.north,
-      isChina,
-    );
+    const southWest = convertCoordinatesForMap(boundsOverlay.west, boundsOverlay.south, isChina);
+    const northEast = convertCoordinatesForMap(boundsOverlay.east, boundsOverlay.north, isChina);
 
     return L.latLngBounds(
       [southWest.latitude, southWest.longitude],
@@ -356,9 +323,7 @@ function MapComponent({
     }
 
     return L.latLngBounds(
-      convertedPhotoLocations.map(
-        (location) => location.position as LatLngTuple,
-      ),
+      convertedPhotoLocations.map((location) => location.position as LatLngTuple),
     );
   }, [convertedPhotoLocations, overlayBounds, showSinglePhoto]);
 
@@ -389,10 +354,7 @@ function MapComponent({
   );
 
   const clusterIndex = useMemo(() => {
-    const index = new Supercluster<
-      ClusterPointProperties,
-      Record<string, never>
-    >({
+    const index = new Supercluster<ClusterPointProperties, Record<string, never>>({
       radius: 64,
       minPoints: 2,
       minZoom: 0,
@@ -404,12 +366,7 @@ function MapComponent({
 
   const defaultBbox = useMemo<BBox>(() => {
     if (fitBounds) {
-      return [
-        fitBounds.getWest(),
-        fitBounds.getSouth(),
-        fitBounds.getEast(),
-        fitBounds.getNorth(),
-      ];
+      return [fitBounds.getWest(), fitBounds.getSouth(), fitBounds.getEast(), fitBounds.getNorth()];
     }
 
     const [lat, lng] = initialCenter;
@@ -453,11 +410,7 @@ function MapComponent({
       : undefined;
 
     return (
-      <Popup
-        closeButton={false}
-        autoPan={false}
-        className="photo-preview-popup"
-      >
+      <Popup closeButton={false} autoPan={false} className="photo-preview-popup">
         <div className="photo-popup">
           {(location.thumbnailUrl || thumbnailUrl) && (
             <img
@@ -608,11 +561,7 @@ function MapComponent({
         />
 
         <MapViewportWatcher onViewportChange={handleViewportChange} />
-        <MapAutoFitBounds
-          bounds={fitBounds}
-          enabled={!showSinglePhoto}
-          fitKey={mapKey}
-        />
+        <MapAutoFitBounds bounds={fitBounds} enabled={!showSinglePhoto} fitKey={mapKey} />
 
         {overlayBounds && (
           <Rectangle
@@ -636,10 +585,7 @@ function MapComponent({
                 <Marker
                   key={location.id}
                   position={location.position}
-                  icon={createPhotoMarkerIcon(
-                    location.thumbnailUrl || thumbnailUrl,
-                    50,
-                  )}
+                  icon={createPhotoMarkerIcon(location.thumbnailUrl || thumbnailUrl, 50)}
                   eventHandlers={createPhotoMarkerHandlers(location.id)}
                 >
                   {renderPopup(location)}
@@ -671,10 +617,7 @@ function MapComponent({
                 <Marker
                   key={location.id}
                   position={location.position}
-                  icon={createPhotoMarkerIcon(
-                    location.thumbnailUrl || thumbnailUrl,
-                    40,
-                  )}
+                  icon={createPhotoMarkerIcon(location.thumbnailUrl || thumbnailUrl, 40)}
                   eventHandlers={createPhotoMarkerHandlers(location.id)}
                 >
                   {renderPopup(location)}

@@ -1,9 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import type {
-  Album as AlbumDTO,
-  ListAlbumsResponse,
-} from "@/lib/albums/types";
+import type { Album as AlbumDTO, ListAlbumsResponse } from "@/lib/albums/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
 
@@ -23,9 +20,7 @@ export const mapAlbumToUI = (
     name: album.album_name?.trim() || t("collections.untitled"),
     description: album.description ?? "",
     imageCount: album.asset_count ?? 0,
-    coverImages: coverAssetId
-      ? [assetUrls.getThumbnailUrl(coverAssetId, "medium")]
-      : undefined,
+    coverImages: coverAssetId ? [assetUrls.getThumbnailUrl(coverAssetId, "medium")] : undefined,
     createdAt: album.created_at ? new Date(album.created_at) : new Date(),
     updatedAt: album.updated_at ? new Date(album.updated_at) : new Date(),
     albumType: album.album_type,
@@ -35,14 +30,8 @@ export const mapAlbumToUI = (
 /**
  * Hook for fetching albums with infinite scrolling/pagination
  */
-export function useAlbums(
-  t: (key: string, options?: any) => string,
-  repositoryId?: string,
-) {
-  const { mutateAsync: fetchAlbums } = $api.useMutation(
-    "get",
-    "/api/v1/albums",
-  );
+export function useAlbums(t: (key: string, options?: any) => string, repositoryId?: string) {
+  const { mutateAsync: fetchAlbums } = $api.useMutation("get", "/api/v1/albums");
 
   return useInfiniteQuery({
     queryKey: ["albums", repositoryId ?? "all"],
@@ -63,8 +52,7 @@ export function useAlbums(
       return {
         albums: (payload?.albums ?? []).map((album) => mapAlbumToUI(album, t)),
         total,
-        nextOffset:
-          pageParam + PAGE_SIZE < total ? pageParam + PAGE_SIZE : null,
+        nextOffset: pageParam + PAGE_SIZE < total ? pageParam + PAGE_SIZE : null,
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,

@@ -76,6 +76,7 @@ export default defineConfig({
     ignorePatterns: [
       "dist/**",
       "coverage/**",
+      "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
       "src/lib/http-commons/openapi-fetch/**",
@@ -105,6 +106,7 @@ export default defineConfig({
     ignorePatterns: [
       "dist/**",
       "coverage/**",
+      "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
       "src/lib/http-commons/openapi-fetch/**",

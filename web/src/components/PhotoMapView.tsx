@@ -50,9 +50,7 @@ export default function PhotoMapView({
             id: point.asset_id,
             position: [point.gps_latitude, point.gps_longitude],
             title,
-            description: subtitle
-              ? new Date(subtitle).toLocaleString()
-              : undefined,
+            description: subtitle ? new Date(subtitle).toLocaleString() : undefined,
             thumbnailUrl: assetUrls.getThumbnailUrl(point.asset_id, "small"),
           };
         })
@@ -104,11 +102,7 @@ export default function PhotoMapView({
   );
 
   const renderListView = () => (
-    <div
-      className={`h-full overflow-y-auto bg-base-100 ${
-        mapRounded ? "rounded-lg" : ""
-      }`}
-    >
+    <div className={`h-full overflow-y-auto bg-base-100 ${mapRounded ? "rounded-lg" : ""}`}>
       {locationGroups.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-base-content/60">
           <MapIcon className="w-16 h-16 mb-4" />
@@ -134,17 +128,11 @@ export default function PhotoMapView({
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-base">
-                        {group.length === 1
-                          ? firstLocation.title
-                          : `${group.length} Photos`}
+                        {group.length === 1 ? firstLocation.title : `${group.length} Photos`}
                       </h3>
-                      <p className="text-sm text-base-content/70 font-mono">
-                        {formattedCoords}
-                      </p>
+                      <p className="text-sm text-base-content/70 font-mono">{formattedCoords}</p>
                     </div>
-                    <div className="badge badge-primary badge-sm">
-                      {group.length}
-                    </div>
+                    <div className="badge badge-primary badge-sm">{group.length}</div>
                   </div>
 
                   {/* Photo thumbnails grid */}
@@ -182,9 +170,7 @@ export default function PhotoMapView({
 
                   {/* Location description if available */}
                   {firstLocation.description && (
-                    <p className="text-sm text-base-content/70 mt-2">
-                      {firstLocation.description}
-                    </p>
+                    <p className="text-sm text-base-content/70 mt-2">{firstLocation.description}</p>
                   )}
                 </div>
               </div>
@@ -220,9 +206,7 @@ export default function PhotoMapView({
       )}
 
       {/* Content */}
-      <div className="h-full">
-        {viewMode === "map" ? renderMapView() : renderListView()}
-      </div>
+      <div className="h-full">{viewMode === "map" ? renderMapView() : renderListView()}</div>
     </div>
   );
 }

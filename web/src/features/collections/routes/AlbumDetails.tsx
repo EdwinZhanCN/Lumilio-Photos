@@ -19,8 +19,7 @@ import type {
   AssetsBulkActionItem,
 } from "@/features/assets/components/shared/bulkActions";
 
-type RebuildAlbumBioClipResponse =
-  components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
+type RebuildAlbumBioClipResponse = components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
 
 const AlbumAssetsContent = () => {
   const { t, i18n } = useI18n();
@@ -56,10 +55,7 @@ const AlbumAssetsContent = () => {
     { label: album?.album_name || t("collections.albumDetails.fallbackName", "Album") },
   ]);
   const isBioAlbum = album?.album_type === "bio";
-  const rebuildBioClipMutation = $api.useMutation(
-    "post",
-    "/api/v1/albums/{id}/bioclip/rebuild",
-  );
+  const rebuildBioClipMutation = $api.useMutation("post", "/api/v1/albums/{id}/bioclip/rebuild");
   const removeAssetFromAlbumMutation = $api.useMutation(
     "delete",
     "/api/v1/albums/{id}/assets/{assetId}",
@@ -121,10 +117,9 @@ const AlbumAssetsContent = () => {
         icon: <FolderMinus size={16} />,
         tone: "danger",
         requiresConfirmation: true,
-        confirmationTitle: t(
-          "collections.albumDetails.bulkActions.removeFromAlbum.confirmTitle",
-          { defaultValue: "Remove selected items from this album?" },
-        ),
+        confirmationTitle: t("collections.albumDetails.bulkActions.removeFromAlbum.confirmTitle", {
+          defaultValue: "Remove selected items from this album?",
+        }),
         confirmationMessage: t(
           "collections.albumDetails.bulkActions.removeFromAlbum.confirmMessage",
           {
@@ -150,29 +145,19 @@ const AlbumAssetsContent = () => {
             await invalidateAlbumAssets();
             showMessage(
               "success",
-              t(
-                "collections.albumDetails.bulkActions.removeFromAlbum.success",
-                { count: context.affectedAssetCount },
-              ),
+              t("collections.albumDetails.bulkActions.removeFromAlbum.success", {
+                count: context.affectedAssetCount,
+              }),
             );
           } catch (error) {
             console.error("Failed to remove selected assets from album:", error);
-            showMessage(
-              "error",
-              t("collections.albumDetails.bulkActions.removeFromAlbum.error"),
-            );
+            showMessage("error", t("collections.albumDetails.bulkActions.removeFromAlbum.error"));
             throw error;
           }
         },
       },
     ],
-    [
-      albumIdNumber,
-      invalidateAlbumAssets,
-      removeAssetFromAlbumMutation,
-      showMessage,
-      t,
-    ],
+    [albumIdNumber, invalidateAlbumAssets, removeAssetFromAlbumMutation, showMessage, t],
   );
 
   const hero = (
@@ -240,9 +225,7 @@ const AlbumAssetsContent = () => {
         bioClipFeedback && (
           <div
             className={`alert mt-4 max-w-xl py-2 text-sm ${
-              bioClipFeedback.tone === "success"
-                ? "alert-success"
-                : "alert-error"
+              bioClipFeedback.tone === "success" ? "alert-success" : "alert-error"
             }`}
           >
             {bioClipFeedback.message}

@@ -1,14 +1,6 @@
 import { useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import {
-  AlertTriangle,
-  Check,
-  Copy,
-  Loader2,
-  RefreshCw,
-  Trash2,
-  X,
-} from "lucide-react";
+import { AlertTriangle, Check, Copy, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
@@ -17,11 +9,7 @@ import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useWorkingRepository } from "@/features/settings";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { formatBytes } from "@/lib/utils/formatters";
-import type {
-  DuplicateGroup,
-  DuplicateMethod,
-  DuplicateStatus,
-} from "@/lib/duplicates/types";
+import type { DuplicateGroup, DuplicateMethod, DuplicateStatus } from "@/lib/duplicates/types";
 import {
   useDetectDuplicates,
   useDismissDuplicateGroup,
@@ -47,10 +35,7 @@ function getMethodLabel(t: (key: string) => string, method: DuplicateMethod) {
   }
 }
 
-function getStatusFilterLabel(
-  t: (key: string) => string,
-  status: DuplicateStatus,
-) {
+function getStatusFilterLabel(t: (key: string) => string, status: DuplicateStatus) {
   switch (status) {
     case "pending":
       return t("duplicates.filters.pending");
@@ -64,17 +49,8 @@ function getStatusFilterLabel(
 const StatusBadge = ({ method }: StatusBadgeProps) => {
   const { t } = useI18n();
   const m = (method ?? "phash") as DuplicateMethod;
-  const color =
-    m === "exact"
-      ? "badge-error"
-      : m === "mixed"
-        ? "badge-warning"
-        : "badge-info";
-  return (
-    <span className={`badge badge-sm ${color} badge-outline`}>
-      {getMethodLabel(t, m)}
-    </span>
-  );
+  const color = m === "exact" ? "badge-error" : m === "mixed" ? "badge-warning" : "badge-info";
+  return <span className={`badge badge-sm ${color} badge-outline`}>{getMethodLabel(t, m)}</span>;
 };
 
 type DuplicateGroupCardProps = {
@@ -93,9 +69,7 @@ const DuplicateGroupCard = ({ group, status }: DuplicateGroupCardProps) => {
     group.recommended_keeper_asset_id ??
     group.assets?.[0]?.asset?.asset_id ??
     null;
-  const [selectedKeeperId, setSelectedKeeperId] = useState<string | null>(
-    initialKeeperId,
-  );
+  const [selectedKeeperId, setSelectedKeeperId] = useState<string | null>(initialKeeperId);
 
   const isResolved = status !== "pending";
   const isDismissed = status === "dismissed";
@@ -191,9 +165,7 @@ const DuplicateGroupCard = ({ group, status }: DuplicateGroupCardProps) => {
               type="button"
               className="btn btn-primary btn-sm rounded-full"
               onClick={handleMerge}
-              disabled={
-                !selectedKeeperId || isActionPending || assets.length < 2
-              }
+              disabled={!selectedKeeperId || isActionPending || assets.length < 2}
             >
               {mergeMutation.isPending ? (
                 <>
@@ -215,24 +187,18 @@ const DuplicateGroupCard = ({ group, status }: DuplicateGroupCardProps) => {
         {assets.map((member) => {
           const assetId = member.asset?.asset_id;
           const isKeeper = assetId === selectedKeeperId;
-          const wasResolvedKeeper =
-            isResolved && !isDismissed && assetId === group.keeper_asset_id;
-          const wasResolvedDuplicate =
-            isResolved && !isDismissed && !wasResolvedKeeper;
+          const wasResolvedKeeper = isResolved && !isDismissed && assetId === group.keeper_asset_id;
+          const wasResolvedDuplicate = isResolved && !isDismissed && !wasResolvedKeeper;
           return (
             <button
               key={assetId}
               type="button"
-              onClick={() =>
-                !isResolved && assetId && setSelectedKeeperId(assetId)
-              }
+              onClick={() => !isResolved && assetId && setSelectedKeeperId(assetId)}
               disabled={isResolved}
               className={[
                 "group relative overflow-hidden rounded-2xl border bg-base-200 text-left transition",
                 isResolved ? "cursor-default" : "cursor-pointer",
-                isKeeper
-                  ? "border-primary ring-2 ring-primary/60"
-                  : "border-transparent",
+                isKeeper ? "border-primary ring-2 ring-primary/60" : "border-transparent",
                 wasResolvedDuplicate ? "opacity-60" : "",
               ].join(" ")}
             >
@@ -306,8 +272,7 @@ function DuplicatesContent() {
     { label: t("duplicates.pageTitle", "Duplicates") },
   ]);
   const showMessage = useMessage();
-  const { repositories, repositoriesQuery, scopedRepositoryId } =
-    useWorkingRepository();
+  const { repositories, repositoriesQuery, scopedRepositoryId } = useWorkingRepository();
   const [status, setStatus] = useState<DuplicateStatus>("pending");
   const [isScanningRepositories, setIsScanningRepositories] = useState(false);
   const summaryQuery = useDuplicateSummary(scopedRepositoryId);
@@ -331,20 +296,13 @@ function DuplicatesContent() {
     [repositories, scopedRepositoryId],
   );
   const canScan =
-    scanRepositoryIds.length > 0 &&
-    (Boolean(scopedRepositoryId) || repositoriesQuery.isSuccess);
+    scanRepositoryIds.length > 0 && (Boolean(scopedRepositoryId) || repositoriesQuery.isSuccess);
   const isScanPending = detectMutation.isPending || isScanningRepositories;
-  const scanLabel = scopedRepositoryId
-    ? t("duplicates.scan")
-    : t("duplicates.scanAll");
+  const scanLabel = scopedRepositoryId ? t("duplicates.scan") : t("duplicates.scanAll");
 
   const lastDetectedLabel = useMemo(() => {
     if (!summary?.last_detected_at) {
-      return (
-        t("duplicates.summary.lastDetected") +
-        ": " +
-        t("duplicates.summary.neverDetected")
-      );
+      return t("duplicates.summary.lastDetected") + ": " + t("duplicates.summary.neverDetected");
     }
     return (
       t("duplicates.summary.lastDetected") +
@@ -458,9 +416,7 @@ function DuplicatesContent() {
                   key={opt}
                   type="button"
                   onClick={() => setStatus(opt)}
-                  className={`btn btn-sm join-item ${
-                    status === opt ? "btn-primary" : "btn-ghost"
-                  }`}
+                  className={`btn btn-sm join-item ${status === opt ? "btn-primary" : "btn-ghost"}`}
                 >
                   {getStatusFilterLabel(t, opt)}
                 </button>
@@ -499,23 +455,16 @@ function DuplicatesContent() {
           {isInitialLoading && (
             <div className="space-y-3">
               {Array.from({ length: 2 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className="h-48 animate-pulse rounded-[1.75rem] bg-base-200"
-                />
+                <div key={idx} className="h-48 animate-pulse rounded-[1.75rem] bg-base-200" />
               ))}
             </div>
           )}
 
           {!isInitialLoading && !hasGroups && (
             <div className="rounded-[1.75rem] border border-dashed border-base-300 px-6 py-12 text-center text-base-content/60">
-              <p className="text-base font-semibold">
-                {t("duplicates.emptyTitle")}
-              </p>
+              <p className="text-base font-semibold">{t("duplicates.emptyTitle")}</p>
               <p className="mt-1 text-sm">
-                {status === "pending" &&
-                summary &&
-                summary.last_detected_at == null
+                {status === "pending" && summary && summary.last_detected_at == null
                   ? t("duplicates.noScanYet")
                   : t("duplicates.emptyDescription")}
               </p>
@@ -525,11 +474,7 @@ function DuplicatesContent() {
           {hasGroups && (
             <div className="space-y-4">
               {groupQuery.groups.map((group) => (
-                <DuplicateGroupCard
-                  key={group.group_id}
-                  group={group}
-                  status={status}
-                />
+                <DuplicateGroupCard key={group.group_id} group={group} status={status} />
               ))}
             </div>
           )}
@@ -547,9 +492,7 @@ type SummaryStatProps = {
 
 const SummaryStat = ({ label, value, title }: SummaryStatProps) => (
   <div className="rounded-2xl bg-base-200/60 px-4 py-3" title={title}>
-    <p className="text-xs font-semibold uppercase tracking-wide text-base-content/55">
-      {label}
-    </p>
+    <p className="text-xs font-semibold uppercase tracking-wide text-base-content/55">{label}</p>
     <p className="mt-1 truncate text-lg font-black">{value}</p>
   </div>
 );

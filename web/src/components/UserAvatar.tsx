@@ -32,19 +32,13 @@ export default function UserAvatar({
   textSize = "text-3xl",
   className = "",
 }: UserAvatarProps): React.ReactNode {
-  const resolvedSrc = assetId
-    ? assetUrls.getThumbnailUrl(assetId, "medium")
-    : undefined;
+  const resolvedSrc = assetId ? assetUrls.getThumbnailUrl(assetId, "medium") : undefined;
 
   if (resolvedSrc) {
     return (
       <div className={`avatar ${className}`}>
         <div className={`${size} rounded-full`}>
-          <img
-            src={resolvedSrc}
-            alt={name}
-            className="rounded-full object-cover"
-          />
+          <img src={resolvedSrc} alt={name} className="rounded-full object-cover" />
         </div>
       </div>
     );

@@ -7,7 +7,8 @@ import {
 import { useValidateLLMSettings } from "@/features/settings/hooks/useSystemSettings";
 import {
   BirdIcon,
-  BotIcon, BotMessageSquareIcon,
+  BotIcon,
+  BotMessageSquareIcon,
   EyeIcon,
   KeyRoundIcon,
   LinkIcon,
@@ -34,10 +35,19 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 const ML_META = {
-  semanticEnabled: { icon: <TextSearchIcon className="size-4" />, color: "bg-info text-info-content" },
-  bioclipEnabled: { icon: <BirdIcon className="size-4" />, color: "bg-success text-success-content" },
+  semanticEnabled: {
+    icon: <TextSearchIcon className="size-4" />,
+    color: "bg-info text-info-content",
+  },
+  bioclipEnabled: {
+    icon: <BirdIcon className="size-4" />,
+    color: "bg-success text-success-content",
+  },
   ocrEnabled: { icon: <EyeIcon className="size-4" />, color: "bg-warning text-warning-content" },
-  faceEnabled: { icon: <ScanFaceIcon className="size-4" />, color: "bg-secondary text-secondary-content" },
+  faceEnabled: {
+    icon: <ScanFaceIcon className="size-4" />,
+    color: "bg-secondary text-secondary-content",
+  },
 } as const;
 
 export default function AiTab() {
@@ -144,9 +154,7 @@ export default function AiTab() {
       {feedback && (
         <div
           className={`rounded-xl px-4 py-3 text-sm ${
-            feedback.tone === "success"
-              ? "bg-success/10 text-success"
-              : "bg-error/10 text-error"
+            feedback.tone === "success" ? "bg-success/10 text-success" : "bg-error/10 text-error"
           }`}
         >
           {feedback.message}

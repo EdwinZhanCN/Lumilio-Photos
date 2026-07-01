@@ -4,10 +4,7 @@ import type { Schemas } from "../api-types";
 
 export type RuntimeInfo = Schemas["dto.RuntimeInfoDTO"];
 
-export const runtimeInfoQueryKey = [
-  "get",
-  "/api/v1/settings/runtime-info",
-] as const;
+export const runtimeInfoQueryKey = ["get", "/api/v1/settings/runtime-info"] as const;
 
 export function useRuntimeInfo(): UseQueryResult<RuntimeInfo, unknown> {
   return $api.useQuery(

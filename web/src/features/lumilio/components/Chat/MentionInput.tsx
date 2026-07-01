@@ -115,10 +115,7 @@ export function MentionInput({
     params: { query: { limit: 100, offset: 0 } },
   });
   const pinsQuery = $api.useQuery("get", "/api/v1/agent/pins");
-  const filterOptionsQuery = $api.useQuery(
-    "get",
-    "/api/v1/assets/filter-options",
-  );
+  const filterOptionsQuery = $api.useQuery("get", "/api/v1/assets/filter-options");
 
   const sources = useMemo(
     () =>
@@ -151,15 +148,16 @@ export function MentionInput({
         .map((mt) => ({ kind: "type" as const, type: mt.type, label: mt.label }));
     }
     if (menu.kind === "entity") {
-      return getEntitiesForType(sources, menu.activeType, menu.query).map(
-        (entity) => ({ kind: "entity" as const, entity }),
-      );
+      return getEntitiesForType(sources, menu.activeType, menu.query).map((entity) => ({
+        kind: "entity" as const,
+        entity,
+      }));
     }
     if (menu.kind === "command") {
       const q = menu.query.toLowerCase();
-      return SLASH_MACROS.filter(
-        (m) => m.label.toLowerCase().includes(q) || m.id.includes(q),
-      ).map((macro) => ({ kind: "macro" as const, macro }));
+      return SLASH_MACROS.filter((m) => m.label.toLowerCase().includes(q) || m.id.includes(q)).map(
+        (macro) => ({ kind: "macro" as const, macro }),
+      );
     }
     return [];
   }, [menu, mentionTypes, sources, SLASH_MACROS]);
@@ -303,9 +301,7 @@ export function MentionInput({
       setValue(before + inserted + after);
       pendingCaretRef.current = before.length + inserted.length;
       setMentions((prev) =>
-        prev.some(
-          (m) => m.id === item.entity.id && m.type === item.entity.type,
-        )
+        prev.some((m) => m.id === item.entity.id && m.type === item.entity.type)
           ? prev
           : [
               ...prev,
@@ -412,8 +408,7 @@ export function MentionInput({
                     : item.kind === "entity"
                       ? item.entity.label
                       : item.macro.label;
-                const desc =
-                  item.kind === "macro" ? item.macro.description : null;
+                const desc = item.kind === "macro" ? item.macro.description : null;
                 return (
                   <li key={key}>
                     <button
@@ -443,10 +438,7 @@ export function MentionInput({
                         )}
                       </span>
                       {item.kind === "type" && (
-                        <ChevronRight
-                          size={15}
-                          className="shrink-0 text-base-content/30"
-                        />
+                        <ChevronRight size={15} className="shrink-0 text-base-content/30" />
                       )}
                     </button>
                   </li>
@@ -485,8 +477,7 @@ export function MentionInput({
           onKeyDown={handleKeyDown}
           onClick={syncMenu}
           onKeyUp={(e) => {
-            if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key))
-              syncMenu();
+            if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) syncMenu();
           }}
           placeholder={resolvedPlaceholder}
           className="block max-h-[140px] min-h-[2.5rem] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm leading-relaxed outline-none placeholder:text-base-content/40 disabled:opacity-60"
@@ -495,9 +486,7 @@ export function MentionInput({
           <button
             type="button"
             className={`btn btn-ghost btn-sm btn-circle ${
-              activeMode
-                ? "text-primary"
-                : "text-base-content/45 hover:text-base-content"
+              activeMode ? "text-primary" : "text-base-content/45 hover:text-base-content"
             }`}
             disabled={disabled}
             aria-pressed={Boolean(activeMode)}

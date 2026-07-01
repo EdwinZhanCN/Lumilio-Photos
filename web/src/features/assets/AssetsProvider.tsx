@@ -1,26 +1,8 @@
-import {
-  createContext,
-  ReactNode,
-  useEffect,
-  useMemo,
-  useCallback,
-  useRef,
-  useState,
-} from "react";
-import {
-  useLocation,
-  useNavigate,
-  useSearchParams,
-  useParams,
-} from "react-router-dom";
+import { createContext, ReactNode, useEffect, useMemo, useCallback, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import {
-  AssetFilter,
-  FiltersState,
-  SelectionState,
-  UIState,
-} from "./types/assets.type";
+import { AssetFilter, FiltersState, SelectionState, UIState } from "./types/assets.type";
 import {
   AssetsStoreInitialState,
   AssetsStoreApi,
@@ -47,9 +29,9 @@ interface AssetsNavigationContextValue {
   closeCarousel: () => void;
 }
 
-export const AssetsNavigationContext = createContext<
-  AssetsNavigationContextValue | undefined
->(undefined);
+export const AssetsNavigationContext = createContext<AssetsNavigationContextValue | undefined>(
+  undefined,
+);
 
 type PersistedAssetsState = {
   filters?: Partial<FiltersState>;
@@ -120,17 +102,14 @@ function loadPersistedState(): PersistedAssetsState {
           ? (candidate.ui.sortBy as UIState["sortBy"])
           : undefined,
         searchQuery:
-          typeof candidate.ui.searchQuery === "string"
-            ? candidate.ui.searchQuery
-            : undefined,
+          typeof candidate.ui.searchQuery === "string" ? candidate.ui.searchQuery : undefined,
       };
     }
 
     if (isRecord(candidate.selection)) {
       const mode = candidate.selection.selectionMode;
       restored.selection = {
-        selectionMode:
-          mode === "single" || mode === "multiple" ? mode : undefined,
+        selectionMode: mode === "single" || mode === "multiple" ? mode : undefined,
       };
     }
 
@@ -189,9 +168,7 @@ function toCompleteLocationBBox(location?: AssetFilter["location"]) {
   };
 }
 
-function assetFilterToFiltersState(
-  filter?: AssetFilter,
-): Partial<FiltersState> {
+function assetFilterToFiltersState(filter?: AssetFilter): Partial<FiltersState> {
   if (!filter) return {};
 
   const filters: Partial<FiltersState> = {
@@ -262,22 +239,17 @@ export const AssetsProvider = ({
   }
 
   const store = storeRef.current;
-  const {
-    setCarouselOpen,
-    setActiveAssetId,
-    hydrateUI,
-    setSelectionMode,
-    batchUpdateFilters,
-  } = useStore(
-    store,
-    useShallow((state) => ({
-      setCarouselOpen: state.setCarouselOpen,
-      setActiveAssetId: state.setActiveAssetId,
-      hydrateUI: state.hydrateUI,
-      setSelectionMode: state.setSelectionMode,
-      batchUpdateFilters: state.batchUpdateFilters,
-    })),
-  );
+  const { setCarouselOpen, setActiveAssetId, hydrateUI, setSelectionMode, batchUpdateFilters } =
+    useStore(
+      store,
+      useShallow((state) => ({
+        setCarouselOpen: state.setCarouselOpen,
+        setActiveAssetId: state.setActiveAssetId,
+        hydrateUI: state.hydrateUI,
+        setSelectionMode: state.setSelectionMode,
+        batchUpdateFilters: state.batchUpdateFilters,
+      })),
+    );
 
   const uiState = useStore(
     store,
@@ -302,13 +274,9 @@ export const AssetsProvider = ({
     const persistedState = isMainPersistentScope ? loadPersistedState() : {};
     const initialSortBy = resolveSortBy(persistedState.ui?.sortBy);
     const initialSearchQuery =
-      syncUrl && urlQuery !== null
-        ? urlQuery
-        : (persistedState.ui?.searchQuery ?? "");
+      syncUrl && urlQuery !== null ? urlQuery : (persistedState.ui?.searchQuery ?? "");
     const routeState = location.state as AssetsRouteState;
-    const routeFilter = assetFilterToFiltersState(
-      routeState?.assetsInitialFilter,
-    );
+    const routeFilter = assetFilterToFiltersState(routeState?.assetsInitialFilter);
 
     if (persistedState.filters) {
       batchUpdateFilters(persistedState.filters);
@@ -362,13 +330,7 @@ export const AssetsProvider = ({
       ui: uiState,
       selection: selectionState,
     });
-  }, [
-    filtersState,
-    isHydrated,
-    isMainPersistentScope,
-    selectionState,
-    uiState,
-  ]);
+  }, [filtersState, isHydrated, isMainPersistentScope, selectionState, uiState]);
 
   useEffect(() => {
     if (!isHydrated) return;

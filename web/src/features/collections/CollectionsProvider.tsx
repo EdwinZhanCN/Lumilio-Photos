@@ -6,13 +6,9 @@ interface CollectionsContextType extends CollectionsState {
   dispatch: React.Dispatch<CollectionsAction>;
 }
 
-const CollectionsContext = createContext<CollectionsContextType | undefined>(
-  undefined,
-);
+const CollectionsContext = createContext<CollectionsContextType | undefined>(undefined);
 
-export const CollectionsProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const CollectionsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(collectionsReducer, initialState);
 
   return (

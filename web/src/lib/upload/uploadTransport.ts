@@ -93,18 +93,13 @@ export const batchUploadFiles = async (
   files.forEach((fileObj) => {
     let fieldName: string;
 
-    if (
-      fileObj.isChunk &&
-      fileObj.chunkIndex !== undefined &&
-      fileObj.totalChunks !== undefined
-    ) {
+    if (fileObj.isChunk && fileObj.chunkIndex !== undefined && fileObj.totalChunks !== undefined) {
       fieldName = `chunk_${fileObj.sessionId}_${fileObj.chunkIndex}_${fileObj.totalChunks}`;
     } else {
       fieldName = `single_${fileObj.sessionId}`;
     }
 
-    const filename =
-      fileObj.fileName || (fileObj.file as File).name || "upload";
+    const filename = fileObj.fileName || (fileObj.file as File).name || "upload";
     formData.append(fieldName, fileObj.file, filename);
   });
 
@@ -225,10 +220,7 @@ export const uploadFileInChunks = async (
             activeUploads--;
 
             if (onProgress) {
-              const progress = Math.min(
-                (completedChunks / totalChunks) * 100,
-                100,
-              );
+              const progress = Math.min((completedChunks / totalChunks) * 100, 100);
               onProgress(progress);
             }
 
@@ -248,9 +240,6 @@ export const generateSessionId = (): string => {
   return crypto.randomUUID();
 };
 
-export const shouldUseChunks = (
-  file: File,
-  threshold: number = 10 * 1024 * 1024,
-): boolean => {
+export const shouldUseChunks = (file: File, threshold: number = 10 * 1024 * 1024): boolean => {
   return file.size > threshold;
 };

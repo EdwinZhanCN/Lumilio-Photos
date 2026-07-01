@@ -37,7 +37,10 @@ export type QueryKey<
   Init = MaybeOptionalInit<Paths[Path], Method>,
 > = Init extends undefined ? readonly [Method, Path] : readonly [Method, Path, Init];
 
-export type QueryOptionsFunction<Paths extends Record<string, Record<HttpMethod, {}>>, Media extends MediaType> = <
+export type QueryOptionsFunction<
+  Paths extends Record<string, Record<HttpMethod, {}>>,
+  Media extends MediaType,
+> = <
   Method extends HttpMethod,
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Method>,
@@ -67,19 +70,22 @@ export type QueryOptionsFunction<Paths extends Record<string, Record<HttpMethod,
     >,
     "queryFn"
   > & {
-  queryFn: Exclude<
-    UseQueryOptions<
-      Response["data"],
-      Response["error"],
-      InferSelectReturnType<Response["data"], Options["select"]>,
-      QueryKey<Paths, Method, Path>
-    >["queryFn"],
-    SkipToken | undefined
-  >;
-}
+    queryFn: Exclude<
+      UseQueryOptions<
+        Response["data"],
+        Response["error"],
+        InferSelectReturnType<Response["data"], Options["select"]>,
+        QueryKey<Paths, Method, Path>
+      >["queryFn"],
+      SkipToken | undefined
+    >;
+  }
 >;
 
-export type UseQueryMethod<Paths extends Record<string, Record<HttpMethod, {}>>, Media extends MediaType> = <
+export type UseQueryMethod<
+  Paths extends Record<string, Record<HttpMethod, {}>>,
+  Media extends MediaType,
+> = <
   Method extends HttpMethod,
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Method>,
@@ -101,7 +107,10 @@ export type UseQueryMethod<Paths extends Record<string, Record<HttpMethod, {}>>,
     : [InitWithUnknowns<Init>, Options?, QueryClient?]
 ) => UseQueryResult<InferSelectReturnType<Response["data"], Options["select"]>, Response["error"]>;
 
-export type UseInfiniteQueryMethod<Paths extends Record<string, Record<HttpMethod, {}>>, Media extends MediaType> = <
+export type UseInfiniteQueryMethod<
+  Paths extends Record<string, Record<HttpMethod, {}>>,
+  Media extends MediaType,
+> = <
   Method extends HttpMethod,
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Method>,
@@ -129,7 +138,10 @@ export type UseInfiniteQueryMethod<Paths extends Record<string, Record<HttpMetho
   Response["error"]
 >;
 
-export type UseSuspenseQueryMethod<Paths extends Record<string, Record<HttpMethod, {}>>, Media extends MediaType> = <
+export type UseSuspenseQueryMethod<
+  Paths extends Record<string, Record<HttpMethod, {}>>,
+  Media extends MediaType,
+> = <
   Method extends HttpMethod,
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Method>,
@@ -149,14 +161,23 @@ export type UseSuspenseQueryMethod<Paths extends Record<string, Record<HttpMetho
   ...[init, options, queryClient]: RequiredKeysOf<Init> extends never
     ? [InitWithUnknowns<Init>?, Options?, QueryClient?]
     : [InitWithUnknowns<Init>, Options?, QueryClient?]
-) => UseSuspenseQueryResult<InferSelectReturnType<Response["data"], Options["select"]>, Response["error"]>;
+) => UseSuspenseQueryResult<
+  InferSelectReturnType<Response["data"], Options["select"]>,
+  Response["error"]
+>;
 
-export type UseMutationMethod<Paths extends Record<string, Record<HttpMethod, {}>>, Media extends MediaType> = <
+export type UseMutationMethod<
+  Paths extends Record<string, Record<HttpMethod, {}>>,
+  Media extends MediaType,
+> = <
   Method extends HttpMethod,
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Method>,
   Response extends Required<FetchResponse<Paths[Path][Method], Init, Media>>, // note: Required is used to avoid repeating NonNullable in UseQuery types
-  Options extends Omit<UseMutationOptions<Response["data"], Response["error"], Init>, "mutationKey" | "mutationFn">,
+  Options extends Omit<
+    UseMutationOptions<Response["data"], Response["error"], Init>,
+    "mutationKey" | "mutationFn"
+  >,
 >(
   method: Method,
   url: Path,
@@ -179,18 +200,22 @@ export type MethodResponse<
     ? PathsWithMethod<Paths, Method>
     : never,
   Options = object,
-> = CreatedClient extends OpenapiQueryClient<infer Paths extends { [key: string]: any }, infer Media extends MediaType>
-  ? NonNullable<FetchResponse<Paths[Path][Method], Options, Media>["data"]>
-  : never;
+> =
+  CreatedClient extends OpenapiQueryClient<
+    infer Paths extends { [key: string]: any },
+    infer Media extends MediaType
+  >
+    ? NonNullable<FetchResponse<Paths[Path][Method], Options, Media>["data"]>
+    : never;
 
 // TODO: Add the ability to bring queryClient as argument
 export default function createClient<Paths extends {}, Media extends MediaType = MediaType>(
   client: FetchClient<Paths, Media>,
 ): OpenapiQueryClient<Paths, Media> {
   const queryFn = async <Method extends HttpMethod, Path extends PathsWithMethod<Paths, Method>>({
-                                                                                                   queryKey: [method, path, init],
-                                                                                                   signal,
-                                                                                                 }: QueryFunctionContext<QueryKey<Paths, Method, Path>>) => {
+    queryKey: [method, path, init],
+    signal,
+  }: QueryFunctionContext<QueryKey<Paths, Method, Path>>) => {
     const mth = method.toUpperCase() as Uppercase<typeof method>;
     const fn = client[mth] as ClientMethod<Paths, typeof method, Media>;
     const { data, error, response } = await fn(path, { signal, ...(init as any) }); // TODO: find a way to avoid as any
@@ -205,11 +230,9 @@ export default function createClient<Paths extends {}, Media extends MediaType =
   };
 
   const queryOptions: QueryOptionsFunction<Paths, Media> = (method, path, ...[init, options]) => ({
-    queryKey: (init === undefined ? ([method, path] as const) : ([method, path, init] as const)) as QueryKey<
-      Paths,
-      typeof method,
-      typeof path
-    >,
+    queryKey: (init === undefined
+      ? ([method, path] as const)
+      : ([method, path, init] as const)) as QueryKey<Paths, typeof method, typeof path>,
     queryFn,
     ...options,
   });
@@ -217,9 +240,15 @@ export default function createClient<Paths extends {}, Media extends MediaType =
   return {
     queryOptions,
     useQuery: (method, path, ...[init, options, queryClient]) =>
-      useQuery(queryOptions(method, path, init as InitWithUnknowns<typeof init>, options), queryClient),
+      useQuery(
+        queryOptions(method, path, init as InitWithUnknowns<typeof init>, options),
+        queryClient,
+      ),
     useSuspenseQuery: (method, path, ...[init, options, queryClient]) =>
-      useSuspenseQuery(queryOptions(method, path, init as InitWithUnknowns<typeof init>, options), queryClient),
+      useSuspenseQuery(
+        queryOptions(method, path, init as InitWithUnknowns<typeof init>, options),
+        queryClient,
+      ),
     useInfiniteQuery: (method, path, init, options, queryClient) => {
       const { pageParamName = "cursor", ...restOptions } = options;
       const { queryKey } = queryOptions(method, path, init);
@@ -231,15 +260,16 @@ export default function createClient<Paths extends {}, Media extends MediaType =
             const fn = client[mth] as ClientMethod<Paths, typeof method, Media>;
 
             // Update body.pagination.offset for POST requests with pagination in body
-            const bodyWithPagination = init?.body && typeof init.body === "object" && "pagination" in init.body
-              ? {
-                  ...init.body,
-                  pagination: {
-                    ...(init.body as any).pagination,
-                    offset: pageParam,
-                  },
-                }
-              : init?.body;
+            const bodyWithPagination =
+              init?.body && typeof init.body === "object" && "pagination" in init.body
+                ? {
+                    ...init.body,
+                    pagination: {
+                      ...(init.body as any).pagination,
+                      offset: pageParam,
+                    },
+                  }
+                : init?.body;
 
             const mergedInit = {
               ...init,

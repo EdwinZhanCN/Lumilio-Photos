@@ -37,10 +37,7 @@ const AssetsTrashContent = () => {
   ]);
   const queryClient = useQueryClient();
   const showMessage = useMessage();
-  const restoreAssetMutation = $api.useMutation(
-    "post",
-    "/api/v1/assets/{id}/restore",
-  );
+  const restoreAssetMutation = $api.useMutation("post", "/api/v1/assets/{id}/restore");
 
   const invalidateAssetLists = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -65,12 +62,9 @@ const AssetsTrashContent = () => {
         tone: "info",
         requiresConfirmation: true,
         confirmationTitle: t("assets.trash.bulkActions.restore.confirmTitle"),
-        confirmationMessage: t(
-          "assets.trash.bulkActions.restore.confirmMessage",
-          {
-            count: context.affectedAssetCount,
-          },
-        ),
+        confirmationMessage: t("assets.trash.bulkActions.restore.confirmMessage", {
+          count: context.affectedAssetCount,
+        }),
         onRun: async ({ selectedAssetIds, affectedAssetCount, clearSelection }) => {
           try {
             await Promise.all(

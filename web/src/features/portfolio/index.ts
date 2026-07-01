@@ -1,1 +1,1 @@
-export {Portfolio} from './routes/Portfolio';
+export { Portfolio } from "./routes/Portfolio";

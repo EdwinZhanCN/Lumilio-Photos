@@ -308,9 +308,7 @@ export function AgentBoard() {
                 }
                 onViewChange={(view) => handleViewChange(pin, view)}
                 onSize={(preset) => handleSizePreset(pin, preset)}
-                onRemove={() =>
-                  deleteMutation.mutate({ params: { path: { id: pin.pin_id! } } })
-                }
+                onRemove={() => deleteMutation.mutate({ params: { path: { id: pin.pin_id! } } })}
               />
             </div>
           ))}

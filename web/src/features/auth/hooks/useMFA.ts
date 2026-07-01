@@ -1,10 +1,6 @@
 import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import type {
-  MFAStatus,
-  RecoveryCodesResponse,
-  TOTPSetupResponse,
-} from "../auth.type.ts";
+import type { MFAStatus, RecoveryCodesResponse, TOTPSetupResponse } from "../auth.type.ts";
 
 const mfaStatusQueryKey = ["get", "/api/v1/auth/mfa"];
 const passkeysQueryKey = ["get", "/api/v1/auth/mfa/passkeys"];

@@ -39,14 +39,26 @@ export default function SettingsShell() {
   const isAdmin = user?.role === "admin";
 
   const tabs: Array<{ key: SettingsTabKey; label: string; icon: SettingsTabIcon }> = [
-    { key: "account", label: t("settings.account.title", { defaultValue: "Account" }), icon: UserCircle2Icon },
+    {
+      key: "account",
+      label: t("settings.account.title", { defaultValue: "Account" }),
+      icon: UserCircle2Icon,
+    },
     { key: "appearance", label: t("settings.appearance"), icon: PaintbrushIcon },
     { key: "server", label: t("settings.server"), icon: ServerIcon },
   ];
   if (isAdmin) {
     tabs.splice(2, 0, { key: "ai", label: t("settings.ai"), icon: SparklesIcon });
-    tabs.push({ key: "cloud", label: t("settings.cloud.title", { defaultValue: "Cloud Sync" }), icon: CloudIcon });
-    tabs.push({ key: "users", label: t("settings.users.title", { defaultValue: "Users" }), icon: Users2Icon });
+    tabs.push({
+      key: "cloud",
+      label: t("settings.cloud.title", { defaultValue: "Cloud Sync" }),
+      icon: CloudIcon,
+    });
+    tabs.push({
+      key: "users",
+      label: t("settings.users.title", { defaultValue: "Users" }),
+      icon: Users2Icon,
+    });
   }
 
   const tabMeta: Record<SettingsTabKey, SettingsTabMeta> = {

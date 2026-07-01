@@ -115,9 +115,7 @@ export function getRetryTasksByCategoryForAssetType(
 /**
  * Get task option by queue name.
  */
-export function getRetryTaskOption(
-  queueName: string,
-): RetryTaskOption | undefined {
+export function getRetryTaskOption(queueName: string): RetryTaskOption | undefined {
   return RETRY_TASK_OPTIONS.find((t) => t.key === queueName);
 }
 

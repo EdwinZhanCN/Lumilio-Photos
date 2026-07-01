@@ -8,17 +8,14 @@ type UserDTO = Schemas["dto.UserDTO"];
 type ManagedUserDTO = Schemas["dto.ManagedUserDTO"];
 type ListUsersResponseDTO = Schemas["dto.ListUsersResponseDTO"];
 
-export type UpdateOwnProfilePayload =
-  Schemas["dto.UpdateOwnProfileRequestDTO"];
-export type AdminUpdateUserPayload =
-  Schemas["dto.AdminUpdateUserRequestDTO"];
-export type ChangePasswordPayload =
-  Schemas["dto.ChangePasswordRequestDTO"];
+export type UpdateOwnProfilePayload = Schemas["dto.UpdateOwnProfileRequestDTO"];
+export type AdminUpdateUserPayload = Schemas["dto.AdminUpdateUserRequestDTO"];
+export type ChangePasswordPayload = Schemas["dto.ChangePasswordRequestDTO"];
 
-export function useUsers(limit = 50, offset = 0): UseQueryResult<
-  ListUsersResponseDTO,
-  unknown
-> & {
+export function useUsers(
+  limit = 50,
+  offset = 0,
+): UseQueryResult<ListUsersResponseDTO, unknown> & {
   users: ManagedUserDTO[];
   total: number;
 } {

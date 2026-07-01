@@ -43,15 +43,11 @@ export function SettingsGroup({
         <div className="px-1 lg:pt-1">
           {title && <div className="text-sm font-semibold">{title}</div>}
           {description && (
-            <p className="mt-1 text-xs leading-relaxed text-base-content/55">
-              {description}
-            </p>
+            <p className="mt-1 text-xs leading-relaxed text-base-content/55">{description}</p>
           )}
         </div>
       )}
-      <div className="divide-y divide-base-300/50 rounded-2xl bg-base-200/50">
-        {children}
-      </div>
+      <div className="divide-y divide-base-300/50 rounded-2xl bg-base-200/50">{children}</div>
     </section>
   );
 }
@@ -110,20 +106,19 @@ export function SettingsRow({
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <Label
-          {...(htmlFor ? { htmlFor } : {})}
-          className="block text-sm font-medium"
-        >
+        <Label {...(htmlFor ? { htmlFor } : {})} className="block text-sm font-medium">
           {label}
         </Label>
-        {description && (
-          <div className="mt-0.5 text-xs text-base-content/55">{description}</div>
-        )}
+        {description && <div className="mt-0.5 text-xs text-base-content/55">{description}</div>}
       </div>
       <div className="flex shrink-0 items-center gap-2 text-sm text-base-content/60">
         {value}
         {control}
-        {selected && <span className="text-primary"><CheckGlyph /></span>}
+        {selected && (
+          <span className="text-primary">
+            <CheckGlyph />
+          </span>
+        )}
         {chevron && <ChevronRight className="size-4 text-base-content/30" />}
       </div>
     </>

@@ -13,15 +13,19 @@
 
 // Vite glob: raw SVG markup keyed by absolute module path. `?raw` avoids an
 // extra network fetch and lets us read the viewBox to rasterize crisply.
-const LOGO_SOURCES = import.meta.glob<string>(
-  "../../../../assets/logos/*.svg",
-  { eager: true, query: "?raw", import: "default" },
-);
+const LOGO_SOURCES = import.meta.glob<string>("../../../../assets/logos/*.svg", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+});
 
 /** Map basename ("canon") -> raw SVG string, built once at module load. */
 const LOGO_BY_KEY: Record<string, string> = Object.fromEntries(
   Object.entries(LOGO_SOURCES).map(([path, svg]) => {
-    const key = path.split("/").pop()!.replace(/\.svg$/i, "");
+    const key = path
+      .split("/")
+      .pop()!
+      .replace(/\.svg$/i, "");
     return [key, svg];
   }),
 );
@@ -114,7 +118,10 @@ function parseSvgGeometry(svg: string): {
   let aspect = 3; // sensible wide fallback for unknown wordmarks
   const viewBoxMatch = openTag.match(/viewBox\s*=\s*"([\d.\s,+-]+)"/i);
   if (viewBoxMatch) {
-    const parts = viewBoxMatch[1].trim().split(/[\s,]+/).map(Number);
+    const parts = viewBoxMatch[1]
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
       aspect = parts[2] / parts[3];
     }
@@ -138,9 +145,7 @@ const LOGO_RASTER_HEIGHT = 256; // crisp source; the worker scales it down
  * aspect ratio, ready to transfer to the tool worker. Returns null if the
  * brand has no bundled logo or rasterization fails.
  */
-export async function rasterizeBrandLogo(
-  key: BrandKey,
-): Promise<ImageBitmap | null> {
+export async function rasterizeBrandLogo(key: BrandKey): Promise<ImageBitmap | null> {
   const svg = LOGO_BY_KEY[key];
   if (!svg) return null;
 
@@ -155,9 +160,7 @@ export async function rasterizeBrandLogo(
       .replace(/\swidth\s*=\s*"[^"]*"/i, "")
       .replace(/\sheight\s*=\s*"[^"]*"/i, "");
     const viewBoxAttr =
-      synthViewBox && !/viewBox\s*=/i.test(cleaned)
-        ? ` viewBox="${synthViewBox}"`
-        : "";
+      synthViewBox && !/viewBox\s*=/i.test(cleaned) ? ` viewBox="${synthViewBox}"` : "";
     return `<svg${cleaned}${viewBoxAttr} width="${width}" height="${height}">`;
   });
 

@@ -35,10 +35,7 @@ interface WorkerProviderProps {
   preload?: WorkerType[];
 }
 
-export const WorkerProvider = ({
-  children,
-  preload,
-}: WorkerProviderProps) => {
+export const WorkerProvider = ({ children, preload }: WorkerProviderProps) => {
   const workerClientRef = useRef<AppWorkerClient | null>(null);
 
   if (workerClientRef.current === null) {
@@ -55,8 +52,6 @@ export const WorkerProvider = ({
   }, []);
 
   return (
-    <WorkerContext.Provider value={workerClientRef.current}>
-      {children}
-    </WorkerContext.Provider>
+    <WorkerContext.Provider value={workerClientRef.current}>{children}</WorkerContext.Provider>
   );
 };

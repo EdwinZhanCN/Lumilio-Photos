@@ -7,10 +7,7 @@ import { AssetsProvider } from "@/features/assets";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
-import {
-  findUtilityClassifier,
-  getUtilityClassifierTitle,
-} from "../utils/utilityClassifiers";
+import { findUtilityClassifier, getUtilityClassifierTitle } from "../utils/utilityClassifiers";
 import type { AssetFilter } from "@/features/assets/types/assets.type";
 
 export default function UtilityClassifierAlbum() {

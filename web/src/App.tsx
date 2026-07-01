@@ -1,11 +1,5 @@
 import React, { useEffect } from "react";
-import {
-  BrowserRouter,
-  Outlet,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
 import { ChatDock } from "@/features/lumilio/components/Chat/ChatDock";
@@ -77,10 +71,7 @@ function HealthPoller(): React.ReactNode {
   const [healthCheckIntervalMs] = usePreference("healthCheckIntervalMs");
   const { setOnline } = useGlobal();
 
-  const intervalMs = Math.max(
-    1000,
-    Math.min(50_000, Math.max(1000, healthCheckIntervalMs)),
-  );
+  const intervalMs = Math.max(1000, Math.min(50_000, Math.max(1000, healthCheckIntervalMs)));
 
   const healthQuery = $api.useQuery(
     "get",

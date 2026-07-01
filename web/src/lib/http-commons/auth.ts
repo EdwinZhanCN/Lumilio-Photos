@@ -1,6 +1,6 @@
 /**
  * Token management utilities for authentication
- * 
+ *
  * This module provides functions for managing JWT tokens in localStorage.
  * Used by the openapi-fetch client for authentication.
  */
@@ -16,8 +16,7 @@ const hasStorage = () => typeof localStorage !== "undefined";
 /**
  * Get the current access token from localStorage
  */
-export const getToken = () =>
-  hasStorage() ? localStorage.getItem(TOKEN_KEY) : null;
+export const getToken = () => (hasStorage() ? localStorage.getItem(TOKEN_KEY) : null);
 
 /**
  * Get the current refresh token from localStorage
@@ -34,8 +33,7 @@ export const saveToken = (token: string, refreshToken: string) => {
   if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 };
 
-export const getMediaToken = () =>
-  hasStorage() ? localStorage.getItem(MEDIA_TOKEN_KEY) : null;
+export const getMediaToken = () => (hasStorage() ? localStorage.getItem(MEDIA_TOKEN_KEY) : null);
 
 export const getMediaTokenExpiresAt = (): number | null => {
   if (!hasStorage()) return null;

@@ -11,12 +11,9 @@ export type Asset = components["schemas"]["dto.AssetDTO"];
 export type AssetDTO = components["schemas"]["dto.AssetDTO"];
 
 // Export metadata types from generated schema
-export type PhotoSpecificMetadata =
-  components["schemas"]["dbtypes.PhotoSpecificMetadata"];
-export type VideoSpecificMetadata =
-  components["schemas"]["dbtypes.VideoSpecificMetadata"];
-export type AudioSpecificMetadata =
-  components["schemas"]["dbtypes.AudioSpecificMetadata"];
+export type PhotoSpecificMetadata = components["schemas"]["dbtypes.PhotoSpecificMetadata"];
+export type VideoSpecificMetadata = components["schemas"]["dbtypes.VideoSpecificMetadata"];
+export type AudioSpecificMetadata = components["schemas"]["dbtypes.AudioSpecificMetadata"];
 
 // Union type for all specific metadata types
 export type SpecificMetadata =
@@ -74,11 +71,7 @@ export function asAudioMetadata(
 export function getTypedMetadata(
   assetType: string | undefined,
   metadata: SpecificMetadata | undefined,
-):
-  | PhotoSpecificMetadata
-  | VideoSpecificMetadata
-  | AudioSpecificMetadata
-  | undefined {
+): PhotoSpecificMetadata | VideoSpecificMetadata | AudioSpecificMetadata | undefined {
   if (!metadata || !assetType) return undefined;
 
   const type = assetType.toUpperCase();

@@ -78,9 +78,7 @@ export function Modal({
           </button>
         </header>
 
-        <div className={`relative min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>
-          {children}
-        </div>
+        <div className={`relative min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>{children}</div>
 
         {footer && (
           <footer className="flex flex-shrink-0 justify-end gap-3 border-t border-base-200 bg-base-200/40 px-6 py-4">

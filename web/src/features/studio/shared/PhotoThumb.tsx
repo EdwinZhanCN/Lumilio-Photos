@@ -24,12 +24,7 @@ export function PhotoThumb({
   const url = assetId ? assetUrls.getThumbnailUrl(assetId, size) : null;
 
   if (!url || failed) {
-    return (
-      <div
-        className={`bg-base-300 ${rounded} ${className}`}
-        aria-hidden="true"
-      />
-    );
+    return <div className={`bg-base-300 ${rounded} ${className}`} aria-hidden="true" />;
   }
 
   return (

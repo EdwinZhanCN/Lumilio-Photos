@@ -14,8 +14,7 @@ export const TAG_SOURCE_USER = "user";
  * A tag is user-editable only when it was added by hand (source "user").
  * Everything else (ai, zeroshot, system, bioclip_classify) is read-only.
  */
-export const isManualTag = (tag: AssetTag): boolean =>
-  tag.source === TAG_SOURCE_USER;
+export const isManualTag = (tag: AssetTag): boolean => tag.source === TAG_SOURCE_USER;
 
 /**
  * Hook for reading and mutating the tags attached to a single asset.
@@ -37,10 +36,7 @@ export function useAssetTags(assetId?: string) {
   );
 
   const addMutation = $api.useMutation("post", "/api/v1/assets/{id}/tags");
-  const removeMutation = $api.useMutation(
-    "delete",
-    "/api/v1/assets/{id}/tags/{tagId}",
-  );
+  const removeMutation = $api.useMutation("delete", "/api/v1/assets/{id}/tags/{tagId}");
 
   const invalidate = useCallback(
     () =>

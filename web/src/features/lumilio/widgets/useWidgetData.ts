@@ -15,7 +15,10 @@ interface WidgetDataOverrides {
  * WidgetData (count, title, mode, liveCount, facets, state). Thin composition
  * over useWidgetMetadata — views that need thumbnails fetch them separately via
  * useWidgetAssetsPreview, so Stat/Timeline never over-fetch images. */
-export function useWidgetData(source: WidgetSource, overrides: WidgetDataOverrides = {}): WidgetData {
+export function useWidgetData(
+  source: WidgetSource,
+  overrides: WidgetDataOverrides = {},
+): WidgetData {
   const { metadata, facets, isLoading, isError } = useWidgetMetadata(source);
 
   return useMemo(() => {
@@ -40,5 +43,14 @@ export function useWidgetData(source: WidgetSource, overrides: WidgetDataOverrid
       facets,
       state,
     };
-  }, [source.kind, metadata, facets, isLoading, isError, overrides.count, overrides.title, overrides.mode]);
+  }, [
+    source.kind,
+    metadata,
+    facets,
+    isLoading,
+    isError,
+    overrides.count,
+    overrides.title,
+    overrides.mode,
+  ]);
 }

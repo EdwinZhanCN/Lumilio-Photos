@@ -2,8 +2,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
 import type { UseQueryResult } from "@tanstack/react-query";
 
-type CapabilitiesResponseDTO =
-  components["schemas"]["dto.CapabilitiesResponseDTO"];
+type CapabilitiesResponseDTO = components["schemas"]["dto.CapabilitiesResponseDTO"];
 
 type MLTaskCapability = {
   enabled: boolean;
@@ -44,9 +43,7 @@ function normalizeTaskCapability(
   };
 }
 
-function normalizeCapabilities(
-  data?: CapabilitiesResponseDTO,
-): Capabilities | undefined {
+function normalizeCapabilities(data?: CapabilitiesResponseDTO): Capabilities | undefined {
   if (!data) {
     return undefined;
   }
@@ -56,17 +53,11 @@ function normalizeCapabilities(
       discoveredNodeCount: data.ml?.discovered_node_count ?? 0,
       activeNodeCount: data.ml?.active_node_count ?? 0,
       tasks: {
-        clipImageEmbed: normalizeTaskCapability(
-          data.ml?.tasks?.semantic_image_embed,
-        ),
+        clipImageEmbed: normalizeTaskCapability(data.ml?.tasks?.semantic_image_embed),
         semanticTextEmbed: normalizeTaskCapability(data.ml?.tasks?.semantic_text_embed),
-        bioClipClassify: normalizeTaskCapability(
-          data.ml?.tasks?.bioclip_classify,
-        ),
+        bioClipClassify: normalizeTaskCapability(data.ml?.tasks?.bioclip_classify),
         ocr: normalizeTaskCapability(data.ml?.tasks?.ocr),
-        faceDetectAndEmbed: normalizeTaskCapability(
-          data.ml?.tasks?.face_recognition,
-        ),
+        faceDetectAndEmbed: normalizeTaskCapability(data.ml?.tasks?.face_recognition),
       },
     },
     llm: {
@@ -78,9 +69,10 @@ function normalizeCapabilities(
   };
 }
 
-export function useCapabilities(
-  refetchInterval?: number | false,
-): UseQueryResult<CapabilitiesResponseDTO, unknown> & {
+export function useCapabilities(refetchInterval?: number | false): UseQueryResult<
+  CapabilitiesResponseDTO,
+  unknown
+> & {
   capabilities?: Capabilities;
 } {
   const query = $api.useQuery(

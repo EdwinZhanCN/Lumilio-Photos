@@ -10,11 +10,7 @@ type AlbumRailProps = {
   onAlbumClick?: (album: Album) => void;
 };
 
-export default function AlbumRail({
-  albums,
-  loading = false,
-  onAlbumClick,
-}: AlbumRailProps) {
+export default function AlbumRail({ albums, loading = false, onAlbumClick }: AlbumRailProps) {
   const { t } = useI18n();
 
   return (

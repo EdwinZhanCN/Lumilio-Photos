@@ -64,16 +64,13 @@ type AssetWithSpecies = Asset & {
   species_predictions?: unknown;
 };
 
-type SpeciesReference =
-  components["schemas"]["dto.SpeciesReferenceResponseDTO"];
+type SpeciesReference = components["schemas"]["dto.SpeciesReferenceResponseDTO"];
 
 type SpeciesReferenceTriggerProps = {
   prediction: ParsedSpeciesPrediction;
 };
 
-const SpeciesReferenceTrigger = ({
-  prediction,
-}: SpeciesReferenceTriggerProps) => {
+const SpeciesReferenceTrigger = ({ prediction }: SpeciesReferenceTriggerProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -83,10 +80,7 @@ const SpeciesReferenceTrigger = ({
     const language = i18n.resolvedLanguage || i18n.language || "en";
     return language.toLowerCase().startsWith("zh") ? "zh" : "en";
   }, [i18n.language, i18n.resolvedLanguage]);
-  const queryName =
-    prediction.scientificName ??
-    prediction.commonName ??
-    prediction.displayName;
+  const queryName = prediction.scientificName ?? prediction.commonName ?? prediction.displayName;
   const referenceQuery = $api.useQuery(
     "get",
     "/api/v1/species/reference",
@@ -154,9 +148,7 @@ const SpeciesReferenceTrigger = ({
             target="_blank"
             rel="noreferrer"
             className="grid size-7 shrink-0 place-items-center rounded-full bg-white/8 text-white/58 hover:bg-white/12 hover:text-white"
-            aria-label={t(
-              "assets.photos.fullscreen.fieldGuide.openINaturalist",
-            )}
+            aria-label={t("assets.photos.fullscreen.fieldGuide.openINaturalist")}
             title={t("assets.photos.fullscreen.fieldGuide.openINaturalist")}
           >
             <ExternalLink className="size-3.5" />
@@ -180,11 +172,7 @@ const SpeciesReferenceTrigger = ({
             {reference.image_url ? (
               <img
                 src={reference.image_url}
-                alt={
-                  reference.common_name ??
-                  reference.scientific_name ??
-                  prediction.displayName
-                }
+                alt={reference.common_name ?? reference.scientific_name ?? prediction.displayName}
                 className="h-20 w-18 rounded-lg object-cover"
                 loading="lazy"
               />
@@ -198,9 +186,7 @@ const SpeciesReferenceTrigger = ({
                 {reference.common_name ?? prediction.displayName}
               </h4>
               {reference.scientific_name && (
-                <p className="truncate text-xs italic text-white/50">
-                  {reference.scientific_name}
-                </p>
+                <p className="truncate text-xs italic text-white/50">{reference.scientific_name}</p>
               )}
               {reference.wikipedia_summary && (
                 <p className="mt-1.5 line-clamp-3 text-xs leading-5 text-white/62">
@@ -228,9 +214,7 @@ const SpeciesReferenceTrigger = ({
               </a>
             )}
             {reference.image_attribution && (
-              <span className="min-w-0 truncate">
-                {reference.image_attribution}
-              </span>
+              <span className="min-w-0 truncate">{reference.image_attribution}</span>
             )}
           </div>
         </div>
@@ -315,10 +299,7 @@ const FullScreenCarousel = ({
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
   const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
-  const addToAlbumMutation = $api.useMutation(
-    "post",
-    "/api/v1/albums/{id}/assets/{assetId}",
-  );
+  const addToAlbumMutation = $api.useMutation("post", "/api/v1/albums/{id}/assets/{assetId}");
 
   const handleOpenStudio = useCallback(
     (asset: Asset) => {
@@ -337,15 +318,11 @@ const FullScreenCarousel = ({
         if (response?.albums) {
           setAlbums(response.albums);
         }
-        const modal = document.getElementById(
-          "album_picker_modal",
-        ) as HTMLDialogElement | null;
+        const modal = document.getElementById("album_picker_modal") as HTMLDialogElement | null;
         modal?.showModal();
       } catch {
         setAlbums([]);
-        const modal = document.getElementById(
-          "album_picker_modal",
-        ) as HTMLDialogElement | null;
+        const modal = document.getElementById("album_picker_modal") as HTMLDialogElement | null;
         modal?.showModal();
       } finally {
         setIsLoadingAlbums(false);
@@ -365,9 +342,7 @@ const FullScreenCarousel = ({
           },
           body: {},
         });
-        const modal = document.getElementById(
-          "album_picker_modal",
-        ) as HTMLDialogElement | null;
+        const modal = document.getElementById("album_picker_modal") as HTMLDialogElement | null;
         modal?.close();
       } catch {
         // silently fail — album picker stays open for retry
@@ -399,9 +374,7 @@ const FullScreenCarousel = ({
       staleTime: 60_000,
     },
   );
-  const fieldGuideAsset = fieldGuideAssetQuery.data as
-    | AssetWithSpecies
-    | undefined;
+  const fieldGuideAsset = fieldGuideAssetQuery.data as AssetWithSpecies | undefined;
 
   const slides = useMemo(() => {
     return photos.map((photo) => ({
@@ -484,12 +457,7 @@ const FullScreenCarousel = ({
     ) {
       setShowFieldGuide(false);
     }
-  }, [
-    fieldGuideAssetQuery.isFetching,
-    hasFieldGuide,
-    isFieldGuideLoading,
-    showFieldGuide,
-  ]);
+  }, [fieldGuideAssetQuery.isFetching, hasFieldGuide, isFieldGuideLoading, showFieldGuide]);
 
   // Add keyboard event handler for Escape key
   useEffect(() => {
@@ -556,9 +524,7 @@ const FullScreenCarousel = ({
     } finally {
       setIsDeleting(false);
       // Close the modal
-      const modal = document.getElementById(
-        "delete_confirm_modal",
-      ) as HTMLDialogElement;
+      const modal = document.getElementById("delete_confirm_modal") as HTMLDialogElement;
       modal?.close();
     }
   };
@@ -591,9 +557,7 @@ const FullScreenCarousel = ({
                   <div className="h-screen w-screen flex items-center justify-center">
                     <div className="flex flex-col items-center gap-3 text-white/60">
                       <ImageOff className="size-10" />
-                      <p className="text-sm">
-                        {t("assets.mediaViewer.media_not_available")}
-                      </p>
+                      <p className="text-sm">{t("assets.mediaViewer.media_not_available")}</p>
                     </div>
                   </div>
                 }
@@ -607,10 +571,7 @@ const FullScreenCarousel = ({
 
       {/* Info panel */}
       {showInfo && currentAsset && (
-        <FullScreenBasicInfo
-          asset={currentAsset}
-          onAssetUpdate={handleAssetUpdate}
-        />
+        <FullScreenBasicInfo asset={currentAsset} onAssetUpdate={handleAssetUpdate} />
       )}
 
       {showFieldGuide && (
@@ -631,10 +592,9 @@ const FullScreenCarousel = ({
                       : fieldGuideAssetQuery.isError
                         ? t("assets.photos.fullscreen.fieldGuide.loadError")
                         : parsedSpeciesPredictions.length > 0
-                          ? t(
-                              "assets.photos.fullscreen.fieldGuide.predictionsCount",
-                              { count: parsedSpeciesPredictions.length },
-                            )
+                          ? t("assets.photos.fullscreen.fieldGuide.predictionsCount", {
+                              count: parsedSpeciesPredictions.length,
+                            })
                           : t("assets.photos.fullscreen.fieldGuide.noResults")}
                   </p>
                 </div>
@@ -690,8 +650,7 @@ const FullScreenCarousel = ({
                             <SpeciesReferenceTrigger prediction={prediction} />
                           </div>
                           {prediction.scientificName &&
-                            prediction.scientificName !==
-                              prediction.displayName && (
+                            prediction.scientificName !== prediction.displayName && (
                               <p className="truncate text-xs italic text-white/50">
                                 {prediction.scientificName}
                               </p>
@@ -738,14 +697,8 @@ const FullScreenCarousel = ({
                     key={rank}
                     className="grid grid-cols-[104px_1fr] items-center border-b border-white/10 pb-2 text-sm last:border-b-0 last:pb-0"
                   >
-                    <span className="text-white/48">
-                      {getRankLabel(t, rank)}
-                    </span>
-                    <span
-                      className={
-                        value ? "truncate text-white/88" : "text-white/28"
-                      }
-                    >
+                    <span className="text-white/48">{getRankLabel(t, rank)}</span>
+                    <span className={value ? "truncate text-white/88" : "text-white/28"}>
                       {value ?? "-"}
                     </span>
                   </div>
@@ -787,18 +740,13 @@ const FullScreenCarousel = ({
       {/* Delete confirmation modal */}
       <dialog id="delete_confirm_modal" className="modal">
         <div className="modal-box">
-          <h3 className="font-bold text-lg text-error">
-            {t("delete.confirmTitle")}
-          </h3>
+          <h3 className="font-bold text-lg text-error">{t("delete.confirmTitle")}</h3>
           <p className="py-4">
             {t("delete.confirmMessage", {
-              filename:
-                currentAsset?.original_filename || t("delete.thisAsset"),
+              filename: currentAsset?.original_filename || t("delete.thisAsset"),
             })}
           </p>
-          <p className="text-sm text-base-content/70 mb-4">
-            {t("delete.softDeleteNote")}
-          </p>
+          <p className="text-sm text-base-content/70 mb-4">{t("delete.softDeleteNote")}</p>
           <div className="modal-action">
             <form method="dialog">
               <button className="btn btn-ghost mr-2" disabled={isDeleting}>
@@ -849,9 +797,7 @@ const FullScreenCarousel = ({
                       <Plus size={18} />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
-                      <div className="font-medium text-sm truncate">
-                        {album.album_name}
-                      </div>
+                      <div className="font-medium text-sm truncate">{album.album_name}</div>
                     </div>
                   </button>
                 </li>
@@ -869,9 +815,7 @@ const FullScreenCarousel = ({
 
           <div className="modal-action">
             <form method="dialog">
-              <button className="btn btn-ghost btn-sm">
-                {t("common.cancel")}
-              </button>
+              <button className="btn btn-ghost btn-sm">{t("common.cancel")}</button>
             </form>
           </div>
         </div>
@@ -897,9 +841,7 @@ const FullScreenCarousel = ({
 
         {/* Like / Favorite */}
         <button
-          className={`btn btn-circle btn-lg ${
-            optimisticLiked ? "text-red-500" : ""
-          }`}
+          className={`btn btn-circle btn-lg ${optimisticLiked ? "text-red-500" : ""}`}
           onClick={handleLikeToggle}
         >
           <Heart className={`${optimisticLiked ? "fill-red-500" : ""}`} />
@@ -909,11 +851,7 @@ const FullScreenCarousel = ({
         <button
           className="btn btn-circle btn-lg"
           onClick={() =>
-            (
-              document.getElementById(
-                "export_modal",
-              ) as HTMLDialogElement | null
-            )?.showModal()
+            (document.getElementById("export_modal") as HTMLDialogElement | null)?.showModal()
           }
         >
           <Share />
@@ -923,9 +861,7 @@ const FullScreenCarousel = ({
         <button
           className="btn btn-circle btn-lg text-error"
           onClick={() => {
-            const modal = document.getElementById(
-              "delete_confirm_modal",
-            ) as HTMLDialogElement;
+            const modal = document.getElementById("delete_confirm_modal") as HTMLDialogElement;
             modal?.showModal();
           }}
           disabled={isDeleting}

@@ -3,10 +3,7 @@
  * mode (light or dark); the Appearance tab stacks two.
  */
 import type React from "react";
-import {
-  type DaisyUIDarkThemeName,
-  type DaisyUILightThemeName,
-} from "@/lib/theme/daisyuiThemes";
+import { type DaisyUIDarkThemeName, type DaisyUILightThemeName } from "@/lib/theme/daisyuiThemes";
 
 export type ModeThemeName = DaisyUILightThemeName | DaisyUIDarkThemeName;
 
@@ -42,9 +39,7 @@ export function ThemePicker({
           <p className="text-sm text-base-content/60">{description}</p>
         </div>
         {isActiveMode ? (
-          <span className="badge badge-primary badge-soft">
-            {activeBadgeLabel}
-          </span>
+          <span className="badge badge-primary badge-soft">{activeBadgeLabel}</span>
         ) : null}
       </div>
 
@@ -60,9 +55,7 @@ export function ThemePicker({
               aria-label={`${title}: ${theme}`}
               className={[
                 "border-base-content/20 hover:border-base-content/40 overflow-hidden rounded-lg border outline-2 outline-offset-2 transition",
-                isSelected
-                  ? "border-base-content/40 outline-base-content"
-                  : "outline-transparent",
+                isSelected ? "border-base-content/40 outline-base-content" : "outline-transparent",
               ].join(" ")}
               onClick={() => onSelect(theme)}
             >
@@ -77,24 +70,16 @@ export function ThemePicker({
                     <div className="font-bold">{theme}</div>
                     <div className="flex flex-wrap gap-1">
                       <div className="bg-primary flex aspect-square w-5 items-center justify-center rounded lg:w-6">
-                        <div className="text-primary-content text-sm font-bold">
-                          A
-                        </div>
+                        <div className="text-primary-content text-sm font-bold">A</div>
                       </div>
                       <div className="bg-secondary flex aspect-square w-5 items-center justify-center rounded lg:w-6">
-                        <div className="text-secondary-content text-sm font-bold">
-                          A
-                        </div>
+                        <div className="text-secondary-content text-sm font-bold">A</div>
                       </div>
                       <div className="bg-accent flex aspect-square w-5 items-center justify-center rounded lg:w-6">
-                        <div className="text-accent-content text-sm font-bold">
-                          A
-                        </div>
+                        <div className="text-accent-content text-sm font-bold">A</div>
                       </div>
                       <div className="bg-neutral flex aspect-square w-5 items-center justify-center rounded lg:w-6">
-                        <div className="text-neutral-content text-sm font-bold">
-                          A
-                        </div>
+                        <div className="text-neutral-content text-sm font-bold">A</div>
                       </div>
                     </div>
                   </div>

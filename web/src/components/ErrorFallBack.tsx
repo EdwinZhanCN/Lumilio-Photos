@@ -1,14 +1,7 @@
 import React from "react";
 import { FallbackProps } from "react-error-boundary";
 import { Link } from "react-router-dom";
-import {
-  AlertTriangle,
-  Home,
-  RefreshCw,
-  Bug,
-  ExternalLink,
-  Copy,
-} from "lucide-react";
+import { AlertTriangle, Home, RefreshCw, Bug, ExternalLink, Copy } from "lucide-react";
 
 type ErrorFallBackProps = {
   code: string | number;
@@ -28,10 +21,8 @@ export default function ErrorFallBack({
   const [copied, setCopied] = React.useState(false);
 
   const details = React.useMemo(() => {
-    const href =
-      typeof window !== "undefined" ? window.location.href : "(unknown)";
-    const ua =
-      typeof navigator !== "undefined" ? navigator.userAgent : "(unknown)";
+    const href = typeof window !== "undefined" ? window.location.href : "(unknown)";
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "(unknown)";
     const time = new Date().toISOString();
 
     return [
@@ -51,8 +42,7 @@ export default function ErrorFallBack({
 
   const issueUrl = React.useMemo(() => {
     const base = "https://github.com/EdwinZhanCN/Lumilio-Photos/issues/new";
-    const titleParam =
-      `[Bug] ${code ?? ""} ${title ?? "Unhandled error"}`.trim();
+    const titleParam = `[Bug] ${code ?? ""} ${title ?? "Unhandled error"}`.trim();
     const params = new URLSearchParams({
       title: titleParam,
       body: details,
@@ -71,8 +61,7 @@ export default function ErrorFallBack({
     }
   };
 
-  const displayMessage =
-    message || error?.message || "Something went wrong. Please try again.";
+  const displayMessage = message || error?.message || "Something went wrong. Please try again.";
 
   return (
     <main
@@ -88,17 +77,11 @@ export default function ErrorFallBack({
             <div className="badge badge-error badge-lg font-mono">{code}</div>
           </div>
 
-          <h1
-            id="error-title"
-            className="card-title text-3xl sm:text-4xl mt-2 text-balance"
-          >
+          <h1 id="error-title" className="card-title text-3xl sm:text-4xl mt-2 text-balance">
             {title}
           </h1>
 
-          <p
-            className="text-base-content/70 mt-2 text-pretty"
-            aria-live="polite"
-          >
+          <p className="text-base-content/70 mt-2 text-pretty" aria-live="polite">
             {displayMessage}
           </p>
 
@@ -125,11 +108,7 @@ export default function ErrorFallBack({
             </Link>
 
             {resetErrorBoundary && (
-              <button
-                type="button"
-                onClick={resetErrorBoundary}
-                className="btn btn-secondary"
-              >
+              <button type="button" onClick={resetErrorBoundary} className="btn btn-secondary">
                 <RefreshCw className="size-4" aria-hidden="true" />
                 <span className="ml-1">Try again</span>
               </button>
@@ -146,15 +125,9 @@ export default function ErrorFallBack({
               <ExternalLink className="size-4 ml-1" aria-hidden="true" />
             </a>
 
-            <button
-              type="button"
-              onClick={onCopyDetails}
-              className="btn btn-ghost"
-            >
+            <button type="button" onClick={onCopyDetails} className="btn btn-ghost">
               <Copy className="size-4" aria-hidden="true" />
-              <span className="ml-1">
-                {copied ? "Copied!" : "Copy details"}
-              </span>
+              <span className="ml-1">{copied ? "Copied!" : "Copy details"}</span>
             </button>
           </div>
         </div>

@@ -66,9 +66,7 @@ export function TopBar({
       <div className="h-6 w-px bg-base-300" />
 
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="truncate text-sm font-medium text-base-content">
-          {fileName}
-        </span>
+        <span className="truncate text-sm font-medium text-base-content">{fileName}</span>
         {justSaved ? (
           <span className="flex items-center gap-1 text-xs font-medium text-success">
             <Check size={13} />
@@ -93,7 +91,10 @@ export function TopBar({
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
-        <div className="tooltip tooltip-bottom" data-tip={t("studio.editor.undo", { defaultValue: "Undo" })}>
+        <div
+          className="tooltip tooltip-bottom"
+          data-tip={t("studio.editor.undo", { defaultValue: "Undo" })}
+        >
           <button
             type="button"
             onClick={onUndo}
@@ -104,7 +105,10 @@ export function TopBar({
             <Undo2 size={17} />
           </button>
         </div>
-        <div className="tooltip tooltip-bottom" data-tip={t("studio.editor.resetAll", { defaultValue: "Reset all" })}>
+        <div
+          className="tooltip tooltip-bottom"
+          data-tip={t("studio.editor.resetAll", { defaultValue: "Reset all" })}
+        >
           <button
             type="button"
             onClick={onResetAll}
@@ -152,11 +156,7 @@ export function TopBar({
           disabled={isExporting}
           className="btn btn-sm gap-1.5 border-base-300 bg-base-100 text-base-content/80"
         >
-          {isExporting ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : (
-            <Download size={15} />
-          )}
+          {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
           <span className="hidden lg:inline">
             {t("studio.editor.export", { defaultValue: "Export" })}
           </span>

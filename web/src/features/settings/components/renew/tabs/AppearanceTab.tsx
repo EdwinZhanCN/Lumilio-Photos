@@ -211,9 +211,7 @@ export default function AppearanceTab() {
               step={1}
               value={compactColumns}
               className="range range-primary range-xs"
-              onChange={(e) =>
-                setAssetPage({ ...assetPage, columns: Number(e.target.value) })
-              }
+              onChange={(e) => setAssetPage({ ...assetPage, columns: Number(e.target.value) })}
               disabled={currentLayout !== "compact"}
             />
           </div>

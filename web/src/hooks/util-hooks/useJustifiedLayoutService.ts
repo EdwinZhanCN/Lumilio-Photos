@@ -1,20 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
-import type {
-  LayoutBox,
-  LayoutConfig,
-  LayoutResult,
-} from "@/lib/layout/justifiedLayout.ts";
+import type { LayoutBox, LayoutConfig, LayoutResult } from "@/lib/layout/justifiedLayout.ts";
 
 export interface UseJustifiedLayoutServiceResult {
   isReady: boolean;
   isLoading: boolean;
   error: string | null;
   initialize: () => Promise<void>;
-  calculateLayout: (
-    boxes: LayoutBox[],
-    config: LayoutConfig,
-  ) => Promise<LayoutResult>;
+  calculateLayout: (boxes: LayoutBox[], config: LayoutConfig) => Promise<LayoutResult>;
   calculateMultipleLayouts: (
     groups: Record<string, LayoutBox[]>,
     config: LayoutConfig,
@@ -53,8 +46,7 @@ export const useJustifiedLayoutService = (): UseJustifiedLayoutServiceResult => 
       })
       .catch((err) => {
         initPromiseRef.current = null;
-        const errorMessage =
-          err instanceof Error ? err.message : "Unknown error";
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
         setError(errorMessage);
         console.error("Failed to initialize justified layout worker:", err);
         throw err;

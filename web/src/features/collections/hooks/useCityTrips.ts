@@ -54,12 +54,18 @@ function buildDisplayTitle(city: string, region?: string, country?: string): str
 
 function formatTripId(city: string, startTime: Date): string {
   const datePart = startTime.toISOString().slice(0, 10);
-  const slug = city.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const slug = city
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
   return `${slug}-${datePart}`;
 }
 
 function computeBBox(points: PointWithCity[]) {
-  let north = -90, south = 90, east = -180, west = 180;
+  let north = -90,
+    south = 90,
+    east = -180,
+    west = 180;
   for (const p of points) {
     if (p.lat > north) north = p.lat;
     if (p.lat < south) south = p.lat;
@@ -77,9 +83,7 @@ function computeBBox(points: PointWithCity[]) {
 function segmentByTimeGap(points: PointWithCity[]): PointWithCity[][] {
   if (points.length === 0) return [];
 
-  const sorted = [...points].sort(
-    (a, b) => a.takenTime.getTime() - b.takenTime.getTime(),
-  );
+  const sorted = [...points].sort((a, b) => a.takenTime.getTime() - b.takenTime.getTime());
 
   const segments: PointWithCity[][] = [[sorted[0]]];
   for (let i = 1; i < sorted.length; i++) {
@@ -108,10 +112,7 @@ export function useCityTrips(options: UseCityTripsOptions = {}) {
     hasNextPage: mapHasNextPage,
   } = useMapPhotoAssets({ repositoryId });
 
-  const {
-    clusters,
-    isLoading: isClustersLoading,
-  } = useLocationClusters({ repositoryId });
+  const { clusters, isLoading: isClustersLoading } = useLocationClusters({ repositoryId });
 
   const isLoading = isMapLoading || isClustersLoading;
   const isIncomplete = mapHasNextPage;

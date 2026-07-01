@@ -44,21 +44,13 @@ type ProgressIndicatorProps = {
  * />
  * ```
  */
-const ProgressIndicator = ({
-  processed,
-  total,
-  label,
-}: ProgressIndicatorProps) => {
+const ProgressIndicator = ({ processed, total, label }: ProgressIndicatorProps) => {
   const { t } = useI18n();
   const labelSuffix = label ? ` - ${label}` : "";
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2">
-        <progress
-          className="progress w-56"
-          value={processed}
-          max={total}
-        ></progress>
+        <progress className="progress w-56" value={processed} max={total}></progress>
         <span className="text-sm text-gray-500">
           {t("upload.ProgressIndicator.progress_display", {
             processed,

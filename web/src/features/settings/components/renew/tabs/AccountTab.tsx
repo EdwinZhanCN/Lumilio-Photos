@@ -284,7 +284,9 @@ function PasskeysModal({
               <Fingerprint className="size-8 text-base-content/30" />
               <div>
                 <p className="text-sm font-medium text-base-content/60">
-                  {t("settings.account.mfa.noPasskeys", { defaultValue: "No passkeys enrolled yet" })}
+                  {t("settings.account.mfa.noPasskeys", {
+                    defaultValue: "No passkeys enrolled yet",
+                  })}
                 </p>
                 <p className="mt-0.5 text-xs text-base-content/50">
                   {passkeySupport.supported
@@ -420,8 +422,7 @@ export default function AccountTab() {
   const effectiveAvatarAssetId = avatarAssetId || undefined;
   const isDirty =
     profileTouched &&
-    (displayName !== (user.display_name ?? "") ||
-      avatarAssetId !== (user.avatar_asset_id ?? ""));
+    (displayName !== (user.display_name ?? "") || avatarAssetId !== (user.avatar_asset_id ?? ""));
   const passkeys = passkeysQuery.passkeys;
   const mfaIsLoading = mfaStatusQuery.isLoading || mfaStatusQuery.isFetching;
   const passkeysAreLoading = passkeysQuery.isLoading || passkeysQuery.isFetching;
@@ -470,7 +471,10 @@ export default function AccountTab() {
       profileSavedTimer.current = setTimeout(() => setProfileJustSaved(false), 2500);
     } catch (error) {
       setProfileError(
-        getErrorMessage(error, t("settings.account.saveError", { defaultValue: "Failed to update profile." })),
+        getErrorMessage(
+          error,
+          t("settings.account.saveError", { defaultValue: "Failed to update profile." }),
+        ),
       );
     }
   };
@@ -488,7 +492,10 @@ export default function AccountTab() {
       });
       setSecurityFeedback({ tone: "success", message: "Passkey added successfully." });
     } catch (error) {
-      setSecurityFeedback({ tone: "error", message: getErrorMessage(error, "Failed to add passkey.") });
+      setSecurityFeedback({
+        tone: "error",
+        message: getErrorMessage(error, "Failed to add passkey."),
+      });
     }
   };
 
@@ -502,7 +509,10 @@ export default function AccountTab() {
       await deletePasskeyMutation.mutateAsync({ params: { path: { id: passkeyID } } });
       setSecurityFeedback({ tone: "success", message: "Passkey removed successfully." });
     } catch (error) {
-      setSecurityFeedback({ tone: "error", message: getErrorMessage(error, "Failed to remove passkey.") });
+      setSecurityFeedback({
+        tone: "error",
+        message: getErrorMessage(error, "Failed to remove passkey."),
+      });
     }
   };
 
@@ -523,16 +533,28 @@ export default function AccountTab() {
     : mfaLoadError
       ? { label: t("common.error", { defaultValue: "Error" }), cls: "badge-error badge-outline" }
       : mfaStatus?.totp_enabled
-        ? { label: t("settings.account.mfa.enabledBadge", { defaultValue: "Enabled" }), cls: "badge-success badge-outline" }
-        : { label: t("settings.account.mfa.disabledBadge", { defaultValue: "Disabled" }), cls: "badge-ghost" };
+        ? {
+            label: t("settings.account.mfa.enabledBadge", { defaultValue: "Enabled" }),
+            cls: "badge-success badge-outline",
+          }
+        : {
+            label: t("settings.account.mfa.disabledBadge", { defaultValue: "Disabled" }),
+            cls: "badge-ghost",
+          };
 
   const passkeysBadge = passkeysAreLoading
     ? { label: t("common.loading", { defaultValue: "Loading..." }), cls: "badge-ghost" }
     : passkeysLoadError
       ? { label: t("common.error", { defaultValue: "Error" }), cls: "badge-error badge-outline" }
       : passkeys.length > 0
-        ? { label: `${passkeys.length} ${t("settings.account.mfa.enrolled", { defaultValue: "enrolled" })}`, cls: "badge-success badge-outline" }
-        : { label: t("settings.account.mfa.notEnrolled", { defaultValue: "Not enrolled" }), cls: "badge-ghost" };
+        ? {
+            label: `${passkeys.length} ${t("settings.account.mfa.enrolled", { defaultValue: "enrolled" })}`,
+            cls: "badge-success badge-outline",
+          }
+        : {
+            label: t("settings.account.mfa.notEnrolled", { defaultValue: "Not enrolled" }),
+            cls: "badge-ghost",
+          };
 
   return (
     <div className="w-full space-y-8 lg:space-y-10">
@@ -545,7 +567,12 @@ export default function AccountTab() {
       >
         <SettingsBlock>
           <div className="flex flex-wrap items-center gap-4">
-            <UserAvatar assetId={effectiveAvatarAssetId} name={resolvedName} size="size-16" textSize="text-lg" />
+            <UserAvatar
+              assetId={effectiveAvatarAssetId}
+              name={resolvedName}
+              size="size-16"
+              textSize="text-lg"
+            />
             <div className="min-w-0 flex-1">
               <div className="text-base font-semibold">{resolvedName}</div>
               <div className="text-sm text-base-content/60">@{user.username}</div>
@@ -565,7 +592,11 @@ export default function AccountTab() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setIsChoosingAvatar(true)}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setIsChoosingAvatar(true)}
+              >
                 {effectiveAvatarAssetId
                   ? t("settings.account.changeAvatar", { defaultValue: "Change photo" })
                   : t("settings.account.chooseAvatar", { defaultValue: "Choose photo" })}
@@ -648,7 +679,9 @@ export default function AccountTab() {
         <SettingsRow
           icon={<ShieldCheckIcon className="size-4" />}
           iconColor="bg-success text-success-content"
-          label={t("settings.account.mfa.authenticatorAppTitle", { defaultValue: "Authenticator App" })}
+          label={t("settings.account.mfa.authenticatorAppTitle", {
+            defaultValue: "Authenticator App",
+          })}
           description={
             mfaIsLoading
               ? t("common.loading", { defaultValue: "Loading..." })
@@ -686,7 +719,9 @@ export default function AccountTab() {
                     ? t(passkeySupport.reasonKey)
                     : ""
           }
-          value={<span className={`badge badge-sm ${passkeysBadge.cls}`}>{passkeysBadge.label}</span>}
+          value={
+            <span className={`badge badge-sm ${passkeysBadge.cls}`}>{passkeysBadge.label}</span>
+          }
           chevron
           disabled={passkeysAreLoading || passkeysLoadError}
           onClick={openPasskeysModal}

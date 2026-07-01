@@ -2,10 +2,7 @@ import { Bot, Cpu, Loader2, Network, RefreshCcw, Sparkles } from "lucide-react";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useI18n } from "@/lib/i18n.tsx";
 
-function availabilityBadgeClass(task: {
-  enabled: boolean;
-  available: boolean;
-}) {
+function availabilityBadgeClass(task: { enabled: boolean; available: boolean }) {
   if (!task.enabled) {
     return "badge badge-ghost";
   }
@@ -43,9 +40,7 @@ export function CapabilitiesMonitor() {
   if (query.isError || !capabilities) {
     return (
       <div className="bg-base-100 rounded-lg shadow-sm p-6 text-center">
-        <div className="text-warning text-sm">
-          {t("settings.serverSettings.capabilitiesError")}
-        </div>
+        <div className="text-warning text-sm">{t("settings.serverSettings.capabilitiesError")}</div>
       </div>
     );
   }
@@ -86,9 +81,7 @@ export function CapabilitiesMonitor() {
           onClick={() => void query.refetch()}
           disabled={query.isFetching}
         >
-          <RefreshCcw
-            className={`w-4 h-4 ${query.isFetching ? "animate-spin" : ""}`}
-          />
+          <RefreshCcw className={`w-4 h-4 ${query.isFetching ? "animate-spin" : ""}`} />
           {t("settings.serverSettings.refresh")}
         </button>
       </div>
@@ -98,12 +91,8 @@ export function CapabilitiesMonitor() {
           <div className="stat-figure text-info">
             <Network className="w-8 h-8" />
           </div>
-          <div className="stat-title">
-            {t("settings.serverSettings.discoveredNodes")}
-          </div>
-          <div className="stat-value text-info">
-            {capabilities.ml.discoveredNodeCount}
-          </div>
+          <div className="stat-title">{t("settings.serverSettings.discoveredNodes")}</div>
+          <div className="stat-value text-info">{capabilities.ml.discoveredNodeCount}</div>
           <div className="stat-desc">
             {capabilities.ml.activeNodeCount}{" "}
             {t("settings.serverSettings.activeNodes").toLowerCase()}
@@ -114,15 +103,12 @@ export function CapabilitiesMonitor() {
           <div className="stat-figure text-success">
             <Cpu className="w-8 h-8" />
           </div>
-          <div className="stat-title">
-            {t("settings.serverSettings.taskAvailability")}
-          </div>
+          <div className="stat-title">{t("settings.serverSettings.taskAvailability")}</div>
           <div className="stat-value text-success">
             {mlTasks.filter((task) => task.capability.available).length}
           </div>
           <div className="stat-desc">
-            / {mlTasks.length}{" "}
-            {t("settings.serverSettings.available").toLowerCase()}
+            / {mlTasks.length} {t("settings.serverSettings.available").toLowerCase()}
           </div>
         </div>
 
@@ -130,17 +116,13 @@ export function CapabilitiesMonitor() {
           <div className="stat-figure text-secondary">
             <Sparkles className="w-8 h-8" />
           </div>
-          <div className="stat-title">
-            {t("settings.serverSettings.llmTitle")}
-          </div>
+          <div className="stat-title">{t("settings.serverSettings.llmTitle")}</div>
           <div className="stat-value text-secondary text-2xl">
             {capabilities.llm.agentEnabled
               ? t("settings.serverSettings.enabled")
               : t("settings.serverSettings.disabled")}
           </div>
-          <div className="stat-desc">
-            {capabilities.llm.provider || t("common.na")}
-          </div>
+          <div className="stat-desc">{capabilities.llm.provider || t("common.na")}</div>
         </div>
       </div>
 
@@ -148,9 +130,7 @@ export function CapabilitiesMonitor() {
         <section className="bg-base-100 rounded-lg shadow-sm p-4 space-y-4">
           <div className="flex items-center gap-2">
             <Cpu className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">
-              {t("settings.serverSettings.mlTitle")}
-            </h2>
+            <h2 className="text-lg font-semibold">{t("settings.serverSettings.mlTitle")}</h2>
           </div>
 
           <div className="space-y-2">
@@ -180,9 +160,7 @@ export function CapabilitiesMonitor() {
         <section className="bg-base-100 rounded-lg shadow-sm p-4 space-y-4">
           <div className="flex items-center gap-2">
             <Bot className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">
-              {t("settings.serverSettings.llmTitle")}
-            </h2>
+            <h2 className="text-lg font-semibold">{t("settings.serverSettings.llmTitle")}</h2>
           </div>
 
           <div className="space-y-3">

@@ -83,8 +83,7 @@ const Histogram: React.FC<HistogramProps> = ({
   classForBar,
 }) => {
   // Helpers
-  const parseDate = (d: string | Date): Date =>
-    d instanceof Date ? new Date(d) : new Date(d);
+  const parseDate = (d: string | Date): Date => (d instanceof Date ? new Date(d) : new Date(d));
   const dateKey = (d: Date): string => d.toISOString().slice(0, 10); // YYYY-MM-DD
 
   const startOfDay = (d: Date) => {
@@ -113,9 +112,7 @@ const Histogram: React.FC<HistogramProps> = ({
 
     if (!s || !e) {
       if (valueMap.size > 0) {
-        const allDates = Array.from(valueMap.keys()).map((k) =>
-          startOfDay(new Date(k)),
-        );
+        const allDates = Array.from(valueMap.keys()).map((k) => startOfDay(new Date(k)));
         allDates.sort((a, b) => a.getTime() - b.getTime());
         s = s || allDates[0];
         e = e || allDates[allDates.length - 1];
@@ -186,15 +183,10 @@ const Histogram: React.FC<HistogramProps> = ({
             const y = vbHeight - h;
             const key = days[i];
             const value = { date: key, count: c };
-            const attrs = ((tooltipDataAttrs
-              ? tooltipDataAttrs(value)
-              : undefined) ?? {}) as Record<
-              string,
-              string | number | undefined
-            >;
+            const attrs = ((tooltipDataAttrs ? tooltipDataAttrs(value) : undefined) ??
+              {}) as Record<string, string | number | undefined>;
             const title =
-              (attrs && (attrs as any).title) ||
-              `${key} • ${c} ${c === 1 ? "item" : "items"}`;
+              (attrs && (attrs as any).title) || `${key} • ${c} ${c === 1 ? "item" : "items"}`;
             const barClass = classForBar ? classForBar(value) : "";
 
             return (

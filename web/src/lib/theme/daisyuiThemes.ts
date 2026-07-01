@@ -112,9 +112,7 @@ export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
 const lightThemeSet = new Set<string>(DAISYUI_LIGHT_THEMES);
 const darkThemeSet = new Set<string>(DAISYUI_DARK_THEMES);
 
-function cloneThemePreferences(
-  preferences: ThemePreferences,
-): ThemePreferences {
+function cloneThemePreferences(preferences: ThemePreferences): ThemePreferences {
   return {
     followSystem: preferences.followSystem,
     mode: preferences.mode,
@@ -129,15 +127,11 @@ export function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark";
 }
 
-export function isLightDaisyUITheme(
-  value: unknown,
-): value is DaisyUILightThemeName {
+export function isLightDaisyUITheme(value: unknown): value is DaisyUILightThemeName {
   return typeof value === "string" && lightThemeSet.has(value);
 }
 
-export function isDarkDaisyUITheme(
-  value: unknown,
-): value is DaisyUIDarkThemeName {
+export function isDarkDaisyUITheme(value: unknown): value is DaisyUIDarkThemeName {
   return typeof value === "string" && darkThemeSet.has(value);
 }
 
@@ -158,8 +152,7 @@ export function normalizeThemePreferences(
       dark?: unknown;
     };
   };
-  const hasLegacyManualPreference =
-    "mode" in maybeTheme || "themes" in maybeTheme;
+  const hasLegacyManualPreference = "mode" in maybeTheme || "themes" in maybeTheme;
 
   return {
     followSystem:
@@ -168,9 +161,7 @@ export function normalizeThemePreferences(
         : hasLegacyManualPreference
           ? false
           : normalizedFallback.followSystem,
-    mode: isThemeMode(maybeTheme.mode)
-      ? maybeTheme.mode
-      : normalizedFallback.mode,
+    mode: isThemeMode(maybeTheme.mode) ? maybeTheme.mode : normalizedFallback.mode,
     themes: {
       light: isLightDaisyUITheme(maybeTheme.themes?.light)
         ? maybeTheme.themes.light
@@ -190,16 +181,11 @@ export function resolveThemeNameForMode(
 }
 
 export function getSystemThemeMode(): ThemeMode {
-  if (
-    typeof window === "undefined" ||
-    typeof window.matchMedia !== "function"
-  ) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return "light";
   }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function resolveActiveThemeMode(
@@ -219,10 +205,7 @@ export function applyThemePreferencesToDocument(
 
   document.documentElement.setAttribute(
     "data-theme",
-    resolveThemeNameForMode(
-      preferences,
-      resolveActiveThemeMode(preferences, systemThemeMode),
-    ),
+    resolveThemeNameForMode(preferences, resolveActiveThemeMode(preferences, systemThemeMode)),
   );
 }
 

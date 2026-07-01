@@ -15,8 +15,7 @@ const formatExifValue = (
     locale: string;
   },
 ): string => {
-  if (value === null || value === undefined || value === "")
-    return options.naText;
+  if (value === null || value === undefined || value === "") return options.naText;
   if (typeof value === "string" && value.trim() === "") return options.naText;
 
   if (key.toLowerCase().includes("date") && !isNaN(new Date(value).getTime())) {
@@ -40,9 +39,7 @@ const formatExifValue = (
 };
 
 // Function to process and clean the raw EXIF data object
-const processExifData = (
-  rawExif: Record<string, any> | any[] | null,
-): [string, any][] => {
+const processExifData = (rawExif: Record<string, any> | any[] | null): [string, any][] => {
   // 1. Handle null or empty input immediately
   if (!rawExif || (Array.isArray(rawExif) && rawExif.length === 0)) {
     return [];
@@ -59,14 +56,10 @@ const processExifData = (
     if ("data" in rawExif && rawExif.data) {
       try {
         // Handle cases where 'data' might be a JSON string
-        const parsed =
-          typeof rawExif.data === "string"
-            ? JSON.parse(rawExif.data)
-            : rawExif.data;
+        const parsed = typeof rawExif.data === "string" ? JSON.parse(rawExif.data) : rawExif.data;
 
         // The parsed data could also be an array
-        dataToProcess =
-          Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : parsed;
+        dataToProcess = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : parsed;
       } catch (e) {
         // If parsing fails, use the parent object but exclude the problematic 'data' field
         const rest = { ...(rawExif as Record<string, any>) };
@@ -81,23 +74,14 @@ const processExifData = (
   }
 
   // 3. Filter and sort the final data object's entries
-  const excludedKeys = [
-    "success",
-    "error",
-    "exitcode",
-    "sourcefile",
-    "directory",
-  ];
+  const excludedKeys = ["success", "error", "exitcode", "sourcefile", "directory"];
 
   if (typeof dataToProcess !== "object" || dataToProcess === null) {
     return [];
   }
 
   return Object.entries(dataToProcess)
-    .filter(
-      ([key]) =>
-        !excludedKeys.some((exKey) => key.toLowerCase().includes(exKey)),
-    )
+    .filter(([key]) => !excludedKeys.some((exKey) => key.toLowerCase().includes(exKey)))
     .sort((a, b) => a[0].localeCompare(b[0]));
 };
 
@@ -153,15 +137,11 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
       </div>
 
       {entries.length === 0 ? (
-        <div className="text-center py-4 text-gray-500">
-          {t("studio.exif.empty")}
-        </div>
+        <div className="text-center py-4 text-gray-500">{t("studio.exif.empty")}</div>
       ) : (
         <div className="rounded-lg bg-base-100 shadow-sm max-h-[calc(70vh)] overflow-y-auto">
           <div className="bg-base-300 p-2 rounded-t-lg flex items-center sticky top-0 z-10">
-            <h3 className="text-sm font-bold text-base-content">
-              {t("studio.exif.properties")}
-            </h3>
+            <h3 className="text-sm font-bold text-base-content">{t("studio.exif.properties")}</h3>
             <span className="ml-2 text-xs opacity-60">
               {t("studio.exif.fieldsCount", { count: entries.length })}
             </span>

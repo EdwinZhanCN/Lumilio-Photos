@@ -34,14 +34,8 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
   className = "",
   onItemClick,
 }) => {
-  const browseGroups = useMemo(
-    () => createBrowseGroupsFromAssets(assets),
-    [assets],
-  );
-  const visibleAssets = useMemo(
-    () => flattenBrowseGroupsToAssets(browseGroups),
-    [browseGroups],
-  );
+  const browseGroups = useMemo(() => createBrowseGroupsFromAssets(assets), [assets]);
+  const visibleAssets = useMemo(() => flattenBrowseGroupsToAssets(browseGroups), [browseGroups]);
 
   const openCarousel = useCallback(
     (assetId: string) => {

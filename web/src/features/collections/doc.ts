@@ -60,15 +60,9 @@
  *
  * @module
  */
-import type {
-  CollectionsProvider,
-  useCollections,
-} from "./CollectionsProvider.tsx";
+import type { CollectionsProvider, useCollections } from "./CollectionsProvider.tsx";
 import type { collectionsReducer } from "./collections.reducer.ts";
-import type {
-  CollectionsState,
-  CollectionsAction,
-} from "./collections.type.ts";
+import type { CollectionsState, CollectionsAction } from "./collections.type.ts";
 import type { useAlbums, mapAlbumToUI } from "./hooks/useAlbums.ts";
 import type { useCityTrips } from "./hooks/useCityTrips.ts";
 import type {

@@ -1,7 +1,4 @@
-import {
-  useSystemSettings,
-  useUpdateSystemSettings,
-} from "./useSystemSettings";
+import { useSystemSettings, useUpdateSystemSettings } from "./useSystemSettings";
 import { useDraftSettings, type DraftSettings } from "./useDraftSettings";
 
 export interface LLMDraft {
@@ -36,11 +33,7 @@ export function useLLMSettingsDraft(): DraftSettings<LLMDraft> {
         body: {
           llm: {
             agent_enabled: draft.agent_enabled,
-            provider: draft.provider as
-              | "ark"
-              | "openai"
-              | "deepseek"
-              | "ollama",
+            provider: draft.provider as "ark" | "openai" | "deepseek" | "ollama",
             model_name: draft.model_name,
             base_url: draft.base_url,
             ...(draft.api_key !== undefined ? { api_key: draft.api_key } : {}),

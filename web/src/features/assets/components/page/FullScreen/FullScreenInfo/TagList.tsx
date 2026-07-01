@@ -14,11 +14,7 @@ import type { components } from "@/lib/http-commons/schema.d.ts";
 import TagPickerMenu, {
   type TagPickerItem,
 } from "@/features/assets/components/shared/TagPickerMenu";
-import {
-  useAssetTags,
-  isManualTag,
-  type AssetTag,
-} from "@/features/assets/hooks/useAssetTags";
+import { useAssetTags, isManualTag, type AssetTag } from "@/features/assets/hooks/useAssetTags";
 
 type TagSuggestion = components["schemas"]["dto.TagDTO"];
 
@@ -48,9 +44,7 @@ export default function TagList({ assetId }: TagListProps) {
 
   const manualTags = tags.filter(isManualTag);
   const appliedIds = new Set(tags.map((tag: AssetTag) => tag.tag_id));
-  const appliedNames = new Set(
-    tags.map((tag: AssetTag) => (tag.tag_name ?? "").toLowerCase()),
-  );
+  const appliedNames = new Set(tags.map((tag: AssetTag) => (tag.tag_name ?? "").toLowerCase()));
 
   // Autocomplete suggestions from the whole tag library; only while open.
   const suggestionsQuery = $api.useQuery(
@@ -68,9 +62,7 @@ export default function TagList({ assetId }: TagListProps) {
   const exactExists =
     trimmed.length > 0 && appliedNames.has(trimmed.toLowerCase())
       ? true
-      : suggestions.some(
-          (tag) => (tag.tag_name ?? "").toLowerCase() === trimmed.toLowerCase(),
-        );
+      : suggestions.some((tag) => (tag.tag_name ?? "").toLowerCase() === trimmed.toLowerCase());
   const showCreate = trimmed.length > 0 && !exactExists;
 
   // Position the portal popover relative to the trigger, flipping above when
@@ -81,10 +73,7 @@ export default function TagList({ assetId }: TagListProps) {
     const r = el.getBoundingClientRect();
     const left = Math.max(
       VIEWPORT_MARGIN,
-      Math.min(
-        r.right - POPOVER_WIDTH,
-        window.innerWidth - POPOVER_WIDTH - VIEWPORT_MARGIN,
-      ),
+      Math.min(r.right - POPOVER_WIDTH, window.innerWidth - POPOVER_WIDTH - VIEWPORT_MARGIN),
     );
     const spaceBelow = window.innerHeight - r.bottom;
     const next: CSSProperties = {
@@ -113,10 +102,7 @@ export default function TagList({ assetId }: TagListProps) {
     const onScrollOrResize = () => reposition();
     const onPointerDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (
-        popoverRef.current?.contains(target) ||
-        triggerRef.current?.contains(target)
-      ) {
+      if (popoverRef.current?.contains(target) || triggerRef.current?.contains(target)) {
         return;
       }
       setOpen(false);
@@ -180,9 +166,7 @@ export default function TagList({ assetId }: TagListProps) {
           {isLoading && tags.length === 0 ? (
             <span className="loading loading-spinner loading-xs shrink-0" />
           ) : tags.length === 0 ? (
-            <span className="text-xs text-base-content/40 font-sans">
-              {t("assets.tags.empty")}
-            </span>
+            <span className="text-xs text-base-content/40 font-sans">{t("assets.tags.empty")}</span>
           ) : (
             tags.map((tag: AssetTag) => (
               <span

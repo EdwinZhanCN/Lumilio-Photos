@@ -155,52 +155,33 @@ export function DevelopPanel({
                   label="Rotate left"
                   disabled={disabled}
                   onClick={() =>
-                    onGeometryChange(
-                      "rotation",
-                      (adjustments.rotation - 90 + 360) % 360,
-                    )
+                    onGeometryChange("rotation", (adjustments.rotation - 90 + 360) % 360)
                   }
                 />
                 <GeoButton
                   icon={RotateCw}
                   label="Rotate right"
                   disabled={disabled}
-                  onClick={() =>
-                    onGeometryChange(
-                      "rotation",
-                      (adjustments.rotation + 90) % 360,
-                    )
-                  }
+                  onClick={() => onGeometryChange("rotation", (adjustments.rotation + 90) % 360)}
                 />
                 <GeoButton
                   icon={FlipHorizontal2}
                   label="Flip horizontal"
                   active={adjustments.flipHorizontal}
                   disabled={disabled}
-                  onClick={() =>
-                    onGeometryChange(
-                      "flipHorizontal",
-                      !adjustments.flipHorizontal,
-                    )
-                  }
+                  onClick={() => onGeometryChange("flipHorizontal", !adjustments.flipHorizontal)}
                 />
                 <GeoButton
                   icon={FlipVertical2}
                   label="Flip vertical"
                   active={adjustments.flipVertical}
                   disabled={disabled}
-                  onClick={() =>
-                    onGeometryChange("flipVertical", !adjustments.flipVertical)
-                  }
+                  onClick={() => onGeometryChange("flipVertical", !adjustments.flipVertical)}
                 />
               </div>
               <div className="flex items-center justify-between px-1 text-[11px] text-base-content/45">
-                <span>
-                  {t("studio.develop.rotation", { defaultValue: "Rotation" })}
-                </span>
-                <span className="font-mono tabular-nums">
-                  {adjustments.rotation}°
-                </span>
+                <span>{t("studio.develop.rotation", { defaultValue: "Rotation" })}</span>
+                <span className="font-mono tabular-nums">{adjustments.rotation}°</span>
               </div>
             </div>
           )}

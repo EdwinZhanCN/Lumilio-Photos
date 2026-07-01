@@ -23,9 +23,7 @@ export function StudioEditMvp(): React.JSX.Element {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<StudioView>("home");
-  const [assetId, setAssetId] = useState<string | null>(
-    () => searchParams.get("assetId"),
-  );
+  const [assetId, setAssetId] = useState<string | null>(() => searchParams.get("assetId"));
   const [focusBorder, setFocusBorder] = useState(false);
   const [recent, setRecent] = useState<RecentEditRecord[]>(() => readRecentEdits());
 

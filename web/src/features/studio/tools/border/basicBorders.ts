@@ -33,11 +33,7 @@ const VIGNETTE_GRADIENT_STOPS = 16;
 // ---------------------------------------------------------------------------
 // COLORED: solid-color frame of `borderWidth` px around the image.
 // ---------------------------------------------------------------------------
-function renderColored(
-  photo: ImageBitmap,
-  borderWidth: number,
-  colorHex: string,
-): OffscreenCanvas {
+function renderColored(photo: ImageBitmap, borderWidth: number, colorHex: string): OffscreenCanvas {
   const bw = Math.max(0, Math.round(borderWidth));
   const W = photo.width;
   const H = photo.height;
@@ -166,9 +162,7 @@ export async function renderBasicBorder(
   signal: AbortSignal,
 ): Promise<Uint8Array> {
   if (!isOffscreenCanvasSupported()) {
-    throw new Error(
-      "The border tool needs OffscreenCanvas, which is unavailable in this runtime",
-    );
+    throw new Error("The border tool needs OffscreenCanvas, which is unavailable in this runtime");
   }
   if (signal.aborted) throw new Error("Operation aborted");
 
@@ -181,12 +175,7 @@ export async function renderBasicBorder(
     } else if (mode === "VIGNETTE") {
       canvas = renderVignette(photo, style.strength);
     } else {
-      canvas = renderFrosted(
-        photo,
-        style.blurSigma,
-        style.brightness,
-        style.cornerRadius,
-      );
+      canvas = renderFrosted(photo, style.blurSigma, style.brightness, style.cornerRadius);
     }
     if (signal.aborted) throw new Error("Operation aborted");
     return await canvasToPngBytes(canvas);

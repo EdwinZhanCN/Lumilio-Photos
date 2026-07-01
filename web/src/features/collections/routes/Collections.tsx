@@ -1,13 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
-import {
-  Album,
-  ArrowRight,
-  LibraryBig,
-  MapPin,
-  Users,
-  Wrench,
-} from "lucide-react";
+import { Album, ArrowRight, LibraryBig, MapPin, Users, Wrench } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
@@ -47,10 +40,7 @@ function CollectionsContent() {
   });
 
   const albums = data?.pages.flatMap((page) => page.albums) ?? [];
-  const {
-    trips,
-    isLoading: isTripsLoading,
-  } = useCityTrips({ repositoryId: scopedRepositoryId });
+  const { trips, isLoading: isTripsLoading } = useCityTrips({ repositoryId: scopedRepositoryId });
 
   return (
     <div className="flex h-full flex-col">
@@ -65,9 +55,7 @@ function CollectionsContent() {
             <CollectionErrorAlert
               message={t("collections.messages.loadAlbumsError", {
                 message:
-                  albumsError instanceof Error
-                    ? albumsError.message
-                    : t("home.errors.unknown"),
+                  albumsError instanceof Error ? albumsError.message : t("home.errors.unknown"),
               })}
             />
           )}
@@ -76,9 +64,7 @@ function CollectionsContent() {
             <CollectionErrorAlert
               message={t("collections.messages.loadPeopleError", {
                 message:
-                  peopleError instanceof Error
-                    ? peopleError.message
-                    : t("home.errors.unknown"),
+                  peopleError instanceof Error ? peopleError.message : t("home.errors.unknown"),
               })}
             />
           )}

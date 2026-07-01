@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -39,9 +32,7 @@ import {
 } from "@/features/settings/hooks/useCloudSync";
 
 const getViewerTimeZone = () =>
-  typeof Intl !== "undefined"
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone
-    : "UTC";
+  typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
 function useRepositoryAssetCount(repositoryId: string) {
   const request = useMemo(
@@ -138,25 +129,20 @@ function RepositoryCard({
           </div>
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h3 className="truncate text-sm font-semibold text-base-content">
-                {name}
-              </h3>
+              <h3 className="truncate text-sm font-semibold text-base-content">{name}</h3>
               {repository.isPrimary && (
                 <span className="badge badge-primary badge-sm">
                   {t("manage.repositories.primaryBadge")}
                 </span>
               )}
-	      {hasCloudBinding && (
-	        <span className="badge badge-info badge-sm gap-1">
-	          <Cloud size={12} />
-	          {t("manage.repositories.sourceCloud")}
-	        </span>
-	      )}
+              {hasCloudBinding && (
+                <span className="badge badge-info badge-sm gap-1">
+                  <Cloud size={12} />
+                  {t("manage.repositories.sourceCloud")}
+                </span>
+              )}
             </div>
-            <p
-              className="mt-1 truncate text-xs text-base-content/55"
-              title={repository.path}
-            >
+            <p className="mt-1 truncate text-xs text-base-content/55" title={repository.path}>
               {repository.path}
             </p>
           </div>
@@ -264,13 +250,15 @@ function RepositoryCard({
                   }}
                   disabled={isBusy || latestRunStatus === "running" || latestRunStatus === "queued"}
                 >
-                  {isCloudImporting || latestRunStatus === "running" || latestRunStatus === "queued" ? (
+                  {isCloudImporting ||
+                  latestRunStatus === "running" ||
+                  latestRunStatus === "queued" ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
                     <CloudDownload size={16} className="text-base-content/70" />
                   )}
-	                  <span>{t("manage.repositories.importFromCloud")}</span>
-	                </button>
+                  <span>{t("manage.repositories.importFromCloud")}</span>
+                </button>
               )}
             </div>
           )}
@@ -286,9 +274,7 @@ function RepositoryCard({
               countQuery.assetCount.toLocaleString()
             )}
           </div>
-          <div className="text-xs text-base-content/55">
-            {t("manage.repositories.assetCount")}
-          </div>
+          <div className="text-xs text-base-content/55">{t("manage.repositories.assetCount")}</div>
         </div>
         {hasCloudBinding && latestRun && (
           <div className="text-right text-xs text-base-content/60">
@@ -304,13 +290,7 @@ function RepositoryCard({
   );
 }
 
-function AddRepositoryModal({
-  isOpen,
-  onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) {
+function AddRepositoryModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { t } = useI18n();
   const showMessage = useMessage();
   const queryClient = useQueryClient();
@@ -377,9 +357,7 @@ function AddRepositoryModal({
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error
-            ? error.message
-            : t("manage.repositories.createFailed"),
+          error instanceof Error ? error.message : t("manage.repositories.createFailed"),
         );
       }
     },
@@ -397,9 +375,7 @@ function AddRepositoryModal({
               <FolderPlus size={20} />
             </div>
             <div>
-              <h3 className="text-base font-semibold">
-                {t("manage.repositories.createTitle")}
-              </h3>
+              <h3 className="text-base font-semibold">{t("manage.repositories.createTitle")}</h3>
             </div>
           </div>
           <button
@@ -509,9 +485,7 @@ function AddRepositoryModal({
               type="submit"
               className="btn btn-primary gap-2"
               disabled={
-                !name.trim() ||
-                createMutation.isPending ||
-                (source === "cloud" && !credentialId)
+                !name.trim() || createMutation.isPending || (source === "cloud" && !credentialId)
               }
             >
               {createMutation.isPending ? (
@@ -539,23 +513,14 @@ export default function RepositoryGrid() {
   const showMessage = useMessage();
   const repositoriesQuery = useIndexingRepositories();
   const repositories = repositoriesQuery.repositories;
-  const {
-    scanRepository,
-    scanRepositories,
-    scanningIds,
-    detectStacks,
-    detectingIds,
-    isScanning,
-  } = useRepositoryScan();
+  const { scanRepository, scanRepositories, scanningIds, detectStacks, detectingIds, isScanning } =
+    useRepositoryScan();
   const detectDuplicatesMutation = useDetectDuplicates();
   const duplicateScanningRepositoryId =
     detectDuplicatesMutation.isPending && detectDuplicatesMutation.variables
       ? detectDuplicatesMutation.variables.repositoryId
       : undefined;
-  const locationRebuildMutation = $api.useMutation(
-    "post",
-    "/api/v1/locations/rebuild",
-  );
+  const locationRebuildMutation = $api.useMutation("post", "/api/v1/locations/rebuild");
   const cloudImportMutation = useStartRepositoryCloudImport();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -577,9 +542,7 @@ export default function RepositoryGrid() {
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error
-            ? error.message
-            : t("manage.repositories.scanFailed"),
+          error instanceof Error ? error.message : t("manage.repositories.scanFailed"),
         );
       }
     },
@@ -600,9 +563,7 @@ export default function RepositoryGrid() {
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error
-            ? error.message
-            : t("manage.repositories.detectStacksFailed"),
+          error instanceof Error ? error.message : t("manage.repositories.detectStacksFailed"),
         );
       }
     },
@@ -629,9 +590,7 @@ export default function RepositoryGrid() {
           "error",
           t("duplicates.scanError", {
             message:
-              error instanceof Error
-                ? error.message
-                : t("manage.repositories.duplicateScanFailed"),
+              error instanceof Error ? error.message : t("manage.repositories.duplicateScanFailed"),
           }),
         );
       }
@@ -656,10 +615,7 @@ export default function RepositoryGrid() {
         });
         showMessage("success", t("manage.repositories.rebuildLocationQueued"));
       } catch (error) {
-        showMessage(
-          "error",
-          error instanceof Error ? error.message : String(error),
-        );
+        showMessage("error", error instanceof Error ? error.message : String(error));
       }
     },
     [locationRebuildMutation, showMessage, t],
@@ -708,9 +664,7 @@ export default function RepositoryGrid() {
     } catch (error) {
       showMessage(
         "error",
-        error instanceof Error
-          ? error.message
-          : t("manage.repositories.scanFailed"),
+        error instanceof Error ? error.message : t("manage.repositories.scanFailed"),
       );
     }
   }, [repositoryIds, scanRepositories, showMessage, t]);
@@ -719,12 +673,8 @@ export default function RepositoryGrid() {
     <section className="container mx-auto max-w-5xl px-4 pb-12">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold">
-            {t("manage.repositories.title")}
-          </h2>
-          <p className="text-sm text-base-content/60">
-            {t("manage.repositories.description")}
-          </p>
+          <h2 className="text-base font-semibold">{t("manage.repositories.title")}</h2>
+          <p className="text-sm text-base-content/60">{t("manage.repositories.description")}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -734,9 +684,7 @@ export default function RepositoryGrid() {
             title={t("manage.repositories.createAction")}
           >
             <Plus size={16} />
-            <span className="hidden sm:inline">
-              {t("manage.repositories.createAction")}
-            </span>
+            <span className="hidden sm:inline">{t("manage.repositories.createAction")}</span>
           </button>
           <button
             type="button"
@@ -750,9 +698,7 @@ export default function RepositoryGrid() {
             ) : (
               <RefreshCcwDot size={16} />
             )}
-            <span className="hidden sm:inline">
-              {t("manage.repositories.scanAll")}
-            </span>
+            <span className="hidden sm:inline">{t("manage.repositories.scanAll")}</span>
           </button>
         </div>
       </div>
@@ -777,9 +723,7 @@ export default function RepositoryGrid() {
               repository={repository}
               isScanning={scanningIds.has(repository.id)}
               isDetecting={detectingIds.has(repository.id)}
-              isDuplicateScanning={
-                duplicateScanningRepositoryId === repository.id
-              }
+              isDuplicateScanning={duplicateScanningRepositoryId === repository.id}
               isRebuildingLocation={rebuildingLocationId === repository.id}
               isCloudImporting={cloudImportingRepositoryId === repository.id}
               onScan={handleScanRepository}
@@ -792,10 +736,7 @@ export default function RepositoryGrid() {
         </div>
       )}
 
-      <AddRepositoryModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-      />
+      <AddRepositoryModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
     </section>
   );
 }

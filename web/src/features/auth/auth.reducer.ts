@@ -7,7 +7,7 @@ const hasTokens = !!(getToken() || getRefreshToken());
 export const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: hasTokens, 
+  isLoading: hasTokens,
   error: null,
 };
 

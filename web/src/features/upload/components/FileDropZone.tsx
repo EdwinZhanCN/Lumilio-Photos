@@ -15,29 +15,29 @@ type FileDropZoneProps = {
 
 /**
  * A drag-and-drop zone component for file uploads.
- * 
+ *
  * This component provides an interactive drop zone where users can:
  * - Drag and drop files directly onto the zone
  * - Click to open a file selection dialog
  * - Visual feedback during drag operations
- * 
+ *
  * The component integrates with the upload context to handle drag events
  * and provides visual feedback when files are being dragged over the zone.
- * 
+ *
  * @param props - Component props
  * @param props.fileInputRef - Reference to the hidden file input element
  * @param props.children - Optional child components to render inside the drop zone
  * @param props.onFilesDropped - Callback function called when files are dropped
- * 
+ *
  * @example
  * ```typescript
  * const fileInputRef = useRef<HTMLInputElement>(null);
- * 
+ *
  * const handleFilesDropped = (files: FileList) => {
  *   // Process dropped files
  *   uploadFiles(Array.from(files));
  * };
- * 
+ *
  * return (
  *   <FileDropZone
  *     fileInputRef={fileInputRef}
@@ -48,13 +48,8 @@ type FileDropZoneProps = {
  * );
  * ```
  */
-const FileDropZone = ({
-  fileInputRef,
-  children,
-  onFilesDropped,
-}: FileDropZoneProps) => {
-  const { state, handleDragOver, handleDragLeave, handleDrop } =
-    useUploadContext();
+const FileDropZone = ({ fileInputRef, children, onFilesDropped }: FileDropZoneProps) => {
+  const { state, handleDragOver, handleDragLeave, handleDrop } = useUploadContext();
   const { isDragging } = state;
 
   // Create a wrapper for handleDrop that calls the specific file handler

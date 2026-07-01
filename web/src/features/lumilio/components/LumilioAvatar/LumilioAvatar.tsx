@@ -21,18 +21,10 @@ interface LumilioAvatarProps {
  * @param duration - The duration of the transition in milliseconds. Default is 2000.
  * @param easing - The CSS easing function for the transition. Default is "ease-out".
  */
-function smoothReset(
-  el: HTMLElement,
-  duration: number = 2000,
-  easing: string = "ease-out",
-) {
+function smoothReset(el: HTMLElement, duration: number = 2000, easing: string = "ease-out") {
   const computed = getComputedStyle(el).transform;
 
-  if (
-    !computed ||
-    computed === "none" ||
-    computed === "matrix(1, 0, 0, 1, 0, 0)"
-  ) {
+  if (!computed || computed === "none" || computed === "matrix(1, 0, 0, 1, 0, 0)") {
     return;
   }
 
@@ -82,10 +74,7 @@ export const LumilioAvatar: React.FC<LumilioAvatarProps> = ({
    * @param duration - The total duration of one animation loop in milliseconds.
    * @returns The remaining time in milliseconds until the current loop completes.
    */
-  const getRemainingTime = (
-    startTime: number,
-    duration: number = ANIMATION_DURATION,
-  ) => {
+  const getRemainingTime = (startTime: number, duration: number = ANIMATION_DURATION) => {
     const elapsed = Date.now() - startTime;
     return Math.max(0, duration - (elapsed % duration));
   };

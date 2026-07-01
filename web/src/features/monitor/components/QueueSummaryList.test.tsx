@@ -25,11 +25,13 @@ const translations: Record<string, string> = {
   "monitor.queueSummary.metrics.remaining": "Remaining",
   "monitor.queueSummary.metrics.total": "Total",
   "monitor.queueSummary.queues.default.description": "Background work for the photo library.",
-  "monitor.queueSummary.queues.thumbnail_asset.description": "Creates previews used throughout the gallery.",
+  "monitor.queueSummary.queues.thumbnail_asset.description":
+    "Creates previews used throughout the gallery.",
   "monitor.queueSummary.queues.thumbnail_asset.name": "Previews",
   "monitor.queueSummary.reviewErrors_other": "Review {{count}} issues",
   "monitor.queueSummary.status.needsAttention": "Needs attention",
-  "monitor.queueSummary.subtitle": "Grouped by the part of the photo library pipeline doing the work.",
+  "monitor.queueSummary.subtitle":
+    "Grouped by the part of the photo library pipeline doing the work.",
   "monitor.queueSummary.time.justNow": "just now",
   "monitor.queueSummary.time.minutesAgo_other": "{{count}} minutes ago",
   "monitor.queueSummary.time.never": "never",
@@ -127,9 +129,7 @@ describe("QueueSummaryList", () => {
     render(<QueueSummaryList />);
 
     expect(screen.getByText("Previews")).toBeInTheDocument();
-    expect(
-      screen.getByText("Creates previews used throughout the gallery."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Creates previews used throughout the gallery.")).toBeInTheDocument();
     expect(screen.getByText("Total")).toBeInTheDocument();
     expect(screen.getByText("100")).toBeInTheDocument();
     expect(screen.getByText("Processed")).toBeInTheDocument();
@@ -155,9 +155,7 @@ describe("QueueSummaryList", () => {
         expect.stringContaining("queue=thumbnail_asset"),
       );
     });
-    expect(clipboardWriteText).toHaveBeenCalledWith(
-      expect.stringContaining("job_id=42"),
-    );
+    expect(clipboardWriteText).toHaveBeenCalledWith(expect.stringContaining("job_id=42"));
     expect(clipboardWriteText).toHaveBeenCalledWith(
       expect.stringContaining("thumbnail failed: decode error"),
     );

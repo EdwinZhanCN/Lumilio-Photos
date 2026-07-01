@@ -22,25 +22,15 @@ describe("assetGroups", () => {
     expect(groups).toHaveLength(3);
     expect(groups[1]?.key).toBe("date:yesterday");
     expect(groups[1]?.assets).toHaveLength(2);
-    expect(flattenAssetGroups(groups).map((asset) => asset.asset_id)).toEqual([
-      "a",
-      "b",
-      "c",
-      "d",
-    ]);
+    expect(flattenAssetGroups(groups).map((asset) => asset.asset_id)).toEqual(["a", "b", "c", "d"]);
   });
 
   it("formats stable date and type keys for display", () => {
-    const t = (_key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? _key;
+    const t = (_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key;
 
     expect(formatAssetGroupLabel("date:today", t as any, "en")).toBe("Today");
-    expect(formatAssetGroupLabel("type:image/jpeg", t as any, "en")).toBe(
-      "image/jpeg",
-    );
-    expect(formatAssetGroupLabel("date:month:2025-03", t as any, "en")).toBe(
-      "March 2025",
-    );
+    expect(formatAssetGroupLabel("type:image/jpeg", t as any, "en")).toBe("image/jpeg");
+    expect(formatAssetGroupLabel("date:month:2025-03", t as any, "en")).toBe("March 2025");
   });
 
   it("groups older assets by month instead of year", () => {
@@ -59,9 +49,6 @@ describe("assetGroups", () => {
       new Date("2026-05-05T12:00:00.000Z"),
     );
 
-    expect(groups.map((group) => group.key)).toEqual([
-      "date:month:2024-03",
-      "date:month:2024-02",
-    ]);
+    expect(groups.map((group) => group.key)).toEqual(["date:month:2024-03", "date:month:2024-02"]);
   });
 });

@@ -175,24 +175,10 @@ export interface SelectionResult {
   setSelectionMode: (mode: "single" | "multiple") => void;
 
   // Extended operations
-  selectRange: (
-    fromAssetId: string,
-    toAssetId: string,
-    assetIds: string[],
-  ) => void;
-  toggleRange: (
-    fromAssetId: string,
-    toAssetId: string,
-    assetIds: string[],
-  ) => void;
-  selectFiltered: (
-    assetIds: string[],
-    predicate: (assetId: string) => boolean,
-  ) => void;
-  deselectFiltered: (
-    assetIds: string[],
-    predicate: (assetId: string) => boolean,
-  ) => void;
+  selectRange: (fromAssetId: string, toAssetId: string, assetIds: string[]) => void;
+  toggleRange: (fromAssetId: string, toAssetId: string, assetIds: string[]) => void;
+  selectFiltered: (assetIds: string[], predicate: (assetId: string) => boolean) => void;
+  deselectFiltered: (assetIds: string[], predicate: (assetId: string) => boolean) => void;
   invertSelection: (assetIds: string[]) => void;
 
   // Computed properties

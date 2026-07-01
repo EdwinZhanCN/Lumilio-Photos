@@ -123,9 +123,7 @@ function formatIso(value: unknown): string | undefined {
 function formatDateTime(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   // exiftool: "2014:01:23 14:57:18" (optionally with subseconds / timezone).
-  const match = value
-    .trim()
-    .match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+  const match = value.trim().match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}:\d{2}:\d{2})/);
   if (!match) return value.trim() || undefined;
   return `${match[1]}-${match[2]}-${match[3]} ${match[4]}`;
 }
@@ -136,18 +134,8 @@ function formatDateTime(value: unknown): string | undefined {
 export function extractBorderExif(exif: RawExif): BorderExif {
   return {
     make: firstString(exif, ["Make", "EXIF:Make", "Exif.Image.Make"]),
-    model: firstString(exif, [
-      "Model",
-      "CameraModelName",
-      "EXIF:Model",
-      "Exif.Image.Model",
-    ]),
-    lensModel: firstString(exif, [
-      "LensModel",
-      "Lens",
-      "EXIF:LensModel",
-      "Exif.Photo.LensModel",
-    ]),
+    model: firstString(exif, ["Model", "CameraModelName", "EXIF:Model", "Exif.Image.Model"]),
+    lensModel: firstString(exif, ["LensModel", "Lens", "EXIF:LensModel", "Exif.Photo.LensModel"]),
     focalLength: formatFocalLength(
       firstValue(exif, ["FocalLength", "EXIF:FocalLength", "Exif.Photo.FocalLength"]),
     ),
@@ -185,8 +173,8 @@ export function extractBorderExif(exif: RawExif): BorderExif {
 
 /** The four shooting parameters, in display order. */
 export function shootingParams(exif: BorderExif): string[] {
-  return [exif.focalLength, exif.aperture, exif.shutter, exif.iso].filter(
-    (v): v is string => Boolean(v),
+  return [exif.focalLength, exif.aperture, exif.shutter, exif.iso].filter((v): v is string =>
+    Boolean(v),
   );
 }
 

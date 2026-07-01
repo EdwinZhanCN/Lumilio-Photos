@@ -5,26 +5,16 @@ import PageHeader from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { useIndexingRepositories } from "@/features/settings/hooks/useAssetIndexing";
-import {
-  CapabilitiesMonitor,
-  MLMonitor,
-  StatMonitor,
-  QueueSummaryList,
-} from "../components";
+import { CapabilitiesMonitor, MLMonitor, StatMonitor, QueueSummaryList } from "../components";
 
 export default function Monitor() {
   const { t } = useI18n();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedView = searchParams.get("tab");
-  const view =
-    requestedView === "capabilities" || requestedView === "ml"
-      ? requestedView
-      : "queue";
+  const view = requestedView === "capabilities" || requestedView === "ml" ? requestedView : "queue";
 
-  const [localRepoId, setLocalRepoId] = useState<string | undefined>(
-    undefined,
-  );
+  const [localRepoId, setLocalRepoId] = useState<string | undefined>(undefined);
   const { repositories } = useIndexingRepositories();
 
   const setView = (nextView: "queue" | "ml" | "capabilities") => {
@@ -43,12 +33,8 @@ export default function Monitor() {
     return (
       <div className="flex min-h-full items-center justify-center p-6">
         <div className="rounded-3xl border border-base-300 bg-base-100 p-8 text-center shadow-sm">
-          <div className="text-lg font-semibold">
-            {t("monitor.adminOnlyTitle")}
-          </div>
-          <p className="mt-2 text-sm opacity-70">
-            {t("monitor.adminOnlyDescription")}
-          </p>
+          <div className="text-lg font-semibold">{t("monitor.adminOnlyTitle")}</div>
+          <p className="mt-2 text-sm opacity-70">{t("monitor.adminOnlyDescription")}</p>
         </div>
       </div>
     );
@@ -73,9 +59,7 @@ export default function Monitor() {
             <select
               className="select select-bordered select-sm w-48"
               value={localRepoId ?? ""}
-              onChange={(e) =>
-                setLocalRepoId(e.target.value || undefined)
-              }
+              onChange={(e) => setLocalRepoId(e.target.value || undefined)}
             >
               <option value="">
                 {t("navbar.repository.all", {

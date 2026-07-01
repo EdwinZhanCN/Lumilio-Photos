@@ -30,12 +30,8 @@ export function readRecentEdits(): RecentEditRecord[] {
   );
 }
 
-export function recordRecentEdit(
-  record: Omit<RecentEditRecord, "editedAt">,
-): RecentEditRecord[] {
-  const existing = readRecentEdits().filter(
-    (item) => item.assetId !== record.assetId,
-  );
+export function recordRecentEdit(record: Omit<RecentEditRecord, "editedAt">): RecentEditRecord[] {
+  const existing = readRecentEdits().filter((item) => item.assetId !== record.assetId);
   const next: RecentEditRecord[] = [
     { ...record, editedAt: new Date().toISOString() },
     ...existing,

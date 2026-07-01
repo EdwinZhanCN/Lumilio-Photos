@@ -68,26 +68,17 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
   const resolvedTitle = title ?? t("home.map.title");
 
   return (
-    <section
-      className={`card bg-base-100 shadow-xl overflow-hidden ${className}`}
-      style={style}
-    >
+    <section className={`card bg-base-100 shadow-xl overflow-hidden ${className}`} style={style}>
       <div>
         <div className="flex items-center justify-between bg-base-200 p-4">
           <div className="flex items-center gap-3">
-            <div className="text-primary">
-              {icon ?? <MapIcon className="size-6" />}
-            </div>
+            <div className="text-primary">{icon ?? <MapIcon className="size-6" />}</div>
             <div>
               <h2 className="text-xl font-bold">{resolvedTitle}</h2>
-              {subtitle && (
-                <p className="text-sm text-base-content/70">{subtitle}</p>
-              )}
+              {subtitle && <p className="text-sm text-base-content/70">{subtitle}</p>}
             </div>
           </div>
-          {headerRight && (
-            <div className="flex items-center gap-2">{headerRight}</div>
-          )}
+          {headerRight && <div className="flex items-center gap-2">{headerRight}</div>}
         </div>
 
         <div className={aspect}>

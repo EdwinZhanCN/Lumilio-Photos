@@ -1,12 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Bird,
-  Cpu,
-  Database,
-  Loader2,
-  RefreshCcw,
-  Workflow,
-} from "lucide-react";
+import { Bird, Cpu, Database, Loader2, RefreshCcw, Workflow } from "lucide-react";
 import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
@@ -68,8 +61,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
   const selectedReindexTask = reindexModal
     ? taskCards.find((task) => task.key === reindexModal.taskKey)
     : undefined;
-  const selectedReindexTotal =
-    selectedReindexTask?.stats?.totalCount ?? stats?.photoTotal ?? 0;
+  const selectedReindexTotal = selectedReindexTask?.stats?.totalCount ?? stats?.photoTotal ?? 0;
   const selectedReindexMissing = Math.max(
     selectedReindexTotal - (selectedReindexTask?.stats?.indexedCount ?? 0),
     0,
@@ -100,9 +92,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
           onClick={() => statsQuery.refetch()}
           disabled={statsQuery.isFetching}
         >
-          <RefreshCcw
-            className={`w-4 h-4 ${statsQuery.isFetching ? "animate-spin" : ""}`}
-          />
+          <RefreshCcw className={`w-4 h-4 ${statsQuery.isFetching ? "animate-spin" : ""}`} />
           {t("settings.serverSettings.refresh")}
         </button>
       </div>
@@ -113,9 +103,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
             <Database className="w-8 h-8" />
           </div>
           <div className="stat-title">{t("monitor.ml.existingPhotos")}</div>
-          <div className="stat-value text-primary">
-            {stats?.photoTotal ?? 0}
-          </div>
+          <div className="stat-value text-primary">{stats?.photoTotal ?? 0}</div>
         </div>
 
         <div className="stat">
@@ -131,9 +119,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
             <Workflow className="w-8 h-8" />
           </div>
           <div className="stat-title">{t("monitor.ml.reindexJobs")}</div>
-          <div className="stat-value text-secondary">
-            {stats?.reindexJobs ?? 0}
-          </div>
+          <div className="stat-value text-secondary">{stats?.reindexJobs ?? 0}</div>
         </div>
       </div>
 
@@ -146,10 +132,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
           const remaining = Math.max(totalCount - indexedCount, 0);
 
           return (
-            <section
-              key={key}
-              className="bg-base-100 rounded-lg shadow-sm p-4 space-y-4"
-            >
+            <section key={key} className="bg-base-100 rounded-lg shadow-sm p-4 space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold">{label}</h2>
@@ -161,9 +144,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                     })}
                   </p>
                 </div>
-                <span className="badge badge-outline">
-                  {formatCoveragePercent(coverage)}
-                </span>
+                <span className="badge badge-outline">{formatCoveragePercent(coverage)}</span>
               </div>
 
               <progress
@@ -174,21 +155,15 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
 
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">
-                    {t("monitor.ml.indexedAssets")}
-                  </div>
+                  <div className="text-base-content/60">{t("monitor.ml.indexedAssets")}</div>
                   <div className="mt-1 font-semibold">{indexedCount}</div>
                 </div>
                 <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">
-                    {t("monitor.ml.remainingAssets")}
-                  </div>
+                  <div className="text-base-content/60">{t("monitor.ml.remainingAssets")}</div>
                   <div className="mt-1 font-semibold">{remaining}</div>
                 </div>
                 <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">
-                    {t("monitor.ml.queuedJobs")}
-                  </div>
+                  <div className="text-base-content/60">{t("monitor.ml.queuedJobs")}</div>
                   <div className="mt-1 font-semibold">{queuedJobs}</div>
                 </div>
               </div>
@@ -200,9 +175,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                     setReindexAll(remaining === 0);
                     setReindexModal({ taskKey: key, taskLabel: label });
                   }}
-                  disabled={
-                    rebuildMutation.isPending && rebuildingTasks.includes(key)
-                  }
+                  disabled={rebuildMutation.isPending && rebuildingTasks.includes(key)}
                 >
                   <RefreshCcw
                     className={`w-4 h-4 ${
@@ -246,9 +219,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                     })}
                   </p>
                 </div>
-                <span className="badge badge-outline">
-                  {formatCoveragePercent(coverage)}
-                </span>
+                <span className="badge badge-outline">{formatCoveragePercent(coverage)}</span>
               </div>
 
               <progress
@@ -259,28 +230,20 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
 
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">
-                    {t("monitor.ml.indexedAssets")}
-                  </div>
+                  <div className="text-base-content/60">{t("monitor.ml.indexedAssets")}</div>
                   <div className="mt-1 font-semibold">{indexedCount}</div>
                 </div>
                 <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">
-                    {t("monitor.ml.remainingAssets")}
-                  </div>
+                  <div className="text-base-content/60">{t("monitor.ml.remainingAssets")}</div>
                   <div className="mt-1 font-semibold">{remaining}</div>
                 </div>
                 <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">
-                    {t("monitor.ml.queuedJobs")}
-                  </div>
+                  <div className="text-base-content/60">{t("monitor.ml.queuedJobs")}</div>
                   <div className="mt-1 font-semibold">{queuedJobs}</div>
                 </div>
               </div>
 
-              <p className="text-xs text-base-content/60">
-                {t("monitor.ml.bioAlbumHint")}
-              </p>
+              <p className="text-xs text-base-content/60">{t("monitor.ml.bioAlbumHint")}</p>
             </section>
           );
         })()}

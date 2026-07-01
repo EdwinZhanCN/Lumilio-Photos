@@ -42,9 +42,7 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
         const offset = Number(lastPageParam ?? 0) || 0;
 
         if (typeof total === "number") {
-          return offset + pageClusters.length < total
-            ? offset + PAGE_SIZE
-            : undefined;
+          return offset + pageClusters.length < total ? offset + PAGE_SIZE : undefined;
         }
 
         return pageClusters.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;

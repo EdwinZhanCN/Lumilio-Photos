@@ -55,10 +55,7 @@ function base64UrlToUint8Array(value: string): Uint8Array {
   return bytes;
 }
 
-function coerceBinaryValue(
-  value: unknown,
-  fieldName: string,
-): Uint8Array {
+function coerceBinaryValue(value: unknown, fieldName: string): Uint8Array {
   if (typeof value === "string") {
     return base64UrlToUint8Array(value);
   }
@@ -91,11 +88,7 @@ function bufferSourceToBase64Url(value: ArrayBuffer | ArrayBufferView | null) {
     binary += String.fromCharCode(byte);
   });
 
-  return window
-    .btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
+  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function coerceCreationOptions(payload: unknown): PublicKeyCredentialCreationOptions {
@@ -103,10 +96,7 @@ function coerceCreationOptions(payload: unknown): PublicKeyCredentialCreationOpt
     response?: Record<string, unknown>;
     publicKey?: Record<string, unknown>;
   };
-  const options = (source?.publicKey ?? source?.response ?? payload) as Record<
-    string,
-    unknown
-  >;
+  const options = (source?.publicKey ?? source?.response ?? payload) as Record<string, unknown>;
   const user = (options.user ?? {}) as Record<string, unknown>;
 
   return {
@@ -133,10 +123,7 @@ function coerceRequestOptions(payload: unknown): PublicKeyCredentialRequestOptio
     response?: Record<string, unknown>;
     publicKey?: Record<string, unknown>;
   };
-  const options = (source?.publicKey ?? source?.response ?? payload) as Record<
-    string,
-    unknown
-  >;
+  const options = (source?.publicKey ?? source?.response ?? payload) as Record<string, unknown>;
 
   return {
     ...options,
@@ -144,10 +131,7 @@ function coerceRequestOptions(payload: unknown): PublicKeyCredentialRequestOptio
     allowCredentials: Array.isArray(options.allowCredentials)
       ? options.allowCredentials.map((credential) => ({
           ...(credential as Record<string, unknown>),
-          id: coerceBinaryValue(
-            (credential as Record<string, unknown>).id,
-            "allowCredentials.id",
-          ),
+          id: coerceBinaryValue((credential as Record<string, unknown>).id, "allowCredentials.id"),
         }))
       : undefined,
   } as unknown as PublicKeyCredentialRequestOptions;
@@ -160,16 +144,14 @@ function serializeCredential(credential: Credential | null) {
   }
 
   const response = publicKeyCredential.response;
-  const clientExtensionResults =
-    publicKeyCredential.getClientExtensionResults?.() ?? {};
+  const clientExtensionResults = publicKeyCredential.getClientExtensionResults?.() ?? {};
 
   if (response instanceof AuthenticatorAttestationResponse) {
     return {
       id: publicKeyCredential.id,
       rawId: bufferSourceToBase64Url(publicKeyCredential.rawId),
       type: publicKeyCredential.type,
-      authenticatorAttachment:
-        publicKeyCredential.authenticatorAttachment ?? undefined,
+      authenticatorAttachment: publicKeyCredential.authenticatorAttachment ?? undefined,
       clientExtensionResults,
       response: {
         clientDataJSON: bufferSourceToBase64Url(response.clientDataJSON),
@@ -184,8 +166,7 @@ function serializeCredential(credential: Credential | null) {
       id: publicKeyCredential.id,
       rawId: bufferSourceToBase64Url(publicKeyCredential.rawId),
       type: publicKeyCredential.type,
-      authenticatorAttachment:
-        publicKeyCredential.authenticatorAttachment ?? undefined,
+      authenticatorAttachment: publicKeyCredential.authenticatorAttachment ?? undefined,
       clientExtensionResults,
       response: {
         clientDataJSON: bufferSourceToBase64Url(response.clientDataJSON),

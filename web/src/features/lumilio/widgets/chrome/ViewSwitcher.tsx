@@ -36,7 +36,12 @@ interface ViewSwitcherProps {
  * Widget is a window pinned to a ref; every registered view consumes the same
  * data, so switching is purely a presentation change. Reused by board cells
  * (persisted) and inline chat widgets (local until pinned). */
-export function ViewSwitcher({ current, onChange, variant = "default", size = "sm" }: ViewSwitcherProps) {
+export function ViewSwitcher({
+  current,
+  onChange,
+  variant = "default",
+  size = "sm",
+}: ViewSwitcherProps) {
   const { t } = useI18n();
   const viewName = useViewName();
   const views = listWidgets();

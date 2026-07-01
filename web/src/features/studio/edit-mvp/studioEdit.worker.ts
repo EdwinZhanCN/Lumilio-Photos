@@ -589,7 +589,11 @@ function drawSourceCanvas(
   return { canvas, width: render.width, height: render.height };
 }
 
-function packAdjustments(adjustments: StudioEditAdjustments, width: number, height: number): Float32Array {
+function packAdjustments(
+  adjustments: StudioEditAdjustments,
+  width: number,
+  height: number,
+): Float32Array {
   return new Float32Array([
     adjustments.exposure,
     adjustments.contrast,
@@ -647,7 +651,7 @@ async function processWithWebGpu(
   imageData: ImageData,
   adjustments: StudioEditAdjustments,
 ): Promise<ProcessedImage> {
-  const device = await getWebGpuDevice() as {
+  const device = (await getWebGpuDevice()) as {
     createTexture: (descriptor: unknown) => unknown;
     createBuffer: (descriptor: unknown) => unknown;
     createShaderModule: (descriptor: unknown) => unknown;
@@ -655,7 +659,12 @@ async function processWithWebGpu(
     createBindGroup: (descriptor: unknown) => unknown;
     createCommandEncoder: () => unknown;
     queue: {
-      writeTexture: (destination: unknown, data: Uint8ClampedArray | Float32Array, layout: unknown, size: unknown) => void;
+      writeTexture: (
+        destination: unknown,
+        data: Uint8ClampedArray | Float32Array,
+        layout: unknown,
+        size: unknown,
+      ) => void;
       writeBuffer: (buffer: unknown, offset: number, data: Float32Array) => void;
       submit: (commands: unknown[]) => void;
     };
@@ -760,11 +769,7 @@ async function processWithWebGpu(
   return { data: result, width, height, engine: "webgpu" };
 }
 
-function compileShader(
-  gl: WebGL2RenderingContext,
-  type: number,
-  source: string,
-): WebGLShader {
+function compileShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
   if (!shader) throw new Error("Failed to create WebGL shader");
   gl.shaderSource(shader, source);
@@ -822,12 +827,7 @@ function processWithWebGl2(
     }
 
     gl.bindVertexArray(vao);
-    const vertices = new Float32Array([
-      -1, -1, 0, 1,
-      1, -1, 1, 1,
-      -1, 1, 0, 0,
-      1, 1, 1, 0,
-    ]);
+    const vertices = new Float32Array([-1, -1, 0, 1, 1, -1, 1, 1, -1, 1, 0, 0, 1, 1, 1, 0]);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
@@ -1008,9 +1008,7 @@ async function processedImageToBlob(
   const canvas = new OffscreenCanvas(processed.width, processed.height);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2D canvas is not available for Studio export");
-  const imageDataBytes = new Uint8ClampedArray(
-    processed.data,
-  ) as Uint8ClampedArray<ArrayBuffer>;
+  const imageDataBytes = new Uint8ClampedArray(processed.data) as Uint8ClampedArray<ArrayBuffer>;
   ctx.putImageData(new ImageData(imageDataBytes, processed.width, processed.height), 0, 0);
   return canvas.convertToBlob({ type: format, quality });
 }

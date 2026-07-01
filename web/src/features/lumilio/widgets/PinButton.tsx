@@ -49,9 +49,7 @@ export function PinButton({ refId, threadId, widget, title }: PinButtonProps) {
             thread_id: threadId,
             title: title ?? "",
             widget,
-            layout: layout
-              ? { x: 0, y: 0, w: layout.w, h: layout.h }
-              : undefined,
+            layout: layout ? { x: 0, y: 0, w: layout.w, h: layout.h } : undefined,
           },
         })
       }

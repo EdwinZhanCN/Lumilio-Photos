@@ -30,11 +30,7 @@ export const assetToPhotoLocation = (
   }
 
   // Convert coordinates if using Gaode Map and location is in China
-  const convertedCoords = autoConvertCoordinates(
-    longitude,
-    latitude,
-    useGaodeMap,
-  );
+  const convertedCoords = autoConvertCoordinates(longitude, latitude, useGaodeMap);
 
   return {
     id: asset.asset_id || `asset-${Date.now()}`,
@@ -71,9 +67,7 @@ export const getAssetThumbnailUrl = (
 /**
  * Calculate the center point of multiple photo locations
  */
-export const calculateCenter = (
-  locations: PhotoLocation[],
-): [number, number] => {
+export const calculateCenter = (locations: PhotoLocation[]): [number, number] => {
   if (locations.length === 0) {
     return [0, 0];
   }
@@ -137,11 +131,7 @@ export const convertPhotoLocationCoordinates = (
   useGaodeMap: boolean,
 ): PhotoLocation => {
   const position = location.position as [number, number];
-  const converted = convertCoordinatesForMap(
-    position[1],
-    position[0],
-    useGaodeMap,
-  );
+  const converted = convertCoordinatesForMap(position[1], position[0], useGaodeMap);
 
   return {
     ...location,

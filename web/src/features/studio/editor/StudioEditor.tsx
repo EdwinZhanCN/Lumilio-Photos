@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
 import client from "@/lib/http-commons/client";
@@ -79,9 +73,7 @@ function getStudioSourceUrl(asset: Asset, assetId: string): string {
 }
 
 function getAssetDimension(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : fallback;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,15 +82,12 @@ function getAssetDimension(value: unknown, fallback: number): number {
 function isAsset(value: unknown): value is Asset {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      typeof (value as Record<string, unknown>).asset_id === "string",
+    typeof value === "object" &&
+    typeof (value as Record<string, unknown>).asset_id === "string",
   );
 }
 
-function unwrapData<T>(
-  response: unknown,
-  guard: (value: unknown) => value is T,
-): T | undefined {
+function unwrapData<T>(response: unknown, guard: (value: unknown) => value is T): T | undefined {
   if (guard(response)) return response;
   return undefined;
 }
@@ -106,17 +95,17 @@ function unwrapData<T>(
 function isSidecarResponse(value: unknown): value is AssetSidecarResponse {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      typeof (value as Record<string, unknown>).asset_id === "string" &&
-      typeof (value as Record<string, unknown>).sidecar === "object",
+    typeof value === "object" &&
+    typeof (value as Record<string, unknown>).asset_id === "string" &&
+    typeof (value as Record<string, unknown>).sidecar === "object",
   );
 }
 
 function isExifResponse(value: unknown): value is { exif_raw: Record<string, unknown> } {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      typeof (value as Record<string, unknown>).exif_raw === "object",
+    typeof value === "object" &&
+    typeof (value as Record<string, unknown>).exif_raw === "object",
   );
 }
 
@@ -141,7 +130,10 @@ function filterExifRows(exif: Record<string, unknown> | null): AssetExifRow[] {
     ["Aperture", ["Aperture", "FNumber", "EXIF:FNumber", "Exif.Photo.FNumber"]],
     ["Shutter", ["ShutterSpeed", "ExposureTime", "EXIF:ExposureTime", "Exif.Photo.ExposureTime"]],
     ["Focal Length", ["FocalLength", "EXIF:FocalLength", "Exif.Photo.FocalLength"]],
-    ["Captured", ["DateTimeOriginal", "CreateDate", "EXIF:DateTimeOriginal", "Exif.Photo.DateTimeOriginal"]],
+    [
+      "Captured",
+      ["DateTimeOriginal", "CreateDate", "EXIF:DateTimeOriginal", "Exif.Photo.DateTimeOriginal"],
+    ],
   ];
   return fields.flatMap(([label, keys]) => {
     const value = getExifValue(exif, keys);
@@ -182,9 +174,7 @@ function createSidecar(asset: Asset, adjustments: StudioEditAdjustments): Lumili
   };
 }
 
-function toPhotometricAdjustments(
-  adjustments: StudioEditAdjustments,
-): StudioEditAdjustments {
+function toPhotometricAdjustments(adjustments: StudioEditAdjustments): StudioEditAdjustments {
   return { ...adjustments, rotation: 0, flipHorizontal: false, flipVertical: false };
 }
 
@@ -242,11 +232,7 @@ async function decodeBlobToImageData(
 }
 
 function cloneImageData(imageData: ImageData): ImageData {
-  return new ImageData(
-    new Uint8ClampedArray(imageData.data),
-    imageData.width,
-    imageData.height,
-  );
+  return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
 }
 
 // ===========================================================================
@@ -278,9 +264,7 @@ export function StudioEditor({
 
   // State
   const [asset, setAsset] = useState<Asset | null>(null);
-  const [adjustments, setAdjustments] = useState<StudioEditAdjustments>(
-    DEFAULT_STUDIO_ADJUSTMENTS,
-  );
+  const [adjustments, setAdjustments] = useState<StudioEditAdjustments>(DEFAULT_STUDIO_ADJUSTMENTS);
   const [history, setHistory] = useState<StudioEditAdjustments[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string | null>(null);
@@ -296,34 +280,28 @@ export function StudioEditor({
   const [error, setError] = useState<string | null>(null);
 
   // Border tool
-  const [borderParams, setBorderParams] = useState<Record<string, unknown>>(
-    BORDER_DEFAULT_PARAMS,
-  );
+  const [borderParams, setBorderParams] = useState<Record<string, unknown>>(BORDER_DEFAULT_PARAMS);
   const [borderResultUrl, setBorderResultUrl] = useState<string | null>(null);
   const [borderResultFileName, setBorderResultFileName] = useState<string | null>(null);
   const [isApplyingBorder, setIsApplyingBorder] = useState(false);
   // EXIF-driven border data (auto-matched from the asset; not user-editable).
   const borderExifRef = useRef<BorderExif>({});
   const logoBitmapCacheRef = useRef<Map<BrandKey, ImageBitmap | null>>(new Map());
-  const [borderExifSummary, setBorderExifSummary] = useState<BorderExifSummary>(
-    EMPTY_BORDER_EXIF_SUMMARY,
-  );
+  const [borderExifSummary, setBorderExifSummary] =
+    useState<BorderExifSummary>(EMPTY_BORDER_EXIF_SUMMARY);
 
   const clearLogoCache = useCallback(() => {
     logoBitmapCacheRef.current.forEach((bitmap) => bitmap?.close?.());
     logoBitmapCacheRef.current.clear();
   }, []);
 
-  const getLogoBitmap = useCallback(
-    async (key: BrandKey): Promise<ImageBitmap | null> => {
-      const cache = logoBitmapCacheRef.current;
-      if (cache.has(key)) return cache.get(key) ?? null;
-      const bitmap = await rasterizeBrandLogo(key);
-      cache.set(key, bitmap);
-      return bitmap;
-    },
-    [],
-  );
+  const getLogoBitmap = useCallback(async (key: BrandKey): Promise<ImageBitmap | null> => {
+    const cache = logoBitmapCacheRef.current;
+    if (cache.has(key)) return cache.get(key) ?? null;
+    const bitmap = await rasterizeBrandLogo(key);
+    cache.set(key, bitmap);
+    return bitmap;
+  }, []);
 
   const currentSignature = useMemo(() => JSON.stringify(adjustments), [adjustments]);
   const isDirty = currentSignature !== lastSavedSignatureRef.current;
@@ -342,10 +320,9 @@ export function StudioEditor({
   // ----- Worker plumbing -----
   const ensureWorker = useCallback(() => {
     if (!workerRef.current) {
-      workerRef.current = new Worker(
-        new URL("../edit-mvp/studioEdit.worker.ts", import.meta.url),
-        { type: "module" },
-      );
+      workerRef.current = new Worker(new URL("../edit-mvp/studioEdit.worker.ts", import.meta.url), {
+        type: "module",
+      });
       workerHasSourceRef.current = false;
     }
     return workerRef.current;
@@ -527,9 +504,7 @@ export function StudioEditor({
           params: { path: { id: assetId } },
         });
         const loadedSidecar = unwrapData(sidecarResponse.data, isSidecarResponse);
-        const nextAdjustments = normalizeStudioAdjustments(
-          loadedSidecar?.sidecar.adjustments,
-        );
+        const nextAdjustments = normalizeStudioAdjustments(loadedSidecar?.sidecar.adjustments);
 
         const [imageResponse, exifResponse] = await Promise.all([
           fetch(getStudioSourceUrl(loadedAsset, assetId)),
@@ -607,7 +582,7 @@ export function StudioEditor({
         setImageSize({ width, height });
 
         const exif = exifResponse
-          ? unwrapData(exifResponse.data, isExifResponse)?.exif_raw ?? null
+          ? (unwrapData(exifResponse.data, isExifResponse)?.exif_raw ?? null)
           : null;
         setExifRows(filterExifRows(exif));
 
@@ -713,8 +688,7 @@ export function StudioEditor({
         height: asset.height ?? imageSize?.height ?? null,
       });
     } catch (saveError) {
-      const message =
-        saveError instanceof Error ? saveError.message : "Failed to save sidecar";
+      const message = saveError instanceof Error ? saveError.message : "Failed to save sidecar";
       setError(message);
       showMessage("error", message);
     } finally {
@@ -743,8 +717,7 @@ export function StudioEditor({
       triggerDownload(url, `${baseName}-lumilio.jpg`);
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (exportError) {
-      const message =
-        exportError instanceof Error ? exportError.message : "Failed to export image";
+      const message = exportError instanceof Error ? exportError.message : "Failed to export image";
       setError(message);
       showMessage("error", message);
     } finally {
@@ -785,18 +758,12 @@ export function StudioEditor({
         const brandText = brandDisplayName(borderExif.make, matchedKey);
         // The Info Strip prefers a rendered logo; Frosted Info always uses text.
         const logo =
-          baseParams.mode === "INFO_STRIP" && matchedKey
-            ? await getLogoBitmap(matchedKey)
-            : null;
+          baseParams.mode === "INFO_STRIP" && matchedKey ? await getLogoBitmap(matchedKey) : null;
         applyParams = { ...applyParams, exif: borderExif, brandText, logo };
       }
 
       // 3) Run the border tool on top of the developed image.
-      const result = await workerClient.runTool(
-        "border",
-        developedFile,
-        applyParams,
-      );
+      const result = await workerClient.runTool("border", developedFile, applyParams);
 
       const url = URL.createObjectURL(result.blob);
       setBorderResultUrl((prev) => {
@@ -807,25 +774,16 @@ export function StudioEditor({
       setBorderResultFileName(result.fileName);
       showMessage("success", t("studio.tools.border.done", { defaultValue: "Border applied" }));
     } catch (borderError) {
-      const message =
-        borderError instanceof Error ? borderError.message : "Failed to apply border";
+      const message = borderError instanceof Error ? borderError.message : "Failed to apply border";
       setError(message);
       showMessage("error", message);
     } finally {
       setIsApplyingBorder(false);
     }
-  }, [
-    adjustments,
-    asset,
-    borderParams,
-    callWorker,
-    getLogoBitmap,
-    showMessage,
-    t,
-    workerClient,
-  ]);
+  }, [adjustments, asset, borderParams, callWorker, getLogoBitmap, showMessage, t, workerClient]);
 
-  const fileName = asset?.original_filename ?? t("studio.editor.loading", { defaultValue: "Loading…" });
+  const fileName =
+    asset?.original_filename ?? t("studio.editor.loading", { defaultValue: "Loading…" });
   const displaySource = borderResultUrl ?? previewUrl;
   // A border result already has geometry baked in, so present it un-rotated.
   const viewportRotation = borderResultUrl ? 0 : adjustments.rotation;
@@ -862,9 +820,7 @@ export function StudioEditor({
           assetId={asset?.asset_id ?? null}
           fileName={asset?.original_filename ?? "-"}
           sizeText={formatBytes(asset?.file_size)}
-          dimensionsText={
-            imageSize ? `${imageSize.width} × ${imageSize.height}` : "-"
-          }
+          dimensionsText={imageSize ? `${imageSize.width} × ${imageSize.height}` : "-"}
           typeText={asset?.mime_type ?? "-"}
           exifRows={exifRows}
         />

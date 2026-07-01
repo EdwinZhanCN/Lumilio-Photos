@@ -110,9 +110,6 @@ export function getEntitiesForType(
 }
 
 /** Flat search across all mention types, ranked by source order. */
-export function searchAllMentions(
-  sources: MentionSource[],
-  query: string,
-): MentionEntity[] {
+export function searchAllMentions(sources: MentionSource[], query: string): MentionEntity[] {
   return sources.flatMap((s) => s.search(query)).slice(0, 30);
 }

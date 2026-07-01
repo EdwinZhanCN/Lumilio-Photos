@@ -104,19 +104,14 @@ import type {
   resolveBrowseSelectedAssetIds,
 } from "./utils/browseItems.ts";
 import type { useAssetActions } from "./hooks/useAssetActions.tsx";
-import type {
-  useBulkAssetOperations,
-} from "./hooks/useSelection.tsx";
+import type { useBulkAssetOperations } from "./hooks/useSelection.tsx";
 import type { useAssetsNavigation } from "./hooks/useAssetsNavigation.ts";
 import type {
   useAssetsView,
   useCurrentAssetsSearchView,
   useCurrentAssetsView,
 } from "./hooks/useAssetsView.tsx";
-import type {
-  PinAssetsViewResult,
-  usePinAssetsView,
-} from "./hooks/usePinAssetsView.tsx";
+import type { PinAssetsViewResult, usePinAssetsView } from "./hooks/usePinAssetsView.tsx";
 import type { AssetsGalleryPage } from "./components/page/AssetsGalleryPage.tsx";
 import type Assets from "./routes/Assets.tsx";
 import type AssetsTrash from "./routes/AssetsTrash.tsx";
