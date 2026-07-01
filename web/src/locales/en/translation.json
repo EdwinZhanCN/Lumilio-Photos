@@ -296,7 +296,6 @@
     },
     "pin": {
       "backToLumilio": "Back to Lumilio",
-      "badge": "Pinned result",
       "count_one": "{{count}} photo",
       "count_other": "{{count}} photos",
       "defaultTitle": "Agent result",
@@ -1298,26 +1297,95 @@
     }
   },
   "people": {
+    "cover": {
+      "error": "Failed to set cover: {{message}}",
+      "success": "Cover updated"
+    },
     "details": {
       "confirmedHint": "This person has been named and confirmed.",
+      "editAction": "Edit",
       "nameLabel": "Name",
       "personCode": "PERSON {{id}}",
-      "renameAction": "Rename",
       "renamePlaceholder": "Name this person",
-      "renameTitle": "Rename person",
       "save": "Save",
       "unconfirmedHint": "This person is still unnamed. Give them a name when you are confident.",
       "updatedLabel": "Updated"
     },
+    "edit": {
+      "tabs": {
+        "faces": "Faces",
+        "info": "Info",
+        "merge": "Merge"
+      },
+      "title": "Edit person"
+    },
+    "faces": {
+      "actions": "Face actions",
+      "clearSelection": "Clear",
+      "count_one": "{{count}} face",
+      "count_other": "{{count}} faces",
+      "empty": "No detected faces for this person.",
+      "missingCrop": "No crop",
+      "move": "Move to another person",
+      "remove": "Remove from this person",
+      "selectAll": "Select all",
+      "selectedCount_one": "{{count}} selected",
+      "selectedCount_other": "{{count}} selected",
+      "selectionMode": {
+        "enter": "Select",
+        "exit": "Done"
+      },
+      "setCover": "Set as cover",
+      "title": "Faces"
+    },
+    "hidden": {
+      "allTab": "All",
+      "badge": "Hidden",
+      "error": "Failed to update person: {{message}}",
+      "hiddenToast": "Person hidden",
+      "settingDescription": "Hide this person from the default people grid without changing photos or face assignments.",
+      "settingTitle": "Hidden",
+      "unhiddenToast": "Person restored",
+      "visibleTab": "Visible"
+    },
     "membersCount_one": "{{count}} face",
     "membersCount_other": "{{count}} faces",
+    "merge": {
+      "confirm": "Merge",
+      "description": "The selected people will be merged into {{name}}. Their photos stay in the library and people filters may change.",
+      "error": "Failed to merge people: {{message}}",
+      "selectedCount_one": "{{count}} selected",
+      "selectedCount_other": "{{count}} selected",
+      "success": "People merged",
+      "title": "Merge people"
+    },
+    "moveFace": {
+      "bulkConfirm": "Move selected",
+      "bulkDescription": "Choose the person these faces belong to.",
+      "bulkError": "Failed to move faces: {{message}}",
+      "bulkSuccess_one": "Moved {{count}} faces",
+      "bulkSuccess_other": "Moved {{count}} faces",
+      "bulkTitle": "Move selected faces"
+    },
     "photosCount_one": "{{count}} photo",
     "photosCount_other": "{{count}} photos",
+    "picker": {
+      "empty": "No matching people",
+      "searchPlaceholder": "Search people"
+    },
     "rebuild": {
       "action": "Rebuild",
       "error": "Failed to rebuild people: {{message}}",
       "running": "Rebuilding...",
       "success": "Rebuilt {{clusters}} people clusters from {{faces}} faces ({{noise}} noise)."
+    },
+    "removeFace": {
+      "bulkConfirm": "Remove selected",
+      "bulkDescription": "The selected faces will no longer be associated with this person. Original photos are not changed.",
+      "bulkError": "Failed to remove faces: {{message}}",
+      "bulkSuccess_one": "Removed {{count}} faces",
+      "bulkSuccess_other": "Removed {{count}} faces",
+      "bulkTitle": "Remove selected faces"
     },
     "unnamed": "Unnamed"
   },

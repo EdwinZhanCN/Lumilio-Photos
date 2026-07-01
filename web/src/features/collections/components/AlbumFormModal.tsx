@@ -125,13 +125,18 @@ export function AlbumFormModal({
 
   const footer = (
     <>
-      <button type="button" className="btn btn-ghost" onClick={close} disabled={isSubmitting}>
+      <button
+        type="button"
+        className="btn btn-ghost shadow-none"
+        onClick={close}
+        disabled={isSubmitting}
+      >
         {t("common.cancel")}
       </button>
       <button
         type="submit"
         form="album-form"
-        className="btn btn-primary"
+        className="btn btn-primary shadow-none"
         disabled={!canSubmit}
       >
         {isSubmitting && <span className="loading loading-spinner loading-sm" />}
@@ -151,22 +156,18 @@ export function AlbumFormModal({
       open={open}
       onClose={close}
       size="lg"
-      className="h-[85vh]"
       dismissable={!isChoosingCover && !isSubmitting}
       icon={isEdit ? <FolderPen size={22} /> : <FolderPlus size={22} />}
       title={
-        isEdit
-          ? t("collections.albumForm.editTitle", "Edit album")
-          : t("collections.newAlbum")
+        isEdit ? t("collections.albumForm.editTitle", "Edit album") : t("collections.newAlbum")
       }
       footer={footer}
     >
-      <form id="album-form" onSubmit={handleSubmit} className="h-full">
-        <div className="grid h-full grid-cols-1 gap-8 p-6 md:grid-cols-2 md:gap-12 md:p-8">
-          {/* Left: text fields */}
-          <div className="flex h-full flex-col gap-6">
-            <fieldset className="fieldset w-full">
-              <legend className="fieldset-legend font-semibold">
+      <form id="album-form" onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 items-start gap-6 p-5 md:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] md:p-6">
+          <div className="space-y-5">
+            <fieldset className="fieldset w-full py-0">
+              <legend className="fieldset-legend pb-1 text-xs font-semibold uppercase tracking-wide text-base-content/55">
                 {t("collections.createModal.fields.name.label")}
               </legend>
               <input
@@ -179,46 +180,47 @@ export function AlbumFormModal({
               />
             </fieldset>
 
-            <fieldset className="fieldset h-full min-h-0 w-full flex-1">
-              <legend className="fieldset-legend font-semibold">
+            <fieldset className="fieldset w-full py-0">
+              <legend className="fieldset-legend pb-1 text-xs font-semibold uppercase tracking-wide text-base-content/55">
                 {t("collections.createModal.fields.description.label")}
               </legend>
               <textarea
-                className="textarea textarea-bordered h-full min-h-30 w-full flex-1 resize-none"
+                className="textarea textarea-bordered h-36 w-full resize-none"
                 placeholder={t("collections.createModal.fields.description.placeholder")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </fieldset>
 
-            <div className="space-y-2">
+            <div className="border-t border-base-200 pt-4">
               <button
                 type="button"
-                className={`btn w-fit gap-2 ${isBioAlbum ? "btn-primary" : "btn-outline"}`}
+                className={`btn btn-sm w-fit gap-2 shadow-none ${
+                  isBioAlbum ? "btn-primary" : "btn-outline"
+                }`}
                 aria-pressed={isBioAlbum}
                 onClick={() => setIsBioAlbum((v) => !v)}
               >
                 <Bird className="size-4" />
                 {t("collections.createModal.fields.bioAlbum.label")}
               </button>
-              <p className="text-xs leading-relaxed text-base-content/60">
+              <p className="mt-2 text-xs leading-5 text-base-content/60">
                 {t("collections.createModal.fields.bioAlbum.hint")}
               </p>
             </div>
           </div>
 
-          {/* Right: cover */}
-          <fieldset className="fieldset flex h-full min-h-0 w-full flex-col">
-            <legend className="fieldset-legend font-semibold">
+          <fieldset className="fieldset w-full py-0">
+            <legend className="fieldset-legend pb-1 text-xs font-semibold uppercase tracking-wide text-base-content/55">
               {t("collections.createModal.fields.cover.label")}
             </legend>
             <button
               type="button"
               onClick={() => setIsChoosingCover(true)}
-              className={`group relative flex min-h-62.5 w-full flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-box border-2 border-dashed transition-all ${
+              className={`group relative flex aspect-square w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-xl border transition-colors ${
                 coverId
-                  ? "border-primary bg-base-100 shadow-sm"
-                  : "border-base-300 bg-base-200/30 hover:border-primary/50 hover:bg-base-200/60"
+                  ? "border-base-300 bg-base-100"
+                  : "border-base-300 bg-base-200/35 hover:border-primary/50 hover:bg-base-200/60"
               }`}
             >
               {coverId ? (
@@ -229,18 +231,18 @@ export function AlbumFormModal({
                     alt={t("collections.createModal.fields.cover.selectedAlt")}
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-base-300/40 opacity-0 backdrop-blur-[2px] transition-opacity group-hover:opacity-100">
-                    <span className="btn btn-primary btn-sm rounded-full shadow-lg">
+                    <span className="btn btn-primary btn-sm rounded-full shadow-none">
                       {t("collections.createModal.fields.cover.change")}
                     </span>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform duration-300 group-hover:scale-110">
-                    <ImageIcon size={32} />
+                  <div className="rounded-full bg-base-100 p-3 text-base-content/45">
+                    <ImageIcon size={28} />
                   </div>
                   <div className="px-4 text-center">
-                    <span className="block text-sm font-bold text-base-content">
+                    <span className="block text-sm font-semibold text-base-content">
                       {t("collections.createModal.fields.cover.choose")}
                     </span>
                     <span className="mt-1 block text-xs text-base-content/60">
@@ -256,10 +258,10 @@ export function AlbumFormModal({
 
       {isChoosingCover && (
         <div className="absolute inset-0 z-40 flex flex-col bg-base-100">
-          <div className="sticky top-0 z-50 flex items-center border-b border-base-200 bg-base-100 p-3 shadow-sm">
+          <div className="sticky top-0 z-50 flex items-center border-b border-base-200 bg-base-100 p-3">
             <button
               type="button"
-              className="btn btn-circle btn-ghost btn-sm"
+              className="btn btn-circle btn-ghost btn-sm shadow-none"
               onClick={() => setIsChoosingCover(false)}
             >
               <MoveLeft size={20} />

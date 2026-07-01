@@ -8,10 +8,7 @@ import { CollectionErrorAlert, LoadMoreButton } from "@/components/collection";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import {
-  usePeople,
-  useRebuildPeopleClusters,
-} from "@/features/people/hooks/usePeople";
+import { usePeople, useRebuildPeopleClusters } from "@/features/people/hooks/usePeople";
 import { useWorkingRepository } from "@/features/settings";
 import PeopleCollectionGrid from "../components/PeopleCollectionGrid";
 
@@ -28,12 +25,13 @@ function PeopleContent() {
   ]);
   const { scopedRepositoryId } = useWorkingRepository();
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const [includeHidden, setIncludeHidden] = useState(false);
   const { people, total, isLoading, isError, error, isFetching } = usePeople({
     limit,
     repositoryId: scopedRepositoryId,
+    includeHidden,
   });
-  const { rebuildPeople, isRebuilding } =
-    useRebuildPeopleClusters(scopedRepositoryId);
+  const { rebuildPeople, isRebuilding } = useRebuildPeopleClusters(scopedRepositoryId);
 
   const handleRebuildPeople = async () => {
     try {
@@ -62,6 +60,28 @@ function PeopleContent() {
         title={t("collections.sections.people")}
         icon={<Users className="h-6 w-6 text-primary" strokeWidth={1.5} />}
       >
+        <div className="join">
+          <button
+            type="button"
+            className={`btn btn-sm join-item ${includeHidden ? "btn-ghost" : "btn-active"}`}
+            onClick={() => {
+              setIncludeHidden(false);
+              setLimit(PAGE_SIZE);
+            }}
+          >
+            {t("people.hidden.visibleTab", "Visible")}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm join-item ${includeHidden ? "btn-active" : "btn-ghost"}`}
+            onClick={() => {
+              setIncludeHidden(true);
+              setLimit(PAGE_SIZE);
+            }}
+          >
+            {t("people.hidden.allTab", "All")}
+          </button>
+        </div>
         <button
           type="button"
           className="btn btn-primary btn-sm rounded-full"
@@ -73,9 +93,7 @@ function PeopleContent() {
           ) : (
             <RefreshCw className="size-4" />
           )}
-          {isRebuilding
-            ? t("people.rebuild.running")
-            : t("people.rebuild.action")}
+          {isRebuilding ? t("people.rebuild.running") : t("people.rebuild.action")}
         </button>
       </PageHeader>
 
@@ -84,8 +102,7 @@ function PeopleContent() {
           {isError && (
             <CollectionErrorAlert
               message={t("collections.messages.loadPeopleError", {
-                message:
-                  error instanceof Error ? error.message : t("home.errors.unknown"),
+                message: error instanceof Error ? error.message : t("home.errors.unknown"),
               })}
             />
           )}

@@ -285,6 +285,16 @@ func (s *faceService) RebuildFaceClusters(ctx context.Context, repositoryID pgty
 	result.CandidateFaces = len(candidateRows)
 	scopes := collectFaceClusteringScopes(candidateRows)
 
+	// Capture manual corrections before unassigning everything so a full
+	// rebuild preserves user-authored membership (moves and merges).
+	manualMemberships, err := s.queries.GetManualFaceClusterMembershipsForScope(ctx, repo.GetManualFaceClusterMembershipsForScopeParams{
+		RepositoryID: repositoryID,
+		OwnerID:      ownerID,
+	})
+	if err != nil {
+		return result, fmt.Errorf("load manual face memberships: %w", err)
+	}
+
 	if err := s.withTx(ctx, func(q *repo.Queries) error {
 		if err := q.DeleteFaceClusterMembersForScope(ctx, repo.DeleteFaceClusterMembersForScopeParams{
 			RepositoryID: repositoryID,
@@ -293,12 +303,37 @@ func (s *faceService) RebuildFaceClusters(ctx context.Context, repositoryID pgty
 			return fmt.Errorf("delete old face cluster memberships: %w", err)
 		}
 
+		// Reapply manual corrections first so their target clusters are not
+		// removed as empty and so automatic clustering treats those faces as
+		// already assigned.
+		preservedClusters := make(map[int32]struct{}, len(manualMemberships))
+		for _, m := range manualMemberships {
+			if _, err := q.AssignFaceClusterMemberExclusive(ctx, repo.AssignFaceClusterMemberExclusiveParams{
+				ClusterID:       m.ClusterID,
+				FaceID:          m.FaceID,
+				SimilarityScore: m.SimilarityScore,
+				Confidence:      m.Confidence,
+				IsManual:        boolPtr(true),
+			}); err != nil {
+				return fmt.Errorf("reapply manual face membership: %w", err)
+			}
+			preservedClusters[m.ClusterID] = struct{}{}
+		}
+
 		if err := q.DeleteEmptyFaceClusters(ctx); err != nil {
 			return fmt.Errorf("delete empty face clusters after unassign: %w", err)
 		}
 
 		for _, scope := range scopes {
 			if err := s.recognizePendingFacesWithQueries(ctx, q, scope); err != nil {
+				return err
+			}
+		}
+
+		// Manual-only clusters may receive no automatic members, so refresh
+		// their representatives explicitly.
+		for clusterID := range preservedClusters {
+			if err := s.refreshClusterRepresentativeWithQueries(ctx, q, clusterID); err != nil {
 				return err
 			}
 		}
@@ -318,8 +353,9 @@ func (s *faceService) RebuildFaceClusters(ctx context.Context, repositoryID pgty
 	result.NoiseFaces = result.CandidateFaces - result.ClusteredFaces
 
 	clusterCount, err := s.queries.CountPeopleScoped(ctx, repo.CountPeopleScopedParams{
-		RepositoryID: repositoryID,
-		OwnerID:      ownerID,
+		RepositoryID:  repositoryID,
+		OwnerID:       ownerID,
+		IncludeHidden: true,
 	})
 	if err != nil {
 		return result, fmt.Errorf("count rebuilt face clusters: %w", err)

@@ -1,5 +1,24 @@
 # People Correction
 
+> **Status: Completed (2026-06-27).** Implemented merge, move-face, remove-face,
+> set-cover, and hide/unhide end to end. Backend: migration `000007` adds
+> `face_clusters.is_hidden`/`hidden_at` (+ index); new SQL in `faces.sql`/
+> `people.sql`; `FaceService` correction methods with owner/repository
+> authorization via `GetPersonByIDScoped`; manual corrections marked
+> `is_manual` and **replayed across full rebuild** so they survive. New routes
+> under `/api/v1/people/{id}/...` plus a per-face crop endpoint
+> (`/faces/{faceId}/crop`). Frontend: hooks in `usePeople.ts`, a visible/hidden
+> toggle on the people grid, a correction action bar + `PersonFacesPanel` on
+> `PersonDetails`, and `PersonMergeModal`/`MoveFaceModal`/`RemoveFaceModal`
+> sharing a `PersonPicker`. `make dto`, `make web-test`, and `make server-test`
+> all pass.
+>
+> **Caveat:** rebuild-preservation is exercised by the live code path but has no
+> DB-backed integration test — the face suite is pure-unit and no DB harness
+> exists in `internal/service`. Open questions (exclusion markers, auto-confirm
+> on move, hidden-people in agent facets) were left as-is; merge accepts
+> multiple sources.
+
 ## Goal
 
 Make recognized people correctable by the user.

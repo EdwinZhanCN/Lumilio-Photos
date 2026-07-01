@@ -14,7 +14,8 @@ import (
 const countPeopleScoped = `-- name: CountPeopleScoped :one
 SELECT COUNT(*)
 FROM face_clusters fc
-WHERE EXISTS (
+WHERE ($1::boolean OR COALESCE(fc.is_hidden, false) = false)
+  AND EXISTS (
     SELECT 1
     FROM face_cluster_members fcm
     JOIN face_items fi ON fi.id = fcm.face_id
@@ -22,23 +23,24 @@ WHERE EXISTS (
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
       AND (
-        $1::uuid IS NULL
-        OR a.repository_id = $1
+        $2::uuid IS NULL
+        OR a.repository_id = $2
       )
       AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
+        $3::integer IS NULL
+        OR a.owner_id = $3
       )
 )
 `
 
 type CountPeopleScopedParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	IncludeHidden bool        `db:"include_hidden" json:"include_hidden"`
+	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPeopleScoped, arg.RepositoryID, arg.OwnerID)
+	row := q.db.QueryRow(ctx, countPeopleScoped, arg.IncludeHidden, arg.RepositoryID, arg.OwnerID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -49,6 +51,8 @@ SELECT
     fc.cluster_id,
     fc.cluster_name,
     fc.is_confirmed,
+    COALESCE(fc.is_hidden, false) AS is_hidden,
+    fc.hidden_at,
     scoped.member_count,
     scoped.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
@@ -121,6 +125,8 @@ type GetPersonByIDScopedRow struct {
 	ClusterID             int32              `db:"cluster_id" json:"cluster_id"`
 	ClusterName           *string            `db:"cluster_name" json:"cluster_name"`
 	IsConfirmed           *bool              `db:"is_confirmed" json:"is_confirmed"`
+	IsHidden              bool               `db:"is_hidden" json:"is_hidden"`
+	HiddenAt              pgtype.Timestamptz `db:"hidden_at" json:"hidden_at"`
 	MemberCount           int64              `db:"member_count" json:"member_count"`
 	AssetCount            int64              `db:"asset_count" json:"asset_count"`
 	CoverFaceImagePath    *string            `db:"cover_face_image_path" json:"cover_face_image_path"`
@@ -136,6 +142,8 @@ func (q *Queries) GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScop
 		&i.ClusterID,
 		&i.ClusterName,
 		&i.IsConfirmed,
+		&i.IsHidden,
+		&i.HiddenAt,
 		&i.MemberCount,
 		&i.AssetCount,
 		&i.CoverFaceImagePath,
@@ -157,6 +165,7 @@ WITH page_people AS MATERIALIZED (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
+      AND ($3::boolean OR COALESCE(fc.is_hidden, false) = false)
       AND (
         $1::uuid IS NULL
         OR a.repository_id = $1
@@ -171,12 +180,14 @@ WITH page_people AS MATERIALIZED (
         COUNT(DISTINCT fcm.face_id) DESC,
         fc.updated_at DESC,
         fc.cluster_id DESC
-    LIMIT $4 OFFSET $3
+    LIMIT $5 OFFSET $4
 )
 SELECT
     fc.cluster_id,
     fc.cluster_name,
     fc.is_confirmed,
+    COALESCE(fc.is_hidden, false) AS is_hidden,
+    fc.hidden_at,
     pp.member_count,
     pp.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
@@ -227,16 +238,19 @@ ORDER BY
 `
 
 type ListPeopleScopedParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
+	IncludeHidden bool        `db:"include_hidden" json:"include_hidden"`
+	Offset        int32       `db:"offset" json:"offset"`
+	Limit         int32       `db:"limit" json:"limit"`
 }
 
 type ListPeopleScopedRow struct {
 	ClusterID             int32              `db:"cluster_id" json:"cluster_id"`
 	ClusterName           *string            `db:"cluster_name" json:"cluster_name"`
 	IsConfirmed           *bool              `db:"is_confirmed" json:"is_confirmed"`
+	IsHidden              bool               `db:"is_hidden" json:"is_hidden"`
+	HiddenAt              pgtype.Timestamptz `db:"hidden_at" json:"hidden_at"`
 	MemberCount           int64              `db:"member_count" json:"member_count"`
 	AssetCount            int64              `db:"asset_count" json:"asset_count"`
 	CoverFaceImagePath    *string            `db:"cover_face_image_path" json:"cover_face_image_path"`
@@ -249,6 +263,7 @@ func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedPara
 	rows, err := q.db.Query(ctx, listPeopleScoped,
 		arg.RepositoryID,
 		arg.OwnerID,
+		arg.IncludeHidden,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -263,6 +278,8 @@ func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedPara
 			&i.ClusterID,
 			&i.ClusterName,
 			&i.IsConfirmed,
+			&i.IsHidden,
+			&i.HiddenAt,
 			&i.MemberCount,
 			&i.AssetCount,
 			&i.CoverFaceImagePath,
@@ -287,7 +304,7 @@ SET
     is_confirmed = true,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $2
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
 `
 
 type RenameFaceClusterParams struct {
@@ -307,6 +324,41 @@ func (q *Queries) RenameFaceCluster(ctx context.Context, arg RenameFaceClusterPa
 		&i.IsConfirmed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
+	)
+	return i, err
+}
+
+const setFaceClusterHidden = `-- name: SetFaceClusterHidden :one
+UPDATE face_clusters
+SET
+    is_hidden = $1,
+    hidden_at = CASE WHEN $1 THEN CURRENT_TIMESTAMP ELSE NULL END,
+    updated_at = CURRENT_TIMESTAMP
+WHERE cluster_id = $2
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
+`
+
+type SetFaceClusterHiddenParams struct {
+	IsHidden  bool  `db:"is_hidden" json:"is_hidden"`
+	ClusterID int32 `db:"cluster_id" json:"cluster_id"`
+}
+
+func (q *Queries) SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error) {
+	row := q.db.QueryRow(ctx, setFaceClusterHidden, arg.IsHidden, arg.ClusterID)
+	var i FaceCluster
+	err := row.Scan(
+		&i.ClusterID,
+		&i.ClusterName,
+		&i.RepresentativeFaceID,
+		&i.ConfidenceScore,
+		&i.MemberCount,
+		&i.IsConfirmed,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
 	)
 	return i, err
 }
@@ -318,7 +370,7 @@ SET
     confidence_score = $2,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $3
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
 `
 
 type UpdateFaceClusterRepresentativeParams struct {
@@ -339,6 +391,8 @@ func (q *Queries) UpdateFaceClusterRepresentative(ctx context.Context, arg Updat
 		&i.IsConfirmed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHidden,
+		&i.HiddenAt,
 	)
 	return i, err
 }

@@ -21,14 +21,14 @@ import (
 
 type stubPeopleFaceService struct {
 	service.FaceService
-	listFn    func(context.Context, pgtype.UUID, *int32, int, int) ([]service.Person, int64, error)
+	listFn    func(context.Context, pgtype.UUID, *int32, bool, int, int) ([]service.Person, int64, error)
 	getFn     func(context.Context, int32, pgtype.UUID, *int32) (*service.Person, error)
 	renameFn  func(context.Context, int32, string) (*repo.FaceCluster, error)
 	rebuildFn func(context.Context, pgtype.UUID, *int32) (service.FaceClusterRebuildResult, error)
 }
 
-func (s stubPeopleFaceService) ListPeople(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]service.Person, int64, error) {
-	return s.listFn(ctx, repositoryID, ownerID, limit, offset)
+func (s stubPeopleFaceService) ListPeople(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32, includeHidden bool, limit, offset int) ([]service.Person, int64, error) {
+	return s.listFn(ctx, repositoryID, ownerID, includeHidden, limit, offset)
 }
 
 func (s stubPeopleFaceService) GetPerson(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) (*service.Person, error) {
@@ -50,7 +50,7 @@ func TestPeopleHandlerListPeople(t *testing.T) {
 	handler := NewPeopleHandler(
 		stubAssetService{},
 		stubPeopleFaceService{
-			listFn: func(_ context.Context, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]service.Person, int64, error) {
+			listFn: func(_ context.Context, repositoryID pgtype.UUID, ownerID *int32, _ bool, limit, offset int) ([]service.Person, int64, error) {
 				capturedRepo = repositoryID
 				require.Nil(t, ownerID)
 				require.Equal(t, 24, limit)

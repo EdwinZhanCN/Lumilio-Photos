@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useState, useCallback } from "react";
-import { Users, UserRound } from "lucide-react";
+import { EyeOff, Users, UserRound } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
@@ -52,11 +52,7 @@ const PersonAssetsContent = () => {
   const cover = (
     <div className="h-20 w-20 overflow-hidden rounded-[1.5rem] border border-base-300/70 bg-base-200">
       {coverUrl ? (
-        <img
-          src={coverUrl}
-          alt={displayName}
-          className="h-full w-full object-cover"
-        />
+        <img src={coverUrl} alt={displayName} className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <UserRound className="size-8 text-base-content/40" />
@@ -71,6 +67,14 @@ const PersonAssetsContent = () => {
       cover={cover}
       title={displayName}
       code={t("people.details.personCode", { id: personId })}
+      badges={
+        person?.is_hidden ? (
+          <span className="badge badge-neutral badge-sm gap-1">
+            <EyeOff className="size-3" />
+            {t("people.hidden.badge", "Hidden")}
+          </span>
+        ) : null
+      }
       description={
         person?.is_confirmed
           ? t("people.details.confirmedHint")
@@ -78,11 +82,13 @@ const PersonAssetsContent = () => {
       }
       edit={{
         onOpen: () => setIsRenameOpen(true),
-        label: t("people.details.renameAction", "Rename"),
+        label: t("people.details.editAction", "Edit"),
         modal: (
           <PersonRenameModal
             open={isRenameOpen}
+            person={person}
             currentName={person?.name ?? ""}
+            repositoryId={scopedRepositoryId}
             isSaving={isRenaming}
             onClose={() => setIsRenameOpen(false)}
             onSubmit={handleRename}
@@ -91,12 +97,8 @@ const PersonAssetsContent = () => {
       }}
       stats={
         <>
-          <MetaStat>
-            {t("people.membersCount", { count: person?.member_count || 0 })}
-          </MetaStat>
-          <MetaStat>
-            {t("people.photosCount", { count: person?.asset_count || 0 })}
-          </MetaStat>
+          <MetaStat>{t("people.membersCount", { count: person?.member_count || 0 })}</MetaStat>
+          <MetaStat>{t("people.photosCount", { count: person?.asset_count || 0 })}</MetaStat>
           <MetaStat>
             {t("people.details.updatedLabel")}{" "}
             {person?.updated_at

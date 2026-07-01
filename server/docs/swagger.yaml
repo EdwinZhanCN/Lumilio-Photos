@@ -1755,6 +1755,20 @@ components:
         total:
           type: integer
       type: object
+    dto.ListPersonFacesResponseDTO:
+      properties:
+        faces:
+          items:
+            $ref: '#/components/schemas/dto.PersonFaceDTO'
+          type: array
+          uniqueItems: false
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+      type: object
     dto.ListRepositoriesResponseDTO:
       properties:
         repositories:
@@ -2059,11 +2073,28 @@ components:
           example: true
           type: boolean
       type: object
+    dto.MergePeopleRequestDTO:
+      properties:
+        source_person_ids:
+          items:
+            type: integer
+          type: array
+          uniqueItems: false
+      required:
+      - source_person_ids
+      type: object
     dto.MessageResponseDTO:
       properties:
         message:
           example: Operation completed successfully
           type: string
+      type: object
+    dto.MoveFaceRequestDTO:
+      properties:
+        target_person_id:
+          type: integer
+      required:
+      - target_person_id
       type: object
     dto.Option:
       properties:
@@ -2146,6 +2177,11 @@ components:
       - challenge_token
       - credential
       type: object
+    dto.PersonCorrectionResponseDTO:
+      properties:
+        person:
+          $ref: '#/components/schemas/dto.PersonDetailDTO'
+      type: object
     dto.PersonDetailDTO:
       properties:
         asset_count:
@@ -2154,7 +2190,11 @@ components:
           type: string
         created_at:
           type: string
+        hidden_at:
+          type: string
         is_confirmed:
+          type: boolean
+        is_hidden:
           type: boolean
         member_count:
           type: integer
@@ -2167,6 +2207,27 @@ components:
         updated_at:
           type: string
       type: object
+    dto.PersonFaceDTO:
+      properties:
+        asset_id:
+          type: string
+        confidence:
+          type: number
+        face_id:
+          type: integer
+        filename:
+          type: string
+        has_crop:
+          type: boolean
+        is_manual:
+          type: boolean
+        is_representative:
+          type: boolean
+        taken_time:
+          type: string
+        upload_time:
+          type: string
+      type: object
     dto.PersonSummaryDTO:
       properties:
         asset_count:
@@ -2175,7 +2236,11 @@ components:
           type: string
         created_at:
           type: string
+        hidden_at:
+          type: string
         is_confirmed:
+          type: boolean
+        is_hidden:
           type: boolean
         member_count:
           type: integer
@@ -2724,6 +2789,18 @@ components:
           type: string
         total_chunks:
           type: integer
+      type: object
+    dto.SetPersonCoverRequestDTO:
+      properties:
+        face_id:
+          type: integer
+      required:
+      - face_id
+      type: object
+    dto.SetPersonHiddenRequestDTO:
+      properties:
+        hidden:
+          type: boolean
       type: object
     dto.SetupRequestDTO:
       type: object
@@ -7897,6 +7974,12 @@ paths:
         name: repository_id
         schema:
           type: string
+      - description: Include people hidden from the default grid
+        in: query
+        name: include_hidden
+        schema:
+          default: false
+          type: boolean
       - description: Maximum number of results (max 100)
         in: query
         name: limit
@@ -8133,6 +8216,401 @@ paths:
                 $ref: '#/components/schemas/api.ErrorResponse'
           description: Internal server error
       summary: Get person cover
+      tags:
+      - people
+    put:
+      description: Set the representative cover face for a person. The face must belong
+        to the person.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.SetPersonCoverRequestDTO'
+                description: Cover payload
+                summary: request
+        description: Cover payload
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.PersonCorrectionResponseDTO'
+          description: Cover updated successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid request parameters
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Person or face not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Set person cover
+      tags:
+      - people
+  /api/v1/people/{id}/faces:
+    get:
+      description: List the individual face crops assigned to a person for correction
+        workflows.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      - description: Maximum number of results (max 200)
+        in: query
+        name: limit
+        schema:
+          default: 60
+          type: integer
+      - description: Number of results to skip
+        in: query
+        name: offset
+        schema:
+          default: 0
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.ListPersonFacesResponseDTO'
+          description: Faces listed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid request parameters
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Person not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      summary: List person faces
+      tags:
+      - people
+  /api/v1/people/{id}/faces/{faceId}/crop:
+    get:
+      description: Serve the face crop image for a single face belonging to a person.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      - description: Face ID
+        in: path
+        name: faceId
+        required: true
+        schema:
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            image/webp:
+              schema:
+                type: file
+          description: Face crop
+        "400":
+          content:
+            image/webp:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid request parameters
+        "401":
+          content:
+            image/webp:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Unauthorized
+        "404":
+          content:
+            image/webp:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Face crop not found
+        "500":
+          content:
+            image/webp:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      summary: Get person face crop
+      tags:
+      - people
+  /api/v1/people/{id}/faces/{faceId}/move:
+    post:
+      description: Reassign a single face from this person to another person as a
+        manual correction.
+      parameters:
+      - description: Source person ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      - description: Face ID
+        in: path
+        name: faceId
+        required: true
+        schema:
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.MoveFaceRequestDTO'
+                description: Move payload
+                summary: request
+        description: Move payload
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.PersonCorrectionResponseDTO'
+          description: Face moved successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid request parameters
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Person or face not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Move face to another person
+      tags:
+      - people
+  /api/v1/people/{id}/faces/{faceId}/remove:
+    post:
+      description: Detach a face from this person, leaving the original asset unchanged.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      - description: Face ID
+        in: path
+        name: faceId
+        required: true
+        schema:
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.PersonCorrectionResponseDTO'
+          description: Face removed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid request parameters
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Person or face not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Remove face from person
+      tags:
+      - people
+  /api/v1/people/{id}/hidden:
+    put:
+      description: Hide or unhide a person from the default people grid. Faces, assets
+        and names are preserved.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.SetPersonHiddenRequestDTO'
+                description: Hidden payload
+                summary: request
+        description: Hidden payload
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.PersonCorrectionResponseDTO'
+          description: Hidden state updated successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid request parameters
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Person not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Set person hidden
+      tags:
+      - people
+  /api/v1/people/{id}/merge:
+    post:
+      description: Merge one or more source people into the target person. Assets
+        remain in the library and corrections become manual.
+      parameters:
+      - description: Target person ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.MergePeopleRequestDTO'
+                description: Merge payload
+                summary: request
+        description: Merge payload
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.PersonCorrectionResponseDTO'
+          description: People merged successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid request parameters
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Person not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Merge people
       tags:
       - people
   /api/v1/people/rebuild:

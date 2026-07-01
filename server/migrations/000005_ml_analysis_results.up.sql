@@ -175,6 +175,8 @@ CREATE TABLE public.face_clusters (
     confidence_score real DEFAULT 0.0,
     member_count integer DEFAULT 0,
     is_confirmed boolean DEFAULT false,
+    is_hidden boolean DEFAULT false NOT NULL,
+    hidden_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT face_clusters_pkey PRIMARY KEY (cluster_id)
@@ -502,6 +504,13 @@ CREATE INDEX face_clusters_confirmed_idx ON public.face_clusters USING btree (is
 
 
 --
+-- Name: face_clusters_hidden_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX face_clusters_hidden_idx ON public.face_clusters USING btree (is_hidden, updated_at DESC);
+
+
+--
 -- Name: face_clusters_representative_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -770,4 +779,3 @@ CREATE TABLE public.asset_quality_scores (
 --
 
 -- FK defined inline above; no additional ALTER needed.
-

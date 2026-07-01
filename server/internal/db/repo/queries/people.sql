@@ -1,7 +1,8 @@
 -- name: CountPeopleScoped :one
 SELECT COUNT(*)
 FROM face_clusters fc
-WHERE EXISTS (
+WHERE (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = false)
+  AND EXISTS (
     SELECT 1
     FROM face_cluster_members fcm
     JOIN face_items fi ON fi.id = fcm.face_id
@@ -29,6 +30,7 @@ WITH page_people AS MATERIALIZED (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
+      AND (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = false)
       AND (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
@@ -49,6 +51,8 @@ SELECT
     fc.cluster_id,
     fc.cluster_name,
     fc.is_confirmed,
+    COALESCE(fc.is_hidden, false) AS is_hidden,
+    fc.hidden_at,
     pp.member_count,
     pp.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
@@ -102,6 +106,8 @@ SELECT
     fc.cluster_id,
     fc.cluster_name,
     fc.is_confirmed,
+    COALESCE(fc.is_hidden, false) AS is_hidden,
+    fc.hidden_at,
     scoped.member_count,
     scoped.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
@@ -177,6 +183,15 @@ UPDATE face_clusters
 SET
     representative_face_id = sqlc.narg('representative_face_id'),
     confidence_score = sqlc.narg('confidence_score'),
+    updated_at = CURRENT_TIMESTAMP
+WHERE cluster_id = sqlc.arg('cluster_id')
+RETURNING *;
+
+-- name: SetFaceClusterHidden :one
+UPDATE face_clusters
+SET
+    is_hidden = sqlc.arg('is_hidden'),
+    hidden_at = CASE WHEN sqlc.arg('is_hidden') THEN CURRENT_TIMESTAMP ELSE NULL END,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = sqlc.arg('cluster_id')
 RETURNING *;
