@@ -102,6 +102,13 @@ export default defineConfig({
   },
 
   fmt: {
+    ignorePatterns: [
+      "dist/**",
+      "coverage/**",
+      "src/wasm/**",
+      "src/lib/http-commons/schema.d.ts",
+      "src/lib/http-commons/openapi-fetch/**",
+    ],
     semi: true,
     singleQuote: false,
   },
