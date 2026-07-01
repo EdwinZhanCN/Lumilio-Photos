@@ -1,4 +1,4 @@
-import {useState, useCallback, useEffect, useRef} from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
 import { SingleHashResult } from "@/workers/workerClient";
 
@@ -7,7 +7,6 @@ export interface HashcodeProgress {
   total: number;
   error?: string;
 }
-
 
 interface HashcodeResult {
   hash: string;
@@ -48,7 +47,7 @@ export const useGenerateHashcode = (): useGenerateHashcodeReturn => {
     let animationFrameId: number;
 
     const tick = () => {
-      setDisplayProgress(prev => {
+      setDisplayProgress((prev) => {
         // 只有数据变了才更新 state，避免无效渲染
         if (prev.processed !== progressRef.current.processed) {
           return { ...progressRef.current };
@@ -63,36 +62,39 @@ export const useGenerateHashcode = (): useGenerateHashcodeReturn => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [isGenerating]);
 
-  const generateHashCodes = useCallback(async (
-    files: FileList | File[],
-    onChunkProcessed?: (result: HashcodeResult) => void
-  ): Promise<HashcodeResult[] | undefined> => {
-    setIsGenerating(true);
-    const filesArray = Array.isArray(files) ? files : Array.from(files);
-    progressRef.current = { processed: 0, total: filesArray.length };
-    const results: HashcodeResult[] = [];
+  const generateHashCodes = useCallback(
+    async (
+      files: FileList | File[],
+      onChunkProcessed?: (result: HashcodeResult) => void,
+    ): Promise<HashcodeResult[] | undefined> => {
+      setIsGenerating(true);
+      const filesArray = Array.isArray(files) ? files : Array.from(files);
+      progressRef.current = { processed: 0, total: filesArray.length };
+      const results: HashcodeResult[] = [];
 
-    try {
-      await workerClient.generateHash(filesArray, (result: SingleHashResult) => {
-        // 1. 更新 Ref (不触发渲染)
-        progressRef.current.processed++;
+      try {
+        await workerClient.generateHash(filesArray, (result: SingleHashResult) => {
+          // 1. 更新 Ref (不触发渲染)
+          progressRef.current.processed++;
 
-        const hashResult = { hash: result.hash, index: result.index };
-        results.push(hashResult);
+          const hashResult = { hash: result.hash, index: result.index };
+          results.push(hashResult);
 
-        // 2. 立即把结果扔出去，给上传队列 (流水线核心)
-        if (onChunkProcessed) {
-          onChunkProcessed(hashResult);
-        }
-      });
-      return results;
-    } catch (error) {
-      console.error("Batch processing failed", error);
-      return undefined;
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [workerClient]);
+          // 2. 立即把结果扔出去，给上传队列 (流水线核心)
+          if (onChunkProcessed) {
+            onChunkProcessed(hashResult);
+          }
+        });
+        return results;
+      } catch (error) {
+        console.error("Batch processing failed", error);
+        return undefined;
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [workerClient],
+  );
 
   const cancelGeneration = useCallback(() => {
     workerClient.abortGenerateHash();
@@ -103,9 +105,9 @@ export const useGenerateHashcode = (): useGenerateHashcodeReturn => {
     isGenerating,
     progress: {
       numberProcessed: displayProgress.processed,
-      total: displayProgress.total
+      total: displayProgress.total,
     },
     generateHashCodes,
-    cancelGeneration
+    cancelGeneration,
   };
 };

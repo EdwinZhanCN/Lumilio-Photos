@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import init, {StreamingHasher} from "../wasm/blake3/blake3_wasm";
+import init, { StreamingHasher } from "../wasm/blake3/blake3_wasm";
 
 // --- Constants (Matching Backend) ---
 const QUICK_HASH_THRESHOLD = 100 * 1024 * 1024; // 100 MB
@@ -43,7 +43,11 @@ async function initialize(): Promise<void> {
   return initializationPromise;
 }
 
-async function calculateQuickHash(file: File, signal: AbortSignal, chunkSize: number): Promise<string> {
+async function calculateQuickHash(
+  file: File,
+  signal: AbortSignal,
+  chunkSize: number,
+): Promise<string> {
   const hasher = new StreamingHasher();
   const sizeBuf = new ArrayBuffer(8);
   const sizeView = new BigUint64Array(sizeBuf);
@@ -64,7 +68,11 @@ async function calculateQuickHash(file: File, signal: AbortSignal, chunkSize: nu
   return hasher.finalize();
 }
 
-async function calculateFullHash(file: File, signal: AbortSignal, chunkSize: number): Promise<string> {
+async function calculateFullHash(
+  file: File,
+  signal: AbortSignal,
+  chunkSize: number,
+): Promise<string> {
   const hasher = new StreamingHasher();
   let offset = 0;
   while (offset < file.size) {
@@ -91,7 +99,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     case "GENERATE_HASH": {
       const signal = abortController.signal;
       const memoryMultiplier = config?.memoryMultiplier || 1.0;
-      
+
       // Adjust chunk sizes based on memory multiplier
       const chunkSize = Math.floor(DEFAULT_CHUNK_SIZE * memoryMultiplier);
       const quickHashChunkSize = Math.floor(DEFAULT_QUICK_HASH_CHUNK_SIZE * memoryMultiplier);
@@ -107,19 +115,20 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           if (signal.aborted) break;
           const asset = data[i];
           try {
-            const hash = asset.size > QUICK_HASH_THRESHOLD 
-              ? await calculateQuickHash(asset, signal, quickHashChunkSize) 
-              : await calculateFullHash(asset, signal, chunkSize);
+            const hash =
+              asset.size > QUICK_HASH_THRESHOLD
+                ? await calculateQuickHash(asset, signal, quickHashChunkSize)
+                : await calculateFullHash(asset, signal, chunkSize);
 
             self.postMessage({
               type: "HASH_SINGLE_COMPLETE",
-              payload: { index: i, hash }
+              payload: { index: i, hash },
             });
           } catch (err: any) {
             if (err.message === "Aborted") break;
             self.postMessage({
               type: "HASH_SINGLE_COMPLETE",
-              payload: { index: i, hash: "", error: err.message }
+              payload: { index: i, hash: "", error: err.message },
             });
           }
         }

@@ -11,11 +11,7 @@ import {
   ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER,
   detectDeviceCapabilities,
 } from "@/lib/utils/smartBatchSizing.ts";
-import type {
-  LayoutBox,
-  LayoutConfig,
-  LayoutResult,
-} from "@/lib/layout/justifiedLayout";
+import type { LayoutBox, LayoutConfig, LayoutResult } from "@/lib/layout/justifiedLayout";
 
 export type WorkerType = "hash" | "justified" | "tool";
 
@@ -55,10 +51,9 @@ export class AppWorkerClient {
     switch (type) {
       case "hash":
         if (!this.hashWorkers[index]) {
-          this.hashWorkers[index] = new Worker(
-            new URL("./hash.worker.ts", import.meta.url),
-            { type: "module" },
-          );
+          this.hashWorkers[index] = new Worker(new URL("./hash.worker.ts", import.meta.url), {
+            type: "module",
+          });
         }
         return this.hashWorkers[index];
 
@@ -73,10 +68,9 @@ export class AppWorkerClient {
 
       case "tool":
         if (!this.toolWorker) {
-          this.toolWorker = new Worker(
-            new URL("./tool.worker.ts", import.meta.url),
-            { type: "module" },
-          );
+          this.toolWorker = new Worker(new URL("./tool.worker.ts", import.meta.url), {
+            type: "module",
+          });
         }
         return this.toolWorker;
 
@@ -88,11 +82,7 @@ export class AppWorkerClient {
   addProgressListener(callback: (detail: any) => void): () => void {
     const handler = (e: CustomEvent) => callback(e.detail);
     this.eventTarget.addEventListener("progress", handler as EventListener);
-    return () =>
-      this.eventTarget.removeEventListener(
-        "progress",
-        handler as EventListener,
-      );
+    return () => this.eventTarget.removeEventListener("progress", handler as EventListener);
   }
 
   private nextJustifiedRequestId(): number {
@@ -117,9 +107,7 @@ export class AppWorkerClient {
         } else if (e.data?.type === "ERROR" && !e.data?.payload?.requestId) {
           worker.removeEventListener("message", handler);
           this.justifiedInitPromise = null;
-          reject(
-            new Error(e.data?.payload?.error || "Justified layout init failed"),
-          );
+          reject(new Error(e.data?.payload?.error || "Justified layout init failed"));
         }
       };
 
@@ -130,10 +118,7 @@ export class AppWorkerClient {
     return this.justifiedInitPromise;
   }
 
-  async calculateJustifiedLayout(
-    boxes: LayoutBox[],
-    config: LayoutConfig,
-  ): Promise<LayoutResult> {
+  async calculateJustifiedLayout(boxes: LayoutBox[], config: LayoutConfig): Promise<LayoutResult> {
     await this.initializeJustifiedLayout();
     const worker = this.getOrInitializeWorker("justified");
     const requestId = this.nextJustifiedRequestId();
@@ -294,11 +279,7 @@ export class AppWorkerClient {
           return;
         }
 
-        if (
-          type === "ERROR" &&
-          payload?.stage === "load_tool" &&
-          payload?.toolId === toolId
-        ) {
+        if (type === "ERROR" && payload?.stage === "load_tool" && payload?.toolId === toolId) {
           globalThis.clearTimeout(timeoutId);
           worker.removeEventListener("message", handler);
           reject(new Error(payload?.error || `Failed to load tool: ${toolId}`));
@@ -350,9 +331,7 @@ export class AppWorkerClient {
         if (type === "TOOL_COMPLETE") {
           worker.removeEventListener("message", handler);
           const bytes =
-            payload.bytes instanceof Uint8Array
-              ? payload.bytes
-              : new Uint8Array(payload.bytes);
+            payload.bytes instanceof Uint8Array ? payload.bytes : new Uint8Array(payload.bytes);
 
           resolve({
             fileName: payload.fileName || "tool-output.bin",
@@ -366,9 +345,7 @@ export class AppWorkerClient {
 
         if (type === "ERROR" && payload.stage === "run_tool") {
           worker.removeEventListener("message", handler);
-          reject(
-            new Error(payload.error || `Tool execution failed: ${toolId}`),
-          );
+          reject(new Error(payload.error || `Tool execution failed: ${toolId}`));
         }
       };
 

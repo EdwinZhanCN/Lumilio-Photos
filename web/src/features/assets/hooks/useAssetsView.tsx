@@ -1,8 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type {
-  InfiniteData,
-  UseInfiniteQueryResult,
-} from "@tanstack/react-query";
+import type { InfiniteData, UseInfiniteQueryResult } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
 import { useFilterState, useSortBy } from "../selectors";
 import {
@@ -16,18 +13,12 @@ import {
   ViewDefinitionOptions,
 } from "@/features/assets/types/assets.type";
 import { generateViewKey } from "../utils/viewKey";
-import {
-  selectFilterAsAssetFilter,
-  selectFiltersEnabled,
-} from "../slices/filters.slice";
+import { selectFilterAsAssetFilter, selectFiltersEnabled } from "../slices/filters.slice";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { Asset } from "@/lib/assets/types";
 import { useWorkingRepository } from "@/features/settings";
-import {
-  flattenAssetGroups,
-  getViewerTimeZone,
-} from "../utils/assetGroups";
+import { flattenAssetGroups, getViewerTimeZone } from "../utils/assetGroups";
 import {
   browseGroupsFromQueryLikePage,
   browseGroupsFromSearchResultsPage,
@@ -42,12 +33,9 @@ import {
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
-type QueryAssetsResponseDTO =
-  components["schemas"]["dto.QueryAssetsResponseDTO"];
-type SearchAssetsRequestDTO =
-  components["schemas"]["dto.SearchAssetsRequestDTO"];
-type SearchAssetsResponseDTO =
-  components["schemas"]["dto.SearchAssetsResponseDTO"];
+type QueryAssetsResponseDTO = components["schemas"]["dto.QueryAssetsResponseDTO"];
+type SearchAssetsRequestDTO = components["schemas"]["dto.SearchAssetsRequestDTO"];
+type SearchAssetsResponseDTO = components["schemas"]["dto.SearchAssetsResponseDTO"];
 
 export type SearchTopResultsMeta = {
   enabled: boolean;
@@ -121,9 +109,7 @@ const EMPTY_PHOTO_SEARCH_VIEW_RESULT: PhotoSearchViewResult = {
 export const TOP_RESULTS_LIMIT = 9;
 export const DEFAULT_ASSET_TYPES: AssetMediaType[] = ["photos", "videos"];
 
-const getApiMimeTypes = (
-  mediaTypes: AssetMediaType[],
-): ("PHOTO" | "VIDEO" | "AUDIO")[] => {
+const getApiMimeTypes = (mediaTypes: AssetMediaType[]): ("PHOTO" | "VIDEO" | "AUDIO")[] => {
   const mimeTypes: ("PHOTO" | "VIDEO" | "AUDIO")[] = [];
   mediaTypes.forEach((type) => {
     switch (type) {
@@ -278,9 +264,7 @@ export const useAssetsViewQuery = (
           items: responseData?.items,
         });
         const hasMore =
-          typeof total === "number"
-            ? offset + loadedCount < total
-            : loadedCount >= pageSize;
+          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
 
         return hasMore ? offset + pageSize : undefined;
       },
@@ -312,10 +296,7 @@ export const useAssetsViewQuery = (
   }, [query.data?.pageParams, query.dataUpdatedAt, pageSize, sortBy]);
 
   const browseGroups = useMemo(
-    () =>
-      mergeAdjacentBrowseGroups(
-        ...assetsPages.map((page) => page.browseGroups),
-      ),
+    () => mergeAdjacentBrowseGroups(...assetsPages.map((page) => page.browseGroups)),
     [assetsPages],
   );
   const groups = useMemo(
@@ -336,8 +317,7 @@ export const useAssetsViewQuery = (
     [browseGroups],
   );
 
-  const lastPage =
-    assetsPages.length > 0 ? assetsPages[assetsPages.length - 1] : undefined;
+  const lastPage = assetsPages.length > 0 ? assetsPages[assetsPages.length - 1] : undefined;
   const pageInfo = useMemo(
     () => ({
       cursor: undefined,
@@ -459,9 +439,7 @@ export const usePhotoSearchView = (
           items: responseData?.result_items,
         });
         const hasMore =
-          typeof total === "number"
-            ? offset + loadedCount < total
-            : loadedCount >= pageSize;
+          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
 
         return hasMore ? offset + pageSize : undefined;
       },
@@ -480,9 +458,7 @@ export const usePhotoSearchView = (
         items: responseData?.result_items,
       });
       const hasMore =
-        typeof total === "number"
-          ? offset + loadedCount < total
-          : loadedCount >= pageSize;
+        typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
 
       return {
         topItems: responseData?.top_items,
@@ -521,10 +497,7 @@ export const usePhotoSearchView = (
     [resultBrowseGroups],
   );
   const resultGroups = useMemo(
-    () =>
-      resultAssets.length > 0
-        ? [{ key: "search:results", assets: resultAssets }]
-        : [],
+    () => (resultAssets.length > 0 ? [{ key: "search:results", assets: resultAssets }] : []),
     [resultAssets],
   );
   const browseItems = useMemo(
@@ -535,17 +508,13 @@ export const usePhotoSearchView = (
       ]),
     [resultBrowseGroups, topResultsBrowseGroups],
   );
-  const browseAssets = useMemo(
-    () => browseItems.map(getBrowseItemAsset),
-    [browseItems],
-  );
+  const browseAssets = useMemo(() => browseItems.map(getBrowseItemAsset), [browseItems]);
   const assets = useMemo(
     () => mergeUniqueAssets(topResults, resultAssets),
     [resultAssets, topResults],
   );
 
-  const lastPage =
-    searchPages.length > 0 ? searchPages[searchPages.length - 1] : undefined;
+  const lastPage = searchPages.length > 0 ? searchPages[searchPages.length - 1] : undefined;
   const pageInfo = useMemo(
     () => ({
       cursor: undefined,
@@ -608,10 +577,7 @@ export const useCurrentAssetsSearchView = (
   const filtersState = useFilterState();
   const { sortBy, pageSize, baseFilter, viewKey, ...viewOptions } = options;
   const rawScopedFilter = useMemo(
-    () =>
-      selectFiltersEnabled(filtersState)
-        ? selectFilterAsAssetFilter(filtersState)
-        : {},
+    () => (selectFiltersEnabled(filtersState) ? selectFilterAsAssetFilter(filtersState) : {}),
     [filtersState],
   );
   const scopedFilter = useMemo(
@@ -658,10 +624,7 @@ export const useCurrentAssetsView = (
 
   const { sortBy, pageSize, baseFilter, viewKey, ...viewOptions } = options;
   const rawScopedFilter = useMemo(
-    () =>
-      selectFiltersEnabled(filtersState)
-        ? selectFilterAsAssetFilter(filtersState)
-        : {},
+    () => (selectFiltersEnabled(filtersState) ? selectFilterAsAssetFilter(filtersState) : {}),
     [filtersState],
   );
   const scopedFilter = useMemo(

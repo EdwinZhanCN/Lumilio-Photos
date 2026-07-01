@@ -130,11 +130,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
       className="flex cursor-pointer items-center gap-2 border-b border-base-300 px-3 py-2"
       onClick={toggleCollapsed}
     >
-      <LumilioAvatar
-        start={isGenerating}
-        size={0.13}
-        className="shrink-0"
-      />
+      <LumilioAvatar start={isGenerating} size={0.13} className="shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-base-content">
           {t("lumilio.dock.title", "Lumilio Agent")}
@@ -142,9 +138,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         <div className="flex min-w-0 items-center gap-1.5 text-xs text-base-content/55">
           {statusDot}
           <span className="truncate">
-            {isGenerating
-              ? t("lumilio.dock.busy", "Working")
-              : t("lumilio.dock.ready", "Ready")}
+            {isGenerating ? t("lumilio.dock.busy", "Working") : t("lumilio.dock.ready", "Ready")}
             {usage && (
               <span
                 title={t("lumilio.dock.usageHint", {
@@ -155,8 +149,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
                 })}
               >
                 <span aria-hidden="true"> · </span>
-                {formatTokens(usage.totalTokens)}{" "}
-                {t("lumilio.dock.tokens", "tokens")}
+                {formatTokens(usage.totalTokens)} {t("lumilio.dock.tokens", "tokens")}
               </span>
             )}
           </span>
@@ -220,9 +213,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
       {messages.length === 0 ? (
         <div className="flex flex-col items-center gap-4 px-4 py-7">
           <LumilioAvatar size={0.3} />
-          <p className="text-center text-sm text-base-content/55">
-            {t("lumilio.chat.empty")}
-          </p>
+          <p className="text-center text-sm text-base-content/55">{t("lumilio.chat.empty")}</p>
           <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
             {QUICK_ACTIONS.map((action) => {
               const active = activeMode === action.mode;
@@ -237,11 +228,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
                       ? "border-primary bg-primary/5"
                       : "border-base-300 hover:border-primary/40 hover:bg-base-200/50"
                   }`}
-                  onClick={() =>
-                    setActiveMode((cur) =>
-                      cur === action.mode ? null : action.mode,
-                    )
-                  }
+                  onClick={() => setActiveMode((cur) => (cur === action.mode ? null : action.mode))}
                 >
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Icon size={16} strokeWidth={1.8} />
@@ -265,7 +252,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
     </div>
   );
 
-  const ModePillIcon = activeMode ? MODE_ICON[activeMode] ?? Sparkles : null;
+  const ModePillIcon = activeMode ? (MODE_ICON[activeMode] ?? Sparkles) : null;
   const modePill =
     activeMode && ModePillIcon ? (
       <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
@@ -390,9 +377,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           onClick={toggleCollapsed}
         >
           <ChevronUp size={16} strokeWidth={1.8} />
-          <span className="font-semibold">
-            {t("lumilio.dock.conversation", "Conversation")}
-          </span>
+          <span className="font-semibold">{t("lumilio.dock.conversation", "Conversation")}</span>
           <span className="text-base-content/70">
             ·{" "}
             {t("lumilio.dock.replyCount", "{{count}} reply", {

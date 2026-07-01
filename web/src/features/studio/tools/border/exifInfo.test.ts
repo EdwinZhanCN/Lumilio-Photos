@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  cameraLabel,
-  extractBorderExif,
-  hasSufficientExif,
-  shootingParams,
-} from "./exifInfo";
+import { cameraLabel, extractBorderExif, hasSufficientExif, shootingParams } from "./exifInfo";
 import { brandDisplayName, matchBrandKey } from "./logoAssets";
 
 describe("extractBorderExif", () => {
@@ -54,9 +49,7 @@ describe("hasSufficientExif", () => {
   });
 
   it("prefers model over make for the camera label", () => {
-    expect(cameraLabel(extractBorderExif({ Make: "SONY", Model: "ILCE-7M4" }))).toBe(
-      "ILCE-7M4",
-    );
+    expect(cameraLabel(extractBorderExif({ Make: "SONY", Model: "ILCE-7M4" }))).toBe("ILCE-7M4");
     expect(cameraLabel(extractBorderExif({ Make: "SONY" }))).toBe("SONY");
   });
 });

@@ -1,26 +1,19 @@
 import { ShieldQuestion } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useLumilioChatStore } from "../../state/chatStore";
-import type {
-  ConfirmationInfo,
-  ConfirmBlock as ConfirmBlockData,
-} from "../../types";
+import type { ConfirmationInfo, ConfirmBlock as ConfirmBlockData } from "../../types";
 
 interface ConfirmBlockProps {
   block: ConfirmBlockData;
 }
 
-const getAction = (info: ConfirmationInfo | undefined) =>
-  info?.action ?? info?.Action;
+const getAction = (info: ConfirmationInfo | undefined) => info?.action ?? info?.Action;
 
-const getCount = (info: ConfirmationInfo | undefined) =>
-  info?.count ?? info?.Count;
+const getCount = (info: ConfirmationInfo | undefined) => info?.count ?? info?.Count;
 
-const getLegacyMessage = (info: ConfirmationInfo | undefined) =>
-  info?.message ?? info?.Message;
+const getLegacyMessage = (info: ConfirmationInfo | undefined) => info?.message ?? info?.Message;
 
-const getTitle = (info: ConfirmationInfo | undefined) =>
-  info?.title ?? info?.Title;
+const getTitle = (info: ConfirmationInfo | undefined) => info?.title ?? info?.Title;
 
 /** Inline confirmation card for an interrupted agent run (preview-then-
  * confirm for consequential actions). Resolving it resumes the stream. */
@@ -28,9 +21,7 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
   const { t } = useI18n();
   const confirmInterrupt = useLumilioChatStore((s) => s.confirmInterrupt);
 
-  const rootCause = block.interrupt.InterruptContexts.find(
-    (ctx) => ctx.IsRootCause,
-  );
+  const rootCause = block.interrupt.InterruptContexts.find((ctx) => ctx.IsRootCause);
   if (!rootCause) return null;
 
   const resolved = block.resolved;

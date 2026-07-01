@@ -40,12 +40,9 @@ const requestMediaToken = async (): Promise<string | null> => {
   return token;
 };
 
-export const getMediaTokenRefreshIntervalMs = () =>
-  MEDIA_TOKEN_REFRESH_INTERVAL_MS;
+export const getMediaTokenRefreshIntervalMs = () => MEDIA_TOKEN_REFRESH_INTERVAL_MS;
 
-export const ensureMediaToken = async (
-  force = false,
-): Promise<string | null> => {
+export const ensureMediaToken = async (force = false): Promise<string | null> => {
   const accessToken = getToken();
   if (!accessToken) {
     removeMediaToken();
@@ -65,13 +62,9 @@ export const ensureMediaToken = async (
 
   mediaTokenRequestInFlight = requestMediaToken()
     .catch((error: unknown) => {
-      const isExistingTokenStillValid =
-        !!existingToken && !!expiresAt && expiresAt > Date.now();
+      const isExistingTokenStillValid = !!existingToken && !!expiresAt && expiresAt > Date.now();
       if (isExistingTokenStillValid) {
-        console.warn(
-          "Failed to refresh media token, keeping current token:",
-          error,
-        );
+        console.warn("Failed to refresh media token, keeping current token:", error);
         return existingToken;
       }
       console.warn("Failed to fetch media token:", error);

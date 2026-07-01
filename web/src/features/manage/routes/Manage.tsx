@@ -39,10 +39,7 @@ const ManageHeader: React.FC = () => {
         </button>
       </PageHeader>
 
-      <SupportedFormatsModal
-        isOpen={showFormatsModal}
-        onClose={() => setShowFormatsModal(false)}
-      />
+      <SupportedFormatsModal isOpen={showFormatsModal} onClose={() => setShowFormatsModal(false)} />
     </>
   );
 };

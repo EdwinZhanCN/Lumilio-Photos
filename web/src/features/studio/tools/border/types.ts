@@ -1,16 +1,9 @@
-export type BorderMode =
-  | "COLORED"
-  | "FROSTED"
-  | "VIGNETTE"
-  | "FROSTED_INFO"
-  | "INFO_STRIP";
+export type BorderMode = "COLORED" | "FROSTED" | "VIGNETTE" | "FROSTED_INFO" | "INFO_STRIP";
 
 /** Modes that are driven by EXIF metadata + a brand logo. */
 export const EXIF_BORDER_MODES = ["FROSTED_INFO", "INFO_STRIP"] as const;
 
-export function isExifBorderMode(
-  mode: BorderMode,
-): mode is "FROSTED_INFO" | "INFO_STRIP" {
+export function isExifBorderMode(mode: BorderMode): mode is "FROSTED_INFO" | "INFO_STRIP" {
   return mode === "FROSTED_INFO" || mode === "INFO_STRIP";
 }
 

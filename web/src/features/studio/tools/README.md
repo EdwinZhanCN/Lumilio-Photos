@@ -118,20 +118,20 @@ In `Studio.tsx`, add state and a handler; in `StudioSidebar.tsx`, add a nav entr
 
 Messages from main thread → worker:
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `LOAD_TOOL` | `{ toolId }` | Pre-registers a tool; replies `TOOL_LOADED` |
-| `RUN_TOOL` | `{ requestId, toolId, file, params }` | Executes a tool; replies `TOOL_PROGRESS` / `TOOL_COMPLETE` / `ERROR` |
-| `ABORT` | — | Aborts the active run |
+| Type        | Payload                               | Description                                                          |
+| ----------- | ------------------------------------- | -------------------------------------------------------------------- |
+| `LOAD_TOOL` | `{ toolId }`                          | Pre-registers a tool; replies `TOOL_LOADED`                          |
+| `RUN_TOOL`  | `{ requestId, toolId, file, params }` | Executes a tool; replies `TOOL_PROGRESS` / `TOOL_COMPLETE` / `ERROR` |
+| `ABORT`     | —                                     | Aborts the active run                                                |
 
 Messages from worker → main thread:
 
-| Type | Payload |
-|------|---------|
-| `TOOL_LOADED` | `{ toolId }` |
-| `TOOL_PROGRESS` | `{ requestId, processed, total }` |
+| Type            | Payload                                    |
+| --------------- | ------------------------------------------ |
+| `TOOL_LOADED`   | `{ toolId }`                               |
+| `TOOL_PROGRESS` | `{ requestId, processed, total }`          |
 | `TOOL_COMPLETE` | `{ requestId, bytes, mimeType, fileName }` |
-| `ERROR` | `{ stage, requestId?, toolId?, error }` |
+| `ERROR`         | `{ stage, requestId?, toolId?, error }`    |
 
 ## ToolRunner Contract
 
@@ -144,6 +144,7 @@ type ToolRunner = (
 ```
 
 Runners must:
+
 - Check `ctx.signal.aborted` at safe points and throw if true.
 - Report progress via `helpers.reportProgress(current, total)`.
 - Return raw image bytes with a valid MIME type.
@@ -153,9 +154,9 @@ Runners must:
 ```ts
 const workerClient = useWorker();
 
-await workerClient.loadTool("border");                              // optional, runTool calls it internally
-const result = await workerClient.runTool("border", file, params);  // { blob, fileName, mimeType }
-workerClient.abortTool();                                           // cancel active run
+await workerClient.loadTool("border"); // optional, runTool calls it internally
+const result = await workerClient.runTool("border", file, params); // { blob, fileName, mimeType }
+workerClient.abortTool(); // cancel active run
 ```
 
 `result.blob` is an in-memory `Blob` ready for `URL.createObjectURL()` or download.

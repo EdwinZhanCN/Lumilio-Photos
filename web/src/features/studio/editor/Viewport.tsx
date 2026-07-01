@@ -1,18 +1,5 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  Maximize2,
-  Minus,
-  Plus,
-  SlidersHorizontal,
-  TriangleAlert,
-  X,
-} from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minus, Plus, SlidersHorizontal, TriangleAlert, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 const VIEWPORT_PAD = 48;
@@ -240,7 +227,10 @@ export function Viewport({
           <Plus size={15} />
         </button>
         <div className="mx-0.5 h-4 w-px bg-base-300" />
-        <div className="tooltip tooltip-left" data-tip={t("studio.editor.fit", { defaultValue: "Fit to screen" })}>
+        <div
+          className="tooltip tooltip-left"
+          data-tip={t("studio.editor.fit", { defaultValue: "Fit to screen" })}
+        >
           <button
             type="button"
             onClick={doFit}

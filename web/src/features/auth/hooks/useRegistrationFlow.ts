@@ -60,9 +60,7 @@ function getApiMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function useRegistrationFlow(options?: {
-  onComplete?: () => void;
-}): RegistrationFlowState {
+export function useRegistrationFlow(options?: { onComplete?: () => void }): RegistrationFlowState {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { completeAuth, isAuthenticated } = useAuth();

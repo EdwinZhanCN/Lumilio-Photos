@@ -28,16 +28,12 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const setupQuery = useSetupStatus();
   const setupMutation = $api.useMutation("post", "/api/v1/setup");
   const databaseInitialized =
-    setupQuery.data?.database_initialized ??
-    setupQuery.data?.initialized ??
-    false;
+    setupQuery.data?.database_initialized ?? setupQuery.data?.initialized ?? false;
 
   const beginSetup = () => {
     void setupMutation
       .mutateAsync({ body: {} })
-      .then(() =>
-        queryClient.invalidateQueries({ queryKey: setupStatusQueryKey }),
-      )
+      .then(() => queryClient.invalidateQueries({ queryKey: setupStatusQueryKey }))
       .catch(() => undefined);
   };
 
@@ -109,10 +105,7 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
           <dl className="mt-5 grid gap-2.5">
             <div className="flex items-start gap-3 rounded-xl border border-base-200 px-4 py-3">
-              <KeyRound
-                size={18}
-                className="mt-0.5 shrink-0 text-base-content/45"
-              />
+              <KeyRound size={18} className="mt-0.5 shrink-0 text-base-content/45" />
               <div>
                 <p className="text-sm font-medium">
                   {t("auth.setup.welcome.rotateTitle", {
@@ -128,10 +121,7 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </div>
             </div>
             <div className="flex items-start gap-3 rounded-xl border border-base-200 px-4 py-3">
-              <HardDrive
-                size={18}
-                className="mt-0.5 shrink-0 text-base-content/45"
-              />
+              <HardDrive size={18} className="mt-0.5 shrink-0 text-base-content/45" />
               <div>
                 <p className="text-sm font-medium">
                   {t("auth.setup.welcome.keyTitle", {

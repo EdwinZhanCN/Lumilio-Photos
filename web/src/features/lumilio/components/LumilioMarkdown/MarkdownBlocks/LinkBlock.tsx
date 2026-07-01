@@ -15,8 +15,7 @@ export const Link: React.FC<LinkBlockProps> = ({
   children,
   ...props
 }) => {
-  const isExternal =
-    href && (href.startsWith("http") || href.startsWith("https"));
+  const isExternal = href && (href.startsWith("http") || href.startsWith("https"));
   const isEmail = href && href.startsWith("mailto:");
   const isPhone = href && href.startsWith("tel:");
 
@@ -120,8 +119,7 @@ export const Link: React.FC<LinkBlockProps> = ({
   const capsuleStyles =
     "inline-flex items-center bg-base-200 hover:bg-base-300 text-base-content/60 px-1 py-1 m-0.5 rounded-full text-xs font-medium transition-all duration-200 no-underline";
 
-  const displayText =
-    typeof children === "string" ? truncateText(children) : children;
+  const displayText = typeof children === "string" ? truncateText(children) : children;
 
   const fullText = getFullText();
 

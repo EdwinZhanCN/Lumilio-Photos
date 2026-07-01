@@ -5,10 +5,7 @@ import type { Schemas } from "../api-types";
 export type SystemSettings = Schemas["dto.SystemSettingsDTO"];
 export type UpdateSystemSettings = Schemas["dto.UpdateSystemSettingsDTO"];
 
-export const systemSettingsQueryKey = [
-  "get",
-  "/api/v1/settings/system",
-] as const;
+export const systemSettingsQueryKey = ["get", "/api/v1/settings/system"] as const;
 
 export function useSystemSettings(): UseQueryResult<SystemSettings, unknown> {
   return $api.useQuery(

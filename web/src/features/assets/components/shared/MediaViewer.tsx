@@ -9,10 +9,7 @@ import "@vidstack/react/player/styles/default/theme.css";
 import "@vidstack/react/player/styles/default/layouts/video.css";
 import "@vidstack/react/player/styles/default/layouts/audio.css";
 
-import {
-  defaultLayoutIcons,
-  DefaultVideoLayout,
-} from "@vidstack/react/player/layouts/default";
+import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { useI18n } from "@/lib/i18n";
 import { useStackCarouselAssets } from "@/features/assets/hooks/useStackCarouselAssets";
 import { useLivePhotoPlayback } from "@/features/assets/hooks/useLivePhotoPlayback";
@@ -34,54 +31,36 @@ interface MediaViewerProps {
  * replicating the native Apple Live Photo experience without any visible
  * player controls.
  */
-const MediaViewer: React.FC<MediaViewerProps> = ({
-  asset,
-  className = "",
-  isActive = true,
-}) => {
+const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "", isActive = true }) => {
   const { t } = useI18n();
   const videoAsset = isVideo(asset);
   const isLivePhoto = asset.stack?.stack_kind === "live_photo";
 
   // Fetch stack members only for Live Photo assets.
-  const { assets: stackAssets } = useStackCarouselAssets(
-    asset,
-    isLivePhoto && isActive,
-  );
+  const { assets: stackAssets } = useStackCarouselAssets(asset, isLivePhoto && isActive);
 
-  const motionAsset = isLivePhoto
-    ? stackAssets.find((a) => isVideo(a))
-    : undefined;
+  const motionAsset = isLivePhoto ? stackAssets.find((a) => isVideo(a)) : undefined;
   const livePhotoVideoUrl = motionAsset?.asset_id
     ? assetUrls.getWebVideoUrl(motionAsset.asset_id)
     : undefined;
 
-  const { videoRef, isPlaying, handlePlay, handleStop, handleEnded } =
-    useLivePhotoPlayback();
+  const { videoRef, isPlaying, handlePlay, handleStop, handleEnded } = useLivePhotoPlayback();
 
   // Get media source URL
   const webVideoUrl =
-    videoAsset && asset.asset_id
-      ? assetUrls.getWebVideoUrl(asset.asset_id)
-      : undefined;
+    videoAsset && asset.asset_id ? assetUrls.getWebVideoUrl(asset.asset_id) : undefined;
 
   // For photos, get large thumbnail as fallback to original
   const imageUrl =
-    !videoAsset && asset.asset_id
-      ? assetUrls.getThumbnailUrl(asset.asset_id, "large")
-      : undefined;
+    !videoAsset && asset.asset_id ? assetUrls.getThumbnailUrl(asset.asset_id, "large") : undefined;
 
   // ── Regular video player ──────────────────────────────────────────────────
   if (videoAsset && webVideoUrl) {
     return (
-      <div
-        className={`h-screen w-screen flex items-center justify-center ${className}`}
-      >
+      <div className={`h-screen w-screen flex items-center justify-center ${className}`}>
         <div className="w-full max-w-6xl h-auto max-h-[90vh]">
           <MediaPlayer
-            title={
-              asset.original_filename || t("assets.mediaViewer.video_title")
-            }
+            title={asset.original_filename || t("assets.mediaViewer.video_title")}
             src={webVideoUrl}
             load="visible"
             crossOrigin
@@ -99,9 +78,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
   // ── Photo display (with optional Live Photo overlay) ──────────────────────
   if (imageUrl) {
     return (
-      <div
-        className={`h-screen w-screen flex items-center justify-center p-4 ${className}`}
-      >
+      <div className={`h-screen w-screen flex items-center justify-center p-4 ${className}`}>
         {/*
           Inner wrapper sizes itself to the rendered image, not the viewport.
           This ensures the Live Photo button is anchored to the image corner,
@@ -120,9 +97,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
           {/* Still image */}
           <img
             src={imageUrl}
-            alt={
-              asset.original_filename || t("assets.mediaViewer.asset_alt_text")
-            }
+            alt={asset.original_filename || t("assets.mediaViewer.asset_alt_text")}
             style={{
               maxHeight: `calc(100vh - 2rem)`,
               maxWidth: `calc(100vw - 2rem)`,
@@ -187,20 +162,14 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
 
   // ── Fallback for unsupported or missing media ─────────────────────────────
   return (
-    <div
-      className={`w-full h-full flex items-center justify-center text-white ${className}`}
-    >
+    <div className={`w-full h-full flex items-center justify-center text-white ${className}`}>
       <div className="text-center">
-        <div className="text-xl mb-2">
-          {t("assets.mediaViewer.media_not_available")}
-        </div>
+        <div className="text-xl mb-2">{t("assets.mediaViewer.media_not_available")}</div>
         <div className="text-sm opacity-70">
           {asset.original_filename || t("assets.mediaViewer.unknown_file")}
         </div>
         <div className="text-xs opacity-50 mt-1">
-          {asset.mime_type ||
-            asset.type ||
-            t("assets.mediaViewer.unknown_type")}
+          {asset.mime_type || asset.type || t("assets.mediaViewer.unknown_type")}
         </div>
       </div>
     </div>

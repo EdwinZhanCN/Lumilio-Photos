@@ -62,10 +62,7 @@ describe("browseItems", () => {
     ]);
 
     expect(browseGroups).toHaveLength(1);
-    expect(browseGroups[0]?.items.map((item) => item.id)).toEqual([
-      "stack:stack-1",
-      "asset:solo",
-    ]);
+    expect(browseGroups[0]?.items.map((item) => item.id)).toEqual(["stack:stack-1", "asset:solo"]);
   });
 
   it("collapses stacked assets within the same group", () => {
@@ -91,9 +88,7 @@ describe("browseItems", () => {
       },
     ];
 
-    const items = flattenBrowseGroups(
-      createBrowseGroupsFromAssetGroups(groups),
-    );
+    const items = flattenBrowseGroups(createBrowseGroupsFromAssetGroups(groups));
 
     expect(items).toHaveLength(1);
     expect(items[0]?.id).toBe("stack:stack-1");
@@ -132,9 +127,7 @@ describe("browseItems", () => {
 
     expect(browseGroups).toHaveLength(1);
     expect(browseGroups[0]?.key).toBe("date:yesterday");
-    expect(browseGroups[0]?.items.map((item) => item.id)).toEqual([
-      "stack:stack-1",
-    ]);
+    expect(browseGroups[0]?.items.map((item) => item.id)).toEqual(["stack:stack-1"]);
   });
 
   it("falls back to the first loaded member when no cover is present", () => {
@@ -160,9 +153,7 @@ describe("browseItems", () => {
       },
     ];
 
-    const item = flattenBrowseGroups(
-      createBrowseGroupsFromAssetGroups(groups),
-    )[0]!;
+    const item = flattenBrowseGroups(createBrowseGroupsFromAssetGroups(groups))[0]!;
 
     expect(getBrowseItemAssetId(item)).toBe("first");
   });
@@ -191,9 +182,7 @@ describe("browseItems", () => {
       },
     ];
 
-    const items = flattenBrowseGroups(
-      createBrowseGroupsFromAssetGroups(groups),
-    );
+    const items = flattenBrowseGroups(createBrowseGroupsFromAssetGroups(groups));
 
     expect(findBrowseItemIndexByAssetId(items, "cover")).toBe(0);
     expect(findBrowseItemIndexByAssetId(items, "member")).toBe(0);
@@ -248,10 +237,7 @@ describe("browseItems", () => {
 
     const deduped = dedupeBrowseItemsById(flattenBrowseGroups(browseGroups));
 
-    expect(deduped.map((item) => item.id)).toEqual([
-      "stack:stack-1",
-      "asset:solo",
-    ]);
+    expect(deduped.map((item) => item.id)).toEqual(["stack:stack-1", "asset:solo"]);
     expect(getBrowseItemAsset(deduped[0]!).asset_id).toBe("cover");
   });
 
@@ -315,10 +301,7 @@ describe("browseItems", () => {
       items,
     );
 
-    expect(resolved.map((item) => item.id)).toEqual([
-      "asset:solo",
-      "stack:stack-1",
-    ]);
+    expect(resolved.map((item) => item.id)).toEqual(["asset:solo", "stack:stack-1"]);
     expect(getBrowseItemAsset(resolved[1]!).asset_id).toBe("cover");
   });
 
@@ -349,10 +332,7 @@ describe("browseItems", () => {
     );
 
     expect(
-      resolveBrowseSelectedAssetIds(
-        ["stack:stack-1", "asset:solo", "asset:missing"],
-        items,
-      ),
+      resolveBrowseSelectedAssetIds(["stack:stack-1", "asset:solo", "asset:missing"], items),
     ).toEqual(["cover", "solo"]);
   });
 
@@ -374,11 +354,9 @@ describe("browseItems", () => {
     ]);
 
     expect(
-      resolveBrowseSelectedAssetIds(
-        ["stack:stack-1", "asset:solo", "asset:missing"],
-        items,
-        { stackMode: "whole-stack" },
-      ),
+      resolveBrowseSelectedAssetIds(["stack:stack-1", "asset:solo", "asset:missing"], items, {
+        stackMode: "whole-stack",
+      }),
     ).toEqual(["cover", "member", "solo"]);
   });
 
@@ -400,11 +378,9 @@ describe("browseItems", () => {
     ]);
 
     expect(
-      resolveBrowseSelectedAssetIds(
-        ["stack:stack-1", "asset:member"],
-        items,
-        { stackMode: "whole-stack" },
-      ),
+      resolveBrowseSelectedAssetIds(["stack:stack-1", "asset:member"], items, {
+        stackMode: "whole-stack",
+      }),
     ).toEqual(["cover", "member"]);
   });
 
@@ -516,10 +492,7 @@ describe("browseItems", () => {
       },
     ]);
 
-    expect(items.map((item) => item.id)).toEqual([
-      "asset:solo",
-      "stack:stack-1",
-    ]);
+    expect(items.map((item) => item.id)).toEqual(["asset:solo", "stack:stack-1"]);
     expect(items[1]).toMatchObject({
       type: "stack",
       memberAssetIds: ["cover", "member"],

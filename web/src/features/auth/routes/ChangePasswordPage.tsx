@@ -74,10 +74,7 @@ export default function ChangePasswordPage(): React.ReactNode {
     event.preventDefault();
     setErrorMessage(null);
 
-    if (
-      confirmPasswordRef.current &&
-      !confirmPasswordRef.current.checkValidity()
-    ) {
+    if (confirmPasswordRef.current && !confirmPasswordRef.current.checkValidity()) {
       confirmPasswordRef.current.reportValidity();
       return;
     }
@@ -174,8 +171,7 @@ export default function ChangePasswordPage(): React.ReactNode {
                   <div
                     className="tooltip tooltip-left cursor-help"
                     data-tip={t("auth.changePassword.currentPasswordHint", {
-                      defaultValue:
-                        "Enter your existing password to verify your identity.",
+                      defaultValue: "Enter your existing password to verify your identity.",
                     })}
                   >
                     <Info className="h-3.5 w-3.5 text-base-content/70 transition-colors hover:text-base-content" />

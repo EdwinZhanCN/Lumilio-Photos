@@ -2,14 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
-import {
-  Album,
-  Plus,
-  Trash2,
-  X,
-  SquareMousePointer,
-  AlertTriangle,
-} from "lucide-react";
+import { Album, Plus, Trash2, X, SquareMousePointer, AlertTriangle } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
@@ -43,14 +36,10 @@ function AlbumsContent() {
     dispatch,
   } = useCollections();
   const deleteAlbumMutation = $api.useMutation("delete", "/api/v1/albums/{id}");
-  const {
-    data,
-    isPending,
-    isFetching,
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
-  } = useAlbums(t, scopedRepositoryId);
+  const { data, isPending, isFetching, hasNextPage, fetchNextPage, isFetchingNextPage } = useAlbums(
+    t,
+    scopedRepositoryId,
+  );
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -74,9 +63,7 @@ function AlbumsContent() {
     setIsDeleting(true);
     try {
       await Promise.all(
-        selectedAlbumIds.map((id) =>
-          deleteAlbumMutation.mutateAsync({ params: { path: { id } } }),
-        ),
+        selectedAlbumIds.map((id) => deleteAlbumMutation.mutateAsync({ params: { path: { id } } })),
       );
 
       await queryClient.invalidateQueries({ queryKey: ["albums"] });
@@ -157,10 +144,7 @@ function AlbumsContent() {
         />
 
         {hasNextPage && (
-          <LoadMoreButton
-            onClick={() => fetchNextPage()}
-            loading={isFetchingNextPage}
-          />
+          <LoadMoreButton onClick={() => fetchNextPage()} loading={isFetchingNextPage} />
         )}
       </div>
 
@@ -180,9 +164,7 @@ function AlbumsContent() {
           <div className="modal-box border-t-4 border-error">
             <div className="mb-4 flex items-center gap-3 text-error">
               <AlertTriangle size={24} />
-              <h3 className="text-lg font-bold">
-                {t("collections.deleteModal.title")}
-              </h3>
+              <h3 className="text-lg font-bold">{t("collections.deleteModal.title")}</h3>
             </div>
             <p className="py-4">
               {t("collections.deleteModal.description", {
@@ -190,10 +172,7 @@ function AlbumsContent() {
               })}
             </p>
             <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setIsDeleteConfirmOpen(false)}
-              >
+              <button className="btn btn-ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
                 {t("common.cancel")}
               </button>
               <button
@@ -208,10 +187,7 @@ function AlbumsContent() {
               </button>
             </div>
           </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => setIsDeleteConfirmOpen(false)}
-          />
+          <div className="modal-backdrop" onClick={() => setIsDeleteConfirmOpen(false)} />
         </div>
       )}
     </div>

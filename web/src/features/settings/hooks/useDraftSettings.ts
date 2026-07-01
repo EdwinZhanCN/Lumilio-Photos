@@ -27,20 +27,15 @@ function equal<T>(a: T | undefined, b: T | undefined): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export function useDraftSettings<T>(
-  options: UseDraftSettingsOptions<T>,
-): DraftSettings<T> {
+export function useDraftSettings<T>(options: UseDraftSettingsOptions<T>): DraftSettings<T> {
   const { server, isLoading, isSaving, saveError, onSave } = options;
 
   const [draft, setDraftState] = useState<T | undefined>(server);
   const [touched, setTouched] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-  const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const serverKey =
-    server === undefined ? "__undefined__" : JSON.stringify(server);
+  const serverKey = server === undefined ? "__undefined__" : JSON.stringify(server);
 
   useEffect(() => {
     if (touched) return;
@@ -54,16 +49,11 @@ export function useDraftSettings<T>(
     setDraftState(next);
   }, []);
 
-  const setField = useCallback(
-    <K extends keyof T>(key: K, value: T[K]) => {
-      setTouched(true);
-      setJustSaved(false);
-      setDraftState((prev) =>
-        prev === undefined ? prev : { ...prev, [key]: value },
-      );
-    },
-    [],
-  );
+  const setField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
+    setTouched(true);
+    setJustSaved(false);
+    setDraftState((prev) => (prev === undefined ? prev : { ...prev, [key]: value }));
+  }, []);
 
   const reset = useCallback(() => {
     setTouched(false);

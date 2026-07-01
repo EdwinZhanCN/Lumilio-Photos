@@ -31,8 +31,7 @@ export function extractVersionedCandidate(
     return { candidate: null, needsRewrite: false };
   }
 
-  const storedVersion =
-    typeof raw.version === "number" ? raw.version : undefined;
+  const storedVersion = typeof raw.version === "number" ? raw.version : undefined;
   if (storedVersion === version && "data" in raw) {
     return { candidate: raw.data, needsRewrite: false };
   }
@@ -84,11 +83,7 @@ export function readVersionedStorageCandidate(
   return { candidate: null, needsRewrite: false, source: "none" };
 }
 
-export function writeVersionedStorageData<T>(
-  key: string,
-  version: number,
-  data: T,
-): void {
+export function writeVersionedStorageData<T>(key: string, version: number, data: T): void {
   if (typeof localStorage === "undefined") {
     return;
   }

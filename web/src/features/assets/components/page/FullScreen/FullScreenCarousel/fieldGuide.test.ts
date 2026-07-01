@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import {
-  formatSpeciesScore,
-  getSpeciesScorePercent,
-  parseSpeciesPrediction,
-} from "./fieldGuide";
+import { formatSpeciesScore, getSpeciesScorePercent, parseSpeciesPrediction } from "./fieldGuide";
 
 describe("field guide species label parsing", () => {
   it("uses common name when the eighth taxonomy slot is present", () => {

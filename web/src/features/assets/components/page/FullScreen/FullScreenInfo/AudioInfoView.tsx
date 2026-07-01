@@ -15,11 +15,7 @@ interface AudioInfoViewProps {
   onClose: () => void;
 }
 
-export default function AudioInfoView({
-  asset,
-  onAssetUpdate,
-  onClose,
-}: AudioInfoViewProps) {
+export default function AudioInfoView({ asset, onAssetUpdate, onClose }: AudioInfoViewProps) {
   const { t } = useI18n();
   const [isPending, startTransition] = useTransition();
   const { updateRating, updateDescription } = useAssetActions();
@@ -44,9 +40,7 @@ export default function AudioInfoView({
     v === undefined || v === null || v === "" ? fallback : v;
 
   // Basic info — audio has no taken_time; display upload_time in browser locale.
-  const uploadDisplay = asset?.upload_time
-    ? formatCaptureTime(asset.upload_time)
-    : "-";
+  const uploadDisplay = asset?.upload_time ? formatCaptureTime(asset.upload_time) : "-";
   const mimeDisplay = fmt(asset?.mime_type);
   const filename = fmt(asset?.original_filename);
 
@@ -54,18 +48,12 @@ export default function AudioInfoView({
   const duration = asset?.duration
     ? `${Math.floor(asset.duration / 60)}:${String(Math.floor(asset.duration % 60)).padStart(2, "0")}`
     : "-";
-  const sizeM = asset?.file_size
-    ? `${(asset.file_size / 1024 / 1024).toFixed(1)}M`
-    : "-";
+  const sizeM = asset?.file_size ? `${(asset.file_size / 1024 / 1024).toFixed(1)}M` : "-";
 
   // Audio technical info
   const codec = fmt(metadata.codec);
-  const bitrate = metadata.bitrate
-    ? `${(metadata.bitrate / 1000).toFixed(0)} kbps`
-    : "-";
-  const sampleRate = metadata.sample_rate
-    ? `${(metadata.sample_rate / 1000).toFixed(1)} kHz`
-    : "-";
+  const bitrate = metadata.bitrate ? `${(metadata.bitrate / 1000).toFixed(0)} kbps` : "-";
+  const sampleRate = metadata.sample_rate ? `${(metadata.sample_rate / 1000).toFixed(1)} kHz` : "-";
   const channels = metadata.channels
     ? metadata.channels === 1
       ? t("assets.audioInfoView.channels_mono")
@@ -137,9 +125,7 @@ export default function AudioInfoView({
           {/* Header - Fixed */}
           <div className="p-4 pb-2 flex items-center justify-between border-b border-base-200">
             <div className="flex items-center gap-2">
-              <h1 className="font-sans font-bold">
-                {t("assets.basicInfo.title")}
-              </h1>
+              <h1 className="font-sans font-bold">{t("assets.basicInfo.title")}</h1>
               <div className="badge badge-soft badge-warning">
                 {t("assets.audioInfoView.audio_badge")}
               </div>
@@ -183,15 +169,9 @@ export default function AudioInfoView({
             {(title !== "-" || artist !== "-" || album !== "-") && (
               <div className="rounded bg-base-300 overflow-hidden">
                 <div className="px-3 py-2 space-y-1">
-                  {title !== "-" && (
-                    <p className="text-sm font-bold leading-tight">{title}</p>
-                  )}
-                  {artist !== "-" && (
-                    <p className="text-xs font-medium">{artist}</p>
-                  )}
-                  {album !== "-" && (
-                    <p className="text-xs opacity-70">{album}</p>
-                  )}
+                  {title !== "-" && <p className="text-sm font-bold leading-tight">{title}</p>}
+                  {artist !== "-" && <p className="text-xs font-medium">{artist}</p>}
+                  {album !== "-" && <p className="text-xs opacity-70">{album}</p>}
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] opacity-60 uppercase tracking-wider">
                     {genre !== "-" && <span>{genre}</span>}
                     {year !== "-" && <span>{year}</span>}

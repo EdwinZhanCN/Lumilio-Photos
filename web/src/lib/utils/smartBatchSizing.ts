@@ -100,8 +100,7 @@ const DEFAULT_CONFIGS: Record<string, BatchSizingConfig> = {
  * Detects device capabilities for batch sizing optimization
  */
 export function detectDeviceCapabilities(): DeviceCapabilities {
-  const cpuCores =
-    (typeof navigator !== "undefined" && navigator.hardwareConcurrency) || 4;
+  const cpuCores = (typeof navigator !== "undefined" && navigator.hardwareConcurrency) || 4;
 
   // Estimate available memory (conservative approach)
   let availableMemoryMB = 1024; // Default conservative estimate
@@ -120,9 +119,7 @@ export function detectDeviceCapabilities(): DeviceCapabilities {
   const isLowEndDevice = cpuCores <= 2 || availableMemoryMB < 512;
   const isMobile =
     typeof navigator !== "undefined" &&
-    /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent,
-    );
+    /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // Calculate max concurrency based on cores and device type
   let maxConcurrency = Math.max(1, Math.floor(cpuCores * 0.8));
@@ -164,8 +161,7 @@ export class SmartBatchSizer {
     const history = this.metricsHistory.get(operationType) || [];
 
     let batchSize =
-      this.currentBatchSizes.get(operationType) ||
-      this.getInitialBatchSize(operationType);
+      this.currentBatchSizes.get(operationType) || this.getInitialBatchSize(operationType);
 
     // Adjust based on recent performance
     if (history.length > 0) {
@@ -184,10 +180,7 @@ export class SmartBatchSizer {
     batchSize = this.applyDeviceConstraints(batchSize, operationType);
 
     // Ensure batch size is within bounds and doesn't exceed total items
-    batchSize = Math.max(
-      config.minBatchSize,
-      Math.min(config.maxBatchSize, batchSize, totalItems),
-    );
+    batchSize = Math.max(config.minBatchSize, Math.min(config.maxBatchSize, batchSize, totalItems));
 
     this.currentBatchSizes.set(operationType, batchSize);
     return batchSize;
@@ -241,12 +234,9 @@ export class SmartBatchSizer {
    */
   private getInitialBatchSize(operationType: string): number {
     const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.default;
-    const { isLowEndDevice, isMobile, maxConcurrency } =
-      this.deviceCapabilities;
+    const { isLowEndDevice, isMobile, maxConcurrency } = this.deviceCapabilities;
 
-    let initialSize = Math.ceil(
-      (config.minBatchSize + config.maxBatchSize) / 2,
-    );
+    let initialSize = Math.ceil((config.minBatchSize + config.maxBatchSize) / 2);
 
     // Reduce for low-end devices
     if (isLowEndDevice) {
@@ -258,10 +248,7 @@ export class SmartBatchSizer {
     // Consider CPU cores
     initialSize = Math.min(initialSize, maxConcurrency * 2);
 
-    return Math.max(
-      config.minBatchSize,
-      Math.min(config.maxBatchSize, initialSize),
-    );
+    return Math.max(config.minBatchSize, Math.min(config.maxBatchSize, initialSize));
   }
 
   /**
@@ -274,11 +261,9 @@ export class SmartBatchSizer {
   ): number {
     const recentMetrics = history.slice(-3); // Consider last 3 operations
     const avgProcessingTime =
-      recentMetrics.reduce((sum, m) => sum + m.processingTimeMs, 0) /
-      recentMetrics.length;
+      recentMetrics.reduce((sum, m) => sum + m.processingTimeMs, 0) / recentMetrics.length;
     const avgErrorRate =
-      recentMetrics.reduce((sum, m) => sum + m.errorRate, 0) /
-      recentMetrics.length;
+      recentMetrics.reduce((sum, m) => sum + m.errorRate, 0) / recentMetrics.length;
 
     let adjustment = 0;
 
@@ -287,10 +272,7 @@ export class SmartBatchSizer {
       adjustment = -Math.ceil(currentSize * config.adaptationRate);
     }
     // If processing is fast and stable, increase batch size
-    else if (
-      avgProcessingTime < config.targetProcessingTimeMs * 0.8 &&
-      avgErrorRate < 0.05
-    ) {
+    else if (avgProcessingTime < config.targetProcessingTimeMs * 0.8 && avgErrorRate < 0.05) {
       adjustment = Math.ceil(currentSize * config.adaptationRate);
     }
 
@@ -299,19 +281,13 @@ export class SmartBatchSizer {
       adjustment = Math.min(adjustment, -Math.ceil(currentSize * 0.3));
     }
 
-    return Math.max(
-      config.minBatchSize,
-      Math.min(config.maxBatchSize, currentSize + adjustment),
-    );
+    return Math.max(config.minBatchSize, Math.min(config.maxBatchSize, currentSize + adjustment));
   }
 
   /**
    * Applies device-specific constraints to batch size
    */
-  private applyDeviceConstraints(
-    batchSize: number,
-    operationType: string,
-  ): number {
+  private applyDeviceConstraints(batchSize: number, operationType: string): number {
     const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.default;
 
     // Apply the fixed adaptive memory constraint
@@ -371,11 +347,7 @@ export function getOptimalBatchSize(
   totalItems: number,
   priority: ProcessingPriority = ProcessingPriority.NORMAL,
 ): number {
-  return globalBatchSizer.getOptimalBatchSize(
-    operationType,
-    totalItems,
-    priority,
-  );
+  return globalBatchSizer.getOptimalBatchSize(operationType, totalItems, priority);
 }
 
 /**

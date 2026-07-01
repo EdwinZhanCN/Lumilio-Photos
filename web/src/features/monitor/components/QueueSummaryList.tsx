@@ -23,11 +23,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
-import type {
-  QueueErrorSampleDTO,
-  QueueSummaryDTO,
-  QueueSummaryResponse,
-} from "../monitor.type";
+import type { QueueErrorSampleDTO, QueueSummaryDTO, QueueSummaryResponse } from "../monitor.type";
 
 type QueuePresentation = {
   icon: LucideIcon;
@@ -63,9 +59,7 @@ const QUEUE_PRESENTATION: Record<string, QueuePresentation> = {
 
 function humanizeQueueName(name?: string): string {
   if (!name) return "";
-  return name
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return name.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function getPresentation(name?: string): QueuePresentation {
@@ -81,9 +75,7 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
   return {
     classify_zeroshot: {
       name: t("monitor.queueSummary.queues.classify_zeroshot.name"),
-      description: t(
-        "monitor.queueSummary.queues.classify_zeroshot.description",
-      ),
+      description: t("monitor.queueSummary.queues.classify_zeroshot.description"),
     },
     detect_stacks: {
       name: t("monitor.queueSummary.queues.detect_stacks.name"),
@@ -99,9 +91,7 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
     },
     match_live_photo: {
       name: t("monitor.queueSummary.queues.match_live_photo.name"),
-      description: t(
-        "monitor.queueSummary.queues.match_live_photo.description",
-      ),
+      description: t("monitor.queueSummary.queues.match_live_photo.description"),
     },
     metadata_asset: {
       name: t("monitor.queueSummary.queues.metadata_asset.name"),
@@ -125,15 +115,11 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
     },
     process_semantic: {
       name: t("monitor.queueSummary.queues.process_semantic.name"),
-      description: t(
-        "monitor.queueSummary.queues.process_semantic.description",
-      ),
+      description: t("monitor.queueSummary.queues.process_semantic.description"),
     },
     rebuild_location_clusters: {
       name: t("monitor.queueSummary.queues.rebuild_location_clusters.name"),
-      description: t(
-        "monitor.queueSummary.queues.rebuild_location_clusters.description",
-      ),
+      description: t("monitor.queueSummary.queues.rebuild_location_clusters.description"),
     },
     reindex_assets: {
       name: t("monitor.queueSummary.queues.reindex_assets.name"),
@@ -171,15 +157,11 @@ function getKindLabels(t: TFunction): Record<string, string> {
     process_ocr: t("monitor.queueSummary.kinds.process_ocr"),
     process_phash: t("monitor.queueSummary.kinds.process_phash"),
     process_semantic: t("monitor.queueSummary.kinds.process_semantic"),
-    rebuild_location_clusters: t(
-      "monitor.queueSummary.kinds.rebuild_location_clusters",
-    ),
+    rebuild_location_clusters: t("monitor.queueSummary.kinds.rebuild_location_clusters"),
     reindex_assets: t("monitor.queueSummary.kinds.reindex_assets"),
     retry_asset: t("monitor.queueSummary.kinds.retry_asset"),
     scan_repository: t("monitor.queueSummary.kinds.scan_repository"),
-    schedule_repository_scans: t(
-      "monitor.queueSummary.kinds.schedule_repository_scans",
-    ),
+    schedule_repository_scans: t("monitor.queueSummary.kinds.schedule_repository_scans"),
     thumbnail_asset: t("monitor.queueSummary.kinds.thumbnail_asset"),
     transcode_asset: t("monitor.queueSummary.kinds.transcode_asset"),
   };
@@ -209,10 +191,7 @@ function formatRelativeTime(
   if (!timestamp) return t("monitor.queueSummary.time.never");
 
   const date = new Date(timestamp);
-  const secondsAgo = Math.max(
-    0,
-    Math.floor((Date.now() - date.getTime()) / 1000),
-  );
+  const secondsAgo = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
 
   if (secondsAgo < 60) {
     return t("monitor.queueSummary.time.justNow");
@@ -235,10 +214,7 @@ function formatRelativeTime(
   return date.toLocaleDateString(language);
 }
 
-function statusForQueue(
-  queue: QueueSummaryDTO,
-  t: TFunction,
-) {
+function statusForQueue(queue: QueueSummaryDTO, t: TFunction) {
   if ((queue.attention_jobs ?? 0) > 0) {
     return {
       label: t("monitor.queueSummary.status.needsAttention"),
@@ -327,10 +303,7 @@ export function QueueSummaryList() {
     });
   };
 
-  const copyDiagnostic = async (
-    queueName: string,
-    sample: QueueErrorSampleDTO,
-  ) => {
+  const copyDiagnostic = async (queueName: string, sample: QueueErrorSampleDTO) => {
     const key = `${queueName}:${sample.job_id}`;
     await navigator.clipboard.writeText(buildDiagnosticText(queueName, sample));
     setCopiedKey(key);
@@ -344,9 +317,7 @@ export function QueueSummaryList() {
       <div className="flex min-h-64 items-center justify-center rounded-lg border border-base-300 bg-base-100 p-6 text-center shadow-sm">
         <div>
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-          <p className="mt-3 text-sm opacity-60">
-            {t("monitor.queueSummary.loading")}
-          </p>
+          <p className="mt-3 text-sm opacity-60">{t("monitor.queueSummary.loading")}</p>
         </div>
       </div>
     );
@@ -357,9 +328,7 @@ export function QueueSummaryList() {
       <div className="flex min-h-64 items-center justify-center rounded-lg border border-base-300 bg-base-100 p-6 text-center shadow-sm">
         <div>
           <AlertCircle className="mx-auto h-8 w-8 text-error" />
-          <div className="mt-2 text-sm text-error">
-            {t("monitor.queueSummary.fetchError")}
-          </div>
+          <div className="mt-2 text-sm text-error">{t("monitor.queueSummary.fetchError")}</div>
         </div>
       </div>
     );
@@ -370,12 +339,8 @@ export function QueueSummaryList() {
       <div className="flex min-h-64 items-center justify-center rounded-lg border border-base-300 bg-base-100 p-8 text-center shadow-sm">
         <div>
           <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
-          <h2 className="mt-3 text-base font-semibold">
-            {t("monitor.queueSummary.emptyTitle")}
-          </h2>
-          <p className="mt-1 text-sm opacity-60">
-            {t("monitor.queueSummary.emptyDescription")}
-          </p>
+          <h2 className="mt-3 text-base font-semibold">{t("monitor.queueSummary.emptyTitle")}</h2>
+          <p className="mt-1 text-sm opacity-60">{t("monitor.queueSummary.emptyDescription")}</p>
         </div>
       </div>
     );
@@ -385,22 +350,14 @@ export function QueueSummaryList() {
     <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
       <div className="flex flex-col gap-2 border-b border-base-300 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold">
-            {t("monitor.queueSummary.title")}
-          </h2>
-          <p className="text-sm opacity-60">
-            {t("monitor.queueSummary.subtitle")}
-          </p>
+          <h2 className="text-base font-semibold">{t("monitor.queueSummary.title")}</h2>
+          <p className="text-sm opacity-60">{t("monitor.queueSummary.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 text-xs opacity-60">
           <Clock className="h-3.5 w-3.5" />
           <span>
             {t("monitor.queueSummary.updated", {
-              time: formatRelativeTime(
-                generatedAt,
-                t,
-                i18n.resolvedLanguage || i18n.language,
-              ),
+              time: formatRelativeTime(generatedAt, t, i18n.resolvedLanguage || i18n.language),
             })}
           </span>
         </div>
@@ -412,8 +369,7 @@ export function QueueSummaryList() {
           const copy = queueCopy[queueName];
           const displayName = copy?.name ?? humanizeQueueName(queueName);
           const description =
-            copy?.description ??
-            t("monitor.queueSummary.queues.default.description");
+            copy?.description ?? t("monitor.queueSummary.queues.default.description");
           const presentation = getPresentation(queueName);
           const Icon = presentation.icon;
           const status = statusForQueue(queue, t);
@@ -449,21 +405,15 @@ export function QueueSummaryList() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-sm font-semibold">
-                        {displayName}
-                      </h3>
-                      <span className={`badge badge-sm ${status.className}`}>
-                        {status.label}
-                      </span>
+                      <h3 className="truncate text-sm font-semibold">{displayName}</h3>
+                      <span className={`badge badge-sm ${status.className}`}>{status.label}</span>
                     </div>
                     <p className="mt-1 text-sm opacity-60">{description}</p>
 
                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-base-200">
                       <div
                         className={`h-full rounded-full ${
-                          (queue.attention_jobs ?? 0) > 0
-                            ? "bg-warning"
-                            : "bg-primary"
+                          (queue.attention_jobs ?? 0) > 0 ? "bg-warning" : "bg-primary"
                         }`}
                         style={{ width: `${progress}%` }}
                       />
@@ -506,17 +456,11 @@ export function QueueSummaryList() {
                   />
                   <Metric
                     label={t("monitor.queueSummary.metrics.averageRuntime")}
-                    value={
-                      averageRuntime ??
-                      t("monitor.queueSummary.metrics.notEnoughData")
-                    }
+                    value={averageRuntime ?? t("monitor.queueSummary.metrics.notEnoughData")}
                   />
                   <Metric
                     label={t("monitor.queueSummary.metrics.averageLatency")}
-                    value={
-                      averageLatency ??
-                      t("monitor.queueSummary.metrics.notEnoughData")
-                    }
+                    value={averageLatency ?? t("monitor.queueSummary.metrics.notEnoughData")}
                   />
                 </div>
               </div>
@@ -530,9 +474,7 @@ export function QueueSummaryList() {
                     onClick={() => toggleQueue(queueName)}
                   >
                     <ChevronDown
-                      className={`h-4 w-4 transition-transform ${
-                        isExpanded ? "rotate-180" : ""
-                      }`}
+                      className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                     />
                     {t("monitor.queueSummary.reviewErrors", {
                       count: queue.attention_jobs ?? 0,
@@ -549,15 +491,12 @@ export function QueueSummaryList() {
                         errorSamples.map((sample) => {
                           const sampleKey = `${queueName}:${sample.job_id}`;
                           const errorTime =
-                            sample.attempted_at ??
-                            sample.finalized_at ??
-                            sample.created_at;
+                            sample.attempted_at ?? sample.finalized_at ?? sample.created_at;
                           const errorLabel =
                             errorStateLabels[sample.state ?? ""] ??
                             t("monitor.queueSummary.errorStates.unknown");
                           const kindLabel =
-                            kindLabels[sample.kind ?? ""] ??
-                            humanizeQueueName(sample.kind);
+                            kindLabels[sample.kind ?? ""] ?? humanizeQueueName(sample.kind);
 
                           return (
                             <div
@@ -567,15 +506,11 @@ export function QueueSummaryList() {
                               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-sm font-medium">
-                                      {kindLabel}
-                                    </span>
+                                    <span className="text-sm font-medium">{kindLabel}</span>
                                     <span className="badge badge-warning badge-sm">
                                       {errorLabel}
                                     </span>
-                                    <span className="text-xs opacity-50">
-                                      #{sample.job_id}
-                                    </span>
+                                    <span className="text-xs opacity-50">#{sample.job_id}</span>
                                   </div>
                                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
                                     <span>
@@ -597,9 +532,7 @@ export function QueueSummaryList() {
                                 <button
                                   type="button"
                                   className="btn btn-xs btn-ghost gap-1 self-start"
-                                  onClick={() =>
-                                    void copyDiagnostic(queueName, sample)
-                                  }
+                                  onClick={() => void copyDiagnostic(queueName, sample)}
                                 >
                                   <Copy className="h-3.5 w-3.5" />
                                   {copiedKey === sampleKey
@@ -609,8 +542,7 @@ export function QueueSummaryList() {
                               </div>
 
                               <p className="mt-2 line-clamp-3 break-words rounded bg-base-100/70 px-2 py-1.5 text-xs text-error">
-                                {sample.last_error ||
-                                  t("monitor.queueSummary.errorFallback")}
+                                {sample.last_error || t("monitor.queueSummary.errorFallback")}
                               </p>
                             </div>
                           );
@@ -628,23 +560,11 @@ export function QueueSummaryList() {
   );
 }
 
-function Metric({
-  label,
-  value,
-  tone = "",
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
+function Metric({ label, value, tone = "" }: { label: string; value: string; tone?: string }) {
   return (
     <div className="rounded-lg bg-base-200/60 px-3 py-2">
-      <div className="text-[0.68rem] font-semibold uppercase tracking-wide opacity-50">
-        {label}
-      </div>
-      <div className={`mt-1 truncate text-sm font-semibold ${tone}`}>
-        {value}
-      </div>
+      <div className="text-[0.68rem] font-semibold uppercase tracking-wide opacity-50">{label}</div>
+      <div className={`mt-1 truncate text-sm font-semibold ${tone}`}>{value}</div>
     </div>
   );
 }

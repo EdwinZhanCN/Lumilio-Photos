@@ -9,10 +9,7 @@ export type StatsCardsProps = {
   repositoryId?: string;
 };
 
-const StatsCards: React.FC<StatsCardsProps> = ({
-  className = "",
-  repositoryId,
-}) => {
+const StatsCards: React.FC<StatsCardsProps> = ({ className = "", repositoryId }) => {
   const { t } = useI18n();
   const {
     focalLengthData,
@@ -73,51 +70,39 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   }, [cameraLensData, t]);
 
   // Calculate multiple time-of-day percentages (golden / blue / sunrise / sunset)
-  const { goldenPercent, bluePercent, sunrisePercent, sunsetPercent } =
-    useMemo(() => {
-      if (!timeDistributionData || timeDistributionData.type !== "hourly") {
-        return {
-          goldenPercent: 0,
-          bluePercent: 0,
-          sunrisePercent: 0,
-          sunsetPercent: 0,
-        };
-      }
+  const { goldenPercent, bluePercent, sunrisePercent, sunsetPercent } = useMemo(() => {
+    if (!timeDistributionData || timeDistributionData.type !== "hourly") {
+      return {
+        goldenPercent: 0,
+        bluePercent: 0,
+        sunrisePercent: 0,
+        sunsetPercent: 0,
+      };
+    }
 
-      const dataArray = timeDistributionData.data ?? [];
-      const totalCount = dataArray.reduce(
-        (sum, item) => sum + (item.count ?? 0),
-        0,
-      );
-      if (totalCount === 0) {
-        return {
-          goldenPercent: 0,
-          bluePercent: 0,
-          sunrisePercent: 0,
-          sunsetPercent: 0,
-        };
-      }
+    const dataArray = timeDistributionData.data ?? [];
+    const totalCount = dataArray.reduce((sum, item) => sum + (item.count ?? 0), 0);
+    if (totalCount === 0) {
+      return {
+        goldenPercent: 0,
+        bluePercent: 0,
+        sunrisePercent: 0,
+        sunsetPercent: 0,
+      };
+    }
 
-      const sumHours = (hours: number[]) =>
-        dataArray
-          .filter((item) => hours.includes(item.value ?? 0))
-          .reduce((sum, item) => sum + (item.count ?? 0), 0);
+    const sumHours = (hours: number[]) =>
+      dataArray
+        .filter((item) => hours.includes(item.value ?? 0))
+        .reduce((sum, item) => sum + (item.count ?? 0), 0);
 
-      const goldenPercent = Math.round(
-        (sumHours([5, 6, 7, 8, 17, 18, 19, 20]) / totalCount) * 100,
-      );
-      const bluePercent = Math.round(
-        (sumHours([4, 5, 20, 21]) / totalCount) * 100,
-      );
-      const sunrisePercent = Math.round(
-        (sumHours([5, 6, 7]) / totalCount) * 100,
-      );
-      const sunsetPercent = Math.round(
-        (sumHours([17, 18, 19]) / totalCount) * 100,
-      );
+    const goldenPercent = Math.round((sumHours([5, 6, 7, 8, 17, 18, 19, 20]) / totalCount) * 100);
+    const bluePercent = Math.round((sumHours([4, 5, 20, 21]) / totalCount) * 100);
+    const sunrisePercent = Math.round((sumHours([5, 6, 7]) / totalCount) * 100);
+    const sunsetPercent = Math.round((sumHours([17, 18, 19]) / totalCount) * 100);
 
-      return { goldenPercent, bluePercent, sunrisePercent, sunsetPercent };
-    }, [timeDistributionData]);
+    return { goldenPercent, bluePercent, sunrisePercent, sunsetPercent };
+  }, [timeDistributionData]);
 
   // Transform heatmap data for GitHubStyleHeatmap
   const heatmapValues = useMemo(() => {
@@ -208,9 +193,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         <div className="card-body">
           <div className="flex items-center gap-2 text-primary">
             <ClockIcon className="size-5" />
-            <h3 className="font-bold">
-              {t("home.stats.timeDistribution.title")}
-            </h3>
+            <h3 className="font-bold">{t("home.stats.timeDistribution.title")}</h3>
           </div>
           <div className="grid grid-cols-2 gap-4 items-center justify-center mt-2">
             <div className="flex flex-col items-center gap-1">
@@ -224,9 +207,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {goldenPercent}%
               </div>
-              <p className="text-xs text-primary">
-                {t("home.stats.timeDistribution.golden")}
-              </p>
+              <p className="text-xs text-primary">{t("home.stats.timeDistribution.golden")}</p>
             </div>
 
             <div className="flex flex-col items-center gap-1">
@@ -240,9 +221,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {bluePercent}%
               </div>
-              <p className="text-xs text-info">
-                {t("home.stats.timeDistribution.blue")}
-              </p>
+              <p className="text-xs text-info">{t("home.stats.timeDistribution.blue")}</p>
             </div>
 
             <div className="flex flex-col items-center gap-1">
@@ -256,9 +235,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {sunrisePercent}%
               </div>
-              <p className="text-xs text-warning">
-                {t("home.stats.timeDistribution.sunrise")}
-              </p>
+              <p className="text-xs text-warning">{t("home.stats.timeDistribution.sunrise")}</p>
             </div>
 
             <div className="flex flex-col items-center gap-1">
@@ -272,9 +249,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {sunsetPercent}%
               </div>
-              <p className="text-xs text-secondary">
-                {t("home.stats.timeDistribution.sunset")}
-              </p>
+              <p className="text-xs text-secondary">{t("home.stats.timeDistribution.sunset")}</p>
             </div>
           </div>
         </div>
@@ -295,9 +270,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                     <span className="truncate" title={item.combo}>
                       {item.combo}
                     </span>
-                    <span className="text-primary ml-2 flex-shrink-0">
-                      {item.rate}%
-                    </span>
+                    <span className="text-primary ml-2 flex-shrink-0">{item.rate}%</span>
                   </div>
                   <progress
                     className="progress progress-primary w-full h-1"

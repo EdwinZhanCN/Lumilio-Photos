@@ -107,12 +107,8 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
             ...(options?.mode
               ? { mode: options.mode as "review" | "organize" | "analyze" | "curate" }
               : {}),
-            ...(contextPayload && contextPayload.length > 0
-              ? { context: contextPayload }
-              : {}),
-            ...(mentionsPayload && mentionsPayload.length > 0
-              ? { mentions: mentionsPayload }
-              : {}),
+            ...(contextPayload && contextPayload.length > 0 ? { context: contextPayload } : {}),
+            ...(mentionsPayload && mentionsPayload.length > 0 ? { mentions: mentionsPayload } : {}),
           },
           callbacks,
         );
@@ -127,10 +123,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
 
       set((state) => ({
         messages: [
-          ...resolveConfirm(
-            state.messages,
-            approved ? "approved" : "rejected",
-          ),
+          ...resolveConfirm(state.messages, approved ? "approved" : "rejected"),
           assistantMessage(),
         ],
         awaitingConfirmation: false,

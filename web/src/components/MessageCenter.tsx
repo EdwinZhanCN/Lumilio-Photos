@@ -4,8 +4,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 
 function formatRelativeTime(createdAt: number, language: string) {
   const delta = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
-  if (delta < 60)
-    return new Intl.RelativeTimeFormat(language).format(-delta, "second");
+  if (delta < 60) return new Intl.RelativeTimeFormat(language).format(-delta, "second");
   if (delta < 3600) {
     const minutes = Math.floor(delta / 60);
     return new Intl.RelativeTimeFormat(language).format(-minutes, "minute");
@@ -20,12 +19,8 @@ function formatRelativeTime(createdAt: number, language: string) {
 
 export default function MessageCenter() {
   const { t, i18n } = useI18n();
-  const {
-    notifications,
-    markNotificationRead,
-    markAllNotificationsRead,
-    clearNotifications,
-  } = useGlobal();
+  const { notifications, markNotificationRead, markAllNotificationsRead, clearNotifications } =
+    useGlobal();
 
   const unreadCount =
     notifications.filter((item) => !item.read).length > 0
@@ -36,11 +31,7 @@ export default function MessageCenter() {
 
   return (
     <div className="dropdown dropdown-end">
-      <button
-        type="button"
-        tabIndex={0}
-        className="btn btn-ghost gap-2 rounded-full"
-      >
+      <button type="button" tabIndex={0} className="btn btn-ghost gap-2 rounded-full">
         <Bell className="w-5 h-5" />
         <span className="badge badge-secondary badge-sm">
           {unreadCount > 99 ? "99+" : unreadCount}

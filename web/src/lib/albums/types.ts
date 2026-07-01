@@ -11,6 +11,4 @@ export type AddAssetToAlbumRequest = Schemas["dto.AddAssetToAlbumRequestDTO"];
 export type UpdateAssetPositionRequest = Schemas["dto.UpdateAssetPositionRequestDTO"];
 export type MessageResponse = Schemas["dto.MessageResponseDTO"];
 
-export type ListAlbumsParams = NonNullable<
-  Paths["/api/v1/albums"]["get"]["parameters"]["query"]
->;
+export type ListAlbumsParams = NonNullable<Paths["/api/v1/albums"]["get"]["parameters"]["query"]>;

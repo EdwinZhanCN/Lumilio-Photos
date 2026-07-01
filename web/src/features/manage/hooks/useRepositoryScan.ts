@@ -7,9 +7,7 @@ type AutoDetectStacksResponse = {
   stacks_created?: number;
 };
 
-const invalidateRepositoryAwareQueries = async (
-  queryClient: ReturnType<typeof useQueryClient>,
-) => {
+const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await Promise.all([
     queryClient.invalidateQueries({
       queryKey: ["get", "/api/v1/assets/indexing/repositories"],
@@ -41,16 +39,9 @@ const unwrapAutoDetectStacksResponse = (
 export function useRepositoryScan() {
   const queryClient = useQueryClient();
   const scanMutation = $api.useMutation("post", "/api/v1/repositories/{id}/scan");
-  const detectStacksMutation = $api.useMutation(
-    "post",
-    "/api/v1/repositories/{id}/stacks/detect",
-  );
-  const [scanningIds, setScanningIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [detectingIds, setDetectingIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const detectStacksMutation = $api.useMutation("post", "/api/v1/repositories/{id}/stacks/detect");
+  const [scanningIds, setScanningIds] = useState<Set<string>>(() => new Set());
+  const [detectingIds, setDetectingIds] = useState<Set<string>>(() => new Set());
 
   const scanRepository = useCallback(
     async (repositoryId: string) => {

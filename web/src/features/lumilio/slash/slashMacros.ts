@@ -39,10 +39,7 @@ export function useSlashMacros(): SlashMacro[] {
         "lumilio.quickActions.organize.description",
         "Group and tag photos, create albums",
       ),
-      template: t(
-        "lumilio.quickActions.organize.template",
-        "Help me organize my recent photos",
-      ),
+      template: t("lumilio.quickActions.organize.template", "Help me organize my recent photos"),
     },
     {
       id: "analyze",
@@ -52,19 +49,13 @@ export function useSlashMacros(): SlashMacro[] {
         "lumilio.quickActions.analyze.description",
         "Discover shooting habits and trends",
       ),
-      template: t(
-        "lumilio.quickActions.analyze.template",
-        "Analyze my shooting habits and trends",
-      ),
+      template: t("lumilio.quickActions.analyze.template", "Analyze my shooting habits and trends"),
     },
     {
       id: "curate",
       mode: "curate",
       label: t("lumilio.quickActions.curate.label", "Curate"),
-      description: t(
-        "lumilio.quickActions.curate.description",
-        "Pick the best photos",
-      ),
+      description: t("lumilio.quickActions.curate.description", "Pick the best photos"),
       template: t(
         "lumilio.quickActions.curate.template",
         "Help me curate the best photos from recent uploads",

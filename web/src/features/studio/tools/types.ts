@@ -19,10 +19,6 @@ export type ToolRunner = (
   helpers?: ToolRunHelpers,
 ) => Promise<ToolRunResult>;
 
-export const SUPPORTED_IMAGE_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-] as const;
+export const SUPPORTED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 export type SupportedImageMimeType = (typeof SUPPORTED_IMAGE_MIME_TYPES)[number];

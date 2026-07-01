@@ -2,10 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Folder, Moon, Sun } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
-import {
-  useResolvedThemeMode,
-  useThemePreference,
-} from "@/lib/theme";
+import { useResolvedThemeMode, useThemePreference } from "@/lib/theme";
 import { useWorkingRepository } from "@/features/settings";
 import UserAvatar from "@/components/UserAvatar";
 import MessageCenter from "@/components/MessageCenter";
@@ -51,13 +48,9 @@ function NavBar() {
             <select
               className="select select-bordered select-sm w-32 sm:w-52"
               value={workingRepositoryId}
-              disabled={
-                repositoriesQuery.isLoading || repositoriesQuery.isError
-              }
+              disabled={repositoriesQuery.isLoading || repositoriesQuery.isError}
               title={selectedRepository?.path}
-              onChange={(event) =>
-                setWorkingRepositoryId(event.target.value || null)
-              }
+              onChange={(event) => setWorkingRepositoryId(event.target.value || null)}
             >
               <option value="">
                 {t("navbar.repository.all", {
@@ -90,9 +83,7 @@ function NavBar() {
             className={`swap swap-rotate ${isFollowingSystem ? "cursor-not-allowed opacity-60" : ""}`}
             title={
               isFollowingSystem
-                ? t(
-                    "settings.appearanceSettings.themes.followSystem.navbarHint",
-                  )
+                ? t("settings.appearanceSettings.themes.followSystem.navbarHint")
                 : undefined
             }
           >
@@ -126,9 +117,7 @@ function NavBar() {
                   textSize="text-sm"
                 />
                 <div className="hidden text-left sm:block">
-                  <div className="text-sm font-semibold leading-tight">
-                    {displayName}
-                  </div>
+                  <div className="text-sm font-semibold leading-tight">{displayName}</div>
                   <div className="text-xs opacity-60 leading-tight">
                     {(user.role ?? "user").toUpperCase()}
                   </div>
@@ -139,13 +128,9 @@ function NavBar() {
                 className="menu dropdown-content z-20 mt-2 w-64 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
               >
                 <li className="menu-title px-3 py-2">
-                  <span className="font-semibold text-base-content">
-                    {displayName}
-                  </span>
+                  <span className="font-semibold text-base-content">{displayName}</span>
                   {user.username && (
-                    <span className="text-xs text-base-content/70">
-                      @{user.username}
-                    </span>
+                    <span className="text-xs text-base-content/70">@{user.username}</span>
                   )}
                 </li>
                 <li>

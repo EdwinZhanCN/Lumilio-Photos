@@ -49,9 +49,7 @@ export const useExportImage = (): useExportImageReturn => {
   const showMessage = useMessage();
 
   const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(
-    null,
-  );
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
@@ -73,10 +71,10 @@ export const useExportImage = (): useExportImageReturn => {
       abortControllerRef.current = new AbortController();
 
       try {
-        const response = await fetch(
-          assetUrls.getOriginalFileUrl(asset.asset_id),
-          { signal: abortControllerRef.current.signal, credentials: "include" },
-        );
+        const response = await fetch(assetUrls.getOriginalFileUrl(asset.asset_id), {
+          signal: abortControllerRef.current.signal,
+          credentials: "include",
+        });
         if (!response.ok) {
           throw new Error(`Failed to fetch image: ${response.statusText}`);
         }
@@ -88,10 +86,7 @@ export const useExportImage = (): useExportImageReturn => {
         if (error instanceof Error && error.name === "AbortError") {
           showMessage("info", "Download cancelled");
         } else {
-          showMessage(
-            "error",
-            error instanceof Error ? error.message : "Download failed",
-          );
+          showMessage("error", error instanceof Error ? error.message : "Download failed");
         }
       } finally {
         setIsExporting(false);
@@ -103,11 +98,7 @@ export const useExportImage = (): useExportImageReturn => {
   );
 
   const fetchExport = useCallback(
-    async (
-      asset: Asset,
-      options: ExportOptions,
-      signal: AbortSignal,
-    ): Promise<void> => {
+    async (asset: Asset, options: ExportOptions, signal: AbortSignal): Promise<void> => {
       const assetId = asset.asset_id;
       if (!assetId) throw new Error("No image available for export");
 
@@ -153,10 +144,7 @@ export const useExportImage = (): useExportImageReturn => {
         return;
       }
       if (options.format !== "original" && !isExportSupported(asset)) {
-        showMessage(
-          "info",
-          "Export conversion is unavailable for video and audio assets.",
-        );
+        showMessage("info", "Export conversion is unavailable for video and audio assets.");
         return;
       }
 
@@ -208,10 +196,7 @@ export const useExportImage = (): useExportImageReturn => {
         for (let i = 0; i < assets.length; i++) {
           if (signal.aborted) break;
           const asset = assets[i];
-          if (
-            !asset.asset_id ||
-            (options.format !== "original" && !isExportSupported(asset))
-          ) {
+          if (!asset.asset_id || (options.format !== "original" && !isExportSupported(asset))) {
             continue;
           }
 

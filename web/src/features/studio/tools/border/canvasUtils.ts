@@ -12,10 +12,7 @@ export function clampByte(value: number): number {
 }
 
 export function isOffscreenCanvasSupported(): boolean {
-  return (
-    typeof OffscreenCanvas !== "undefined" &&
-    typeof createImageBitmap === "function"
-  );
+  return typeof OffscreenCanvas !== "undefined" && typeof createImageBitmap === "function";
 }
 
 /** Trace a rounded-rectangle path (manual; avoids relying on ctx.roundRect). */
@@ -37,9 +34,7 @@ export function roundRectPath(
   ctx.closePath();
 }
 
-export async function canvasToPngBytes(
-  canvas: OffscreenCanvas,
-): Promise<Uint8Array> {
+export async function canvasToPngBytes(canvas: OffscreenCanvas): Promise<Uint8Array> {
   const blob = await canvas.convertToBlob({ type: "image/png" });
   return new Uint8Array(await blob.arrayBuffer());
 }

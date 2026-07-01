@@ -130,7 +130,7 @@ type FiltersInput = FiltersSlice | FiltersState;
 
 // Helper to normalize input
 const getFiltersState = (input: FiltersInput): FiltersState => {
-  if ('filters' in input && input.filters && 'enabled' in input.filters) {
+  if ("filters" in input && input.filters && "enabled" in input.filters) {
     return input.filters;
   }
   return input as FiltersState;
@@ -138,12 +138,7 @@ const getFiltersState = (input: FiltersInput): FiltersState => {
 
 const hasLocationFilter = (location?: FiltersState["location"]): boolean =>
   !!location &&
-  !(
-    location.north === 0 &&
-    location.south === 0 &&
-    location.east === 0 &&
-    location.west === 0
-  );
+  !(location.north === 0 && location.south === 0 && location.east === 0 && location.west === 0);
 
 export const selectFiltersEnabled = (input: FiltersInput): boolean => {
   const state = getFiltersState(input);
@@ -252,16 +247,12 @@ export const validateFilters = (filters: Partial<FiltersState>): string[] => {
 };
 
 // Filter transformation utilities
-export const mergeFilters = (
-  base: FiltersState,
-  override: Partial<FiltersState>,
-): FiltersState => {
+export const mergeFilters = (base: FiltersState, override: Partial<FiltersState>): FiltersState => {
   return {
     ...base,
     ...override,
     // Deep merge for complex fields
-    filename:
-      override.filename !== undefined ? override.filename : base.filename,
+    filename: override.filename !== undefined ? override.filename : base.filename,
     date: override.date !== undefined ? override.date : base.date,
   };
 };

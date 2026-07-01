@@ -154,7 +154,10 @@ export default function UsersTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(error, t("settings.users.saveError", { defaultValue: "Failed to update user." })),
+        message: getErrorMessage(
+          error,
+          t("settings.users.saveError", { defaultValue: "Failed to update user." }),
+        ),
       });
     }
   };
@@ -185,7 +188,10 @@ export default function UsersTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(error, t("settings.users.resetAccessError", { defaultValue: "Failed to reset access." })),
+        message: getErrorMessage(
+          error,
+          t("settings.users.resetAccessError", { defaultValue: "Failed to reset access." }),
+        ),
       });
     }
   };
@@ -227,7 +233,9 @@ export default function UsersTab() {
       >
         {usersQuery.isLoading && (
           <SettingsBlock>
-            <p className="text-sm text-base-content/60">{t("common.loading", { defaultValue: "Loading..." })}</p>
+            <p className="text-sm text-base-content/60">
+              {t("common.loading", { defaultValue: "Loading..." })}
+            </p>
           </SettingsBlock>
         )}
         {usersQuery.isError && (
@@ -293,7 +301,12 @@ export default function UsersTab() {
           >
             <SettingsBlock>
               <div className="flex flex-wrap items-center gap-4">
-                <UserAvatar assetId={effectiveAvatarAssetId} name={resolvedName} size="size-16" textSize="text-lg" />
+                <UserAvatar
+                  assetId={effectiveAvatarAssetId}
+                  name={resolvedName}
+                  size="size-16"
+                  textSize="text-lg"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="text-base font-semibold">{resolvedName}</div>
                   <div className="text-sm text-base-content/60">@{selectedUser.username}</div>
@@ -313,7 +326,11 @@ export default function UsersTab() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setIsChoosingAvatar(true)}>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setIsChoosingAvatar(true)}
+                  >
                     {effectiveAvatarAssetId
                       ? t("settings.users.changeAvatar", { defaultValue: "Change photo" })
                       : t("settings.users.chooseAvatar", { defaultValue: "Choose photo" })}
@@ -340,7 +357,9 @@ export default function UsersTab() {
                 className="input input-bordered input-sm mt-2 w-full"
                 value={form.username}
                 onChange={(event) =>
-                  setForm((c) => (c ? { ...c, username: normalizeUsernameInput(event.target.value) } : c))
+                  setForm((c) =>
+                    c ? { ...c, username: normalizeUsernameInput(event.target.value) } : c,
+                  )
                 }
                 pattern={USERNAME_PATTERN}
                 minLength={USERNAME_MIN_LENGTH}
@@ -359,7 +378,9 @@ export default function UsersTab() {
                 id="user-display-name"
                 className="input input-bordered input-sm mt-2 w-full"
                 value={form.displayName}
-                onChange={(event) => setForm((c) => (c ? { ...c, displayName: event.target.value } : c))}
+                onChange={(event) =>
+                  setForm((c) => (c ? { ...c, displayName: event.target.value } : c))
+                }
                 maxLength={DISPLAY_NAME_MAX_LENGTH}
                 placeholder={selectedUser.username ?? "Display name"}
               />
@@ -399,7 +420,9 @@ export default function UsersTab() {
                   type="checkbox"
                   className="toggle toggle-primary"
                   checked={form.isActive}
-                  onChange={(event) => setForm((c) => (c ? { ...c, isActive: event.target.checked } : c))}
+                  onChange={(event) =>
+                    setForm((c) => (c ? { ...c, isActive: event.target.checked } : c))
+                  }
                 />
               }
             />
@@ -413,7 +436,8 @@ export default function UsersTab() {
                     defaultValue: "Use Change password in Account settings for your own account.",
                   })
                 : t("settings.users.resetAccessHint", {
-                    defaultValue: "Generate a temporary password and clear every MFA factor for this user.",
+                    defaultValue:
+                      "Generate a temporary password and clear every MFA factor for this user.",
                   })
             }
           >
@@ -427,7 +451,8 @@ export default function UsersTab() {
                       defaultValue: "This action is unavailable for your own account.",
                     })
                   : t("settings.users.resetAccessScope", {
-                      defaultValue: "Use this when an account owner has lost access to every sign-in factor.",
+                      defaultValue:
+                        "Use this when an account owner has lost access to every sign-in factor.",
                     })
               }
               control={
@@ -448,7 +473,9 @@ export default function UsersTab() {
                   <div className="min-w-0 flex-1 space-y-3">
                     <div>
                       <div className="text-sm font-semibold">
-                        {t("settings.users.resetAccessPanelTitle", { defaultValue: "Temporary password" })}
+                        {t("settings.users.resetAccessPanelTitle", {
+                          defaultValue: "Temporary password",
+                        })}
                       </div>
                       <p className="mt-1 text-sm text-base-content/70">
                         {t("settings.users.resetAccessPanelBody", {
@@ -458,7 +485,9 @@ export default function UsersTab() {
                       </p>
                     </div>
                     <div className="flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-3 md:flex-row md:items-center md:justify-between">
-                      <code className="break-all text-sm font-semibold">{resetAccessState.temporaryPassword}</code>
+                      <code className="break-all text-sm font-semibold">
+                        {resetAccessState.temporaryPassword}
+                      </code>
                       <button
                         type="button"
                         className="btn btn-sm btn-warning"
@@ -472,12 +501,16 @@ export default function UsersTab() {
                     <div className="flex flex-wrap gap-2 text-xs">
                       {resetAccessState.clearedPasskeys && (
                         <span className="badge badge-warning badge-outline">
-                          {t("settings.users.clearedPasskeys", { defaultValue: "Passkeys cleared" })}
+                          {t("settings.users.clearedPasskeys", {
+                            defaultValue: "Passkeys cleared",
+                          })}
                         </span>
                       )}
                       {resetAccessState.clearedTotp && (
                         <span className="badge badge-warning badge-outline">
-                          {t("settings.users.clearedTotp", { defaultValue: "Authenticator App cleared" })}
+                          {t("settings.users.clearedTotp", {
+                            defaultValue: "Authenticator App cleared",
+                          })}
                         </span>
                       )}
                     </div>

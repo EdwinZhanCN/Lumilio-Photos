@@ -91,12 +91,7 @@ export interface ConfirmationInfo {
 
 // --- Conversation model: messages are lists of typed blocks ---
 
-export type Block =
-  | TextBlock
-  | ReasoningBlock
-  | ToolBlock
-  | WidgetBlock
-  | ConfirmBlock;
+export type Block = TextBlock | ReasoningBlock | ToolBlock | WidgetBlock | ConfirmBlock;
 
 export interface TextBlock {
   kind: "text";

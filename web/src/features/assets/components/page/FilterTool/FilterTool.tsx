@@ -977,9 +977,7 @@ const TagSection = memo(function TagSection({
         noResultsText={t("assets.filterTool.tagSection.no_results")}
         checked={checked}
         suggestions={active ? suggestions : []}
-        onToggleChecked={(item) =>
-          onValueChange(value.filter((name) => name !== item.name))
-        }
+        onToggleChecked={(item) => onValueChange(value.filter((name) => name !== item.name))}
         onSelectSuggestion={(item) => onValueChange([...value, item.name])}
         className="max-h-52"
       />
@@ -1078,7 +1076,9 @@ export default function FilterTool({
 
   // Location (BBox)
   const [locationEnabled, setLocationEnabled] = useState<boolean>(!!initialDTO.location);
-  const [location, setLocation] = useState<LocationBBox>(initialDTO.location ?? EMPTY_LOCATION_BBOX);
+  const [location, setLocation] = useState<LocationBBox>(
+    initialDTO.location ?? EMPTY_LOCATION_BBOX,
+  );
 
   // Camera model / Lens
   const [cameraModelEnabled, setCameraModelEnabled] = useState<boolean>(!!initialDTO.camera_model);
@@ -1305,9 +1305,7 @@ export default function FilterTool({
     setLensEnabled(isFieldLocked("lens") && isFieldActive(initialDTO, "lens"));
     setLens(initialDTO.lens ?? "");
 
-    setTagEnabled(
-      isFieldLocked("tag_names") && isFieldActive(initialDTO, "tag_names"),
-    );
+    setTagEnabled(isFieldLocked("tag_names") && isFieldActive(initialDTO, "tag_names"));
     setTagNames(initialDTO.tag_names ?? []);
 
     if (!autoApply) {

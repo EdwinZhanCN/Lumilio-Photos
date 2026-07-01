@@ -22,13 +22,7 @@ interface SettingsPageProps {
   children: ReactNode;
 }
 
-export function SettingsPage({
-  icon,
-  title,
-  description,
-  actions,
-  children,
-}: SettingsPageProps) {
+export function SettingsPage({ icon, title, description, actions, children }: SettingsPageProps) {
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3">
@@ -37,9 +31,7 @@ export function SettingsPage({
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold">{title}</h2>
-          {description && (
-            <p className="mt-0.5 text-sm text-base-content/60">{description}</p>
-          )}
+          {description && <p className="mt-0.5 text-sm text-base-content/60">{description}</p>}
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
       </div>

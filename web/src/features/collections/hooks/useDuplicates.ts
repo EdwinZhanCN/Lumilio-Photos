@@ -13,8 +13,7 @@ import type {
 function isDuplicateQueryKey(queryKey: readonly unknown[]) {
   return (
     queryKey[0] === "get" &&
-    (queryKey[1] === "/api/v1/duplicates/summary" ||
-      queryKey[1] === "/api/v1/duplicates/groups")
+    (queryKey[1] === "/api/v1/duplicates/summary" || queryKey[1] === "/api/v1/duplicates/groups")
   );
 }
 
@@ -114,10 +113,7 @@ interface MergeMutationVariables {
 
 export function useMergeDuplicateGroup() {
   const queryClient = useQueryClient();
-  const mutation = $api.useMutation(
-    "post",
-    "/api/v1/duplicates/groups/{id}/merge",
-  );
+  const mutation = $api.useMutation("post", "/api/v1/duplicates/groups/{id}/merge");
 
   return useMutation({
     mutationFn: async ({ groupId, body }: MergeMutationVariables) => {
@@ -146,10 +142,7 @@ interface DismissMutationVariables {
 
 export function useDismissDuplicateGroup() {
   const queryClient = useQueryClient();
-  const mutation = $api.useMutation(
-    "post",
-    "/api/v1/duplicates/groups/{id}/dismiss",
-  );
+  const mutation = $api.useMutation("post", "/api/v1/duplicates/groups/{id}/dismiss");
 
   return useMutation({
     mutationFn: async ({ groupId }: DismissMutationVariables) => {

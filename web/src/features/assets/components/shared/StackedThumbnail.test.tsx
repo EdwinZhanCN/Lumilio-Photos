@@ -5,17 +5,12 @@ import StackedThumbnail from "./StackedThumbnail";
 
 vi.mock("@/lib/i18n", () => ({
   useI18n: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? _key,
+    t: (_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key,
   }),
 }));
 
 vi.mock("./MediaThumbnail", () => ({
-  default: ({
-    onClick,
-  }: {
-    onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  }) => (
+  default: ({ onClick }: { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void }) => (
     <button type="button" onClick={onClick}>
       thumbnail
     </button>
@@ -28,13 +23,7 @@ let lastOverlayProps: {
 } | null = null;
 
 vi.mock("./StackCarouselOverlay", () => ({
-  default: ({
-    open,
-    focusAssetId,
-  }: {
-    open: boolean;
-    focusAssetId?: string;
-  }) => {
+  default: ({ open, focusAssetId }: { open: boolean; focusAssetId?: string }) => {
     lastOverlayProps = { open, focusAssetId };
     return open ? <div>stack-carousel-overlay</div> : null;
   },
@@ -54,8 +43,6 @@ const asset = {
     stack_cover: true,
   },
 } as Asset;
-
-
 
 const plainBrowseStack = {
   type: "stack",
@@ -120,14 +107,8 @@ describe("StackedThumbnail", () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-
   it("shows a non-interactive Live Photo badge for live photo stacks", () => {
-    render(
-      <StackedThumbnail
-        asset={livePhotoAsset}
-        stackInfo={livePhotoAsset.stack!}
-      />,
-    );
+    render(<StackedThumbnail asset={livePhotoAsset} stackInfo={livePhotoAsset.stack!} />);
 
     // The Live Photo badge is a decorative div, not a button
     expect(screen.queryByRole("button", { name: /live photo/i })).toBeNull();

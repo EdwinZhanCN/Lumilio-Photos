@@ -112,9 +112,8 @@ self.onmessage = async (event: MessageEvent<ToolWorkerMessage>) => {
         throw new Error("Operation aborted");
       }
 
-      const bytes = result.bytes instanceof Uint8Array
-        ? result.bytes
-        : new Uint8Array(result.bytes);
+      const bytes =
+        result.bytes instanceof Uint8Array ? result.bytes : new Uint8Array(result.bytes);
 
       self.postMessage(
         {
@@ -135,8 +134,7 @@ self.onmessage = async (event: MessageEvent<ToolWorkerMessage>) => {
           stage: "run_tool",
           requestId,
           toolId,
-          error:
-            error instanceof Error ? error.message : "Tool execution failed",
+          error: error instanceof Error ? error.message : "Tool execution failed",
         },
       });
     } finally {

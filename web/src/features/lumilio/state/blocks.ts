@@ -1,10 +1,4 @@
-import type {
-  Block,
-  ChatMessage,
-  InterruptInfo,
-  ReasoningBlock,
-  SideChannelEvent,
-} from "../types";
+import type { Block, ChatMessage, InterruptInfo, ReasoningBlock, SideChannelEvent } from "../types";
 
 /** Pure reduction rules from SSE events onto the typed-block conversation.
  * The store applies these against the last assistant message; rendering never
@@ -27,10 +21,7 @@ export const assistantMessage = (): ChatMessage => ({
 const isAssistantLast = (messages: ChatMessage[]): boolean =>
   messages.length > 0 && messages[messages.length - 1].role === "assistant";
 
-const replaceLastMessage = (
-  messages: ChatMessage[],
-  blocks: Block[],
-): ChatMessage[] => {
+const replaceLastMessage = (messages: ChatMessage[], blocks: Block[]): ChatMessage[] => {
   const next = messages.slice();
   next[next.length - 1] = { ...next[next.length - 1], blocks };
   return next;
@@ -38,9 +29,7 @@ const replaceLastMessage = (
 
 const closeReasoning = (block: ReasoningBlock): ReasoningBlock => ({
   ...block,
-  durationS:
-    block.durationS ??
-    Math.max(0, Math.round((Date.now() - block.startedAt) / 1000)),
+  durationS: block.durationS ?? Math.max(0, Math.round((Date.now() - block.startedAt) / 1000)),
 });
 
 /** Closes a trailing open reasoning block, if any. */
@@ -65,10 +54,7 @@ export const applyChunk = (
   if (chunk.reasoning) {
     const last = blocks[blocks.length - 1];
     if (last?.kind === "reasoning" && last.durationS === undefined) {
-      blocks = [
-        ...blocks.slice(0, -1),
-        { ...last, text: last.text + chunk.reasoning },
-      ];
+      blocks = [...blocks.slice(0, -1), { ...last, text: last.text + chunk.reasoning }];
     } else {
       blocks = [
         ...blocks,
@@ -86,15 +72,9 @@ export const applyChunk = (
     blocks = withClosedTail(blocks);
     const last = blocks[blocks.length - 1];
     if (last?.kind === "text") {
-      blocks = [
-        ...blocks.slice(0, -1),
-        { ...last, markdown: last.markdown + chunk.output },
-      ];
+      blocks = [...blocks.slice(0, -1), { ...last, markdown: last.markdown + chunk.output }];
     } else {
-      blocks = [
-        ...blocks,
-        { kind: "text", id: newId(), markdown: chunk.output },
-      ];
+      blocks = [...blocks, { kind: "text", id: newId(), markdown: chunk.output }];
     }
   }
 
@@ -103,10 +83,7 @@ export const applyChunk = (
 
 /** tool_execution events upsert a tool block by executionId; widget_show
  * appends a widget block that hydrates from the ref API. */
-export const applySideEvent = (
-  messages: ChatMessage[],
-  event: SideChannelEvent,
-): ChatMessage[] => {
+export const applySideEvent = (messages: ChatMessage[], event: SideChannelEvent): ChatMessage[] => {
   if (!isAssistantLast(messages)) return messages;
   if (!event.tool?.executionId) return messages;
   let blocks = withClosedTail(messages[messages.length - 1].blocks);
@@ -130,8 +107,7 @@ export const applySideEvent = (
   }
 
   const index = blocks.findIndex(
-    (block) =>
-      block.kind === "tool" && block.executionId === event.tool.executionId,
+    (block) => block.kind === "tool" && block.executionId === event.tool.executionId,
   );
   const existingId = index >= 0 ? blocks[index].id : newId();
   const toolBlock: Block = {
@@ -159,10 +135,7 @@ export const applyInterrupt = (
 ): ChatMessage[] => {
   if (!isAssistantLast(messages)) return messages;
   const blocks = withClosedTail(messages[messages.length - 1].blocks);
-  return replaceLastMessage(messages, [
-    ...blocks,
-    { kind: "confirm", id: newId(), interrupt },
-  ]);
+  return replaceLastMessage(messages, [...blocks, { kind: "confirm", id: newId(), interrupt }]);
 };
 
 /** Marks the pending confirm block as resolved (the resume stream follows
@@ -174,9 +147,7 @@ export const resolveConfirm = (
   messages.map((message) => ({
     ...message,
     blocks: message.blocks.map((block) =>
-      block.kind === "confirm" && !block.resolved
-        ? { ...block, resolved }
-        : block,
+      block.kind === "confirm" && !block.resolved ? { ...block, resolved } : block,
     ),
   }));
 

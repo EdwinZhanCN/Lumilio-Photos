@@ -47,11 +47,9 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
   style,
 }) => {
   // Helpers
-  const parseDate = (d: string | Date): Date =>
-    d instanceof Date ? new Date(d) : new Date(d);
+  const parseDate = (d: string | Date): Date => (d instanceof Date ? new Date(d) : new Date(d));
   const dateKey = (d: Date): string => d.toISOString().slice(0, 10); // YYYY-MM-DD
-  const clamp = (n: number, min: number, max: number) =>
-    Math.min(max, Math.max(min, n));
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
   const startOfWeek = (d: Date, ws: number) => {
     const res = new Date(d);
@@ -73,20 +71,7 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
   };
 
   const monthShort = (idx: number) =>
-    [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ][idx];
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][idx];
 
   // Merge duplicate dates and normalize input
   const valueMap = React.useMemo(() => {
@@ -189,22 +174,11 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
       className={`react-calendar-heatmap ${className ?? ""}`}
       style={{ display: "inline-block", ...style }}
     >
-      <svg
-        width={svgWidth}
-        height={svgHeight}
-        role="img"
-        aria-label="Calendar heatmap"
-      >
+      <svg width={svgWidth} height={svgHeight} role="img" aria-label="Calendar heatmap">
         {showMonthLabels && monthLabels.length > 0 && (
           <g transform={`translate(0, ${topPad - 4})`} aria-hidden="true">
             {monthLabels.map((m, i) => (
-              <text
-                key={`${m.text}-${i}`}
-                x={m.x}
-                y={0}
-                fontSize={10}
-                fill="currentColor"
-              >
+              <text key={`${m.text}-${i}`} x={m.x} y={0} fontSize={10} fill="currentColor">
                 {m.text}
               </text>
             ))}
@@ -224,14 +198,10 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
                   const dayClass =
                     (classForValue
                       ? classForValue(count > 0 ? value : undefined)
-                      : defaultClassForValue(count > 0 ? value : undefined)) ||
-                    "";
+                      : defaultClassForValue(count > 0 ? value : undefined)) || "";
                   const dataAttrs = ((tooltipDataAttrs
                     ? tooltipDataAttrs(count > 0 ? value : undefined)
-                    : undefined) ?? {}) as Record<
-                    string,
-                    string | number | undefined
-                  >;
+                    : undefined) ?? {}) as Record<string, string | number | undefined>;
                   const title =
                     (dataAttrs && (dataAttrs as any).title) ||
                     `${key} • ${count} ${count === 1 ? "item" : "items"}`;

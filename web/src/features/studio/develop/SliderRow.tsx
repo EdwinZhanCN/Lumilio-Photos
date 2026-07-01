@@ -1,9 +1,6 @@
 import React, { useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
-import {
-  type AdjustmentControl,
-  isControlModified,
-} from "@/features/studio/editor/developConfig";
+import { type AdjustmentControl, isControlModified } from "@/features/studio/editor/developConfig";
 
 type SliderRowProps = {
   control: AdjustmentControl;
@@ -45,13 +42,9 @@ export function SliderRow({
   const { t } = useI18n();
   const { label, min, max, step, unit } = control;
   const changed = isControlModified(control, value);
-  const format = (v: number) =>
-    step < 1 ? Number(v.toFixed(2)) : Math.round(v);
+  const format = (v: number) => (step < 1 ? Number(v.toFixed(2)) : Math.round(v));
 
-  const reset = useCallback(
-    () => onChange(defaultValue),
-    [defaultValue, onChange],
-  );
+  const reset = useCallback(() => onChange(defaultValue), [defaultValue, onChange]);
 
   return (
     <div
@@ -68,13 +61,12 @@ export function SliderRow({
               changed ? "font-medium text-base-content" : "text-base-content/70"
             }`}
           >
-            {t(SLIDER_I18N_KEYS[control.key] ?? `studio.develop.${control.key}`, { defaultValue: label })}
+            {t(SLIDER_I18N_KEYS[control.key] ?? `studio.develop.${control.key}`, {
+              defaultValue: label,
+            })}
           </span>
           {changed && (
-            <span
-              className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-              aria-label="modified"
-            />
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="modified" />
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -86,14 +78,10 @@ export function SliderRow({
             step={step}
             disabled={disabled}
             aria-label={label}
-            onChange={(e) =>
-              onChange(clamp(parseFloat(e.target.value), min, max))
-            }
+            onChange={(e) => onChange(clamp(parseFloat(e.target.value), min, max))}
             className="input input-xs input-bordered h-6 w-[58px] bg-base-100 px-1.5 text-right font-mono text-[11px] tabular-nums focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
           />
-          {unit && (
-            <span className="w-3 text-[10px] text-base-content/40">{unit}</span>
-          )}
+          {unit && <span className="w-3 text-[10px] text-base-content/40">{unit}</span>}
         </div>
       </div>
       <input

@@ -1,10 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vite-plus/test";
 import type { Asset, StackMemberDTO } from "@/lib/assets/types";
 import client from "@/lib/http-commons/client";
-import {
-  normalizeStackMembers,
-  resolveStackCarouselAssets,
-} from "./useStackCarouselAssets";
+import { normalizeStackMembers, resolveStackCarouselAssets } from "./useStackCarouselAssets";
 
 vi.mock("@/lib/http-commons/client", () => ({
   default: {
@@ -12,10 +9,7 @@ vi.mock("@/lib/http-commons/client", () => ({
   },
 }));
 
-const createAsset = (
-  assetId: string,
-  overrides: Partial<Asset> = {},
-): Asset =>
+const createAsset = (assetId: string, overrides: Partial<Asset> = {}): Asset =>
   ({
     asset_id: assetId,
     original_filename: `${assetId}.jpg`,
@@ -61,11 +55,7 @@ describe("useStackCarouselAssets helpers", () => {
     ]);
 
     expect(client.GET).toHaveBeenCalledTimes(2);
-    expect(assets.map((asset) => asset.asset_id)).toEqual([
-      "member-1",
-      "cover",
-      "member-2",
-    ]);
+    expect(assets.map((asset) => asset.asset_id)).toEqual(["member-1", "cover", "member-2"]);
   });
 
   it("filters failed fetches but keeps successful assets", async () => {
@@ -80,10 +70,7 @@ describe("useStackCarouselAssets helpers", () => {
       createMember("cover", 2),
     ]);
 
-    expect(assets.map((asset) => asset.asset_id)).toEqual([
-      "member-2",
-      "cover",
-    ]);
+    expect(assets.map((asset) => asset.asset_id)).toEqual(["member-2", "cover"]);
   });
 
   it("dedupes duplicate member ids", async () => {

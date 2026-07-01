@@ -10,11 +10,7 @@ export {
 } from "./components/renew";
 export type { ModeThemeName } from "./components/renew";
 export { useWorkingRepository } from "./hooks/useWorkingRepository";
-export {
-  usePreference,
-  useDebouncedPreference,
-  usePreferencesStore,
-} from "./preferences";
+export { usePreference, useDebouncedPreference, usePreferencesStore } from "./preferences";
 export type { Preferences, AssetPagePreferences } from "./preferences";
 export { useRuntimeInfo } from "./hooks/useRuntimeInfo";
 export { useAISettingsDraft } from "./hooks/useAISettingsDraft";

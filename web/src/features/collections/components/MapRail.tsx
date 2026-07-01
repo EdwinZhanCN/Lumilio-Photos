@@ -19,12 +19,7 @@ function formatTripStart(date: Date, locale?: string): string {
   });
 }
 
-export default function MapRail({
-  trips,
-  loading = false,
-  onMapClick,
-  onTripClick,
-}: MapRailProps) {
+export default function MapRail({ trips, loading = false, onMapClick, onTripClick }: MapRailProps) {
   const { t, i18n } = useI18n();
   const locale = i18n.resolvedLanguage || i18n.language;
 
@@ -46,10 +41,9 @@ export default function MapRail({
             src: assetUrls.getThumbnailUrl(trip.coverAssetId, "medium"),
           }}
           title={trip.displayTitle}
-          subtitle={`${formatTripStart(trip.startTime, locale)} · ${t(
-            "collections.itemsCount",
-            { count: trip.photoCount },
-          )}`}
+          subtitle={`${formatTripStart(trip.startTime, locale)} · ${t("collections.itemsCount", {
+            count: trip.photoCount,
+          })}`}
           onClick={() => onTripClick?.(trip)}
           className="w-48"
         />

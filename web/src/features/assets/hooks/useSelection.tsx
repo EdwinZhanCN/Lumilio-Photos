@@ -7,14 +7,8 @@ import {
   useAssetsStoreApi,
 } from "../assets.store";
 import { SelectionResult } from "@/features/assets";
-import {
-  useSelectionEnabled,
-  useSelectedIds,
-  useSelectionMode,
-} from "../selectors";
-import {
-  selectLastSelectedId,
-} from "../slices/selection.slice";
+import { useSelectionEnabled, useSelectedIds, useSelectionMode } from "../selectors";
+import { selectLastSelectedId } from "../slices/selection.slice";
 import { useAssetActions } from "./useAssetActions";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { getToken } from "@/lib/http-commons/auth";
@@ -44,16 +38,10 @@ const useSelectionFromStore = (store: AssetsStoreApi): SelectionResult => {
   // Fine-grained subscriptions
   const enabled = useStore(store, (state) => state.selection.enabled);
   const selectedIds = useStore(store, (state) => state.selection.selectedIds);
-  const selectionMode = useStore(
-    store,
-    (state) => state.selection.selectionMode,
-  );
+  const selectionMode = useStore(store, (state) => state.selection.selectionMode);
 
   // Actions
-  const toggleAssetSelection = useStore(
-    store,
-    (state) => state.toggleAssetSelection,
-  );
+  const toggleAssetSelection = useStore(store, (state) => state.toggleAssetSelection);
   const selectAsset = useStore(store, (state) => state.selectAsset);
   const deselectAsset = useStore(store, (state) => state.deselectAsset);
   const selectAllAssets = useStore(store, (state) => state.selectAll);
@@ -65,10 +53,7 @@ const useSelectionFromStore = (store: AssetsStoreApi): SelectionResult => {
   const selectedCount = selectedIds.size;
   const hasSelection = selectedCount > 0;
 
-  const selectedAsArray = useMemo(
-    () => Array.from(selectedIds),
-    [selectedIds],
-  );
+  const selectedAsArray = useMemo(() => Array.from(selectedIds), [selectedIds]);
 
   // Selection operations
   const isSelected = useCallback(
@@ -242,10 +227,7 @@ export const useSelection = (): SelectionResult => {
 /**
  * Hook for keyboard-enhanced selection operations.
  */
-const useKeyboardSelectionFromStore = (
-  store: AssetsStoreApi,
-  assetIds: string[],
-) => {
+const useKeyboardSelectionFromStore = (store: AssetsStoreApi, assetIds: string[]) => {
   const selection = useSelectionFromStore(store);
   // We need to access the store state directly for event handlers
 
@@ -348,18 +330,16 @@ export const useSelectionState = () => {
 
 const triggerDownload = (blob: Blob, filename: string): void => {
   const blobUrl = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = blobUrl;
-  link.setAttribute('download', filename);
+  link.setAttribute("download", filename);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(blobUrl);
 };
 
-const filenameFromContentDisposition = (
-  contentDisposition: string | null,
-): string | undefined => {
+const filenameFromContentDisposition = (contentDisposition: string | null): string | undefined => {
   if (!contentDisposition) return undefined;
   const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
   if (utf8Match?.[1]) {
@@ -391,102 +371,111 @@ export const useBulkAssetOperations = (resolvedAssetIds?: string[]) => {
       }));
 
       await batchUpdateAssets(updates);
-    }, [resolvedAssetIds, selection.selectedIds, batchUpdateAssets]);
+    },
+    [resolvedAssetIds, selection.selectedIds, batchUpdateAssets],
+  );
 
-  const bulkSetLike = useCallback(async (liked: boolean): Promise<void> => {
-    const targetIds = resolvedAssetIds ?? Array.from(selection.selectedIds);
-    const updates = targetIds.map((assetId) => ({
-      assetId,
-      updates: {
-        liked,
-      },
-    }));
+  const bulkSetLike = useCallback(
+    async (liked: boolean): Promise<void> => {
+      const targetIds = resolvedAssetIds ?? Array.from(selection.selectedIds);
+      const updates = targetIds.map((assetId) => ({
+        assetId,
+        updates: {
+          liked,
+        },
+      }));
 
-    await batchUpdateAssets(updates);
-  }, [resolvedAssetIds, selection.selectedIds, batchUpdateAssets]);
+      await batchUpdateAssets(updates);
+    },
+    [resolvedAssetIds, selection.selectedIds, batchUpdateAssets],
+  );
 
   const bulkDelete = useCallback(async (): Promise<void> => {
     const targetIds = resolvedAssetIds ?? Array.from(selection.selectedIds);
-    await Promise.all(
-      targetIds.map((assetId) => deleteAsset(assetId)),
-    );
+    await Promise.all(targetIds.map((assetId) => deleteAsset(assetId)));
     selection.clear();
   }, [resolvedAssetIds, selection.selectedIds, selection.clear, deleteAsset]);
 
-  const bulkDownload = useCallback(async (assets?: Asset[]): Promise<void> => {
-    const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
-    if (ids.length === 0) return;
+  const bulkDownload = useCallback(
+    async (assets?: Asset[]): Promise<void> => {
+      const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
+      if (ids.length === 0) return;
 
-    if (ids.length > 10) {
-      const headers = new Headers({
-        "Content-Type": "application/json",
-      });
-      const token = getToken();
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
-      }
+      if (ids.length > 10) {
+        const headers = new Headers({
+          "Content-Type": "application/json",
+        });
+        const token = getToken();
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
 
-      const response = await fetch(assetUrls.getBulkDownloadUrl(), {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ asset_ids: ids }),
-      });
-      if (!response.ok) {
-        throw new Error(`Bulk download failed with ${response.status}`);
-      }
+        const response = await fetch(assetUrls.getBulkDownloadUrl(), {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ asset_ids: ids }),
+        });
+        if (!response.ok) {
+          throw new Error(`Bulk download failed with ${response.status}`);
+        }
 
-      const blob = await response.blob();
-      const filename =
-        filenameFromContentDisposition(response.headers.get('content-disposition')) ??
-        "lumilio-assets.zip";
-      triggerDownload(blob, filename);
-      return;
-    }
-
-    for (const id of ids) {
-      try {
-        const url = assetUrls.getOriginalFileUrl(id as string);
-        const response = await fetch(url);
         const blob = await response.blob();
-
-        // Try to get filename from asset object first, then content-disposition, then fallback
-        let filename = `asset-${id}`;
-
-        // 1. Try asset object
-        if (assets) {
-          const asset = assets.find(a => a.asset_id === id);
-          if (asset?.original_filename) {
-            filename = asset.original_filename;
-          }
-        }
-
-        // 2. Try content-disposition if we didn't find it
-        if (filename === `asset-${id}`) {
-          filename =
-            filenameFromContentDisposition(response.headers.get('content-disposition')) ??
-            filename;
-        }
-
+        const filename =
+          filenameFromContentDisposition(response.headers.get("content-disposition")) ??
+          "lumilio-assets.zip";
         triggerDownload(blob, filename);
-      } catch (error) {
-        console.error(`Failed to download asset ${id}:`, error);
+        return;
       }
-      // Small delay to prevent browser from blocking multiple downloads
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-  }, [resolvedAssetIds, selection.selectedIds]);
 
-  const bulkAddToAlbum = useCallback(async (albumId: number): Promise<void> => {
-    const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
-    await Promise.all(
-      ids.map((assetId) =>
-        addAssetToAlbum({
-          params: { path: { id: albumId, assetId: assetId as string } },
-          body: {},
-        }),
-      ),
-    );
-  }, [resolvedAssetIds, selection.selectedIds, addAssetToAlbum]);
+      for (const id of ids) {
+        try {
+          const url = assetUrls.getOriginalFileUrl(id as string);
+          const response = await fetch(url);
+          const blob = await response.blob();
+
+          // Try to get filename from asset object first, then content-disposition, then fallback
+          let filename = `asset-${id}`;
+
+          // 1. Try asset object
+          if (assets) {
+            const asset = assets.find((a) => a.asset_id === id);
+            if (asset?.original_filename) {
+              filename = asset.original_filename;
+            }
+          }
+
+          // 2. Try content-disposition if we didn't find it
+          if (filename === `asset-${id}`) {
+            filename =
+              filenameFromContentDisposition(response.headers.get("content-disposition")) ??
+              filename;
+          }
+
+          triggerDownload(blob, filename);
+        } catch (error) {
+          console.error(`Failed to download asset ${id}:`, error);
+        }
+        // Small delay to prevent browser from blocking multiple downloads
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    },
+    [resolvedAssetIds, selection.selectedIds],
+  );
+
+  const bulkAddToAlbum = useCallback(
+    async (albumId: number): Promise<void> => {
+      const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
+      await Promise.all(
+        ids.map((assetId) =>
+          addAssetToAlbum({
+            params: { path: { id: albumId, assetId: assetId as string } },
+            body: {},
+          }),
+        ),
+      );
+    },
+    [resolvedAssetIds, selection.selectedIds, addAssetToAlbum],
+  );
 
   return {
     bulkUpdateRating,

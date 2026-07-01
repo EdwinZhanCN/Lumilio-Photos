@@ -1,1 +1,1 @@
-import 'zustand/middleware/immer'
+import "zustand/middleware/immer";

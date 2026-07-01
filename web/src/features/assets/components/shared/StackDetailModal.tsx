@@ -42,9 +42,7 @@ const truncateAssetId = (assetId: string) => {
 const memberCardClasses = (isCurrent: boolean) =>
   [
     "overflow-hidden rounded-[1.5rem] border bg-base-100/95 shadow-[0_20px_50px_-32px_rgba(15,23,42,0.45)] transition-shadow",
-    isCurrent
-      ? "border-primary/35 ring-1 ring-primary/20"
-      : "border-base-300/70",
+    isCurrent ? "border-primary/35 ring-1 ring-primary/20" : "border-base-300/70",
   ].join(" ");
 
 export default function StackDetailModal({
@@ -75,9 +73,7 @@ export default function StackDetailModal({
       return [];
     }
 
-    const coverPosition = Math.min(
-      ...stackMembers.map((member) => member.position ?? 0),
-    );
+    const coverPosition = Math.min(...stackMembers.map((member) => member.position ?? 0));
 
     return stackMembers.map((member) => ({
       ...member,
@@ -126,9 +122,7 @@ export default function StackDetailModal({
                   {t("assets.stackDetail.memberCount", {
                     count: memberCount,
                     defaultValue:
-                      memberCount === 1
-                        ? "1 asset in stack"
-                        : `${memberCount} assets in stack`,
+                      memberCount === 1 ? "1 asset in stack" : `${memberCount} assets in stack`,
                   })}
                 </p>
               </div>
@@ -160,8 +154,7 @@ export default function StackDetailModal({
               <div className="alert border border-warning/25 bg-warning/10 text-warning-content">
                 <span>
                   {t("assets.stackDetail.error", {
-                    defaultValue:
-                      "Stack details are temporarily unavailable for this asset.",
+                    defaultValue: "Stack details are temporarily unavailable for this asset.",
                   })}
                 </span>
               </div>
@@ -169,8 +162,7 @@ export default function StackDetailModal({
               <div className="alert border border-base-300 bg-base-200/70 text-base-content/70">
                 <span>
                   {t("assets.stackDetail.empty", {
-                    defaultValue:
-                      "No related assets were returned for this stack.",
+                    defaultValue: "No related assets were returned for this stack.",
                   })}
                 </span>
               </div>
@@ -180,18 +172,11 @@ export default function StackDetailModal({
                   const relation = member.relation ?? "alternative";
                   const position = member.position ?? 0;
                   const memberAssetId = member.asset_id ?? asset.asset_id ?? "";
-                  const thumbnailUrl = assetUrls.getThumbnailUrl(
-                    memberAssetId,
-                    "medium",
-                  );
-                  const badgeClass =
-                    RELATION_STYLES[relation] ?? RELATION_STYLES.alternative;
+                  const thumbnailUrl = assetUrls.getThumbnailUrl(memberAssetId, "medium");
+                  const badgeClass = RELATION_STYLES[relation] ?? RELATION_STYLES.alternative;
 
                   return (
-                    <article
-                      key={memberAssetId}
-                      className={memberCardClasses(member.isCurrent)}
-                    >
+                    <article key={memberAssetId} className={memberCardClasses(member.isCurrent)}>
                       <div className="relative aspect-[4/3] overflow-hidden bg-base-200">
                         <img
                           src={thumbnailUrl}

@@ -1,13 +1,5 @@
 import React from "react";
-import {
-  Aperture,
-  Camera,
-  Clock,
-  Focus,
-  Sun,
-  Timer,
-  type LucideIcon,
-} from "lucide-react";
+import { Aperture, Camera, Clock, Focus, Sun, Timer, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { PhotoThumb } from "@/features/studio/shared/PhotoThumb";
 
@@ -45,9 +37,7 @@ function MetaRow({
     <div className="flex items-baseline justify-between gap-3 py-1">
       <span className="text-xs text-base-content/50">{label}</span>
       <span
-        className={`truncate text-xs text-base-content/85 ${
-          mono ? "font-mono" : "font-medium"
-        }`}
+        className={`truncate text-xs text-base-content/85 ${mono ? "font-mono" : "font-medium"}`}
       >
         {value}
       </span>

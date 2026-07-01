@@ -77,10 +77,7 @@ function ImgStackGrid({
             {isSelectionMode && (
               <div className="absolute top-1 right-1 z-10">
                 {isSelected ? (
-                  <CheckCircle2
-                    className="text-primary fill-base-100"
-                    size={22}
-                  />
+                  <CheckCircle2 className="text-primary fill-base-100" size={22} />
                 ) : (
                   <Circle className="text-base-content/30" size={22} />
                 )}

@@ -84,11 +84,7 @@ export default function GlobalProvider({ children }: GlobalProviderProps) {
   }, []);
 
   const addNotification = useCallback(
-    (
-      type: GlobalMessageType,
-      message: string,
-      options?: { duration?: number },
-    ) => {
+    (type: GlobalMessageType, message: string, options?: { duration?: number }) => {
       const trimmed = message.trim();
       if (!trimmed) return null;
 

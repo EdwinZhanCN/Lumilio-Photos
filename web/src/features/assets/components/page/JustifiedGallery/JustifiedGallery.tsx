@@ -1,33 +1,17 @@
-import React, {
-  useCallback,
-  useEffect,
-  memo,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, memo, useMemo, useRef, useState } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
 import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
 import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useJustifiedLayoutService } from "@/hooks/util-hooks/useJustifiedLayoutService";
 import type { LayoutResult } from "@/lib/layout/justifiedLayout";
-import {
-  assetsToLayoutBoxes,
-  createResponsiveConfig,
-} from "@/lib/layout/justifiedLayout";
+import { assetsToLayoutBoxes, createResponsiveConfig } from "@/lib/layout/justifiedLayout";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { AssetGalleryProps } from "../gallery.types";
-import {
-  DEFAULT_GROUP_KEYS,
-  formatAssetGroupLabel,
-} from "@/features/assets/utils/assetGroups";
+import { DEFAULT_GROUP_KEYS, formatAssetGroupLabel } from "@/features/assets/utils/assetGroups";
 import EmptyState from "@/components/EmptyState";
-import type {
-  BrowseGroup,
-  BrowseItem,
-} from "@/features/assets/types/assets.type";
+import type { BrowseGroup, BrowseItem } from "@/features/assets/types/assets.type";
 import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
 
 import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
@@ -142,8 +126,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   });
   const [layoutError, setLayoutError] = useState<string | null>(null);
 
-  const { calculateMultipleLayouts, error: layoutServiceError } =
-    useJustifiedLayoutService();
+  const { calculateMultipleLayouts, error: layoutServiceError } = useJustifiedLayoutService();
 
   const groupEntries = useMemo(
     () => browseGroups.filter((group) => group.items.length > 0),
@@ -165,9 +148,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   const layoutInputs = useMemo(() => {
     const inputs: Record<string, ReturnType<typeof assetsToLayoutBoxes>> = {};
     groupEntries.forEach((group) => {
-      inputs[group.key] = assetsToLayoutBoxes(
-        group.items.map(getBrowseItemAsset),
-      );
+      inputs[group.key] = assetsToLayoutBoxes(group.items.map(getBrowseItemAsset));
     });
     return inputs;
   }, [groupEntries]);
@@ -194,12 +175,9 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
 
   const hasCurrentLayouts = layoutState.signature === layoutSignature;
   const hasCompleteCurrentLayout =
-    hasCurrentLayouts &&
-    groupEntries.every((group) => Boolean(layoutState.layouts[group.key]));
+    hasCurrentLayouts && groupEntries.every((group) => Boolean(layoutState.layouts[group.key]));
   const displayGroupEntries =
-    hasCurrentLayouts || layoutState.groups.length === 0
-      ? groupEntries
-      : layoutState.groups;
+    hasCurrentLayouts || layoutState.groups.length === 0 ? groupEntries : layoutState.groups;
   const layouts = layoutState.layouts;
 
   useEffect(() => {
@@ -297,11 +275,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   ]);
 
   const handleAssetClick = useCallback(
-    (
-      item: BrowseItem,
-      asset: Asset,
-      event: React.MouseEvent | React.KeyboardEvent,
-    ) => {
+    (item: BrowseItem, asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
       if (!asset.asset_id) return;
       if (selection.enabled) {
         selection.handleClick(item.id, event as any);
@@ -360,8 +334,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
         const groupKey = group.key;
         const items = group.items;
         const layout = layouts[groupKey];
-        const showHeader =
-          groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
+        const showHeader = groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
         const groupLabel = formatAssetGroupLabel(
           groupKey,
           t,
@@ -396,13 +369,9 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                   const assetId = asset.asset_id;
                   const stackInfo = asset.stack;
                   const hasStackOverlay =
-                    Boolean(stackInfo?.stack_size) &&
-                    (stackInfo?.stack_size ?? 0) > 1;
+                    Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
                   const thumbnailUrl = assetId
-                    ? assetUrls.getThumbnailUrl(
-                        assetId,
-                        getThumbnailSize(width),
-                      )
+                    ? assetUrls.getThumbnailUrl(assetId, getThumbnailSize(width))
                     : undefined;
 
                   return (
@@ -415,17 +384,13 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                       dataAssetId={assetId}
                       allowOverflow={hasStackOverlay}
                     >
-                      {stackInfo &&
-                      stackInfo.stack_size &&
-                      stackInfo.stack_size > 1 ? (
+                      {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
                         <StackedThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
                           stackInfo={stackInfo}
                           browseStack={item.type === "stack" ? item : undefined}
-                          onClick={(event) =>
-                            handleAssetClick(item, asset, event)
-                          }
+                          onClick={(event) => handleAssetClick(item, asset, event)}
                           isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
                           className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
@@ -434,9 +399,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                         <MediaThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
-                          onClick={(event) =>
-                            handleAssetClick(item, asset, event)
-                          }
+                          onClick={(event) => handleAssetClick(item, asset, event)}
                           isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
                           className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
@@ -455,9 +418,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
         );
       })}
 
-      {hasMore && supportsIntersectionObserver && (
-        <div ref={sentinelRef} className="h-10 w-full" />
-      )}
+      {hasMore && supportsIntersectionObserver && <div ref={sentinelRef} className="h-10 w-full" />}
 
       {hasMore && (isLoadingMore || !supportsIntersectionObserver) && (
         <div
@@ -471,11 +432,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
             </>
           ) : (
             !supportsIntersectionObserver && (
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={onLoadMore}
-                type="button"
-              >
+              <button className="btn btn-sm btn-outline" onClick={onLoadMore} type="button">
                 {t("assets.justifiedGallery.loading_more")}
               </button>
             )

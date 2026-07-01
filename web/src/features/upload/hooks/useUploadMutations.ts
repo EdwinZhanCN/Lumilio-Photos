@@ -1,9 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import {
-  batchUploadFiles,
-  uploadFile,
-  uploadFileInChunks,
-} from "@/lib/upload/uploadTransport";
+import { batchUploadFiles, uploadFile, uploadFileInChunks } from "@/lib/upload/uploadTransport";
 import type {
   UploadResponse,
   BatchUploadResponse,
@@ -59,13 +55,13 @@ export type ChunkedUploadVariables = {
 
 /**
  * React Query mutation hook for uploading a single file.
- * 
+ *
  * @returns Mutation object for single file uploads
- * 
+ *
  * @example
  * ```typescript
  * const uploadMutation = useUploadFileMutation();
- * 
+ *
  * uploadMutation.mutate({
  *   file: selectedFile,
  *   hash: fileHash,
@@ -80,13 +76,13 @@ export const useUploadFileMutation = () =>
 
 /**
  * React Query mutation hook for uploading multiple files in batch.
- * 
+ *
  * @returns Mutation object for batch file uploads
- * 
+ *
  * @example
  * ```typescript
  * const batchUploadMutation = useBatchUploadMutation();
- * 
+ *
  * batchUploadMutation.mutate({
  *   files: batchFiles,
  *   repositoryId: 'repo-123',
@@ -102,16 +98,16 @@ export const useBatchUploadMutation = () =>
 
 /**
  * React Query mutation hook for uploading large files in chunks.
- * 
+ *
  * This is ideal for large files that need to be uploaded in smaller pieces
  * to handle network interruptions and provide progress updates.
- * 
+ *
  * @returns Mutation object for chunked file uploads
- * 
+ *
  * @example
  * ```typescript
  * const chunkedUploadMutation = useChunkedUploadMutation();
- * 
+ *
  * chunkedUploadMutation.mutate({
  *   file: largeFile,
  *   sessionId: 'session-123',
@@ -123,22 +119,6 @@ export const useBatchUploadMutation = () =>
  */
 export const useChunkedUploadMutation = () =>
   useMutation<BatchUploadResponse, Error, ChunkedUploadVariables>({
-    mutationFn: ({
-      file,
-      sessionId,
-      hash,
-      chunkSize,
-      repositoryId,
-      onProgress,
-      options,
-    }) =>
-      uploadFileInChunks(
-        file,
-        sessionId,
-        hash,
-        chunkSize,
-        repositoryId,
-        onProgress,
-        options,
-      ),
+    mutationFn: ({ file, sessionId, hash, chunkSize, repositoryId, onProgress, options }) =>
+      uploadFileInChunks(file, sessionId, hash, chunkSize, repositoryId, onProgress, options),
   });

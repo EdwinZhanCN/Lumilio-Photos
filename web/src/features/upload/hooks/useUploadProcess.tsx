@@ -3,24 +3,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useWorkingRepository } from "@/features/settings";
 import { useI18n } from "@/lib/i18n";
-import {
-  HashcodeProgress,
-  useGenerateHashcode,
-} from "@/hooks/util-hooks/useGenerateHashcode";
+import { HashcodeProgress, useGenerateHashcode } from "@/hooks/util-hooks/useGenerateHashcode";
 import type { BatchUploadResult } from "@/lib/upload/types";
-import {
-  generateSessionId,
-  shouldUseChunks,
-} from "@/lib/upload/uploadTransport";
+import { generateSessionId, shouldUseChunks } from "@/lib/upload/uploadTransport";
 import {
   useBatchUploadMutation,
   useChunkedUploadMutation,
 } from "@/features/upload/hooks/useUploadMutations";
 import { useUploadConfig } from "@/features/upload/hooks/useUploadQueries";
-import {
-  getOptimalBatchSize,
-  ProcessingPriority,
-} from "@/lib/utils/smartBatchSizing.ts";
+import { getOptimalBatchSize, ProcessingPriority } from "@/lib/utils/smartBatchSizing.ts";
 
 // Transport fallbacks used only while the server upload config is unavailable.
 // The server endpoint is the source of truth for these values.
@@ -92,9 +83,7 @@ export function useUploadProcess(): useUploadProcessReturn {
   const updateFileProgress = useCallback(
     (sessionId: string, updates: Partial<FileUploadProgress>) => {
       setFileProgress((prev) =>
-        prev.map((item) =>
-          item.sessionId === sessionId ? { ...item, ...updates } : item,
-        ),
+        prev.map((item) => (item.sessionId === sessionId ? { ...item, ...updates } : item)),
       );
     },
     [],
@@ -106,19 +95,14 @@ export function useUploadProcess(): useUploadProcessReturn {
         const key = query.queryKey;
         if (Array.isArray(key)) {
           const path = key[1];
-          return (
-            path === "/api/v1/assets/list" || path === "/api/v1/assets/search"
-          );
+          return path === "/api/v1/assets/list" || path === "/api/v1/assets/search";
         }
         return false;
       },
     });
   }, [queryClient]);
 
-  const toPositiveInt = (
-    value: number | undefined,
-    fallback: number,
-  ): number => {
+  const toPositiveInt = (value: number | undefined, fallback: number): number => {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
       return Math.max(1, Math.floor(fallback));
     }
@@ -149,10 +133,7 @@ export function useUploadProcess(): useUploadProcessReturn {
       serverUploadConfig?.max_concurrent,
       FALLBACK_MAX_CONCURRENT,
     );
-    const effectiveChunkSize = toPositiveInt(
-      serverUploadConfig?.chunk_size,
-      FALLBACK_CHUNK_SIZE,
-    );
+    const effectiveChunkSize = toPositiveInt(serverUploadConfig?.chunk_size, FALLBACK_CHUNK_SIZE);
 
     const semaphore = {
       count: maxConcurrentUploads,
@@ -210,9 +191,7 @@ export function useUploadProcess(): useUploadProcessReturn {
             onUploadProgress: (e) => {
               const p = e.total ? Math.round((e.loaded * 100) / e.total) : 0;
               setUploadProgress(p);
-              sessions.forEach((s) =>
-                updateFileProgress(s.sessionId, { progress: p }),
-              );
+              sessions.forEach((s) => updateFileProgress(s.sessionId, { progress: p }));
             },
           },
         });
@@ -351,9 +330,7 @@ export function useUploadProcess(): useUploadProcessReturn {
       await Promise.all(uploadTasks);
       await invalidateAssetQueries();
 
-      const uploaded = results
-        .filter((r) => r.success)
-        .map((r) => r.file_name || "");
+      const uploaded = results.filter((r) => r.success).map((r) => r.file_name || "");
       const failed = results
         .filter((r) => !r.success)
         .map((r) => ({
@@ -378,10 +355,7 @@ export function useUploadProcess(): useUploadProcessReturn {
 
       return { uploaded, failed };
     } catch (error: any) {
-      showMessage(
-        "error",
-        error.message || t("upload.UploadProcess.processFailed"),
-      );
+      showMessage("error", error.message || t("upload.UploadProcess.processFailed"));
       return {
         uploaded: [],
         failed: fileArray.map((f) => ({

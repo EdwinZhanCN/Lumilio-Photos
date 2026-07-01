@@ -6,10 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getCurrentLanguage, type SupportedLanguage } from "@/lib/i18n.tsx";
-import {
-  DEFAULT_THEME_PREFERENCES,
-  type ThemePreferences,
-} from "@/lib/theme/daisyuiThemes";
+import { DEFAULT_THEME_PREFERENCES, type ThemePreferences } from "@/lib/theme/daisyuiThemes";
 
 export interface AssetPagePreferences {
   layout: "compact" | "full";
@@ -39,10 +36,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 };
 
 interface PreferencesState extends Preferences {
-  setPreference: <K extends keyof Preferences>(
-    key: K,
-    value: Preferences[K],
-  ) => void;
+  setPreference: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void;
   resetPreferences: () => void;
 }
 
@@ -50,8 +44,7 @@ export const usePreferencesStore = create<PreferencesState>()(
   persist(
     (set) => ({
       ...DEFAULT_PREFERENCES,
-      setPreference: (key, value) =>
-        set({ [key]: value } as Pick<Preferences, typeof key>),
+      setPreference: (key, value) => set({ [key]: value } as Pick<Preferences, typeof key>),
       resetPreferences: () => set({ ...DEFAULT_PREFERENCES }),
     }),
     {
@@ -75,10 +68,7 @@ export function usePreference<K extends keyof Preferences>(
 ): [Preferences[K], (value: Preferences[K]) => void] {
   const value = usePreferencesStore((s) => s[key]);
   const setPreference = usePreferencesStore((s) => s.setPreference);
-  const set = useCallback(
-    (next: Preferences[K]) => setPreference(key, next),
-    [key, setPreference],
-  );
+  const set = useCallback((next: Preferences[K]) => setPreference(key, next), [key, setPreference]);
   return [value, set];
 }
 

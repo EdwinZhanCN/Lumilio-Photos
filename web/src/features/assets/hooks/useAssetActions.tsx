@@ -9,16 +9,11 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { Asset } from "@/lib/assets/types";
 
 type BrowseItemDTO = components["schemas"]["dto.BrowseItemDTO"];
-type QueryAssetsResponseDTO =
-  components["schemas"]["dto.QueryAssetsResponseDTO"];
-type SearchAssetsResponseDTO =
-  components["schemas"]["dto.SearchAssetsResponseDTO"];
+type QueryAssetsResponseDTO = components["schemas"]["dto.QueryAssetsResponseDTO"];
+type SearchAssetsResponseDTO = components["schemas"]["dto.SearchAssetsResponseDTO"];
 type AssetsListPage = QueryAssetsResponseDTO | SearchAssetsResponseDTO;
 
-const ASSET_LIST_QUERY_PATHS = new Set([
-  "/api/v1/assets/list",
-  "/api/v1/assets/search",
-]);
+const ASSET_LIST_QUERY_PATHS = new Set(["/api/v1/assets/list", "/api/v1/assets/search"]);
 
 const isAssetListQuery = (queryKey: unknown): boolean => {
   if (!Array.isArray(queryKey)) return false;
@@ -56,12 +51,8 @@ const patchBrowseItemAsset = (
   return updated ? nextItem : item;
 };
 
-const isSearchAssetsPage = (
-  page: AssetsListPage,
-): page is SearchAssetsResponseDTO =>
-  "result_items" in page ||
-  "top_items" in page ||
-  "results_total_assets" in page;
+const isSearchAssetsPage = (page: AssetsListPage): page is SearchAssetsResponseDTO =>
+  "result_items" in page || "top_items" in page || "results_total_assets" in page;
 
 const patchAssetsListPage = (
   page: AssetsListPage,
@@ -93,19 +84,10 @@ export const useAssetActions = (): AssetActionsResult => {
   const showMessage = useMessage();
   const { t } = useI18n();
 
-  const updateRatingMutation = $api.useMutation(
-    "put",
-    "/api/v1/assets/{id}/rating",
-  );
+  const updateRatingMutation = $api.useMutation("put", "/api/v1/assets/{id}/rating");
   const toggleLikeMutation = $api.useMutation("put", "/api/v1/assets/{id}/like");
-  const updateDescriptionMutation = $api.useMutation(
-    "put",
-    "/api/v1/assets/{id}/description",
-  );
-  const deleteAssetMutation = $api.useMutation(
-    "delete",
-    "/api/v1/assets/{id}",
-  );
+  const updateDescriptionMutation = $api.useMutation("put", "/api/v1/assets/{id}/description");
+  const deleteAssetMutation = $api.useMutation("delete", "/api/v1/assets/{id}");
 
   const invalidateAssetQueries = useCallback(() => {
     return queryClient.invalidateQueries({
@@ -124,9 +106,7 @@ export const useAssetActions = (): AssetActionsResult => {
 
           return {
             ...oldData,
-            pages: oldData.pages.map((page) =>
-              patchAssetsListPage(page, assetId, updateFn),
-            ),
+            pages: oldData.pages.map((page) => patchAssetsListPage(page, assetId, updateFn)),
           };
         },
       );
@@ -237,10 +217,7 @@ export const useAssetActions = (): AssetActionsResult => {
         );
 
         await invalidateAssetQueries();
-        showMessage(
-          "success",
-          t("bulk.updateSuccess", { count: updates.length }),
-        );
+        showMessage("success", t("bulk.updateSuccess", { count: updates.length }));
       } catch (error) {
         console.error("Failed to batch update assets:", error);
         showMessage("error", t("bulk.updateError"));

@@ -47,8 +47,7 @@ export default function PhotoInfoView({
     ? (asset.specific_metadata as PhotoSpecificMetadata)
     : ({} as PhotoSpecificMetadata);
   const hasGPS =
-    typeof metadata.gps_latitude === "number" &&
-    typeof metadata.gps_longitude === "number";
+    typeof metadata.gps_latitude === "number" && typeof metadata.gps_longitude === "number";
   const locationClusterQuery = useAssetLocationCluster({
     latitude: hasGPS ? metadata.gps_latitude : undefined,
     longitude: hasGPS ? metadata.gps_longitude : undefined,
@@ -76,12 +75,9 @@ export default function PhotoInfoView({
   // Dimensions and file info
   const width = asset?.width;
   const height = asset?.height;
-  const resolution =
-    metadata.resolution || (width && height ? `${width}✕${height}` : "-");
+  const resolution = metadata.resolution || (width && height ? `${width}✕${height}` : "-");
   const dimensions = metadata.dimensions || resolution;
-  const sizeM = asset?.file_size
-    ? `${(asset.file_size / 1024 / 1024).toFixed(1)}M`
-    : "-";
+  const sizeM = asset?.file_size ? `${(asset.file_size / 1024 / 1024).toFixed(1)}M` : "-";
 
   // Camera and lens info
   const cameraModel = fmt(metadata.camera_model);
@@ -91,14 +87,8 @@ export default function PhotoInfoView({
   const iso = fmt(metadata.iso_speed);
   const exposure = fmt(metadata.exposure_time);
   const ev = fmt(metadata.exposure);
-  const focal = fmt(
-    metadata.focal_length
-      ? `${metadata.focal_length}mm`
-      : metadata.focal_length,
-  );
-  const fnumber = fmt(
-    metadata.f_number ? `f/${metadata.f_number}` : metadata.f_number,
-  );
+  const focal = fmt(metadata.focal_length ? `${metadata.focal_length}mm` : metadata.focal_length);
+  const fnumber = fmt(metadata.f_number ? `f/${metadata.f_number}` : metadata.f_number);
 
   // Additional metadata
   const isRaw = metadata.is_raw ? t("assets.photoInfoView.raw_badge") : "";
@@ -158,9 +148,7 @@ export default function PhotoInfoView({
           {/* Header - Fixed */}
           <div className="p-4 pb-2 flex items-center justify-between border-b border-base-200">
             <div className="flex items-center gap-2">
-              <h1 className="font-sans font-bold">
-                {t("assets.basicInfo.title")}
-              </h1>
+              <h1 className="font-sans font-bold">{t("assets.basicInfo.title")}</h1>
               <div className="badge badge-soft badge-success">{asset.type}</div>
             </div>
             <div className="flex gap-1">
@@ -180,9 +168,7 @@ export default function PhotoInfoView({
               <div className="flex flex-wrap gap-2 items-center">
                 <p className="text-sm">{takenDisplay}</p>
                 <div className="text-xs text-info">{mimeDisplay}</div>
-                {isRaw && (
-                  <div className="badge badge-xs badge-warning">{isRaw}</div>
-                )}
+                {isRaw && <div className="badge badge-xs badge-warning">{isRaw}</div>}
               </div>
               <div className="flex gap-2 items-center mt-2">
                 <RatingComponent
@@ -267,11 +253,7 @@ export default function PhotoInfoView({
                       </span>
                     </div>
                   ) : (
-                    locationName && (
-                      <div className="font-medium leading-tight">
-                        {locationName}
-                      </div>
-                    )
+                    locationName && <div className="font-medium leading-tight">{locationName}</div>
                   )}
                 </div>
 

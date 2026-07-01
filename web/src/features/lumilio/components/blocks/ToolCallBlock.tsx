@@ -38,9 +38,7 @@ export function ToolCallBlock({ block }: ToolCallBlockProps) {
       >
         <Hammer className="flex-shrink-0" size={12} strokeWidth={1.5} />
         <span className="flex-shrink-0 whitespace-nowrap">{block.name}</span>
-        {block.status === "running" && (
-          <Loader className="flex-shrink-0 animate-spin" size={13} />
-        )}
+        {block.status === "running" && <Loader className="flex-shrink-0 animate-spin" size={13} />}
         {block.status === "success" &&
           (isEmptyResult ? (
             <TriangleAlert className="flex-shrink-0" size={13} />
@@ -49,14 +47,10 @@ export function ToolCallBlock({ block }: ToolCallBlockProps) {
           ))}
         {block.status === "error" && <X className="flex-shrink-0" size={13} />}
         {summary && (
-          <span className="min-w-0 truncate text-left text-base-content/50 ml-0.5">
-            {summary}
-          </span>
+          <span className="min-w-0 truncate text-left text-base-content/50 ml-0.5">{summary}</span>
         )}
         {block.count !== undefined && block.count > 0 && (
-          <span className="flex-shrink-0 text-base-content/40">
-            · {block.count}
-          </span>
+          <span className="flex-shrink-0 text-base-content/40">· {block.count}</span>
         )}
       </button>
 
@@ -67,9 +61,7 @@ export function ToolCallBlock({ block }: ToolCallBlockProps) {
               <div>
                 {block.error.code}: {block.error.message}
               </div>
-              {block.error.hint && (
-                <div className="text-base-content/40">{block.error.hint}</div>
-              )}
+              {block.error.hint && <div className="text-base-content/40">{block.error.hint}</div>}
             </>
           )}
           {block.refId && (

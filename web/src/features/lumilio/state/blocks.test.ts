@@ -10,14 +10,9 @@ import {
 } from "./blocks";
 import type { ChatMessage, SideChannelEvent } from "../types";
 
-const conversation = (): ChatMessage[] => [
-  userMessage("hello"),
-  assistantMessage(),
-];
+const conversation = (): ChatMessage[] => [userMessage("hello"), assistantMessage()];
 
-const toolEvent = (
-  overrides: Partial<SideChannelEvent> = {},
-): SideChannelEvent => ({
+const toolEvent = (overrides: Partial<SideChannelEvent> = {}): SideChannelEvent => ({
   type: "tool_execution",
   timestamp: Date.now(),
   tool: { name: "filter_assets", executionId: "exec-1" },
@@ -87,11 +82,7 @@ describe("applySideEvent", () => {
     messages = applySideEvent(messages, toolEvent());
     messages = applyChunk(messages, { output: "Found them." });
 
-    expect(messages[1].blocks.map((b) => b.kind)).toEqual([
-      "text",
-      "tool",
-      "text",
-    ]);
+    expect(messages[1].blocks.map((b) => b.kind)).toEqual(["text", "tool", "text"]);
   });
 
   it("appends widget blocks from widget_show events", () => {

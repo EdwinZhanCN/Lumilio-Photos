@@ -75,15 +75,10 @@ export const dedupeBrowseItemsById = (items: BrowseItem[]): BrowseItem[] => {
   return deduped;
 };
 
-export const findBrowseItemById = (
-  items: BrowseItem[],
-  itemId: string,
-): BrowseItem | undefined => items.find((item) => item.id === itemId);
+export const findBrowseItemById = (items: BrowseItem[], itemId: string): BrowseItem | undefined =>
+  items.find((item) => item.id === itemId);
 
-export const findBrowseItemIndexByAssetId = (
-  items: BrowseItem[],
-  assetId: string,
-): number =>
+export const findBrowseItemIndexByAssetId = (items: BrowseItem[], assetId: string): number =>
   items.findIndex((item) => {
     if (item.type === "asset") {
       return item.asset.asset_id === assetId;
@@ -151,9 +146,7 @@ export const resolveBrowseSelectedAssetIds = (
   return resolved;
 };
 
-export const createBrowseGroupsFromAssetGroups = (
-  groups?: AssetGroup[],
-): BrowseGroup[] => {
+export const createBrowseGroupsFromAssetGroups = (groups?: AssetGroup[]): BrowseGroup[] => {
   if (!groups || groups.length === 0) return [];
 
   const stackItemsById = new Map<string, BrowseItem>();
@@ -194,19 +187,10 @@ export const createBrowseGroupsFromAssetGroups = (
 
       existingItem.assets = [...existingItem.assets, asset];
       if (asset.asset_id) {
-        existingItem.memberAssetIds = [
-          ...(existingItem.memberAssetIds ?? []),
-          asset.asset_id,
-        ];
-        existingItem.matchedMemberIds = [
-          ...(existingItem.matchedMemberIds ?? []),
-          asset.asset_id,
-        ];
+        existingItem.memberAssetIds = [...(existingItem.memberAssetIds ?? []), asset.asset_id];
+        existingItem.matchedMemberIds = [...(existingItem.matchedMemberIds ?? []), asset.asset_id];
       }
-      const nextRepresentative = preferRepresentative(
-        existingItem.representative,
-        asset,
-      );
+      const nextRepresentative = preferRepresentative(existingItem.representative, asset);
       if (nextRepresentative === existingItem.representative) {
         return;
       }
@@ -218,9 +202,7 @@ export const createBrowseGroupsFromAssetGroups = (
       const existingGroup = browseGroups[existingGroupIndex];
       if (!existingGroup) return;
 
-      existingGroup.items = existingGroup.items.filter(
-        (item) => item.id !== existingItem.id,
-      );
+      existingGroup.items = existingGroup.items.filter((item) => item.id !== existingItem.id);
       items.push(existingItem);
       stackGroupIndexById.set(stackId, browseGroups.length);
     });
@@ -232,13 +214,8 @@ export const createBrowseGroupsFromAssetGroups = (
   return browseGroups.filter((group) => group.items.length > 0);
 };
 
-export const createBrowseGroupsFromAssets = (
-  assets?: Asset[],
-  key = "flat:all",
-): BrowseGroup[] =>
-  createBrowseGroupsFromAssetGroups(
-    assets && assets.length > 0 ? [{ key, assets }] : [],
-  );
+export const createBrowseGroupsFromAssets = (assets?: Asset[], key = "flat:all"): BrowseGroup[] =>
+  createBrowseGroupsFromAssetGroups(assets && assets.length > 0 ? [{ key, assets }] : []);
 
 export const createBrowseItemsFromBrowseItemDTOs = (
   dtoItems?: BrowseItemDTO[] | null,
@@ -285,10 +262,7 @@ export const createBrowseGroupsFromBrowseItemDTOs = (
   return items.length > 0 ? [{ key, items }] : [];
 };
 
-export const groupBrowseItemsBySort = (
-  items: BrowseItem[],
-  sortBy: SortByType,
-): BrowseGroup[] => {
+export const groupBrowseItemsBySort = (items: BrowseItem[], sortBy: SortByType): BrowseGroup[] => {
   if (items.length === 0) return [];
 
   const itemByRepresentativeId = new Map<string, BrowseItem>();
@@ -311,9 +285,7 @@ export const groupBrowseItemsBySort = (
     .filter((group) => group.items.length > 0);
 };
 
-export const mergeAdjacentBrowseGroups = (
-  ...groupCollections: BrowseGroup[][]
-): BrowseGroup[] => {
+export const mergeAdjacentBrowseGroups = (...groupCollections: BrowseGroup[][]): BrowseGroup[] => {
   const merged: BrowseGroup[] = [];
 
   groupCollections.forEach((groups) => {

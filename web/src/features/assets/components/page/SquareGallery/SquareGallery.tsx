@@ -6,10 +6,7 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { AssetGalleryProps } from "../gallery.types";
-import {
-  DEFAULT_GROUP_KEYS,
-  formatAssetGroupLabel,
-} from "@/features/assets/utils/assetGroups";
+import { DEFAULT_GROUP_KEYS, formatAssetGroupLabel } from "@/features/assets/utils/assetGroups";
 import EmptyState from "@/components/EmptyState";
 import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
 import type { BrowseItem } from "@/features/assets/types/assets.type";
@@ -17,11 +14,7 @@ import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfi
 import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
 
 interface SquareGalleryProps extends AssetGalleryProps {
-  renderTileCaption?: (
-    asset: Asset,
-    index: number,
-    groupKey: string,
-  ) => React.ReactNode;
+  renderTileCaption?: (asset: Asset, index: number, groupKey: string) => React.ReactNode;
   render3DCard?: boolean;
 }
 
@@ -66,8 +59,7 @@ const SquareGalleryItem = memo(
     const [ref, mounted] = useVisibleOnce();
     const assetId = asset.asset_id;
     const stackInfo = asset.stack;
-    const hasStackOverlay =
-      Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
+    const hasStackOverlay = Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
     const allowOverflow = render3DCard || hasStackOverlay;
     const visibilityStyle = allowOverflow
       ? {}
@@ -80,11 +72,7 @@ const SquareGalleryItem = memo(
     return (
       <div
         ref={ref}
-        className={
-          render3DCard
-            ? "hover-3d relative aspect-square"
-            : "relative aspect-square"
-        }
+        className={render3DCard ? "hover-3d relative aspect-square" : "relative aspect-square"}
         role="listitem"
         data-asset-id={assetId}
         style={visibilityStyle as React.CSSProperties}
@@ -178,11 +166,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   const selection = useOptionalKeyboardSelection(flatAssetIds);
 
   const handleAssetClick = useCallback(
-    (
-      item: BrowseItem,
-      asset: Asset,
-      event: React.MouseEvent | React.KeyboardEvent,
-    ) => {
+    (item: BrowseItem, asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
       if (!asset.asset_id) return;
       if (selection.enabled) {
         selection.handleClick(item.id, event as any);
@@ -222,8 +206,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
       {groupEntries.map((group) => {
         const groupKey = group.key;
         const items = group.items;
-        const showHeader =
-          groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
+        const showHeader = groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
         const groupLabel = formatAssetGroupLabel(
           groupKey,
           t,
@@ -278,9 +261,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
         );
       })}
 
-      {hasMore && supportsIntersectionObserver && (
-        <div ref={sentinelRef} className="h-10 w-full" />
-      )}
+      {hasMore && supportsIntersectionObserver && <div ref={sentinelRef} className="h-10 w-full" />}
 
       {hasMore && (isLoadingMore || !supportsIntersectionObserver) && (
         <div
@@ -294,11 +275,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
             </>
           ) : (
             !supportsIntersectionObserver && (
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={onLoadMore}
-                type="button"
-              >
+              <button className="btn btn-sm btn-outline" onClick={onLoadMore} type="button">
                 {t("assets.justifiedGallery.loading_more")}
               </button>
             )

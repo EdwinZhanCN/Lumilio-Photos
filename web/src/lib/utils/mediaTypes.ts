@@ -77,9 +77,7 @@ export const isExportSupported = (asset: Asset): boolean => {
 /**
  * Gets the media type category for an asset
  */
-export const getMediaType = (
-  asset: Asset,
-): "video" | "audio" | "photo" | "unknown" => {
+export const getMediaType = (asset: Asset): "video" | "audio" | "photo" | "unknown" => {
   if (isVideo(asset)) return "video";
   if (isAudio(asset)) return "audio";
   if (isPhoto(asset)) return "photo";
@@ -99,10 +97,7 @@ export const formatDuration = (duration?: number): string => {
 /**
  * Gets the appropriate ARIA label for an asset
  */
-export const getAssetAriaLabel = (
-  asset: Asset,
-  includeDuration = true,
-): string => {
+export const getAssetAriaLabel = (asset: Asset, includeDuration = true): string => {
   const filename = asset.original_filename || "Asset";
   const mediaType = getMediaType(asset);
   const duration = asset.duration;

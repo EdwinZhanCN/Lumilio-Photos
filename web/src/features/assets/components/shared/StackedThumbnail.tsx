@@ -84,16 +84,12 @@ const StackedThumbnail: React.FC<StackedThumbnailProps> = ({
             aria-label={t("assets.stackDetail.openButton", {
               count: stackCount,
               defaultValue:
-                stackCount === 1
-                  ? "View stack details"
-                  : `View ${stackCount} related assets`,
+                stackCount === 1 ? "View stack details" : `View ${stackCount} related assets`,
             })}
             title={t("assets.stackDetail.openButton", {
               count: stackCount,
               defaultValue:
-                stackCount === 1
-                  ? "View stack details"
-                  : `View ${stackCount} related assets`,
+                stackCount === 1 ? "View stack details" : `View ${stackCount} related assets`,
             })}
           >
             <div
@@ -101,9 +97,7 @@ const StackedThumbnail: React.FC<StackedThumbnailProps> = ({
               data-tip={t("assets.stackDetail.openButton", {
                 count: stackCount,
                 defaultValue:
-                  stackCount === 1
-                    ? "View stack details"
-                    : `View ${stackCount} related assets`,
+                  stackCount === 1 ? "View stack details" : `View ${stackCount} related assets`,
               })}
             >
               <Layers className="size-3.5" />
@@ -111,8 +105,6 @@ const StackedThumbnail: React.FC<StackedThumbnailProps> = ({
             </div>
           </button>
         )}
-
-
       </div>
 
       {/* Regular stacks open a carousel overlay; Live Photos use the main carousel */}

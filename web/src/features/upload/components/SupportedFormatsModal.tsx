@@ -1,8 +1,5 @@
 import React from "react";
-import {
-  getFormatGroups,
-  type FormatGroup,
-} from "@/lib/utils/accept-file-extensions";
+import { getFormatGroups, type FormatGroup } from "@/lib/utils/accept-file-extensions";
 import { Image, Video, Music, Camera } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 
@@ -11,10 +8,7 @@ interface SupportedFormatsModalProps {
   onClose: () => void;
 }
 
-const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
+const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({ isOpen, onClose }) => {
   const { t } = useI18n(); // Initialize useI18n
   const formatGroups = getFormatGroups();
 
@@ -76,25 +70,18 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
   return (
     <>
       {/* Modal backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal dialog */}
       <dialog open className="modal modal-open z-50">
         <div className="modal-box max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-2xl">
-              {t("upload.SupportedFormatsModal.title")}
-            </h3>
+            <h3 className="font-bold text-2xl">{t("upload.SupportedFormatsModal.title")}</h3>
             <button
               onClick={onClose}
               className="btn btn-sm btn-circle btn-ghost"
-              aria-label={t(
-                "upload.SupportedFormatsModal.close_button_aria_label",
-              )}
+              aria-label={t("upload.SupportedFormatsModal.close_button_aria_label")}
             >
               ✕
             </button>
@@ -108,15 +95,9 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
                   <div className="card-body p-4">
                     {/* Category header */}
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="text-primary">
-                        {getCategoryIcon(group.category)}
-                      </div>
-                      <h4 className="font-semibold text-lg">
-                        {getCategoryLabel(group.category)}
-                      </h4>
-                      <div
-                        className={`badge ${getCategoryColor(group.category)} badge-sm`}
-                      >
+                      <div className="text-primary">{getCategoryIcon(group.category)}</div>
+                      <h4 className="font-semibold text-lg">{getCategoryLabel(group.category)}</h4>
+                      <div className={`badge ${getCategoryColor(group.category)} badge-sm`}>
                         {t("upload.SupportedFormatsModal.formats_count", {
                           count: group.formats.length,
                         })}
@@ -130,9 +111,7 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
                           key={format.ext}
                           className="flex items-center gap-2 p-2 bg-base-100 rounded hover:bg-base-300 transition-colors"
                         >
-                          <code className="text-xs font-mono text-primary">
-                            {format.ext}
-                          </code>
+                          <code className="text-xs font-mono text-primary">{format.ext}</code>
                           <span className="text-xs text-base-content/70 truncate">
                             {format.name}
                           </span>

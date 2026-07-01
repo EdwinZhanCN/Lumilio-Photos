@@ -20,14 +20,9 @@ declare module "supercluster" {
     point_count_abbreviated: number | string;
   }
 
-  export type ClusterFeature<C = Record<string, unknown>> = PointFeature<
-    C & ClusterProperties
-  >;
+  export type ClusterFeature<C = Record<string, unknown>> = PointFeature<C & ClusterProperties>;
 
-  export interface SuperclusterOptions<
-    P = Record<string, unknown>,
-    C = Record<string, unknown>,
-  > {
+  export interface SuperclusterOptions<P = Record<string, unknown>, C = Record<string, unknown>> {
     minZoom?: number;
     maxZoom?: number;
     minPoints?: number;
@@ -50,22 +45,12 @@ declare module "supercluster" {
     features: Array<TileFeature<P>>;
   }
 
-  export default class Supercluster<
-    P = Record<string, unknown>,
-    C = Record<string, unknown>,
-  > {
+  export default class Supercluster<P = Record<string, unknown>, C = Record<string, unknown>> {
     constructor(options?: SuperclusterOptions<P, C>);
     load(points: Array<PointFeature<P>>): Supercluster<P, C>;
-    getClusters(
-      bbox: BBox,
-      zoom: number,
-    ): Array<PointFeature<P> | ClusterFeature<C>>;
+    getClusters(bbox: BBox, zoom: number): Array<PointFeature<P> | ClusterFeature<C>>;
     getChildren(clusterId: number): Array<PointFeature<P> | ClusterFeature<C>>;
-    getLeaves(
-      clusterId: number,
-      limit?: number,
-      offset?: number,
-    ): Array<PointFeature<P>>;
+    getLeaves(clusterId: number, limit?: number, offset?: number): Array<PointFeature<P>>;
     getTile(z: number, x: number, y: number): Tile<P> | null;
     getClusterExpansionZoom(clusterId: number): number;
   }

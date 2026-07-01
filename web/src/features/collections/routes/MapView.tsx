@@ -52,9 +52,7 @@ function MapViewContent() {
             id: point.asset_id,
             position: [point.gps_latitude, point.gps_longitude],
             title,
-            description: subtitle
-              ? new Date(subtitle).toLocaleString()
-              : undefined,
+            description: subtitle ? new Date(subtitle).toLocaleString() : undefined,
             thumbnailUrl: assetUrls.getThumbnailUrl(point.asset_id, "small"),
           };
         })

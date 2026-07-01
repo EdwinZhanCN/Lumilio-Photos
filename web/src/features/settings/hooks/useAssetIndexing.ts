@@ -4,14 +4,10 @@ import type { components } from "@/lib/http-commons/schema";
 
 type Schemas = components["schemas"];
 
-type IndexingRepositoryListResponseDTO =
-  Schemas["dto.IndexingRepositoryListResponseDTO"];
-type AssetIndexingStatsResponseDTO =
-  Schemas["dto.AssetIndexingStatsResponseDTO"];
-export type RebuildAssetIndexesPayload =
-  Schemas["dto.RebuildAssetIndexesRequestDTO"];
-export type RebuildAssetIndexesResponse =
-  Schemas["dto.RebuildAssetIndexesResponseDTO"];
+type IndexingRepositoryListResponseDTO = Schemas["dto.IndexingRepositoryListResponseDTO"];
+type AssetIndexingStatsResponseDTO = Schemas["dto.AssetIndexingStatsResponseDTO"];
+export type RebuildAssetIndexesPayload = Schemas["dto.RebuildAssetIndexesRequestDTO"];
+export type RebuildAssetIndexesResponse = Schemas["dto.RebuildAssetIndexesResponseDTO"];
 
 type AssetIndexingTaskStatsDTO = Schemas["dto.AssetIndexingTaskStatsDTO"];
 
@@ -150,9 +146,7 @@ export function useRebuildAssetIndexes() {
   });
 }
 
-export function extractRebuildResponseData(
-  raw: unknown,
-): RebuildAssetIndexesResponse | undefined {
+export function extractRebuildResponseData(raw: unknown): RebuildAssetIndexesResponse | undefined {
   if (raw && typeof raw === "object") {
     return raw as RebuildAssetIndexesResponse;
   }

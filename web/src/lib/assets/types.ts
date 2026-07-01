@@ -14,10 +14,8 @@ export type FilterOptionsResponse = Schemas["dto.OptionsResponseDTO"];
 export type UpdateAssetRequest = Schemas["dto.UpdateAssetRequestDTO"];
 export type UpdateRatingRequest = Schemas["dto.UpdateRatingRequestDTO"];
 export type UpdateLikeRequest = Schemas["dto.UpdateLikeRequestDTO"];
-export type UpdateRatingAndLikeRequest =
-  Schemas["dto.UpdateRatingAndLikeRequestDTO"];
-export type UpdateDescriptionRequest =
-  Schemas["dto.UpdateDescriptionRequestDTO"];
+export type UpdateRatingAndLikeRequest = Schemas["dto.UpdateRatingAndLikeRequestDTO"];
+export type UpdateDescriptionRequest = Schemas["dto.UpdateDescriptionRequestDTO"];
 export type ReprocessAssetRequest = Schemas["dto.ReprocessAssetRequestDTO"];
 export type ReprocessAssetResponse = Schemas["dto.ReprocessAssetResponseDTO"];
 export type GetAssetByIdParams = NonNullable<
@@ -29,7 +27,5 @@ export type StackPreview = Schemas["dto.StackPreviewDTO"];
 export type StackDTO = Schemas["dto.StackDTO"];
 export type StackMemberDTO = Schemas["dto.StackMemberDTO"];
 export type StackByAssetResponse = Schemas["dto.StackByAssetResponseDTO"];
-export type AutoDetectStacksResponse =
-  Schemas["dto.AutoDetectStacksResponseDTO"];
-export type CreateManualStackRequest =
-  Schemas["dto.CreateManualStackRequestDTO"];
+export type AutoDetectStacksResponse = Schemas["dto.AutoDetectStacksResponseDTO"];
+export type CreateManualStackRequest = Schemas["dto.CreateManualStackRequestDTO"];

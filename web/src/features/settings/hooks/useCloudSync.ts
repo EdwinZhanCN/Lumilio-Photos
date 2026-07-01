@@ -65,7 +65,9 @@ export function useRemoveCloudCredential() {
   return $api.useMutation("delete", "/api/v1/cloud/credentials/{id}", {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/cloud/credentials"] });
-      void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/assets/indexing/repositories"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+      });
     },
   });
 }
@@ -86,8 +88,7 @@ export function useRepositoryCloudStatus(repositoryId: string, enabled = true) {
       // Only poll while an import is actively in progress; otherwise fetch once.
       // Avoids every repository card hammering this endpoint every 5s forever.
       refetchInterval: (query) => {
-        const status = (query.state.data as RepositoryCloudStatus | undefined)
-          ?.latest_run?.status;
+        const status = (query.state.data as RepositoryCloudStatus | undefined)?.latest_run?.status;
         return status === "running" || status === "queued" ? 5000 : false;
       },
       staleTime: 2000,
@@ -101,9 +102,13 @@ export function useStartRepositoryCloudImport() {
     onSuccess: (_data, variables) => {
       const id = variables?.params?.path?.id;
       if (id) {
-        void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/repositories/{id}/cloud"] });
+        void queryClient.invalidateQueries({
+          queryKey: ["get", "/api/v1/repositories/{id}/cloud"],
+        });
       }
-      void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/assets/indexing/repositories"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+      });
     },
   });
 }

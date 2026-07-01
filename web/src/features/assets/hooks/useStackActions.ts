@@ -4,10 +4,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 
 export const useStackActions = () => {
   const queryClient = useQueryClient();
-  const createManualStackMutation = $api.useMutation(
-    "post",
-    "/api/v1/assets/stacks",
-  );
+  const createManualStackMutation = $api.useMutation("post", "/api/v1/assets/stacks");
 
   const invalidateAssetAndStackQueries = useCallback(async () => {
     await queryClient.invalidateQueries({

@@ -38,9 +38,7 @@ export function StatMonitor() {
       <div className="stats stats-vertical lg:stats-horizontal shadow-sm w-full">
         <div className="stat">
           <div className="stat-title">{t("common.error")}</div>
-          <div className="stat-value text-error text-lg">
-            {error || t("monitor.stats.noData")}
-          </div>
+          <div className="stat-value text-error text-lg">{error || t("monitor.stats.noData")}</div>
         </div>
       </div>
     );
@@ -50,9 +48,7 @@ export function StatMonitor() {
   const issueJobs = (stats.retryable ?? 0) + (stats.cancelled ?? 0) + (stats.discarded ?? 0);
   const totalProcessed = (stats.completed ?? 0) + (stats.cancelled ?? 0) + (stats.discarded ?? 0);
   const successRate =
-    totalProcessed > 0
-      ? (((stats.completed ?? 0) / totalProcessed) * 100).toFixed(1)
-      : "0.0";
+    totalProcessed > 0 ? (((stats.completed ?? 0) / totalProcessed) * 100).toFixed(1) : "0.0";
 
   return (
     <div className="stats stats-vertical lg:stats-horizontal shadow-sm w-full">
@@ -131,9 +127,7 @@ export function StatMonitor() {
               {t("monitor.stats.discardedCount", { count: stats.discarded })}
             </span>
           )}
-          {issueJobs === 0 && (
-            <span className="text-success">{t("monitor.stats.allHealthy")}</span>
-          )}
+          {issueJobs === 0 && <span className="text-success">{t("monitor.stats.allHealthy")}</span>}
         </div>
       </div>
     </div>

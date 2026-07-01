@@ -5,10 +5,7 @@ import { immer } from "zustand/middleware/immer";
 import { enableMapSet } from "immer";
 import { createUISlice, UISlice } from "./slices/ui.slice";
 import { createFiltersSlice, FiltersSlice } from "./slices/filters.slice";
-import {
-  createSelectionSlice,
-  SelectionSlice,
-} from "./slices/selection.slice";
+import { createSelectionSlice, SelectionSlice } from "./slices/selection.slice";
 import { FiltersState, SelectionState, UIState } from "./types/assets.type";
 
 enableMapSet();
@@ -24,30 +21,18 @@ export type AssetsStoreInitialState = {
   };
 };
 
-const normalizeSelectedIds = (
-  selectedIds?: Set<string> | string[],
-): Set<string> => {
+const normalizeSelectedIds = (selectedIds?: Set<string> | string[]): Set<string> => {
   if (selectedIds instanceof Set) return new Set(selectedIds);
   if (Array.isArray(selectedIds)) return new Set(selectedIds);
   return new Set<string>();
 };
 
-export const createAssetsStore = (
-  initialState: AssetsStoreInitialState = {},
-): AssetsStoreApi =>
+export const createAssetsStore = (initialState: AssetsStoreInitialState = {}): AssetsStoreApi =>
   createStore<AssetsStore>()(
     immer((set, get, store) => {
       const uiSlice = createUISlice(set as any, get as any, store as any);
-      const filtersSlice = createFiltersSlice(
-        set as any,
-        get as any,
-        store as any,
-      );
-      const selectionSlice = createSelectionSlice(
-        set as any,
-        get as any,
-        store as any,
-      );
+      const filtersSlice = createFiltersSlice(set as any, get as any, store as any);
+      const selectionSlice = createSelectionSlice(set as any, get as any, store as any);
 
       return {
         ...uiSlice,
@@ -80,9 +65,7 @@ export const useAssetsStoreApi = (): AssetsStoreApi => {
   return store;
 };
 
-export function useAssetsStore<T>(
-  selector: (state: AssetsStore) => T,
-): T {
+export function useAssetsStore<T>(selector: (state: AssetsStore) => T): T {
   const store = useAssetsStoreApi();
   return useStore(store, selector);
 }

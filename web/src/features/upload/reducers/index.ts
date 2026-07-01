@@ -6,10 +6,7 @@ export const initialState: UploadState = {
   isDragging: false,
 };
 
-export const uploadReducer = (
-  state: UploadState,
-  action: UploadAction,
-): UploadState => {
+export const uploadReducer = (state: UploadState, action: UploadAction): UploadState => {
   switch (action.type) {
     case "SET_DRAGGING":
       return { ...state, isDragging: action.payload };

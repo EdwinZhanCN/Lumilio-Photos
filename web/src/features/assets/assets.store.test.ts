@@ -36,12 +36,8 @@ describe("createAssetsStore", () => {
     expect(mainStore.getState().ui.searchQuery).toBe("raw exclude");
     expect(mainStore.getState().ui.sortBy).toBe("recently_added");
     expect(mainStore.getState().selection.selectionMode).toBe("multiple");
-    expect(mainStore.getState().selection.selectedIds.has("asset-main")).toBe(
-      true,
-    );
-    expect(mainStore.getState().selection.selectedIds.has("asset-picker")).toBe(
-      false,
-    );
+    expect(mainStore.getState().selection.selectedIds.has("asset-main")).toBe(true);
+    expect(mainStore.getState().selection.selectedIds.has("asset-picker")).toBe(false);
 
     expect(pickerStore.getState().filters).toMatchObject({
       enabled: true,
@@ -51,11 +47,7 @@ describe("createAssetsStore", () => {
     expect(pickerStore.getState().ui.searchQuery).toBe("cover");
     expect(pickerStore.getState().ui.sortBy).toBe("date_captured");
     expect(pickerStore.getState().selection.selectionMode).toBe("single");
-    expect(pickerStore.getState().selection.selectedIds.has("asset-picker")).toBe(
-      true,
-    );
-    expect(pickerStore.getState().selection.selectedIds.has("asset-main")).toBe(
-      false,
-    );
+    expect(pickerStore.getState().selection.selectedIds.has("asset-picker")).toBe(true);
+    expect(pickerStore.getState().selection.selectedIds.has("asset-main")).toBe(false);
   });
 });

@@ -15,11 +15,7 @@ interface VideoInfoViewProps {
   onClose: () => void;
 }
 
-export default function VideoInfoView({
-  asset,
-  onAssetUpdate,
-  onClose,
-}: VideoInfoViewProps) {
+export default function VideoInfoView({ asset, onAssetUpdate, onClose }: VideoInfoViewProps) {
   const { t } = useI18n();
   const [isPending, startTransition] = useTransition();
   const { updateRating, updateDescription } = useAssetActions();
@@ -57,18 +53,12 @@ export default function VideoInfoView({
   const height = asset?.height;
   const resolution = width && height ? `${width}✕${height}` : "-";
   const duration = asset?.duration ? `${asset.duration.toFixed(1)}s` : "-";
-  const sizeM = asset?.file_size
-    ? `${(asset.file_size / 1024 / 1024).toFixed(1)}M`
-    : "-";
+  const sizeM = asset?.file_size ? `${(asset.file_size / 1024 / 1024).toFixed(1)}M` : "-";
 
   // Video technical info
   const codec = fmt(metadata.codec);
-  const bitrate = metadata.bitrate
-    ? `${(metadata.bitrate / 1000000).toFixed(1)} Mbps`
-    : "-";
-  const frameRate = metadata.frame_rate
-    ? `${metadata.frame_rate.toFixed(0)} fps`
-    : "-";
+  const bitrate = metadata.bitrate ? `${(metadata.bitrate / 1000000).toFixed(1)} Mbps` : "-";
+  const frameRate = metadata.frame_rate ? `${metadata.frame_rate.toFixed(0)} fps` : "-";
   const cameraModel = fmt(metadata.camera_model);
 
   // GPS info
@@ -133,9 +123,7 @@ export default function VideoInfoView({
           {/* Header - Fixed */}
           <div className="p-4 pb-2 flex items-center justify-between border-b border-base-200">
             <div className="flex items-center gap-2">
-              <h1 className="font-sans font-bold">
-                {t("assets.basicInfo.title")}
-              </h1>
+              <h1 className="font-sans font-bold">{t("assets.basicInfo.title")}</h1>
               <div className="badge badge-soft badge-info">
                 {t("assets.videoInfoView.video_badge")}
               </div>
@@ -178,9 +166,7 @@ export default function VideoInfoView({
             {/* Video Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">
               <div className="px-3 py-2 space-y-1">
-                {cameraModel !== "-" && (
-                  <p className="text-sm font-medium">{cameraModel}</p>
-                )}
+                {cameraModel !== "-" && <p className="text-sm font-medium">{cameraModel}</p>}
                 <p className="text-xs opacity-70">
                   {t("assets.videoInfoView.codec_label", { codec })}
                 </p>
@@ -225,9 +211,7 @@ export default function VideoInfoView({
                 <div className="text-[10px] uppercase tracking-wider font-bold text-base-content/50 mb-2">
                   {t("assets.videoInfoView.recording_location")}
                 </div>
-                <div className="text-[10px] font-mono text-base-content/50">
-                  {gpsDisplay}
-                </div>
+                <div className="text-[10px] font-mono text-base-content/50">{gpsDisplay}</div>
               </div>
             )}
           </div>

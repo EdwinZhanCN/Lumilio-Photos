@@ -41,9 +41,7 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
         const offset = Number(lastPageParam ?? 0) || 0;
 
         if (typeof total === "number") {
-          return offset + pagePoints.length < total
-            ? offset + PAGE_SIZE
-            : undefined;
+          return offset + pagePoints.length < total ? offset + PAGE_SIZE : undefined;
         }
 
         return pagePoints.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;
@@ -52,12 +50,7 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
   ) as UseInfiniteQueryResult<InfiniteData<AssetMapPointListResponse>, unknown>;
 
   useEffect(() => {
-    if (
-      !query.hasNextPage ||
-      query.isFetchingNextPage ||
-      query.isLoading ||
-      query.isError
-    ) {
+    if (!query.hasNextPage || query.isFetchingNextPage || query.isLoading || query.isError) {
       return;
     }
 

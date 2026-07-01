@@ -112,7 +112,12 @@ export function TileHeader({
           <LiveBadge data={data} size={size} locale={locale} />
           <div className="flex-1" />
           {showSwitcher && (
-            <ViewSwitcher current={view} onChange={onViewChange} variant="glass" size={switcherSize} />
+            <ViewSwitcher
+              current={view}
+              onChange={onViewChange}
+              variant="glass"
+              size={switcherSize}
+            />
           )}
           {menu}
         </div>

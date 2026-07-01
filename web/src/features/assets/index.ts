@@ -1,9 +1,7 @@
 export { AssetsProvider } from "./AssetsProvider";
 export { useAssetsView, useCurrentAssetsView } from "./hooks/useAssetsView";
 // Export removed: useAsset and related hooks are deleted
-export {
-  useAssetActions,
-} from "./hooks/useAssetActions";
+export { useAssetActions } from "./hooks/useAssetActions";
 export {
   useSelection,
   useKeyboardSelection,
@@ -16,16 +14,8 @@ export { useAssetsNavigation } from "./hooks/useAssetsNavigation";
 export * from "./selectors";
 
 // Export scoped Zustand store helpers
-export {
-  createAssetsStore,
-  useAssetsStore,
-  useAssetsStoreApi,
-} from "./assets.store";
-export type {
-  AssetsStore,
-  AssetsStoreApi,
-  AssetsStoreInitialState,
-} from "./assets.store";
+export { createAssetsStore, useAssetsStore, useAssetsStoreApi } from "./assets.store";
+export type { AssetsStore, AssetsStoreApi, AssetsStoreInitialState } from "./assets.store";
 
 // Export types
 export type {

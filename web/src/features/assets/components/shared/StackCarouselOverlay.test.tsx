@@ -5,8 +5,7 @@ import StackCarouselOverlay from "./StackCarouselOverlay";
 
 vi.mock("@/lib/i18n", () => ({
   useI18n: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? _key,
+    t: (_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key,
   }),
 }));
 
@@ -30,13 +29,7 @@ vi.mock("@/features/assets/hooks/useStackCarouselAssets", () => ({
 vi.mock(
   "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel",
   () => ({
-    default: ({
-      initialSlide,
-      slideIndex,
-    }: {
-      initialSlide: number;
-      slideIndex?: number;
-    }) => (
+    default: ({ initialSlide, slideIndex }: { initialSlide: number; slideIndex?: number }) => (
       <div
         data-testid="fullscreen-carousel"
         data-initial-slide={initialSlide}
@@ -62,14 +55,7 @@ const asset = {
 
 describe("StackCarouselOverlay", () => {
   it("opens on the matched member when a focus asset is provided", () => {
-    render(
-      <StackCarouselOverlay
-        asset={asset}
-        focusAssetId="member"
-        open
-        onClose={vi.fn()}
-      />,
-    );
+    render(<StackCarouselOverlay asset={asset} focusAssetId="member" open onClose={vi.fn()} />);
 
     const carousel = screen.getByTestId("fullscreen-carousel");
     expect(carousel).toHaveAttribute("data-initial-slide", "1");

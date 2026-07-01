@@ -56,8 +56,7 @@ export default function TagPickerMenu({
   className = "",
   style,
 }: TagPickerMenuProps) {
-  const isEmpty =
-    !showCreate && suggestions.length === 0 && checked.length === 0;
+  const isEmpty = !showCreate && suggestions.length === 0 && checked.length === 0;
 
   return (
     <div
@@ -87,9 +86,7 @@ export default function TagPickerMenu({
               <span className="flex items-center justify-center w-4 h-4 shrink-0 rounded bg-primary text-primary-content">
                 <Check className="w-3 h-3" />
               </span>
-              <span className="min-w-0 flex-1 truncate text-left">
-                {item.name}
-              </span>
+              <span className="min-w-0 flex-1 truncate text-left">{item.name}</span>
             </button>
           </li>
         ))}
@@ -108,20 +105,14 @@ export default function TagPickerMenu({
               onClick={() => onSelectSuggestion(item)}
             >
               <span className="w-4 h-4 shrink-0 rounded border border-base-content/30" />
-              <span className="min-w-0 flex-1 truncate text-left">
-                {item.name}
-              </span>
+              <span className="min-w-0 flex-1 truncate text-left">{item.name}</span>
             </button>
           </li>
         ))}
 
         {showCreate && onCreate && (
           <li>
-            <button
-              type="button"
-              className="flex items-center gap-2"
-              onClick={onCreate}
-            >
+            <button type="button" className="flex items-center gap-2" onClick={onCreate}>
               <Plus className="w-4 h-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">
                 {createLabel}

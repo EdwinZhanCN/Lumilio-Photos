@@ -1,10 +1,7 @@
 import { Copy, Trash2, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { RailCardTone } from "./RailCard";
-import {
-  getUtilityClassifierTitle,
-  UTILITY_CLASSIFIERS,
-} from "../utils/utilityClassifiers";
+import { getUtilityClassifierTitle, UTILITY_CLASSIFIERS } from "../utils/utilityClassifiers";
 
 export type UtilityShortcut = {
   /** Stable identity for React keys. */
@@ -38,12 +35,14 @@ export function useUtilityShortcuts(): UtilityShortcut[] {
       title: t("collections.utilities.trash.title"),
       tone: "warning",
     },
-    ...UTILITY_CLASSIFIERS.map((classifier): UtilityShortcut => ({
-      key: classifier.slug,
-      to: `/collections/utilities/${classifier.slug}`,
-      icon: classifier.icon,
-      title: getUtilityClassifierTitle(t, classifier.slug),
-      tone: "accent",
-    })),
+    ...UTILITY_CLASSIFIERS.map(
+      (classifier): UtilityShortcut => ({
+        key: classifier.slug,
+        to: `/collections/utilities/${classifier.slug}`,
+        icon: classifier.icon,
+        title: getUtilityClassifierTitle(t, classifier.slug),
+        tone: "accent",
+      }),
+    ),
   ];
 }

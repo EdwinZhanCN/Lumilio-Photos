@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "../preferences";
-import {
-  type IndexingRepositoryOption,
-  useIndexingRepositories,
-} from "./useAssetIndexing";
+import { type IndexingRepositoryOption, useIndexingRepositories } from "./useAssetIndexing";
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -36,10 +33,7 @@ export function useWorkingRepository() {
   const normalizedWorkingRepositoryId = workingRepositoryId?.trim() ?? "";
 
   const selectedRepository = useMemo(
-    () =>
-      repositories.find(
-        (repository) => repository.id === normalizedWorkingRepositoryId,
-      ),
+    () => repositories.find((repository) => repository.id === normalizedWorkingRepositoryId),
     [repositories, normalizedWorkingRepositoryId],
   );
 
@@ -54,11 +48,7 @@ export function useWorkingRepository() {
   );
 
   useEffect(() => {
-    if (
-      !repositoriesQuery.isSuccess ||
-      !normalizedWorkingRepositoryId ||
-      selectedRepository
-    ) {
+    if (!repositoriesQuery.isSuccess || !normalizedWorkingRepositoryId || selectedRepository) {
       return;
     }
 
@@ -102,8 +92,7 @@ export function useWorkingRepository() {
     scopeLabel,
     scopeDescription,
     getRepositoryLabel: useCallback(
-      (repository: IndexingRepositoryOption) =>
-        getRepositoryDisplayName(repository, t),
+      (repository: IndexingRepositoryOption) => getRepositoryDisplayName(repository, t),
       [t],
     ),
     setWorkingRepositoryId,

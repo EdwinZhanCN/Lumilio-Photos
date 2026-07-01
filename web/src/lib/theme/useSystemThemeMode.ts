@@ -2,14 +2,10 @@ import { useEffect, useState } from "react";
 import { getSystemThemeMode, type ThemeMode } from "./daisyuiThemes";
 
 export function useSystemThemeMode(): ThemeMode {
-  const [systemThemeMode, setSystemThemeMode] =
-    useState<ThemeMode>(getSystemThemeMode);
+  const [systemThemeMode, setSystemThemeMode] = useState<ThemeMode>(getSystemThemeMode);
 
   useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      typeof window.matchMedia !== "function"
-    ) {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
       return;
     }
 

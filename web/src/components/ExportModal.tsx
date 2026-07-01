@@ -9,10 +9,7 @@ import {
   Paintbrush,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  useExportImage,
-  type ExportOptions,
-} from "@/hooks/util-hooks/useExportImage.tsx";
+import { useExportImage, type ExportOptions } from "@/hooks/util-hooks/useExportImage.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Asset } from "@/lib/assets/types";
@@ -45,11 +42,7 @@ export default function ExportModal({
   onOpenStudio,
   onAddToAlbum,
 }: ExportModalProps) {
-  const {
-    isExporting,
-    exportImage,
-    downloadOriginal: defaultDownloadOriginal,
-  } = useExportImage();
+  const { isExporting, exportImage, downloadOriginal: defaultDownloadOriginal } = useExportImage();
   const { t } = useI18n();
 
   const [format, setFormat] = useState<ExportFormat>("png");
@@ -58,10 +51,7 @@ export default function ExportModal({
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [forceFullRetry, setForceFullRetry] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
-  const reprocessMutation = $api.useMutation(
-    "post",
-    "/api/v1/assets/{id}/reprocess",
-  );
+  const reprocessMutation = $api.useMutation("post", "/api/v1/assets/{id}/reprocess");
 
   const originalUrl = useMemo(() => {
     if (!asset?.asset_id) return "";
@@ -79,10 +69,7 @@ export default function ExportModal({
     [asset?.type],
   );
   const supportedSelectedTasks = useMemo(
-    () =>
-      selectedTasks.filter((task) =>
-        isRetryTaskSupportedForAssetType(task, asset?.type),
-      ),
+    () => selectedTasks.filter((task) => isRetryTaskSupportedForAssetType(task, asset?.type)),
     [asset?.type, selectedTasks],
   );
   const hasRetryableTasks =
@@ -90,15 +77,11 @@ export default function ExportModal({
     retryTasksByCategory.media.length > 0 ||
     retryTasksByCategory.ml.length > 0;
   const canSubmitRetry =
-    !!asset?.asset_id &&
-    !isRetrying &&
-    (forceFullRetry || supportedSelectedTasks.length > 0);
+    !!asset?.asset_id && !isRetrying && (forceFullRetry || supportedSelectedTasks.length > 0);
 
   useEffect(() => {
     setSelectedTasks((current) =>
-      current.filter((task) =>
-        isRetryTaskSupportedForAssetType(task, asset?.type),
-      ),
+      current.filter((task) => isRetryTaskSupportedForAssetType(task, asset?.type)),
     );
   }, [asset?.type]);
 
@@ -157,17 +140,12 @@ export default function ExportModal({
       await exportImage(asset, options);
     }
     // Close modal after export (if dialog exists)
-    const modal = document.getElementById(
-      "export_modal",
-    ) as HTMLDialogElement | null;
+    const modal = document.getElementById("export_modal") as HTMLDialogElement | null;
     modal?.close();
   }, [asset, canExport, buildExportOptions, exportImage, onExport]);
 
   const handleRetry = useCallback(async () => {
-    if (
-      !asset?.asset_id ||
-      (!forceFullRetry && supportedSelectedTasks.length === 0)
-    ) {
+    if (!asset?.asset_id || (!forceFullRetry && supportedSelectedTasks.length === 0)) {
       return;
     }
 
@@ -182,9 +160,7 @@ export default function ExportModal({
       });
 
       // Close retry modal on success
-      const retryModal = document.getElementById(
-        "retry_modal",
-      ) as HTMLDialogElement | null;
+      const retryModal = document.getElementById("retry_modal") as HTMLDialogElement | null;
       retryModal?.close();
 
       // Reset state
@@ -215,7 +191,10 @@ export default function ExportModal({
         </form>
 
         <div className="flex gap-2 mb-2">
-          <div className="tooltip tooltip-bottom" data-tip={t("exportModal.studio", { defaultValue: "Studio" })}>
+          <div
+            className="tooltip tooltip-bottom"
+            data-tip={t("exportModal.studio", { defaultValue: "Studio" })}
+          >
             <button
               className="btn btn-soft btn-circle"
               onClick={() => {
@@ -226,7 +205,10 @@ export default function ExportModal({
             </button>
           </div>
 
-          <div className="tooltip tooltip-bottom" data-tip={t("exportModal.addToAlbum", { defaultValue: "Add to album" })}>
+          <div
+            className="tooltip tooltip-bottom"
+            data-tip={t("exportModal.addToAlbum", { defaultValue: "Add to album" })}
+          >
             <button
               className="btn btn-soft btn-circle"
               onClick={() => {
@@ -239,7 +221,10 @@ export default function ExportModal({
 
           {/* TODO: Implement the share function */}
 
-          <div className="tooltip tooltip-bottom" data-tip={t("exportModal.downloadOriginal", { defaultValue: "Download Original" })}>
+          <div
+            className="tooltip tooltip-bottom"
+            data-tip={t("exportModal.downloadOriginal", { defaultValue: "Download Original" })}
+          >
             <button
               className="btn btn-soft btn-circle"
               onClick={handleDownloadOriginal}
@@ -262,7 +247,10 @@ export default function ExportModal({
             </button>
           </div>
 
-          <div className="tooltip tooltip-bottom" data-tip={t("exportModal.retryProcessing", { defaultValue: "Retry Processing" })}>
+          <div
+            className="tooltip tooltip-bottom"
+            data-tip={t("exportModal.retryProcessing", { defaultValue: "Retry Processing" })}
+          >
             <button
               className="btn btn-soft btn-circle"
               disabled={!asset}
@@ -280,7 +268,9 @@ export default function ExportModal({
 
         {canExport && (
           <fieldset className="fieldset">
-            <legend className="fieldset-legend">{t("exportModal.exportFormat", { defaultValue: "Export Format" })}</legend>
+            <legend className="fieldset-legend">
+              {t("exportModal.exportFormat", { defaultValue: "Export Format" })}
+            </legend>
             <select
               className="select mb-2"
               value={format}
@@ -288,16 +278,16 @@ export default function ExportModal({
               disabled={!canAct}
             >
               <option value="png">{t("exportModal.format.png", { defaultValue: "PNG" })}</option>
-              <option value="jpeg">{t("exportModal.format.jpeg", { defaultValue: "JPEG (80%)" })}</option>
-              <option value="webp">{t("exportModal.format.webp", { defaultValue: "WebP (80%)" })}</option>
+              <option value="jpeg">
+                {t("exportModal.format.jpeg", { defaultValue: "JPEG (80%)" })}
+              </option>
+              <option value="webp">
+                {t("exportModal.format.webp", { defaultValue: "WebP (80%)" })}
+              </option>
               <option value="avif">{t("exportModal.format.avif", { defaultValue: "AVIF" })}</option>
             </select>
             <span className="label">{t("exportModal.optional", { defaultValue: "Optional" })}</span>
-            <button
-              className="btn btn-soft btn-primary"
-              onClick={handleExport}
-              disabled={!canAct}
-            >
+            <button className="btn btn-soft btn-primary" onClick={handleExport} disabled={!canAct}>
               {isExporting ? (
                 <>
                   <span className="loading loading-spinner loading-xs" />
@@ -315,7 +305,8 @@ export default function ExportModal({
         {asset && !canExport && (
           <div className="mt-3 text-sm opacity-70">
             {t("exportModal.exportUnavailable", {
-              defaultValue: "Export conversion is unavailable for video and audio assets. You can still download the original file.",
+              defaultValue:
+                "Export conversion is unavailable for video and audio assets. You can still download the original file.",
             })}
           </div>
         )}
@@ -338,9 +329,14 @@ export default function ExportModal({
             </button>
           </form>
 
-          <h3 className="font-semibold text-lg mb-1">{t("exportModal.retryTitle", { defaultValue: "Retry Processing Tasks" })}</h3>
+          <h3 className="font-semibold text-lg mb-1">
+            {t("exportModal.retryTitle", { defaultValue: "Retry Processing Tasks" })}
+          </h3>
           <p className="text-xs opacity-60 mb-4">
-            {t("exportModal.selectedCount", { defaultValue: "{{count}} selected", count: supportedSelectedTasks.length })}
+            {t("exportModal.selectedCount", {
+              defaultValue: "{{count}} selected",
+              count: supportedSelectedTasks.length,
+            })}
           </p>
 
           <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
@@ -364,19 +360,21 @@ export default function ExportModal({
                           if (e.target.checked) {
                             setSelectedTasks([...selectedTasks, task.key]);
                           } else {
-                            setSelectedTasks(
-                              selectedTasks.filter((t) => t !== task.key),
-                            );
+                            setSelectedTasks(selectedTasks.filter((t) => t !== task.key));
                           }
                         }}
                         disabled={isRetrying}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium">
-                          {t(`exportModal.retryTasks.${task.key}.label`, { defaultValue: task.label })}
+                          {t(`exportModal.retryTasks.${task.key}.label`, {
+                            defaultValue: task.label,
+                          })}
                         </div>
                         <div className="text-xs opacity-60 mt-0.5">
-                          {t(`exportModal.retryTasks.${task.key}.description`, { defaultValue: task.description })}
+                          {t(`exportModal.retryTasks.${task.key}.description`, {
+                            defaultValue: task.description,
+                          })}
                         </div>
                       </div>
                     </label>
@@ -405,19 +403,21 @@ export default function ExportModal({
                           if (e.target.checked) {
                             setSelectedTasks([...selectedTasks, task.key]);
                           } else {
-                            setSelectedTasks(
-                              selectedTasks.filter((t) => t !== task.key),
-                            );
+                            setSelectedTasks(selectedTasks.filter((t) => t !== task.key));
                           }
                         }}
                         disabled={isRetrying}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium">
-                          {t(`exportModal.retryTasks.${task.key}.label`, { defaultValue: task.label })}
+                          {t(`exportModal.retryTasks.${task.key}.label`, {
+                            defaultValue: task.label,
+                          })}
                         </div>
                         <div className="text-xs opacity-60 mt-0.5">
-                          {t(`exportModal.retryTasks.${task.key}.description`, { defaultValue: task.description })}
+                          {t(`exportModal.retryTasks.${task.key}.description`, {
+                            defaultValue: task.description,
+                          })}
                         </div>
                       </div>
                     </label>
@@ -446,19 +446,21 @@ export default function ExportModal({
                           if (e.target.checked) {
                             setSelectedTasks([...selectedTasks, task.key]);
                           } else {
-                            setSelectedTasks(
-                              selectedTasks.filter((t) => t !== task.key),
-                            );
+                            setSelectedTasks(selectedTasks.filter((t) => t !== task.key));
                           }
                         }}
                         disabled={isRetrying}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium">
-                          {t(`exportModal.retryTasks.${task.key}.label`, { defaultValue: task.label })}
+                          {t(`exportModal.retryTasks.${task.key}.label`, {
+                            defaultValue: task.label,
+                          })}
                         </div>
                         <div className="text-xs opacity-60 mt-0.5">
-                          {t(`exportModal.retryTasks.${task.key}.description`, { defaultValue: task.description })}
+                          {t(`exportModal.retryTasks.${task.key}.description`, {
+                            defaultValue: task.description,
+                          })}
                         </div>
                       </div>
                     </label>
@@ -469,7 +471,9 @@ export default function ExportModal({
 
             {!hasRetryableTasks && (
               <div className="text-sm opacity-70 py-4 text-center">
-                {t("exportModal.noRetryTasks", { defaultValue: "No retry tasks are available for this asset type." })}
+                {t("exportModal.noRetryTasks", {
+                  defaultValue: "No retry tasks are available for this asset type.",
+                })}
               </div>
             )}
 
@@ -488,7 +492,9 @@ export default function ExportModal({
                     {t("exportModal.forceFullRetry", { defaultValue: "Force full retry" })}
                   </div>
                   <div className="text-xs opacity-60 mt-0.5">
-                    {t("exportModal.forceFullRetryHint", { defaultValue: "Re-run all processing tasks regardless of previous status" })}
+                    {t("exportModal.forceFullRetryHint", {
+                      defaultValue: "Re-run all processing tasks regardless of previous status",
+                    })}
                   </div>
                 </div>
               </label>

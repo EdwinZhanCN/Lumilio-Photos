@@ -192,7 +192,9 @@ const BootstrapWizard: React.FC = () => {
   const repoError = createRepoMutation.error
     ? apiMessage(
         createRepoMutation.error,
-        t("auth.primaryRepository.error", { defaultValue: "Failed to create the primary repository." }),
+        t("auth.primaryRepository.error", {
+          defaultValue: "Failed to create the primary repository.",
+        }),
       )
     : null;
 
@@ -207,12 +209,16 @@ const BootstrapWizard: React.FC = () => {
     [
       HardDrive,
       t("auth.bootstrap.welcome.localTitle", { defaultValue: "Your data stays home" }),
-      t("auth.bootstrap.welcome.localBody", { defaultValue: "Everything is stored on this server only." }),
+      t("auth.bootstrap.welcome.localBody", {
+        defaultValue: "Everything is stored on this server only.",
+      }),
     ],
     [
       Users,
       t("auth.bootstrap.welcome.inviteTitle", { defaultValue: "Invite others later" }),
-      t("auth.bootstrap.welcome.inviteBody", { defaultValue: "Add household members once setup is complete." }),
+      t("auth.bootstrap.welcome.inviteBody", {
+        defaultValue: "Add household members once setup is complete.",
+      }),
     ],
   ];
 
@@ -234,7 +240,8 @@ const BootstrapWizard: React.FC = () => {
             </div>
             <p className="mt-8 text-xs leading-relaxed text-base-content/40">
               {t("auth.bootstrap.sidebarNote", {
-                defaultValue: "This wizard appears only once — until the first administrator is created.",
+                defaultValue:
+                  "This wizard appears only once — until the first administrator is created.",
               })}
             </p>
           </aside>
@@ -255,7 +262,9 @@ const BootstrapWizard: React.FC = () => {
                 </div>
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tight text-base-content">
-                    {t("auth.bootstrap.welcome.title", { defaultValue: "Welcome to Lumilio Photos" })}
+                    {t("auth.bootstrap.welcome.title", {
+                      defaultValue: "Welcome to Lumilio Photos",
+                    })}
                   </h1>
                   <p className="mt-2 text-sm leading-relaxed text-base-content/55">
                     {t("auth.bootstrap.welcome.body", {
@@ -346,7 +355,9 @@ const BootstrapWizard: React.FC = () => {
             {current === 1 && (
               <div className="max-w-md">
                 <CardHead
-                  title={t("auth.bootstrap.admin.title", { defaultValue: "Create the administrator" })}
+                  title={t("auth.bootstrap.admin.title", {
+                    defaultValue: "Create the administrator",
+                  })}
                   sub={t("auth.bootstrap.admin.subtitle", {
                     defaultValue: "This account can manage the server, libraries, and members.",
                   })}
@@ -359,7 +370,9 @@ const BootstrapWizard: React.FC = () => {
                     <TextInput
                       icon={User}
                       type="text"
-                      placeholder={t("auth.register.usernamePlaceholder", { defaultValue: "admin" })}
+                      placeholder={t("auth.register.usernamePlaceholder", {
+                        defaultValue: "admin",
+                      })}
                       value={username}
                       onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
                       pattern={USERNAME_PATTERN}
@@ -403,7 +416,9 @@ const BootstrapWizard: React.FC = () => {
                 <CardHead
                   icon={Smartphone}
                   tone="primary"
-                  title={t("auth.bootstrap.totp.title", { defaultValue: "Add an authenticator app" })}
+                  title={t("auth.bootstrap.totp.title", {
+                    defaultValue: "Add an authenticator app",
+                  })}
                   sub={t("auth.bootstrap.totp.subtitle", {
                     defaultValue: "Optional — scan and verify to enable an authenticator app.",
                   })}
@@ -417,7 +432,9 @@ const BootstrapWizard: React.FC = () => {
                     onVerify={submitTotp}
                     invalid={Boolean(displayError)}
                     busy={isBusy}
-                    verifyLabel={t("auth.register.verifyAndEnable", { defaultValue: "Verify & enable" })}
+                    verifyLabel={t("auth.register.verifyAndEnable", {
+                      defaultValue: "Verify & enable",
+                    })}
                   />
                 </div>
                 <button
@@ -437,7 +454,9 @@ const BootstrapWizard: React.FC = () => {
                 <CardHead
                   icon={Fingerprint}
                   tone="primary"
-                  title={t("auth.bootstrap.passkey.title", { defaultValue: "Add an admin passkey" })}
+                  title={t("auth.bootstrap.passkey.title", {
+                    defaultValue: "Add an admin passkey",
+                  })}
                   sub={t("auth.bootstrap.passkey.subtitle", {
                     defaultValue: "Optional — a fast, phishing-resistant way to sign in as admin.",
                   })}
@@ -512,13 +531,8 @@ const BootstrapWizard: React.FC = () => {
                   </div>
                 )}
 
-                <form
-                  className="mt-5 flex flex-col gap-4"
-                  onSubmit={(e) => void submitRepo(e)}
-                >
-                  <Field
-                    label={t("auth.primaryRepository.name", { defaultValue: "Name" })}
-                  >
+                <form className="mt-5 flex flex-col gap-4" onSubmit={(e) => void submitRepo(e)}>
+                  <Field label={t("auth.primaryRepository.name", { defaultValue: "Name" })}>
                     <TextInput
                       icon={FolderPlus}
                       type="text"

@@ -34,9 +34,7 @@ export function SectionHeader({
       <span className="text-xs font-semibold uppercase tracking-wider text-base-content/70">
         {title}
       </span>
-      {modified && (
-        <span className="badge badge-primary badge-xs ml-auto" aria-label="modified" />
-      )}
+      {modified && <span className="badge badge-primary badge-xs ml-auto" aria-label="modified" />}
     </button>
   );
 }

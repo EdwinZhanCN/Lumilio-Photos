@@ -14,13 +14,7 @@ export type UseFeaturedPhotosOptions = {
 };
 
 export function useFeaturedPhotos(options: UseFeaturedPhotosOptions = {}) {
-  const {
-    count = 8,
-    candidateLimit = 240,
-    days = 3650,
-    seed,
-    repositoryId,
-  } = options;
+  const { count = 8, candidateLimit = 240, days = 3650, seed, repositoryId } = options;
 
   const query = $api.useQuery(
     "get",

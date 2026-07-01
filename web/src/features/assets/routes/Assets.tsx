@@ -43,10 +43,7 @@ const Assets = () => {
             to: origin?.from ?? "/lumilio",
           },
           {
-            label:
-              pinMeta?.title ??
-              origin?.label ??
-              t("assets.pinTrailLabel", "Selection"),
+            label: pinMeta?.title ?? origin?.label ?? t("assets.pinTrailLabel", "Selection"),
           },
         ]
       : [],
@@ -67,12 +64,7 @@ const Assets = () => {
         />
       )}
     >
-      <AssetsProvider
-        key={scopeId}
-        scopeId={scopeId}
-        persist={!isPinMode}
-        syncUrl={isPinMode}
-      >
+      <AssetsProvider key={scopeId} scopeId={scopeId} persist={!isPinMode} syncUrl={isPinMode}>
         <WorkerProvider>
           <AssetsGalleryPage pinId={pin ?? undefined} />
         </WorkerProvider>

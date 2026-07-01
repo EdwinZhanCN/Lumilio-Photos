@@ -6,11 +6,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { ExifDataDisplay } from "@/components/ExifDataDisplay";
 import type { Asset } from "@/lib/http-commons";
-import {
-  isPhotoMetadata,
-  isVideoMetadata,
-  isAudioMetadata,
-} from "@/lib/http-commons";
+import { isPhotoMetadata, isVideoMetadata, isAudioMetadata } from "@/lib/http-commons";
 import PhotoInfoView from "./PhotoInfoView";
 import VideoInfoView from "./VideoInfoView";
 import AudioInfoView from "./AudioInfoView";
@@ -23,10 +19,7 @@ interface FullScreenBasicInfoProps {
   onAssetUpdate?: (updatedAsset: Asset) => void;
 }
 
-export default function FullScreenBasicInfo({
-  asset,
-  onAssetUpdate,
-}: FullScreenBasicInfoProps) {
+export default function FullScreenBasicInfo({ asset, onAssetUpdate }: FullScreenBasicInfoProps) {
   const showMessage = useMessage();
   const { t } = useI18n();
 
@@ -42,13 +35,9 @@ export default function FullScreenBasicInfo({
     },
   ) as UseQueryResult<AssetExifResponse, unknown>;
 
-  const rawExif =
-    (exifQuery.data?.exif_raw as Record<string, unknown> | undefined) ??
-    null;
+  const rawExif = (exifQuery.data?.exif_raw as Record<string, unknown> | undefined) ?? null;
   const rawExifForDisplay =
-    rawExif && Object.keys(rawExif).length > 0
-      ? (rawExif as Record<string, any>)
-      : null;
+    rawExif && Object.keys(rawExif).length > 0 ? (rawExif as Record<string, any>) : null;
 
   const closeInfo = () => {
     window.dispatchEvent(new CustomEvent("fullscreen:toggleInfo"));
@@ -60,9 +49,7 @@ export default function FullScreenBasicInfo({
       return;
     }
 
-    (
-      document.getElementById("exif_modal") as HTMLDialogElement | null
-    )?.showModal();
+    (document.getElementById("exif_modal") as HTMLDialogElement | null)?.showModal();
 
     const result = await exifQuery.refetch();
 
@@ -78,16 +65,13 @@ export default function FullScreenBasicInfo({
     }
 
     const payload = result.data;
-    const exifRaw = payload?.exif_raw as
-      | Record<string, unknown>
-      | undefined;
+    const exifRaw = payload?.exif_raw as Record<string, unknown> | undefined;
     if (!exifRaw || Object.keys(exifRaw).length === 0) {
       showMessage("info", t("assets.basicInfo.exifNotAvailable"));
     }
   };
 
-  const isLoadingExif =
-    exifQuery.isFetching && !rawExifForDisplay;
+  const isLoadingExif = exifQuery.isFetching && !rawExifForDisplay;
 
   // Return null if no asset
   if (!asset) {
@@ -116,10 +100,7 @@ export default function FullScreenBasicInfo({
                 <X />
               </button>
             </form>
-            <ExifDataDisplay
-              exifData={rawExifForDisplay}
-              isLoading={isLoadingExif}
-            />
+            <ExifDataDisplay exifData={rawExifForDisplay} isLoading={isLoadingExif} />
           </div>
         </dialog>
       </>
@@ -128,24 +109,12 @@ export default function FullScreenBasicInfo({
 
   // Render VideoInfoView for videos
   if (isVideoMetadata(assetType, metadata)) {
-    return (
-      <VideoInfoView
-        asset={asset}
-        onAssetUpdate={onAssetUpdate}
-        onClose={closeInfo}
-      />
-    );
+    return <VideoInfoView asset={asset} onAssetUpdate={onAssetUpdate} onClose={closeInfo} />;
   }
 
   // Render AudioInfoView for audio
   if (isAudioMetadata(assetType, metadata)) {
-    return (
-      <AudioInfoView
-        asset={asset}
-        onAssetUpdate={onAssetUpdate}
-        onClose={closeInfo}
-      />
-    );
+    return <AudioInfoView asset={asset} onAssetUpdate={onAssetUpdate} onClose={closeInfo} />;
   }
 
   // Fallback: Generic view for unknown types
@@ -154,10 +123,10 @@ export default function FullScreenBasicInfo({
       <div className="card bg-base-100 w-max shadow-sm">
         <div className="card-body">
           <div className="card-actions justify-end">
-            <h1 className="font-sans font-bold">
-              {t("assets.basicInfo.title")}
-            </h1>
-            <div className="badge badge-soft badge-neutral">{t("assets.fullScreenBasicInfo.unknown_asset_type")}</div>
+            <h1 className="font-sans font-bold">{t("assets.basicInfo.title")}</h1>
+            <div className="badge badge-soft badge-neutral">
+              {t("assets.fullScreenBasicInfo.unknown_asset_type")}
+            </div>
             <button className="btn btn-circle btn-xs" onClick={closeInfo}>
               <X className="w-4 h-4" />
             </button>

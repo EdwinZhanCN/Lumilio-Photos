@@ -59,9 +59,7 @@ export const validateFile = (file: File): FileValidationResult => {
 
   const isRAW =
     assetType === "photo" &&
-    supportedRAWExtensions.includes(
-      extension as (typeof supportedRAWExtensions)[number],
-    );
+    supportedRAWExtensions.includes(extension as (typeof supportedRAWExtensions)[number]);
 
   return {
     valid: true,
@@ -123,16 +121,13 @@ export const isFileSupported = (filename: string): boolean => {
 /**
  * Get user-friendly error message from validation result
  */
-export const getValidationErrorMessage = (
-  result: FileValidationResult,
-): string => {
+export const getValidationErrorMessage = (result: FileValidationResult): string => {
   if (result.valid) {
     return "";
   }
 
   return (
-    result.errorReason ||
-    "File validation failed for unknown reason. Please check the file format."
+    result.errorReason || "File validation failed for unknown reason. Please check the file format."
   );
 };
 

@@ -8,12 +8,7 @@ import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useLocationClusters } from "../hooks/useLocationClusters";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useWorkingRepository } from "@/features/settings";
-import {
-  AlertTriangleIcon,
-  CameraIcon,
-  HomeIcon,
-  SparklesIcon,
-} from "lucide-react";
+import { AlertTriangleIcon, CameraIcon, HomeIcon, SparklesIcon } from "lucide-react";
 
 function Home() {
   const { t } = useI18n();
@@ -79,22 +74,13 @@ function Home() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <PageHeader
-        title={t("routes.home")}
-        icon={<HomeIcon className="w-6 h-6 text-primary" />}
-      >
-        <div
-          role="tablist"
-          aria-label={t("routes.home")}
-          className="tabs tabs-box"
-        >
+      <PageHeader title={t("routes.home")} icon={<HomeIcon className="w-6 h-6 text-primary" />}>
+        <div role="tablist" aria-label={t("routes.home")} className="tabs tabs-box">
           <button
             type="button"
             role="tab"
             aria-selected={displayMode === "gallery"}
-            className={`tab gap-2 ${
-              displayMode === "gallery" ? "tab-active" : ""
-            }`}
+            className={`tab gap-2 ${displayMode === "gallery" ? "tab-active" : ""}`}
             onClick={() => setDisplayMode("gallery")}
           >
             <SparklesIcon className="size-4" />
@@ -104,9 +90,7 @@ function Home() {
             type="button"
             role="tab"
             aria-selected={displayMode === "stats"}
-            className={`tab gap-2 ${
-              displayMode === "stats" ? "tab-active" : ""
-            }`}
+            className={`tab gap-2 ${displayMode === "stats" ? "tab-active" : ""}`}
             onClick={() => setDisplayMode("stats")}
           >
             <CameraIcon className="size-4" />
@@ -123,10 +107,7 @@ function Home() {
                 <AlertTriangleIcon className="size-5" />
                 <span>
                   {t("home.errors.featuredLoadFailed", {
-                    message:
-                      error instanceof Error
-                        ? error.message
-                        : t("home.errors.unknown"),
+                    message: error instanceof Error ? error.message : t("home.errors.unknown"),
                   })}
                 </span>
               </div>

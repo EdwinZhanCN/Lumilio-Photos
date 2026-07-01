@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Clock,
-  Frame,
-  Image as ImageIcon,
-  ImageOff,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Clock, Frame, Image as ImageIcon, ImageOff, SlidersHorizontal } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import PageHeader from "@/components/PageHeader";
 import { RecentEditItem } from "./RecentEditItem";
@@ -36,8 +30,7 @@ export function StudioHome({
       <PageHeader
         title={t("studio.title", { defaultValue: "Studio" })}
         subtitle={t("studio.tagline", {
-          defaultValue:
-            "Quick, non-destructive edits for photos already in your library.",
+          defaultValue: "Quick, non-destructive edits for photos already in your library.",
         })}
         icon={<SlidersHorizontal className="h-6 w-6 text-primary" />}
       >

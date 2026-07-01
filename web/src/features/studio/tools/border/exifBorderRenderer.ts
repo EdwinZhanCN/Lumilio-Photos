@@ -12,17 +12,8 @@
  *   left, brand logo (or text fallback) + divider + params/date on the right.
  */
 
-import {
-  cameraLabel,
-  shootingParams,
-  type BorderExif,
-} from "./exifInfo";
-import {
-  canvasToPngBytes,
-  clamp,
-  isOffscreenCanvasSupported,
-  roundRectPath,
-} from "./canvasUtils";
+import { cameraLabel, shootingParams, type BorderExif } from "./exifInfo";
+import { canvasToPngBytes, clamp, isOffscreenCanvasSupported, roundRectPath } from "./canvasUtils";
 
 export type ExifBorderMode = "FROSTED_INFO" | "INFO_STRIP";
 
@@ -155,8 +146,7 @@ function renderFrostedInfo(
   const fg = containSize(photo.width, photo.height, boxW, boxH);
   const fgX = Math.round((W - fg.w) / 2);
   const fgY = marginTop + Math.round((boxH - fg.h) / 2);
-  const radius =
-    (clamp(style.cornerRadius, 0, 100) / 100) * Math.min(fg.w, fg.h) * 0.16;
+  const radius = (clamp(style.cornerRadius, 0, 100) / 100) * Math.min(fg.w, fg.h) * 0.16;
 
   // Soft drop shadow behind the card.
   ctx.save();

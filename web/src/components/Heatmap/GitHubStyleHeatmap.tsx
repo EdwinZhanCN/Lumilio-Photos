@@ -136,8 +136,7 @@ export const GitHubStyleHeatmap: React.FC<GitHubStyleHeatmapProps> = ({
     while (currentDate <= end) {
       const key = formatDate(currentDate);
       const inRange =
-        currentDate.getTime() >= yearStart.getTime() &&
-        currentDate.getTime() <= yearEnd.getTime();
+        currentDate.getTime() >= yearStart.getTime() && currentDate.getTime() <= yearEnd.getTime();
       const count = inRange ? valueMap.get(key) || 0 : 0;
       if (count > max) max = count;
 
@@ -222,8 +221,7 @@ export const GitHubStyleHeatmap: React.FC<GitHubStyleHeatmapProps> = ({
         height={svgHeight}
         className="github-heatmap-svg"
         style={{
-          fontFamily:
-            "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
       >
         {/* 月份标签 */}
@@ -269,15 +267,9 @@ export const GitHubStyleHeatmap: React.FC<GitHubStyleHeatmapProps> = ({
         )}
 
         {/* 贡献方块 */}
-        <g
-          className="contributions"
-          transform={`translate(${leftPadding}, ${topPadding})`}
-        >
+        <g className="contributions" transform={`translate(${leftPadding}, ${topPadding})`}>
           {weeks.map((week, weekIndex) => (
-            <g
-              key={weekIndex}
-              transform={`translate(${weekIndex * (cellSize + cellGap)}, 0)`}
-            >
+            <g key={weekIndex} transform={`translate(${weekIndex * (cellSize + cellGap)}, 0)`}>
               {week.map((day) => {
                 if (!day.inRange) return null;
                 const y = day.date.getDay() * (cellSize + cellGap);
@@ -301,8 +293,7 @@ export const GitHubStyleHeatmap: React.FC<GitHubStyleHeatmapProps> = ({
                     style={{ cursor: "pointer" }}
                   >
                     <title>
-                      {formatDate(day.date)}: {day.count}{" "}
-                      {day.count === 1 ? "photo" : "photos"}
+                      {formatDate(day.date)}: {day.count} {day.count === 1 ? "photo" : "photos"}
                     </title>
                   </rect>
                 );

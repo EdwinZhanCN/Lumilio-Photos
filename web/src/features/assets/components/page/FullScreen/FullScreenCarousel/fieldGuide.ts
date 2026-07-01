@@ -59,10 +59,8 @@ export function normalizeSpeciesPredictions(input: unknown): SpeciesPrediction[]
     }
 
     const prediction = item as Record<string, unknown>;
-    const label =
-      typeof prediction.label === "string" ? prediction.label : undefined;
-    const score =
-      typeof prediction.score === "number" ? prediction.score : undefined;
+    const label = typeof prediction.label === "string" ? prediction.label : undefined;
+    const score = typeof prediction.score === "number" ? prediction.score : undefined;
 
     if (label) {
       predictions.push({ label, score });
@@ -89,8 +87,7 @@ export function parseSpeciesPrediction(
 
   const [kingdom, phylum, className, order, family, genus, species, commonName] =
     slots.map(cleanSlot);
-  const scientificName =
-    genus && species ? `${genus} ${species}` : genus ?? species;
+  const scientificName = genus && species ? `${genus} ${species}` : (genus ?? species);
   const fallbackName = [...slots].reverse().map(cleanSlot).find(Boolean);
 
   return {

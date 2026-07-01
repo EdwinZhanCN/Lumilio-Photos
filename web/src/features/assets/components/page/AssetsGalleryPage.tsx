@@ -31,9 +31,7 @@ import { useI18n } from "@/lib/i18n";
 import { usePreference } from "@/features/settings";
 import type { BrowseGroup } from "@/features/assets";
 import type { AssetGalleryProps } from "./gallery.types";
-import {
-  findBrowseItemIndexByAssetId,
-} from "@/features/assets/utils/browseItems";
+import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import type { AssetFilter } from "@/features/assets/types/assets.type";
 import type { FilterFieldKey } from "@/features/assets/components/page/FilterTool/FilterTool";
 
@@ -120,8 +118,7 @@ export function AssetsGalleryPage({
   }, [hasActiveFilters, isSearchActive, isTrashView, t]);
   const currentLayout = assetPage.layout;
   const compactColumns = assetPage.columns;
-  const GalleryComponent =
-    currentLayout === "compact" ? SquareGallery : JustifiedGallery;
+  const GalleryComponent = currentLayout === "compact" ? SquareGallery : JustifiedGallery;
 
   const pinView = usePinAssetsView(pinId, {
     sortBy,
@@ -163,9 +160,7 @@ export function AssetsGalleryPage({
     disabled: isPinMode || !searchEnabled,
   });
   const activeSearchView = isPinMode ? pinView : photoSearchView;
-  const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(
-    null,
-  );
+  const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(null);
 
   const hasFetchedOnce = isFetched;
 
@@ -178,12 +173,8 @@ export function AssetsGalleryPage({
   const topResultsBrowseGroups = activeSearchView.topResultsBrowseGroups;
   const searchResultBrowseGroups = activeSearchView.resultBrowseGroups;
   const activeBrowseGroups = isSearchActive ? [] : browseGroups;
-  const activeBrowseItems = isSearchActive
-    ? activeSearchView.browseItems
-    : flatBrowseItems;
-  const activeBrowseAssets = isSearchActive
-    ? activeSearchView.browseAssets
-    : flatAssets;
+  const activeBrowseItems = isSearchActive ? activeSearchView.browseItems : flatBrowseItems;
+  const activeBrowseAssets = isSearchActive ? activeSearchView.browseAssets : flatAssets;
 
   // Gallery selection becomes agent context. Selection state stores browse item
   // ids; resolve them to asset UUIDs before the chat request snapshots context.
@@ -254,8 +245,7 @@ export function AssetsGalleryPage({
             <div className="alert alert-warning">
               <span>
                 {t("search.error", {
-                  defaultValue:
-                    "Search is temporarily unavailable. Try again in a moment.",
+                  defaultValue: "Search is temporarily unavailable. Try again in a moment.",
                 })}
               </span>
             </div>
@@ -335,11 +325,7 @@ export function AssetsGalleryPage({
         setIsLocatingAsset(false);
       }
     }
-  }, [
-    assetId,
-    activeBrowseAssets.length,
-    activeBrowseItems,
-  ]);
+  }, [assetId, activeBrowseAssets.length, activeBrowseItems]);
 
   const pinHeader = useMemo(() => {
     if (!isPinMode) {
@@ -348,16 +334,11 @@ export function AssetsGalleryPage({
 
     const pin = pinView.pin;
     const resolvedTitle =
-      pin?.title ||
-      t("assets.pin.defaultTitle", { defaultValue: "Agent result" });
+      pin?.title || t("assets.pin.defaultTitle", { defaultValue: "Agent result" });
     const metaParts: string[] = [];
 
     if (pin?.mode) {
-      metaParts.push(
-        pin.mode === "live"
-          ? t("assets.pin.modeLive")
-          : t("assets.pin.modeFrozen"),
-      );
+      metaParts.push(pin.mode === "live" ? t("assets.pin.modeLive") : t("assets.pin.modeFrozen"));
     }
     if ((pin?.count ?? 0) > 0) {
       metaParts.push(t("assets.pin.count", { count: pin?.count ?? 0 }));
@@ -385,10 +366,7 @@ export function AssetsGalleryPage({
       <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
         <AlertTriangle className="size-8 text-warning" />
         <p className="max-w-md text-base-content/70">{t("assets.pin.expired")}</p>
-        <Link
-          to={pinOrigin?.from ?? "/lumilio"}
-          className="btn btn-sm btn-outline gap-1.5"
-        >
+        <Link to={pinOrigin?.from ?? "/lumilio"} className="btn btn-sm btn-outline gap-1.5">
           <ArrowLeft className="size-4" />
           {pinOrigin?.fromLabel ?? t("assets.pin.backToLumilio")}
         </Link>
@@ -425,9 +403,7 @@ export function AssetsGalleryPage({
 
   const showEndOfResults =
     !hasNextPage &&
-    (isSearchActive
-      ? activeSearchView.resultAssets.length > 0
-      : allAssets.length > 0);
+    (isSearchActive ? activeSearchView.resultAssets.length > 0 : allAssets.length > 0);
 
   const browseGalleryProps: AssetGalleryProps = {
     browseGroups: activeBrowseGroups,
@@ -463,16 +439,11 @@ export function AssetsGalleryPage({
       ) : isFetching && allAssets.length === 0 ? (
         <PhotosLoadingSkeleton />
       ) : (
-        <GalleryComponent
-          key={`browse:${currentLayout}`}
-          {...browseGalleryProps}
-        />
+        <GalleryComponent key={`browse:${currentLayout}`} {...browseGalleryProps} />
       )}
 
       {showEndOfResults && (
-        <div className="text-center p-4 text-gray-500">
-          {t("assets.all.end_of_results")}
-        </div>
+        <div className="text-center p-4 text-gray-500">{t("assets.all.end_of_results")}</div>
       )}
 
       {isCarouselOpen &&
@@ -489,17 +460,11 @@ export function AssetsGalleryPage({
               <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
                 <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
                   <div className="loading loading-spinner loading-lg mb-4"></div>
-                  <p className="text-lg font-medium mb-2">
-                    {t("assets.all.locating_asset")}
-                  </p>
+                  <p className="text-lg font-medium mb-2">{t("assets.all.locating_asset")}</p>
                   {hasNextPage && !isFetching && !isFetchingNextPage ? (
-                    <p className="text-sm text-gray-300">
-                      {t("assets.all.loading_more_data")}
-                    </p>
+                    <p className="text-sm text-gray-300">{t("assets.all.loading_more_data")}</p>
                   ) : (
-                    <p className="text-sm text-gray-300">
-                      {t("assets.all.asset_not_available")}
-                    </p>
+                    <p className="text-sm text-gray-300">{t("assets.all.asset_not_available")}</p>
                   )}
                 </div>
               </div>
