@@ -30,7 +30,10 @@
  *   `/api/v1/duplicates/*`.
  * - **Utility classifier albums** — not entities at all: {@link UTILITY_CLASSIFIERS}
  *   is a static client table of saved tag-source queries (documents, receipts,
- *   illustration) rendered as virtual albums over the asset list.
+ *   illustration) rendered as virtual albums over the asset list. **Liked**
+ *   ({@link Liked}) is the same shape over `{ liked: true }` — no favorites
+ *   table, just the existing `assets.liked` column filtered through the
+ *   normal list/search endpoints.
  * - **Places / trips** — fully derived client-side. {@link useCityTrips} segments
  *   map points by geohashed city + time gaps into trips; there is **no backend
  *   trip entity**, so a trip is identity-less and editing it is meaningless.
@@ -51,6 +54,12 @@
  *   identity uses {@link encodeTagKey} / {@link decodeTagKey} over
  *   `{ tagName, source }`, matching the `tag_name` + `tag_source` filter pair
  *   `AssetFilterDTO` already supports.
+ * - **Liked** — the utility rail ({@link useUtilityShortcuts}) also includes
+ *   Liked alongside Duplicates and Trash. {@link Liked} scopes
+ *   {@link AssetsGalleryPage} to `{ liked: true }` and hides the default
+ *   `set-liked` bulk menu in favor of a single scoped "remove from Liked"
+ *   action, since setting liked=true is meaningless on a page already
+ *   filtered to liked assets.
  *
  * ## Composition
  *
@@ -114,6 +123,7 @@ import type AlbumDetails from "./routes/AlbumDetails.tsx";
 import type TripDetails from "./routes/TripDetails.tsx";
 import type UtilityClassifierAlbum from "./routes/UtilityClassifierAlbum.tsx";
 import type Duplicates from "./routes/Duplicates.tsx";
+import type Liked from "./routes/Liked.tsx";
 import type Folders from "./routes/Folders.tsx";
 import type FolderDetails from "./routes/FolderDetails.tsx";
 import type Tags from "./routes/Tags.tsx";

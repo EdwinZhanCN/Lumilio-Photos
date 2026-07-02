@@ -709,6 +709,20 @@
       "duplicates": {
         "title": "重复照片"
       },
+      "liked": {
+        "bulkActions": {
+          "unlike": {
+            "confirmMessage_other": "这会将 {{count}} 个资源从喜欢中移除。",
+            "confirmTitle": "从喜欢中移除？",
+            "label_other": "从喜欢中移除 {{count}} 个"
+          }
+        },
+        "messages": {
+          "unlikeError": "从喜欢中移除所选资源失败。",
+          "unlikeSuccess_other": "已从喜欢中移除 {{count}} 个资源。"
+        },
+        "title": "喜欢"
+      },
       "trash": {
         "title": "回收站"
       }
