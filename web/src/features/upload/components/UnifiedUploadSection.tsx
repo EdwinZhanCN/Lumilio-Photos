@@ -23,11 +23,14 @@ function UnifiedUploadSection(): React.JSX.Element {
   const uploadConfigQuery = useUploadConfig();
 
   const uploadConfig = uploadConfigQuery.data;
+  // This picker is the only surface for the working repository: the upload
+  // target is chosen at the moment it takes effect, nowhere else.
   const {
     repositories,
     repositoriesQuery,
+    workingRepositoryId,
     selectedRepository,
-    scopedRepositoryId,
+    setWorkingRepositoryId,
     getRepositoryLabel,
   } = useWorkingRepository();
   const primaryRepository = useMemo(
@@ -35,19 +38,9 @@ function UnifiedUploadSection(): React.JSX.Element {
     [repositories],
   );
   const uploadTargetRepository = selectedRepository ?? primaryRepository;
-  const uploadTargetName = uploadTargetRepository
-    ? getRepositoryLabel(uploadTargetRepository)
-    : repositoriesQuery.isLoading
-      ? t("common.loading", { defaultValue: "Loading..." })
-      : t("upload.UnifiedUploadSection.default_upload_target");
-  const uploadTargetMode = scopedRepositoryId
-    ? t("upload.UnifiedUploadSection.upload_target_from_settings")
-    : t("upload.UnifiedUploadSection.upload_target_default");
   const uploadTargetDescription = uploadTargetRepository?.path
     ? uploadTargetRepository.path
-    : scopedRepositoryId
-      ? t("upload.UnifiedUploadSection.upload_target_unavailable")
-      : t("upload.UnifiedUploadSection.default_upload_target_hint");
+    : t("upload.UnifiedUploadSection.default_upload_target_hint");
 
   const formatBytes = (value?: number) => {
     if (!value && value !== 0) return "-";
@@ -166,13 +159,32 @@ function UnifiedUploadSection(): React.JSX.Element {
           </div>
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-base-content/70">
+              <label
+                className="text-sm font-medium text-base-content/70"
+                htmlFor="upload-target-repository"
+              >
                 {t("upload.UnifiedUploadSection.upload_target_label")}
-              </span>
-              <span className="truncate text-sm font-semibold text-base-content">
-                {uploadTargetName}
-              </span>
-              <span className="badge badge-outline badge-sm">{uploadTargetMode}</span>
+              </label>
+              <select
+                id="upload-target-repository"
+                className="select select-bordered select-sm w-full max-w-56"
+                value={workingRepositoryId}
+                disabled={repositoriesQuery.isLoading || repositoriesQuery.isError}
+                onChange={(event) => setWorkingRepositoryId(event.target.value || null)}
+              >
+                {repositories.map((repository) => (
+                  <option key={repository.id} value={repository.id}>
+                    {getRepositoryLabel(repository)}
+                  </option>
+                ))}
+              </select>
+              {repositoriesQuery.isError && (
+                <span className="text-xs text-base-content/60">
+                  {t("navbar.repository.unavailable", {
+                    defaultValue: "Repository options unavailable",
+                  })}
+                </span>
+              )}
             </div>
             <p
               className="mt-1 truncate text-xs text-base-content/55"

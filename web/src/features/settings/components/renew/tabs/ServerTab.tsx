@@ -1,10 +1,8 @@
-import { useWorkingRepository } from "@/features/settings/hooks/useWorkingRepository";
 import { useDebouncedPreference } from "@/features/settings";
 import { useRuntimeInfo } from "@/features/settings/hooks/useRuntimeInfo";
 import { useI18n } from "@/lib/i18n.tsx";
-import { DatabaseIcon, GaugeIcon } from "lucide-react";
+import { GaugeIcon } from "lucide-react";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
-import { SettingsDropdown } from "../SettingsDropdown";
 
 function formatBoolean(value: boolean | undefined, t: (key: string) => string): string {
   return t(`settings.serverSettings.booleanValues.${value ? "true" : "false"}`);
@@ -12,14 +10,6 @@ function formatBoolean(value: boolean | undefined, t: (key: string) => string): 
 
 export default function ServerTab() {
   const { t } = useI18n();
-  const {
-    repositories,
-    repositoriesQuery,
-    workingRepositoryId,
-    selectedRepository,
-    setWorkingRepositoryId,
-    getRepositoryLabel,
-  } = useWorkingRepository();
   const [healthCheckIntervalMs, setHealthCheckIntervalMs] =
     useDebouncedPreference("healthCheckIntervalMs");
   const runtimeQuery = useRuntimeInfo();
@@ -49,56 +39,6 @@ export default function ServerTab() {
 
   return (
     <div className="w-full space-y-8 lg:space-y-10">
-      <SettingsGroup
-        title={t("settings.serverSettings.workingRepositoryTitle", {
-          defaultValue: "Working repository",
-        })}
-        description={t("settings.serverSettings.workingRepositoryDescription", {
-          defaultValue:
-            "Choose the default repository scope for repository-aware pages and actions. Select All repositories to keep global views.",
-        })}
-      >
-        <SettingsRow
-          align="start"
-          htmlFor="server-working-repo"
-          icon={<DatabaseIcon className="size-4" />}
-          iconColor="bg-info text-info-content"
-          label={t("settings.serverSettings.workingRepositoryLabel", {
-            defaultValue: "Current application repository",
-          })}
-          description={
-            selectedRepository?.path ??
-            (repositoriesQuery.isError
-              ? t("settings.serverSettings.workingRepositoryUnavailable", {
-                  defaultValue: "Repository options are temporarily unavailable.",
-                })
-              : t("settings.serverSettings.workingRepositoryHint", {
-                  defaultValue:
-                    "Used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
-                }))
-          }
-          control={
-            <SettingsDropdown
-              id="server-working-repo"
-              value={workingRepositoryId}
-              disabled={repositoriesQuery.isLoading}
-              options={[
-                { value: "", label: t("navbar.repository.all") },
-                ...repositories.map((repository) => ({
-                  value: repository.id ?? "",
-                  label: getRepositoryLabel(repository),
-                })),
-              ]}
-              onChange={(nextRepositoryId) => setWorkingRepositoryId(nextRepositoryId || null)}
-              ariaLabel={t("settings.serverSettings.workingRepositoryLabel", {
-                defaultValue: "Current application repository",
-              })}
-              className="w-full sm:w-56"
-            />
-          }
-        />
-      </SettingsGroup>
-
       <SettingsGroup
         title={t("settings.serverSettings.healthCheckInterval")}
         description={t("settings.serverSettings.healthCheckDescription")}

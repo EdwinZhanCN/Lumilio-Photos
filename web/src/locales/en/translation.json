@@ -758,9 +758,6 @@
   "duplicates": {
     "emptyDescription": "Looks like every photo in this library is one of a kind.",
     "emptyTitle": "No duplicates to review",
-    "errors": {
-      "noRepository": "No repository selected"
-    },
     "filters": {
       "dismissed": "Dismissed",
       "merged": "Merged",
@@ -793,12 +790,7 @@
     },
     "noScanYet": "Run a scan to find duplicate photos across your library.",
     "pageTitle": "Duplicates",
-    "scan": "Scan",
-    "scanAll": "Scan all",
-    "scanAllSuccess_one": "Scanned {{count}} repository. Found {{groups}} duplicate sets ({{exact}} exact, {{phash}} similar, {{mixed}} mixed)",
-    "scanAllSuccess_other": "Scanned {{count}} repositories. Found {{groups}} duplicate sets ({{exact}} exact, {{phash}} similar, {{mixed}} mixed)",
     "scanError": "Failed to scan: {{message}}",
-    "scanning": "Scanning...",
     "scanSuccess": "Found {{groups}} duplicate sets ({{exact}} exact, {{phash}} similar, {{mixed}} mixed)",
     "summary": {
       "lastDetected": "Last scan",
@@ -1309,7 +1301,6 @@
     },
     "repository": {
       "all": "All repositories",
-      "label": "Working repository",
       "primary": "Primary",
       "unavailable": "Repository options unavailable"
     }
@@ -1702,10 +1693,7 @@
         "semanticTextEmbed": "CLIP text embed"
       },
       "unavailable": "Unavailable",
-      "workingRepositoryDescription": "Choose the default repository scope for repository-aware pages and actions. Select All repositories to keep global views.",
       "workingRepositoryHint": "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
-      "workingRepositoryLabel": "Current application repository",
-      "workingRepositoryTitle": "Working repository",
       "workingRepositoryUnavailable": "Repository options are temporarily unavailable."
     },
     "title": "Settings",
@@ -1909,7 +1897,6 @@
       "add_files_button": "Add Files",
       "cannot_clear_while_processing": "Cannot clear files while processing",
       "clear_button": "Clear",
-      "default_upload_target": "Default repository",
       "default_upload_target_hint": "No working library is selected; uploads will use the primary/default repository.",
       "drag_drop_or_click": "Drag & Drop or Click to Upload",
       "no_files_selected_for_upload": "No files selected for upload",
@@ -1920,10 +1907,7 @@
       "supported_file_types_description": "Supports images, RAW formats, videos, and audio files",
       "upload_button": "Upload{{countLabel}}",
       "upload_information_title": "Upload Information",
-      "upload_target_default": "Default",
-      "upload_target_from_settings": "From Settings",
       "upload_target_label": "Upload target",
-      "upload_target_unavailable": "The selected repository is temporarily unavailable.",
       "uploading_status": "Uploading..."
     },
     "UploadAssets": {

@@ -97,7 +97,6 @@ export const useFilterActions = () =>
       setCameraModel: s.setFilterCameraModel,
       setLens: s.setFilterLens,
       setLocation: s.setFilterLocation,
-      setRepositoryId: s.setFilterRepositoryId,
       resetFilters: s.resetFilters,
       batchUpdateFilters: s.batchUpdateFilters,
     })),

@@ -13,6 +13,7 @@ import {
   Plus,
   RefreshCcw,
   RefreshCcwDot,
+  ScanFace,
   X,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -25,6 +26,7 @@ import {
 import { getRepositoryDisplayName } from "@/features/settings/hooks/useWorkingRepository";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates";
+import { useRebuildPeopleClusters } from "@/features/people/hooks/usePeople";
 import {
   useCloudCredentials,
   useRepositoryCloudStatus,
@@ -522,6 +524,9 @@ export default function RepositoryGrid() {
       : undefined;
   const locationRebuildMutation = $api.useMutation("post", "/api/v1/locations/rebuild");
   const cloudImportMutation = useStartRepositoryCloudImport();
+  // People span repositories, so the rebuild is a library-wide job: no
+  // per-repository target here on purpose.
+  const { rebuildPeople, isRebuilding: isRebuildingPeople } = useRebuildPeopleClusters();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const repositoryIds = useMemo(
@@ -652,6 +657,27 @@ export default function RepositoryGrid() {
     [cloudImportMutation, showMessage, t],
   );
 
+  const handleRebuildPeople = useCallback(async () => {
+    try {
+      const result = await rebuildPeople();
+      showMessage(
+        "success",
+        t("people.rebuild.success", {
+          clusters: result?.clusters_total ?? 0,
+          faces: result?.clustered_faces ?? 0,
+          noise: result?.noise_faces ?? 0,
+        }),
+      );
+    } catch (error) {
+      showMessage(
+        "error",
+        t("people.rebuild.error", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }, [rebuildPeople, showMessage, t]);
+
   const handleScanAll = useCallback(async () => {
     try {
       await scanRepositories(repositoryIds);
@@ -699,6 +725,22 @@ export default function RepositoryGrid() {
               <RefreshCcwDot size={16} />
             )}
             <span className="hidden sm:inline">{t("manage.repositories.scanAll")}</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-soft gap-2"
+            onClick={handleRebuildPeople}
+            disabled={isRebuildingPeople}
+            title={t("people.rebuild.action")}
+          >
+            {isRebuildingPeople ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <ScanFace size={16} />
+            )}
+            <span className="hidden sm:inline">
+              {isRebuildingPeople ? t("people.rebuild.running") : t("people.rebuild.action")}
+            </span>
           </button>
         </div>
       </div>

@@ -38,6 +38,12 @@ export type UsePeopleOptions = {
   includeHidden?: boolean;
 };
 
+/**
+ * People list for grid/rail pages. This is the only people hook that follows
+ * the browse scope: repository is a read-only display filter on lists, while
+ * a person itself is not repository-scoped (detail, faces, and every mutation
+ * take no repository at all).
+ */
 export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
   ListPeopleResponse,
   unknown
@@ -78,13 +84,16 @@ export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
   };
 }
 
+/**
+ * Maintenance action (Manage page). repositoryId only bounds which faces are
+ * re-assigned; omitting it rebuilds across all repositories, which is the
+ * intended default since people span repositories.
+ */
 export function useRebuildPeopleClusters(repositoryId?: string): {
   rebuildPeople: () => Promise<FaceClusterRebuildResponse>;
   isRebuilding: boolean;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
-  const scopedId = repositoryId ?? scopedRepositoryId;
 
   const mutation = $api.useMutation("post", "/api/v1/people/rebuild", {
     onSuccess: async () => {
@@ -103,24 +112,19 @@ export function useRebuildPeopleClusters(repositoryId?: string): {
     rebuildPeople: () =>
       mutation.mutateAsync({
         params: {
-          query: scopedId ? { repository_id: scopedId } : {},
+          query: repositoryId ? { repository_id: repositoryId } : {},
         },
       }) as Promise<FaceClusterRebuildResponse>,
     isRebuilding: mutation.isPending,
   };
 }
 
-export function usePersonDetails(
-  personId?: number,
-  repositoryId?: string,
-): UseQueryResult<PersonDetail, unknown> & {
+export function usePersonDetails(personId?: number): UseQueryResult<PersonDetail, unknown> & {
   person?: PersonDetail;
   renamePerson: (name: string) => Promise<unknown>;
   isRenaming: boolean;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
-  const scopedId = repositoryId ?? scopedRepositoryId;
 
   const query = $api.useQuery(
     "get",
@@ -130,7 +134,6 @@ export function usePersonDetails(
         path: {
           id: personId ?? 0,
         },
-        query: scopedId ? { repository_id: scopedId } : {},
       },
     },
     {
@@ -161,7 +164,6 @@ export function usePersonDetails(
           path: {
             id: personId ?? 0,
           },
-          query: scopedId ? { repository_id: scopedId } : {},
         },
         body: {
           name,
@@ -171,15 +173,17 @@ export function usePersonDetails(
   };
 }
 
+/**
+ * All faces of one person, unscoped: this feeds the correction panel, which
+ * must show every face regardless of which repository it lives in.
+ */
 export function usePersonFaces(
   personId?: number,
-  options: { repositoryId?: string; limit?: number; offset?: number } = {},
+  options: { limit?: number; offset?: number } = {},
 ): UseQueryResult<ListPersonFacesResponse, unknown> & {
   faces: PersonFaceList;
   total: number;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
-  const repositoryId = options.repositoryId ?? scopedRepositoryId;
   const limit = options.limit ?? 60;
   const offset = options.offset ?? 0;
 
@@ -190,7 +194,6 @@ export function usePersonFaces(
       params: {
         path: { id: personId ?? 0 },
         query: {
-          repository_id: repositoryId,
           limit,
           offset,
         },
@@ -209,16 +212,14 @@ export function usePersonFaces(
   };
 }
 
-export function useMergePeople(repositoryId?: string): {
+export function useMergePeople(): {
   mergePeople: (
     targetPersonId: number,
     sourcePersonIds: number[],
   ) => Promise<PersonCorrectionResponse>;
   isMerging: boolean;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
-  const scopedId = repositoryId ?? scopedRepositoryId;
 
   const mutation = $api.useMutation("post", "/api/v1/people/{id}/merge", {
     onSuccess: () => invalidatePeopleQueries(queryClient),
@@ -229,7 +230,6 @@ export function useMergePeople(repositoryId?: string): {
       mutation.mutateAsync({
         params: {
           path: { id: targetPersonId },
-          query: scopedId ? { repository_id: scopedId } : {},
         },
         body: { source_person_ids: sourcePersonIds },
       }) as Promise<PersonCorrectionResponse>,
@@ -237,7 +237,7 @@ export function useMergePeople(repositoryId?: string): {
   };
 }
 
-export function useMoveFace(repositoryId?: string): {
+export function useMoveFace(): {
   moveFace: (
     personId: number,
     faceId: number,
@@ -245,9 +245,7 @@ export function useMoveFace(repositoryId?: string): {
   ) => Promise<PersonCorrectionResponse>;
   isMoving: boolean;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
-  const scopedId = repositoryId ?? scopedRepositoryId;
 
   const mutation = $api.useMutation("post", "/api/v1/people/{id}/faces/{faceId}/move", {
     onSuccess: () => invalidatePeopleQueries(queryClient),
@@ -258,7 +256,6 @@ export function useMoveFace(repositoryId?: string): {
       mutation.mutateAsync({
         params: {
           path: { id: personId, faceId },
-          query: scopedId ? { repository_id: scopedId } : {},
         },
         body: { target_person_id: targetPersonId },
       }) as Promise<PersonCorrectionResponse>,
@@ -266,13 +263,11 @@ export function useMoveFace(repositoryId?: string): {
   };
 }
 
-export function useRemoveFaceFromPerson(repositoryId?: string): {
+export function useRemoveFaceFromPerson(): {
   removeFace: (personId: number, faceId: number) => Promise<PersonCorrectionResponse>;
   isRemoving: boolean;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
-  const scopedId = repositoryId ?? scopedRepositoryId;
 
   const mutation = $api.useMutation("post", "/api/v1/people/{id}/faces/{faceId}/remove", {
     onSuccess: () => invalidatePeopleQueries(queryClient),
@@ -283,20 +278,17 @@ export function useRemoveFaceFromPerson(repositoryId?: string): {
       mutation.mutateAsync({
         params: {
           path: { id: personId, faceId },
-          query: scopedId ? { repository_id: scopedId } : {},
         },
       }) as Promise<PersonCorrectionResponse>,
     isRemoving: mutation.isPending,
   };
 }
 
-export function useSetPersonCover(repositoryId?: string): {
+export function useSetPersonCover(): {
   setPersonCover: (personId: number, faceId: number) => Promise<PersonCorrectionResponse>;
   isSettingCover: boolean;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
-  const scopedId = repositoryId ?? scopedRepositoryId;
 
   const mutation = $api.useMutation("put", "/api/v1/people/{id}/cover", {
     onSuccess: () => invalidatePeopleQueries(queryClient),
@@ -307,7 +299,6 @@ export function useSetPersonCover(repositoryId?: string): {
       mutation.mutateAsync({
         params: {
           path: { id: personId },
-          query: scopedId ? { repository_id: scopedId } : {},
         },
         body: { face_id: faceId },
       }) as Promise<PersonCorrectionResponse>,
@@ -315,13 +306,11 @@ export function useSetPersonCover(repositoryId?: string): {
   };
 }
 
-export function useSetPersonHidden(repositoryId?: string): {
+export function useSetPersonHidden(): {
   setPersonHidden: (personId: number, hidden: boolean) => Promise<PersonCorrectionResponse>;
   isUpdatingHidden: boolean;
 } {
-  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
-  const scopedId = repositoryId ?? scopedRepositoryId;
 
   const mutation = $api.useMutation("put", "/api/v1/people/{id}/hidden", {
     onSuccess: () => invalidatePeopleQueries(queryClient),
@@ -332,7 +321,6 @@ export function useSetPersonHidden(repositoryId?: string): {
       mutation.mutateAsync({
         params: {
           path: { id: personId },
-          query: scopedId ? { repository_id: scopedId } : {},
         },
         body: { hidden },
       }) as Promise<PersonCorrectionResponse>,

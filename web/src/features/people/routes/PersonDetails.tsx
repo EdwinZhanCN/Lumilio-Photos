@@ -4,7 +4,6 @@ import { EyeOff, Users, UserRound } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { useBrowseScope } from "@/features/settings";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePersonDetails } from "../hooks/usePeople";
@@ -18,7 +17,6 @@ const PersonAssetsContent = () => {
     personId: string;
     assetId: string;
   }>();
-  const { scopedRepositoryId } = useBrowseScope();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const personIdNumber = personId ? Number(personId) : 0;
 
@@ -27,7 +25,7 @@ const PersonAssetsContent = () => {
     isLoading: isPersonLoading,
     renamePerson,
     isRenaming,
-  } = usePersonDetails(personIdNumber || undefined, scopedRepositoryId);
+  } = usePersonDetails(personIdNumber || undefined);
 
   const handleRename = useCallback(
     async (nextName: string) => {
@@ -46,7 +44,7 @@ const PersonAssetsContent = () => {
   ]);
   const coverUrl =
     person?.person_id && person.cover_face_image_path
-      ? assetUrls.getPersonCoverUrl(person.person_id, scopedRepositoryId)
+      ? assetUrls.getPersonCoverUrl(person.person_id)
       : null;
 
   const cover = (
@@ -88,7 +86,6 @@ const PersonAssetsContent = () => {
             open={isRenameOpen}
             person={person}
             currentName={person?.name ?? ""}
-            repositoryId={scopedRepositoryId}
             isSaving={isRenaming}
             onClose={() => setIsRenameOpen(false)}
             onSubmit={handleRename}
