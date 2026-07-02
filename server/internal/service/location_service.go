@@ -41,7 +41,7 @@ type ListLocationClustersParams struct {
 
 type LocationCluster struct {
 	ClusterID         string
-	OwnerID           int32
+	OwnerID           *int32
 	RepositoryID      string
 	Geohash           string
 	Precision         int32

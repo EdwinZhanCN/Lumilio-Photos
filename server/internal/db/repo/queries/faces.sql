@@ -38,8 +38,10 @@ WHERE id = $1;
 DELETE FROM face_items WHERE asset_id = $1;
 
 -- name: CreateFaceCluster :one
-INSERT INTO face_clusters (cluster_name, representative_face_id, confidence_score, is_confirmed)
-VALUES ($1, $2, $3, $4)
+-- owner_id is the cluster's structural owner (rule: a cluster never spans
+-- owners). NULL means the cluster groups ownerless assets and is admin-only.
+INSERT INTO face_clusters (owner_id, cluster_name, representative_face_id, confidence_score, is_confirmed)
+VALUES (sqlc.narg('owner_id'), sqlc.arg('cluster_name'), sqlc.arg('representative_face_id'), sqlc.arg('confidence_score'), sqlc.arg('is_confirmed'))
 RETURNING *;
 
 -- name: GetFaceClusterByID :one
@@ -131,13 +133,15 @@ ORDER BY fi.confidence DESC
 LIMIT $2;
 
 -- name: GetUnclusteredFacesInScope :many
+-- repository_id is a face *selection* filter (which faces get processed),
+-- not part of cluster identity — clusters span repositories, never owners.
 SELECT fi.*
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
 WHERE fcm.face_id IS NULL
   AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = sqlc.arg('repository_id')::uuid
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id')::uuid)
   AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
   AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
   AND fi.embedding IS NOT NULL
@@ -156,31 +160,14 @@ AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_
 ORDER BY similarity DESC
 LIMIT sqlc.arg('limit');
 
--- name: GetIncrementalFaceNeighbors :many
-SELECT
-    fi.*,
-    CAST(1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) AS double precision) AS similarity
-FROM face_items fi
-JOIN assets a ON a.asset_id = fi.asset_id
-WHERE fi.id != sqlc.arg('id')
-  AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = sqlc.arg('repository_id')::uuid
-  AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
-  AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
-  AND fi.embedding IS NOT NULL
-  AND fi.confidence >= sqlc.arg('min_confidence')
-  AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
-  AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_similarity')::float8
-ORDER BY similarity DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
-LIMIT sqlc.arg('limit');
-
 -- name: CountIncrementalFaceNeighbors :one
+-- DBSCAN core check runs over the whole owner scope: clusters span
+-- repositories, so neighbors are never repository-filtered.
 SELECT COUNT(*)::bigint
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fi.id != sqlc.arg('id')
   AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = sqlc.arg('repository_id')::uuid
   AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
   AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
   AND fi.embedding IS NOT NULL
@@ -189,6 +176,8 @@ WHERE fi.id != sqlc.arg('id')
   AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_similarity')::float8;
 
 -- name: GetNearestAssignedFaceCluster :one
+-- Cluster attachment is owner-scoped only: a face may join a cluster whose
+-- members live in a different repository, same owner.
 SELECT
     fcm.cluster_id,
     fi.id AS face_id,
@@ -198,7 +187,6 @@ JOIN assets a ON a.asset_id = fi.asset_id
 JOIN face_cluster_members fcm ON fcm.face_id = fi.id
 WHERE fi.id != sqlc.arg('id')
   AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = sqlc.arg('repository_id')::uuid
   AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
   AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
   AND fi.embedding IS NOT NULL
@@ -459,6 +447,8 @@ SET cluster_id = sqlc.arg('target_cluster_id'),
 WHERE cluster_id = sqlc.arg('source_cluster_id');
 
 -- name: GetClusterMergeCandidates :many
+-- Merge suggestions never pair clusters of different owners; owner_id
+-- optionally restricts candidates to one owner's clusters (nil = admin).
 WITH pair_scores AS (
     SELECT
         fc1.cluster_id,
@@ -470,12 +460,14 @@ WITH pair_scores AS (
     JOIN face_cluster_members fcm1 ON fcm1.cluster_id = fc1.cluster_id
     JOIN face_items fi1 ON fi1.id = fcm1.face_id
     JOIN face_clusters fc2 ON fc1.cluster_id < fc2.cluster_id
+        AND fc1.owner_id IS NOT DISTINCT FROM fc2.owner_id
     JOIN face_cluster_members fcm2 ON fcm2.cluster_id = fc2.cluster_id
     JOIN face_items fi2 ON fi2.id = fcm2.face_id
     WHERE fi1.embedding IS NOT NULL
       AND fi2.embedding IS NOT NULL
       AND COALESCE(fc1.is_confirmed, false) = true
       AND COALESCE(fc2.is_confirmed, false) = true
+      AND (sqlc.narg('owner_id')::integer IS NULL OR fc1.owner_id = sqlc.narg('owner_id'))
     GROUP BY fc1.cluster_id, fc1.cluster_name, fc2.cluster_id, fc2.cluster_name
 )
 SELECT cluster_id, name1, other_cluster_id, name2, avg_similarity

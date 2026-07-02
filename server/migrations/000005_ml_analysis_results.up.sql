@@ -170,6 +170,7 @@ ALTER SEQUENCE public.face_cluster_members_id_seq OWNED BY public.face_cluster_m
 
 CREATE TABLE public.face_clusters (
     cluster_id integer NOT NULL,
+    owner_id integer,
     cluster_name character varying(255),
     representative_face_id integer,
     confidence_score real DEFAULT 0.0,
@@ -179,7 +180,8 @@ CREATE TABLE public.face_clusters (
     hidden_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT face_clusters_pkey PRIMARY KEY (cluster_id)
+    CONSTRAINT face_clusters_pkey PRIMARY KEY (cluster_id),
+    CONSTRAINT face_clusters_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(user_id) ON DELETE CASCADE
 );
 
 --
@@ -501,6 +503,13 @@ CREATE INDEX face_cluster_members_similarity_idx ON public.face_cluster_members 
 --
 
 CREATE INDEX face_clusters_confirmed_idx ON public.face_clusters USING btree (is_confirmed) WHERE (is_confirmed = true);
+
+
+--
+-- Name: face_clusters_owner_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX face_clusters_owner_idx ON public.face_clusters USING btree (owner_id);
 
 
 --

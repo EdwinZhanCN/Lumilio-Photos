@@ -16,8 +16,10 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
+// faceClusterScope is the cluster identity partition: clusters span
+// repositories (the product intent — one person across all storage
+// locations) but never owners or embedding models.
 type faceClusterScope struct {
-	RepositoryID   pgtype.UUID
 	OwnerID        *int32
 	EmbeddingModel *string
 }
@@ -44,7 +46,9 @@ func (s *faceService) recognizePendingFacesForAsset(ctx context.Context, asset r
 		return nil
 	}
 	for _, scope := range collectPendingFaceRecognitionScopes(asset, items) {
-		if err := s.recognizePendingFaces(ctx, scope); err != nil {
+		// The asset's repository bounds which pending faces get processed on
+		// this save; cluster matching inside is owner-wide across repos.
+		if err := s.recognizePendingFaces(ctx, scope, asset.RepositoryID); err != nil {
 			return err
 		}
 	}
@@ -63,7 +67,6 @@ func collectPendingFaceRecognitionScopes(asset repo.Asset, items []repo.FaceItem
 			continue
 		}
 		scope := faceClusterScope{
-			RepositoryID:   asset.RepositoryID,
 			OwnerID:        cloneInt32Ptr(asset.OwnerID),
 			EmbeddingModel: normalizedName(item.EmbeddingModel),
 		}
@@ -80,16 +83,19 @@ func collectPendingFaceRecognitionScopes(asset repo.Asset, items []repo.FaceItem
 	return scopes
 }
 
-func (s *faceService) recognizePendingFaces(ctx context.Context, scope faceClusterScope) error {
+func (s *faceService) recognizePendingFaces(ctx context.Context, scope faceClusterScope, selectRepositoryID pgtype.UUID) error {
 	return s.withTx(ctx, func(q *repo.Queries) error {
-		return s.recognizePendingFacesWithQueries(ctx, q, scope)
+		return s.recognizePendingFacesWithQueries(ctx, q, scope, selectRepositoryID)
 	})
 }
 
-func (s *faceService) recognizePendingFacesWithQueries(ctx context.Context, q *repo.Queries, scope faceClusterScope) error {
+// recognizePendingFacesWithQueries assigns unclustered faces to clusters.
+// selectRepositoryID only bounds which pending faces are picked up (invalid
+// UUID = all repositories); it never partitions cluster identity.
+func (s *faceService) recognizePendingFacesWithQueries(ctx context.Context, q *repo.Queries, scope faceClusterScope, selectRepositoryID pgtype.UUID) error {
 	minFaceSize := int32(0)
 	pending, err := q.GetUnclusteredFacesInScope(ctx, repo.GetUnclusteredFacesInScopeParams{
-		RepositoryID:   scope.RepositoryID,
+		RepositoryID:   selectRepositoryID,
 		OwnerID:        scope.OwnerID,
 		EmbeddingModel: scope.EmbeddingModel,
 		MinConfidence:  faceRecognitionMinScore,
@@ -154,7 +160,7 @@ func (s *faceService) recognizePendingFace(ctx context.Context, q *repo.Queries,
 		}
 		return pendingFaceRecognitionAssigned, nil
 	case pendingFaceRecognitionDecisionCreateCluster:
-		if _, err := s.createClusterForFaceWithQueries(ctx, q, item, nil, false); err != nil {
+		if _, err := s.createClusterForFaceWithQueries(ctx, q, item, scope.OwnerID, nil, false); err != nil {
 			return pendingFaceRecognitionSkipped, err
 		}
 		return pendingFaceRecognitionAssigned, nil
@@ -173,7 +179,6 @@ func (s *faceService) findNearestAssignedFaceCluster(ctx context.Context, q *rep
 	row, err := q.GetNearestAssignedFaceCluster(ctx, repo.GetNearestAssignedFaceClusterParams{
 		EmbeddingQuery: &queryVector,
 		ID:             item.ID,
-		RepositoryID:   scope.RepositoryID,
 		OwnerID:        scope.OwnerID,
 		EmbeddingModel: scope.EmbeddingModel,
 		MinConfidence:  faceRecognitionMinScore,
@@ -190,12 +195,12 @@ func (s *faceService) findNearestAssignedFaceCluster(ctx context.Context, q *rep
 }
 
 func faceClusterScopeKey(scope faceClusterScope) string {
-	parts := []string{pgUUIDToString(scope.RepositoryID), "owner", "nil", "model", "nil"}
+	parts := []string{"owner", "nil", "model", "nil"}
 	if scope.OwnerID != nil {
-		parts[2] = fmt.Sprintf("%d", *scope.OwnerID)
+		parts[1] = fmt.Sprintf("%d", *scope.OwnerID)
 	}
 	if scope.EmbeddingModel != nil {
-		parts[4] = strings.TrimSpace(*scope.EmbeddingModel)
+		parts[3] = strings.TrimSpace(*scope.EmbeddingModel)
 	}
 	return strings.Join(parts, ":")
 }
@@ -226,7 +231,6 @@ func (s *faceService) isCoreFaceDBSCAN(ctx context.Context, q *repo.Queries, ite
 	minFaceSize := int32(0)
 	count, err := q.CountIncrementalFaceNeighbors(ctx, repo.CountIncrementalFaceNeighborsParams{
 		ID:             item.ID,
-		RepositoryID:   scope.RepositoryID,
 		OwnerID:        scope.OwnerID,
 		EmbeddingModel: scope.EmbeddingModel,
 		MinConfidence:  faceRecognitionMinScore,
@@ -248,7 +252,6 @@ func collectFaceClusteringScopes(rows []repo.GetFaceClusteringCandidatesRow) []f
 	seen := make(map[string]struct{})
 	for _, row := range rows {
 		scope := faceClusterScope{
-			RepositoryID:   row.RepositoryID,
 			OwnerID:        cloneInt32Ptr(row.OwnerID),
 			EmbeddingModel: normalizedName(row.EmbeddingModel),
 		}
@@ -325,7 +328,7 @@ func (s *faceService) RebuildFaceClusters(ctx context.Context, repositoryID pgty
 		}
 
 		for _, scope := range scopes {
-			if err := s.recognizePendingFacesWithQueries(ctx, q, scope); err != nil {
+			if err := s.recognizePendingFacesWithQueries(ctx, q, scope, repositoryID); err != nil {
 				return err
 			}
 		}

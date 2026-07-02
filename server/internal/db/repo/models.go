@@ -337,6 +337,7 @@ type EmbeddingSpace struct {
 
 type FaceCluster struct {
 	ClusterID            int32              `db:"cluster_id" json:"cluster_id"`
+	OwnerID              *int32             `db:"owner_id" json:"owner_id"`
 	ClusterName          *string            `db:"cluster_name" json:"cluster_name"`
 	RepresentativeFaceID *int32             `db:"representative_face_id" json:"representative_face_id"`
 	ConfidenceScore      *float32           `db:"confidence_score" json:"confidence_score"`
@@ -390,7 +391,7 @@ type FaceResult struct {
 
 type LocationCluster struct {
 	ClusterID         pgtype.UUID        `db:"cluster_id" json:"cluster_id"`
-	OwnerID           int32              `db:"owner_id" json:"owner_id"`
+	OwnerID           *int32             `db:"owner_id" json:"owner_id"`
 	RepositoryID      pgtype.UUID        `db:"repository_id" json:"repository_id"`
 	Geohash           string             `db:"geohash" json:"geohash"`
 	Precision         int32              `db:"precision" json:"precision"`

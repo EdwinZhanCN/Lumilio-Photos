@@ -1714,6 +1714,9 @@ components:
           example: Photos Library
           type: string
         path:
+          description: |-
+            Path is only populated for admin callers; repository filesystem
+            locations are never exposed to regular users.
           example: /Volumes/Media/Photos
           type: string
         role:
@@ -6281,8 +6284,8 @@ paths:
       - assets
   /api/v1/assets/indexing/repositories:
     get:
-      description: Return repositories that can be used to scope indexing stats and
-        reindex requests.
+      description: Return the shared repository registry for browse-scope/upload selectors
+        and indexing filters. Paths are only included for admins.
       requestBody:
         content:
           application/json:
@@ -6301,7 +6304,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/api.ErrorResponse'
           description: Internal server error
-      summary: List indexing repositories
+      summary: List repositories for scope selection
       tags:
       - assets
   /api/v1/assets/indexing/stats:
@@ -8279,11 +8282,6 @@ paths:
         required: true
         schema:
           type: integer
-      - description: Optional repository UUID filter
-        in: query
-        name: repository_id
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -8440,11 +8438,6 @@ paths:
         required: true
         schema:
           type: integer
-      - description: Optional repository UUID filter
-        in: query
-        name: repository_id
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -8614,11 +8607,6 @@ paths:
         required: true
         schema:
           type: integer
-      - description: Optional repository UUID filter
-        in: query
-        name: repository_id
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -8676,11 +8664,6 @@ paths:
         required: true
         schema:
           type: integer
-      - description: Optional repository UUID filter
-        in: query
-        name: repository_id
-        schema:
-          type: string
       responses:
         "200":
           content:
@@ -8722,11 +8705,6 @@ paths:
         required: true
         schema:
           type: integer
-      - description: Optional repository UUID filter
-        in: query
-        name: repository_id
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -8779,11 +8757,6 @@ paths:
         required: true
         schema:
           type: integer
-      - description: Optional repository UUID filter
-        in: query
-        name: repository_id
-        schema:
-          type: string
       requestBody:
         content:
           application/json:

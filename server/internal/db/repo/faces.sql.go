@@ -75,18 +75,16 @@ FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fi.id != $1
   AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = $2::uuid
-  AND a.owner_id IS NOT DISTINCT FROM $3::integer
-  AND fi.embedding_model IS NOT DISTINCT FROM $4::text
+  AND a.owner_id IS NOT DISTINCT FROM $2::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM $3::text
   AND fi.embedding IS NOT NULL
-  AND fi.confidence >= $5
-  AND COALESCE(fi.face_size, 0) >= $6
-  AND 1 - (fi.embedding <=> $7::vector) >= $8::float8
+  AND fi.confidence >= $4
+  AND COALESCE(fi.face_size, 0) >= $5
+  AND 1 - (fi.embedding <=> $6::vector) >= $7::float8
 `
 
 type CountIncrementalFaceNeighborsParams struct {
 	ID             int32            `db:"id" json:"id"`
-	RepositoryID   pgtype.UUID      `db:"repository_id" json:"repository_id"`
 	OwnerID        *int32           `db:"owner_id" json:"owner_id"`
 	EmbeddingModel *string          `db:"embedding_model" json:"embedding_model"`
 	MinConfidence  float32          `db:"min_confidence" json:"min_confidence"`
@@ -95,10 +93,11 @@ type CountIncrementalFaceNeighborsParams struct {
 	MinSimilarity  float64          `db:"min_similarity" json:"min_similarity"`
 }
 
+// DBSCAN core check runs over the whole owner scope: clusters span
+// repositories, so neighbors are never repository-filtered.
 func (q *Queries) CountIncrementalFaceNeighbors(ctx context.Context, arg CountIncrementalFaceNeighborsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countIncrementalFaceNeighbors,
 		arg.ID,
-		arg.RepositoryID,
 		arg.OwnerID,
 		arg.EmbeddingModel,
 		arg.MinConfidence,
@@ -136,20 +135,24 @@ func (q *Queries) CountPersonFacesScoped(ctx context.Context, arg CountPersonFac
 }
 
 const createFaceCluster = `-- name: CreateFaceCluster :one
-INSERT INTO face_clusters (cluster_name, representative_face_id, confidence_score, is_confirmed)
-VALUES ($1, $2, $3, $4)
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
+INSERT INTO face_clusters (owner_id, cluster_name, representative_face_id, confidence_score, is_confirmed)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type CreateFaceClusterParams struct {
+	OwnerID              *int32   `db:"owner_id" json:"owner_id"`
 	ClusterName          *string  `db:"cluster_name" json:"cluster_name"`
 	RepresentativeFaceID *int32   `db:"representative_face_id" json:"representative_face_id"`
 	ConfidenceScore      *float32 `db:"confidence_score" json:"confidence_score"`
 	IsConfirmed          *bool    `db:"is_confirmed" json:"is_confirmed"`
 }
 
+// owner_id is the cluster's structural owner (rule: a cluster never spans
+// owners). NULL means the cluster groups ownerless assets and is admin-only.
 func (q *Queries) CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error) {
 	row := q.db.QueryRow(ctx, createFaceCluster,
+		arg.OwnerID,
 		arg.ClusterName,
 		arg.RepresentativeFaceID,
 		arg.ConfidenceScore,
@@ -158,6 +161,7 @@ func (q *Queries) CreateFaceCluster(ctx context.Context, arg CreateFaceClusterPa
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,
@@ -411,7 +415,7 @@ func (q *Queries) DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UU
 }
 
 const getAllFaceClusters = `-- name: GetAllFaceClusters :many
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
+SELECT cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 ORDER BY is_confirmed DESC, member_count DESC
 `
 
@@ -426,6 +430,7 @@ func (q *Queries) GetAllFaceClusters(ctx context.Context) ([]FaceCluster, error)
 		var i FaceCluster
 		if err := rows.Scan(
 			&i.ClusterID,
+			&i.OwnerID,
 			&i.ClusterName,
 			&i.RepresentativeFaceID,
 			&i.ConfidenceScore,
@@ -458,12 +463,14 @@ WITH pair_scores AS (
     JOIN face_cluster_members fcm1 ON fcm1.cluster_id = fc1.cluster_id
     JOIN face_items fi1 ON fi1.id = fcm1.face_id
     JOIN face_clusters fc2 ON fc1.cluster_id < fc2.cluster_id
+        AND fc1.owner_id IS NOT DISTINCT FROM fc2.owner_id
     JOIN face_cluster_members fcm2 ON fcm2.cluster_id = fc2.cluster_id
     JOIN face_items fi2 ON fi2.id = fcm2.face_id
     WHERE fi1.embedding IS NOT NULL
       AND fi2.embedding IS NOT NULL
       AND COALESCE(fc1.is_confirmed, false) = true
       AND COALESCE(fc2.is_confirmed, false) = true
+      AND ($3::integer IS NULL OR fc1.owner_id = $3)
     GROUP BY fc1.cluster_id, fc1.cluster_name, fc2.cluster_id, fc2.cluster_name
 )
 SELECT cluster_id, name1, other_cluster_id, name2, avg_similarity
@@ -476,6 +483,7 @@ LIMIT $2
 type GetClusterMergeCandidatesParams struct {
 	MinSimilarity float64 `db:"min_similarity" json:"min_similarity"`
 	Limit         int32   `db:"limit" json:"limit"`
+	OwnerID       *int32  `db:"owner_id" json:"owner_id"`
 }
 
 type GetClusterMergeCandidatesRow struct {
@@ -486,8 +494,10 @@ type GetClusterMergeCandidatesRow struct {
 	AvgSimilarity  float64 `db:"avg_similarity" json:"avg_similarity"`
 }
 
+// Merge suggestions never pair clusters of different owners; owner_id
+// optionally restricts candidates to one owner's clusters (nil = admin).
 func (q *Queries) GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, getClusterMergeCandidates, arg.MinSimilarity, arg.Limit)
+	rows, err := q.db.Query(ctx, getClusterMergeCandidates, arg.MinSimilarity, arg.Limit, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -513,7 +523,7 @@ func (q *Queries) GetClusterMergeCandidates(ctx context.Context, arg GetClusterM
 }
 
 const getConfirmedFaceClusters = `-- name: GetConfirmedFaceClusters :many
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
+SELECT cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 WHERE is_confirmed = true
 ORDER BY cluster_name ASC
 `
@@ -529,6 +539,7 @@ func (q *Queries) GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, 
 		var i FaceCluster
 		if err := rows.Scan(
 			&i.ClusterID,
+			&i.OwnerID,
 			&i.ClusterName,
 			&i.RepresentativeFaceID,
 			&i.ConfidenceScore,
@@ -601,7 +612,7 @@ func (q *Queries) GetFaceClusterAssignmentsForScope(ctx context.Context, arg Get
 }
 
 const getFaceClusterByFaceID = `-- name: GetFaceClusterByFaceID :one
-SELECT fc.cluster_id, fc.cluster_name, fc.representative_face_id, fc.confidence_score, fc.member_count, fc.is_confirmed, fc.is_hidden, fc.hidden_at, fc.created_at, fc.updated_at FROM face_clusters fc
+SELECT fc.cluster_id, fc.owner_id, fc.cluster_name, fc.representative_face_id, fc.confidence_score, fc.member_count, fc.is_confirmed, fc.is_hidden, fc.hidden_at, fc.created_at, fc.updated_at FROM face_clusters fc
 JOIN face_cluster_members fcm ON fc.cluster_id = fcm.cluster_id
 WHERE fcm.face_id = $1
 `
@@ -611,6 +622,7 @@ func (q *Queries) GetFaceClusterByFaceID(ctx context.Context, faceID int32) (Fac
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,
@@ -625,7 +637,7 @@ func (q *Queries) GetFaceClusterByFaceID(ctx context.Context, faceID int32) (Fac
 }
 
 const getFaceClusterByID = `-- name: GetFaceClusterByID :one
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
+SELECT cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 WHERE cluster_id = $1
 `
 
@@ -634,6 +646,7 @@ func (q *Queries) GetFaceClusterByID(ctx context.Context, clusterID int32) (Face
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,
@@ -648,7 +661,7 @@ func (q *Queries) GetFaceClusterByID(ctx context.Context, clusterID int32) (Face
 }
 
 const getFaceClusterByRepresentative = `-- name: GetFaceClusterByRepresentative :one
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
+SELECT cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 WHERE representative_face_id = $1
 `
 
@@ -657,6 +670,7 @@ func (q *Queries) GetFaceClusterByRepresentative(ctx context.Context, representa
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,
@@ -1310,109 +1324,6 @@ func (q *Queries) GetFacesByExpression(ctx context.Context, arg GetFacesByExpres
 	return items, nil
 }
 
-const getIncrementalFaceNeighbors = `-- name: GetIncrementalFaceNeighbors :many
-SELECT
-    fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at,
-    CAST(1 - (fi.embedding <=> $1::vector) AS double precision) AS similarity
-FROM face_items fi
-JOIN assets a ON a.asset_id = fi.asset_id
-WHERE fi.id != $2
-  AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = $3::uuid
-  AND a.owner_id IS NOT DISTINCT FROM $4::integer
-  AND fi.embedding_model IS NOT DISTINCT FROM $5::text
-  AND fi.embedding IS NOT NULL
-  AND fi.confidence >= $6
-  AND COALESCE(fi.face_size, 0) >= $7
-  AND 1 - (fi.embedding <=> $1::vector) >= $8::float8
-ORDER BY similarity DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
-LIMIT $9
-`
-
-type GetIncrementalFaceNeighborsParams struct {
-	EmbeddingQuery *pgvector.Vector `db:"embedding_query" json:"embedding_query"`
-	ID             int32            `db:"id" json:"id"`
-	RepositoryID   pgtype.UUID      `db:"repository_id" json:"repository_id"`
-	OwnerID        *int32           `db:"owner_id" json:"owner_id"`
-	EmbeddingModel *string          `db:"embedding_model" json:"embedding_model"`
-	MinConfidence  float32          `db:"min_confidence" json:"min_confidence"`
-	MinFaceSize    *int32           `db:"min_face_size" json:"min_face_size"`
-	MinSimilarity  float64          `db:"min_similarity" json:"min_similarity"`
-	Limit          int32            `db:"limit" json:"limit"`
-}
-
-type GetIncrementalFaceNeighborsRow struct {
-	ID             int32              `db:"id" json:"id"`
-	AssetID        pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	FaceID         *string            `db:"face_id" json:"face_id"`
-	BoundingBox    []byte             `db:"bounding_box" json:"bounding_box"`
-	Confidence     float32            `db:"confidence" json:"confidence"`
-	AgeGroup       *string            `db:"age_group" json:"age_group"`
-	Gender         *string            `db:"gender" json:"gender"`
-	Ethnicity      *string            `db:"ethnicity" json:"ethnicity"`
-	Expression     *string            `db:"expression" json:"expression"`
-	FaceSize       *int32             `db:"face_size" json:"face_size"`
-	FaceImagePath  *string            `db:"face_image_path" json:"face_image_path"`
-	Embedding      *pgvector.Vector   `db:"embedding" json:"embedding"`
-	EmbeddingModel *string            `db:"embedding_model" json:"embedding_model"`
-	IsPrimary      *bool              `db:"is_primary" json:"is_primary"`
-	QualityScore   *float32           `db:"quality_score" json:"quality_score"`
-	BlurScore      *float32           `db:"blur_score" json:"blur_score"`
-	PoseAngles     []byte             `db:"pose_angles" json:"pose_angles"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	Similarity     float64            `db:"similarity" json:"similarity"`
-}
-
-func (q *Queries) GetIncrementalFaceNeighbors(ctx context.Context, arg GetIncrementalFaceNeighborsParams) ([]GetIncrementalFaceNeighborsRow, error) {
-	rows, err := q.db.Query(ctx, getIncrementalFaceNeighbors,
-		arg.EmbeddingQuery,
-		arg.ID,
-		arg.RepositoryID,
-		arg.OwnerID,
-		arg.EmbeddingModel,
-		arg.MinConfidence,
-		arg.MinFaceSize,
-		arg.MinSimilarity,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetIncrementalFaceNeighborsRow
-	for rows.Next() {
-		var i GetIncrementalFaceNeighborsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.AssetID,
-			&i.FaceID,
-			&i.BoundingBox,
-			&i.Confidence,
-			&i.AgeGroup,
-			&i.Gender,
-			&i.Ethnicity,
-			&i.Expression,
-			&i.FaceSize,
-			&i.FaceImagePath,
-			&i.Embedding,
-			&i.EmbeddingModel,
-			&i.IsPrimary,
-			&i.QualityScore,
-			&i.BlurScore,
-			&i.PoseAngles,
-			&i.CreatedAt,
-			&i.Similarity,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getManualFaceClusterMembershipsForScope = `-- name: GetManualFaceClusterMembershipsForScope :many
 SELECT
     fcm.face_id,
@@ -1475,13 +1386,12 @@ JOIN assets a ON a.asset_id = fi.asset_id
 JOIN face_cluster_members fcm ON fcm.face_id = fi.id
 WHERE fi.id != $2
   AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = $3::uuid
-  AND a.owner_id IS NOT DISTINCT FROM $4::integer
-  AND fi.embedding_model IS NOT DISTINCT FROM $5::text
+  AND a.owner_id IS NOT DISTINCT FROM $3::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM $4::text
   AND fi.embedding IS NOT NULL
-  AND fi.confidence >= $6
-  AND COALESCE(fi.face_size, 0) >= $7
-  AND 1 - (fi.embedding <=> $1::vector) >= $8::float8
+  AND fi.confidence >= $5
+  AND COALESCE(fi.face_size, 0) >= $6
+  AND 1 - (fi.embedding <=> $1::vector) >= $7::float8
 ORDER BY similarity DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
 LIMIT 1
 `
@@ -1489,7 +1399,6 @@ LIMIT 1
 type GetNearestAssignedFaceClusterParams struct {
 	EmbeddingQuery *pgvector.Vector `db:"embedding_query" json:"embedding_query"`
 	ID             int32            `db:"id" json:"id"`
-	RepositoryID   pgtype.UUID      `db:"repository_id" json:"repository_id"`
 	OwnerID        *int32           `db:"owner_id" json:"owner_id"`
 	EmbeddingModel *string          `db:"embedding_model" json:"embedding_model"`
 	MinConfidence  float32          `db:"min_confidence" json:"min_confidence"`
@@ -1503,11 +1412,12 @@ type GetNearestAssignedFaceClusterRow struct {
 	Similarity float64 `db:"similarity" json:"similarity"`
 }
 
+// Cluster attachment is owner-scoped only: a face may join a cluster whose
+// members live in a different repository, same owner.
 func (q *Queries) GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error) {
 	row := q.db.QueryRow(ctx, getNearestAssignedFaceCluster,
 		arg.EmbeddingQuery,
 		arg.ID,
-		arg.RepositoryID,
 		arg.OwnerID,
 		arg.EmbeddingModel,
 		arg.MinConfidence,
@@ -1824,7 +1734,7 @@ JOIN assets a ON a.asset_id = fi.asset_id
 LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
 WHERE fcm.face_id IS NULL
   AND COALESCE(a.is_deleted, false) = false
-  AND a.repository_id = $1::uuid
+  AND ($1::uuid IS NULL OR a.repository_id = $1::uuid)
   AND a.owner_id IS NOT DISTINCT FROM $2::integer
   AND fi.embedding_model IS NOT DISTINCT FROM $3::text
   AND fi.embedding IS NOT NULL
@@ -1841,6 +1751,8 @@ type GetUnclusteredFacesInScopeParams struct {
 	MinFaceSize    *int32      `db:"min_face_size" json:"min_face_size"`
 }
 
+// repository_id is a face *selection* filter (which faces get processed),
+// not part of cluster identity — clusters span repositories, never owners.
 func (q *Queries) GetUnclusteredFacesInScope(ctx context.Context, arg GetUnclusteredFacesInScopeParams) ([]FaceItem, error) {
 	rows, err := q.db.Query(ctx, getUnclusteredFacesInScope,
 		arg.RepositoryID,
@@ -2144,7 +2056,7 @@ SET
     is_confirmed = $4,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $1
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
+RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type UpdateFaceClusterParams struct {
@@ -2164,6 +2076,7 @@ func (q *Queries) UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterPa
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,

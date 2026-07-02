@@ -170,7 +170,7 @@ func (q *Queries) FindCandidatesForStacking(ctx context.Context, repositoryID pg
 }
 
 const findCandidatesForStackingByName = `-- name: FindCandidatesForStackingByName :many
-SELECT a.asset_id, a.original_filename, a.mime_type,
+SELECT a.asset_id, a.owner_id, a.original_filename, a.mime_type,
        a.specific_metadata->>'is_raw' as is_raw,
        a.taken_time, a.upload_time,
        regexp_replace(a.original_filename, '\.[^.]+$', '') as base_name
@@ -185,6 +185,7 @@ ORDER BY base_name, a.original_filename
 
 type FindCandidatesForStackingByNameRow struct {
 	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
 	OriginalFilename string             `db:"original_filename" json:"original_filename"`
 	MimeType         string             `db:"mime_type" json:"mime_type"`
 	IsRaw            interface{}        `db:"is_raw" json:"is_raw"`
@@ -194,7 +195,8 @@ type FindCandidatesForStackingByNameRow struct {
 }
 
 // Find assets that share base names but are not yet in any stack.
-// Includes taken_time and upload_time for time-based clustering.
+// Includes taken_time and upload_time for time-based clustering, and
+// owner_id because auto-detected stacks never span owners.
 func (q *Queries) FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error) {
 	rows, err := q.db.Query(ctx, findCandidatesForStackingByName, repositoryID)
 	if err != nil {
@@ -206,6 +208,7 @@ func (q *Queries) FindCandidatesForStackingByName(ctx context.Context, repositor
 		var i FindCandidatesForStackingByNameRow
 		if err := rows.Scan(
 			&i.AssetID,
+			&i.OwnerID,
 			&i.OriginalFilename,
 			&i.MimeType,
 			&i.IsRaw,
@@ -265,10 +268,16 @@ SELECT COUNT(*) as count
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
 WHERE asm.stack_id = $1 AND a.is_deleted = false
+  AND ($2::integer IS NULL OR a.owner_id = $2)
 `
 
-func (q *Queries) GetStackMemberCount(ctx context.Context, stackID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, getStackMemberCount, stackID)
+type GetStackMemberCountParams struct {
+	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
+	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetStackMemberCount(ctx context.Context, arg GetStackMemberCountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getStackMemberCount, arg.StackID, arg.OwnerID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -279,10 +288,16 @@ SELECT COUNT(*) as count
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
 WHERE asm.stack_id = $1
+  AND ($2::integer IS NULL OR a.owner_id = $2)
 `
 
-func (q *Queries) GetStackMemberCountAny(ctx context.Context, stackID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, getStackMemberCountAny, stackID)
+type GetStackMemberCountAnyParams struct {
+	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
+	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetStackMemberCountAny(ctx context.Context, arg GetStackMemberCountAnyParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getStackMemberCountAny, arg.StackID, arg.OwnerID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -293,11 +308,18 @@ SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
 WHERE asm.stack_id = $1 AND a.is_deleted = false
+  AND ($2::integer IS NULL OR a.owner_id = $2)
 ORDER BY asm.position ASC, asm.created_at ASC
 `
 
-func (q *Queries) GetStackMembers(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error) {
-	rows, err := q.db.Query(ctx, getStackMembers, stackID)
+type GetStackMembersParams struct {
+	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
+	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+}
+
+// owner_id restricts the member list to assets the caller may see (nil = admin).
+func (q *Queries) GetStackMembers(ctx context.Context, arg GetStackMembersParams) ([]AssetStackMember, error) {
+	rows, err := q.db.Query(ctx, getStackMembers, arg.StackID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -327,11 +349,18 @@ SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
 WHERE asm.stack_id = $1
+  AND ($2::integer IS NULL OR a.owner_id = $2)
 ORDER BY asm.position ASC, asm.created_at ASC
 `
 
-func (q *Queries) GetStackMembersAny(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error) {
-	rows, err := q.db.Query(ctx, getStackMembersAny, stackID)
+type GetStackMembersAnyParams struct {
+	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
+	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+}
+
+// owner_id restricts the member list to assets the caller may see (nil = admin).
+func (q *Queries) GetStackMembersAny(ctx context.Context, arg GetStackMembersAnyParams) ([]AssetStackMember, error) {
+	rows, err := q.db.Query(ctx, getStackMembersAny, arg.StackID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}

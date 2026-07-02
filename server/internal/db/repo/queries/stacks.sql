@@ -23,17 +23,21 @@ DELETE FROM asset_stack_members
 WHERE asset_id = $1;
 
 -- name: GetStackMembers :many
+-- owner_id restricts the member list to assets the caller may see (nil = admin).
 SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
-WHERE asm.stack_id = $1 AND a.is_deleted = false
+WHERE asm.stack_id = sqlc.arg('stack_id') AND a.is_deleted = false
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
 ORDER BY asm.position ASC, asm.created_at ASC;
 
 -- name: GetStackMembersAny :many
+-- owner_id restricts the member list to assets the caller may see (nil = admin).
 SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
-WHERE asm.stack_id = $1
+WHERE asm.stack_id = sqlc.arg('stack_id')
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
 ORDER BY asm.position ASC, asm.created_at ASC;
 
 -- name: GetStackByAssetID :one
@@ -50,13 +54,15 @@ WHERE asm.asset_id = ANY($1::uuid[]);
 SELECT COUNT(*) as count
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
-WHERE asm.stack_id = $1 AND a.is_deleted = false;
+WHERE asm.stack_id = sqlc.arg('stack_id') AND a.is_deleted = false
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'));
 
 -- name: GetStackMemberCountAny :one
 SELECT COUNT(*) as count
 FROM asset_stack_members asm
 JOIN assets a ON a.asset_id = asm.asset_id
-WHERE asm.stack_id = $1;
+WHERE asm.stack_id = sqlc.arg('stack_id')
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'));
 
 -- name: FindCandidatesForStacking :many
 -- Find assets in the same repository that share a base filename pattern
@@ -91,8 +97,9 @@ ORDER BY a.original_filename;
 
 -- name: FindCandidatesForStackingByName :many
 -- Find assets that share base names but are not yet in any stack.
--- Includes taken_time and upload_time for time-based clustering.
-SELECT a.asset_id, a.original_filename, a.mime_type,
+-- Includes taken_time and upload_time for time-based clustering, and
+-- owner_id because auto-detected stacks never span owners.
+SELECT a.asset_id, a.owner_id, a.original_filename, a.mime_type,
        a.specific_metadata->>'is_raw' as is_raw,
        a.taken_time, a.upload_time,
        regexp_replace(a.original_filename, '\.[^.]+$', '') as base_name

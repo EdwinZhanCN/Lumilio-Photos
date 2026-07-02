@@ -55,9 +55,11 @@ type RebuildAssetIndexesResponseDTO struct {
 }
 
 type IndexingRepositoryOptionDTO struct {
-	ID        string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name      string `json:"name" example:"Photos Library"`
-	Path      string `json:"path" example:"/Volumes/Media/Photos"`
+	ID   string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name string `json:"name" example:"Photos Library"`
+	// Path is only populated for admin callers; repository filesystem
+	// locations are never exposed to regular users.
+	Path      string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
 	Role      string `json:"role" example:"regular"`
 	IsPrimary bool   `json:"is_primary" example:"false"`
 }

@@ -15,6 +15,10 @@ const countPeopleScoped = `-- name: CountPeopleScoped :one
 SELECT COUNT(*)
 FROM face_clusters fc
 WHERE ($1::boolean OR COALESCE(fc.is_hidden, false) = false)
+  AND (
+    $2::integer IS NULL
+    OR fc.owner_id = $2
+  )
   AND EXISTS (
     SELECT 1
     FROM face_cluster_members fcm
@@ -23,24 +27,23 @@ WHERE ($1::boolean OR COALESCE(fc.is_hidden, false) = false)
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
       AND (
-        $2::uuid IS NULL
-        OR a.repository_id = $2
-      )
-      AND (
-        $3::integer IS NULL
-        OR a.owner_id = $3
+        $3::uuid IS NULL
+        OR a.repository_id = $3
       )
 )
 `
 
 type CountPeopleScopedParams struct {
 	IncludeHidden bool        `db:"include_hidden" json:"include_hidden"`
-	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
 	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
 }
 
+// owner_id filters on the cluster's structural owner (NULL-owner clusters are
+// admin-only); repository_id stays a member-asset display filter because
+// people legitimately span repositories.
 func (q *Queries) CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPeopleScoped, arg.IncludeHidden, arg.RepositoryID, arg.OwnerID)
+	row := q.db.QueryRow(ctx, countPeopleScoped, arg.IncludeHidden, arg.OwnerID, arg.RepositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -73,10 +76,6 @@ JOIN LATERAL (
         $1::uuid IS NULL
         OR a.repository_id = $1
       )
-      AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
-      )
 ) scoped ON scoped.member_count > 0
 LEFT JOIN LATERAL (
     SELECT fi.face_image_path, fi.asset_id
@@ -87,10 +86,6 @@ LEFT JOIN LATERAL (
       AND (
         $1::uuid IS NULL
         OR a.repository_id = $1
-      )
-      AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
       )
     LIMIT 1
 ) rep ON true
@@ -105,20 +100,20 @@ LEFT JOIN LATERAL (
         $1::uuid IS NULL
         OR a.repository_id = $1
       )
-      AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
-      )
     ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
     LIMIT 1
 ) best ON true
-WHERE fc.cluster_id = $3
+WHERE fc.cluster_id = $2
+  AND (
+    $3::integer IS NULL
+    OR fc.owner_id = $3
+  )
 `
 
 type GetPersonByIDScopedParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
 	ClusterID    int32       `db:"cluster_id" json:"cluster_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
 }
 
 type GetPersonByIDScopedRow struct {
@@ -135,8 +130,10 @@ type GetPersonByIDScopedRow struct {
 	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Authorization is an equality check on the cluster's structural owner;
+// repository_id remains a read-time display filter on member counts/covers.
 func (q *Queries) GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error) {
-	row := q.db.QueryRow(ctx, getPersonByIDScoped, arg.RepositoryID, arg.OwnerID, arg.ClusterID)
+	row := q.db.QueryRow(ctx, getPersonByIDScoped, arg.RepositoryID, arg.ClusterID, arg.OwnerID)
 	var i GetPersonByIDScopedRow
 	err := row.Scan(
 		&i.ClusterID,
@@ -165,14 +162,14 @@ WITH page_people AS MATERIALIZED (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
-      AND ($3::boolean OR COALESCE(fc.is_hidden, false) = false)
+      AND ($2::boolean OR COALESCE(fc.is_hidden, false) = false)
+      AND (
+        $3::integer IS NULL
+        OR fc.owner_id = $3
+      )
       AND (
         $1::uuid IS NULL
         OR a.repository_id = $1
-      )
-      AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
       )
     GROUP BY fc.cluster_id, fc.is_confirmed, fc.updated_at
     ORDER BY
@@ -206,10 +203,6 @@ LEFT JOIN LATERAL (
         $1::uuid IS NULL
         OR a.repository_id = $1
       )
-      AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
-      )
     LIMIT 1
 ) rep ON true
 LEFT JOIN LATERAL (
@@ -223,10 +216,6 @@ LEFT JOIN LATERAL (
         $1::uuid IS NULL
         OR a.repository_id = $1
       )
-      AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
-      )
     ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
     LIMIT 1
 ) best ON true
@@ -239,8 +228,8 @@ ORDER BY
 
 type ListPeopleScopedParams struct {
 	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
 	IncludeHidden bool        `db:"include_hidden" json:"include_hidden"`
+	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
 	Offset        int32       `db:"offset" json:"offset"`
 	Limit         int32       `db:"limit" json:"limit"`
 }
@@ -262,8 +251,8 @@ type ListPeopleScopedRow struct {
 func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error) {
 	rows, err := q.db.Query(ctx, listPeopleScoped,
 		arg.RepositoryID,
-		arg.OwnerID,
 		arg.IncludeHidden,
+		arg.OwnerID,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -304,7 +293,7 @@ SET
     is_confirmed = true,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $2
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
+RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type RenameFaceClusterParams struct {
@@ -317,6 +306,7 @@ func (q *Queries) RenameFaceCluster(ctx context.Context, arg RenameFaceClusterPa
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,
@@ -337,7 +327,7 @@ SET
     hidden_at = CASE WHEN $1 THEN CURRENT_TIMESTAMP ELSE NULL END,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $2
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
+RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type SetFaceClusterHiddenParams struct {
@@ -350,6 +340,7 @@ func (q *Queries) SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHi
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,
@@ -370,7 +361,7 @@ SET
     confidence_score = $2,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $3
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
+RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type UpdateFaceClusterRepresentativeParams struct {
@@ -384,6 +375,7 @@ func (q *Queries) UpdateFaceClusterRepresentative(ctx context.Context, arg Updat
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
+		&i.OwnerID,
 		&i.ClusterName,
 		&i.RepresentativeFaceID,
 		&i.ConfidenceScore,

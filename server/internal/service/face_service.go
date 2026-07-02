@@ -44,7 +44,6 @@ type FaceService interface {
 	SearchAssetsByFaceCluster(ctx context.Context, clusterID int32, limit, offset int) ([]repo.Asset, error)
 	DeleteFaceResults(ctx context.Context, assetID pgtype.UUID) error
 	GetFaceStats(ctx context.Context) ([]dbtypes.FaceStats, error)
-	CreateFaceCluster(ctx context.Context, clusterName string, representativeFaceID int32) (*repo.FaceCluster, error)
 	GetUnclusteredFaces(ctx context.Context, minConfidence float32, limit int) ([]repo.FaceItem, error)
 	FindSimilarFaces(ctx context.Context, embeddingVector []float32, faceID int32, minSimilarity float32, limit int) ([]SimilarFace, error)
 	UpdateFaceEmbedding(ctx context.Context, faceID int32, embedding []float32, modelID string) (*repo.FaceItem, error)
@@ -55,12 +54,20 @@ type FaceService interface {
 	RebuildFaceClusters(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32) (FaceClusterRebuildResult, error)
 	ListPersonFaces(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]PersonFace, int64, error)
 	GetPersonFaceCrop(ctx context.Context, clusterID, faceID int32, repositoryID pgtype.UUID, ownerID *int32) (*PersonFaceCrop, error)
-	MergePeople(ctx context.Context, targetClusterID int32, sourceClusterIDs []int32, repositoryID pgtype.UUID, ownerID *int32) error
-	MoveFace(ctx context.Context, faceID, targetClusterID int32, repositoryID pgtype.UUID, ownerID *int32) error
-	RemoveFaceFromPerson(ctx context.Context, faceID, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) error
-	SetPersonCover(ctx context.Context, clusterID, faceID int32, repositoryID pgtype.UUID, ownerID *int32) error
-	SetPersonHidden(ctx context.Context, clusterID int32, hidden bool, repositoryID pgtype.UUID, ownerID *int32) (*Person, error)
+	// Person mutations take no repository filter: a person is not
+	// repository-scoped, and authorization is an equality check on the
+	// cluster's structural owner (nil ownerID = admin).
+	MergePeople(ctx context.Context, targetClusterID int32, sourceClusterIDs []int32, ownerID *int32) error
+	MoveFace(ctx context.Context, faceID, targetClusterID int32, ownerID *int32) error
+	RemoveFaceFromPerson(ctx context.Context, faceID, clusterID int32, ownerID *int32) error
+	SetPersonCover(ctx context.Context, clusterID, faceID int32, ownerID *int32) error
+	SetPersonHidden(ctx context.Context, clusterID int32, hidden bool, ownerID *int32) (*Person, error)
 }
+
+// ErrPeopleCrossOwner is returned when a correction would produce a cluster
+// whose members belong to different owners (violates the whole-entity
+// ownership rule), e.g. an admin merging two users' people.
+var ErrPeopleCrossOwner = errors.New("people belong to different owners")
 
 // FaceResultWithItems contains face results and detailed face items.
 type FaceResultWithItems struct {
@@ -385,23 +392,9 @@ func (s *faceService) cleanupAffectedClusters(ctx context.Context, clusterIDs []
 	return nil
 }
 
-func (s *faceService) assignFaceToCluster(ctx context.Context, item repo.FaceItem, asset repo.Asset) error {
-	if !isClusterCandidate(item) || item.Embedding == nil || !asset.RepositoryID.Valid {
-		return nil
-	}
-	return s.recognizePendingFaces(ctx, faceClusterScope{
-		RepositoryID:   asset.RepositoryID,
-		OwnerID:        cloneInt32Ptr(asset.OwnerID),
-		EmbeddingModel: normalizedName(item.EmbeddingModel),
-	})
-}
-
-func (s *faceService) createClusterForFace(ctx context.Context, item repo.FaceItem) (*repo.FaceCluster, error) {
-	return s.createClusterForFaceWithQueries(ctx, s.queries, item, nil, false)
-}
-
-func (s *faceService) createClusterForFaceWithQueries(ctx context.Context, q *repo.Queries, item repo.FaceItem, name *string, confirmed bool) (*repo.FaceCluster, error) {
+func (s *faceService) createClusterForFaceWithQueries(ctx context.Context, q *repo.Queries, item repo.FaceItem, ownerID *int32, name *string, confirmed bool) (*repo.FaceCluster, error) {
 	cluster, err := q.CreateFaceCluster(ctx, repo.CreateFaceClusterParams{
+		OwnerID:              cloneInt32Ptr(ownerID),
 		ClusterName:          normalizedName(name),
 		RepresentativeFaceID: &item.ID,
 		ConfidenceScore:      &item.Confidence,
@@ -728,25 +721,6 @@ func (s *faceService) SearchAssetsByFaceCluster(ctx context.Context, clusterID i
 	})
 }
 
-func (s *faceService) CreateFaceCluster(ctx context.Context, clusterName string, representativeFaceID int32) (*repo.FaceCluster, error) {
-	var name *string
-	if trimmed := strings.TrimSpace(clusterName); trimmed != "" {
-		name = &trimmed
-	}
-	confidence := float32(0.0)
-	isConfirmed := false
-	cluster, err := s.queries.CreateFaceCluster(ctx, repo.CreateFaceClusterParams{
-		ClusterName:          name,
-		RepresentativeFaceID: &representativeFaceID,
-		ConfidenceScore:      &confidence,
-		IsConfirmed:          &isConfirmed,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &cluster, nil
-}
-
 func (s *faceService) GetUnclusteredFaces(ctx context.Context, minConfidence float32, limit int) ([]repo.FaceItem, error) {
 	return s.queries.GetUnclusteredFaces(ctx, repo.GetUnclusteredFacesParams{
 		Confidence: minConfidence,
@@ -875,26 +849,33 @@ func (s *faceService) RenamePerson(ctx context.Context, clusterID int32, name st
 	return &cluster, nil
 }
 
-// authorizePerson ensures the cluster has at least one face inside the given
-// repository/owner scope. It returns pgx.ErrNoRows when the person is not
-// visible to the caller, which handlers translate into a 404.
-func (s *faceService) authorizePerson(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) error {
-	_, err := s.queries.GetPersonByIDScoped(ctx, repo.GetPersonByIDScopedParams{
-		RepositoryID: repositoryID,
-		OwnerID:      ownerID,
-		ClusterID:    clusterID,
-	})
-	return err
+// authorizePerson applies the whole-entity ownership rule: nil ownerID
+// (admin) passes everything; otherwise the cluster's structural owner must
+// match exactly, and NULL-owner clusters stay admin-only. Foreign clusters
+// surface as pgx.ErrNoRows so handlers translate them into 404s without
+// leaking existence.
+func (s *faceService) authorizePerson(ctx context.Context, clusterID int32, ownerID *int32) (*repo.FaceCluster, error) {
+	cluster, err := s.queries.GetFaceClusterByID(ctx, clusterID)
+	if err != nil {
+		return nil, err
+	}
+	if ownerID != nil && (cluster.OwnerID == nil || *cluster.OwnerID != *ownerID) {
+		return nil, pgx.ErrNoRows
+	}
+	return &cluster, nil
 }
 
-// ListPersonFaces returns UI-safe face crops for a person, scoped to the caller.
+// ListPersonFaces returns UI-safe face crops for a person, scoped to the
+// caller. repositoryID only filters which faces are listed (display), not
+// who may see the person.
 func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]PersonFace, int64, error) {
-	if err := s.authorizePerson(ctx, clusterID, repositoryID, ownerID); err != nil {
+	cluster, err := s.authorizePerson(ctx, clusterID, ownerID)
+	if err != nil {
 		return nil, 0, err
 	}
 
 	var representativeFaceID int32
-	if cluster, err := s.queries.GetFaceClusterByID(ctx, clusterID); err == nil && cluster.RepresentativeFaceID != nil {
+	if cluster.RepresentativeFaceID != nil {
 		representativeFaceID = *cluster.RepresentativeFaceID
 	}
 
@@ -965,8 +946,9 @@ func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID i
 // memberships become manual on the target so they survive incremental
 // recognition, and empty source clusters are deleted. The target name,
 // confirmation and hidden state are preserved.
-func (s *faceService) MergePeople(ctx context.Context, targetClusterID int32, sourceClusterIDs []int32, repositoryID pgtype.UUID, ownerID *int32) error {
-	if err := s.authorizePerson(ctx, targetClusterID, repositoryID, ownerID); err != nil {
+func (s *faceService) MergePeople(ctx context.Context, targetClusterID int32, sourceClusterIDs []int32, ownerID *int32) error {
+	target, err := s.authorizePerson(ctx, targetClusterID, ownerID)
+	if err != nil {
 		return err
 	}
 
@@ -977,8 +959,14 @@ func (s *faceService) MergePeople(ctx context.Context, targetClusterID int32, so
 			continue
 		}
 		seen[id] = struct{}{}
-		if err := s.authorizePerson(ctx, id, repositoryID, ownerID); err != nil {
+		source, err := s.authorizePerson(ctx, id, ownerID)
+		if err != nil {
 			return err
+		}
+		// Even admins may not fold one owner's person into another's: the
+		// merged cluster would span owners, breaking the structural rule.
+		if !int32PtrEqual(source.OwnerID, target.OwnerID) {
+			return ErrPeopleCrossOwner
 		}
 		sources = append(sources, id)
 	}
@@ -1003,17 +991,23 @@ func (s *faceService) MergePeople(ctx context.Context, targetClusterID int32, so
 }
 
 // MoveFace reassigns a single face to another person as a manual correction.
-func (s *faceService) MoveFace(ctx context.Context, faceID, targetClusterID int32, repositoryID pgtype.UUID, ownerID *int32) error {
-	if err := s.authorizePerson(ctx, targetClusterID, repositoryID, ownerID); err != nil {
+func (s *faceService) MoveFace(ctx context.Context, faceID, targetClusterID int32, ownerID *int32) error {
+	target, err := s.authorizePerson(ctx, targetClusterID, ownerID)
+	if err != nil {
 		return err
 	}
 
-	if _, err := s.queries.GetFaceForCorrectionScoped(ctx, repo.GetFaceForCorrectionScopedParams{
-		FaceID:       faceID,
-		RepositoryID: repositoryID,
-		OwnerID:      ownerID,
-	}); err != nil {
+	face, err := s.queries.GetFaceForCorrectionScoped(ctx, repo.GetFaceForCorrectionScopedParams{
+		FaceID:  faceID,
+		OwnerID: ownerID,
+	})
+	if err != nil {
 		return err
+	}
+	// The face's asset owner must match the target cluster owner, or the
+	// cluster would span owners.
+	if !int32PtrEqual(face.OwnerID, target.OwnerID) {
+		return ErrPeopleCrossOwner
 	}
 
 	var sourceClusterID int32
@@ -1047,15 +1041,14 @@ func (s *faceService) MoveFace(ctx context.Context, faceID, targetClusterID int3
 
 // RemoveFaceFromPerson detaches a face from a person, leaving it unclustered so
 // it can be recovered by a later rebuild or correction. The asset is unchanged.
-func (s *faceService) RemoveFaceFromPerson(ctx context.Context, faceID, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) error {
-	if err := s.authorizePerson(ctx, clusterID, repositoryID, ownerID); err != nil {
+func (s *faceService) RemoveFaceFromPerson(ctx context.Context, faceID, clusterID int32, ownerID *int32) error {
+	if _, err := s.authorizePerson(ctx, clusterID, ownerID); err != nil {
 		return err
 	}
 	if _, err := s.queries.GetPersonFaceScoped(ctx, repo.GetPersonFaceScopedParams{
-		ClusterID:    clusterID,
-		FaceID:       faceID,
-		RepositoryID: repositoryID,
-		OwnerID:      ownerID,
+		ClusterID: clusterID,
+		FaceID:    faceID,
+		OwnerID:   ownerID,
 	}); err != nil {
 		return err
 	}
@@ -1073,15 +1066,14 @@ func (s *faceService) RemoveFaceFromPerson(ctx context.Context, faceID, clusterI
 
 // SetPersonCover marks a face as the representative cover. The face must belong
 // to the person.
-func (s *faceService) SetPersonCover(ctx context.Context, clusterID, faceID int32, repositoryID pgtype.UUID, ownerID *int32) error {
-	if err := s.authorizePerson(ctx, clusterID, repositoryID, ownerID); err != nil {
+func (s *faceService) SetPersonCover(ctx context.Context, clusterID, faceID int32, ownerID *int32) error {
+	if _, err := s.authorizePerson(ctx, clusterID, ownerID); err != nil {
 		return err
 	}
 	face, err := s.queries.GetPersonFaceScoped(ctx, repo.GetPersonFaceScopedParams{
-		ClusterID:    clusterID,
-		FaceID:       faceID,
-		RepositoryID: repositoryID,
-		OwnerID:      ownerID,
+		ClusterID: clusterID,
+		FaceID:    faceID,
+		OwnerID:   ownerID,
 	})
 	if err != nil {
 		return err
@@ -1100,8 +1092,8 @@ func (s *faceService) SetPersonCover(ctx context.Context, clusterID, faceID int3
 
 // SetPersonHidden hides or unhides a person from default people views without
 // touching face assignments, names or assets.
-func (s *faceService) SetPersonHidden(ctx context.Context, clusterID int32, hidden bool, repositoryID pgtype.UUID, ownerID *int32) (*Person, error) {
-	if err := s.authorizePerson(ctx, clusterID, repositoryID, ownerID); err != nil {
+func (s *faceService) SetPersonHidden(ctx context.Context, clusterID int32, hidden bool, ownerID *int32) (*Person, error) {
+	if _, err := s.authorizePerson(ctx, clusterID, ownerID); err != nil {
 		return nil, err
 	}
 	if _, err := s.queries.SetFaceClusterHidden(ctx, repo.SetFaceClusterHiddenParams{
@@ -1110,7 +1102,7 @@ func (s *faceService) SetPersonHidden(ctx context.Context, clusterID int32, hidd
 	}); err != nil {
 		return nil, fmt.Errorf("set person hidden: %w", err)
 	}
-	return s.GetPerson(ctx, clusterID, repositoryID, ownerID)
+	return s.GetPerson(ctx, clusterID, pgtype.UUID{}, ownerID)
 }
 
 func personFromListRow(row repo.ListPeopleScopedRow) Person {
@@ -1181,4 +1173,12 @@ func pgUUIDToString(value pgtype.UUID) string {
 
 func boolPtr(value bool) *bool {
 	return &value
+}
+
+// int32PtrEqual treats two nil pointers as equal (NULL IS NOT DISTINCT FROM NULL).
+func int32PtrEqual(a, b *int32) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }

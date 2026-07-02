@@ -1754,19 +1754,22 @@ func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndex
 	}
 }
 
-func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository) dto.IndexingRepositoryListResponseDTO {
+func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository, includePath bool) dto.IndexingRepositoryListResponseDTO {
 	items := make([]dto.IndexingRepositoryOptionDTO, 0, len(repositories))
 	for _, repository := range repositories {
 		if repository == nil {
 			continue
 		}
-		items = append(items, dto.IndexingRepositoryOptionDTO{
+		item := dto.IndexingRepositoryOptionDTO{
 			ID:        uuid.UUID(repository.RepoID.Bytes).String(),
 			Name:      repository.Name,
-			Path:      repository.Path,
 			Role:      string(repository.Role),
 			IsPrimary: repository.Role == dbtypes.RepoRolePrimary,
-		})
+		}
+		if includePath {
+			item.Path = repository.Path
+		}
+		items = append(items, item)
 	}
 
 	return dto.IndexingRepositoryListResponseDTO{
@@ -1915,74 +1918,6 @@ func toAssetDTOs(assets []repo.Asset) []dto.AssetDTO {
 		items[i] = dto.ToAssetDTO(asset)
 	}
 	return items
-}
-
-// enrichAssetDTOsWithStackInfo batch-fetches stack membership for the given
-// asset DTOs and attaches a StackPreviewDTO to each asset that belongs to a stack.
-func (h *AssetHandler) enrichAssetDTOsWithStackInfo(ctx context.Context, dtos []dto.AssetDTO) error {
-	if len(dtos) == 0 || h.stackService == nil {
-		return nil
-	}
-
-	assetIDs := make([]uuid.UUID, 0, len(dtos))
-	for _, d := range dtos {
-		if d.AssetID == "" {
-			continue
-		}
-		id, err := uuid.Parse(d.AssetID)
-		if err != nil {
-			continue
-		}
-		assetIDs = append(assetIDs, id)
-	}
-
-	if len(assetIDs) == 0 {
-		return nil
-	}
-
-	stacks, err := h.stackService.GetStacksByAssets(ctx, assetIDs)
-	if err != nil {
-		return fmt.Errorf("batch fetch stacks: %w", err)
-	}
-
-	for i := range dtos {
-		assetID, err := uuid.Parse(dtos[i].AssetID)
-		if err != nil {
-			continue
-		}
-
-		stackInfo, ok := stacks[assetID]
-		if !ok {
-			continue
-		}
-
-		// Determine if this asset is the cover (lowest position)
-		isCover := false
-		minPos := int32(0)
-		if len(stackInfo.Members) > 0 {
-			minPos = stackInfo.Members[0].Position
-			for _, m := range stackInfo.Members {
-				if m.Position < minPos {
-					minPos = m.Position
-				}
-			}
-			for _, m := range stackInfo.Members {
-				if m.AssetID == assetID && m.Position == minPos {
-					isCover = true
-					break
-				}
-			}
-		}
-
-		size := int(stackInfo.MemberCount)
-		dtos[i].Stack = &dto.StackPreviewDTO{
-			StackID:    stackInfo.StackID.String(),
-			StackCover: isCover,
-			StackSize:  &size,
-		}
-	}
-
-	return nil
 }
 
 func uuidStrings(values []uuid.UUID) []string {
@@ -2228,9 +2163,11 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 	api.JSONOK(c, searchResponse)
 }
 
-// ListIndexingRepositories returns repository options for indexing filters and reindex scope selection.
-// @Summary List indexing repositories
-// @Description Return repositories that can be used to scope indexing stats and reindex requests.
+// ListIndexingRepositories returns repository options for scope selectors
+// (browse scope, upload target) and indexing filters. All authenticated users
+// may read the shared registry; filesystem paths are admin-only.
+// @Summary List repositories for scope selection
+// @Description Return the shared repository registry for browse-scope/upload selectors and indexing filters. Paths are only included for admins.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -2245,7 +2182,8 @@ func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, toIndexingRepositoryListResponseDTO(repositories))
+	isAdmin := ownerScopeID(c) == nil
+	api.JSONOK(c, toIndexingRepositoryListResponseDTO(repositories, isAdmin))
 }
 
 // GetIndexingStats returns indexing coverage and queue status for photo AI tasks.
@@ -4098,7 +4036,7 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 		return
 	}
 
-	stackInfo, err := h.stackService.GetStackByAssetAny(c.Request.Context(), assetID)
+	stackInfo, err := h.stackService.GetStackByAssetAny(c.Request.Context(), assetID, ownerScopeID(c))
 	if err != nil {
 		if errors.Is(err, service.ErrStackNotFound) {
 			api.GinNotFound(c, err, "Asset is not in a stack")

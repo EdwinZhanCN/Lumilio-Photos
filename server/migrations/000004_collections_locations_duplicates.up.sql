@@ -154,7 +154,7 @@ CREATE TABLE public.duplicate_group_edges (
 
 CREATE TABLE public.location_clusters (
     cluster_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    owner_id integer DEFAULT 0 NOT NULL,
+    owner_id integer,
     repository_id uuid NOT NULL,
     geohash text NOT NULL,
     "precision" integer DEFAULT 7 NOT NULL,
@@ -172,7 +172,8 @@ CREATE TABLE public.location_clusters (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     search_vector tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, ((((((((COALESCE(label, ''::text) || ' '::text) || COALESCE(country, ''::text)) || ' '::text) || COALESCE(region, ''::text)) || ' '::text) || COALESCE(city, ''::text)) || ' '::text) || COALESCE(geohash, ''::text)))) STORED,
     CONSTRAINT location_clusters_pkey PRIMARY KEY (cluster_id),
-    CONSTRAINT location_clusters_owner_id_repository_id_geohash_key UNIQUE (owner_id, repository_id, geohash),
+    CONSTRAINT location_clusters_owner_id_repository_id_geohash_key UNIQUE NULLS NOT DISTINCT (owner_id, repository_id, geohash),
+    CONSTRAINT location_clusters_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
     CONSTRAINT location_clusters_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(repo_id) ON DELETE CASCADE,
     CONSTRAINT location_clusters_centroid_latitude_check CHECK (((centroid_latitude >= ('-90'::integer)::double precision) AND (centroid_latitude <= (90)::double precision))),
     CONSTRAINT location_clusters_centroid_longitude_check CHECK (((centroid_longitude >= ('-180'::integer)::double precision) AND (centroid_longitude <= (180)::double precision))),
