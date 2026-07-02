@@ -710,6 +710,23 @@
       "duplicates": {
         "title": "Duplicates"
       },
+      "liked": {
+        "bulkActions": {
+          "unlike": {
+            "confirmMessage_one": "This will remove {{count}} asset from Liked.",
+            "confirmMessage_other": "This will remove {{count}} assets from Liked.",
+            "confirmTitle": "Remove from Liked?",
+            "label_one": "Remove {{count}} from Liked",
+            "label_other": "Remove {{count}} from Liked"
+          }
+        },
+        "messages": {
+          "unlikeError": "Failed to remove selected assets from Liked.",
+          "unlikeSuccess_one": "Removed {{count}} asset from Liked.",
+          "unlikeSuccess_other": "Removed {{count}} assets from Liked."
+        },
+        "title": "Liked"
+      },
       "trash": {
         "title": "Trash"
       }

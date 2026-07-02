@@ -1,0 +1,120 @@
+import { useCallback } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { useQueryClient } from "@tanstack/react-query";
+import { Heart, HeartOff } from "lucide-react";
+import ErrorFallBack from "@/components/ErrorFallBack";
+import { AssetsProvider, useAssetActions } from "@/features/assets";
+import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import type {
+  AssetsBulkActionContext,
+  AssetsBulkActionItem,
+} from "@/features/assets/components/shared/bulkActions";
+import { WorkerProvider } from "@/contexts/WorkerProvider";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
+import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useI18n } from "@/lib/i18n";
+
+const HIDDEN_LIKED_BULK_ACTIONS = ["set-liked"] as const;
+
+const LikedContent = () => {
+  const { t } = useI18n();
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("sidebar.collections", "Collections"), to: "/collections" },
+    {
+      label: t("collections.sections.utilities", "Utilities"),
+      to: "/collections/utilities",
+    },
+    { label: t("collections.utilities.liked.title", "Liked") },
+  ]);
+  const queryClient = useQueryClient();
+  const showMessage = useMessage();
+  const { batchUpdateAssets } = useAssetActions();
+
+  const invalidateAssetLists = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key)) return false;
+
+        const path = key[1];
+        return path === "/api/v1/assets/list" || path === "/api/v1/assets/search";
+      },
+    });
+  }, [queryClient]);
+
+  const bulkActions = useCallback(
+    (context: AssetsBulkActionContext): AssetsBulkActionItem[] => [
+      {
+        id: "unlike-assets",
+        label: t("collections.utilities.liked.bulkActions.unlike.label", {
+          count: context.affectedAssetCount,
+        }),
+        icon: <HeartOff size={16} />,
+        requiresConfirmation: true,
+        confirmationTitle: t("collections.utilities.liked.bulkActions.unlike.confirmTitle"),
+        confirmationMessage: t("collections.utilities.liked.bulkActions.unlike.confirmMessage", {
+          count: context.affectedAssetCount,
+        }),
+        onRun: async ({ selectedAssetIds, affectedAssetCount, clearSelection }) => {
+          try {
+            await batchUpdateAssets(
+              selectedAssetIds.map((assetId) => ({
+                assetId,
+                updates: { liked: false },
+              })),
+            );
+            await invalidateAssetLists();
+            clearSelection();
+            showMessage(
+              "success",
+              t("collections.utilities.liked.messages.unlikeSuccess", {
+                count: affectedAssetCount,
+              }),
+            );
+          } catch (error) {
+            console.error("Failed to unlike selected assets:", error);
+            showMessage("error", t("collections.utilities.liked.messages.unlikeError"));
+            throw error;
+          }
+        },
+      },
+    ],
+    [batchUpdateAssets, invalidateAssetLists, showMessage, t],
+  );
+
+  return (
+    <AssetsProvider scopeId="collections:liked" syncUrl basePath="/collections/liked">
+      <WorkerProvider>
+        <AssetsGalleryPage
+          title={t("collections.utilities.liked.title")}
+          icon={<Heart className="h-6 w-6 text-primary" strokeWidth={1.5} />}
+          baseFilter={{ liked: true }}
+          viewKey="collections:liked"
+          bulkActions={bulkActions}
+          hiddenBulkActions={HIDDEN_LIKED_BULK_ACTIONS}
+        />
+      </WorkerProvider>
+    </AssetsProvider>
+  );
+};
+
+const Liked = () => {
+  const { t } = useI18n();
+
+  return (
+    <ErrorBoundary
+      FallbackComponent={(props) => (
+        <ErrorFallBack
+          code={500}
+          title={t("assets.errorFallback.something_went_wrong")}
+          {...props}
+        />
+      )}
+    >
+      <LikedContent />
+    </ErrorBoundary>
+  );
+};
+
+export default Liked;

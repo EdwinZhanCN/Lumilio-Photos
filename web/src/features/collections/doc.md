@@ -29,7 +29,10 @@ Each rail has a distinct backend story, and the differences are the point:
   `/api/v1/duplicates/*`.
 - **Utility classifier albums** — not entities at all: [UTILITY_CLASSIFIERS](./utils/utilityClassifiers.ts)
   is a static client table of saved tag-source queries (documents, receipts,
-  illustration) rendered as virtual albums over the asset list.
+  illustration) rendered as virtual albums over the asset list. **Liked**
+  ([Liked](./routes/Liked.tsx)) is the same shape over `{ liked: true }` — no favorites
+  table, just the existing `assets.liked` column filtered through the
+  normal list/search endpoints.
 - **Places / trips** — fully derived client-side. [useCityTrips](./hooks/useCityTrips.ts) segments
   map points by geohashed city + time gaps into trips; there is **no backend
   trip entity**, so a trip is identity-less and editing it is meaningless.
@@ -50,6 +53,12 @@ Each rail has a distinct backend story, and the differences are the point:
   identity uses [encodeTagKey](./utils/tagKey.ts) / [decodeTagKey](./utils/tagKey.ts) over
   `{ tagName, source }`, matching the `tag_name` + `tag_source` filter pair
   `AssetFilterDTO` already supports.
+- **Liked** — the utility rail ([useUtilityShortcuts](./components/utilityShortcuts.ts)) also includes
+  Liked alongside Duplicates and Trash. [Liked](./routes/Liked.tsx) scopes
+  [AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx) to `{ liked: true }` and hides the default
+  `set-liked` bulk menu in favor of a single scoped "remove from Liked"
+  action, since setting liked=true is meaningless on a page already
+  filtered to liked assets.
 
 ## Composition
 

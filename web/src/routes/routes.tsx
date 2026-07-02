@@ -13,6 +13,7 @@ import TripDetails from "@/features/collections/routes/TripDetails";
 import People from "@/features/collections/routes/People";
 import Utilities from "@/features/collections/routes/Utilities";
 import Duplicates from "@/features/collections/routes/Duplicates";
+import Liked from "@/features/collections/routes/Liked";
 import UtilityClassifierAlbum from "@/features/collections/routes/UtilityClassifierAlbum";
 import Folders from "@/features/collections/routes/Folders";
 import FolderDetails from "@/features/collections/routes/FolderDetails";
@@ -144,6 +145,14 @@ export const appRoutes = [
   {
     path: "/collections/trash/:assetId",
     element: <AssetsTrash />,
+  },
+  {
+    path: "/collections/liked",
+    element: <Liked />,
+  },
+  {
+    path: "/collections/liked/:assetId",
+    element: <Liked />,
   },
   {
     path: "/collections/:albumId",
