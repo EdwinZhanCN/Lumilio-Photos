@@ -1383,9 +1383,9 @@
       "searchPlaceholder": "Search people"
     },
     "rebuild": {
-      "action": "Rebuild",
+      "action": "Rebuild face recognition",
       "error": "Failed to rebuild people: {{message}}",
-      "running": "Rebuilding...",
+      "running": "Rebuilding face recognition...",
       "success": "Rebuilt {{clusters}} people clusters from {{faces}} faces ({{noise}} noise)."
     },
     "removeFace": {
