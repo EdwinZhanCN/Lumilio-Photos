@@ -1,5 +1,10 @@
 # Ownership And Repository Scope
 
+> **Completed 2026-07-02.** The model is documented permanently in
+> [`scoping.md`](../../scoping.md). End-to-end validation happens against a
+> reset dev database (migrations were edited in place, per the
+> pre-production policy).
+
 ## Goal
 
 Give Lumilio a final, documented positioning for its two scoping axes —
