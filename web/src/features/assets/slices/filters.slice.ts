@@ -16,6 +16,7 @@ export interface FiltersSlice {
   setFilterLens: (lens: string | undefined) => void;
   setFilterTagNames: (tagNames: string[] | undefined) => void;
   setFilterLocation: (location: FiltersState["location"]) => void;
+  setFilterRepositoryId: (repositoryId: string | undefined) => void;
   resetFilters: () => void;
   batchUpdateFilters: (updates: Partial<FiltersState>) => void;
 }
@@ -38,6 +39,7 @@ export const createFiltersSlice: StateCreator<
     lens: undefined,
     tag_names: undefined,
     location: undefined,
+    repository_id: undefined,
   },
 
   setFiltersEnabled: (enabled) =>
@@ -95,6 +97,11 @@ export const createFiltersSlice: StateCreator<
       state.filters.location = location;
     }),
 
+  setFilterRepositoryId: (repositoryId) =>
+    set((state) => {
+      state.filters.repository_id = repositoryId;
+    }),
+
   resetFilters: () =>
     set((state) => {
       state.filters = {
@@ -109,6 +116,7 @@ export const createFiltersSlice: StateCreator<
         lens: undefined,
         tag_names: undefined,
         location: undefined,
+        repository_id: undefined,
       };
     }),
 

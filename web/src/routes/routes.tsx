@@ -14,6 +14,10 @@ import People from "@/features/collections/routes/People";
 import Utilities from "@/features/collections/routes/Utilities";
 import Duplicates from "@/features/collections/routes/Duplicates";
 import UtilityClassifierAlbum from "@/features/collections/routes/UtilityClassifierAlbum";
+import Folders from "@/features/collections/routes/Folders";
+import FolderDetails from "@/features/collections/routes/FolderDetails";
+import Tags from "@/features/collections/routes/Tags";
+import TagDetails from "@/features/collections/routes/TagDetails";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
@@ -108,6 +112,30 @@ export const appRoutes = [
   {
     path: "/collections/utilities/:classifierSlug/:assetId",
     element: <UtilityClassifierAlbum />,
+  },
+  {
+    path: "/collections/folders",
+    element: <Folders />,
+  },
+  {
+    path: "/collections/folders/:folderKey",
+    element: <FolderDetails />,
+  },
+  {
+    path: "/collections/folders/:folderKey/:assetId",
+    element: <FolderDetails />,
+  },
+  {
+    path: "/collections/tags",
+    element: <Tags />,
+  },
+  {
+    path: "/collections/tags/:tagKey",
+    element: <TagDetails />,
+  },
+  {
+    path: "/collections/tags/:tagKey/:assetId",
+    element: <TagDetails />,
   },
   {
     path: "/collections/trash",

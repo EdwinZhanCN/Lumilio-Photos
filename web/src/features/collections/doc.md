@@ -1,10 +1,13 @@
 # Collections
 
 The hub for every way of *grouping* assets that isn't the raw library
-timeline: albums, places/trips, people, and utility views (classifier albums,
-duplicates). [Collections](./routes/Collections.tsx) is the landing page — four rails, each a
-preview that links to its own full route. Person *detail* lives in the
+timeline: albums, places/trips, people, folders, tags, and utility views
+(classifier albums, duplicates). [Collections](./routes/Collections.tsx) is the landing page —
+rails that each preview a full route. Person *detail* lives in the
 `people` feature; collections only owns the people rail/grid entry into it.
+Folders and tags are reached through [useUtilityShortcuts](./components/utilityShortcuts.ts) alongside
+Duplicates and Trash, since they're browse-only utility-style views, not
+their own hub rail.
 
 ## State
 
@@ -29,6 +32,21 @@ Each rail has a distinct backend story, and the differences are the point:
 - **Places / trips** — fully derived client-side. [useCityTrips](./hooks/useCityTrips.ts) segments
   map points by geohashed city + time gaps into trips; there is **no backend
   trip entity**, so a trip is identity-less and editing it is meaningless.
+- **Folders** — derived from `assets.storage_path` prefixes; there is no
+  folders table. [useFolders](./hooks/useFolders.ts) lists immediate child folders (recursive
+  counts/covers) and [useFolderSummary](./hooks/useFolders.ts) aggregates one folder path, both
+  backed by new `/api/v1/assets/folders*` endpoints. Route identity is a
+  `{ repositoryId, folderPath }` pair packed by [encodeFolderKey](./utils/folderKey.ts) /
+  [decodeFolderKey](./utils/folderKey.ts) into an opaque `:folderKey` segment, since a raw
+  path can contain slashes.
+- **Tags** — a real vocabulary, but grouped by `(tag_id, source)` because the
+  same tag name can carry both manual and AI/system assignments across
+  different assets. [useTagSummaries](./hooks/useTagSummaries.ts) wraps the new
+  `/api/v1/assets/tag-summaries` endpoint (counts/covers), distinct from the
+  autocomplete-only `/api/v1/assets/tags` used by `@`-mentions. Route
+  identity uses [encodeTagKey](./utils/tagKey.ts) / [decodeTagKey](./utils/tagKey.ts) over
+  `{ tagName, source }`, matching the `tag_name` + `tag_source` filter pair
+  `AssetFilterDTO` already supports.
 
 ## Composition
 
@@ -37,22 +55,32 @@ flowchart TD
     HUB["Collections · hub"]
     HUB --> UR["UtilitiesRail"] --> DUP["Duplicates"]
     UR --> UCA["UtilityClassifierAlbum"]
+    UR --> FLD["Folders"] --> FD["FolderDetails"]
+    UR --> TGS["Tags"] --> TD2["TagDetails"]
     HUB --> MR["MapRail"] --> TD["TripDetails"]
     HUB --> AR["AlbumRail"] --> AD["AlbumDetails · hero + edit"]
     HUB --> PR["PeopleRail"] -.->|people feature| PERSON["PersonDetails"]
 ```
 
-[AlbumDetails](./routes/AlbumDetails.tsx), [TripDetails](./routes/TripDetails.tsx) and [UtilityClassifierAlbum](./routes/UtilityClassifierAlbum.tsx)
-all render through the shared [AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx) orchestrator, differing
-only by injection points: album scopes by `{ album_id }`, trip by
-`{ location(bbox), date }`, classifier by `{ tag_name, tag_source }`. Album
-detail carries an *editable* hero — [CollectionHero](@/components/collection) composed with
-[AlbumFormModal](./components/AlbumFormModal.tsx); trips and classifier albums pass no `hero` and expose
-no edit, because they have no entity to mutate. [Duplicates](./routes/Duplicates.tsx) is the one
-review-style page, not an asset grid.
+[Folders](./routes/Folders.tsx) and [Tags](./routes/Tags.tsx) are the list pages that route into
+[FolderDetails](./routes/FolderDetails.tsx) and [TagDetails](./routes/TagDetails.tsx).
+
+[AlbumDetails](./routes/AlbumDetails.tsx), [TripDetails](./routes/TripDetails.tsx), [UtilityClassifierAlbum](./routes/UtilityClassifierAlbum.tsx),
+[FolderDetails](./routes/FolderDetails.tsx) and [TagDetails](./routes/TagDetails.tsx) all render through the shared
+[AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx) orchestrator, differing only by injection points:
+album scopes by `{ album_id }`, trip by `{ location(bbox), date }`, classifier
+and tag detail by `{ tag_name, tag_source }`, folder detail by
+`{ repository_id, folder_path, folder_recursive }`. Album detail carries an
+*editable* hero — [CollectionHero](@/components/collection) composed with [AlbumFormModal](./components/AlbumFormModal.tsx);
+trips, classifier albums, and tag detail pass no `hero` and expose no edit,
+because they have no entity to mutate. [FolderDetails](./routes/FolderDetails.tsx) passes a `hero`
+with breadcrumb/child-folder drilldown chips, not an edit surface — folders
+still aren't a mutable entity. [Duplicates](./routes/Duplicates.tsx) is the one review-style
+page, not an asset grid.
 
 ## Decisions
 
 Editing is modal-only — [AlbumFormModal](./components/AlbumFormModal.tsx) both creates and edits albums
-over a shared modal shell, with no inline editing. Trips and classifier albums
-expose no edit affordance by design: they have no entity to mutate.
+over a shared modal shell, with no inline editing. Trips, classifier albums,
+folders, and tags expose no edit affordance by design: they have no entity to
+mutate (or, for tags, mutation is out of scope for v1 per the exec plan).

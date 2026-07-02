@@ -116,6 +116,12 @@ type AssetService interface {
 	// by tsquery matching. Rankings are the retrievers' own orders.
 	SearchAssetIDsSemantic(ctx context.Context, query string, strictness aggregatesearch.SetStrictness, maxResults int) ([]uuid.UUID, aggregatesearch.SetMeta, error)
 	SearchAssetIDsOCR(ctx context.Context, query string, maxResults int) ([]uuid.UUID, error)
+
+	// Folders and tags are derived/vocabulary collection views (no folder
+	// entity exists; "folders" come from assets.storage_path prefixes).
+	ListFolderSummaries(ctx context.Context, ownerID *int32, repositoryID *string, parentPath string) ([]FolderSummary, error)
+	GetFolderSummary(ctx context.Context, ownerID *int32, repositoryID string, folderPath string) (FolderSummary, error)
+	ListTagSummaries(ctx context.Context, ownerID *int32, repositoryID *string, source *string, query *string, limit, offset int) ([]TagSummary, error)
 }
 
 // QueryAssetsParams contains all parameters for the unified asset query
@@ -142,6 +148,8 @@ type QueryAssetsParams struct {
 	TagName          *string
 	TagSource        *string
 	TagNames         []string
+	FolderPath       *string
+	FolderRecursive  *bool
 	LocationNorth    *float64
 	LocationSouth    *float64
 	LocationEast     *float64
@@ -1491,6 +1499,8 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		TagName:          params.TagName,
 		TagSource:        params.TagSource,
 		TagNames:         params.TagNames,
+		FolderPath:       params.FolderPath,
+		FolderRecursive:  params.FolderRecursive,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1523,6 +1533,8 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		TagName:          params.TagName,
 		TagSource:        params.TagSource,
 		TagNames:         params.TagNames,
+		FolderPath:       params.FolderPath,
+		FolderRecursive:  params.FolderRecursive,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
@@ -1930,6 +1942,8 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedP
 	out.TagName = params.TagName
 	out.TagNames = params.TagNames
 	out.TagSource = params.TagSource
+	out.FolderPath = params.FolderPath
+	out.FolderRecursive = params.FolderRecursive
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
 		if parsed, err := uuid.Parse(strings.TrimSpace(*params.RepositoryID)); err == nil {
 			out.RepositoryID = pgtype.UUID{Bytes: parsed, Valid: true}

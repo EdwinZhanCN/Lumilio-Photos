@@ -51,10 +51,15 @@ type AssetControllerInterface interface {
 	GetLikedAssets(c *gin.Context)           // GET /assets/liked - Get liked assets
 
 	// Tag management operations
-	GetAssetTags(c *gin.Context)   // GET    /assets/:id/tags - List tags on an asset
-	AddAssetTag(c *gin.Context)    // POST   /assets/:id/tags - Add a manual tag to an asset
-	RemoveAssetTag(c *gin.Context) // DELETE /assets/:id/tags/:tagId - Remove a tag from an asset
-	ListTags(c *gin.Context)       // GET    /assets/tags - List/search tag definitions
+	GetAssetTags(c *gin.Context)    // GET    /assets/:id/tags - List tags on an asset
+	AddAssetTag(c *gin.Context)     // POST   /assets/:id/tags - Add a manual tag to an asset
+	RemoveAssetTag(c *gin.Context)  // DELETE /assets/:id/tags/:tagId - Remove a tag from an asset
+	ListTags(c *gin.Context)        // GET    /assets/tags - List/search tag definitions
+	GetTagSummaries(c *gin.Context) // GET   /assets/tag-summaries - Browsable tag vocabulary with counts/covers
+
+	// Folder collection view (derived from storage_path, no folders table)
+	GetFolders(c *gin.Context)       // GET /assets/folders - List immediate child folders under a parent path
+	GetFolderSummary(c *gin.Context) // GET /assets/folders/summary - Aggregate stats for one folder path
 
 	// Reprocessing operations
 	ReprocessAsset(c *gin.Context) // POST /assets/:id/reprocess - Reprocess failed or warning assets
@@ -411,9 +416,14 @@ func NewRouter(
 
 			// Tag management routes
 			assets.GET("/tags", assetController.ListTags)
+			assets.GET("/tag-summaries", assetController.GetTagSummaries)
 			assets.GET("/:id/tags", assetController.GetAssetTags)
 			assets.POST("/:id/tags", assetController.AddAssetTag)
 			assets.DELETE("/:id/tags/:tagId", assetController.RemoveAssetTag)
+
+			// Folder collection view routes (derived from storage_path)
+			assets.GET("/folders", assetController.GetFolders)
+			assets.GET("/folders/summary", assetController.GetFolderSummary)
 
 			// Stack routes. Reads use optional auth (handler enforces
 			// per-asset ownership); mutations require authentication.

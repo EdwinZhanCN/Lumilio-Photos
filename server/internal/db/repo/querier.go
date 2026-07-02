@@ -271,6 +271,17 @@ type Querier interface {
 	GetFacesByExpression(ctx context.Context, arg GetFacesByExpressionParams) ([]FaceItem, error)
 	// 获取焦距分布统计
 	GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]GetFocalLengthDistributionRow, error)
+	// Folder browsing has no dedicated table: "folders" are derived from the
+	// repository-relative prefix of assets.storage_path. All queries here treat
+	// storage_path as relative (see assets_repository_id_storage_path_key) and
+	// must never expose repositories.path (the absolute host path).
+	// Lists immediate child folders of parent_path (recursive descendant
+	// counts/covers). Excludes internal .lumilio paths and any asset that sits
+	// directly in parent_path (files, not folders).
+	GetFolderChildSummaries(ctx context.Context, arg GetFolderChildSummariesParams) ([]GetFolderChildSummariesRow, error)
+	// Aggregate stats for one folder path (recursive descendants), used for the
+	// folder detail header/hero.
+	GetFolderSummary(ctx context.Context, arg GetFolderSummaryParams) (GetFolderSummaryRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
 	GetIncrementalFaceNeighbors(ctx context.Context, arg GetIncrementalFaceNeighborsParams) ([]GetIncrementalFaceNeighborsRow, error)
 	GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error)
@@ -325,6 +336,11 @@ type Querier interface {
 	GetSystemState(ctx context.Context) (SystemState, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
+	// Browsable tag vocabulary with counts/cover, distinct from
+	// SearchTagsByName (definition-only autocomplete). Groups by (tag_id,
+	// source) because the same tag_id can carry manual assignments on some
+	// assets and AI/system assignments on others.
+	GetTagSummaries(ctx context.Context, arg GetTagSummariesParams) ([]GetTagSummariesRow, error)
 	GetTagsByCategory(ctx context.Context, category *string) ([]Tag, error)
 	GetThumbnailByAssetAndSize(ctx context.Context, arg GetThumbnailByAssetAndSizeParams) (Thumbnail, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error)

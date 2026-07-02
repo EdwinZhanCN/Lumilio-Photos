@@ -304,7 +304,7 @@ SET
     is_confirmed = true,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $2
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type RenameFaceClusterParams struct {
@@ -322,10 +322,10 @@ func (q *Queries) RenameFaceCluster(ctx context.Context, arg RenameFaceClusterPa
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -337,7 +337,7 @@ SET
     hidden_at = CASE WHEN $1 THEN CURRENT_TIMESTAMP ELSE NULL END,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $2
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type SetFaceClusterHiddenParams struct {
@@ -355,10 +355,10 @@ func (q *Queries) SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHi
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -370,7 +370,7 @@ SET
     confidence_score = $2,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $3
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type UpdateFaceClusterRepresentativeParams struct {
@@ -389,10 +389,10 @@ func (q *Queries) UpdateFaceClusterRepresentative(ctx context.Context, arg Updat
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

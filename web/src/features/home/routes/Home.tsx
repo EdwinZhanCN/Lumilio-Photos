@@ -1,5 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
+import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";
 import SpacetimeMapCard from "../components/SpacetimeMapCard";
@@ -7,14 +8,14 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useLocationClusters } from "../hooks/useLocationClusters";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { AlertTriangleIcon, CameraIcon, HomeIcon, SparklesIcon } from "lucide-react";
 
 function Home() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const displayMode = searchParams.get("tab") === "stats" ? "stats" : "gallery";
 
   const setDisplayMode = (nextMode: "gallery" | "stats") => {
@@ -75,6 +76,7 @@ function Home() {
   return (
     <div className="flex flex-col h-full min-h-0">
       <PageHeader title={t("routes.home")} icon={<HomeIcon className="w-6 h-6 text-primary" />}>
+        <BrowseScopeSelect />
         <div role="tablist" aria-label={t("routes.home")} className="tabs tabs-box">
           <button
             type="button"

@@ -3,10 +3,11 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Album, ArrowRight, LibraryBig, MapPin, Users, Wrench } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionErrorAlert } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { usePeople } from "@/features/people/hooks/usePeople";
 import AlbumRail from "../components/AlbumRail";
 import MapRail from "../components/MapRail";
@@ -22,7 +23,7 @@ function CollectionsContent() {
     { label: t("sidebar.home", "Home"), to: "/" },
     { label: t("sidebar.collections", "Collections") },
   ]);
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const {
     data,
     isPending: isAlbumsLoading,
@@ -47,7 +48,9 @@ function CollectionsContent() {
       <PageHeader
         title={t("routes.collections")}
         icon={<LibraryBig className="h-6 w-6 text-primary" strokeWidth={1.5} />}
-      />
+      >
+        <BrowseScopeSelect />
+      </PageHeader>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">
         <div className="space-y-6">

@@ -4,10 +4,11 @@ import { ErrorBoundary } from "react-error-boundary";
 import { MapIcon } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import MapComponent, { type PhotoLocation } from "@/components/MapComponent";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { useMapPhotoAssets } from "@/features/home/hooks/useMapPhotoAssets";
 import { useLocationClusters } from "@/features/home/hooks/useLocationClusters";
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -20,7 +21,7 @@ function MapViewContent() {
     { label: t("sidebar.collections", "Collections"), to: "/collections" },
     { label: t("collections.sections.places", "Places") },
   ]);
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
 
   const {
     points: mapPoints,
@@ -86,7 +87,9 @@ function MapViewContent() {
       <PageHeader
         title={t("collections.places.mapViewTitle")}
         icon={<MapIcon className="h-6 w-6 text-primary" strokeWidth={1.5} />}
-      />
+      >
+        <BrowseScopeSelect />
+      </PageHeader>
 
       <div className="flex-1 min-h-0 relative">
         <MapComponent

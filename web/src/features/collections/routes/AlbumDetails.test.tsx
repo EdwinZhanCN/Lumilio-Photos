@@ -36,7 +36,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("@/features/settings", () => ({
-  useWorkingRepository: () => ({
+  useBrowseScope: () => ({
     scopedRepositoryId: undefined,
   }),
 }));

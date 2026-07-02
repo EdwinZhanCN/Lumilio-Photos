@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"server/internal/api"
 	"server/internal/api/dto"
@@ -1797,6 +1798,20 @@ func normalizeFilenameOperator(operator string) string {
 	}
 }
 
+// normalizeFolderPath normalizes a repository-relative folder path filter:
+// it converts platform separators to '/', collapses repeated separators via
+// path.Clean, and trims leading/trailing slashes so SQL prefix matching
+// against storage_path is consistent regardless of client input.
+func normalizeFolderPath(folderPath string) string {
+	cleaned := strings.ReplaceAll(folderPath, "\\", "/")
+	cleaned = path.Clean(cleaned)
+	cleaned = strings.Trim(cleaned, "/")
+	if cleaned == "." {
+		return ""
+	}
+	return cleaned
+}
+
 func assetQueryDateLocation(viewerTimeZone string) *time.Location {
 	if strings.TrimSpace(viewerTimeZone) == "" {
 		return time.UTC
@@ -1852,6 +1867,12 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		locationWest = &filter.Location.West
 	}
 
+	var folderPath *string
+	if filter.FolderPath != nil {
+		normalized := normalizeFolderPath(*filter.FolderPath)
+		folderPath = &normalized
+	}
+
 	return service.QueryAssetsParams{
 		Query:            query,
 		SearchType:       searchType,
@@ -1875,6 +1896,8 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		TagSource:        filter.TagSource,
 		TagNames:         filter.TagNames,
 		PersonID:         filter.PersonID,
+		FolderPath:       folderPath,
+		FolderRecursive:  filter.FolderRecursive,
 		LocationNorth:    locationNorth,
 		LocationSouth:    locationSouth,
 		LocationEast:     locationEast,
@@ -2899,6 +2922,156 @@ func (h *AssetHandler) ListTags(c *gin.Context) {
 	}
 
 	api.JSONOK(c, dto.TagListResponseDTO{Tags: items})
+}
+
+// GetTagSummaries returns a browsable, count/cover-enriched tag vocabulary
+// @Summary List tag summaries
+// @Description List manual and AI/system tags with usage counts and covers, for the Tags collection view
+// @Tags assets
+// @Produce json
+// @Param repository_id query string false "Optional repository UUID filter"
+// @Param source query string false "Optional tag source filter (e.g. manual, zeroshot)"
+// @Param q query string false "Search query (substring match on tag name)"
+// @Param limit query int false "Max results" default(50)
+// @Param offset query int false "Result offset" default(0)
+// @Success 200 {object} dto.TagSummaryListResponseDTO "Tag summaries retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/tag-summaries [get]
+func (h *AssetHandler) GetTagSummaries(c *gin.Context) {
+	var repositoryID *string
+	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
+		if _, err := uuid.Parse(rawRepoID); err != nil {
+			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			return
+		}
+		repositoryID = &rawRepoID
+	}
+
+	var source *string
+	if rawSource := strings.TrimSpace(c.Query("source")); rawSource != "" {
+		source = &rawSource
+	}
+
+	var query *string
+	if rawQuery := strings.TrimSpace(c.Query("q")); rawQuery != "" {
+		query = &rawQuery
+	}
+
+	limit, err := parseIntQueryWithRange(c, "limit", 50, 1, 500)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid limit parameter")
+		return
+	}
+	offset, err := parseIntQueryWithRange(c, "offset", 0, 0, 10000000)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid offset parameter")
+		return
+	}
+
+	summaries, err := h.assetService.ListTagSummaries(c.Request.Context(), ownerScopeID(c), repositoryID, source, query, limit, offset)
+	if err != nil {
+		log.Printf("Failed to list tag summaries: %v", err)
+		api.GinInternalError(c, err, "Failed to list tag summaries")
+		return
+	}
+
+	items := make([]dto.TagSummaryDTO, len(summaries))
+	for i, summary := range summaries {
+		items[i] = dto.TagSummaryDTO{
+			TagID:        summary.TagID,
+			TagName:      summary.TagName,
+			Source:       summary.Source,
+			AssetCount:   summary.AssetCount,
+			CoverAssetID: summary.CoverAssetID,
+			LastUsedAt:   summary.LastUsedAt,
+		}
+	}
+	api.JSONOK(c, dto.TagSummaryListResponseDTO{Tags: items})
+}
+
+// GetFolders lists immediate child folders under a repository-relative parent path
+// @Summary List folder summaries
+// @Description List immediate child folders of a repository-relative path, with recursive asset counts and covers, for the Folders collection view
+// @Tags assets
+// @Produce json
+// @Param repository_id query string false "Optional repository UUID filter"
+// @Param path query string false "Repository-relative parent folder path (empty for root)"
+// @Success 200 {object} dto.FolderListResponseDTO "Folder summaries retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/folders [get]
+func (h *AssetHandler) GetFolders(c *gin.Context) {
+	var repositoryID *string
+	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
+		if _, err := uuid.Parse(rawRepoID); err != nil {
+			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			return
+		}
+		repositoryID = &rawRepoID
+	}
+
+	parentPath := normalizeFolderPath(c.Query("path"))
+
+	summaries, err := h.assetService.ListFolderSummaries(c.Request.Context(), ownerScopeID(c), repositoryID, parentPath)
+	if err != nil {
+		log.Printf("Failed to list folder summaries: %v", err)
+		api.GinInternalError(c, err, "Failed to list folder summaries")
+		return
+	}
+
+	items := make([]dto.FolderSummaryDTO, len(summaries))
+	for i, summary := range summaries {
+		items[i] = folderSummaryToDTO(summary)
+	}
+	api.JSONOK(c, dto.FolderListResponseDTO{Folders: items, ParentPath: parentPath})
+}
+
+// GetFolderSummary returns aggregate stats for one repository-relative folder
+// @Summary Get one folder summary
+// @Description Get recursive asset counts, date range, and cover for one repository-relative folder path, for the Folder detail header
+// @Tags assets
+// @Produce json
+// @Param repository_id query string true "Repository UUID"
+// @Param path query string false "Repository-relative folder path (empty for root)"
+// @Success 200 {object} dto.FolderSummaryDTO "Folder summary retrieved successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/folders/summary [get]
+func (h *AssetHandler) GetFolderSummary(c *gin.Context) {
+	repositoryID := strings.TrimSpace(c.Query("repository_id"))
+	if _, err := uuid.Parse(repositoryID); err != nil {
+		api.GinBadRequest(c, err, "Invalid or missing repository_id parameter")
+		return
+	}
+
+	folderPath := normalizeFolderPath(c.Query("path"))
+
+	summary, err := h.assetService.GetFolderSummary(c.Request.Context(), ownerScopeID(c), repositoryID, folderPath)
+	if err != nil {
+		log.Printf("Failed to get folder summary: %v", err)
+		api.GinInternalError(c, err, "Failed to get folder summary")
+		return
+	}
+
+	api.JSONOK(c, folderSummaryToDTO(summary))
+}
+
+func folderSummaryToDTO(summary service.FolderSummary) dto.FolderSummaryDTO {
+	return dto.FolderSummaryDTO{
+		RepositoryID:   summary.RepositoryID,
+		RepositoryName: summary.RepositoryName,
+		FolderPath:     summary.FolderPath,
+		DisplayName:    summary.DisplayName,
+		Depth:          summary.Depth,
+		AssetCount:     summary.AssetCount,
+		PhotoCount:     summary.PhotoCount,
+		VideoCount:     summary.VideoCount,
+		AudioCount:     summary.AudioCount,
+		DateStart:      summary.DateStart,
+		DateEnd:        summary.DateEnd,
+		CoverAssetID:   summary.CoverAssetID,
+	}
 }
 
 // GetAssetsByRating gets assets filtered by rating

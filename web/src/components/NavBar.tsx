@@ -52,11 +52,6 @@ function NavBar() {
               title={selectedRepository?.path}
               onChange={(event) => setWorkingRepositoryId(event.target.value || null)}
             >
-              <option value="">
-                {t("navbar.repository.all", {
-                  defaultValue: "All repositories",
-                })}
-              </option>
               {repositories.map((repository) => (
                 <option key={repository.id} value={repository.id}>
                   {getRepositoryLabel(repository)}

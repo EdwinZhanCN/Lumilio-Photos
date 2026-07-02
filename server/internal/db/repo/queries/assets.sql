@@ -519,6 +519,24 @@ WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (
+    sqlc.narg('folder_path')::text IS NULL
+    OR (
+      CASE
+        WHEN sqlc.narg('folder_path')::text = '' THEN
+          CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN true
+            ELSE position('/' in a.storage_path) = 0
+          END
+        ELSE
+          CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN
+            a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+          ELSE
+            a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+            AND a.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
+          END
+      END
+    )
+  )
+  AND (
     sqlc.narg('tag_name')::text IS NULL
     OR EXISTS (
       SELECT 1
@@ -619,6 +637,24 @@ WITH page_ids AS MATERIALIZED (
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
     AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (
+      sqlc.narg('folder_path')::text IS NULL
+      OR (
+        CASE
+          WHEN sqlc.narg('folder_path')::text = '' THEN
+            CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN true
+              ELSE position('/' in a.storage_path) = 0
+            END
+          ELSE
+            CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN
+              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+            ELSE
+              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+              AND a.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
+            END
+        END
+      )
+    )
     AND (
       sqlc.narg('person_id')::integer IS NULL
       OR EXISTS (
@@ -734,6 +770,24 @@ WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted')::boolean, false)
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (
+    sqlc.narg('folder_path')::text IS NULL
+    OR (
+      CASE
+        WHEN sqlc.narg('folder_path')::text = '' THEN
+          CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN true
+            ELSE position('/' in a.storage_path) = 0
+          END
+        ELSE
+          CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN
+            a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+          ELSE
+            a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+            AND a.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
+          END
+      END
+    )
+  )
+  AND (
     sqlc.narg('person_id')::integer IS NULL
     OR EXISTS (
       SELECT 1
@@ -843,6 +897,24 @@ WITH filtered AS MATERIALIZED (
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
     AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (
+      sqlc.narg('folder_path')::text IS NULL
+      OR (
+        CASE
+          WHEN sqlc.narg('folder_path')::text = '' THEN
+            CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN true
+              ELSE position('/' in a.storage_path) = 0
+            END
+          ELSE
+            CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN
+              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+            ELSE
+              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+              AND a.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
+            END
+        END
+      )
+    )
     AND (
       sqlc.narg('person_id')::integer IS NULL
       OR EXISTS (
@@ -1013,6 +1085,24 @@ WITH filtered AS MATERIALIZED (
     AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
     AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (
+      sqlc.narg('folder_path')::text IS NULL
+      OR (
+        CASE
+          WHEN sqlc.narg('folder_path')::text = '' THEN
+            CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN true
+              ELSE position('/' in a.storage_path) = 0
+            END
+          ELSE
+            CASE WHEN COALESCE(sqlc.narg('folder_recursive')::boolean, true) THEN
+              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+            ELSE
+              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+              AND a.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
+            END
+        END
+      )
+    )
     AND (
       sqlc.narg('person_id')::integer IS NULL
       OR EXISTS (

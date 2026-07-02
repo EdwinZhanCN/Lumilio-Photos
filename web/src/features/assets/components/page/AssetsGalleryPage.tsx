@@ -430,6 +430,7 @@ export function AssetsGalleryPage({
         bulkActions={bulkActions}
         hiddenBulkActions={hiddenBulkActions}
         capabilities={{ showScan: !isPinMode }}
+        scopeControlHidden={baseFilter?.repository_id !== undefined}
       />
 
       {hero}

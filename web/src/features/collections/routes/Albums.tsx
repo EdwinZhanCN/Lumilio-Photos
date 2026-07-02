@@ -5,12 +5,13 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Album, Plus, Trash2, X, SquareMousePointer, AlertTriangle } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { LoadMoreButton } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { $api } from "@/lib/http-commons/queryClient";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { CollectionsProvider, useCollections } from "../CollectionsProvider";
 import AlbumFormModal from "../components/AlbumFormModal";
 import { ImgStackGrid } from "../components/ImgStackGrid";
@@ -26,7 +27,7 @@ function AlbumsContent() {
   ]);
   const queryClient = useQueryClient();
   const showMessage = useMessage();
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const {
     selectedAlbumIds,
     isSelectionMode,
@@ -85,6 +86,7 @@ function AlbumsContent() {
         title={t("collections.sections.albums")}
         icon={<Album className="h-6 w-6 text-primary" strokeWidth={1.5} />}
       >
+        <BrowseScopeSelect />
         <div className="flex min-h-[32px] items-center gap-2">
           {isSelectionMode ? (
             <>

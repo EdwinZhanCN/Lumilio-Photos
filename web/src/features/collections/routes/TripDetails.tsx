@@ -8,7 +8,7 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { CityTripGroup } from "../hooks/useCityTrips";
 import { useCityTrips } from "../hooks/useCityTrips";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 
 const TripDetails = () => {
   const { t } = useI18n();
@@ -17,7 +17,7 @@ const TripDetails = () => {
     assetId: string;
   }>();
   const location = useLocation();
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const { trips } = useCityTrips({ repositoryId: scopedRepositoryId });
 
   // Try to get trip from route state first, fall back to lookup by id

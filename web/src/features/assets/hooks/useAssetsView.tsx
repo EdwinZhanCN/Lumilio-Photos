@@ -17,7 +17,7 @@ import { selectFilterAsAssetFilter, selectFiltersEnabled } from "../slices/filte
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { Asset } from "@/lib/assets/types";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { flattenAssetGroups, getViewerTimeZone } from "../utils/assetGroups";
 import {
   browseGroupsFromQueryLikePage,
@@ -167,7 +167,7 @@ export const normalizeSearchSortBy = (
 };
 
 const useDefinitionFilter = (definition: AssetViewDefinition): AssetFilter => {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
 
   return useMemo(() => {
     const mergedFilter: AssetFilter = {
