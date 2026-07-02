@@ -61,16 +61,18 @@ const countDuplicateGroups = `-- name: CountDuplicateGroups :one
 SELECT COUNT(*) AS count
 FROM duplicate_groups g
 WHERE ($1::uuid IS NULL OR g.repository_id = $1)
-  AND ($2::text IS NULL OR g.status = $2)
+  AND ($2::integer IS NULL OR g.owner_id = $2)
+  AND ($3::text IS NULL OR g.status = $3)
 `
 
 type CountDuplicateGroupsParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
 	Status       *string     `db:"status" json:"status"`
 }
 
 func (q *Queries) CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countDuplicateGroups, arg.RepositoryID, arg.Status)
+	row := q.db.QueryRow(ctx, countDuplicateGroups, arg.RepositoryID, arg.OwnerID, arg.Status)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -78,22 +80,24 @@ func (q *Queries) CountDuplicateGroups(ctx context.Context, arg CountDuplicateGr
 
 const createDuplicateGroup = `-- name: CreateDuplicateGroup :one
 INSERT INTO duplicate_groups (
-    repository_id, method, status, asset_count, total_size,
+    repository_id, owner_id, method, status, asset_count, total_size,
     recommended_keeper_asset_id, detection_version
 ) VALUES (
     $1,
     $2,
-    'pending',
     $3,
+    'pending',
     $4,
     $5,
-    $6
+    $6,
+    $7
 )
 RETURNING group_id
 `
 
 type CreateDuplicateGroupParams struct {
 	RepositoryID             pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID                  *int32      `db:"owner_id" json:"owner_id"`
 	Method                   string      `db:"method" json:"method"`
 	AssetCount               int32       `db:"asset_count" json:"asset_count"`
 	TotalSize                int64       `db:"total_size" json:"total_size"`
@@ -104,6 +108,7 @@ type CreateDuplicateGroupParams struct {
 func (q *Queries) CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, createDuplicateGroup,
 		arg.RepositoryID,
+		arg.OwnerID,
 		arg.Method,
 		arg.AssetCount,
 		arg.TotalSize,
@@ -209,6 +214,7 @@ const getDuplicateGroupByID = `-- name: GetDuplicateGroupByID :one
 SELECT
     g.group_id,
     g.repository_id,
+    g.owner_id,
     g.method,
     g.status,
     g.asset_count,
@@ -230,6 +236,7 @@ func (q *Queries) GetDuplicateGroupByID(ctx context.Context, groupID pgtype.UUID
 	err := row.Scan(
 		&i.GroupID,
 		&i.RepositoryID,
+		&i.OwnerID,
 		&i.Method,
 		&i.Status,
 		&i.AssetCount,
@@ -309,7 +316,13 @@ SELECT
     MAX(g.detected_at)::timestamptz AS last_detected_at
 FROM duplicate_groups g
 WHERE ($1::uuid IS NULL OR g.repository_id = $1)
+  AND ($2::integer IS NULL OR g.owner_id = $2)
 `
+
+type GetDuplicateSummaryParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+}
 
 type GetDuplicateSummaryRow struct {
 	PendingGroups     int64              `db:"pending_groups" json:"pending_groups"`
@@ -322,8 +335,8 @@ type GetDuplicateSummaryRow struct {
 }
 
 // Top-level metrics for the Utilities rail card.
-func (q *Queries) GetDuplicateSummary(ctx context.Context, repositoryID pgtype.UUID) (GetDuplicateSummaryRow, error) {
-	row := q.db.QueryRow(ctx, getDuplicateSummary, repositoryID)
+func (q *Queries) GetDuplicateSummary(ctx context.Context, arg GetDuplicateSummaryParams) (GetDuplicateSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getDuplicateSummary, arg.RepositoryID, arg.OwnerID)
 	var i GetDuplicateSummaryRow
 	err := row.Scan(
 		&i.PendingGroups,
@@ -338,7 +351,7 @@ func (q *Queries) GetDuplicateSummary(ctx context.Context, repositoryID pgtype.U
 }
 
 const getExactDuplicateCandidates = `-- name: GetExactDuplicateCandidates :many
-SELECT a.asset_id, a.hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
+SELECT a.asset_id, a.owner_id, a.hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
@@ -350,15 +363,17 @@ WHERE a.is_deleted = false
       AND b.type = 'PHOTO'
       AND b.hash IS NOT NULL
       AND b.repository_id = a.repository_id
+      AND b.owner_id IS NOT DISTINCT FROM a.owner_id
       AND b.hash = a.hash
       AND b.file_size = a.file_size
       AND b.asset_id <> a.asset_id
   )
-ORDER BY a.hash, a.file_size, a.asset_id
+ORDER BY a.owner_id, a.hash, a.file_size, a.asset_id
 `
 
 type GetExactDuplicateCandidatesRow struct {
 	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
 	Hash             *string            `db:"hash" json:"hash"`
 	FileSize         int64              `db:"file_size" json:"file_size"`
 	OriginalFilename string             `db:"original_filename" json:"original_filename"`
@@ -367,9 +382,10 @@ type GetExactDuplicateCandidatesRow struct {
 	Rating           *int32             `db:"rating" json:"rating"`
 }
 
-// Returns assets in a repository that share the exact same (hash, file_size).
-// Only photos are considered, and only non-deleted assets. Results are ordered
-// so members of the same duplicate set are adjacent.
+// Returns assets in a repository that share the exact same (hash, file_size)
+// with at least one other asset of the same owner. Only photos are considered,
+// and only non-deleted assets. Results are ordered so members of the same
+// duplicate set (owner included in the grouping key) are adjacent.
 func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID pgtype.UUID) ([]GetExactDuplicateCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, getExactDuplicateCandidates, repositoryID)
 	if err != nil {
@@ -381,6 +397,7 @@ func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID 
 		var i GetExactDuplicateCandidatesRow
 		if err := rows.Scan(
 			&i.AssetID,
+			&i.OwnerID,
 			&i.Hash,
 			&i.FileSize,
 			&i.OriginalFilename,
@@ -545,6 +562,7 @@ const listDuplicateGroups = `-- name: ListDuplicateGroups :many
 SELECT
     g.group_id,
     g.repository_id,
+    g.owner_id,
     g.method,
     g.status,
     g.asset_count,
@@ -558,25 +576,30 @@ SELECT
     g.updated_at
 FROM duplicate_groups g
 WHERE ($1::uuid IS NULL OR g.repository_id = $1)
-  AND ($2::text IS NULL OR g.status = $2)
+  AND ($2::integer IS NULL OR g.owner_id = $2)
+  AND ($3::text IS NULL OR g.status = $3)
 ORDER BY
     CASE WHEN g.status = 'pending' THEN g.detected_at ELSE g.resolved_at END DESC NULLS LAST,
     g.group_id DESC
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListDuplicateGroupsParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
 	Status       *string     `db:"status" json:"status"`
 	Offset       int32       `db:"offset" json:"offset"`
 	Limit        int32       `db:"limit" json:"limit"`
 }
 
-// Paginated list of duplicate groups for the given repository and status.
+// Paginated list of duplicate groups for the given repository, owner, and
+// status. owner_id NULL means no owner scope (admin); non-admin callers pass
+// their own ID and never see NULL-owner or foreign groups.
 // Pending groups are returned newest-first; resolved groups by resolution time.
 func (q *Queries) ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error) {
 	rows, err := q.db.Query(ctx, listDuplicateGroups,
 		arg.RepositoryID,
+		arg.OwnerID,
 		arg.Status,
 		arg.Offset,
 		arg.Limit,
@@ -591,6 +614,7 @@ func (q *Queries) ListDuplicateGroups(ctx context.Context, arg ListDuplicateGrou
 		if err := rows.Scan(
 			&i.GroupID,
 			&i.RepositoryID,
+			&i.OwnerID,
 			&i.Method,
 			&i.Status,
 			&i.AssetCount,
@@ -614,7 +638,7 @@ func (q *Queries) ListDuplicateGroups(ctx context.Context, arg ListDuplicateGrou
 }
 
 const listPHashEmbeddingsForRepository = `-- name: ListPHashEmbeddingsForRepository :many
-SELECT a.asset_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+SELECT a.asset_id, a.owner_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
 FROM assets a
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
@@ -626,6 +650,7 @@ WHERE a.is_deleted = false
 
 type ListPHashEmbeddingsForRepositoryRow struct {
 	AssetID    pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	OwnerID    *int32             `db:"owner_id" json:"owner_id"`
 	FileSize   int64              `db:"file_size" json:"file_size"`
 	TakenTime  pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
 	UploadTime pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
@@ -634,7 +659,8 @@ type ListPHashEmbeddingsForRepositoryRow struct {
 }
 
 // Loads pHash embeddings for every non-deleted photo in a repository so the
-// service layer can build a similarity graph in-memory.
+// service layer can build a similarity graph in-memory. owner_id is included
+// because duplicate edges never cross owners.
 func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]ListPHashEmbeddingsForRepositoryRow, error) {
 	rows, err := q.db.Query(ctx, listPHashEmbeddingsForRepository, repositoryID)
 	if err != nil {
@@ -646,6 +672,7 @@ func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, reposito
 		var i ListPHashEmbeddingsForRepositoryRow
 		if err := rows.Scan(
 			&i.AssetID,
+			&i.OwnerID,
 			&i.FileSize,
 			&i.TakenTime,
 			&i.UploadTime,

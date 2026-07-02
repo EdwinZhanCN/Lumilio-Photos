@@ -280,6 +280,7 @@ type CloudSyncFile struct {
 type DuplicateGroup struct {
 	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
 	RepositoryID             pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	OwnerID                  *int32             `db:"owner_id" json:"owner_id"`
 	Method                   string             `db:"method" json:"method"`
 	Status                   string             `db:"status" json:"status"`
 	AssetCount               int32              `db:"asset_count" json:"asset_count"`

@@ -66,20 +66,25 @@ type DuplicateService interface {
 	DetectForRepository(ctx context.Context, repositoryID uuid.UUID) (DuplicateDetectionResult, error)
 
 	// GetSummary returns the metrics shown on the Utilities Rail card.
-	GetSummary(ctx context.Context, repositoryID *uuid.UUID) (DuplicateSummary, error)
+	// ownerID scopes the metrics to one owner's groups; nil means no owner
+	// scope (admin).
+	GetSummary(ctx context.Context, repositoryID *uuid.UUID, ownerID *int32) (DuplicateSummary, error)
 
 	// ListGroups returns paginated duplicate groups for a repository/status.
 	ListGroups(ctx context.Context, params ListDuplicateGroupsParams) (ListDuplicateGroupsResult, error)
 
 	// GetGroup loads a single duplicate group with all assets and edges.
-	GetGroup(ctx context.Context, groupID uuid.UUID) (DuplicateGroupDetail, error)
+	// requireOwner, when non-nil, makes foreign (or NULL-owner) groups return
+	// ErrDuplicateGroupNotFound so their existence is not leaked.
+	GetGroup(ctx context.Context, groupID uuid.UUID, requireOwner *int32) (DuplicateGroupDetail, error)
 
 	// MergeGroup is the Apple Photos-style merge: keeper retains visual + selected
 	// metadata is unioned onto keeper, and all other duplicates are soft deleted.
 	MergeGroup(ctx context.Context, params MergeGroupParams) (MergeGroupResult, error)
 
 	// DismissGroup marks a group as user-acknowledged and not a duplicate.
-	DismissGroup(ctx context.Context, groupID uuid.UUID) error
+	// requireOwner follows the same semantics as GetGroup.
+	DismissGroup(ctx context.Context, groupID uuid.UUID, requireOwner *int32) error
 }
 
 // DuplicateDetectionResult is returned after a detection run finishes.
@@ -106,6 +111,7 @@ type DuplicateSummary struct {
 // ListDuplicateGroupsParams is the input for ListGroups.
 type ListDuplicateGroupsParams struct {
 	RepositoryID *uuid.UUID
+	OwnerID      *int32 // nil = no owner scope (admin)
 	Status       string
 	Limit        int
 	Offset       int
@@ -156,6 +162,7 @@ type MergeGroupParams struct {
 	KeeperAssetID     uuid.UUID
 	DuplicateAssetIDs []uuid.UUID // optional; defaults to all non-keeper members
 	Policy            MergeMetadataPolicy
+	RequireOwner      *int32 // non-nil: foreign/NULL-owner groups are treated as not found
 }
 
 // MergeGroupResult summarizes a merge for the API caller.
@@ -203,12 +210,22 @@ func NewDuplicateService(
 
 type detectionAsset struct {
 	id         uuid.UUID
+	owner      *int32
 	fileSize   int64
 	takenTime  time.Time
 	uploadTime time.Time
 	rating     int32
 	phash      uint64
 	hasPHash   bool
+}
+
+// detectionOwnerKey collapses a nullable owner into a comparable grouping key.
+// NULL owners group together (and the resulting group stays admin-only).
+func detectionOwnerKey(owner *int32) int64 {
+	if owner == nil {
+		return -1
+	}
+	return int64(*owner)
 }
 
 type duplicateEdge struct {
@@ -252,6 +269,7 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 			da = &detectionAsset{id: id}
 			assets[id] = da
 		}
+		da.owner = row.OwnerID
 		da.fileSize = row.FileSize
 		da.takenTime = timestamptzOrZero(row.TakenTime)
 		da.uploadTime = timestamptzOrZero(row.UploadTime)
@@ -265,6 +283,9 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 		if da == nil {
 			da = &detectionAsset{id: id}
 			assets[id] = da
+		}
+		if da.owner == nil {
+			da.owner = row.OwnerID
 		}
 		if da.fileSize == 0 {
 			da.fileSize = row.FileSize
@@ -376,8 +397,11 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 			totalSize += m.fileSize
 		}
 
+		// Edges never cross owners, so every member of a component shares
+		// the same owner; stamp it as the group owner (NULL = admin-only).
 		groupID, err := txQueries.CreateDuplicateGroup(ctx, repo.CreateDuplicateGroupParams{
 			RepositoryID:             pgRepoID,
+			OwnerID:                  c.members[0].owner,
 			Method:                   method,
 			AssetCount:               int32(len(c.members)),
 			TotalSize:                totalSize,
@@ -434,23 +458,25 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 	return result, nil
 }
 
-// buildExactEdges turns rows sharing (hash, file_size) into edges. To keep the
-// edge set linear we connect each non-first row to the first row in the run;
-// union-find handles full connectivity. Pairs in the same photo stack are skipped.
+// buildExactEdges turns rows sharing (owner, hash, file_size) into edges. To
+// keep the edge set linear we connect each non-first row to the first row in
+// the run; union-find handles full connectivity. Owner is part of the grouping
+// key so a group never spans owners. Pairs in the same photo stack are skipped.
 func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow, stackOf map[uuid.UUID]uuid.UUID) []duplicateEdge {
 	if len(rows) == 0 {
 		return nil
 	}
 	var edges []duplicateEdge
 	type key struct {
-		hash string
-		size int64
+		owner int64
+		hash  string
+		size  int64
 	}
 	var anchor uuid.UUID
 	var have bool
 	var prev key
 	for _, r := range rows {
-		k := key{hash: derefString(r.Hash), size: r.FileSize}
+		k := key{owner: detectionOwnerKey(r.OwnerID), hash: derefString(r.Hash), size: r.FileSize}
 		id := pgToUUID(r.AssetID)
 		if !have || k != prev {
 			anchor = id
@@ -476,11 +502,13 @@ func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow, stackOf map[uui
 // prefix bucket as a cheap candidate filter: any two 64-bit hashes within k
 // bits must share at least one 16-bit chunk identical when k <= 6 (pigeonhole
 // on 4 chunks of 16 bits). For larger thresholds this filter degrades, which
-// is fine — we still verify distance below. Pairs in the same photo stack are skipped.
+// is fine — we still verify distance below. Pairs in the same photo stack or
+// with different owners are skipped: duplicate edges never cross owners.
 func buildPHashEdges(rows []repo.ListPHashEmbeddingsForRepositoryRow, stackOf map[uuid.UUID]uuid.UUID) []duplicateEdge {
 	type item struct {
-		id   uuid.UUID
-		hash uint64
+		id    uuid.UUID
+		owner int64
+		hash  uint64
 	}
 	items := make([]item, 0, len(rows))
 	for _, r := range rows {
@@ -491,7 +519,7 @@ func buildPHashEdges(rows []repo.ListPHashEmbeddingsForRepositoryRow, stackOf ma
 		if !ok {
 			continue
 		}
-		items = append(items, item{id: pgToUUID(r.AssetID), hash: h})
+		items = append(items, item{id: pgToUUID(r.AssetID), owner: detectionOwnerKey(r.OwnerID), hash: h})
 	}
 	if len(items) < 2 {
 		return nil
@@ -515,6 +543,9 @@ func buildPHashEdges(rows []repo.ListPHashEmbeddingsForRepositoryRow, stackOf ma
 			}
 			for i := 0; i < len(idxs); i++ {
 				for j := i + 1; j < len(idxs); j++ {
+					if items[idxs[i]].owner != items[idxs[j]].owner {
+						continue
+					}
 					a, b := items[idxs[i]].id, items[idxs[j]].id
 					if a == b {
 						continue
@@ -631,9 +662,11 @@ func orderEdge(a, b uuid.UUID) (uuid.UUID, uuid.UUID) {
 // Read APIs
 // ----------------------------------------------------------------------------
 
-func (s *duplicateService) GetSummary(ctx context.Context, repositoryID *uuid.UUID) (DuplicateSummary, error) {
-	pgRepo := optionalUUID(repositoryID)
-	row, err := s.queries.GetDuplicateSummary(ctx, pgRepo)
+func (s *duplicateService) GetSummary(ctx context.Context, repositoryID *uuid.UUID, ownerID *int32) (DuplicateSummary, error) {
+	row, err := s.queries.GetDuplicateSummary(ctx, repo.GetDuplicateSummaryParams{
+		RepositoryID: optionalUUID(repositoryID),
+		OwnerID:      ownerID,
+	})
 	if err != nil {
 		return DuplicateSummary{}, err
 	}
@@ -671,6 +704,7 @@ func (s *duplicateService) ListGroups(ctx context.Context, params ListDuplicateG
 
 	groups, err := s.queries.ListDuplicateGroups(ctx, repo.ListDuplicateGroupsParams{
 		RepositoryID: pgRepo,
+		OwnerID:      params.OwnerID,
 		Status:       pgStatus,
 		Limit:        int32(limit),
 		Offset:       int32(offset),
@@ -680,6 +714,7 @@ func (s *duplicateService) ListGroups(ctx context.Context, params ListDuplicateG
 	}
 	total, err := s.queries.CountDuplicateGroups(ctx, repo.CountDuplicateGroupsParams{
 		RepositoryID: pgRepo,
+		OwnerID:      params.OwnerID,
 		Status:       pgStatus,
 	})
 	if err != nil {
@@ -715,7 +750,7 @@ func (s *duplicateService) ListGroups(ctx context.Context, params ListDuplicateG
 	return result, nil
 }
 
-func (s *duplicateService) GetGroup(ctx context.Context, groupID uuid.UUID) (DuplicateGroupDetail, error) {
+func (s *duplicateService) GetGroup(ctx context.Context, groupID uuid.UUID, requireOwner *int32) (DuplicateGroupDetail, error) {
 	pgID := uuidToPG(groupID)
 	group, err := s.queries.GetDuplicateGroupByID(ctx, pgID)
 	if err != nil {
@@ -723,6 +758,9 @@ func (s *duplicateService) GetGroup(ctx context.Context, groupID uuid.UUID) (Dup
 			return DuplicateGroupDetail{}, ErrDuplicateGroupNotFound
 		}
 		return DuplicateGroupDetail{}, err
+	}
+	if !duplicateGroupOwnedBy(group, requireOwner) {
+		return DuplicateGroupDetail{}, ErrDuplicateGroupNotFound
 	}
 	assets, err := s.queries.GetDuplicateGroupAssets(ctx, pgID)
 	if err != nil {
@@ -751,6 +789,9 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 			return MergeGroupResult{}, ErrDuplicateGroupNotFound
 		}
 		return MergeGroupResult{}, err
+	}
+	if !duplicateGroupOwnedBy(group, params.RequireOwner) {
+		return MergeGroupResult{}, ErrDuplicateGroupNotFound
 	}
 	if group.Status != DuplicateStatusPending {
 		return MergeGroupResult{}, ErrDuplicateGroupAlreadyResolved
@@ -912,7 +953,7 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 	}, nil
 }
 
-func (s *duplicateService) DismissGroup(ctx context.Context, groupID uuid.UUID) error {
+func (s *duplicateService) DismissGroup(ctx context.Context, groupID uuid.UUID, requireOwner *int32) error {
 	pgID := uuidToPG(groupID)
 	group, err := s.queries.GetDuplicateGroupByID(ctx, pgID)
 	if err != nil {
@@ -921,10 +962,23 @@ func (s *duplicateService) DismissGroup(ctx context.Context, groupID uuid.UUID) 
 		}
 		return err
 	}
+	if !duplicateGroupOwnedBy(group, requireOwner) {
+		return ErrDuplicateGroupNotFound
+	}
 	if group.Status != DuplicateStatusPending {
 		return ErrDuplicateGroupAlreadyResolved
 	}
 	return s.queries.MarkDuplicateGroupDismissed(ctx, pgID)
+}
+
+// duplicateGroupOwnedBy applies the whole-entity ownership rule: a nil
+// requirement (admin) passes everything; otherwise the group's owner must
+// match exactly, and NULL-owner groups stay admin-only.
+func duplicateGroupOwnedBy(group repo.DuplicateGroup, requireOwner *int32) bool {
+	if requireOwner == nil {
+		return true
+	}
+	return group.OwnerID != nil && *group.OwnerID == *requireOwner
 }
 
 // computeKeeperPreferences gathers MAX(rating), OR(liked), and a description

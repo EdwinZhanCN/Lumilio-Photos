@@ -12,10 +12,11 @@ WHERE a.repository_id = sqlc.arg('repository_id')
   AND a.is_deleted = false;
 
 -- name: GetExactDuplicateCandidates :many
--- Returns assets in a repository that share the exact same (hash, file_size).
--- Only photos are considered, and only non-deleted assets. Results are ordered
--- so members of the same duplicate set are adjacent.
-SELECT a.asset_id, a.hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
+-- Returns assets in a repository that share the exact same (hash, file_size)
+-- with at least one other asset of the same owner. Only photos are considered,
+-- and only non-deleted assets. Results are ordered so members of the same
+-- duplicate set (owner included in the grouping key) are adjacent.
+SELECT a.asset_id, a.owner_id, a.hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
@@ -27,16 +28,18 @@ WHERE a.is_deleted = false
       AND b.type = 'PHOTO'
       AND b.hash IS NOT NULL
       AND b.repository_id = a.repository_id
+      AND b.owner_id IS NOT DISTINCT FROM a.owner_id
       AND b.hash = a.hash
       AND b.file_size = a.file_size
       AND b.asset_id <> a.asset_id
   )
-ORDER BY a.hash, a.file_size, a.asset_id;
+ORDER BY a.owner_id, a.hash, a.file_size, a.asset_id;
 
 -- name: ListPHashEmbeddingsForRepository :many
 -- Loads pHash embeddings for every non-deleted photo in a repository so the
--- service layer can build a similarity graph in-memory.
-SELECT a.asset_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+-- service layer can build a similarity graph in-memory. owner_id is included
+-- because duplicate edges never cross owners.
+SELECT a.asset_id, a.owner_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
 FROM assets a
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
@@ -70,10 +73,11 @@ WHERE repository_id = sqlc.arg('repository_id')
 
 -- name: CreateDuplicateGroup :one
 INSERT INTO duplicate_groups (
-    repository_id, method, status, asset_count, total_size,
+    repository_id, owner_id, method, status, asset_count, total_size,
     recommended_keeper_asset_id, detection_version
 ) VALUES (
     sqlc.arg('repository_id'),
+    sqlc.narg('owner_id'),
     sqlc.arg('method'),
     'pending',
     sqlc.arg('asset_count'),
@@ -102,6 +106,7 @@ SET distance = EXCLUDED.distance,
 SELECT
     g.group_id,
     g.repository_id,
+    g.owner_id,
     g.method,
     g.status,
     g.asset_count,
@@ -117,11 +122,14 @@ FROM duplicate_groups g
 WHERE g.group_id = sqlc.arg('group_id');
 
 -- name: ListDuplicateGroups :many
--- Paginated list of duplicate groups for the given repository and status.
+-- Paginated list of duplicate groups for the given repository, owner, and
+-- status. owner_id NULL means no owner scope (admin); non-admin callers pass
+-- their own ID and never see NULL-owner or foreign groups.
 -- Pending groups are returned newest-first; resolved groups by resolution time.
 SELECT
     g.group_id,
     g.repository_id,
+    g.owner_id,
     g.method,
     g.status,
     g.asset_count,
@@ -135,6 +143,7 @@ SELECT
     g.updated_at
 FROM duplicate_groups g
 WHERE (sqlc.narg('repository_id')::uuid IS NULL OR g.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR g.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('status')::text IS NULL OR g.status = sqlc.narg('status'))
 ORDER BY
     CASE WHEN g.status = 'pending' THEN g.detected_at ELSE g.resolved_at END DESC NULLS LAST,
@@ -145,6 +154,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 SELECT COUNT(*) AS count
 FROM duplicate_groups g
 WHERE (sqlc.narg('repository_id')::uuid IS NULL OR g.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR g.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('status')::text IS NULL OR g.status = sqlc.narg('status'));
 
 -- name: GetDuplicateGroupAssets :many
@@ -228,7 +238,8 @@ SELECT
     )::bigint AS recoverable_bytes,
     MAX(g.detected_at)::timestamptz AS last_detected_at
 FROM duplicate_groups g
-WHERE (sqlc.narg('repository_id')::uuid IS NULL OR g.repository_id = sqlc.narg('repository_id'));
+WHERE (sqlc.narg('repository_id')::uuid IS NULL OR g.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR g.owner_id = sqlc.narg('owner_id'));
 
 -- ============================================================================
 -- Metadata merge helpers (used inside merge transactions)
