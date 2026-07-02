@@ -110,7 +110,6 @@ export interface FiltersState {
     east: number;
     west: number;
   };
-  repository_id?: string;
 }
 
 // ===== Selection State =====

@@ -22,7 +22,6 @@ import PersonPicker from "./PersonPicker";
 
 interface PersonFacesPanelProps {
   personId: number;
-  repositoryId?: string;
 }
 
 type PendingBulkAction = "move" | "remove" | null;
@@ -30,16 +29,16 @@ type PendingBulkAction = "move" | "remove" | null;
 /**
  * Face-level correction surface for a person. Normal mode keeps per-face actions
  * local to each crop; selection mode exposes bulk reassignment/removal.
+ * Corrections are entity actions on the person, so nothing here is
+ * repository-scoped: all faces are shown regardless of where they live.
  */
-export default function PersonFacesPanel({ personId, repositoryId }: PersonFacesPanelProps) {
+export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
   const { t } = useI18n();
   const showMessage = useMessage();
-  const { faces, total, isLoading } = usePersonFaces(personId, {
-    repositoryId,
-  });
-  const { setPersonCover, isSettingCover } = useSetPersonCover(repositoryId);
-  const { moveFace, isMoving } = useMoveFace(repositoryId);
-  const { removeFace, isRemoving } = useRemoveFaceFromPerson(repositoryId);
+  const { faces, total, isLoading } = usePersonFaces(personId);
+  const { setPersonCover, isSettingCover } = useSetPersonCover();
+  const { moveFace, isMoving } = useMoveFace();
+  const { removeFace, isRemoving } = useRemoveFaceFromPerson();
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedFaceIds, setSelectedFaceIds] = useState<number[]>([]);
@@ -243,12 +242,7 @@ export default function PersonFacesPanel({ personId, repositoryId }: PersonFaces
               {t("people.moveFace.bulkDescription", "Choose the person these faces belong to.")}
             </p>
           </div>
-          <PersonPicker
-            excludeIds={[personId]}
-            selectedIds={targetIds}
-            onChange={setTargetIds}
-            repositoryId={repositoryId}
-          />
+          <PersonPicker excludeIds={[personId]} selectedIds={targetIds} onChange={setTargetIds} />
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -316,9 +310,7 @@ export default function PersonFacesPanel({ personId, repositoryId }: PersonFaces
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8">
           {faces.map((face) => {
             const faceId = face.face_id ?? 0;
-            const cropUrl = face.has_crop
-              ? assetUrls.getFaceCropUrl(personId, faceId, repositoryId)
-              : null;
+            const cropUrl = face.has_crop ? assetUrls.getFaceCropUrl(personId, faceId) : null;
             const selected = selectedFaceIdSet.has(faceId);
             return (
               <div key={faceId} className="group relative">

@@ -49,7 +49,6 @@ vi.mock("@/features/assets/selectors", () => ({
   useFilterState: () => ({ enabled: false }),
   useFilterActions: () => ({
     batchUpdateFilters: mocks.batchUpdateFilters,
-    setRepositoryId: vi.fn(),
   }),
 }));
 
@@ -58,17 +57,12 @@ vi.mock("@/hooks/util-hooks/useMessage", () => ({
 }));
 
 vi.mock("@/features/settings", () => ({
-  useWorkingRepository: () => ({
-    repositories: [{ id: "repo-1", name: "Repo 1" }],
-    selectedRepository: undefined,
-    scopeLabel: "All libraries",
-    scopedRepositoryId: undefined,
-    getRepositoryLabel: (repo: { name?: string }) => repo.name ?? "Repo",
-  }),
   useBrowseScope: () => ({
     repositories: [{ id: "repo-1", name: "Repo 1" }],
     browseRepositoryId: "",
     scopedRepositoryId: undefined,
+    selectedRepository: undefined,
+    scopeLabel: "All libraries",
     setBrowseRepositoryId: vi.fn(),
     getRepositoryLabel: (repo: { name?: string }) => repo.name ?? "Repo",
   }),

@@ -13,7 +13,6 @@ type PersonPickerProps = {
   onChange: (next: number[]) => void;
   /** Allow selecting more than one person. Defaults to single-select. */
   multiSelect?: boolean;
-  repositoryId?: string;
   /** Include hidden people in the searchable list. */
   includeHidden?: boolean;
 };
@@ -28,13 +27,11 @@ export default function PersonPicker({
   selectedIds,
   onChange,
   multiSelect = false,
-  repositoryId,
   includeHidden = false,
 }: PersonPickerProps) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
   const { people, isLoading } = usePeople({
-    repositoryId,
     includeHidden,
     limit: 100,
   });
@@ -88,7 +85,7 @@ export default function PersonPicker({
             const personId = person.person_id ?? 0;
             const selected = selectedIds.includes(personId);
             const coverUrl = person.cover_face_image_path
-              ? assetUrls.getPersonCoverUrl(personId, repositoryId)
+              ? assetUrls.getPersonCoverUrl(personId)
               : null;
             return (
               <button

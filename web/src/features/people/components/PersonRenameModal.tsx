@@ -14,7 +14,6 @@ interface PersonRenameModalProps {
   person?: PersonDetail;
   /** Current name, used to seed the field. */
   currentName: string;
-  repositoryId?: string;
   isSaving: boolean;
   onClose: () => void;
   /** Commit the new name; resolve to close. */
@@ -31,7 +30,6 @@ export function PersonRenameModal({
   open,
   person,
   currentName,
-  repositoryId,
   isSaving,
   onClose,
   onSubmit,
@@ -42,8 +40,8 @@ export function PersonRenameModal({
   const [isHidden, setIsHidden] = useState(Boolean(person?.is_hidden));
   const [activeTab, setActiveTab] = useState<EditTab>("info");
   const [sourceIds, setSourceIds] = useState<number[]>([]);
-  const { setPersonHidden, isUpdatingHidden } = useSetPersonHidden(repositoryId);
-  const { mergePeople, isMerging } = useMergePeople(repositoryId);
+  const { setPersonHidden, isUpdatingHidden } = useSetPersonHidden();
+  const { mergePeople, isMerging } = useMergePeople();
 
   useEffect(() => {
     if (open) {
@@ -210,9 +208,7 @@ export function PersonRenameModal({
             </div>
           )}
 
-          {activeTab === "faces" && personId > 0 && (
-            <PersonFacesPanel personId={personId} repositoryId={repositoryId} />
-          )}
+          {activeTab === "faces" && personId > 0 && <PersonFacesPanel personId={personId} />}
 
           {activeTab === "merge" && (
             <div className="max-w-2xl space-y-4">
@@ -231,7 +227,6 @@ export function PersonRenameModal({
                 selectedIds={sourceIds}
                 onChange={setSourceIds}
                 multiSelect
-                repositoryId={repositoryId}
               />
               <div className="flex items-center justify-between gap-3 border-t border-base-200 pt-3">
                 <span className="text-xs text-base-content/55">

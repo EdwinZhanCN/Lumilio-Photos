@@ -34,7 +34,7 @@ import { useI18n } from "@/lib/i18n";
 import { useFilterState, useFilterActions } from "@/features/assets/selectors";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
-import { useWorkingRepository, useBrowseScope } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import { useStackActions } from "@/features/assets/hooks/useStackActions";
 import {
@@ -114,8 +114,12 @@ const AssetsPageHeader = ({
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
   const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
-  const { repositories, selectedRepository, scopeLabel } = useWorkingRepository();
+  // Scan follows the browse scope: it targets what the gallery is showing
+  // (one repository, or every repository when the scope is "All").
   const {
+    repositories,
+    selectedRepository,
+    scopeLabel,
     scopedRepositoryId: browseScopeId,
     getRepositoryLabel: getBrowseRepoLabel,
     setBrowseRepositoryId,

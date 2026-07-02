@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { AlertTriangle, Check, Copy, Loader2, RefreshCw, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, Copy, Loader2, Trash2, X } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { formatBytes } from "@/lib/utils/formatters";
 import type { DuplicateGroup, DuplicateMethod, DuplicateStatus } from "@/lib/duplicates/types";
 import {
-  useDetectDuplicates,
   useDismissDuplicateGroup,
   useDuplicateGroupList,
   useDuplicateSummary,
@@ -271,34 +271,20 @@ function DuplicatesContent() {
     },
     { label: t("duplicates.pageTitle", "Duplicates") },
   ]);
-  const showMessage = useMessage();
-  const { repositories, repositoriesQuery, scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const [status, setStatus] = useState<DuplicateStatus>("pending");
-  const [isScanningRepositories, setIsScanningRepositories] = useState(false);
   const summaryQuery = useDuplicateSummary(scopedRepositoryId);
   const groupQuery = useDuplicateGroupList({
     repositoryId: scopedRepositoryId,
     status,
     limit: 50,
   });
-  const detectMutation = useDetectDuplicates();
 
   const summary = summaryQuery.data;
 
   const isInitialLoading = groupQuery.isLoading;
   const hasGroups = groupQuery.groups.length > 0;
   const hasSummaryError = summaryQuery.isError;
-  const scanRepositoryIds = useMemo(
-    () =>
-      scopedRepositoryId
-        ? [scopedRepositoryId]
-        : repositories.map((repository) => repository.id).filter(Boolean),
-    [repositories, scopedRepositoryId],
-  );
-  const canScan =
-    scanRepositoryIds.length > 0 && (Boolean(scopedRepositoryId) || repositoriesQuery.isSuccess);
-  const isScanPending = detectMutation.isPending || isScanningRepositories;
-  const scanLabel = scopedRepositoryId ? t("duplicates.scan") : t("duplicates.scanAll");
 
   const lastDetectedLabel = useMemo(() => {
     if (!summary?.last_detected_at) {
@@ -311,73 +297,13 @@ function DuplicatesContent() {
     );
   }, [summary?.last_detected_at, t]);
 
-  const handleScan = async () => {
-    if (!canScan) {
-      showMessage(
-        "error",
-        t("duplicates.scanError", {
-          message: t("duplicates.errors.noRepository"),
-        }),
-      );
-      return;
-    }
-    try {
-      setIsScanningRepositories(true);
-      const result = { groups: 0, exact: 0, phash: 0, mixed: 0 };
-      for (const repositoryId of scanRepositoryIds) {
-        const current = await detectMutation.mutateAsync({ repositoryId });
-        result.groups += current.groups ?? 0;
-        result.exact += current.exact_groups ?? 0;
-        result.phash += current.phash_groups ?? 0;
-        result.mixed += current.mixed_groups ?? 0;
-      }
-      showMessage(
-        "success",
-        scopedRepositoryId
-          ? t("duplicates.scanSuccess", result)
-          : t("duplicates.scanAllSuccess", {
-              ...result,
-              count: scanRepositoryIds.length,
-            }),
-      );
-    } catch (err) {
-      showMessage(
-        "error",
-        t("duplicates.scanError", {
-          message: err instanceof Error ? err.message : String(err),
-        }),
-      );
-    } finally {
-      setIsScanningRepositories(false);
-    }
-  };
-
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title={t("duplicates.pageTitle")}
         icon={<Copy className="h-6 w-6 text-primary" strokeWidth={1.5} />}
       >
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm rounded-full"
-            onClick={handleScan}
-            disabled={isScanPending || !canScan}
-          >
-            {isScanPending ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                {t("duplicates.scanning")}
-              </>
-            ) : (
-              <>
-                <RefreshCw className="size-4" />
-                {scanLabel}
-              </>
-            )}
-          </button>
-        </div>
+        <BrowseScopeSelect />
       </PageHeader>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">

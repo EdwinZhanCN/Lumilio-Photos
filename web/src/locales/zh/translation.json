@@ -757,9 +757,6 @@
   "duplicates": {
     "emptyDescription": "看起来你的资料库里每张照片都是独一无二的。",
     "emptyTitle": "没有需要处理的重复项",
-    "errors": {
-      "noRepository": "未选择仓库"
-    },
     "filters": {
       "dismissed": "已忽略",
       "merged": "已合并",
@@ -792,11 +789,7 @@
     },
     "noScanYet": "运行一次扫描以查找资料库中的重复照片。",
     "pageTitle": "重复照片",
-    "scan": "立即扫描",
-    "scanAll": "扫描全部",
-    "scanAllSuccess_other": "已扫描 {{count}} 个资源库，共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
     "scanError": "扫描失败：{{message}}",
-    "scanning": "扫描中...",
     "scanSuccess": "共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
     "summary": {
       "lastDetected": "上次扫描",
@@ -1305,7 +1298,6 @@
     },
     "repository": {
       "all": "全部仓库",
-      "label": "工作仓库",
       "primary": "主仓库",
       "unavailable": "仓库选项暂时不可用"
     }
@@ -1693,10 +1685,7 @@
         "semanticTextEmbed": "文本语义分析"
       },
       "unavailable": "不可用",
-      "workingRepositoryDescription": "选择支持仓库作用域的页面和操作默认使用哪个仓库。选择全部仓库时保持全局视图。",
       "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持仓库过滤时都会默认使用这个范围。",
-      "workingRepositoryLabel": "当前应用仓库",
-      "workingRepositoryTitle": "工作仓库",
       "workingRepositoryUnavailable": "仓库选项暂时不可用。"
     },
     "title": "设置",
@@ -1900,7 +1889,6 @@
       "add_files_button": "添加文件",
       "cannot_clear_while_processing": "处理过程中无法清除文件",
       "clear_button": "清除",
-      "default_upload_target": "默认资源库",
       "default_upload_target_hint": "当前未选择具体工作资源库；上传会进入主/默认资源库。",
       "drag_drop_or_click": "拖拽或点击上传",
       "no_files_selected_for_upload": "未选择要上传的文件",
@@ -1911,10 +1899,7 @@
       "supported_file_types_description": "支持图片、RAW 格式、视频和音频文件",
       "upload_button": "上传{{countLabel}}",
       "upload_information_title": "上传信息",
-      "upload_target_default": "默认",
-      "upload_target_from_settings": "来自设置",
       "upload_target_label": "上传目标",
-      "upload_target_unavailable": "当前选择的资源库暂时不可用。",
       "uploading_status": "上传中..."
     },
     "UploadAssets": {

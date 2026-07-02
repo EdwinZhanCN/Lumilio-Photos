@@ -1,9 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Folder, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { useResolvedThemeMode, useThemePreference } from "@/lib/theme";
-import { useWorkingRepository } from "@/features/settings";
 import UserAvatar from "@/components/UserAvatar";
 import MessageCenter from "@/components/MessageCenter";
 import NavbarUploadQueue from "@/features/upload/components/NavbarUploadQueue";
@@ -14,14 +13,6 @@ function NavBar() {
   const { user, logout } = useAuth();
   const [theme, setTheme] = useThemePreference();
   const resolvedThemeMode = useResolvedThemeMode();
-  const {
-    repositories,
-    repositoriesQuery,
-    workingRepositoryId,
-    selectedRepository,
-    setWorkingRepositoryId,
-    getRepositoryLabel,
-  } = useWorkingRepository();
   const isDarkMode = resolvedThemeMode === "dark";
   const isFollowingSystem = theme.followSystem;
   const displayName = user?.display_name || user?.username || "User";
@@ -37,37 +28,6 @@ function NavBar() {
           />
           {t("app.name")}
         </Link>
-
-        <label className="form-control gap-1 min-w-0">
-          <span className="sr-only">
-            {t("navbar.repository.label", {
-              defaultValue: "Working repository",
-            })}
-          </span>
-          <div className="flex items-center gap-2 min-w-0">
-            <select
-              className="select select-bordered select-sm w-32 sm:w-52"
-              value={workingRepositoryId}
-              disabled={repositoriesQuery.isLoading || repositoriesQuery.isError}
-              title={selectedRepository?.path}
-              onChange={(event) => setWorkingRepositoryId(event.target.value || null)}
-            >
-              {repositories.map((repository) => (
-                <option key={repository.id} value={repository.id}>
-                  {getRepositoryLabel(repository)}
-                </option>
-              ))}
-            </select>
-            <Folder className="size-5 shrink-0 text-base-content/60" />
-          </div>
-          {repositoriesQuery.isError && (
-            <span className="text-xs text-base-content/60">
-              {t("navbar.repository.unavailable", {
-                defaultValue: "Repository options unavailable",
-              })}
-            </span>
-          )}
-        </label>
       </div>
 
       <div className="flex flex-1 justify-end">

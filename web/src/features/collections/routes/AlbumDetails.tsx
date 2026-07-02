@@ -8,7 +8,6 @@ import { AlbumIcon, Bird, FolderMinus, RefreshCcw } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import type { components } from "@/lib/http-commons/schema";
-import { useBrowseScope } from "@/features/settings";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import AlbumFormModal from "../components/AlbumFormModal";
@@ -26,7 +25,6 @@ const AlbumAssetsContent = () => {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { albumId } = useParams<{ albumId: string }>();
-  const { scopedRepositoryId } = useBrowseScope();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [bioClipFeedback, setBioClipFeedback] = useState<{
     tone: "success" | "error";
@@ -34,14 +32,14 @@ const AlbumAssetsContent = () => {
   } | null>(null);
   const albumIdNumber = albumId ? Number(albumId) : 0;
 
-  // Fetch album metadata for the hero banner.
+  // Fetch album metadata for the hero banner. An album intentionally spans
+  // repositories, so the browse scope never filters its detail or members.
   const albumQuery = $api.useQuery(
     "get",
     "/api/v1/albums/{id}",
     {
       params: {
         path: { id: albumIdNumber },
-        query: scopedRepositoryId ? { repository_id: scopedRepositoryId } : {},
       },
     },
     { enabled: !!albumId },
