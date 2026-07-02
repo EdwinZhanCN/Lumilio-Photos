@@ -5,8 +5,9 @@
 
 -- name: GetFolderChildSummaries :many
 -- Lists immediate child folders of parent_path (recursive descendant
--- counts/covers). Excludes internal .lumilio paths and any asset that sits
--- directly in parent_path (files, not folders).
+-- counts/covers). Excludes internal .lumilio paths, app-managed inbox
+-- uploads, and any asset that sits directly in parent_path (files, not
+-- folders).
 WITH scoped AS (
   SELECT
     a.asset_id,
@@ -23,6 +24,7 @@ WITH scoped AS (
     AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
     AND a.storage_path NOT LIKE '.lumilio/%'
+    AND a.storage_path NOT LIKE 'inbox/%'
     AND (
       sqlc.arg('parent_path')::text = ''
       OR a.storage_path LIKE sqlc.arg('parent_path')::text || '/%'
@@ -69,6 +71,7 @@ WHERE a.is_deleted = false
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND a.repository_id = sqlc.arg('repository_id')
   AND a.storage_path NOT LIKE '.lumilio/%'
+  AND a.storage_path NOT LIKE 'inbox/%'
   AND (
     sqlc.arg('folder_path')::text = ''
     OR a.storage_path LIKE sqlc.arg('folder_path')::text || '/%'

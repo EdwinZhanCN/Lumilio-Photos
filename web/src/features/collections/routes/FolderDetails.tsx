@@ -7,10 +7,13 @@ import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AssetsProvider } from "@/features/assets";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
+import { CollectionHero, MetaStat } from "@/components/collection";
 import { useI18n } from "@/lib/i18n";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import type { AssetFilter } from "@/features/assets/types/assets.type";
 import { useFolders, useFolderSummary } from "../hooks/useFolders";
 import { decodeFolderKey, encodeFolderKey } from "../utils/folderKey";
+import { formatDateRange } from "../utils/formatDateRange";
 
 export default function FolderDetails() {
   const { folderKey } = useParams<{ folderKey: string }>();
@@ -67,46 +70,63 @@ export default function FolderDetails() {
 
   const basePath = `/collections/folders/${folderKey}`;
   const title = summary?.display_name || identity.folderPath || t("collections.folders.root", "Root");
+  const isSummaryLoading = summaryQuery.isPending && !summary;
+  const dateRangeLabel = formatDateRange(summary?.date_start, summary?.date_end);
 
   const hero = (
-    <div className="flex flex-col gap-2 px-4 pb-2">
-      {summary && (
-        <p className="text-sm text-base-content/60">
-          {[
-            summary.repository_name,
-            t("collections.folders.itemCount", {
-              count: summary.asset_count ?? 0,
+    <CollectionHero
+      loading={isSummaryLoading}
+      title={title}
+      stats={
+        <>
+          <MetaStat loading={isSummaryLoading}>{summary?.repository_name}</MetaStat>
+          <MetaStat loading={isSummaryLoading}>
+            {t("collections.folders.itemCount", {
+              count: summary?.asset_count ?? 0,
               defaultValue: "{{count}} items",
-            }),
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      )}
-      {children.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {children.map((child) => (
-            <button
-              key={child.folder_path}
-              type="button"
-              className="btn btn-sm btn-soft btn-info gap-1.5"
-              onClick={() =>
-                navigate(
-                  `/collections/folders/${encodeFolderKey({
-                    repositoryId: child.repository_id ?? identity.repositoryId,
-                    folderPath: child.folder_path ?? "",
-                  })}`,
-                )
-              }
-            >
-              <FolderIcon className="h-3.5 w-3.5" />
-              {child.display_name}
-              <span className="opacity-60">({child.asset_count ?? 0})</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+            })}
+          </MetaStat>
+          {dateRangeLabel && <MetaStat>{dateRangeLabel}</MetaStat>}
+        </>
+      }
+      footer={
+        children.length > 0 && (
+          <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1">
+            {children.map((child) => (
+              <button
+                key={child.folder_path}
+                type="button"
+                className="btn btn-sm btn-soft btn-info shrink-0 gap-1.5"
+                onClick={() =>
+                  navigate(
+                    `/collections/folders/${encodeFolderKey({
+                      repositoryId: child.repository_id ?? identity.repositoryId,
+                      folderPath: child.folder_path ?? "",
+                    })}`,
+                  )
+                }
+              >
+                {child.cover_asset_id ? (
+                  <span className="avatar">
+                    <span className="size-5 rounded-full">
+                      <img
+                        src={assetUrls.getThumbnailUrl(child.cover_asset_id, "small")}
+                        alt=""
+                        className="rounded-full object-cover"
+                      />
+                    </span>
+                  </span>
+                ) : (
+                  <FolderIcon className="h-3.5 w-3.5" />
+                )}
+                {child.display_name}
+                <span className="opacity-60">({child.asset_count ?? 0})</span>
+              </button>
+            ))}
+          </div>
+        )
+      }
+    />
   );
 
   return (

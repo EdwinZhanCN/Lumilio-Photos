@@ -29,6 +29,7 @@ WITH scoped AS (
     AND ($2::integer IS NULL OR a.owner_id = $2)
     AND ($3::uuid IS NULL OR a.repository_id = $3)
     AND a.storage_path NOT LIKE '.lumilio/%'
+    AND a.storage_path NOT LIKE 'inbox/%'
     AND (
       $1::text = ''
       OR a.storage_path LIKE $1::text || '/%'
@@ -83,8 +84,9 @@ type GetFolderChildSummariesRow struct {
 // storage_path as relative (see assets_repository_id_storage_path_key) and
 // must never expose repositories.path (the absolute host path).
 // Lists immediate child folders of parent_path (recursive descendant
-// counts/covers). Excludes internal .lumilio paths and any asset that sits
-// directly in parent_path (files, not folders).
+// counts/covers). Excludes internal .lumilio paths, app-managed inbox
+// uploads, and any asset that sits directly in parent_path (files, not
+// folders).
 func (q *Queries) GetFolderChildSummaries(ctx context.Context, arg GetFolderChildSummariesParams) ([]GetFolderChildSummariesRow, error) {
 	rows, err := q.db.Query(ctx, getFolderChildSummaries, arg.ParentPath, arg.OwnerID, arg.RepositoryID)
 	if err != nil {
@@ -129,6 +131,7 @@ WHERE a.is_deleted = false
   AND ($1::integer IS NULL OR a.owner_id = $1)
   AND a.repository_id = $2
   AND a.storage_path NOT LIKE '.lumilio/%'
+  AND a.storage_path NOT LIKE 'inbox/%'
   AND (
     $3::text = ''
     OR a.storage_path LIKE $3::text || '/%'

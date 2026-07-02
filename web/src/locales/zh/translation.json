@@ -653,9 +653,10 @@
       "title": "删除相册"
     },
     "emptyAlbums": "还没有相册。",
+    "emptyFolders": "还没有文件夹。",
     "emptyPeople": "还没有识别出人物。",
     "folders": {
-      "empty": "此仓库中尚未找到文件夹。",
+      "empty": "此处暂无文件夹。上传的文件会自动按日期归档；当你直接将文件放入仓库目录或扫描已有素材库后，文件夹才会出现。",
       "itemCount_other": "{{count}} 项",
       "root": "根目录"
     },

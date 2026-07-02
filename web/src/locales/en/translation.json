@@ -653,9 +653,10 @@
       "title": "Delete albums"
     },
     "emptyAlbums": "No albums yet.",
+    "emptyFolders": "No folders yet.",
     "emptyPeople": "No recognized people yet.",
     "folders": {
-      "empty": "No folders found in this repository yet.",
+      "empty": "No folders here yet. Uploads are organized automatically by date; folders appear once you add files directly into a repository or scan an existing library.",
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
       "root": "Root"
