@@ -7,6 +7,8 @@ package repo
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTag = `-- name: CreateTag :one
@@ -72,6 +74,83 @@ func (q *Queries) GetTagByName(ctx context.Context, tagName string) (Tag, error)
 		&i.IsAiGenerated,
 	)
 	return i, err
+}
+
+const getTagSummaries = `-- name: GetTagSummaries :many
+SELECT
+  t.tag_id,
+  t.tag_name,
+  at.source,
+  COUNT(DISTINCT a.asset_id)::bigint AS asset_count,
+  (ARRAY_AGG(a.asset_id ORDER BY COALESCE(a.taken_time, a.upload_time) DESC))[1]::uuid AS cover_asset_id,
+  MAX(COALESCE(a.taken_time, a.upload_time))::timestamptz AS last_used_at
+FROM asset_tags at
+JOIN tags t ON t.tag_id = at.tag_id
+JOIN assets a ON a.asset_id = at.asset_id
+WHERE a.is_deleted = false
+  AND ($1::integer IS NULL OR a.owner_id = $1)
+  AND ($2::uuid IS NULL OR a.repository_id = $2)
+  AND ($3::text IS NULL OR at.source = $3)
+  AND ($4::text IS NULL OR t.tag_name ILIKE '%' || $4::text || '%')
+GROUP BY t.tag_id, t.tag_name, at.source
+ORDER BY asset_count DESC, t.tag_name ASC
+LIMIT $6 OFFSET $5
+`
+
+type GetTagSummariesParams struct {
+	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	Source       *string     `db:"source" json:"source"`
+	Query        *string     `db:"query" json:"query"`
+	Offset       int32       `db:"offset" json:"offset"`
+	Limit        int32       `db:"limit" json:"limit"`
+}
+
+type GetTagSummariesRow struct {
+	TagID        int32              `db:"tag_id" json:"tag_id"`
+	TagName      string             `db:"tag_name" json:"tag_name"`
+	Source       string             `db:"source" json:"source"`
+	AssetCount   int64              `db:"asset_count" json:"asset_count"`
+	CoverAssetID pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	LastUsedAt   pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+}
+
+// Browsable tag vocabulary with counts/cover, distinct from
+// SearchTagsByName (definition-only autocomplete). Groups by (tag_id,
+// source) because the same tag_id can carry manual assignments on some
+// assets and AI/system assignments on others.
+func (q *Queries) GetTagSummaries(ctx context.Context, arg GetTagSummariesParams) ([]GetTagSummariesRow, error) {
+	rows, err := q.db.Query(ctx, getTagSummaries,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.Source,
+		arg.Query,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTagSummariesRow
+	for rows.Next() {
+		var i GetTagSummariesRow
+		if err := rows.Scan(
+			&i.TagID,
+			&i.TagName,
+			&i.Source,
+			&i.AssetCount,
+			&i.CoverAssetID,
+			&i.LastUsedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTagsByCategory = `-- name: GetTagsByCategory :many

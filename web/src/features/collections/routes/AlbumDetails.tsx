@@ -8,7 +8,7 @@ import { AlbumIcon, Bird, FolderMinus, RefreshCcw } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import type { components } from "@/lib/http-commons/schema";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import AlbumFormModal from "../components/AlbumFormModal";
@@ -26,7 +26,7 @@ const AlbumAssetsContent = () => {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { albumId } = useParams<{ albumId: string }>();
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [bioClipFeedback, setBioClipFeedback] = useState<{
     tone: "success" | "error";

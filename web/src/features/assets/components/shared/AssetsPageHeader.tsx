@@ -34,7 +34,7 @@ import { useI18n } from "@/lib/i18n";
 import { useFilterState, useFilterActions } from "@/features/assets/selectors";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
-import { useWorkingRepository } from "@/features/settings";
+import { useWorkingRepository, useBrowseScope } from "@/features/settings";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import { useStackActions } from "@/features/assets/hooks/useStackActions";
 import {
@@ -67,6 +67,7 @@ export interface AssetsPageHeaderProps {
   capabilities?: {
     showScan?: boolean;
   };
+  scopeControlHidden?: boolean;
 }
 
 const AssetsPageHeader = ({
@@ -81,6 +82,7 @@ const AssetsPageHeader = ({
   bulkActions,
   hiddenBulkActions,
   capabilities,
+  scopeControlHidden,
 }: AssetsPageHeaderProps) => {
   const { t } = useI18n();
   const selection = useSelection();
@@ -113,6 +115,11 @@ const AssetsPageHeader = ({
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
   const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
   const { repositories, selectedRepository, scopeLabel } = useWorkingRepository();
+  const {
+    scopedRepositoryId: browseScopeId,
+    getRepositoryLabel: getBrowseRepoLabel,
+    setBrowseRepositoryId,
+  } = useBrowseScope();
   const { scanRepositories, isScanning } = useRepositoryScan();
   const showScan = capabilities?.showScan ?? true;
 
@@ -694,6 +701,25 @@ const AssetsPageHeader = ({
               </li>
             </ul>
           </div>
+
+          {!scopeControlHidden && repositories.length > 0 && (
+            <select
+              className="select select-sm select-bordered rounded-full w-auto max-w-[12rem]"
+              value={browseScopeId ?? ""}
+              onChange={(e) => setBrowseRepositoryId(e.target.value || null)}
+              title={t("assets.assetsPageHeader.scope.title", "Gallery scope")}
+              aria-label={t("assets.assetsPageHeader.scope.title", "Gallery scope")}
+            >
+              <option value="">
+                {t("navbar.repository.all", "All repositories")}
+              </option>
+              {repositories.map((repo) => (
+                <option key={repo.id} value={repo.id}>
+                  {getBrowseRepoLabel(repo)}
+                </option>
+              ))}
+            </select>
+          )}
 
           <FilterTool
             initial={inboundDTO}

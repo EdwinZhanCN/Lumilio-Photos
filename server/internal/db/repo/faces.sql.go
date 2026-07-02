@@ -138,7 +138,7 @@ func (q *Queries) CountPersonFacesScoped(ctx context.Context, arg CountPersonFac
 const createFaceCluster = `-- name: CreateFaceCluster :one
 INSERT INTO face_clusters (cluster_name, representative_face_id, confidence_score, is_confirmed)
 VALUES ($1, $2, $3, $4)
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type CreateFaceClusterParams struct {
@@ -163,10 +163,10 @@ func (q *Queries) CreateFaceCluster(ctx context.Context, arg CreateFaceClusterPa
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -411,7 +411,7 @@ func (q *Queries) DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UU
 }
 
 const getAllFaceClusters = `-- name: GetAllFaceClusters :many
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 ORDER BY is_confirmed DESC, member_count DESC
 `
 
@@ -431,10 +431,10 @@ func (q *Queries) GetAllFaceClusters(ctx context.Context) ([]FaceCluster, error)
 			&i.ConfidenceScore,
 			&i.MemberCount,
 			&i.IsConfirmed,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.IsHidden,
 			&i.HiddenAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -513,7 +513,7 @@ func (q *Queries) GetClusterMergeCandidates(ctx context.Context, arg GetClusterM
 }
 
 const getConfirmedFaceClusters = `-- name: GetConfirmedFaceClusters :many
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 WHERE is_confirmed = true
 ORDER BY cluster_name ASC
 `
@@ -534,10 +534,10 @@ func (q *Queries) GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, 
 			&i.ConfidenceScore,
 			&i.MemberCount,
 			&i.IsConfirmed,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.IsHidden,
 			&i.HiddenAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -601,7 +601,7 @@ func (q *Queries) GetFaceClusterAssignmentsForScope(ctx context.Context, arg Get
 }
 
 const getFaceClusterByFaceID = `-- name: GetFaceClusterByFaceID :one
-SELECT fc.cluster_id, fc.cluster_name, fc.representative_face_id, fc.confidence_score, fc.member_count, fc.is_confirmed, fc.created_at, fc.updated_at, fc.is_hidden, fc.hidden_at FROM face_clusters fc
+SELECT fc.cluster_id, fc.cluster_name, fc.representative_face_id, fc.confidence_score, fc.member_count, fc.is_confirmed, fc.is_hidden, fc.hidden_at, fc.created_at, fc.updated_at FROM face_clusters fc
 JOIN face_cluster_members fcm ON fc.cluster_id = fcm.cluster_id
 WHERE fcm.face_id = $1
 `
@@ -616,16 +616,16 @@ func (q *Queries) GetFaceClusterByFaceID(ctx context.Context, faceID int32) (Fac
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getFaceClusterByID = `-- name: GetFaceClusterByID :one
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 WHERE cluster_id = $1
 `
 
@@ -639,16 +639,16 @@ func (q *Queries) GetFaceClusterByID(ctx context.Context, clusterID int32) (Face
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getFaceClusterByRepresentative = `-- name: GetFaceClusterByRepresentative :one
-SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at FROM face_clusters
+SELECT cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at FROM face_clusters
 WHERE representative_face_id = $1
 `
 
@@ -662,10 +662,10 @@ func (q *Queries) GetFaceClusterByRepresentative(ctx context.Context, representa
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -2144,7 +2144,7 @@ SET
     is_confirmed = $4,
     updated_at = CURRENT_TIMESTAMP
 WHERE cluster_id = $1
-RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, created_at, updated_at, is_hidden, hidden_at
+RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type UpdateFaceClusterParams struct {
@@ -2169,10 +2169,10 @@ func (q *Queries) UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterPa
 		&i.ConfidenceScore,
 		&i.MemberCount,
 		&i.IsConfirmed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.IsHidden,
 		&i.HiddenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

@@ -89,6 +89,9 @@
         "noRepositories": "没有可扫描的资源库。",
         "title": "扫描 {{scope}}"
       },
+      "scope": {
+        "title": "图库范围"
+      },
       "selectionMode": {
         "enter": "进入选择模式",
         "exit": "退出选择模式",
@@ -651,6 +654,11 @@
     },
     "emptyAlbums": "还没有相册。",
     "emptyPeople": "还没有识别出人物。",
+    "folders": {
+      "empty": "此仓库中尚未找到文件夹。",
+      "itemCount_other": "{{count}} 项",
+      "root": "根目录"
+    },
     "itemsCount_one": "{{count}} 项",
     "itemsCount_other": "{{count}} 项",
     "messages": {
@@ -670,9 +678,18 @@
     },
     "sections": {
       "albums": "相册",
+      "folders": "文件夹",
       "people": "人物",
       "places": "地点",
+      "tags": "标签",
       "utilities": "工具"
+    },
+    "tags": {
+      "empty": "未找到标签。",
+      "searchPlaceholder": "搜索标签",
+      "sourceAI": "AI",
+      "sourceAll": "全部",
+      "sourceManual": "手动"
     },
     "title": "合集",
     "untitled": "未命名相册",

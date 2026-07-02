@@ -46,6 +46,18 @@ func applyLocationClusterOwnershipScope(c *gin.Context, params service.ListLocat
 	return params
 }
 
+// ownerScopeID returns the current non-admin user's ID for scoping
+// owner-filtered read endpoints, or nil for admins/unauthenticated callers
+// (no scope applied).
+func ownerScopeID(c *gin.Context) *int32 {
+	user, ok := currentUserFromContext(c)
+	if !ok || service.IsAdminRole(user.Role) {
+		return nil
+	}
+	ownerID := int32(user.UserID)
+	return &ownerID
+}
+
 func (h *AssetHandler) loadAsset(c *gin.Context, assetID uuid.UUID) (*repo.Asset, bool) {
 	asset, err := h.assetService.GetAsset(c.Request.Context(), assetID)
 	if err != nil {

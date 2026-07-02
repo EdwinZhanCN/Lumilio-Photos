@@ -1030,6 +1030,15 @@ const docTemplate = `{
                     "filename": {
                         "$ref": "#/components/schemas/dto.FilenameFilterDTO"
                     },
+                    "folder_path": {
+                        "example": "inbox/2026/05",
+                        "type": "string"
+                    },
+                    "folder_recursive": {
+                        "description": "FolderRecursive controls whether FolderPath matches descendants (default true) or direct contents only.",
+                        "example": true,
+                        "type": "boolean"
+                    },
                     "is_deleted": {
                         "example": false,
                         "type": "boolean"
@@ -2344,6 +2353,72 @@ const docTemplate = `{
                     "value": {
                         "example": "IMG_",
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.FolderListResponseDTO": {
+                "properties": {
+                    "folders": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.FolderSummaryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "parent_path": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.FolderSummaryDTO": {
+                "properties": {
+                    "asset_count": {
+                        "example": 128,
+                        "type": "integer"
+                    },
+                    "audio_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "cover_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "date_end": {
+                        "type": "string"
+                    },
+                    "date_start": {
+                        "type": "string"
+                    },
+                    "depth": {
+                        "example": 3,
+                        "type": "integer"
+                    },
+                    "display_name": {
+                        "example": "05",
+                        "type": "string"
+                    },
+                    "folder_path": {
+                        "example": "inbox/2026/05",
+                        "type": "string"
+                    },
+                    "photo_count": {
+                        "example": 110,
+                        "type": "integer"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "repository_name": {
+                        "example": "Primary Library",
+                        "type": "string"
+                    },
+                    "video_count": {
+                        "example": 18,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -4399,6 +4474,46 @@ const docTemplate = `{
                     "tags": {
                         "items": {
                             "$ref": "#/components/schemas/dto.TagDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.TagSummaryDTO": {
+                "properties": {
+                    "asset_count": {
+                        "example": 37,
+                        "type": "integer"
+                    },
+                    "cover_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "last_used_at": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "example": "manual",
+                        "type": "string"
+                    },
+                    "tag_id": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "tag_name": {
+                        "example": "document",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.TagSummaryListResponseDTO": {
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.TagSummaryDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -7467,6 +7582,125 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/folders": {
+            "get": {
+                "description": "List immediate child folders of a repository-relative path, with recursive asset counts and covers, for the Folders collection view",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Repository-relative parent folder path (empty for root)",
+                        "in": "query",
+                        "name": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.FolderListResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Folder summaries retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "List folder summaries",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/folders/summary": {
+            "get": {
+                "description": "Get recursive asset counts, date range, and cover for one repository-relative folder path, for the Folder detail header",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "query",
+                        "name": "repository_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Repository-relative folder path (empty for root)",
+                        "in": "query",
+                        "name": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.FolderSummaryDTO"
+                                }
+                            }
+                        },
+                        "description": "Folder summary retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get one folder summary",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/indexing/rebuild": {
             "post": {
                 "description": "Queue a background batch that backfills AI indexing for existing photos.",
@@ -8009,6 +8243,91 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Create manual stack",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/tag-summaries": {
+            "get": {
+                "description": "List manual and AI/system tags with usage counts and covers, for the Tags collection view",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional tag source filter (e.g. manual, zeroshot)",
+                        "in": "query",
+                        "name": "source",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Search query (substring match on tag name)",
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Max results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 50,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Result offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.TagSummaryListResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Tag summaries retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "List tag summaries",
                 "tags": [
                     "assets"
                 ]

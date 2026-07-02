@@ -1,6 +1,6 @@
 import { useQueryClient, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import type {
   FaceClusterRebuildResponse,
   ListPeopleResponse,
@@ -45,7 +45,7 @@ export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
   people: PersonSummaryList;
   total: number;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const repositoryId = options.repositoryId ?? scopedRepositoryId;
   const limit = options.limit ?? 24;
   const offset = options.offset ?? 0;
@@ -82,7 +82,7 @@ export function useRebuildPeopleClusters(repositoryId?: string): {
   rebuildPeople: () => Promise<FaceClusterRebuildResponse>;
   isRebuilding: boolean;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
   const scopedId = repositoryId ?? scopedRepositoryId;
 
@@ -118,7 +118,7 @@ export function usePersonDetails(
   renamePerson: (name: string) => Promise<unknown>;
   isRenaming: boolean;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
   const scopedId = repositoryId ?? scopedRepositoryId;
 
@@ -178,7 +178,7 @@ export function usePersonFaces(
   faces: PersonFaceList;
   total: number;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const repositoryId = options.repositoryId ?? scopedRepositoryId;
   const limit = options.limit ?? 60;
   const offset = options.offset ?? 0;
@@ -216,7 +216,7 @@ export function useMergePeople(repositoryId?: string): {
   ) => Promise<PersonCorrectionResponse>;
   isMerging: boolean;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
   const scopedId = repositoryId ?? scopedRepositoryId;
 
@@ -245,7 +245,7 @@ export function useMoveFace(repositoryId?: string): {
   ) => Promise<PersonCorrectionResponse>;
   isMoving: boolean;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
   const scopedId = repositoryId ?? scopedRepositoryId;
 
@@ -270,7 +270,7 @@ export function useRemoveFaceFromPerson(repositoryId?: string): {
   removeFace: (personId: number, faceId: number) => Promise<PersonCorrectionResponse>;
   isRemoving: boolean;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
   const scopedId = repositoryId ?? scopedRepositoryId;
 
@@ -294,7 +294,7 @@ export function useSetPersonCover(repositoryId?: string): {
   setPersonCover: (personId: number, faceId: number) => Promise<PersonCorrectionResponse>;
   isSettingCover: boolean;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
   const scopedId = repositoryId ?? scopedRepositoryId;
 
@@ -319,7 +319,7 @@ export function useSetPersonHidden(repositoryId?: string): {
   setPersonHidden: (personId: number, hidden: boolean) => Promise<PersonCorrectionResponse>;
   isUpdatingHidden: boolean;
 } {
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const queryClient = useQueryClient();
   const scopedId = repositoryId ?? scopedRepositoryId;
 

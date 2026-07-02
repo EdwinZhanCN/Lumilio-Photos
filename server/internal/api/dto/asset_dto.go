@@ -335,6 +335,48 @@ type TagListResponseDTO struct {
 	Tags []TagDTO `json:"tags"`
 }
 
+// TagSummaryDTO summarizes one tag's usage across the caller's accessible
+// asset set. Distinct (tag_id, source) pairs are reported separately since a
+// tag name can carry both manual and AI/system assignments.
+type TagSummaryDTO struct {
+	TagID        int32      `json:"tag_id" example:"42"`
+	TagName      string     `json:"tag_name" example:"document"`
+	Source       string     `json:"source,omitempty" example:"manual"`
+	AssetCount   int64      `json:"asset_count" example:"37"`
+	CoverAssetID *string    `json:"cover_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`
+}
+
+// TagSummaryListResponseDTO is a browsable, count/cover-enriched tag list,
+// distinct from the autocomplete-oriented TagListResponseDTO.
+type TagSummaryListResponseDTO struct {
+	Tags []TagSummaryDTO `json:"tags"`
+}
+
+// FolderSummaryDTO summarizes assets grouped under one immediate child
+// folder of the requested parent path. FolderPath and DisplayName are
+// repository-relative; absolute host paths are never exposed here.
+type FolderSummaryDTO struct {
+	RepositoryID   string     `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RepositoryName string     `json:"repository_name" example:"Primary Library"`
+	FolderPath     string     `json:"folder_path" example:"inbox/2026/05"`
+	DisplayName    string     `json:"display_name" example:"05"`
+	Depth          int        `json:"depth" example:"3"`
+	AssetCount     int64      `json:"asset_count" example:"128"`
+	PhotoCount     int64      `json:"photo_count" example:"110"`
+	VideoCount     int64      `json:"video_count" example:"18"`
+	AudioCount     int64      `json:"audio_count" example:"0"`
+	DateStart      *time.Time `json:"date_start,omitempty"`
+	DateEnd        *time.Time `json:"date_end,omitempty"`
+	CoverAssetID   *string    `json:"cover_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+}
+
+// FolderListResponseDTO is a browsable folder listing scoped to one parent path.
+type FolderListResponseDTO struct {
+	Folders    []FolderSummaryDTO `json:"folders"`
+	ParentPath string             `json:"parent_path"`
+}
+
 // AssetAlbumRefDTO mirrors one entry of the `albums` aggregate built by
 // GetAssetWithRelations.
 type AssetAlbumRefDTO struct {
@@ -715,6 +757,9 @@ type AssetFilterDTO struct {
 	TagSource    *string            `json:"tag_source,omitempty" example:"zeroshot"`
 	TagNames     []string           `json:"tag_names,omitempty"`
 	PersonID     *int32             `json:"person_id,omitempty" example:"42"`
+	FolderPath   *string            `json:"folder_path,omitempty" example:"inbox/2026/05"`
+	// FolderRecursive controls whether FolderPath matches descendants (default true) or direct contents only.
+	FolderRecursive *bool `json:"folder_recursive,omitempty" example:"true"`
 }
 
 // FilterAssetsRequestDTO represents the request structure for filtering assets

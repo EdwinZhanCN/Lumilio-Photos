@@ -2,10 +2,13 @@
  * # Collections
  *
  * The hub for every way of *grouping* assets that isn't the raw library
- * timeline: albums, places/trips, people, and utility views (classifier albums,
- * duplicates). {@link Collections} is the landing page — four rails, each a
- * preview that links to its own full route. Person *detail* lives in the
+ * timeline: albums, places/trips, people, folders, tags, and utility views
+ * (classifier albums, duplicates). {@link Collections} is the landing page —
+ * rails that each preview a full route. Person *detail* lives in the
  * `people` feature; collections only owns the people rail/grid entry into it.
+ * Folders and tags are reached through {@link useUtilityShortcuts} alongside
+ * Duplicates and Trash, since they're browse-only utility-style views, not
+ * their own hub rail.
  *
  * ## State
  *
@@ -30,6 +33,21 @@
  * - **Places / trips** — fully derived client-side. {@link useCityTrips} segments
  *   map points by geohashed city + time gaps into trips; there is **no backend
  *   trip entity**, so a trip is identity-less and editing it is meaningless.
+ * - **Folders** — derived from `assets.storage_path` prefixes; there is no
+ *   folders table. {@link useFolders} lists immediate child folders (recursive
+ *   counts/covers) and {@link useFolderSummary} aggregates one folder path, both
+ *   backed by new `/api/v1/assets/folders*` endpoints. Route identity is a
+ *   `{ repositoryId, folderPath }` pair packed by {@link encodeFolderKey} /
+ *   {@link decodeFolderKey} into an opaque `:folderKey` segment, since a raw
+ *   path can contain slashes.
+ * - **Tags** — a real vocabulary, but grouped by `(tag_id, source)` because the
+ *   same tag name can carry both manual and AI/system assignments across
+ *   different assets. {@link useTagSummaries} wraps the new
+ *   `/api/v1/assets/tag-summaries` endpoint (counts/covers), distinct from the
+ *   autocomplete-only `/api/v1/assets/tags` used by `@`-mentions. Route
+ *   identity uses {@link encodeTagKey} / {@link decodeTagKey} over
+ *   `{ tagName, source }`, matching the `tag_name` + `tag_source` filter pair
+ *   `AssetFilterDTO` already supports.
  *
  * ## Composition
  *
@@ -38,25 +56,35 @@
  *     HUB["Collections · hub"]
  *     HUB --> UR["UtilitiesRail"] --> DUP["Duplicates"]
  *     UR --> UCA["UtilityClassifierAlbum"]
+ *     UR --> FLD["Folders"] --> FD["FolderDetails"]
+ *     UR --> TGS["Tags"] --> TD2["TagDetails"]
  *     HUB --> MR["MapRail"] --> TD["TripDetails"]
  *     HUB --> AR["AlbumRail"] --> AD["AlbumDetails · hero + edit"]
  *     HUB --> PR["PeopleRail"] -.->|people feature| PERSON["PersonDetails"]
  * ```
  *
- * {@link AlbumDetails}, {@link TripDetails} and {@link UtilityClassifierAlbum}
- * all render through the shared {@link AssetsGalleryPage} orchestrator, differing
- * only by injection points: album scopes by `{ album_id }`, trip by
- * `{ location(bbox), date }`, classifier by `{ tag_name, tag_source }`. Album
- * detail carries an *editable* hero — {@link CollectionHero} composed with
- * {@link AlbumFormModal}; trips and classifier albums pass no `hero` and expose
- * no edit, because they have no entity to mutate. {@link Duplicates} is the one
- * review-style page, not an asset grid.
+ * {@link Folders} and {@link Tags} are the list pages that route into
+ * {@link FolderDetails} and {@link TagDetails}.
+ *
+ * {@link AlbumDetails}, {@link TripDetails}, {@link UtilityClassifierAlbum},
+ * {@link FolderDetails} and {@link TagDetails} all render through the shared
+ * {@link AssetsGalleryPage} orchestrator, differing only by injection points:
+ * album scopes by `{ album_id }`, trip by `{ location(bbox), date }`, classifier
+ * and tag detail by `{ tag_name, tag_source }`, folder detail by
+ * `{ repository_id, folder_path, folder_recursive }`. Album detail carries an
+ * *editable* hero — {@link CollectionHero} composed with {@link AlbumFormModal};
+ * trips, classifier albums, and tag detail pass no `hero` and expose no edit,
+ * because they have no entity to mutate. {@link FolderDetails} passes a `hero`
+ * with breadcrumb/child-folder drilldown chips, not an edit surface — folders
+ * still aren't a mutable entity. {@link Duplicates} is the one review-style
+ * page, not an asset grid.
  *
  * ## Decisions
  *
  * Editing is modal-only — {@link AlbumFormModal} both creates and edits albums
- * over a shared modal shell, with no inline editing. Trips and classifier albums
- * expose no edit affordance by design: they have no entity to mutate.
+ * over a shared modal shell, with no inline editing. Trips, classifier albums,
+ * folders, and tags expose no edit affordance by design: they have no entity to
+ * mutate (or, for tags, mutation is out of scope for v1 per the exec plan).
  *
  * @module
  */
@@ -71,6 +99,11 @@ import type {
   useDetectDuplicates,
 } from "./hooks/useDuplicates.ts";
 import type { UTILITY_CLASSIFIERS } from "./utils/utilityClassifiers.ts";
+import type { useFolders, useFolderSummary } from "./hooks/useFolders.ts";
+import type { useTagSummaries } from "./hooks/useTagSummaries.ts";
+import type { encodeFolderKey, decodeFolderKey } from "./utils/folderKey.ts";
+import type { encodeTagKey, decodeTagKey } from "./utils/tagKey.ts";
+import type { useUtilityShortcuts } from "./components/utilityShortcuts.ts";
 import type { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage.tsx";
 import type { CollectionHero } from "@/components/collection";
 import type Collections from "./routes/Collections.tsx";
@@ -78,5 +111,9 @@ import type AlbumDetails from "./routes/AlbumDetails.tsx";
 import type TripDetails from "./routes/TripDetails.tsx";
 import type UtilityClassifierAlbum from "./routes/UtilityClassifierAlbum.tsx";
 import type Duplicates from "./routes/Duplicates.tsx";
+import type Folders from "./routes/Folders.tsx";
+import type FolderDetails from "./routes/FolderDetails.tsx";
+import type Tags from "./routes/Tags.tsx";
+import type TagDetails from "./routes/TagDetails.tsx";
 import type { AlbumFormModal } from "./components/AlbumFormModal.tsx";
 export {};

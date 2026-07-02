@@ -4,7 +4,7 @@ import { EyeOff, Users, UserRound } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { useWorkingRepository } from "@/features/settings";
+import { useBrowseScope } from "@/features/settings";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePersonDetails } from "../hooks/usePeople";
@@ -18,7 +18,7 @@ const PersonAssetsContent = () => {
     personId: string;
     assetId: string;
   }>();
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const personIdNumber = personId ? Number(personId) : 0;
 

@@ -89,6 +89,9 @@
         "noRepositories": "No repositories are available to scan.",
         "title": "Scan {{scope}}"
       },
+      "scope": {
+        "title": "Gallery scope"
+      },
       "selectionMode": {
         "enter": "Enter Selection Mode",
         "exit": "Exit Selection Mode",
@@ -651,6 +654,12 @@
     },
     "emptyAlbums": "No albums yet.",
     "emptyPeople": "No recognized people yet.",
+    "folders": {
+      "empty": "No folders found in this repository yet.",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items",
+      "root": "Root"
+    },
     "itemsCount_one": "{{count}} item",
     "itemsCount_other": "{{count}} items",
     "messages": {
@@ -670,9 +679,18 @@
     },
     "sections": {
       "albums": "Albums",
+      "folders": "Folders",
       "people": "People",
       "places": "Places",
+      "tags": "Tags",
       "utilities": "Utilities"
+    },
+    "tags": {
+      "empty": "No tags found.",
+      "searchPlaceholder": "Search tags",
+      "sourceAI": "AI",
+      "sourceAll": "All",
+      "sourceManual": "Manual"
     },
     "title": "Collections",
     "untitled": "Untitled Album",

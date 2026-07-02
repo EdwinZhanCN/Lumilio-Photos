@@ -4,12 +4,13 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Loader2, RefreshCw, Users } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import { CollectionErrorAlert, LoadMoreButton } from "@/components/collection";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { usePeople, useRebuildPeopleClusters } from "@/features/people/hooks/usePeople";
-import { useWorkingRepository } from "@/features/settings";
+import { useWorkingRepository, useBrowseScope } from "@/features/settings";
 import PeopleCollectionGrid from "../components/PeopleCollectionGrid";
 
 const PAGE_SIZE = 24;
@@ -23,7 +24,8 @@ function PeopleContent() {
     { label: t("sidebar.collections", "Collections"), to: "/collections" },
     { label: t("collections.sections.people", "People") },
   ]);
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { scopedRepositoryId } = useBrowseScope();
+  const { scopedRepositoryId: writeRepositoryId } = useWorkingRepository();
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [includeHidden, setIncludeHidden] = useState(false);
   const { people, total, isLoading, isError, error, isFetching } = usePeople({
@@ -31,7 +33,7 @@ function PeopleContent() {
     repositoryId: scopedRepositoryId,
     includeHidden,
   });
-  const { rebuildPeople, isRebuilding } = useRebuildPeopleClusters(scopedRepositoryId);
+  const { rebuildPeople, isRebuilding } = useRebuildPeopleClusters(writeRepositoryId);
 
   const handleRebuildPeople = async () => {
     try {
@@ -60,6 +62,7 @@ function PeopleContent() {
         title={t("collections.sections.people")}
         icon={<Users className="h-6 w-6 text-primary" strokeWidth={1.5} />}
       >
+        <BrowseScopeSelect />
         <div className="join">
           <button
             type="button"

@@ -19,6 +19,7 @@ export interface Preferences {
   theme: ThemePreferences;
   assetPage: AssetPagePreferences;
   workingRepositoryId?: string;
+  browseRepositoryId?: string;
   /** Monitor/health-check polling interval in milliseconds. */
   healthCheckIntervalMs: number;
 }
@@ -32,6 +33,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     columns: 6,
   },
   workingRepositoryId: undefined,
+  browseRepositoryId: undefined,
   healthCheckIntervalMs: 30_000,
 };
 
@@ -57,6 +59,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         theme: state.theme,
         assetPage: state.assetPage,
         workingRepositoryId: state.workingRepositoryId,
+        browseRepositoryId: state.browseRepositoryId,
         healthCheckIntervalMs: state.healthCheckIntervalMs,
       }),
     },

@@ -48,16 +48,25 @@ export function useWorkingRepository() {
   );
 
   useEffect(() => {
-    if (!repositoriesQuery.isSuccess || !normalizedWorkingRepositoryId || selectedRepository) {
+    if (!repositoriesQuery.isSuccess || repositories.length === 0) {
       return;
     }
 
-    setWorkingRepositoryId(null);
+    if (selectedRepository) {
+      return;
+    }
+
+    const primary =
+      repositories.find((repository) => repository.isPrimary) ?? repositories[0];
+    if (primary && normalizedWorkingRepositoryId !== primary.id) {
+      setWorkingRepositoryId(primary.id);
+    }
   }, [
     repositoriesQuery.isSuccess,
     selectedRepository,
     setWorkingRepositoryId,
     normalizedWorkingRepositoryId,
+    repositories,
   ]);
 
   const scopeLabel = selectedRepository

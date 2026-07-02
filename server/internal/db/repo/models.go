@@ -341,10 +341,10 @@ type FaceCluster struct {
 	ConfidenceScore      *float32           `db:"confidence_score" json:"confidence_score"`
 	MemberCount          *int32             `db:"member_count" json:"member_count"`
 	IsConfirmed          *bool              `db:"is_confirmed" json:"is_confirmed"`
-	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	IsHidden             bool               `db:"is_hidden" json:"is_hidden"`
 	HiddenAt             pgtype.Timestamptz `db:"hidden_at" json:"hidden_at"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type FaceClusterMember struct {
