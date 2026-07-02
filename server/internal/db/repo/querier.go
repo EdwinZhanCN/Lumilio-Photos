@@ -287,8 +287,9 @@ type Querier interface {
 	// storage_path as relative (see assets_repository_id_storage_path_key) and
 	// must never expose repositories.path (the absolute host path).
 	// Lists immediate child folders of parent_path (recursive descendant
-	// counts/covers). Excludes internal .lumilio paths and any asset that sits
-	// directly in parent_path (files, not folders).
+	// counts/covers). Excludes internal .lumilio paths, app-managed inbox
+	// uploads, and any asset that sits directly in parent_path (files, not
+	// folders).
 	GetFolderChildSummaries(ctx context.Context, arg GetFolderChildSummariesParams) ([]GetFolderChildSummariesRow, error)
 	// Aggregate stats for one folder path (recursive descendants), used for the
 	// folder detail header/hero.

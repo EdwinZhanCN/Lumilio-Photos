@@ -5,9 +5,10 @@ timeline: albums, places/trips, people, folders, tags, and utility views
 (classifier albums, duplicates). [Collections](./routes/Collections.tsx) is the landing page —
 rails that each preview a full route. Person *detail* lives in the
 `people` feature; collections only owns the people rail/grid entry into it.
-Folders and tags are reached through [useUtilityShortcuts](./components/utilityShortcuts.ts) alongside
-Duplicates and Trash, since they're browse-only utility-style views, not
-their own hub rail.
+Folders sit alongside albums/places/people as their own hub rail — a
+browsing concept, not a maintenance tool. Tags are reached through
+[useUtilityShortcuts](./components/utilityShortcuts.ts) alongside Duplicates and Trash, since it's a
+browse-only utility-style view, not its own hub rail.
 
 ## State
 
@@ -38,7 +39,9 @@ Each rail has a distinct backend story, and the differences are the point:
   backed by new `/api/v1/assets/folders*` endpoints. Route identity is a
   `{ repositoryId, folderPath }` pair packed by [encodeFolderKey](./utils/folderKey.ts) /
   [decodeFolderKey](./utils/folderKey.ts) into an opaque `:folderKey` segment, since a raw
-  path can contain slashes.
+  path can contain slashes. Both queries exclude the app-managed
+  `.lumilio/` and `inbox/` prefixes, so the rail only ever shows folders a
+  human placed or scanned into the repository.
 - **Tags** — a real vocabulary, but grouped by `(tag_id, source)` because the
   same tag name can carry both manual and AI/system assignments across
   different assets. [useTagSummaries](./hooks/useTagSummaries.ts) wraps the new
@@ -55,11 +58,11 @@ flowchart TD
     HUB["Collections · hub"]
     HUB --> UR["UtilitiesRail"] --> DUP["Duplicates"]
     UR --> UCA["UtilityClassifierAlbum"]
-    UR --> FLD["Folders"] --> FD["FolderDetails"]
     UR --> TGS["Tags"] --> TD2["TagDetails"]
     HUB --> MR["MapRail"] --> TD["TripDetails"]
     HUB --> AR["AlbumRail"] --> AD["AlbumDetails · hero + edit"]
     HUB --> PR["PeopleRail"] -.->|people feature| PERSON["PersonDetails"]
+    HUB --> FR["FoldersRail"] --> FD["FolderDetails"]
 ```
 
 [Folders](./routes/Folders.tsx) and [Tags](./routes/Tags.tsx) are the list pages that route into

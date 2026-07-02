@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
-import { Album, ArrowRight, LibraryBig, MapPin, Users, Wrench } from "lucide-react";
+import { Album, ArrowRight, FolderTree, LibraryBig, MapPin, Users, Wrench } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import BrowseScopeSelect from "@/components/BrowseScopeSelect";
@@ -10,11 +10,14 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useBrowseScope } from "@/features/settings";
 import { usePeople } from "@/features/people/hooks/usePeople";
 import AlbumRail from "../components/AlbumRail";
+import FoldersRail from "../components/FoldersRail";
 import MapRail from "../components/MapRail";
 import PeopleRail from "../components/PeopleRail";
 import UtilitiesRail from "../components/UtilitiesRail";
 import { useAlbums } from "../hooks/useAlbums";
 import { useCityTrips } from "../hooks/useCityTrips";
+import { useFolders } from "../hooks/useFolders";
+import { encodeFolderKey } from "../utils/folderKey";
 
 function CollectionsContent() {
   const { t } = useI18n();
@@ -42,6 +45,8 @@ function CollectionsContent() {
 
   const albums = data?.pages.flatMap((page) => page.albums) ?? [];
   const { trips, isLoading: isTripsLoading } = useCityTrips({ repositoryId: scopedRepositoryId });
+  const { data: foldersData, isPending: isFoldersLoading } = useFolders(scopedRepositoryId, "");
+  const folders = foldersData?.folders ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -182,6 +187,40 @@ function CollectionsContent() {
                 if (!person?.person_id) return;
                 void navigate(`/people/${person.person_id}`);
               }}
+            />
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-base-200 p-3 text-primary">
+                  <FolderTree className="size-5" strokeWidth={1.75} />
+                </div>
+                <h2 className="text-2xl font-black tracking-tight">
+                  {t("collections.sections.folders")}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm rounded-full"
+                onClick={() => navigate("/collections/folders")}
+              >
+                {t("common.viewAll")}
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+
+            <FoldersRail
+              folders={folders.slice(0, 12)}
+              loading={isFoldersLoading}
+              onFolderClick={(folder) =>
+                navigate(
+                  `/collections/folders/${encodeFolderKey({
+                    repositoryId: folder.repository_id ?? "",
+                    folderPath: folder.folder_path ?? "",
+                  })}`,
+                )
+              }
             />
           </section>
         </div>

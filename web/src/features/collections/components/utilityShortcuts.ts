@@ -1,4 +1,4 @@
-import { Copy, FolderTree, Tag, Trash2, type LucideIcon } from "lucide-react";
+import { Copy, Tag, Trash2, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { RailCardTone } from "./RailCard";
 import { getUtilityClassifierTitle, UTILITY_CLASSIFIERS } from "../utils/utilityClassifiers";
@@ -34,13 +34,6 @@ export function useUtilityShortcuts(): UtilityShortcut[] {
       icon: Trash2,
       title: t("collections.utilities.trash.title"),
       tone: "warning",
-    },
-    {
-      key: "folders",
-      to: "/collections/folders",
-      icon: FolderTree,
-      title: t("collections.sections.folders", "Folders"),
-      tone: "primary",
     },
     {
       key: "tags",
