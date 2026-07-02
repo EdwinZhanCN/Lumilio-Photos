@@ -265,6 +265,11 @@ export const AssetsProvider = ({
   );
 
   const initialized = useRef(false);
+  // Latest store search query, kept fresh every render without being a
+  // dependency of the URL->store effect below (see that effect for why).
+  const searchQueryRef = useRef(uiState.searchQuery);
+  searchQueryRef.current = uiState.searchQuery;
+
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
@@ -342,6 +347,14 @@ export const AssetsProvider = ({
     setActiveAssetId(activeAssetId);
   }, [isHydrated, params.assetId, setActiveAssetId, setCarouselOpen]);
 
+  // URL -> store. Deliberately excludes uiState.searchQuery from the
+  // dependency list: this effect exists to pick up *external* URL changes
+  // (back/forward, deep links), not to react to the store itself. Typing in
+  // the search box updates the store directly (see SearchFAB), which the
+  // effect below mirrors into the URL; if this effect also re-ran on every
+  // store change, it would "correct" the just-typed value against a URL that
+  // hasn't caught up yet, and the two effects would ping-pong indefinitely
+  // (reproduced by typing two characters faster than a URL round-trip).
   useEffect(() => {
     if (!syncUrl || !isHydrated) return;
 
@@ -349,11 +362,16 @@ export const AssetsProvider = ({
     const urlQuery = liveSearchParams.get("q");
     const resolvedQuery = urlQuery ?? "";
 
-    if (urlQuery !== null && resolvedQuery !== uiState.searchQuery) {
+    if (urlQuery !== null && resolvedQuery !== searchQueryRef.current) {
       hydrateUI({ searchQuery: resolvedQuery });
     }
-  }, [hydrateUI, isHydrated, searchParams, syncUrl, uiState.searchQuery]);
+  }, [hydrateUI, isHydrated, searchParams, syncUrl]);
 
+  // Store -> URL. Deliberately excludes `searchParams` from the dependency
+  // list so it only fires when the store's search query actually changes,
+  // not whenever the URL changes (including changes this effect itself just
+  // made) — see the effect above for the ping-pong this avoids. It still
+  // reads the live URL via getLiveSearchParams to preserve unrelated params.
   useEffect(() => {
     if (!syncUrl || !isHydrated) return;
 
@@ -368,7 +386,8 @@ export const AssetsProvider = ({
     if (nextParams.toString() !== liveSearchParams.toString()) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [isHydrated, searchParams, setSearchParams, syncUrl, uiState.searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated, setSearchParams, syncUrl, uiState.searchQuery]);
 
   const openCarousel = useCallback(
     (assetId: string) => {
