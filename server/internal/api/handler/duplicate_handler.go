@@ -49,7 +49,7 @@ func (h *DuplicateHandler) GetDuplicateSummary(c *gin.Context) {
 		api.GinBadRequest(c, err, "Invalid repository_id")
 		return
 	}
-	summary, err := h.duplicateService.GetSummary(c.Request.Context(), repoID)
+	summary, err := h.duplicateService.GetSummary(c.Request.Context(), repoID, ownerScopeID(c))
 	if err != nil {
 		log.Printf("get duplicate summary failed: %v", err)
 		api.GinInternalError(c, err, "Failed to load duplicate summary")
@@ -92,6 +92,7 @@ func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 
 	result, err := h.duplicateService.ListGroups(c.Request.Context(), service.ListDuplicateGroupsParams{
 		RepositoryID: repoID,
+		OwnerID:      ownerScopeID(c),
 		Status:       status,
 		Limit:        limit,
 		Offset:       offset,
@@ -133,7 +134,7 @@ func (h *DuplicateHandler) GetDuplicateGroup(c *gin.Context) {
 		api.GinBadRequest(c, err, "Invalid duplicate group id")
 		return
 	}
-	detail, err := h.duplicateService.GetGroup(c.Request.Context(), groupID)
+	detail, err := h.duplicateService.GetGroup(c.Request.Context(), groupID, ownerScopeID(c))
 	if err != nil {
 		if errors.Is(err, service.ErrDuplicateGroupNotFound) {
 			api.GinNotFound(c, err, "Duplicate group not found")
@@ -250,6 +251,7 @@ func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 		KeeperAssetID:     keeperID,
 		DuplicateAssetIDs: duplicates,
 		Policy:            policy,
+		RequireOwner:      ownerScopeID(c),
 	})
 	if err != nil {
 		switch {
@@ -295,7 +297,7 @@ func (h *DuplicateHandler) DismissDuplicateGroup(c *gin.Context) {
 		api.GinBadRequest(c, err, "Invalid duplicate group id")
 		return
 	}
-	if err := h.duplicateService.DismissGroup(c.Request.Context(), groupID); err != nil {
+	if err := h.duplicateService.DismissGroup(c.Request.Context(), groupID, ownerScopeID(c)); err != nil {
 		switch {
 		case errors.Is(err, service.ErrDuplicateGroupNotFound):
 			api.GinNotFound(c, err, "Duplicate group not found")

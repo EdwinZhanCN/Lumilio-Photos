@@ -243,14 +243,15 @@ type Querier interface {
 	GetDuplicateGroupByID(ctx context.Context, groupID pgtype.UUID) (DuplicateGroup, error)
 	GetDuplicateGroupEdges(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupEdge, error)
 	// Top-level metrics for the Utilities rail card.
-	GetDuplicateSummary(ctx context.Context, repositoryID pgtype.UUID) (GetDuplicateSummaryRow, error)
+	GetDuplicateSummary(ctx context.Context, arg GetDuplicateSummaryParams) (GetDuplicateSummaryRow, error)
 	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (GetEmbeddingRow, error)
 	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (GetEmbeddingByTypeRow, error)
 	GetEmbeddingModels(ctx context.Context, embeddingType string) ([]GetEmbeddingModelsRow, error)
 	GetEmbeddingSpaceByAttributes(ctx context.Context, arg GetEmbeddingSpaceByAttributesParams) (EmbeddingSpace, error)
-	// Returns assets in a repository that share the exact same (hash, file_size).
-	// Only photos are considered, and only non-deleted assets. Results are ordered
-	// so members of the same duplicate set are adjacent.
+	// Returns assets in a repository that share the exact same (hash, file_size)
+	// with at least one other asset of the same owner. Only photos are considered,
+	// and only non-deleted assets. Results are ordered so members of the same
+	// duplicate set (owner included in the grouping key) are adjacent.
 	GetExactDuplicateCandidates(ctx context.Context, repositoryID pgtype.UUID) ([]GetExactDuplicateCandidatesRow, error)
 	GetFaceClusterAssignmentsForScope(ctx context.Context, arg GetFaceClusterAssignmentsForScopeParams) ([]GetFaceClusterAssignmentsForScopeRow, error)
 	GetFaceClusterByFaceID(ctx context.Context, faceID int32) (FaceCluster, error)
@@ -372,12 +373,15 @@ type Querier interface {
 	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
 	ListCloudCredentials(ctx context.Context) ([]CloudCredential, error)
 	ListCloudImportRunsForRepository(ctx context.Context, arg ListCloudImportRunsForRepositoryParams) ([]CloudImportRun, error)
-	// Paginated list of duplicate groups for the given repository and status.
+	// Paginated list of duplicate groups for the given repository, owner, and
+	// status. owner_id NULL means no owner scope (admin); non-admin callers pass
+	// their own ID and never see NULL-owner or foreign groups.
 	// Pending groups are returned newest-first; resolved groups by resolution time.
 	ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
 	// Loads pHash embeddings for every non-deleted photo in a repository so the
-	// service layer can build a similarity graph in-memory.
+	// service layer can build a similarity graph in-memory. owner_id is included
+	// because duplicate edges never cross owners.
 	ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]ListPHashEmbeddingsForRepositoryRow, error)
 	ListPendingLocationClusters(ctx context.Context, arg ListPendingLocationClustersParams) ([]LocationCluster, error)
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)

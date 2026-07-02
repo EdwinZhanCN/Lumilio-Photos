@@ -466,15 +466,16 @@ func NewRouter(
 			people.PUT("/:id/hidden", authController.AuthMiddleware(), peopleController.SetPersonHidden)
 		}
 
-		// Duplicate detection routes (Utilities Rail). Auth is required for
-		// mutating actions (detect/merge/dismiss); reads are open to authed users.
+		// Duplicate detection routes (Utilities Rail). Reads and per-group
+		// merge/dismiss are owner-scoped inside the handlers; detection is a
+		// repository-wide maintenance job and stays admin-only (Manage page).
 		duplicates := v1.Group("/duplicates")
 		duplicates.Use(authController.AuthMiddleware(), appInitializedMiddleware)
 		{
 			duplicates.GET("/summary", duplicateController.GetDuplicateSummary)
 			duplicates.GET("/groups", duplicateController.ListDuplicateGroups)
 			duplicates.GET("/groups/:id", duplicateController.GetDuplicateGroup)
-			duplicates.POST("/detect", duplicateController.DetectDuplicates)
+			duplicates.POST("/detect", authController.RequireAdmin(), duplicateController.DetectDuplicates)
 			duplicates.POST("/groups/:id/merge", duplicateController.MergeDuplicateGroup)
 			duplicates.POST("/groups/:id/dismiss", duplicateController.DismissDuplicateGroup)
 		}

@@ -90,6 +90,7 @@ CREATE TABLE public.asset_stack_members (
 CREATE TABLE public.duplicate_groups (
     group_id uuid DEFAULT gen_random_uuid() NOT NULL,
     repository_id uuid NOT NULL,
+    owner_id integer,
     method text NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
     asset_count integer DEFAULT 0 NOT NULL,
@@ -105,6 +106,7 @@ CREATE TABLE public.duplicate_groups (
     CONSTRAINT duplicate_groups_keeper_asset_id_fkey FOREIGN KEY (keeper_asset_id) REFERENCES public.assets(asset_id) ON DELETE SET NULL,
     CONSTRAINT duplicate_groups_recommended_keeper_asset_id_fkey FOREIGN KEY (recommended_keeper_asset_id) REFERENCES public.assets(asset_id) ON DELETE SET NULL,
     CONSTRAINT duplicate_groups_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(repo_id) ON DELETE CASCADE,
+    CONSTRAINT duplicate_groups_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
     CONSTRAINT duplicate_groups_method_check CHECK ((method = ANY (ARRAY['exact'::text, 'phash'::text, 'mixed'::text]))),
     CONSTRAINT duplicate_groups_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'merged'::text, 'dismissed'::text])))
 );
@@ -291,6 +293,13 @@ CREATE INDEX idx_duplicate_groups_repo_status ON public.duplicate_groups USING b
 --
 
 CREATE INDEX idx_duplicate_groups_status ON public.duplicate_groups USING btree (status);
+
+
+--
+-- Name: idx_duplicate_groups_owner_repo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_duplicate_groups_owner_repo ON public.duplicate_groups USING btree (owner_id, repository_id);
 
 
 --
