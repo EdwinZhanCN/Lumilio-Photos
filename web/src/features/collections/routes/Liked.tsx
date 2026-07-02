@@ -13,8 +13,14 @@ import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n";
+import type { AssetFilter } from "@/features/assets/types/assets.type";
 
 const HIDDEN_LIKED_BULK_ACTIONS = ["set-liked"] as const;
+// Module-level constant so the reference is stable across renders — an
+// inline `{ liked: true }` literal would give AssetsGalleryPage's internal
+// `useMemo([baseFilter, ...])` a new identity every render, which
+// retriggers the view definition and can loop with the syncUrl search sync.
+const LIKED_BASE_FILTER: AssetFilter = { liked: true };
 
 const LikedContent = () => {
   const { t } = useI18n();
@@ -89,7 +95,7 @@ const LikedContent = () => {
         <AssetsGalleryPage
           title={t("collections.utilities.liked.title")}
           icon={<Heart className="h-6 w-6 text-primary" strokeWidth={1.5} />}
-          baseFilter={{ liked: true }}
+          baseFilter={LIKED_BASE_FILTER}
           viewKey="collections:liked"
           bulkActions={bulkActions}
           hiddenBulkActions={HIDDEN_LIKED_BULK_ACTIONS}
