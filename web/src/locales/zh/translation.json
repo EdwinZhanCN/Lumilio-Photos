@@ -1376,9 +1376,9 @@
       "searchPlaceholder": "搜索人物"
     },
     "rebuild": {
-      "action": "重建",
+      "action": "重建人物识别",
       "error": "重建人物失败：{{message}}",
-      "running": "重建中...",
+      "running": "重建人物识别中...",
       "success": "已从 {{faces}} 张脸重建 {{clusters}} 个人物聚类（噪声 {{noise}}）。"
     },
     "removeFace": {
