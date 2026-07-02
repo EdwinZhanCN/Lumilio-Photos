@@ -377,7 +377,10 @@ func NewRouter(
 			assets.GET("/filter-options", assetController.GetFilterOptions)
 			assets.GET("/featured", assetController.GetFeaturedAssets)
 			assets.GET("/map-points", assetController.GetPhotoMapPoints)
-			assets.GET("/indexing/repositories", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.ListIndexingRepositories)
+			// Repository registry read: open to all authenticated users so
+			// browse-scope and upload selectors work for non-admins; the
+			// handler strips filesystem paths for them.
+			assets.GET("/indexing/repositories", authController.AuthMiddleware(), assetController.ListIndexingRepositories)
 			assets.GET("/indexing/stats", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.GetIndexingStats)
 			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.RebuildAssetIndexes)
 			assets.POST("/list", assetController.QueryAssets)

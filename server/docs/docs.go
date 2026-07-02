@@ -2485,6 +2485,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "path": {
+                        "description": "Path is only populated for admin callers; repository filesystem\nlocations are never exposed to regular users.",
                         "example": "/Volumes/Media/Photos",
                         "type": "string"
                     },
@@ -7756,7 +7757,7 @@ const docTemplate = `{
         },
         "/api/v1/assets/indexing/repositories": {
             "get": {
-                "description": "Return repositories that can be used to scope indexing stats and reindex requests.",
+                "description": "Return the shared repository registry for browse-scope/upload selectors and indexing filters. Paths are only included for admins.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -7788,7 +7789,7 @@ const docTemplate = `{
                         "description": "Internal server error"
                     }
                 },
-                "summary": "List indexing repositories",
+                "summary": "List repositories for scope selection",
                 "tags": [
                     "assets"
                 ]
@@ -12905,14 +12906,6 @@ const docTemplate = `{
                         "schema": {
                             "type": "integer"
                         }
-                    },
-                    {
-                        "description": "Optional repository UUID filter",
-                        "in": "query",
-                        "name": "repository_id",
-                        "schema": {
-                            "type": "string"
-                        }
                     }
                 ],
                 "requestBody": {
@@ -13169,14 +13162,6 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Optional repository UUID filter",
-                        "in": "query",
-                        "name": "repository_id",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 ],
@@ -13451,14 +13436,6 @@ const docTemplate = `{
                         "schema": {
                             "type": "integer"
                         }
-                    },
-                    {
-                        "description": "Optional repository UUID filter",
-                        "in": "query",
-                        "name": "repository_id",
-                        "schema": {
-                            "type": "string"
-                        }
                     }
                 ],
                 "requestBody": {
@@ -13555,14 +13532,6 @@ const docTemplate = `{
                         "schema": {
                             "type": "integer"
                         }
-                    },
-                    {
-                        "description": "Optional repository UUID filter",
-                        "in": "query",
-                        "name": "repository_id",
-                        "schema": {
-                            "type": "string"
-                        }
                     }
                 ],
                 "responses": {
@@ -13629,14 +13598,6 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Optional repository UUID filter",
-                        "in": "query",
-                        "name": "repository_id",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 ],
@@ -13724,14 +13685,6 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Optional repository UUID filter",
-                        "in": "query",
-                        "name": "repository_id",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 ],

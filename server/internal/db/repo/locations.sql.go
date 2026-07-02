@@ -88,7 +88,7 @@ INSERT INTO location_cluster_assets (cluster_id, asset_id)
 SELECT lc.cluster_id, a.asset_id
 FROM assets a
 JOIN location_clusters lc
-  ON lc.owner_id = COALESCE(a.owner_id, 0)::integer
+  ON lc.owner_id IS NOT DISTINCT FROM a.owner_id
  AND lc.repository_id = a.repository_id
  AND lc.geohash = a.gps_geohash_7
 WHERE a.is_deleted = false
@@ -98,7 +98,7 @@ WHERE a.is_deleted = false
   AND a.gps_longitude IS NOT NULL
   AND a.gps_geohash_7 IS NOT NULL
   AND ($1::uuid IS NULL OR a.repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR COALESCE(a.owner_id, 0)::integer = $2::integer)
+  AND ($2::integer IS NULL OR a.owner_id = $2::integer)
 ON CONFLICT (cluster_id, asset_id) DO NOTHING
 `
 
@@ -124,7 +124,7 @@ INSERT INTO location_clusters (
   geocode_status
 )
 SELECT
-  COALESCE(a.owner_id, 0)::integer AS owner_id,
+  a.owner_id,
   a.repository_id,
   a.gps_geohash_7 AS geohash,
   7 AS precision,
@@ -140,8 +140,8 @@ WHERE a.is_deleted = false
   AND a.gps_longitude IS NOT NULL
   AND a.gps_geohash_7 IS NOT NULL
   AND ($1::uuid IS NULL OR a.repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR COALESCE(a.owner_id, 0)::integer = $2::integer)
-GROUP BY COALESCE(a.owner_id, 0)::integer, a.repository_id, a.gps_geohash_7
+  AND ($2::integer IS NULL OR a.owner_id = $2::integer)
+GROUP BY a.owner_id, a.repository_id, a.gps_geohash_7
 ON CONFLICT (owner_id, repository_id, geohash) DO UPDATE
 SET
   centroid_latitude = EXCLUDED.centroid_latitude,

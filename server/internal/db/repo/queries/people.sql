@@ -1,7 +1,14 @@
 -- name: CountPeopleScoped :one
+-- owner_id filters on the cluster's structural owner (NULL-owner clusters are
+-- admin-only); repository_id stays a member-asset display filter because
+-- people legitimately span repositories.
 SELECT COUNT(*)
 FROM face_clusters fc
 WHERE (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = false)
+  AND (
+    sqlc.narg('owner_id')::integer IS NULL
+    OR fc.owner_id = sqlc.narg('owner_id')
+  )
   AND EXISTS (
     SELECT 1
     FROM face_cluster_members fcm
@@ -12,10 +19,6 @@ WHERE (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = fa
       AND (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
-      )
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
       )
 );
 
@@ -32,12 +35,12 @@ WITH page_people AS MATERIALIZED (
     WHERE a.is_deleted = false
       AND (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = false)
       AND (
-        sqlc.narg('repository_id')::uuid IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
+        sqlc.narg('owner_id')::integer IS NULL
+        OR fc.owner_id = sqlc.narg('owner_id')
       )
       AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
+        sqlc.narg('repository_id')::uuid IS NULL
+        OR a.repository_id = sqlc.narg('repository_id')
       )
     GROUP BY fc.cluster_id, fc.is_confirmed, fc.updated_at
     ORDER BY
@@ -71,10 +74,6 @@ LEFT JOIN LATERAL (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
-      )
     LIMIT 1
 ) rep ON true
 LEFT JOIN LATERAL (
@@ -88,10 +87,6 @@ LEFT JOIN LATERAL (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
-      )
     ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
     LIMIT 1
 ) best ON true
@@ -102,6 +97,8 @@ ORDER BY
     fc.cluster_id DESC;
 
 -- name: GetPersonByIDScoped :one
+-- Authorization is an equality check on the cluster's structural owner;
+-- repository_id remains a read-time display filter on member counts/covers.
 SELECT
     fc.cluster_id,
     fc.cluster_name,
@@ -128,10 +125,6 @@ JOIN LATERAL (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
-      )
 ) scoped ON scoped.member_count > 0
 LEFT JOIN LATERAL (
     SELECT fi.face_image_path, fi.asset_id
@@ -142,10 +135,6 @@ LEFT JOIN LATERAL (
       AND (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
-      )
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
       )
     LIMIT 1
 ) rep ON true
@@ -160,14 +149,14 @@ LEFT JOIN LATERAL (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
-      )
     ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
     LIMIT 1
 ) best ON true
-WHERE fc.cluster_id = sqlc.arg('cluster_id');
+WHERE fc.cluster_id = sqlc.arg('cluster_id')
+  AND (
+    sqlc.narg('owner_id')::integer IS NULL
+    OR fc.owner_id = sqlc.narg('owner_id')
+  );
 
 -- name: RenameFaceCluster :one
 UPDATE face_clusters

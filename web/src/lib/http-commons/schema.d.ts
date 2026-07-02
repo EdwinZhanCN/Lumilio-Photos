@@ -3936,8 +3936,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List indexing repositories
-         * @description Return repositories that can be used to scope indexing stats and reindex requests.
+         * List repositories for scope selection
+         * @description Return the shared repository registry for browse-scope/upload selectors and indexing filters. Paths are only included for admins.
          */
         get: {
             parameters: {
@@ -7217,10 +7217,7 @@ export interface paths {
          */
         patch: {
             parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
+                query?: never;
                 header?: never;
                 path: {
                     /** @description Person ID */
@@ -7437,10 +7434,7 @@ export interface paths {
          */
         put: {
             parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
+                query?: never;
                 header?: never;
                 path: {
                     /** @description Person ID */
@@ -7674,10 +7668,7 @@ export interface paths {
          */
         post: {
             parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
+                query?: never;
                 header?: never;
                 path: {
                     /** @description Source person ID */
@@ -7753,10 +7744,7 @@ export interface paths {
          */
         post: {
             parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
+                query?: never;
                 header?: never;
                 path: {
                     /** @description Person ID */
@@ -7826,10 +7814,7 @@ export interface paths {
          */
         put: {
             parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
+                query?: never;
                 header?: never;
                 path: {
                     /** @description Person ID */
@@ -7904,10 +7889,7 @@ export interface paths {
          */
         post: {
             parameters: {
-                query?: {
-                    /** @description Optional repository UUID filter */
-                    repository_id?: string;
-                };
+                query?: never;
                 header?: never;
                 path: {
                     /** @description Target person ID */
@@ -10735,7 +10717,11 @@ export interface components {
             is_primary?: boolean;
             /** @example Photos Library */
             name?: string;
-            /** @example /Volumes/Media/Photos */
+            /**
+             * @description Path is only populated for admin callers; repository filesystem
+             *     locations are never exposed to regular users.
+             * @example /Volumes/Media/Photos
+             */
             path?: string;
             /** @example regular */
             role?: string;

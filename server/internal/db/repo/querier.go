@@ -78,9 +78,14 @@ type Querier interface {
 	CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error)
 	CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
+	// DBSCAN core check runs over the whole owner scope: clusters span
+	// repositories, so neighbors are never repository-filtered.
 	CountIncrementalFaceNeighbors(ctx context.Context, arg CountIncrementalFaceNeighborsParams) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
+	// owner_id filters on the cluster's structural owner (NULL-owner clusters are
+	// admin-only); repository_id stays a member-asset display filter because
+	// people legitimately span repositories.
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPersonFacesScoped(ctx context.Context, arg CountPersonFacesScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
@@ -99,6 +104,8 @@ type Querier interface {
 	CreateCloudCredential(ctx context.Context, arg CreateCloudCredentialParams) (CloudCredential, error)
 	CreateCloudImportRun(ctx context.Context, arg CreateCloudImportRunParams) (CloudImportRun, error)
 	CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (pgtype.UUID, error)
+	// owner_id is the cluster's structural owner (rule: a cluster never spans
+	// owners). NULL means the cluster groups ownerless assets and is admin-only.
 	CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error)
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
 	CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error)
@@ -160,7 +167,8 @@ type Querier interface {
 	// This is used for auto-detecting RAW+JPEG stacks
 	FindCandidatesForStacking(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingRow, error)
 	// Find assets that share base names but are not yet in any stack.
-	// Includes taken_time and upload_time for time-based clustering.
+	// Includes taken_time and upload_time for time-based clustering, and
+	// owner_id because auto-detected stacks never span owners.
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
 	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID pgtype.UUID) (RepositoryCloudBinding, error)
@@ -229,6 +237,8 @@ type Querier interface {
 	GetCloudImportRun(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error)
 	GetCloudSyncCursor(ctx context.Context, arg GetCloudSyncCursorParams) (string, error)
 	GetCloudSyncFile(ctx context.Context, arg GetCloudSyncFileParams) (GetCloudSyncFileRow, error)
+	// Merge suggestions never pair clusters of different owners; owner_id
+	// optionally restricts candidates to one owner's clusters (nil = admin).
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
@@ -284,12 +294,13 @@ type Querier interface {
 	// folder detail header/hero.
 	GetFolderSummary(ctx context.Context, arg GetFolderSummaryParams) (GetFolderSummaryRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
-	GetIncrementalFaceNeighbors(ctx context.Context, arg GetIncrementalFaceNeighborsParams) ([]GetIncrementalFaceNeighborsRow, error)
 	GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
 	GetManualFaceClusterMembershipsForScope(ctx context.Context, arg GetManualFaceClusterMembershipsForScopeParams) ([]GetManualFaceClusterMembershipsForScopeRow, error)
+	// Cluster attachment is owner-scoped only: a face may join a cluster whose
+	// members live in a different repository, same owner.
 	GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error)
 	GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error)
 	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
@@ -299,6 +310,8 @@ type Querier interface {
 	// Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
 	// a specific asset set, for the agent dedupe tool's in-memory similarity graph.
 	GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []pgtype.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error)
+	// Authorization is an equality check on the cluster's structural owner;
+	// repository_id remains a read-time display filter on member counts/covers.
 	GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error)
 	GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScopedParams) (GetPersonFaceScopedRow, error)
 	// Lightweight photo locations for map clustering/rendering.
@@ -323,10 +336,12 @@ type Querier interface {
 	GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, error)
 	GetStackByAssetID(ctx context.Context, assetID pgtype.UUID) (GetStackByAssetIDRow, error)
 	GetStackByID(ctx context.Context, stackID pgtype.UUID) (AssetStack, error)
-	GetStackMemberCount(ctx context.Context, stackID pgtype.UUID) (int64, error)
-	GetStackMemberCountAny(ctx context.Context, stackID pgtype.UUID) (int64, error)
-	GetStackMembers(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error)
-	GetStackMembersAny(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error)
+	GetStackMemberCount(ctx context.Context, arg GetStackMemberCountParams) (int64, error)
+	GetStackMemberCountAny(ctx context.Context, arg GetStackMemberCountAnyParams) (int64, error)
+	// owner_id restricts the member list to assets the caller may see (nil = admin).
+	GetStackMembers(ctx context.Context, arg GetStackMembersParams) ([]AssetStackMember, error)
+	// owner_id restricts the member list to assets the caller may see (nil = admin).
+	GetStackMembersAny(ctx context.Context, arg GetStackMembersAnyParams) ([]AssetStackMember, error)
 	// ============================================================================
 	// Duplicate detection candidate queries
 	// ============================================================================
@@ -355,6 +370,8 @@ type Querier interface {
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
 	GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTopSpeciesLabelsRow, error)
 	GetUnclusteredFaces(ctx context.Context, arg GetUnclusteredFacesParams) ([]FaceItem, error)
+	// repository_id is a face *selection* filter (which faces get processed),
+	// not part of cluster identity — clusters span repositories, never owners.
 	GetUnclusteredFacesInScope(ctx context.Context, arg GetUnclusteredFacesInScopeParams) ([]FaceItem, error)
 	GetUserByID(ctx context.Context, userID int32) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)

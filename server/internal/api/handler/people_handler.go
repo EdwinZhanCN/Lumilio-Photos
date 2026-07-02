@@ -157,7 +157,6 @@ func (h *PeopleHandler) GetPerson(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Person ID"
-// @Param repository_id query string false "Optional repository UUID filter"
 // @Param request body dto.UpdatePersonRequestDTO true "Person update payload"
 // @Success 200 {object} dto.PersonDetailDTO "Person updated successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
@@ -167,10 +166,6 @@ func (h *PeopleHandler) GetPerson(c *gin.Context) {
 // @Security BearerAuth
 func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 	personID, ok := parsePersonID(c)
-	if !ok {
-		return
-	}
-	repositoryID, ok := parseOptionalRepositoryUUID(c)
 	if !ok {
 		return
 	}
@@ -187,7 +182,7 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 		return
 	}
 
-	_, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c))
+	_, err := h.faceService.GetPerson(c.Request.Context(), personID, pgtype.UUID{}, scopedOwnerIDFromContext(c))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
@@ -204,7 +199,7 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 		return
 	}
 
-	person, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c))
+	person, err := h.faceService.GetPerson(c.Request.Context(), personID, pgtype.UUID{}, scopedOwnerIDFromContext(c))
 	if err != nil {
 		log.Printf("Failed to reload person %d after rename: %v", personID, err)
 		api.GinInternalError(c, err, "Failed to reload person")
@@ -527,7 +522,6 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Target person ID"
-// @Param repository_id query string false "Optional repository UUID filter"
 // @Param request body dto.MergePeopleRequestDTO true "Merge payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "People merged successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
@@ -537,10 +531,6 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 // @Security BearerAuth
 func (h *PeopleHandler) MergePeople(c *gin.Context) {
 	personID, ok := parsePersonID(c)
-	if !ok {
-		return
-	}
-	repositoryID, ok := parseOptionalRepositoryUUID(c)
 	if !ok {
 		return
 	}
@@ -556,9 +546,13 @@ func (h *PeopleHandler) MergePeople(c *gin.Context) {
 	}
 
 	ownerID := scopedOwnerIDFromContext(c)
-	if err := h.faceService.MergePeople(c.Request.Context(), personID, req.SourcePersonIDs, repositoryID, ownerID); err != nil {
+	if err := h.faceService.MergePeople(c.Request.Context(), personID, req.SourcePersonIDs, ownerID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
+			return
+		}
+		if errors.Is(err, service.ErrPeopleCrossOwner) {
+			api.GinBadRequest(c, err, "People belong to different owners")
 			return
 		}
 		log.Printf("Failed to merge people into %d: %v", personID, err)
@@ -566,7 +560,7 @@ func (h *PeopleHandler) MergePeople(c *gin.Context) {
 		return
 	}
 
-	h.respondWithCorrectedPerson(c, personID, repositoryID, ownerID)
+	h.respondWithCorrectedPerson(c, personID, ownerID)
 }
 
 // MoveFace reassigns a single face to another person.
@@ -577,7 +571,6 @@ func (h *PeopleHandler) MergePeople(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Source person ID"
 // @Param faceId path int true "Face ID"
-// @Param repository_id query string false "Optional repository UUID filter"
 // @Param request body dto.MoveFaceRequestDTO true "Move payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Face moved successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
@@ -594,10 +587,6 @@ func (h *PeopleHandler) MoveFace(c *gin.Context) {
 	if !ok {
 		return
 	}
-	repositoryID, ok := parseOptionalRepositoryUUID(c)
-	if !ok {
-		return
-	}
 
 	var req dto.MoveFaceRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -610,9 +599,13 @@ func (h *PeopleHandler) MoveFace(c *gin.Context) {
 	}
 
 	ownerID := scopedOwnerIDFromContext(c)
-	if err := h.faceService.MoveFace(c.Request.Context(), faceID, req.TargetPersonID, repositoryID, ownerID); err != nil {
+	if err := h.faceService.MoveFace(c.Request.Context(), faceID, req.TargetPersonID, ownerID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Person or face not found")
+			return
+		}
+		if errors.Is(err, service.ErrPeopleCrossOwner) {
+			api.GinBadRequest(c, err, "Face and target person belong to different owners")
 			return
 		}
 		log.Printf("Failed to move face %d to person %d: %v", faceID, req.TargetPersonID, err)
@@ -620,7 +613,7 @@ func (h *PeopleHandler) MoveFace(c *gin.Context) {
 		return
 	}
 
-	h.respondWithCorrectedPerson(c, personID, repositoryID, ownerID)
+	h.respondWithCorrectedPerson(c, personID, ownerID)
 }
 
 // RemoveFace detaches a face from a person.
@@ -630,7 +623,6 @@ func (h *PeopleHandler) MoveFace(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Person ID"
 // @Param faceId path int true "Face ID"
-// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Face removed successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 404 {object} api.ErrorResponse "Person or face not found"
@@ -646,13 +638,9 @@ func (h *PeopleHandler) RemoveFace(c *gin.Context) {
 	if !ok {
 		return
 	}
-	repositoryID, ok := parseOptionalRepositoryUUID(c)
-	if !ok {
-		return
-	}
 
 	ownerID := scopedOwnerIDFromContext(c)
-	if err := h.faceService.RemoveFaceFromPerson(c.Request.Context(), faceID, personID, repositoryID, ownerID); err != nil {
+	if err := h.faceService.RemoveFaceFromPerson(c.Request.Context(), faceID, personID, ownerID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Person or face not found")
 			return
@@ -662,7 +650,7 @@ func (h *PeopleHandler) RemoveFace(c *gin.Context) {
 		return
 	}
 
-	h.respondWithCorrectedPerson(c, personID, repositoryID, ownerID)
+	h.respondWithCorrectedPerson(c, personID, ownerID)
 }
 
 // SetPersonCover sets the representative cover face for a person.
@@ -672,7 +660,6 @@ func (h *PeopleHandler) RemoveFace(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Person ID"
-// @Param repository_id query string false "Optional repository UUID filter"
 // @Param request body dto.SetPersonCoverRequestDTO true "Cover payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Cover updated successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
@@ -685,10 +672,6 @@ func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
 	if !ok {
 		return
 	}
-	repositoryID, ok := parseOptionalRepositoryUUID(c)
-	if !ok {
-		return
-	}
 
 	var req dto.SetPersonCoverRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -697,7 +680,7 @@ func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
 	}
 
 	ownerID := scopedOwnerIDFromContext(c)
-	if err := h.faceService.SetPersonCover(c.Request.Context(), personID, req.FaceID, repositoryID, ownerID); err != nil {
+	if err := h.faceService.SetPersonCover(c.Request.Context(), personID, req.FaceID, ownerID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Person or face not found")
 			return
@@ -707,7 +690,7 @@ func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
 		return
 	}
 
-	h.respondWithCorrectedPerson(c, personID, repositoryID, ownerID)
+	h.respondWithCorrectedPerson(c, personID, ownerID)
 }
 
 // SetPersonHidden hides or unhides a person from default people views.
@@ -717,7 +700,6 @@ func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Person ID"
-// @Param repository_id query string false "Optional repository UUID filter"
 // @Param request body dto.SetPersonHiddenRequestDTO true "Hidden payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Hidden state updated successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
@@ -730,10 +712,6 @@ func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
 	if !ok {
 		return
 	}
-	repositoryID, ok := parseOptionalRepositoryUUID(c)
-	if !ok {
-		return
-	}
 
 	var req dto.SetPersonHiddenRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -742,7 +720,7 @@ func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
 	}
 
 	ownerID := scopedOwnerIDFromContext(c)
-	person, err := h.faceService.SetPersonHidden(c.Request.Context(), personID, req.Hidden, repositoryID, ownerID)
+	person, err := h.faceService.SetPersonHidden(c.Request.Context(), personID, req.Hidden, ownerID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
@@ -761,8 +739,8 @@ func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
 // returns a focused correction response. A person that was emptied and removed
 // by the correction yields a null person, which the frontend treats as a
 // navigate-away signal.
-func (h *PeopleHandler) respondWithCorrectedPerson(c *gin.Context, personID int32, repositoryID pgtype.UUID, ownerID *int32) {
-	person, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, ownerID)
+func (h *PeopleHandler) respondWithCorrectedPerson(c *gin.Context, personID int32, ownerID *int32) {
+	person, err := h.faceService.GetPerson(c.Request.Context(), personID, pgtype.UUID{}, ownerID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			api.JSONOK(c, dto.PersonCorrectionResponseDTO{})

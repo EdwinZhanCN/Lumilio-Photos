@@ -55,14 +55,10 @@ type StackService interface {
 	// CreateManualStack groups the given assets into a new stack.
 	CreateManualStack(ctx context.Context, assetIDs []uuid.UUID) (*StackInfo, error)
 
-	// GetStackByAsset returns the stack containing the given asset, if any.
-	GetStackByAsset(ctx context.Context, assetID uuid.UUID) (*StackInfo, error)
-
-	// GetStackByAssetAny returns the stack for an asset, including trashed members.
-	GetStackByAssetAny(ctx context.Context, assetID uuid.UUID) (*StackInfo, error)
-
-	// GetStacksByAssets returns stacks for multiple assets (batch query).
-	GetStacksByAssets(ctx context.Context, assetIDs []uuid.UUID) (map[uuid.UUID]*StackInfo, error)
+	// GetStackByAssetAny returns the stack for an asset, including trashed
+	// members. ownerID restricts the returned member list to assets the
+	// caller may see (nil = admin).
+	GetStackByAssetAny(ctx context.Context, assetID uuid.UUID, ownerID *int32) (*StackInfo, error)
 
 	// RemoveFromStack removes an asset from its stack.
 	RemoveFromStack(ctx context.Context, assetID uuid.UUID) error
@@ -154,17 +150,22 @@ func effectiveTime(taken pgtype.Timestamptz, upload pgtype.Timestamptz) time.Tim
 	return time.Now()
 }
 
-// timeCluster groups candidates by base name, then splits each group into
-// sub-groups where all members were taken within stackMaxTimeGap of each other.
+// timeCluster groups candidates by owner + base name, then splits each group
+// into sub-groups where all members were taken within stackMaxTimeGap of each
+// other. Owner is part of the grouping key: a stack never spans owners.
 func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []struct {
 	BaseName string
 	Members  []repo.FindCandidatesForStackingByNameRow
 } {
-	// First group by base name
-	baseGroups := make(map[string][]repo.FindCandidatesForStackingByNameRow)
+	// First group by owner + base name
+	type groupKey struct {
+		owner    int64
+		baseName string
+	}
+	baseGroups := make(map[groupKey][]repo.FindCandidatesForStackingByNameRow)
 	for _, c := range candidates {
-		bn := baseName(c.OriginalFilename)
-		baseGroups[bn] = append(baseGroups[bn], c)
+		key := groupKey{owner: detectionOwnerKey(c.OwnerID), baseName: baseName(c.OriginalFilename)}
+		baseGroups[key] = append(baseGroups[key], c)
 	}
 
 	var result []struct {
@@ -172,7 +173,8 @@ func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []struct 
 		Members  []repo.FindCandidatesForStackingByNameRow
 	}
 
-	for bn, group := range baseGroups {
+	for key, group := range baseGroups {
+		bn := key.baseName
 		if len(group) < 2 {
 			continue
 		}
@@ -343,20 +345,11 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 		}
 	}
 
-	return s.buildStackInfo(ctx, stackID, false)
-}
-
-// GetStackByAsset returns the stack containing the given asset.
-func (s *stackService) GetStackByAsset(ctx context.Context, assetID uuid.UUID) (*StackInfo, error) {
-	return s.getStackByAsset(ctx, assetID, false)
+	return s.buildStackInfo(ctx, stackID, false, nil)
 }
 
 // GetStackByAssetAny returns the stack containing the given asset, including trashed members.
-func (s *stackService) GetStackByAssetAny(ctx context.Context, assetID uuid.UUID) (*StackInfo, error) {
-	return s.getStackByAsset(ctx, assetID, true)
-}
-
-func (s *stackService) getStackByAsset(ctx context.Context, assetID uuid.UUID, includeDeleted bool) (*StackInfo, error) {
+func (s *stackService) GetStackByAssetAny(ctx context.Context, assetID uuid.UUID, ownerID *int32) (*StackInfo, error) {
 	row, err := s.queries.GetStackByAssetID(ctx, pgtype.UUID{Bytes: assetID, Valid: true})
 	if err != nil {
 		return nil, ErrStackNotFound
@@ -369,53 +362,7 @@ func (s *stackService) getStackByAsset(ctx context.Context, assetID uuid.UUID, i
 		return nil, ErrStackNotFound
 	}
 
-	return s.buildStackInfo(ctx, pgtype.UUID{Bytes: stackUUID, Valid: true}, includeDeleted)
-}
-
-// GetStacksByAssets returns stacks for multiple assets.
-func (s *stackService) GetStacksByAssets(ctx context.Context, assetIDs []uuid.UUID) (map[uuid.UUID]*StackInfo, error) {
-	pgUUIDs := make([]pgtype.UUID, len(assetIDs))
-	for i, id := range assetIDs {
-		pgUUIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
-
-	rows, err := s.queries.GetStacksByAssetIDs(ctx, pgUUIDs)
-	if err != nil {
-		return nil, fmt.Errorf("get stacks by asset ids: %w", err)
-	}
-
-	// Collect unique stack IDs
-	stackSet := make(map[uuid.UUID]bool)
-	assetToStack := make(map[uuid.UUID]uuid.UUID)
-	for _, row := range rows {
-		var assetID, stackID uuid.UUID
-		if row.AssetID.Valid {
-			assetID = row.AssetID.Bytes
-		}
-		if row.StackID.Valid {
-			stackID = row.StackID.Bytes
-		}
-		if assetID != uuid.Nil && stackID != uuid.Nil {
-			assetToStack[assetID] = stackID
-			stackSet[stackID] = true
-		}
-	}
-
-	// Build stack info for each unique stack
-	result := make(map[uuid.UUID]*StackInfo)
-	for stackID := range stackSet {
-		info, err := s.buildStackInfo(ctx, pgtype.UUID{Bytes: stackID, Valid: true}, false)
-		if err != nil {
-			s.logger.Warn("failed to build stack info", zap.String("stack_id", stackID.String()), zap.Error(err))
-			continue
-		}
-		// Map each asset in this stack to the stack info
-		for _, m := range info.Members {
-			result[m.AssetID] = info
-		}
-	}
-
-	return result, nil
+	return s.buildStackInfo(ctx, pgtype.UUID{Bytes: stackUUID, Valid: true}, true, ownerID)
 }
 
 // RemoveFromStack removes an asset from its stack.
@@ -541,8 +488,9 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 	return nil
 }
 
-// buildStackInfo constructs a StackInfo from a stack ID.
-func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID, includeDeleted bool) (*StackInfo, error) {
+// buildStackInfo constructs a StackInfo from a stack ID. ownerID restricts
+// members (and the count) to assets that owner may see; nil = no restriction.
+func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID, includeDeleted bool, ownerID *int32) (*StackInfo, error) {
 	var stackKind dbtypes.StackKind
 	if err := s.pool.QueryRow(ctx, `SELECT stack_kind FROM asset_stacks WHERE stack_id = $1`, stackID).Scan(&stackKind); err != nil {
 		return nil, fmt.Errorf("get stack kind: %w", err)
@@ -551,9 +499,9 @@ func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID, 
 	var members []repo.AssetStackMember
 	var err error
 	if includeDeleted {
-		members, err = s.queries.GetStackMembersAny(ctx, stackID)
+		members, err = s.queries.GetStackMembersAny(ctx, repo.GetStackMembersAnyParams{StackID: stackID, OwnerID: ownerID})
 	} else {
-		members, err = s.queries.GetStackMembers(ctx, stackID)
+		members, err = s.queries.GetStackMembers(ctx, repo.GetStackMembersParams{StackID: stackID, OwnerID: ownerID})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get stack members: %w", err)
@@ -561,9 +509,9 @@ func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID, 
 
 	var count int64
 	if includeDeleted {
-		count, err = s.queries.GetStackMemberCountAny(ctx, stackID)
+		count, err = s.queries.GetStackMemberCountAny(ctx, repo.GetStackMemberCountAnyParams{StackID: stackID, OwnerID: ownerID})
 	} else {
-		count, err = s.queries.GetStackMemberCount(ctx, stackID)
+		count, err = s.queries.GetStackMemberCount(ctx, repo.GetStackMemberCountParams{StackID: stackID, OwnerID: ownerID})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get stack member count: %w", err)

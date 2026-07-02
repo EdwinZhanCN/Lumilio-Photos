@@ -256,7 +256,7 @@ func (s *assetService) queryCollapsedSemanticBrowseItems(ctx context.Context, pa
 	if err != nil {
 		return BrowseQueryResult{}, err
 	}
-	items, err := s.collapseAssetsToBrowseItems(ctx, assets)
+	items, err := s.collapseAssetsToBrowseItems(ctx, assets, params.OwnerID)
 	if err != nil {
 		return BrowseQueryResult{}, err
 	}
@@ -318,7 +318,7 @@ func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, p
 			params.Offset,
 		), nil
 	}
-	items, err := s.collapseAssetsToBrowseItems(ctx, assets)
+	items, err := s.collapseAssetsToBrowseItems(ctx, assets, params.OwnerID)
 	if err != nil {
 		return BrowseQueryResult{}, err
 	}
@@ -418,7 +418,8 @@ func pageBrowseItems(items []BrowseItem, limit, offset int) []BrowseItem {
 
 // collapseAssetsToBrowseItems groups vector- or list-ranked assets into stack rows: each stack emits once in input order,
 // using the stack cover asset for thumbnails and MemberAssetIDs from DB; MatchedMemberIDs lists input assets belonging to that stack.
-func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets []repo.Asset) ([]BrowseItem, error) {
+// ownerID restricts expanded stack member lists to assets the caller may see (nil = admin).
+func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets []repo.Asset, ownerID *int32) ([]BrowseItem, error) {
 	if len(assets) == 0 {
 		return []BrowseItem{}, nil
 	}
@@ -465,7 +466,10 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 	coverIDsByStack := make(map[uuid.UUID]uuid.UUID, len(stackOrder))
 
 	for _, stackID := range stackOrder {
-		members, err := s.queries.GetStackMembers(ctx, pgtype.UUID{Bytes: stackID, Valid: true})
+		members, err := s.queries.GetStackMembers(ctx, repo.GetStackMembersParams{
+			StackID: pgtype.UUID{Bytes: stackID, Valid: true},
+			OwnerID: ownerID,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("get stack members for %s: %w", stackID.String(), err)
 		}
