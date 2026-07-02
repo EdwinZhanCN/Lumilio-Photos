@@ -92,6 +92,11 @@ credential setup is complete, an admin exists, and exactly one active primary
 repository exists. Repository config lives in `.lumiliorepo` files and is handled
 by `internal/storage/repocfg`.
 
+Repositories are unowned shared storage; per-user visibility and mutation
+authorization run entirely on `assets.owner_id`. The full model — the two
+axes, the grouped-entity ownership rules, and which endpoints take which
+scope — is in [scoping.md](./scoping.md).
+
 ## Database And API Contracts
 
 - Migrations live in `server/migrations`.

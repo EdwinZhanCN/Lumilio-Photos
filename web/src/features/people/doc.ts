@@ -9,12 +9,16 @@
  *
  * ## Ownership
  *
- * Every person query and mutation is repository/owner scoped. {@link usePeople}
- * lists people for the working repository (with an `includeHidden` toggle that
- * switches the grid from visible-only to all people); {@link usePersonDetails}
- * loads one person plus its rename. {@link PersonDetails} is the detail route:
- * a {@link CollectionHero} with an edit action that opens {@link PersonRenameModal},
- * and the person's asset gallery rendered through {@link AssetsGalleryPage}.
+ * A person is owner-scoped but **not** repository-scoped: clusters span
+ * repositories, so only the list read follows the browse scope.
+ * {@link usePeople} lists people under the current browse scope (with an
+ * `includeHidden` toggle that switches the grid from visible-only to all
+ * people); {@link usePersonDetails} loads one person plus its rename, with no
+ * repository filter — as do the face list and every mutation below.
+ * {@link PersonDetails} is the detail route: a {@link CollectionHero} with an
+ * edit action that opens {@link PersonRenameModal}, and the person's asset
+ * gallery rendered through {@link AssetsGalleryPage}. See
+ * `site/docs/internal/agent/scoping.md` for the scoping model.
  *
  * ## Corrections
  *

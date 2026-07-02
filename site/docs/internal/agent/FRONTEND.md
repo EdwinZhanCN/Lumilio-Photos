@@ -134,6 +134,12 @@ Use Zustand for feature-local interactive UI state:
 
 Do not mirror the same data across Query, Context, and Zustand without a clear ownership reason.
 
+Repository scoping follows the four-source model in
+[scoping.md](./scoping.md): `useBrowseScope` for list pages,
+`useWorkingRepository` for upload only, the entity's own `repository_id` for
+entity actions, and Manage for maintenance jobs. Do not add repository
+parameters to person/album detail pages or mutations.
+
 ## Routing And Shell
 
 Public routes include login and register. Bootstrap routes handle first-user setup. Protected standalone routes handle MFA and password changes.
