@@ -246,18 +246,26 @@ should use `auto-fill/minmax` instead of fixed column counts.
 Centered-card pages; verify small-phone heights (keyboard overlap) and wide
 screens. Includes MFA/passkey flows.
 
-- [ ] features/auth/AuthProvider.tsx
-- [ ] features/auth/components/BootstrapGate.tsx
-- [ ] features/auth/components/PrimaryRepositoryGate.tsx
-- [ ] features/auth/components/ProtectedRoute.tsx
-- [ ] features/auth/components/RegistrationForm.tsx
-- [ ] features/auth/components/SetupGate.tsx
-- [ ] features/auth/components/ui.tsx
-- [ ] features/auth/routes/BootstrapWizard.tsx
-- [ ] features/auth/routes/ChangePasswordPage.tsx
-- [ ] features/auth/routes/LoginPage.tsx
-- [ ] features/auth/routes/MFAPage.tsx
-- [ ] features/auth/routes/RegisterPage.tsx
+- [x] features/auth/AuthProvider.tsx — no visual surface (reducer provider).
+- [x] features/auth/components/BootstrapGate.tsx — `min-h-screen` → `min-h-dvh`
+      (correct height on mobile browsers with dynamic chrome/keyboard).
+- [x] features/auth/components/PrimaryRepositoryGate.tsx — same `min-h-dvh` fix;
+      form grid already `sm:grid-cols-2`.
+- [x] features/auth/components/ProtectedRoute.tsx — same `min-h-dvh` fix.
+- [x] features/auth/components/RegistrationForm.tsx — same `min-h-dvh` fix;
+      already responsive otherwise (AuthShell caps width, wraps).
+- [x] features/auth/components/SetupGate.tsx — same `min-h-dvh` fix.
+- [x] features/auth/components/ui.tsx — already responsive (`AuthShell` uses
+      `w-full` + `maxWidth`, `p-7 sm:p-8`); the whole auth kit was already
+      built mobile-first.
+- [x] features/auth/routes/BootstrapWizard.tsx — same `min-h-dvh` fix;
+      already responsive (sidebar `hidden md:flex`, dedicated mobile stepper).
+- [x] features/auth/routes/ChangePasswordPage.tsx — same `min-h-dvh` fix;
+      already responsive (`p-8 sm:p-10`, `text-3xl sm:text-4xl`).
+- [x] features/auth/routes/LoginPage.tsx — same `min-h-dvh` fix.
+- [x] features/auth/routes/MFAPage.tsx — same `min-h-dvh` fix.
+- [x] features/auth/routes/RegisterPage.tsx — no visual surface (thin wrapper
+      around RegistrationForm).
 
 ## Batch 5 — Home, Settings, People, Manage, Updates, Portfolio
 

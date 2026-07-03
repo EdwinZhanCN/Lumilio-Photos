@@ -223,7 +223,7 @@ const BootstrapWizard: React.FC = () => {
   ];
 
   return (
-    <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+    <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
       <div className="screen-in w-full" style={{ maxWidth: 880 }} key={`bootstrap-${current}`}>
         <div className="overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_44px_-18px_rgba(0,0,0,0.18)] md:grid md:grid-cols-[260px_1fr]">
           {/* sidebar */}

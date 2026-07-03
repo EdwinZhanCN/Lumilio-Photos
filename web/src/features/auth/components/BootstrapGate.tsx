@@ -21,7 +21,7 @@ const BootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   if (bootstrapQuery.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-base-200">
+      <div className="min-h-dvh flex items-center justify-center bg-base-200">
         <div className="flex flex-col items-center gap-4">
           <span className="loading loading-spinner loading-lg text-primary"></span>
           <p className="text-sm font-medium opacity-50 animate-pulse">
@@ -36,7 +36,7 @@ const BootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   if (bootstrapQuery.isError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-base-200 px-4">
+      <div className="min-h-dvh flex items-center justify-center bg-base-200 px-4">
         <div className="alert alert-error max-w-md text-sm">
           <div className="flex flex-col gap-3">
             <span>
