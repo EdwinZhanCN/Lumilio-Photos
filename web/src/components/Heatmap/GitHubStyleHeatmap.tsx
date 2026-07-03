@@ -215,7 +215,7 @@ export const GitHubStyleHeatmap: React.FC<GitHubStyleHeatmapProps> = ({
   const svgHeight = topPadding + 7 * (cellSize + cellGap) - cellGap;
 
   return (
-    <div className={`github-heatmap ${className}`}>
+    <div className={`github-heatmap max-w-full overflow-x-auto ${className}`}>
       <svg
         width={svgWidth}
         height={svgHeight}

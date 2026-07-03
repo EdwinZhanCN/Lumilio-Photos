@@ -24,7 +24,9 @@ export function CollectionTitle({
   }
   return (
     <div className="flex flex-wrap items-baseline gap-4">
-      <h1 className="truncate text-4xl font-black tracking-tight text-primary">{title}</h1>
+      <h1 className="truncate text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-primary">
+        {title}
+      </h1>
       {code && <span className="badge badge-ghost font-mono text-xs opacity-50">{code}</span>}
       {children}
     </div>
