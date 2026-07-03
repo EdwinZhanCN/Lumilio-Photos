@@ -164,9 +164,10 @@ type QueryAssetsParams struct {
 type AssetSetSourceKind string
 
 const (
-	AssetSetSourceLibrary AssetSetSourceKind = "library"
-	AssetSetSourcePin     AssetSetSourceKind = "pin"
-	AssetSetSourceRef     AssetSetSourceKind = "ref"
+	AssetSetSourceLibrary   AssetSetSourceKind = "library"
+	AssetSetSourcePin       AssetSetSourceKind = "pin"
+	AssetSetSourceRef       AssetSetSourceKind = "ref"
+	AssetSetSourceShareLink AssetSetSourceKind = "share_link"
 )
 
 // AssetSetSource scopes a query to an internally resolved asset set.

@@ -1,4 +1,5 @@
 import { useLocation, useSearchParams } from "react-router-dom";
+import { useCallback, useState } from "react";
 import { AssetsProvider } from "../AssetsProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
@@ -8,6 +9,12 @@ import { useI18n } from "@/lib/i18n";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import type {
+  AssetsBulkActionContext,
+  AssetsBulkActionItem,
+} from "@/features/assets/components/shared/bulkActions";
+import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
+import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
 
 type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 
@@ -54,6 +61,17 @@ const Assets = () => {
   // alive across carousel open/close navigation.
   const scopeId = isPinMode ? `assets:pin:${pin}` : "assets:main";
 
+  const [shareAssetIds, setShareAssetIds] = useState<string[] | null>(null);
+  const bulkActions = useCallback(
+    (_context: AssetsBulkActionContext): AssetsBulkActionItem[] => [
+      createShareSelectedBulkAction(
+        t("assets.assetsPageHeader.bulkActions.share.label", "Share"),
+        setShareAssetIds,
+      ),
+    ],
+    [t],
+  );
+
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
@@ -66,9 +84,15 @@ const Assets = () => {
     >
       <AssetsProvider key={scopeId} scopeId={scopeId} persist={!isPinMode} syncUrl={isPinMode}>
         <WorkerProvider>
-          <AssetsGalleryPage pinId={pin ?? undefined} />
+          <AssetsGalleryPage pinId={pin ?? undefined} bulkActions={bulkActions} />
         </WorkerProvider>
       </AssetsProvider>
+      <CreateShareLinkModal
+        open={shareAssetIds !== null}
+        onClose={() => setShareAssetIds(null)}
+        sourceKind="asset_snapshot"
+        assetIds={shareAssetIds ?? undefined}
+      />
     </ErrorBoundary>
   );
 };

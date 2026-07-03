@@ -536,6 +536,27 @@ type Setting struct {
 	MlBioclipEnabled    bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
 }
 
+type ShareLink struct {
+	ShareID          pgtype.UUID        `db:"share_id" json:"share_id"`
+	OwnerID          int32              `db:"owner_id" json:"owner_id"`
+	TokenHash        []byte             `db:"token_hash" json:"token_hash"`
+	Title            string             `db:"title" json:"title"`
+	Description      *string            `db:"description" json:"description"`
+	SourceKind       string             `db:"source_kind" json:"source_kind"`
+	SourceRef        *string            `db:"source_ref" json:"source_ref"`
+	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
+	AssetCount       int32              `db:"asset_count" json:"asset_count"`
+	AllowDownload    bool               `db:"allow_download" json:"allow_download"`
+	IncludeOriginals bool               `db:"include_originals" json:"include_originals"`
+	Status           string             `db:"status" json:"status"`
+	ExpiresAt        pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RevokedAt        pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	LastViewedAt     pgtype.Timestamptz `db:"last_viewed_at" json:"last_viewed_at"`
+	ViewCount        int64              `db:"view_count" json:"view_count"`
+}
+
 type SpeciesPrediction struct {
 	PredictionID int32              `db:"prediction_id" json:"prediction_id"`
 	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`

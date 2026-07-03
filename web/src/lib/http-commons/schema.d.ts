@@ -8017,6 +8017,411 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/shares/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public share metadata
+         * @description Get a public share's de-sensitized metadata (title, asset count, expiry, download policy). Records one view.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share token */
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.PublicShareMetadataDTO"];
+                    };
+                };
+                /** @description Share not found or no longer available */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/shares/{token}/assets/{assetId}/original": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public share original file
+         * @description Serve the original file for an asset that belongs to this share. Requires allow_download and include_originals to both be enabled.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share token */
+                    token: string;
+                    /** @description Asset ID */
+                    assetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Original file content */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": Record<string, never>;
+                    };
+                };
+                /** @description Original downloads are not enabled for this share */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/shares/{token}/assets/{assetId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public share asset thumbnail
+         * @description Serve a thumbnail for an asset that belongs to this share.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Thumbnail size */
+                    size?: "small" | "medium" | "large";
+                };
+                header?: never;
+                path: {
+                    /** @description Share token */
+                    token: string;
+                    /** @description Asset ID */
+                    assetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Thumbnail image file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Record<string, never>;
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/shares/{token}/assets/{assetId}/web-audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public share asset web audio
+         * @description Serve the web-optimized audio for an asset that belongs to this share.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share token */
+                    token: string;
+                    /** @description Asset ID */
+                    assetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Web-optimized audio file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "audio/mpeg": Record<string, never>;
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/shares/{token}/assets/{assetId}/web-video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public share asset web video
+         * @description Serve the web-optimized video for an asset that belongs to this share.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share token */
+                    token: string;
+                    /** @description Asset ID */
+                    assetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Web-optimized video file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "video/mp4": Record<string, never>;
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "video/mp4": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/shares/{token}/assets/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List public share assets
+         * @description Browse a public share's assets in date order. v1 is browse-only: no filter/search/sort.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share token */
+                    token: string;
+                };
+                cookie?: never;
+            };
+            /** @description Pagination */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.PublicShareAssetListRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.PublicShareAssetListResponseDTO"];
+                    };
+                };
+                /** @description Share not found or no longer available */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/shares/{token}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Download public share
+         * @description Serve the share's original files (optionally scoped to a subset via asset_ids) as a zip archive. Requires allow_download to be enabled.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share token */
+                    token: string;
+                };
+                cookie?: never;
+            };
+            /** @description Optional asset ID subset */
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.PublicShareDownloadRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Zip archive */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": Record<string, never>;
+                    };
+                };
+                /** @description Downloads are not enabled for this share */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories": {
         parameters: {
             query?: never;
@@ -8954,6 +9359,340 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/share-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List share links
+         * @description List all share links owned by the current user, newest first.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ListShareLinksResponseDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a share link
+         * @description Resolve a source into an asset snapshot and create a revocable, time-limited public share link. The raw token is returned only in this response.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Share link creation data */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.CreateShareLinkRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Share link created successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.CreateShareLinkResponseDTO"];
+                    };
+                };
+                /** @description Invalid request or source */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Failed to create share link */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/share-links/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a share link
+         * @description Get one share link's metadata (never the token).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ShareLinkDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Share link not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Delete a share link
+         * @description Permanently remove a share link record. Only expired or revoked links may be deleted.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Share link must be expired or revoked first */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Share link not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Update a share link
+         * @description Patch a share link's title/description/download settings, and/or extend its expiry by extend_days.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Share link update */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateShareLinkRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ShareLinkDTO"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Share link not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/share-links/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a share link
+         * @description Immediately disable public access for a share link.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Share ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ShareLinkDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Share link not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -10521,6 +11260,40 @@ export interface components {
             cloud_import_run_id?: string;
             repository?: components["schemas"]["dto.RepositoryDTO"];
         };
+        "dto.CreateShareLinkRequestDTO": {
+            allow_download?: boolean;
+            asset_ids?: string[];
+            description?: string;
+            /** @example 30 */
+            expires_in_days?: number;
+            include_originals?: boolean;
+            /** @enum {string} */
+            source_kind: "asset_snapshot" | "album" | "person" | "utility_query" | "pin";
+            source_ref?: string;
+            title: string;
+        };
+        "dto.CreateShareLinkResponseDTO": {
+            allow_download?: boolean;
+            asset_count?: number;
+            created_at?: string;
+            description?: string;
+            expires_at?: string;
+            include_originals?: boolean;
+            last_viewed_at?: string;
+            revoked_at?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            share_id?: string;
+            /** @enum {string} */
+            source_kind?: "asset_snapshot" | "album" | "person" | "utility_query" | "pin";
+            source_ref?: string;
+            /** @enum {string} */
+            status?: "active" | "revoked";
+            title?: string;
+            /** @example 7yQhF3z9k2mN8pXeR5tVwL1sJ4bC6dA0 */
+            token?: string;
+            updated_at?: string;
+            view_count?: number;
+        };
         "dto.DateRangeDTO": {
             from?: string;
             to?: string;
@@ -10779,6 +11552,9 @@ export interface components {
         };
         "dto.ListRepositoriesResponseDTO": {
             repositories?: components["schemas"]["dto.RepositoryDTO"][];
+        };
+        "dto.ListShareLinksResponseDTO": {
+            items?: components["schemas"]["dto.ShareLinkDTO"][];
         };
         "dto.ListUsersResponseDTO": {
             limit?: number;
@@ -11052,6 +11828,44 @@ export interface components {
             failed_sessions?: number;
             overall_progress?: number;
             total_sessions?: number;
+        };
+        "dto.PublicAssetDTO": {
+            asset_id?: string;
+            duration?: number;
+            height?: number;
+            taken_time?: string;
+            /** @enum {string} */
+            type?: "PHOTO" | "VIDEO" | "AUDIO";
+            width?: number;
+        };
+        "dto.PublicShareAssetListRequestDTO": {
+            /** @example 50 */
+            limit?: number;
+            /** @example 0 */
+            offset?: number;
+        };
+        "dto.PublicShareAssetListResponseDTO": {
+            items?: components["schemas"]["dto.PublicAssetDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.PublicShareDownloadRequestDTO": {
+            asset_ids?: string[];
+        };
+        "dto.PublicShareMetadataDTO": {
+            allow_download?: boolean;
+            asset_count?: number;
+            created_at?: string;
+            description?: string;
+            expires_at?: string;
+            /**
+             * @description IncludeOriginals tells the viewer whether per-asset original downloads
+             *     are available (GetPublicShareOriginal requires both this and
+             *     AllowDownload); it is a policy flag, not sensitive.
+             */
+            include_originals?: boolean;
+            title?: string;
         };
         "dto.QueryAssetsResponseDTO": {
             items?: components["schemas"]["dto.BrowseItemDTO"][];
@@ -11395,6 +12209,26 @@ export interface components {
             primary_repository_initialized?: boolean;
             repository_defaults?: components["schemas"]["dto.RepositoryDefaultsDTO"];
         };
+        "dto.ShareLinkDTO": {
+            allow_download?: boolean;
+            asset_count?: number;
+            created_at?: string;
+            description?: string;
+            expires_at?: string;
+            include_originals?: boolean;
+            last_viewed_at?: string;
+            revoked_at?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            share_id?: string;
+            /** @enum {string} */
+            source_kind?: "asset_snapshot" | "album" | "person" | "utility_query" | "pin";
+            source_ref?: string;
+            /** @enum {string} */
+            status?: "active" | "revoked";
+            title?: string;
+            updated_at?: string;
+            view_count?: number;
+        };
         "dto.SpeciesReferenceResponseDTO": {
             /** @example Barasingha */
             common_name?: string;
@@ -11623,6 +12457,14 @@ export interface components {
             name?: string;
             /** @example flat */
             storage_strategy?: string;
+        };
+        "dto.UpdateShareLinkRequestDTO": {
+            allow_download?: boolean;
+            description?: string;
+            /** @example 30 */
+            extend_days?: number;
+            include_originals?: boolean;
+            title?: string;
         };
         "dto.UpdateSystemSettingsDTO": {
             llm?: components["schemas"]["dto.UpdateLLMSettingsDTO"];

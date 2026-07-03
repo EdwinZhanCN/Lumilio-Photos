@@ -116,6 +116,7 @@ type Querier interface {
 	CreateRegistrationSession(ctx context.Context, arg CreateRegistrationSessionParams) (RegistrationSession, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateRepositoryScanRun(ctx context.Context, arg CreateRepositoryScanRunParams) (RepositoryScanRun, error)
+	CreateShareLink(ctx context.Context, arg CreateShareLinkParams) (ShareLink, error)
 	CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error)
 	CreateStack(ctx context.Context) (AssetStack, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
@@ -151,6 +152,7 @@ type Querier interface {
 	DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error
 	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
 	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
+	DeleteShareLink(ctx context.Context, arg DeleteShareLinkParams) (int64, error)
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteStack(ctx context.Context, stackID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
@@ -160,6 +162,7 @@ type Querier interface {
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
 	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) error
+	ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLinkExpiryParams) (ShareLink, error)
 	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
 	// Find all assets sharing the same base filename (without extension and without iteration suffix)
 	FindAssetsByBaseName(ctx context.Context, arg FindAssetsByBaseNameParams) ([]FindAssetsByBaseNameRow, error)
@@ -172,6 +175,7 @@ type Querier interface {
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
 	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID pgtype.UUID) (RepositoryCloudBinding, error)
+	GetActiveShareLinkByTokenHash(ctx context.Context, tokenHash []byte) (ShareLink, error)
 	GetAgentPin(ctx context.Context, arg GetAgentPinParams) (AgentPin, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
@@ -331,6 +335,7 @@ type Querier interface {
 	GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) (RepositoryScanRun, error)
 	GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	GetSettings(ctx context.Context) (Setting, error)
+	GetShareLinkByID(ctx context.Context, arg GetShareLinkByIDParams) (ShareLink, error)
 	GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams) ([]GetSimilarFacesRow, error)
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
@@ -379,6 +384,7 @@ type Querier interface {
 	GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error)
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
 	IncrementCloudImportRunCounts(ctx context.Context, arg IncrementCloudImportRunCountsParams) (CloudImportRun, error)
+	IncrementShareLinkView(ctx context.Context, shareID pgtype.UUID) error
 	InsertDuplicateGroupAsset(ctx context.Context, arg InsertDuplicateGroupAssetParams) error
 	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
@@ -411,6 +417,7 @@ type Querier interface {
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID pgtype.UUID) ([]RepositoryCloudBinding, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
+	ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUserWebAuthnCredentialSummaries(ctx context.Context, userID int32) ([]ListUserWebAuthnCredentialSummariesRow, error)
 	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
@@ -457,6 +464,7 @@ type Querier interface {
 	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	RestoreAsset(ctx context.Context, assetID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
+	RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams) (ShareLink, error)
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
@@ -503,6 +511,7 @@ type Querier interface {
 	UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg UpdateRepositoryCloudBindingLastRunParams) (RepositoryCloudBinding, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
+	UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error

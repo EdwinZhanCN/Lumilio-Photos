@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AlbumIcon, Bird, FolderMinus, RefreshCcw } from "lucide-react";
+import { AlbumIcon, Bird, FolderMinus, RefreshCcw, Share2 } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import type { components } from "@/lib/http-commons/schema";
@@ -17,6 +17,8 @@ import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
 } from "@/features/assets/components/shared/bulkActions";
+import { CreateShareLinkModal, type ShareSourceKind } from "@/features/share/components/CreateShareLinkModal";
+import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
 
 type RebuildAlbumBioClipResponse = components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
 
@@ -26,6 +28,11 @@ const AlbumAssetsContent = () => {
   const showMessage = useMessage();
   const { albumId } = useParams<{ albumId: string }>();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [shareRequest, setShareRequest] = useState<{
+    sourceKind: ShareSourceKind;
+    assetIds?: string[];
+    sourceRef?: string;
+  } | null>(null);
   const [bioClipFeedback, setBioClipFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -107,6 +114,10 @@ const AlbumAssetsContent = () => {
 
   const bulkActions = useCallback(
     (context: AssetsBulkActionContext): AssetsBulkActionItem[] => [
+      createShareSelectedBulkAction(
+        t("assets.assetsPageHeader.bulkActions.share.label", "Share"),
+        (assetIds) => setShareRequest({ sourceKind: "asset_snapshot", assetIds }),
+      ),
       {
         id: "remove-from-current-album",
         label: t("collections.albumDetails.bulkActions.removeFromAlbum.label", {
@@ -158,6 +169,11 @@ const AlbumAssetsContent = () => {
     [albumIdNumber, invalidateAlbumAssets, removeAssetFromAlbumMutation, showMessage, t],
   );
 
+  const openShareAlbum = useCallback(() => {
+    if (!albumIdNumber) return;
+    setShareRequest({ sourceKind: "album", sourceRef: String(albumIdNumber) });
+  }, [albumIdNumber]);
+
   const hero = (
     <CollectionHero
       loading={isAlbumLoading && !album}
@@ -172,6 +188,16 @@ const AlbumAssetsContent = () => {
         )
       }
       description={album?.description}
+      actions={
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm gap-1.5 rounded-full"
+          onClick={openShareAlbum}
+        >
+          <Share2 className="size-3.5" />
+          {t("collections.albumDetails.shareAction", "Share")}
+        </button>
+      }
       edit={{
         onOpen: () => setIsEditOpen(true),
         label: t("common.edit", "Edit"),
@@ -234,15 +260,25 @@ const AlbumAssetsContent = () => {
   );
 
   return (
-    <AssetsGalleryPage
-      title={album?.album_name || t("collections.albumDetails.fallbackName")}
-      icon={<AlbumIcon className="h-6 w-6 text-primary" />}
-      baseFilter={{ album_id: albumIdNumber }}
-      viewKey={`album:${albumId}`}
-      hero={hero}
-      bulkActions={bulkActions}
-      hiddenBulkActions={["delete-assets"]}
-    />
+    <>
+      <AssetsGalleryPage
+        title={album?.album_name || t("collections.albumDetails.fallbackName")}
+        icon={<AlbumIcon className="h-6 w-6 text-primary" />}
+        baseFilter={{ album_id: albumIdNumber }}
+        viewKey={`album:${albumId}`}
+        hero={hero}
+        bulkActions={bulkActions}
+        hiddenBulkActions={["delete-assets"]}
+      />
+      <CreateShareLinkModal
+        open={shareRequest !== null}
+        onClose={() => setShareRequest(null)}
+        sourceKind={shareRequest?.sourceKind ?? "asset_snapshot"}
+        assetIds={shareRequest?.assetIds}
+        sourceRef={shareRequest?.sourceRef}
+        defaultTitle={shareRequest?.sourceKind === "album" ? album?.album_name : undefined}
+      />
+    </>
   );
 };
 

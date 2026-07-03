@@ -2017,6 +2017,119 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.CreateShareLinkRequestDTO": {
+                "properties": {
+                    "allow_download": {
+                        "type": "boolean"
+                    },
+                    "asset_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "expires_in_days": {
+                        "example": 30,
+                        "maximum": 365,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "include_originals": {
+                        "type": "boolean"
+                    },
+                    "source_kind": {
+                        "enum": [
+                            "asset_snapshot",
+                            "album",
+                            "person",
+                            "utility_query",
+                            "pin"
+                        ],
+                        "type": "string"
+                    },
+                    "source_ref": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "source_kind",
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.CreateShareLinkResponseDTO": {
+                "properties": {
+                    "allow_download": {
+                        "type": "boolean"
+                    },
+                    "asset_count": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "include_originals": {
+                        "type": "boolean"
+                    },
+                    "last_viewed_at": {
+                        "type": "string"
+                    },
+                    "revoked_at": {
+                        "type": "string"
+                    },
+                    "share_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "source_kind": {
+                        "enum": [
+                            "asset_snapshot",
+                            "album",
+                            "person",
+                            "utility_query",
+                            "pin"
+                        ],
+                        "type": "string"
+                    },
+                    "source_ref": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "enum": [
+                            "active",
+                            "revoked"
+                        ],
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "token": {
+                        "example": "7yQhF3z9k2mN8pXeR5tVwL1sJ4bC6dA0",
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "view_count": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.DateRangeDTO": {
                 "properties": {
                     "from": {
@@ -2654,6 +2767,18 @@ const docTemplate = `{
                     "repositories": {
                         "items": {
                             "$ref": "#/components/schemas/dto.RepositoryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ListShareLinksResponseDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.ShareLinkDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -3370,6 +3495,110 @@ const docTemplate = `{
                     },
                     "total_sessions": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PublicAssetDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "taken_time": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "enum": [
+                            "PHOTO",
+                            "VIDEO",
+                            "AUDIO"
+                        ],
+                        "type": "string"
+                    },
+                    "width": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PublicShareAssetListRequestDTO": {
+                "properties": {
+                    "limit": {
+                        "example": 50,
+                        "maximum": 200,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PublicShareAssetListResponseDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.PublicAssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PublicShareDownloadRequestDTO": {
+                "properties": {
+                    "asset_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PublicShareMetadataDTO": {
+                "properties": {
+                    "allow_download": {
+                        "type": "boolean"
+                    },
+                    "asset_count": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "include_originals": {
+                        "description": "IncludeOriginals tells the viewer whether per-asset original downloads\nare available (GetPublicShareOriginal requires both this and\nAllowDownload); it is a policy flag, not sensitive.",
+                        "type": "boolean"
+                    },
+                    "title": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4178,6 +4407,68 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.ShareLinkDTO": {
+                "properties": {
+                    "allow_download": {
+                        "type": "boolean"
+                    },
+                    "asset_count": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "include_originals": {
+                        "type": "boolean"
+                    },
+                    "last_viewed_at": {
+                        "type": "string"
+                    },
+                    "revoked_at": {
+                        "type": "string"
+                    },
+                    "share_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "source_kind": {
+                        "enum": [
+                            "asset_snapshot",
+                            "album",
+                            "person",
+                            "utility_query",
+                            "pin"
+                        ],
+                        "type": "string"
+                    },
+                    "source_ref": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "enum": [
+                            "active",
+                            "revoked"
+                        ],
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "view_count": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.SpeciesReferenceResponseDTO": {
                 "properties": {
                     "common_name": {
@@ -4726,6 +5017,29 @@ const docTemplate = `{
                     },
                     "storage_strategy": {
                         "example": "flat",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateShareLinkRequestDTO": {
+                "properties": {
+                    "allow_download": {
+                        "type": "boolean"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "extend_days": {
+                        "example": 30,
+                        "maximum": 365,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "include_originals": {
+                        "type": "boolean"
+                    },
+                    "title": {
                         "type": "string"
                     }
                 },
@@ -13761,6 +14075,419 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/public/shares/{token}": {
+            "get": {
+                "description": "Get a public share's de-sensitized metadata (title, asset count, expiry, download policy). Records one view.",
+                "parameters": [
+                    {
+                        "description": "Share token",
+                        "in": "path",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.PublicShareMetadataDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Share not found or no longer available"
+                    }
+                },
+                "summary": "Get public share metadata",
+                "tags": [
+                    "public-shares"
+                ]
+            }
+        },
+        "/api/v1/public/shares/{token}/assets/list": {
+            "post": {
+                "description": "Browse a public share's assets in date order. v1 is browse-only: no filter/search/sort.",
+                "parameters": [
+                    {
+                        "description": "Share token",
+                        "in": "path",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.PublicShareAssetListRequestDTO",
+                                        "summary": "request",
+                                        "description": "Pagination"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Pagination",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.PublicShareAssetListResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Share not found or no longer available"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "List public share assets",
+                "tags": [
+                    "public-shares"
+                ]
+            }
+        },
+        "/api/v1/public/shares/{token}/assets/{assetId}/original": {
+            "get": {
+                "description": "Serve the original file for an asset that belongs to this share. Requires allow_download and include_originals to both be enabled.",
+                "parameters": [
+                    {
+                        "description": "Share token",
+                        "in": "path",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "assetId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Original file content"
+                    },
+                    "403": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Original downloads are not enabled for this share"
+                    },
+                    "404": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "summary": "Get public share original file",
+                "tags": [
+                    "public-shares"
+                ]
+            }
+        },
+        "/api/v1/public/shares/{token}/assets/{assetId}/thumbnail": {
+            "get": {
+                "description": "Serve a thumbnail for an asset that belongs to this share.",
+                "parameters": [
+                    {
+                        "description": "Share token",
+                        "in": "path",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "assetId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Thumbnail size",
+                        "in": "query",
+                        "name": "size",
+                        "schema": {
+                            "default": "medium",
+                            "enum": [
+                                "small",
+                                "medium",
+                                "large"
+                            ],
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Thumbnail image file"
+                    },
+                    "404": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "summary": "Get public share asset thumbnail",
+                "tags": [
+                    "public-shares"
+                ]
+            }
+        },
+        "/api/v1/public/shares/{token}/assets/{assetId}/web-audio": {
+            "get": {
+                "description": "Serve the web-optimized audio for an asset that belongs to this share.",
+                "parameters": [
+                    {
+                        "description": "Share token",
+                        "in": "path",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "assetId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "audio/mpeg": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Web-optimized audio file"
+                    },
+                    "404": {
+                        "content": {
+                            "audio/mpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "summary": "Get public share asset web audio",
+                "tags": [
+                    "public-shares"
+                ]
+            }
+        },
+        "/api/v1/public/shares/{token}/assets/{assetId}/web-video": {
+            "get": {
+                "description": "Serve the web-optimized video for an asset that belongs to this share.",
+                "parameters": [
+                    {
+                        "description": "Share token",
+                        "in": "path",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "assetId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Web-optimized video file"
+                    },
+                    "404": {
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "summary": "Get public share asset web video",
+                "tags": [
+                    "public-shares"
+                ]
+            }
+        },
+        "/api/v1/public/shares/{token}/download": {
+            "post": {
+                "description": "Serve the share's original files (optionally scoped to a subset via asset_ids) as a zip archive. Requires allow_download to be enabled.",
+                "parameters": [
+                    {
+                        "description": "Share token",
+                        "in": "path",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.PublicShareDownloadRequestDTO",
+                                        "summary": "request",
+                                        "description": "Optional asset ID subset"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Optional asset ID subset"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Zip archive"
+                    },
+                    "403": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Downloads are not enabled for this share"
+                    },
+                    "404": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "summary": "Download public share",
+                "tags": [
+                    "public-shares"
+                ]
+            }
+        },
         "/api/v1/repositories": {
             "get": {
                 "description": "Return all registered repositories.",
@@ -14725,6 +15452,380 @@ const docTemplate = `{
                 "summary": "Get system setup status",
                 "tags": [
                     "setup"
+                ]
+            }
+        },
+        "/api/v1/share-links": {
+            "get": {
+                "description": "List all share links owned by the current user, newest first.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ListShareLinksResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List share links",
+                "tags": [
+                    "share-links"
+                ]
+            },
+            "post": {
+                "description": "Resolve a source into an asset snapshot and create a revocable, time-limited public share link. The raw token is returned only in this response.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CreateShareLinkRequestDTO",
+                                        "summary": "request",
+                                        "description": "Share link creation data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Share link creation data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.CreateShareLinkResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Share link created successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request or source"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Failed to create share link"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create a share link",
+                "tags": [
+                    "share-links"
+                ]
+            }
+        },
+        "/api/v1/share-links/{id}": {
+            "delete": {
+                "description": "Permanently remove a share link record. Only expired or revoked links may be deleted.",
+                "parameters": [
+                    {
+                        "description": "Share ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Share link must be expired or revoked first"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Share link not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a share link",
+                "tags": [
+                    "share-links"
+                ]
+            },
+            "get": {
+                "description": "Get one share link's metadata (never the token).",
+                "parameters": [
+                    {
+                        "description": "Share ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ShareLinkDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Share link not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get a share link",
+                "tags": [
+                    "share-links"
+                ]
+            },
+            "patch": {
+                "description": "Patch a share link's title/description/download settings, and/or extend its expiry by extend_days.",
+                "parameters": [
+                    {
+                        "description": "Share ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateShareLinkRequestDTO",
+                                        "summary": "request",
+                                        "description": "Share link update"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Share link update",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ShareLinkDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Share link not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update a share link",
+                "tags": [
+                    "share-links"
+                ]
+            }
+        },
+        "/api/v1/share-links/{id}/revoke": {
+            "post": {
+                "description": "Immediately disable public access for a share link.",
+                "parameters": [
+                    {
+                        "description": "Share ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ShareLinkDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Share link not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Revoke a share link",
+                "tags": [
+                    "share-links"
                 ]
             }
         },

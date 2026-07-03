@@ -46,6 +46,11 @@
         "noAlbumsFound": "未找到相册",
         "title": "添加到相册"
       },
+      "bulkActions": {
+        "share": {
+          "label": "分享"
+        }
+      },
       "bulkConfirm": {
         "likedTitle": "更新喜欢状态？",
         "ratingTitle": "设置评分"
@@ -604,7 +609,8 @@
       "createdAtLabel": "创建于",
       "fallbackName": "相册",
       "itemsCount_one": "{{count}} 项",
-      "itemsCount_other": "{{count}} 项"
+      "itemsCount_other": "{{count}} 项",
+      "shareAction": "分享"
     },
     "albumForm": {
       "editTitle": "编辑相册",
@@ -723,6 +729,9 @@
         },
         "title": "喜欢"
       },
+      "sharedLinks": {
+        "title": "分享链接"
+      },
       "trash": {
         "title": "回收站"
       }
@@ -747,9 +756,11 @@
     "loading": "加载中…",
     "loadMore": "加载更多",
     "na": "无",
+    "next": "下一个",
     "notAvailable": "不可用",
     "or": "或",
     "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
+    "previous": "上一个",
     "remove": "移除",
     "retry": "重试",
     "save": "保存",
@@ -842,6 +853,7 @@
     "retryTitle": "重试处理任务",
     "selectedCount_one": "已选 {{count}} 项",
     "selectedCount_other": "已选 {{count}} 项",
+    "share": "分享",
     "studio": "工作室",
     "submitRetry": "提交重试",
     "submitting": "提交中...",
@@ -1329,6 +1341,7 @@
       "personCode": "人物 {{id}}",
       "renamePlaceholder": "为这个人物命名",
       "save": "保存",
+      "shareAction": "分享",
       "unconfirmedHint": "这个人物还未命名，确认后可以直接填写名字。",
       "updatedLabel": "更新于"
     },
@@ -1747,6 +1760,91 @@
       "title": "用户管理",
       "username": "用户名",
       "usernameHint": "3–32 个字符，以字母开头。允许小写字母、数字、点、下划线和连字符。"
+    }
+  },
+  "share": {
+    "create": {
+      "copied": "已复制到剪贴板",
+      "createdHint": "请立即复制此链接——关闭对话框后将不再显示。",
+      "createdTitle": "链接已创建",
+      "creating": "创建中…",
+      "error": "创建分享链接失败。",
+      "fields": {
+        "allowDownload": {
+          "label": "允许下载"
+        },
+        "expiry": {
+          "days_other": "{{count}} 天",
+          "label": "有效期"
+        },
+        "includeOriginals": {
+          "label": "包含原图"
+        },
+        "title": {
+          "label": "标题",
+          "placeholder": "分享给家人"
+        }
+      },
+      "submit": "创建链接",
+      "title": "分享"
+    },
+    "manage": {
+      "actions": {
+        "delete": "删除",
+        "extend": "延期",
+        "revoke": "撤销"
+      },
+      "columns": {
+        "actions": "操作",
+        "assets": "项目数",
+        "created": "创建时间",
+        "expires": "到期时间",
+        "lastViewed": "最后查看",
+        "source": "来源",
+        "title": "标题",
+        "views": "查看次数"
+      },
+      "deleteError": "删除分享链接失败。",
+      "deleteSuccess": "分享链接已删除。",
+      "emptyDescription": "你创建的分享链接会显示在这里。",
+      "emptyTitle": "暂无分享链接",
+      "extendError": "延长分享链接有效期失败。",
+      "extendSuccess": "已延长 30 天。",
+      "filters": {
+        "active": "有效",
+        "expired": "已过期",
+        "revoked": "已撤销"
+      },
+      "neverViewed": "从未查看",
+      "pageTitle": "分享链接",
+      "revokeError": "撤销分享链接失败。",
+      "revokeSuccess": "分享链接已撤销。",
+      "source": {
+        "album": "相册",
+        "assetSnapshot": "已选项目",
+        "person": "人物",
+        "pin": "看板",
+        "utilityQuery": "工具结果"
+      }
+    },
+    "public": {
+      "footer": "由 Lumilio Photos 提供分享",
+      "grid": {
+        "empty": "此分享暂无内容。"
+      },
+      "header": {
+        "assetCount_other": "{{count}} 项",
+        "downloadAll": "下载全部",
+        "downloadError": "下载失败，请重试。",
+        "expires": "{{date}} 到期"
+      },
+      "lightbox": {
+        "download": "下载"
+      },
+      "unavailable": {
+        "body": "该链接可能已过期，或已被分享者撤销。",
+        "title": "此链接已失效"
+      }
     }
   },
   "sidebar": {

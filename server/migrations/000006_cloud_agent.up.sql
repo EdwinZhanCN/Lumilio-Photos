@@ -181,5 +181,50 @@ CREATE INDEX idx_repository_cloud_bindings_credential ON public.repository_cloud
 
 
 --
+-- Name: share_links; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.share_links (
+    share_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id integer NOT NULL,
+    token_hash bytea NOT NULL,
+    title text NOT NULL,
+    description text,
+    source_kind text NOT NULL,
+    source_ref text,
+    asset_ids uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    asset_count integer DEFAULT 0 NOT NULL,
+    allow_download boolean DEFAULT false NOT NULL,
+    include_originals boolean DEFAULT false NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    revoked_at timestamp with time zone,
+    last_viewed_at timestamp with time zone,
+    view_count bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT share_links_pkey PRIMARY KEY (share_id),
+    CONSTRAINT share_links_token_hash_key UNIQUE (token_hash),
+    CONSTRAINT share_links_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(user_id) ON DELETE CASCADE,
+    CONSTRAINT share_links_status_check CHECK ((status = ANY (ARRAY['active'::text, 'revoked'::text]))),
+    CONSTRAINT share_links_source_kind_check CHECK ((source_kind = ANY (ARRAY['asset_snapshot'::text, 'album'::text, 'person'::text, 'utility_query'::text, 'pin'::text])))
+);
+
+
+--
+-- Name: idx_share_links_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_share_links_owner ON public.share_links USING btree (owner_id, created_at DESC);
+
+
+--
+-- Name: idx_share_links_status_expires; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_share_links_status_expires ON public.share_links USING btree (status, expires_at);
+
+
+--
 -- Name: agent_pins agent_pins_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --

@@ -103,14 +103,17 @@ describe("AlbumDetails bulk actions", () => {
       selectedAssets: [],
       clearSelection: vi.fn(),
     };
-    const [removeAction] = props.bulkActions(context) as Array<{
+    const actions = props.bulkActions(context) as Array<{
       id: string;
       onRun: (context: AssetsBulkActionContext) => Promise<void>;
     }>;
 
-    expect(removeAction.id).toBe("remove-from-current-album");
+    expect(actions.map((action) => action.id)).toContain("share-selected");
 
-    await removeAction.onRun(context);
+    const removeAction = actions.find((action) => action.id === "remove-from-current-album");
+    expect(removeAction).toBeDefined();
+
+    await removeAction!.onRun(context);
 
     await waitFor(() => {
       expect(mocks.removeAssetFromAlbum).toHaveBeenCalledTimes(2);

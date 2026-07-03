@@ -34,6 +34,8 @@ export interface CollectionHeroProps {
   stats?: ReactNode;
   /** Edit affordance: top-right edit button + the modal it toggles. */
   edit?: CollectionHeroEdit;
+  /** Extra top-right actions rendered before the edit button (e.g. a Share button). */
+  actions?: ReactNode;
   /** Extra content below the stat row (feedback alerts, etc.). */
   footer?: ReactNode;
   className?: string;
@@ -55,6 +57,7 @@ export function CollectionHero({
   description,
   stats,
   edit,
+  actions,
   footer,
   className = "",
 }: CollectionHeroProps): ReactNode {
@@ -75,15 +78,20 @@ export function CollectionHero({
           </div>
         </div>
 
-        {edit && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm gap-1.5 rounded-full"
-            onClick={edit.onOpen}
-          >
-            <Pencil className="size-3.5" />
-            {edit.label}
-          </button>
+        {(actions || edit) && (
+          <div className="flex items-center gap-2">
+            {actions}
+            {edit && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm gap-1.5 rounded-full"
+                onClick={edit.onOpen}
+              >
+                <Pencil className="size-3.5" />
+                {edit.label}
+              </button>
+            )}
+          </div>
         )}
       </div>
 

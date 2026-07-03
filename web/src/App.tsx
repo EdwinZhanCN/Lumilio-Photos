@@ -8,6 +8,7 @@ import {
   bootstrapRoutes,
   protectedStandaloneRoutes,
   publicRoutes,
+  shareRoutes,
 } from "@/routes/routes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GlobalProvider, { useGlobal } from "@/contexts/GlobalContext";
@@ -104,42 +105,54 @@ function App(): React.ReactNode {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <BrowserRouter>
-              <SetupGate>
-                <BootstrapGate>
-                  <Routes>
-                    {publicRoutes.map((route) => (
-                      <Route key={route.path} path={route.path} element={route.element} />
-                    ))}
-                    {bootstrapRoutes.map((route) => (
-                      <Route key={route.path} path={route.path} element={route.element} />
-                    ))}
-                    {protectedStandaloneRoutes.map((route) => (
-                      <Route
-                        key={route.path}
-                        path={route.path}
-                        element={<ProtectedRoute>{route.element}</ProtectedRoute>}
-                      />
-                    ))}
+              <Routes>
+                {/* Public share routes render outside SetupGate/BootstrapGate:
+                    a recipient with a valid token must never be redirected
+                    through first-run setup or forced to authenticate. */}
+                {shareRoutes.map((route) => (
+                  <Route key={route.path} path={route.path} element={route.element} />
+                ))}
+                <Route
+                  element={
+                    <SetupGate>
+                      <BootstrapGate>
+                        <Outlet />
+                      </BootstrapGate>
+                    </SetupGate>
+                  }
+                >
+                  {publicRoutes.map((route) => (
+                    <Route key={route.path} path={route.path} element={route.element} />
+                  ))}
+                  {bootstrapRoutes.map((route) => (
+                    <Route key={route.path} path={route.path} element={route.element} />
+                  ))}
+                  {protectedStandaloneRoutes.map((route) => (
                     <Route
-                      element={
-                        <ProtectedRoute>
-                          <PrimaryRepositoryGate>
-                            <WorkerProvider preload={["hash"]}>
-                              <UploadProvider>
-                                <AppShellLayout />
-                              </UploadProvider>
-                            </WorkerProvider>
-                          </PrimaryRepositoryGate>
-                        </ProtectedRoute>
-                      }
-                    >
-                      {appRoutes.map((route) => (
-                        <Route key={route.path} path={route.path} element={route.element} />
-                      ))}
-                    </Route>
-                  </Routes>
-                </BootstrapGate>
-              </SetupGate>
+                      key={route.path}
+                      path={route.path}
+                      element={<ProtectedRoute>{route.element}</ProtectedRoute>}
+                    />
+                  ))}
+                  <Route
+                    element={
+                      <ProtectedRoute>
+                        <PrimaryRepositoryGate>
+                          <WorkerProvider preload={["hash"]}>
+                            <UploadProvider>
+                              <AppShellLayout />
+                            </UploadProvider>
+                          </WorkerProvider>
+                        </PrimaryRepositoryGate>
+                      </ProtectedRoute>
+                    }
+                  >
+                    {appRoutes.map((route) => (
+                      <Route key={route.path} path={route.path} element={route.element} />
+                    ))}
+                  </Route>
+                </Route>
+              </Routes>
             </BrowserRouter>
           </AuthProvider>
           <HealthPoller />

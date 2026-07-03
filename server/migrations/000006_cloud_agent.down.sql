@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS public.share_links CASCADE;
 DROP TABLE IF EXISTS public.agent_pins CASCADE;
 DROP TABLE IF EXISTS public.agent_checkpoints CASCADE;
 DROP TABLE IF EXISTS public.repository_cloud_bindings CASCADE;
