@@ -51,7 +51,7 @@ export function PublicShare(): ReactNode {
 
   if (!token || view.notFound) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-base-100 px-4 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-base-100 px-4 text-center">
         <ImageOff className="size-10 text-base-content/30" />
         <p className="text-base font-medium">
           {t("share.public.unavailable.title", "This link is no longer available")}
@@ -68,14 +68,14 @@ export function PublicShare(): ReactNode {
 
   if (view.isMetadataLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-base-100">
+      <div className="flex min-h-dvh items-center justify-center bg-base-100">
         <span className="loading loading-spinner loading-lg text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-base-100">
+    <div className="flex min-h-dvh flex-col bg-base-100">
       <PublicShareHeader
         title={view.metadata?.title ?? ""}
         description={view.metadata?.description}

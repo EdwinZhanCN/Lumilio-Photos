@@ -59,7 +59,7 @@ const FileDropZone = ({ fileInputRef, children, onFilesDropped }: FileDropZonePr
 
   return (
     <div
-      className={`border-2 border-dashed rounded-2xl p-16 text-center transition-all duration-200 cursor-pointer
+      className={`border-2 border-dashed rounded-2xl p-8 sm:p-16 text-center transition-all duration-200 cursor-pointer
                 ${isDragging ? "border-primary bg-primary/10 scale-[0.99]" : "border-base-300 hover:border-primary/60 hover:bg-base-200/50"}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
