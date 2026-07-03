@@ -8,6 +8,7 @@ import {
   RotateCw,
   SlidersHorizontal,
   Undo2,
+  X,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -43,6 +44,9 @@ type DevelopPanelProps = {
   isApplyingBorder: boolean;
   hasBorderResult: boolean;
   borderExifSummary?: BorderExifSummary;
+  /** Below `lg` the panel becomes a bottom sheet; these control its visibility. */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 };
 
 type GroupId = "geometry" | "light" | "color" | "detail" | "tools";
@@ -91,6 +95,8 @@ export function DevelopPanel({
   isApplyingBorder,
   hasBorderResult,
   borderExifSummary,
+  mobileOpen = false,
+  onMobileClose,
 }: DevelopPanelProps): React.JSX.Element {
   const { t } = useI18n();
   const [openMap, setOpenMap] = useState<Record<GroupId, boolean>>({
@@ -108,33 +114,53 @@ export function DevelopPanel({
   };
 
   return (
-    <aside
-      className="flex h-full w-[340px] shrink-0 flex-col border-l border-base-300 bg-base-200/40"
-      aria-label="Develop panel"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-base-content">
-          <SlidersHorizontal size={16} className="text-base-content/70" />
-          {t("studio.develop.title", { defaultValue: "Develop" })}
-        </h2>
+    <>
+      {mobileOpen && (
         <div
-          className="tooltip tooltip-left"
-          data-tip={t("studio.develop.resetAll", {
-            defaultValue: "Reset all adjustments",
-          })}
-        >
-          <button
-            type="button"
-            onClick={onResetAll}
-            disabled={disabled}
-            className="btn btn-ghost btn-xs gap-1 text-base-content/60"
-          >
-            <Undo2 size={13} />
-            {t("studio.develop.reset", { defaultValue: "Reset" })}
-          </button>
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`${
+          mobileOpen ? "flex" : "hidden"
+        } fixed inset-x-0 bottom-0 z-50 max-h-[75vh] w-full shrink-0 flex-col rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:flex lg:h-full lg:max-h-none lg:w-[340px] lg:rounded-none lg:border-t-0 lg:border-l lg:bg-base-200/40 lg:shadow-none`}
+        aria-label="Develop panel"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-base-content">
+            <SlidersHorizontal size={16} className="text-base-content/70" />
+            {t("studio.develop.title", { defaultValue: "Develop" })}
+          </h2>
+          <div className="flex items-center gap-1.5">
+            <div
+              className="tooltip tooltip-left"
+              data-tip={t("studio.develop.resetAll", {
+                defaultValue: "Reset all adjustments",
+              })}
+            >
+              <button
+                type="button"
+                onClick={onResetAll}
+                disabled={disabled}
+                className="btn btn-ghost btn-xs gap-1 text-base-content/60"
+              >
+                <Undo2 size={13} />
+                {t("studio.develop.reset", { defaultValue: "Reset" })}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={onMobileClose}
+              aria-label={t("common.close", { defaultValue: "Close" })}
+              className="btn btn-ghost btn-xs btn-square text-base-content/60 lg:hidden"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Scrollable groups */}
       <div className="min-h-0 flex-1 overflow-y-auto px-3">
@@ -242,6 +268,7 @@ export function DevelopPanel({
           })}
         </p>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -9,6 +9,7 @@ import {
   Loader2,
   RotateCw,
   Save,
+  SlidersHorizontal,
   Undo2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -29,6 +30,7 @@ type TopBarProps = {
   onBeforeUp: () => void;
   onSave: () => void;
   onExport: () => void;
+  onToggleDevelopPanel?: () => void;
 };
 
 export function TopBar({
@@ -47,6 +49,7 @@ export function TopBar({
   onBeforeUp,
   onSave,
   onExport,
+  onToggleDevelopPanel,
 }: TopBarProps): React.JSX.Element {
   const { t } = useI18n();
 
@@ -91,6 +94,16 @@ export function TopBar({
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        {onToggleDevelopPanel && (
+          <button
+            type="button"
+            onClick={onToggleDevelopPanel}
+            aria-label={t("studio.develop.title", { defaultValue: "Develop" })}
+            className="btn btn-ghost btn-sm btn-square text-base-content/70 lg:hidden"
+          >
+            <SlidersHorizontal size={17} />
+          </button>
+        )}
         <div
           className="tooltip tooltip-bottom"
           data-tip={t("studio.editor.undo", { defaultValue: "Undo" })}

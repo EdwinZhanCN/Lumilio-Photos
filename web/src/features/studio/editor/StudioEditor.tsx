@@ -269,6 +269,7 @@ export function StudioEditor({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
+  const [mobileDevelopOpen, setMobileDevelopOpen] = useState(false);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [exifRows, setExifRows] = useState<AssetExifRow[]>([]);
   const [isLoadingAsset, setIsLoadingAsset] = useState(false);
@@ -813,6 +814,7 @@ export function StudioEditor({
         onBeforeUp={() => setShowOriginal(false)}
         onSave={handleSave}
         onExport={handleExport}
+        onToggleDevelopPanel={() => setMobileDevelopOpen((v) => !v)}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -853,6 +855,8 @@ export function StudioEditor({
           isApplyingBorder={isApplyingBorder}
           hasBorderResult={Boolean(borderResultUrl)}
           borderExifSummary={borderExifSummary}
+          mobileOpen={mobileDevelopOpen}
+          onMobileClose={() => setMobileDevelopOpen(false)}
         />
       </div>
     </div>

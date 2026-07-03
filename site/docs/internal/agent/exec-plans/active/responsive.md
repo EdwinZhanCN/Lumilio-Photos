@@ -354,19 +354,30 @@ Canvas/editor layout: side panels should collapse to bottom drawers/tabs on
 narrow widths; viewport must keep correct canvas sizing on resize. Worker
 graph must stay DOM-free — breakpoint logic lives in React, never in workers.
 
-- [ ] features/studio/develop/BorderToolSection.tsx
-- [ ] features/studio/develop/DevelopPanel.tsx
-- [ ] features/studio/develop/SectionHeader.tsx
-- [ ] features/studio/develop/SliderRow.tsx
-- [ ] features/studio/editor/AssetPanel.tsx
-- [ ] features/studio/editor/StudioEditor.tsx
-- [ ] features/studio/editor/TopBar.tsx
-- [ ] features/studio/editor/Viewport.tsx
-- [ ] features/studio/home/RecentEditItem.tsx
-- [ ] features/studio/home/StudioHome.tsx
-- [ ] features/studio/routes/StudioEditMvp.tsx
-- [ ] features/studio/shared/PhotoThumb.tsx
-- [ ] features/studio/tools/border/BorderPanel.tsx
+- [x] features/studio/develop/BorderToolSection.tsx — already responsive
+      (lives inside the now-responsive DevelopPanel scroll area).
+- [x] features/studio/develop/DevelopPanel.tsx — was a fixed `w-[340px]`
+      sidebar always in flow, squeezing the Viewport to ~35px on phones. Now a
+      bottom sheet (`fixed inset-x-0 bottom-0 max-h-[75vh]`) toggled by a
+      `lg:hidden` button in TopBar below `lg`; unchanged fixed sidebar at `lg:`+.
+- [x] features/studio/develop/SectionHeader.tsx — already responsive.
+- [x] features/studio/develop/SliderRow.tsx — already responsive.
+- [x] features/studio/editor/AssetPanel.tsx — already `hidden lg:flex` (confirmed correct).
+- [x] features/studio/editor/StudioEditor.tsx — wires the new
+      `mobileDevelopOpen` state through to TopBar and DevelopPanel; Viewport
+      now gets full width on phones once the side panels are out of flow.
+- [x] features/studio/editor/TopBar.tsx — added the `lg:hidden` Develop-panel
+      toggle button (existing buttons already hide labels responsively).
+- [x] features/studio/editor/Viewport.tsx — already responsive (ResizeObserver-driven fit/zoom).
+- [x] features/studio/home/RecentEditItem.tsx — "Resume" button was
+      hover-only (`opacity-0` unconditionally), unreachable without a mouse;
+      now visible by default and hover-hidden only at `sm:`+.
+- [x] features/studio/home/StudioHome.tsx — already responsive
+      (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-3`, `lg:grid-cols-2`).
+- [x] features/studio/routes/StudioEditMvp.tsx — already responsive (delegates to StudioEditor/StudioHome).
+- [x] features/studio/shared/PhotoThumb.tsx — already responsive (size fully caller-controlled).
+- [x] features/studio/tools/border/BorderPanel.tsx — already responsive
+      (`tabs-boxed flex-wrap`, lives in the responsive DevelopPanel).
 
 ## Batch 8 — Lumilio (agent chat + widgets)
 

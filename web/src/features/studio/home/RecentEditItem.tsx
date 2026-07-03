@@ -33,7 +33,7 @@ export function RecentEditItem({ item, onResume }: RecentEditItemProps): React.J
       <button
         type="button"
         onClick={() => onResume(item.assetId)}
-        className="btn btn-ghost btn-xs gap-1 text-base-content/70 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+        className="btn btn-ghost btn-xs gap-1 text-base-content/70 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
       >
         <Pencil size={13} />
         {t("studio.home.resume", { defaultValue: "Resume" })}
