@@ -1357,7 +1357,7 @@ export default function FilterTool({
       </button>
 
       {open && (
-        <div className="dropdown-content bg-base-100 rounded-box z-50 w-80 p-0 shadow-xl border border-base-200 mt-2 overflow-hidden flex flex-col">
+        <div className="dropdown-content bg-base-100 rounded-box z-50 w-80 max-w-[calc(100vw-2rem)] p-0 shadow-xl border border-base-200 mt-2 overflow-hidden flex flex-col">
           {/* Header (Sticky) */}
           <div className="p-4 border-b border-base-200 bg-base-100 sticky top-0 z-10">
             <div className="flex items-center justify-between">
