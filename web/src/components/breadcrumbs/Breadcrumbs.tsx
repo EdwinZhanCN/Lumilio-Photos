@@ -13,7 +13,10 @@ export function Breadcrumbs({ className = "" }: { className?: string }): ReactNo
   if (items.length === 0) return null;
 
   return (
-    <nav className={`breadcrumbs px-4 py-1.5 text-sm ${className}`} aria-label="Breadcrumb">
+    <nav
+      className={`breadcrumbs max-w-full overflow-x-auto px-4 py-1.5 text-sm ${className}`}
+      aria-label="Breadcrumb"
+    >
       <ul>
         {items.map((item, i) => {
           const isLast = i === items.length - 1;

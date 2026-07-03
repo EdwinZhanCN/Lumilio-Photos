@@ -104,32 +104,45 @@ Add `useBreakpoint` hook here.
 
 ## Batch 1 — Shared Components
 
-- [ ] components/breadcrumbs/BreadcrumbContext.tsx
-- [ ] components/breadcrumbs/Breadcrumbs.tsx
-- [ ] components/BrowseScopeSelect.tsx
-- [ ] components/collection/CollectionErrorAlert.tsx
-- [ ] components/collection/CollectionHero.tsx
-- [ ] components/collection/CollectionTitle.tsx
-- [ ] components/collection/LoadMoreButton.tsx
-- [ ] components/collection/MetaStatRow.tsx
-- [ ] components/EmptyState.tsx
-- [ ] components/ErrorFallBack.tsx
-- [ ] components/ExifDataDisplay.tsx
-- [ ] components/ExportModal.tsx
-- [ ] components/Heatmap/CalendarHeatmap.tsx
-- [ ] components/Heatmap/GitHubStyleHeatmap.tsx
-- [ ] components/Heatmap/Histogram.tsx
-- [ ] components/icons/LensIcon.tsx
-- [ ] components/icons/LivePhotos.tsx
-- [ ] components/MapComponent.tsx
-- [ ] components/MessageCenter.tsx
-- [ ] components/Notifications.tsx
-- [ ] components/PhotoMapView.tsx
-- [ ] components/PhotoPicker.tsx
-- [ ] components/ui/InlineTextEditor.tsx
-- [ ] components/ui/RatingComponent.tsx
-- [ ] components/ui/Sonner.tsx
-- [ ] components/UserAvatar.tsx
+- [x] components/breadcrumbs/BreadcrumbContext.tsx — no visual surface (context only).
+- [x] components/breadcrumbs/Breadcrumbs.tsx — trail scrolls horizontally
+      (`overflow-x-auto`) instead of wrapping/clipping on narrow screens.
+- [x] components/BrowseScopeSelect.tsx — already responsive (bounded width select).
+- [x] components/collection/CollectionErrorAlert.tsx — already responsive.
+- [x] components/collection/CollectionHero.tsx — already responsive
+      (`flex-col lg:flex-row`); depends on CollectionTitle/MetaStatRow fixes below.
+- [x] components/collection/CollectionTitle.tsx — title scales
+      `text-2xl sm:text-3xl lg:text-4xl` instead of fixed `text-4xl`.
+- [x] components/collection/LoadMoreButton.tsx — already responsive.
+- [x] components/collection/MetaStatRow.tsx — stat strip wraps (`flex-wrap`)
+      instead of overflowing when there are many stats on a narrow screen.
+- [x] components/EmptyState.tsx — padding tightens below `sm`.
+- [x] components/ErrorFallBack.tsx — already responsive (`text-3xl sm:text-4xl`,
+      `flex-wrap` actions).
+- [x] components/ExifDataDisplay.tsx — already responsive.
+- [x] components/ExportModal.tsx — action icon row wraps (`flex-wrap`) instead
+      of overflowing on narrow modal widths.
+- [x] components/Heatmap/CalendarHeatmap.tsx — wrapper scrolls horizontally
+      (`overflow-x-auto`) instead of causing page overflow; grid itself stays
+      fixed-cell by design (calendar heatmap convention).
+- [x] components/Heatmap/GitHubStyleHeatmap.tsx — same horizontal-scroll fix.
+- [x] components/Heatmap/Histogram.tsx — already responsive (SVG `viewBox` +
+      100% width).
+- [x] components/icons/LensIcon.tsx — no visual surface (icon primitive).
+- [x] components/icons/LivePhotos.tsx — no visual surface (icon primitive).
+- [x] components/MapComponent.tsx — already responsive (sizes from container
+      height/width props; Leaflet handles its own resize).
+- [x] components/MessageCenter.tsx — already responsive (dropdown clamps to
+      `max-w-[calc(100vw-2rem)]`).
+- [x] components/Notifications.tsx — no visual surface (renders `<Toaster/>`).
+- [x] components/PhotoMapView.tsx — already responsive
+      (`grid-cols-4 sm:grid-cols-6 md:grid-cols-8`, toggle labels hide `<sm`).
+- [x] components/PhotoPicker.tsx — already responsive (flex column, scrollable body).
+- [x] components/ui/InlineTextEditor.tsx — already responsive (`min-w-0`, wraps).
+- [x] components/ui/RatingComponent.tsx — already responsive (compact, no fixed widths).
+- [x] components/ui/Sonner.tsx — already responsive (Sonner handles its own
+      mobile layout).
+- [x] components/UserAvatar.tsx — already responsive (size fully caller-controlled).
 
 ## Batch 2 — Assets (gallery core)
 

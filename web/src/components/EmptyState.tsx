@@ -23,7 +23,7 @@ function EmptyState({ className = "", title, description }: EmptyStateProps) {
 
   return (
     <div className={`flex min-h-[400px] w-full items-center justify-center p-6 ${className}`}>
-      <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-[2rem] border border-dashed border-base-300 bg-base-200/40 px-8 py-12 text-center">
+      <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-[2rem] border border-dashed border-base-300 bg-base-200/40 px-6 py-10 sm:px-8 sm:py-12 text-center">
         <div className="flex size-16 items-center justify-center rounded-2xl border border-base-300 bg-base-100 text-base-content/50">
           <ImageIcon className="size-8" strokeWidth={1.75} />
         </div>

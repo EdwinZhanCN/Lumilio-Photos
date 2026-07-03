@@ -171,8 +171,8 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
 
   return (
     <div
-      className={`react-calendar-heatmap ${className ?? ""}`}
-      style={{ display: "inline-block", ...style }}
+      className={`react-calendar-heatmap max-w-full overflow-x-auto ${className ?? ""}`}
+      style={{ ...style }}
     >
       <svg width={svgWidth} height={svgHeight} role="img" aria-label="Calendar heatmap">
         {showMonthLabels && monthLabels.length > 0 && (

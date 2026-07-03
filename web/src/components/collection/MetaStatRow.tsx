@@ -39,7 +39,7 @@ export function MetaStatRow({
 }): ReactNode {
   return (
     <div
-      className={`flex items-center gap-6 transition-all duration-500 ease-in-out ${
+      className={`flex flex-wrap items-center gap-x-6 gap-y-1 transition-all duration-500 ease-in-out ${
         dense ? "text-[10px] opacity-60" : "text-xs opacity-40"
       } ${className}`}
     >
