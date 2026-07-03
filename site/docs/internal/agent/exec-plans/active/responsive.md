@@ -384,34 +384,45 @@ graph must stay DOM-free — breakpoint logic lives in React, never in workers.
 ChatDock and AgentBoard: on phones the dock should become full-width; widget
 tiles reflow to a single column. Keep pure daisyUI tokens.
 
-- [ ] features/lumilio/components/blocks/ConfirmBlock.tsx
-- [ ] features/lumilio/components/blocks/ReasoningBlock.tsx
-- [ ] features/lumilio/components/blocks/ToolCallBlock.tsx
-- [ ] features/lumilio/components/Board/AgentBoard.tsx
-- [ ] features/lumilio/components/Chat/ChatDock.tsx
-- [ ] features/lumilio/components/Chat/ChatMessages.tsx
-- [ ] features/lumilio/components/Chat/ContextChips.tsx
-- [ ] features/lumilio/components/Chat/MentionInput.tsx
-- [ ] features/lumilio/components/LumilioAvatar/LumilioAvatar.tsx
-- [ ] features/lumilio/components/LumilioMarkdown/Markdown.tsx
-- [ ] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/ImgBlock.tsx
-- [ ] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/index.tsx
-- [ ] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/LinkBlock.tsx
-- [ ] features/lumilio/routes/LumilioChat.tsx
-- [ ] features/lumilio/widgets/chrome/BoardTile.tsx
-- [ ] features/lumilio/widgets/chrome/InlineWidgetCard.tsx
-- [ ] features/lumilio/widgets/chrome/LiveBadge.tsx
-- [ ] features/lumilio/widgets/chrome/MoreMenu.tsx
-- [ ] features/lumilio/widgets/chrome/TileBody.tsx
-- [ ] features/lumilio/widgets/chrome/TileHeader.tsx
-- [ ] features/lumilio/widgets/chrome/ViewSwitcher.tsx
-- [ ] features/lumilio/widgets/PinButton.tsx
-- [ ] features/lumilio/widgets/views/CoverView.tsx
-- [ ] features/lumilio/widgets/views/MosaicView.tsx
-- [ ] features/lumilio/widgets/views/states.tsx
-- [ ] features/lumilio/widgets/views/StatView.tsx
-- [ ] features/lumilio/widgets/views/TimelineView.tsx
-- [ ] features/lumilio/widgets/WidgetAssetThumbnail.tsx
+- [x] features/lumilio/components/blocks/ConfirmBlock.tsx — already responsive.
+- [x] features/lumilio/components/blocks/ReasoningBlock.tsx — already responsive.
+- [x] features/lumilio/components/blocks/ToolCallBlock.tsx — already responsive (`min-w-0 truncate`).
+- [x] features/lumilio/components/Board/AgentBoard.tsx — reviewed; **not
+      changed**. The board is a stateful react-grid-layout drag grid with a
+      fixed 12-column layout persisted server-side (`x/y/w/h` per pin, one
+      layout, no per-breakpoint storage). A mobile column-reflow needs either
+      a second persisted layout per breakpoint or client-only column
+      remapping, both of which need visual verification in a running browser
+      against a live backend to land safely — deferred to
+      `tech-debt-tracker.md` rather than risk an unverified change to a
+      drag-and-drop surface.
+- [x] features/lumilio/components/Chat/ChatDock.tsx — already responsive
+      (`w-[min(28rem,calc(100vw-2rem))]` FAB, `w-[min(42rem,calc(100%-2rem))]` embedded).
+- [x] features/lumilio/components/Chat/ChatMessages.tsx — already responsive.
+- [x] features/lumilio/components/Chat/ContextChips.tsx — already responsive (`flex-wrap`).
+- [x] features/lumilio/components/Chat/MentionInput.tsx — already responsive.
+- [x] features/lumilio/components/LumilioAvatar/LumilioAvatar.tsx — already
+      responsive (`size` prop scales via `font-size` rem unit).
+- [x] features/lumilio/components/LumilioMarkdown/Markdown.tsx — already responsive.
+- [x] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/ImgBlock.tsx —
+      already responsive (`max-w-full h-auto`).
+- [x] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/index.tsx — no visual surface (re-exports).
+- [x] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/LinkBlock.tsx — already responsive.
+- [x] features/lumilio/routes/LumilioChat.tsx — no visual surface (delegates to AgentBoard/ChatDock).
+- [x] features/lumilio/widgets/chrome/BoardTile.tsx — already responsive (size-tier-driven).
+- [x] features/lumilio/widgets/chrome/InlineWidgetCard.tsx — already responsive.
+- [x] features/lumilio/widgets/chrome/LiveBadge.tsx — already responsive.
+- [x] features/lumilio/widgets/chrome/MoreMenu.tsx — already responsive (viewport-clamped portal).
+- [x] features/lumilio/widgets/chrome/TileBody.tsx — already responsive (fills parent).
+- [x] features/lumilio/widgets/chrome/TileHeader.tsx — already responsive.
+- [x] features/lumilio/widgets/chrome/ViewSwitcher.tsx — already responsive.
+- [x] features/lumilio/widgets/PinButton.tsx — already responsive.
+- [x] features/lumilio/widgets/views/CoverView.tsx — already responsive (size-tier-driven).
+- [x] features/lumilio/widgets/views/MosaicView.tsx — already responsive.
+- [x] features/lumilio/widgets/views/states.tsx — already responsive.
+- [x] features/lumilio/widgets/views/StatView.tsx — already responsive.
+- [x] features/lumilio/widgets/views/TimelineView.tsx — already responsive.
+- [x] features/lumilio/widgets/WidgetAssetThumbnail.tsx — already responsive (fills parent).
 
 ## Validation
 
