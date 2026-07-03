@@ -39,11 +39,6 @@ import (
 	"github.com/riverqueue/river"
 )
 
-type assetDownloadFile struct {
-	asset repo.Asset
-	path  string
-}
-
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
 	assetService    service.AssetService
@@ -1245,7 +1240,7 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 	zipWriter := zip.NewWriter(c.Writer)
 	archiveNames := make(map[string]int, len(files))
 	for _, file := range files {
-		if err := h.writeAssetToZip(zipWriter, archiveNames, file); err != nil {
+		if err := writeAssetToZip(zipWriter, archiveNames, file); err != nil {
 			log.Printf("Failed to write asset to zip: %v", err)
 			_ = zipWriter.Close()
 			return
@@ -1255,43 +1250,6 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 	if err := zipWriter.Close(); err != nil {
 		log.Printf("Failed to finalize asset download zip: %v", err)
 	}
-}
-
-func (h *AssetHandler) writeAssetToZip(zipWriter *zip.Writer, archiveNames map[string]int, file assetDownloadFile) error {
-	source, err := os.Open(file.path)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	archiveName := uniqueZipArchiveName(archiveNames, file.asset.OriginalFilename)
-	entry, err := zipWriter.Create(archiveName)
-	if err != nil {
-		return err
-	}
-
-	_, err = io.Copy(entry, source)
-	return err
-}
-
-func uniqueZipArchiveName(seen map[string]int, filename string) string {
-	name := filepath.Base(strings.TrimSpace(filename))
-	if name == "." || name == ".." || name == string(filepath.Separator) || name == "" {
-		name = "asset"
-	}
-
-	ext := filepath.Ext(name)
-	stem := strings.TrimSuffix(name, ext)
-	if stem == "" {
-		stem = "asset"
-	}
-
-	candidate := name
-	for index := 2; seen[candidate] > 0; index++ {
-		candidate = fmt.Sprintf("%s (%d)%s", stem, index, ext)
-	}
-	seen[candidate] = 1
-	return candidate
 }
 
 // GetWebVideo serves the web-optimized video version by asset ID
@@ -3254,18 +3212,7 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 }
 
 func (h *AssetHandler) getRepositoryForAsset(ctx context.Context, asset *repo.Asset) (*repo.Repository, error) {
-	if asset == nil {
-		return nil, fmt.Errorf("asset is nil")
-	}
-	if !asset.RepositoryID.Valid {
-		return nil, fmt.Errorf("asset repository id is invalid")
-	}
-
-	repository, err := h.queries.GetRepository(ctx, asset.RepositoryID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get repository by id: %w", err)
-	}
-	return &repository, nil
+	return getRepositoryForAsset(ctx, h.queries, asset)
 }
 
 func (h *AssetHandler) resolveAssetRepoPath(ctx context.Context, asset *repo.Asset) (string, error) {
@@ -3310,11 +3257,7 @@ func (h *AssetHandler) defaultSidecarForAsset(assetID uuid.UUID, asset *repo.Ass
 }
 
 func (h *AssetHandler) resolveRepositoryPath(repositoryPath string, storagePath string) string {
-	trimmed := strings.TrimSpace(storagePath)
-	if filepath.IsAbs(trimmed) {
-		return trimmed
-	}
-	return filepath.Join(repositoryPath, trimmed)
+	return resolveRepositoryPath(repositoryPath, storagePath)
 }
 
 func (h *AssetHandler) handleUploadFailureFile(repoPath, filePath, filename, reason string) {

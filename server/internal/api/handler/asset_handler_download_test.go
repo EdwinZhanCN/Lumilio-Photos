@@ -75,14 +75,13 @@ func TestAssetHandlerWriteAssetToZip_UsesOriginalFilenames(t *testing.T) {
 
 	var archive bytes.Buffer
 	zipWriter := zip.NewWriter(&archive)
-	handler := &AssetHandler{}
 	archiveNames := map[string]int{}
 
-	require.NoError(t, handler.writeAssetToZip(zipWriter, archiveNames, assetDownloadFile{
+	require.NoError(t, writeAssetToZip(zipWriter, archiveNames, assetDownloadFile{
 		asset: repo.Asset{OriginalFilename: "IMG_0001.jpg"},
 		path:  firstPath,
 	}))
-	require.NoError(t, handler.writeAssetToZip(zipWriter, archiveNames, assetDownloadFile{
+	require.NoError(t, writeAssetToZip(zipWriter, archiveNames, assetDownloadFile{
 		asset: repo.Asset{OriginalFilename: "IMG_0001.jpg"},
 		path:  secondPath,
 	}))

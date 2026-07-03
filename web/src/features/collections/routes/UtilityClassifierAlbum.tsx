@@ -1,6 +1,6 @@
 import { Navigate, useParams } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AssetsProvider } from "@/features/assets";
@@ -9,6 +9,12 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { findUtilityClassifier, getUtilityClassifierTitle } from "../utils/utilityClassifiers";
 import type { AssetFilter } from "@/features/assets/types/assets.type";
+import type {
+  AssetsBulkActionContext,
+  AssetsBulkActionItem,
+} from "@/features/assets/components/shared/bulkActions";
+import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
+import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
 
 export default function UtilityClassifierAlbum() {
   const { classifierSlug } = useParams<{ classifierSlug: string }>();
@@ -21,6 +27,17 @@ export default function UtilityClassifierAlbum() {
       tag_source: "zeroshot",
     }),
     [classifier?.tagName],
+  );
+
+  const [shareAssetIds, setShareAssetIds] = useState<string[] | null>(null);
+  const bulkActions = useCallback(
+    (_context: AssetsBulkActionContext): AssetsBulkActionItem[] => [
+      createShareSelectedBulkAction(
+        t("assets.assetsPageHeader.bulkActions.share.label", "Share"),
+        setShareAssetIds,
+      ),
+    ],
+    [t],
   );
 
   useBreadcrumbs(
@@ -65,9 +82,16 @@ export default function UtilityClassifierAlbum() {
             icon={<Icon className="w-6 h-6 text-primary" />}
             baseFilter={baseFilter}
             viewKey={`utility:${classifier.slug}`}
+            bulkActions={bulkActions}
           />
         </WorkerProvider>
       </AssetsProvider>
+      <CreateShareLinkModal
+        open={shareAssetIds !== null}
+        onClose={() => setShareAssetIds(null)}
+        sourceKind="asset_snapshot"
+        assetIds={shareAssetIds ?? undefined}
+      />
     </ErrorBoundary>
   );
 }

@@ -36,6 +36,7 @@ import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useCarouselContextContributor } from "@/features/lumilio/contributors/useCarouselContextContributor";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
+import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
 import MediaViewer from "../../../shared/MediaViewer";
 import type { Asset, components } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -307,6 +308,11 @@ const FullScreenCarousel = ({
     },
     [navigate],
   );
+
+  const [shareAsset, setShareAsset] = useState<Asset | null>(null);
+  const handleShare = useCallback((asset: Asset) => {
+    setShareAsset(asset);
+  }, []);
 
   const handleAddToAlbum = useCallback(
     async (_asset: Asset) => {
@@ -735,6 +741,16 @@ const FullScreenCarousel = ({
         asset={currentAsset}
         onOpenStudio={handleOpenStudio}
         onAddToAlbum={handleAddToAlbum}
+        onShare={handleShare}
+      />
+
+      {/* Share this asset */}
+      <CreateShareLinkModal
+        open={shareAsset !== null}
+        onClose={() => setShareAsset(null)}
+        sourceKind="asset_snapshot"
+        assetIds={shareAsset?.asset_id ? [shareAsset.asset_id] : undefined}
+        defaultTitle={shareAsset?.original_filename ?? undefined}
       />
 
       {/* Delete confirmation modal */}

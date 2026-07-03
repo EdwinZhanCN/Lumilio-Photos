@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useState, useCallback } from "react";
-import { EyeOff, Users, UserRound } from "lucide-react";
+import { EyeOff, Share2, Users, UserRound } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
@@ -10,6 +10,12 @@ import { usePersonDetails } from "../hooks/usePeople";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import PersonRenameModal from "../components/PersonRenameModal";
+import { CreateShareLinkModal, type ShareSourceKind } from "@/features/share/components/CreateShareLinkModal";
+import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
+import type {
+  AssetsBulkActionContext,
+  AssetsBulkActionItem,
+} from "@/features/assets/components/shared/bulkActions";
 
 const PersonAssetsContent = () => {
   const { t, i18n } = useI18n();
@@ -18,6 +24,11 @@ const PersonAssetsContent = () => {
     assetId: string;
   }>();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [shareRequest, setShareRequest] = useState<{
+    sourceKind: ShareSourceKind;
+    assetIds?: string[];
+    sourceRef?: string;
+  } | null>(null);
   const personIdNumber = personId ? Number(personId) : 0;
 
   const {
@@ -34,6 +45,21 @@ const PersonAssetsContent = () => {
     },
     [person?.name, renamePerson],
   );
+
+  const bulkActions = useCallback(
+    (_context: AssetsBulkActionContext): AssetsBulkActionItem[] => [
+      createShareSelectedBulkAction(
+        t("assets.assetsPageHeader.bulkActions.share.label", "Share"),
+        (assetIds) => setShareRequest({ sourceKind: "asset_snapshot", assetIds }),
+      ),
+    ],
+    [t],
+  );
+
+  const openSharePerson = useCallback(() => {
+    if (!personIdNumber) return;
+    setShareRequest({ sourceKind: "person", sourceRef: String(personIdNumber) });
+  }, [personIdNumber]);
 
   const displayName = person?.name || t("people.unnamed");
   useBreadcrumbs([
@@ -78,6 +104,16 @@ const PersonAssetsContent = () => {
           ? t("people.details.confirmedHint")
           : t("people.details.unconfirmedHint")
       }
+      actions={
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm gap-1.5 rounded-full"
+          onClick={openSharePerson}
+        >
+          <Share2 className="size-3.5" />
+          {t("people.details.shareAction", "Share")}
+        </button>
+      }
       edit={{
         onOpen: () => setIsRenameOpen(true),
         label: t("people.details.editAction", "Edit"),
@@ -110,13 +146,24 @@ const PersonAssetsContent = () => {
   );
 
   return (
-    <AssetsGalleryPage
-      title={displayName}
-      icon={<Users className="w-6 h-6 text-primary" />}
-      viewKey={`person:${personId}`}
-      baseFilter={{ person_id: personIdNumber }}
-      hero={hero}
-    />
+    <>
+      <AssetsGalleryPage
+        title={displayName}
+        icon={<Users className="w-6 h-6 text-primary" />}
+        viewKey={`person:${personId}`}
+        baseFilter={{ person_id: personIdNumber }}
+        hero={hero}
+        bulkActions={bulkActions}
+      />
+      <CreateShareLinkModal
+        open={shareRequest !== null}
+        onClose={() => setShareRequest(null)}
+        sourceKind={shareRequest?.sourceKind ?? "asset_snapshot"}
+        assetIds={shareRequest?.assetIds}
+        sourceRef={shareRequest?.sourceRef}
+        defaultTitle={shareRequest?.sourceKind === "person" ? displayName : undefined}
+      />
+    </>
   );
 };
 

@@ -218,6 +218,11 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	agentPins := pins.NewService(queries, refStore, assetService)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
+	// Share links reuse the same asset-set-source query path pins use
+	// (resolveSourceAssetIDs -> AssetService.QueryAssets / agentPins.AssetIDs),
+	// so it's constructed here once both dependencies exist.
+	shareLinkService := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyPath)
+
 	// Register agent tools
 	tools.RegisterAll()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
@@ -299,6 +304,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	cloudController := handler.NewCloudHandler(cloudSyncService)
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, appConfig.StorageConfig.Path, cloudSyncService)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
+	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -326,6 +332,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		repositoryScanController,
 		duplicateController,
 		cloudController,
+		shareLinkController,
 		handler.RequireLLMAgentEnabled(settingsService),
 		handler.RequireAppInitialized(bootstrapService),
 		appConfig.ServerConfig.CORSAllowedOrigins,

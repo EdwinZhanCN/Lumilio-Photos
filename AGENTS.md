@@ -52,3 +52,4 @@ The system is local-first: preserve original media, keep repository/storage sema
 - Frontend server state belongs in TanStack Query; feature-local interactive UI state can use Zustand; Context is for cross-cutting app state.
 - Keep generated files generated. If a generated artifact changes, include the command that produced it in your notes.
 - Document a feature with a `doc.ts` at its root (`@module` comment, markdown prose, `{@link}` to real symbols). Every `{@link X}` MUST be `import type`-d in the same file — tsc plus the `docts/link-needs-import` rule enforce it. The sibling `doc.md` is generated; never hand-edit it. See [docts.md](site/docs/internal/agent/docts.md).
+- Commit messages convention, use this pattern: feat: …, fix: …., chore: …, refactor: …. and docs: … etc.If something domain specific and worth noting, then use pattern like: feat(assets): …

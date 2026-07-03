@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { Heart, HeartOff } from "lucide-react";
@@ -14,6 +14,8 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n";
 import type { AssetFilter } from "@/features/assets/types/assets.type";
+import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
+import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
 
 const HIDDEN_LIKED_BULK_ACTIONS = ["set-liked"] as const;
 // Module-level constant so the reference is stable across renders — an
@@ -36,6 +38,7 @@ const LikedContent = () => {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { batchUpdateAssets } = useAssetActions();
+  const [shareAssetIds, setShareAssetIds] = useState<string[] | null>(null);
 
   const invalidateAssetLists = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -51,6 +54,10 @@ const LikedContent = () => {
 
   const bulkActions = useCallback(
     (context: AssetsBulkActionContext): AssetsBulkActionItem[] => [
+      createShareSelectedBulkAction(
+        t("assets.assetsPageHeader.bulkActions.share.label", "Share"),
+        setShareAssetIds,
+      ),
       {
         id: "unlike-assets",
         label: t("collections.utilities.liked.bulkActions.unlike.label", {
@@ -90,18 +97,26 @@ const LikedContent = () => {
   );
 
   return (
-    <AssetsProvider scopeId="collections:liked" syncUrl basePath="/collections/liked">
-      <WorkerProvider>
-        <AssetsGalleryPage
-          title={t("collections.utilities.liked.title")}
-          icon={<Heart className="h-6 w-6 text-primary" strokeWidth={1.5} />}
-          baseFilter={LIKED_BASE_FILTER}
-          viewKey="collections:liked"
-          bulkActions={bulkActions}
-          hiddenBulkActions={HIDDEN_LIKED_BULK_ACTIONS}
-        />
-      </WorkerProvider>
-    </AssetsProvider>
+    <>
+      <AssetsProvider scopeId="collections:liked" syncUrl basePath="/collections/liked">
+        <WorkerProvider>
+          <AssetsGalleryPage
+            title={t("collections.utilities.liked.title")}
+            icon={<Heart className="h-6 w-6 text-primary" strokeWidth={1.5} />}
+            baseFilter={LIKED_BASE_FILTER}
+            viewKey="collections:liked"
+            bulkActions={bulkActions}
+            hiddenBulkActions={HIDDEN_LIKED_BULK_ACTIONS}
+          />
+        </WorkerProvider>
+      </AssetsProvider>
+      <CreateShareLinkModal
+        open={shareAssetIds !== null}
+        onClose={() => setShareAssetIds(null)}
+        sourceKind="asset_snapshot"
+        assetIds={shareAssetIds ?? undefined}
+      />
+    </>
   );
 };
 

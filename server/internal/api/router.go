@@ -235,6 +235,25 @@ type SetupControllerInterface interface {
 	Setup(c *gin.Context)          // POST /setup
 }
 
+// ShareLinkControllerInterface defines the share link endpoints: owner-scoped
+// management (authenticated) plus public, token-authorized viewing.
+type ShareLinkControllerInterface interface {
+	NewShareLink(c *gin.Context)    // POST   /share-links
+	ListShareLinks(c *gin.Context)  // GET    /share-links
+	GetShareLink(c *gin.Context)    // GET    /share-links/:id
+	UpdateShareLink(c *gin.Context) // PATCH  /share-links/:id
+	RevokeShareLink(c *gin.Context) // POST   /share-links/:id/revoke
+	DeleteShareLink(c *gin.Context) // DELETE /share-links/:id
+
+	GetPublicShare(c *gin.Context)          // GET  /public/shares/:token
+	ListPublicShareAssets(c *gin.Context)   // POST /public/shares/:token/assets/list
+	GetPublicShareThumbnail(c *gin.Context) // GET  /public/shares/:token/assets/:assetId/thumbnail
+	GetPublicShareWebVideo(c *gin.Context)  // GET  /public/shares/:token/assets/:assetId/web-video
+	GetPublicShareWebAudio(c *gin.Context)  // GET  /public/shares/:token/assets/:assetId/web-audio
+	GetPublicShareOriginal(c *gin.Context)  // GET  /public/shares/:token/assets/:assetId/original
+	DownloadPublicShare(c *gin.Context)     // POST /public/shares/:token/download
+}
+
 func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
@@ -253,6 +272,7 @@ func NewRouter(
 	repositoryScanController RepositoryScanControllerInterface,
 	duplicateController DuplicateControllerInterface,
 	cloudController CloudControllerInterface,
+	shareLinkController ShareLinkControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
 	appInitializedMiddleware gin.HandlerFunc,
 	corsAllowedOrigins []string,
@@ -539,6 +559,34 @@ func NewRouter(
 			agent.PATCH("/pins/layout", agentController.UpdatePinLayout)
 			agent.PATCH("/pins/:id", agentController.UpdatePin)
 			agent.DELETE("/pins/:id", agentController.DeletePin)
+		}
+
+		// Share link routes: owner-scoped management, authenticated.
+		shareLinks := v1.Group("/share-links")
+		shareLinks.Use(authController.AuthMiddleware(), appInitializedMiddleware)
+		{
+			shareLinks.POST("", shareLinkController.NewShareLink)
+			shareLinks.GET("", shareLinkController.ListShareLinks)
+			shareLinks.GET("/:id", shareLinkController.GetShareLink)
+			shareLinks.PATCH("/:id", shareLinkController.UpdateShareLink)
+			shareLinks.POST("/:id/revoke", shareLinkController.RevokeShareLink)
+			shareLinks.DELETE("/:id", shareLinkController.DeleteShareLink)
+		}
+
+		// Public share routes: no auth middleware at all — the share token
+		// itself is the capability, validated per-request inside the
+		// handler/service (mirrors the /setup group precedent for "public
+		// because the system has no secrets to gate on for this caller").
+		publicShares := v1.Group("/public/shares")
+		publicShares.Use(appInitializedMiddleware)
+		{
+			publicShares.GET("/:token", shareLinkController.GetPublicShare)
+			publicShares.POST("/:token/assets/list", shareLinkController.ListPublicShareAssets)
+			publicShares.GET("/:token/assets/:assetId/thumbnail", shareLinkController.GetPublicShareThumbnail)
+			publicShares.GET("/:token/assets/:assetId/web-video", shareLinkController.GetPublicShareWebVideo)
+			publicShares.GET("/:token/assets/:assetId/web-audio", shareLinkController.GetPublicShareWebAudio)
+			publicShares.GET("/:token/assets/:assetId/original", shareLinkController.GetPublicShareOriginal)
+			publicShares.POST("/:token/download", shareLinkController.DownloadPublicShare)
 		}
 	}
 

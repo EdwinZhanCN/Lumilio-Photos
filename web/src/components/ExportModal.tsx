@@ -2,6 +2,7 @@ import {
   BookPlus,
   CloudDownload,
   ImageDown,
+  Share2,
   SquareArrowOutUpRight,
   X,
   RefreshCw,
@@ -32,6 +33,7 @@ interface ExportModalProps {
 
   onOpenStudio?: (asset: Asset) => void;
   onAddToAlbum?: (asset: Asset) => void | Promise<void>;
+  onShare?: (asset: Asset) => void;
 }
 
 export default function ExportModal({
@@ -41,6 +43,7 @@ export default function ExportModal({
   onExport,
   onOpenStudio,
   onAddToAlbum,
+  onShare,
 }: ExportModalProps) {
   const { isExporting, exportImage, downloadOriginal: defaultDownloadOriginal } = useExportImage();
   const { t } = useI18n();
@@ -103,6 +106,15 @@ export default function ExportModal({
     if (!originalUrl) return;
     window.open(originalUrl, "_blank", "noopener,noreferrer");
   }, [asset, onOpenOriginalInNewTab, originalUrl]);
+
+  const handleShare = useCallback(() => {
+    if (!asset || !onShare) return;
+    // CreateShareLinkModal isn't a native <dialog>, so it can't stack above
+    // this top-layer dialog — close it first so the share modal is visible.
+    const modal = document.getElementById("export_modal") as HTMLDialogElement | null;
+    modal?.close();
+    onShare(asset);
+  }, [asset, onShare]);
 
   const buildExportOptions = useCallback((): ExportOptions => {
     switch (format) {
@@ -219,7 +231,16 @@ export default function ExportModal({
             </button>
           </div>
 
-          {/* TODO: Implement the share function */}
+          {onShare && (
+            <div
+              className="tooltip tooltip-bottom"
+              data-tip={t("exportModal.share", { defaultValue: "Share" })}
+            >
+              <button className="btn btn-soft btn-circle" onClick={handleShare} disabled={!canAct}>
+                <Share2 />
+              </button>
+            </div>
+          )}
 
           <div
             className="tooltip tooltip-bottom"

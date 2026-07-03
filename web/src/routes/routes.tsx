@@ -21,6 +21,8 @@ import Tags from "@/features/collections/routes/Tags";
 import TagDetails from "@/features/collections/routes/TagDetails";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
+import PublicShare from "@/features/share/routes/PublicShare.tsx";
+import SharedLinks from "@/features/share/routes/SharedLinks.tsx";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import MFAPage from "@/features/auth/routes/MFAPage.tsx";
 import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
@@ -36,6 +38,20 @@ export const publicRoutes = [
   {
     path: "/register",
     element: <RegisterPage />,
+  },
+];
+
+// shareRoutes are rendered outside SetupGate/BootstrapGate (see App.tsx) so a
+// recipient hitting a public share link is never redirected through
+// first-run setup or forced to authenticate.
+export const shareRoutes = [
+  {
+    path: "/s/:token",
+    element: <PublicShare />,
+  },
+  {
+    path: "/s/:token/:assetId",
+    element: <PublicShare />,
   },
 ];
 
@@ -153,6 +169,10 @@ export const appRoutes = [
   {
     path: "/collections/liked/:assetId",
     element: <Liked />,
+  },
+  {
+    path: "/collections/shared-links",
+    element: <SharedLinks />,
   },
   {
     path: "/collections/:albumId",

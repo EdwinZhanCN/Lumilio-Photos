@@ -1,4 +1,4 @@
-import { Copy, Heart, Tag, Trash2, type LucideIcon } from "lucide-react";
+import { Copy, Heart, Share2, Tag, Trash2, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { RailCardTone } from "./RailCard";
 import { getUtilityClassifierTitle, UTILITY_CLASSIFIERS } from "../utils/utilityClassifiers";
@@ -48,6 +48,13 @@ export function useUtilityShortcuts(): UtilityShortcut[] {
       icon: Tag,
       title: t("collections.sections.tags", "Tags"),
       tone: "accent",
+    },
+    {
+      key: "shared-links",
+      to: "/collections/shared-links",
+      icon: Share2,
+      title: t("collections.utilities.sharedLinks.title", "Shared Links"),
+      tone: "primary",
     },
     ...UTILITY_CLASSIFIERS.map(
       (classifier): UtilityShortcut => ({
