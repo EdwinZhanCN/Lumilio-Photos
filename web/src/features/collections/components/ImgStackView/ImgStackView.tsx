@@ -24,7 +24,7 @@ function ImgStackView({
 
   return (
     <div
-      className={`group relative inline-block size-50 transition-all duration-300 ${isSelected ? "scale-95" : ""}`}
+      className={`group relative block w-full max-w-50 aspect-square transition-all duration-300 ${isSelected ? "scale-95" : ""}`}
     >
       {/* Back card */}
       <div
