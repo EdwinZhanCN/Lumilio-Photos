@@ -150,33 +150,56 @@ Highest-traffic surface. Watch: gallery virtualization width math,
 full-screen carousel + info panel (info should become a bottom
 sheet/drawer on phones), selection toolbar overflow on narrow widths.
 
-- [ ] features/assets/AssetsProvider.tsx
-- [ ] features/assets/components/page/AssetsGalleryPage.tsx
-- [ ] features/assets/components/page/FilterTool/FilterTool.tsx
-- [ ] features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx
-- [ ] features/assets/components/page/FullScreen/FullScreenInfo/AudioInfoView.tsx
-- [ ] features/assets/components/page/FullScreen/FullScreenInfo/FullScreenBasicInfo.tsx
-- [ ] features/assets/components/page/FullScreen/FullScreenInfo/PhotoInfoView.tsx
-- [ ] features/assets/components/page/FullScreen/FullScreenInfo/TagList.tsx
-- [ ] features/assets/components/page/FullScreen/FullScreenInfo/VideoInfoView.tsx
-- [ ] features/assets/components/page/JustifiedGallery/JustifiedGallery.tsx
-- [ ] features/assets/components/page/LoadingSkeleton.tsx
-- [ ] features/assets/components/page/SearchFAB.tsx
-- [ ] features/assets/components/page/SquareGallery/SquareGallery.tsx
-- [ ] features/assets/components/shared/AssetsPageHeader.tsx
-- [ ] features/assets/components/shared/MediaThumbnail.tsx
-- [ ] features/assets/components/shared/MediaViewer.tsx
-- [ ] features/assets/components/shared/StackCarouselOverlay.tsx
-- [ ] features/assets/components/shared/StackDetailModal.tsx
-- [ ] features/assets/components/shared/StackedThumbnail.tsx
-- [ ] features/assets/components/shared/TagPickerMenu.tsx
-- [ ] features/assets/hooks/useAssetActions.tsx
-- [ ] features/assets/hooks/useAssetsView.tsx
-- [ ] features/assets/hooks/useAssetTags.tsx
-- [ ] features/assets/hooks/usePinAssetsView.tsx
-- [ ] features/assets/hooks/useSelection.tsx
-- [ ] features/assets/routes/Assets.tsx
-- [ ] features/assets/routes/AssetsTrash.tsx
+- [x] features/assets/AssetsProvider.tsx — no visual surface (provider only).
+- [x] features/assets/components/page/AssetsGalleryPage.tsx — already responsive
+      (delegates layout entirely to header/gallery/carousel sub-components).
+- [x] features/assets/components/page/FilterTool/FilterTool.tsx — dropdown
+      panel clamps (`max-w-[calc(100vw-2rem)]`) instead of overflowing off the
+      right edge on narrow screens.
+- [x] features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx —
+      already responsive (field-guide aside sizes off viewport, FAB flower is
+      daisyUI-driven).
+- [x] features/assets/components/page/FullScreen/FullScreenInfo/AudioInfoView.tsx —
+      info panel becomes a bottom sheet (`fixed inset-x-0 bottom-0`) below
+      `sm`, floating top-right card at `sm:`+ (was a fixed `w-[380px]`
+      absolute panel that overflowed phone widths).
+- [x] features/assets/components/page/FullScreen/FullScreenInfo/FullScreenBasicInfo.tsx —
+      fallback generic-type card now clamps to viewport width.
+- [x] features/assets/components/page/FullScreen/FullScreenInfo/PhotoInfoView.tsx —
+      same bottom-sheet-on-mobile fix as AudioInfoView.
+- [x] features/assets/components/page/FullScreen/FullScreenInfo/TagList.tsx —
+      already responsive (horizontal-scroll tag row, viewport-clamped portal popover).
+- [x] features/assets/components/page/FullScreen/FullScreenInfo/VideoInfoView.tsx —
+      same bottom-sheet-on-mobile fix as AudioInfoView.
+- [x] features/assets/components/page/JustifiedGallery/JustifiedGallery.tsx —
+      verified: layout is fully container-width-driven via ResizeObserver, no
+      rewrite needed.
+- [x] features/assets/components/page/LoadingSkeleton.tsx — already responsive.
+- [x] features/assets/components/page/SearchFAB.tsx — search input clamps
+      (`max-w-[calc(100vw-6rem)]`) instead of nearly touching the viewport
+      edge on the smallest phones.
+- [x] features/assets/components/page/SquareGallery/SquareGallery.tsx —
+      verified: already `grid-cols-2` below `md`, custom column count at `md:`+.
+- [x] features/assets/components/shared/AssetsPageHeader.tsx — already
+      responsive (full `lg:` toolbar vs. compact `Ellipsis` dropdown menu below `lg`).
+- [x] features/assets/components/shared/MediaThumbnail.tsx — already responsive
+      (fills parent grid cell).
+- [x] features/assets/components/shared/MediaViewer.tsx — already responsive
+      (`calc(100vw/100vh)`-bounded media).
+- [x] features/assets/components/shared/StackCarouselOverlay.tsx — already responsive.
+- [x] features/assets/components/shared/StackDetailModal.tsx — already
+      responsive (`sm:` padding, `md:`/`xl:` grid columns).
+- [x] features/assets/components/shared/StackedThumbnail.tsx — already responsive.
+- [x] features/assets/components/shared/TagPickerMenu.tsx — already responsive.
+- [x] features/assets/hooks/useAssetActions.tsx — no visual surface.
+- [x] features/assets/hooks/useAssetsView.tsx — no visual surface.
+- [x] features/assets/hooks/useAssetTags.tsx — no visual surface.
+- [x] features/assets/hooks/usePinAssetsView.tsx — no visual surface.
+- [x] features/assets/hooks/useSelection.tsx — no visual surface.
+- [x] features/assets/routes/Assets.tsx — no visual surface (delegates to
+      AssetsGalleryPage).
+- [x] features/assets/routes/AssetsTrash.tsx — no visual surface (delegates to
+      AssetsGalleryPage).
 
 ## Batch 3 — Collections
 

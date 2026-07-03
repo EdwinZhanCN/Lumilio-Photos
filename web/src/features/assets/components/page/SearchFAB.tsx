@@ -105,7 +105,7 @@ export function SearchFAB({ className }: SearchFABProps) {
               value={localValue}
               onChange={handleChange}
               placeholder="Search photos…"
-              className="input input-bordered rounded-full w-72 bg-base-100 shadow-md text-sm"
+              className="input input-bordered rounded-full w-72 max-w-[calc(100vw-6rem)] bg-base-100 shadow-md text-sm"
             />
             {localValue && (
               <button
