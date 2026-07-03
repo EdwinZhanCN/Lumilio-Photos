@@ -206,32 +206,40 @@ sheet/drawer on phones), selection toolbar overflow on narrow widths.
 Rails (`Rail`/`RailCard`) are shared — fix once, all rails inherit. Grids
 should use `auto-fill/minmax` instead of fixed column counts.
 
-- [ ] features/collections/CollectionsProvider.tsx
-- [ ] features/collections/components/AlbumFormModal.tsx
-- [ ] features/collections/components/AlbumRail.tsx
-- [ ] features/collections/components/FoldersRail.tsx
-- [ ] features/collections/components/ImgStackGrid/ImgStackGrid.tsx
-- [ ] features/collections/components/ImgStackView/ImgStackView.tsx
-- [ ] features/collections/components/MapRail.tsx
-- [ ] features/collections/components/PeopleCollectionGrid.tsx
-- [ ] features/collections/components/PeopleRail.tsx
-- [ ] features/collections/components/Rail.tsx
-- [ ] features/collections/components/RailCard.tsx
-- [ ] features/collections/components/UtilitiesRail.tsx
-- [ ] features/collections/routes/AlbumDetails.tsx
-- [ ] features/collections/routes/Albums.tsx
-- [ ] features/collections/routes/Collections.tsx
-- [ ] features/collections/routes/Duplicates.tsx
-- [ ] features/collections/routes/FolderDetails.tsx
-- [ ] features/collections/routes/Folders.tsx
-- [ ] features/collections/routes/Liked.tsx
-- [ ] features/collections/routes/MapView.tsx
-- [ ] features/collections/routes/People.tsx
-- [ ] features/collections/routes/TagDetails.tsx
-- [ ] features/collections/routes/Tags.tsx
-- [ ] features/collections/routes/TripDetails.tsx
-- [ ] features/collections/routes/Utilities.tsx
-- [ ] features/collections/routes/UtilityClassifierAlbum.tsx
+- [x] features/collections/CollectionsProvider.tsx — no visual surface (reducer provider).
+- [x] features/collections/components/AlbumFormModal.tsx — already responsive
+      (Modal's `modal-bottom sm:modal-middle`, single-col below `md`).
+- [x] features/collections/components/AlbumRail.tsx — already responsive (Rail/RailCard).
+- [x] features/collections/components/FoldersRail.tsx — already responsive.
+- [x] features/collections/components/ImgStackGrid/ImgStackGrid.tsx — grid
+      already responsive; wraps the fixed-size stack view in a `w-full flex
+      justify-center` cell so ImgStackView can size to the column.
+- [x] features/collections/components/ImgStackView/ImgStackView.tsx — was a
+      hardcoded `size-50` (200px) that overflowed the `grid-cols-2` mobile
+      column; now `w-full max-w-50 aspect-square`.
+- [x] features/collections/components/MapRail.tsx — already responsive.
+- [x] features/collections/components/PeopleCollectionGrid.tsx — already responsive.
+- [x] features/collections/components/PeopleRail.tsx — already responsive.
+- [x] features/collections/components/Rail.tsx — already responsive (horizontal scroll row).
+- [x] features/collections/components/RailCard.tsx — already responsive.
+- [x] features/collections/components/UtilitiesRail.tsx — already responsive.
+- [x] features/collections/routes/AlbumDetails.tsx — already responsive (delegates to CollectionHero/AssetsGalleryPage).
+- [x] features/collections/routes/Albums.tsx — already responsive.
+- [x] features/collections/routes/Collections.tsx — section headers wrap
+      (`flex-wrap`) and title scales `text-xl sm:text-2xl` instead of a fixed
+      size that could crowd the "View all" button on narrow screens.
+- [x] features/collections/routes/Duplicates.tsx — already responsive
+      (`grid-cols-2 sm:grid-cols-4` summary, `grid-cols-2 ... lg:grid-cols-5` thumbnails).
+- [x] features/collections/routes/FolderDetails.tsx — already responsive.
+- [x] features/collections/routes/Folders.tsx — already responsive.
+- [x] features/collections/routes/Liked.tsx — already responsive (delegates to AssetsGalleryPage).
+- [x] features/collections/routes/MapView.tsx — already responsive (map fills container).
+- [x] features/collections/routes/People.tsx — already responsive.
+- [x] features/collections/routes/TagDetails.tsx — already responsive.
+- [x] features/collections/routes/Tags.tsx — already responsive.
+- [x] features/collections/routes/TripDetails.tsx — already responsive.
+- [x] features/collections/routes/Utilities.tsx — already responsive.
+- [x] features/collections/routes/UtilityClassifierAlbum.tsx — already responsive.
 
 ## Batch 4 — Auth & Onboarding
 

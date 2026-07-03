@@ -78,12 +78,12 @@ function CollectionsContent() {
           )}
 
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-base-200 p-3 text-primary">
                   <Wrench className="size-5" strokeWidth={1.75} />
                 </div>
-                <h2 className="text-2xl font-black tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
                   {t("collections.sections.utilities")}
                 </h2>
               </div>
@@ -101,12 +101,12 @@ function CollectionsContent() {
           </section>
 
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-base-200 p-3 text-primary">
                   <MapPin className="size-5" strokeWidth={1.75} />
                 </div>
-                <h2 className="text-2xl font-black tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
                   {t("collections.sections.places")}
                 </h2>
               </div>
@@ -133,12 +133,12 @@ function CollectionsContent() {
           </section>
 
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-base-200 p-3 text-primary">
                   <Album className="size-5" strokeWidth={1.75} />
                 </div>
-                <h2 className="text-2xl font-black tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
                   {t("collections.sections.albums")}
                 </h2>
               </div>
@@ -160,12 +160,12 @@ function CollectionsContent() {
           </section>
 
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-base-200 p-3 text-primary">
                   <Users className="size-5" strokeWidth={1.75} />
                 </div>
-                <h2 className="text-2xl font-black tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
                   {t("collections.sections.people")}
                 </h2>
               </div>
@@ -191,12 +191,12 @@ function CollectionsContent() {
           </section>
 
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-base-200 p-3 text-primary">
                   <FolderTree className="size-5" strokeWidth={1.75} />
                 </div>
-                <h2 className="text-2xl font-black tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
                   {t("collections.sections.folders")}
                 </h2>
               </div>

@@ -84,7 +84,7 @@ function ImgStackGrid({
               </div>
             )}
 
-            <div className="mb-3">
+            <div className="mb-3 w-full flex justify-center">
               <ImgStackView
                 coverImages={album.coverImages}
                 albumName={album.name}
