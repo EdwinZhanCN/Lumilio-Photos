@@ -50,3 +50,14 @@ Keep this list short. Each item should have a concrete owner path and a reason i
     registration works in Safari/Chrome against `localhost` once the SPA ships.
   - **Phase 2 UI**: native storage-location picker + "reconnect external drive"
     dialog (supervisor currently persists/falls back but has no picker UI).
+- **AgentBoard has no mobile column reflow.** Owner:
+  `web/src/features/lumilio/components/Board/AgentBoard.tsx`. The board is a
+  react-grid-layout drag grid with a fixed 12-column layout persisted
+  server-side (`x/y/w/h` per pin via `/api/v1/agent/pins/layout`) — there is
+  only one stored layout, not one per breakpoint. On phones the 12 columns
+  compress into narrow slivers instead of reflowing to 1-2 columns. Fixing it
+  needs either a second persisted layout keyed by breakpoint or a client-only
+  column remap, and either approach needs visual verification in a real
+  browser against a running backend (not available when this was surveyed —
+  see `exec-plans/completed/responsive.md` Batch 8). File as its own plan
+  before changing it.
