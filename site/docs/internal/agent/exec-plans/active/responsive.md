@@ -435,6 +435,19 @@ Final pass (after Batch 8):
   common window sizes — desktop is the primary product; no regressions there.
 - Check both a light and a dark daisyUI theme once.
 
+**Status: all 8 batches done (code-reviewed + `make web-test` per batch);
+the live browser walk above was not run in this session** — an earlier check
+hit the wrong dev-server port (6658 instead of the actual 6657) and the
+`claude-in-chrome` browser extension disconnected before a retry against the
+correct port could complete. The backend/API is reachable through the
+correct dev server, so a full authenticated walk should be possible in a
+follow-up session. Before shipping, walk routes.tsx at 375/768/1024/1440 in
+both themes per the checklist above, paying special attention to: the
+Batch 0 drawer (hamburger open/close on mobile), Batch 2's fullscreen info
+bottom sheet, Batch 3's `ImgStackView` grid fix, Batch 7's Studio
+DevelopPanel bottom sheet, and the Batch 8 AgentBoard gap noted in
+`tech-debt-tracker.md`.
+
 ## Risks & Decisions
 
 - **Desktop regressions** are the main risk: mobile-first rewrites of
