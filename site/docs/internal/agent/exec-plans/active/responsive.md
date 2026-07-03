@@ -272,32 +272,43 @@ screens. Includes MFA/passkey flows.
 Settings uses the renew (macOS inset-grouped) shell — keep its design
 language; the shell likely needs a single-column collapse below `md`.
 
-- [ ] features/home/components/GalleryGrid.tsx
-- [ ] features/home/components/SpacetimeMapCard.tsx
-- [ ] features/home/components/StatsCards.tsx
-- [ ] features/home/routes/Home.tsx
-- [ ] features/settings/components/renew/SettingsDropdown.tsx
-- [ ] features/settings/components/renew/SettingsGroup.tsx
-- [ ] features/settings/components/renew/SettingsPage.tsx
-- [ ] features/settings/components/renew/SettingsSaveBar.tsx
-- [ ] features/settings/components/renew/SettingsShell.tsx
-- [ ] features/settings/components/renew/tabs/AccountTab.tsx
-- [ ] features/settings/components/renew/tabs/AiTab.tsx
-- [ ] features/settings/components/renew/tabs/AppearanceTab.tsx
-- [ ] features/settings/components/renew/tabs/CloudTab.tsx
-- [ ] features/settings/components/renew/tabs/ServerTab.tsx
-- [ ] features/settings/components/renew/tabs/UsersTab.tsx
-- [ ] features/settings/components/renew/ThemePicker.tsx
-- [ ] features/settings/preferencesEffects.tsx
-- [ ] features/settings/routes/Settings.tsx
-- [ ] features/people/components/PersonFacesPanel.tsx
-- [ ] features/people/components/PersonPicker.tsx
-- [ ] features/people/components/PersonRenameModal.tsx
-- [ ] features/people/routes/PersonDetails.tsx
-- [ ] features/manage/components/RepositoryGrid.tsx
-- [ ] features/manage/routes/Manage.tsx
-- [ ] features/updates/routes/Updates.tsx
-- [ ] features/portfolio/routes/Portfolio.tsx
+- [x] features/home/components/GalleryGrid.tsx — already responsive (delegates to SquareGallery).
+- [x] features/home/components/SpacetimeMapCard.tsx — already responsive.
+- [x] features/home/components/StatsCards.tsx — already responsive
+      (`grid-cols-1 md:grid-cols-2`, horizontal-scroll heatmap).
+- [x] features/home/routes/Home.tsx — already responsive (tabs wrap via daisyUI `tabs-box`).
+- [x] features/settings/components/renew/SettingsDropdown.tsx — already responsive.
+- [x] features/settings/components/renew/SettingsGroup.tsx — already responsive
+      (mobile stacks, `lg:grid-cols-[...]` two-column on desktop).
+- [x] features/settings/components/renew/SettingsPage.tsx — already responsive.
+- [x] features/settings/components/renew/SettingsSaveBar.tsx — already
+      responsive (`sm:flex-row`).
+- [x] features/settings/components/renew/SettingsShell.tsx — already
+      responsive (tab strip `flex-wrap`).
+- [x] features/settings/components/renew/tabs/AccountTab.tsx — already
+      responsive (`modal-bottom sm:modal-middle`, `flex-wrap`).
+- [x] features/settings/components/renew/tabs/AiTab.tsx — already responsive.
+- [x] features/settings/components/renew/tabs/AppearanceTab.tsx — already responsive.
+- [x] features/settings/components/renew/tabs/CloudTab.tsx — already responsive.
+- [x] features/settings/components/renew/tabs/ServerTab.tsx — already responsive.
+- [x] features/settings/components/renew/tabs/UsersTab.tsx — already responsive.
+- [x] features/settings/components/renew/ThemePicker.tsx — already responsive
+      (`grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5`).
+- [x] features/settings/preferencesEffects.tsx — no visual surface (effect only).
+- [x] features/settings/routes/Settings.tsx — no visual surface (thin wrapper).
+- [x] features/people/components/PersonFacesPanel.tsx — already responsive
+      (`grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8`).
+- [x] features/people/components/PersonPicker.tsx — already responsive.
+- [x] features/people/components/PersonRenameModal.tsx — already responsive
+      (Modal's bottom-sheet-on-mobile, `flex-col sm:flex-row`).
+- [x] features/people/routes/PersonDetails.tsx — already responsive.
+- [x] features/manage/components/RepositoryGrid.tsx — header wraps
+      (`flex-wrap`, `min-w-0`) instead of squeezing title against action buttons.
+- [x] features/manage/routes/Manage.tsx — dropped a stray `min-h-screen` on a
+      route already nested in the app shell's own scroll container (was
+      inflating the scrollable area beyond the content's real height).
+- [x] features/updates/routes/Updates.tsx — no visual surface (PageHeader only, placeholder route).
+- [x] features/portfolio/routes/Portfolio.tsx — no visual surface (PageHeader only, placeholder route).
 
 ## Batch 6 — Upload, Share, Monitor
 

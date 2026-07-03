@@ -48,7 +48,7 @@ const Manage = () => {
   const { t } = useI18n();
 
   return (
-    <div className="min-h-screen bg-base-100">
+    <div className="bg-base-100">
       <ManageHeader />
       <ErrorBoundary
         FallbackComponent={(props) => (
