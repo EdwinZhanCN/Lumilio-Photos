@@ -14,6 +14,12 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
 import { useAuth } from "@/features/auth";
 
+/** Unchecks the shell drawer checkbox so navigating on mobile auto-closes it. */
+function closeMobileDrawer() {
+  const toggle = document.getElementById("app-drawer") as HTMLInputElement | null;
+  if (toggle) toggle.checked = false;
+}
+
 function SideBar() {
   const [messageCount] = useState<number>(0);
   const { online: isOnline } = useGlobal();
@@ -22,17 +28,25 @@ function SideBar() {
   const { t } = useI18n();
 
   return (
-    <div className="select-none">
-      <ul className="menu rounded-box mx-2 my-2 gap-2">
+    <div className="select-none h-full">
+      <ul className="menu rounded-box mx-2 my-2 gap-2 w-64 lg:w-56">
         <li>
-          <Link to="/" className={location.pathname === "/" ? "active" : ""}>
+          <Link
+            to="/"
+            onClick={closeMobileDrawer}
+            className={location.pathname === "/" ? "active" : ""}
+          >
             <Home className="size-5" />
             {t("sidebar.home")}
             <span className="badge badge-sm">{messageCount}</span>
           </Link>
         </li>
         <li>
-          <Link to="/assets/" className={location.pathname.startsWith("/assets") ? "active" : ""}>
+          <Link
+            to="/assets/"
+            onClick={closeMobileDrawer}
+            className={location.pathname.startsWith("/assets") ? "active" : ""}
+          >
             <Image className="size-5" />
             {t("sidebar.assets")}
           </Link>
@@ -40,6 +54,7 @@ function SideBar() {
         <li>
           <Link
             to="/collections"
+            onClick={closeMobileDrawer}
             className={location.pathname.startsWith("/collections") ? "active" : ""}
           >
             <LibraryBig className="size-5" />
@@ -47,7 +62,7 @@ function SideBar() {
           </Link>
         </li>
         <li>
-          <Link to={"/studio"}>
+          <Link to={"/studio"} onClick={closeMobileDrawer}>
             <Paintbrush className="size-5" />
             {t("sidebar.studio")}
           </Link>
@@ -59,13 +74,17 @@ function SideBar() {
           </Link>
         </li> */}
         <li>
-          <Link to="/manage" className={location.pathname.startsWith("/manage") ? "active" : ""}>
+          <Link
+            to="/manage"
+            onClick={closeMobileDrawer}
+            className={location.pathname.startsWith("/manage") ? "active" : ""}
+          >
             <Folders className="size-5" />
             {t("sidebar.manage")}
           </Link>
         </li>
         <li>
-          <Link to="/settings">
+          <Link to="/settings" onClick={closeMobileDrawer}>
             <SlidersHorizontal className="size-5" />
             {t("sidebar.settings")}
           </Link>
@@ -86,7 +105,7 @@ function SideBar() {
         </li> */}
         {user?.role === "admin" && (
           <li>
-            <Link to="/server-monitor">
+            <Link to="/server-monitor" onClick={closeMobileDrawer}>
               {isOnline ? (
                 <div className="flex items-center justify-center gap-2 text-success">
                   <Activity className="size-5" />

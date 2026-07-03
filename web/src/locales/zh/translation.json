@@ -1852,9 +1852,11 @@
     "badges": {
       "new": "新"
     },
+    "closeMenu": "关闭菜单",
     "collections": "合集",
     "home": "首页",
     "manage": "管理",
+    "openMenu": "打开菜单",
     "portfolio": "作品集",
     "settings": "设置",
     "status": {

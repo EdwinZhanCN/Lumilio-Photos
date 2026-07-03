@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Moon, Sun } from "lucide-react";
+import { Menu, Moon, Sun } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { useResolvedThemeMode, useThemePreference } from "@/lib/theme";
@@ -18,15 +18,22 @@ function NavBar() {
   const displayName = user?.display_name || user?.username || "User";
 
   return (
-    <div className="navbar bg-base-100 px-4 py-2 gap-3 z-49">
-      <div className="flex flex-1 items-center gap-3 min-w-0">
-        <Link className="btn btn-ghost text-xl shrink-0" to="/">
+    <div className="navbar bg-base-100 px-2 sm:px-4 py-2 gap-2 sm:gap-3 z-49">
+      <div className="flex flex-1 items-center gap-1 sm:gap-3 min-w-0">
+        <label
+          htmlFor="app-drawer"
+          aria-label={t("sidebar.openMenu", { defaultValue: "Open menu" })}
+          className="btn btn-square btn-ghost lg:hidden"
+        >
+          <Menu className="size-5" />
+        </label>
+        <Link className="btn btn-ghost text-xl shrink-0 px-2 sm:px-4" to="/">
           <img
             src={"/logo.png"}
             className="size-6 bg-contain object-contain"
             alt={t("app.name") + " Logo"}
           />
-          {t("app.name")}
+          <span className="hidden sm:inline">{t("app.name")}</span>
         </Link>
       </div>
 

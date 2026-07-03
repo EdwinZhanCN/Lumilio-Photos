@@ -59,11 +59,11 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="modal modal-open z-50">
+    <div className="modal modal-open modal-bottom sm:modal-middle z-50">
       <div
-        className={`modal-box flex max-h-[85vh] flex-col overflow-hidden p-0 ${SIZE_CLASS[size]} ${className}`}
+        className={`modal-box flex max-h-[85vh] w-full flex-col overflow-hidden p-0 rounded-b-none sm:rounded-b-2xl ${SIZE_CLASS[size]} ${className}`}
       >
-        <header className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-base-200 bg-base-200/40 px-6 py-4">
+        <header className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-base-200 bg-base-200/40 px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
             {icon && <span className="text-primary">{icon}</span>}
             <h3 className="text-lg font-bold">{title}</h3>
@@ -81,7 +81,7 @@ export function Modal({
         <div className={`relative min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>{children}</div>
 
         {footer && (
-          <footer className="flex flex-shrink-0 justify-end gap-3 border-t border-base-200 bg-base-200/40 px-6 py-4">
+          <footer className="flex flex-shrink-0 justify-end gap-3 border-t border-base-200 bg-base-200/40 px-4 sm:px-6 py-4">
             {footer}
           </footer>
         )}

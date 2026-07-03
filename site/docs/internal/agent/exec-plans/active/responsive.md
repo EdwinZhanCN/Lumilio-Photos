@@ -1,0 +1,365 @@
+# Responsive Adaptation (All TSX)
+
+## Goal
+
+Make every page and component in `web/src` adapt cleanly across screen sizes —
+phone (~375px), tablet (~768px), laptop (~1024px), and wide desktop (≥1440px) —
+with no horizontal page scroll, no clipped controls, and touch-friendly targets
+on small screens.
+
+Coverage target: **all 192 non-test `.tsx` files** under `web/src`. Every file
+is either adapted or explicitly audited as "no visual surface / already fine"
+and checked off in the tracker below.
+
+## Ground Rules
+
+- **Load skills first.** Each implementation session MUST invoke the
+  **frontend skill** and the **daisyUI skill** (via the Skill tool) before
+  writing any UI code, and follow their guidance for layout and component
+  choices. If a skill is unavailable in the environment, note that in the
+  session summary and proceed with the principles below.
+- Stack: Tailwind CSS 4 + daisyUI 5, React 19. Use **pure daisyUI semantic
+  tokens** (`bg-base-100`, `text-base-content`, `primary/secondary/accent`) —
+  no custom color tokens.
+- **Mobile-first**: base styles target the smallest screen; add `sm:`/`md:`/
+  `lg:`/`xl:` upward. Prefer CSS (responsive utilities, `grid`
+  `auto-fill/minmax`, flex-wrap, container queries `@container` for
+  self-contained components) over JS breakpoint logic.
+- Prefer daisyUI responsive primitives: `drawer` (sidebar collapse), `dock`
+  (mobile bottom nav if needed), `modal-bottom sm:modal-middle` (modals become
+  bottom sheets on phones), `menu` horizontal/vertical switches, responsive
+  `join`/`btn` sizing.
+- When JS is unavoidable (virtualized galleries, canvas, maps), add ONE shared
+  hook `web/src/hooks/util-hooks/useBreakpoint.ts` (matchMedia-based, aligned
+  to Tailwind breakpoints) and reuse it everywhere. Do not scatter ad-hoc
+  `window.innerWidth` reads.
+- Touch targets ≥ 44px on `<lg`; hover-only affordances need a
+  touch-visible equivalent (e.g. overlay actions on thumbnails).
+- Never run bare `vp fmt`. Never hand-edit `translation.json` (if copy is
+  added: `t()` → `vp exec i18next-cli extract` → fill zh). Never hand-edit
+  generated files (`doc.md`, `schema.d.ts`, `src/wasm/**`).
+
+## Non-Goals
+
+- No visual redesign — same look, adapted layout only.
+- No new mobile-only routes or a separate mobile app shell rewrite.
+- No dependency/toolchain changes (Vite+ stays pinned).
+- No backend changes.
+
+## Current State
+
+- 46 of 192 files use responsive prefixes; the rest are fixed-desktop layouts.
+- Batch 0 done: App shell now uses a daisyUI `drawer lg:drawer-open` — sidebar
+  is `drawer-side` (mobile overlay, permanent rail on `lg`+), NavBar has the
+  `lg:hidden` hamburger trigger (`label[for=app-drawer]`).
+- `hooks/util-hooks/useBreakpoint.ts` exists (`useBreakpoint(bp)` /
+  `useIsMobile()`, matchMedia-based, Tailwind default breakpoints) — reuse
+  this in later batches instead of ad-hoc `window.innerWidth`.
+- Galleries (`JustifiedGallery`, `SquareGallery`) compute layout from container
+  width via `lib/utils/smartBatchSizing.ts` — verify rather than rewrite.
+
+## Workflow (per batch)
+
+1. Load frontend + daisyUI skills.
+2. Read each file in the batch; classify: **adapt** / **already responsive** /
+   **no visual surface** (providers, hooks without JSX layout, contexts).
+3. Apply fixes with Tailwind responsive utilities + daisyUI primitives.
+4. Verify visually in the browser (Chrome tools: `resize_window` or devtools
+   device emulation) at **375 / 768 / 1024 / 1440** widths against `make web-dev`.
+   Checks: no horizontal body scroll, no overlapping/clipped controls, modals
+   and menus reachable, galleries reflow.
+5. Run `make web-test` (or `cd web && vp check --no-fmt --no-lint && vp lint && vp test`).
+6. Tick the tracker checkboxes in this file, commit per batch:
+   `refactor(web): responsive — <batch name>`.
+
+Batches are ordered so shared shells/components land first; feature batches can
+then rely on them. One batch ≈ one session/PR.
+
+## Batch 0 — Shell & Foundation
+
+The drawer/nav shell decision here shapes everything else. Sidebar should
+collapse into a daisyUI `drawer` below `lg`; NavBar gets a hamburger trigger.
+Add `useBreakpoint` hook here.
+
+- [x] App.tsx — shell rebuilt on daisyUI `drawer lg:drawer-open`; sidebar is
+      `drawer-side` (overlay + auto-close on nav below `lg`), navbar stays in
+      `drawer-content`.
+- [x] components/NavBar.tsx — hamburger `label[for=app-drawer]` shown `lg:hidden`;
+      logo wordmark hides below `sm`; gaps tighten on small screens.
+- [x] components/SideBar.tsx — menu content reused for both the `lg:drawer-open`
+      rail and the mobile drawer; links close the drawer on navigate.
+- [x] components/PageHeader.tsx — header wraps (`flex-wrap`), title/subtitle
+      shrink on `<sm`, action children wrap and right-align.
+- [x] components/Modal.tsx — `modal-bottom sm:modal-middle` (bottom sheet on
+      phones), header/footer padding tightens below `sm`.
+- [x] routes/routes.tsx — no visual surface (route/element data only).
+- [x] main.tsx — no visual surface (bootstrap only).
+- [x] lib/i18n.tsx — no visual surface (provider only).
+- [x] lib/theme/ThemeEffects.tsx — no visual surface (effect only, no JSX).
+- [x] contexts/GlobalContext.tsx — no visual surface (provider only).
+- [x] contexts/WorkerProvider.tsx — no visual surface (provider only).
+- [x] hooks/util-hooks/useExportImage.tsx — no visual surface (hook only).
+- [x] hooks/util-hooks/useGenerateHashcode.tsx — no visual surface (hook only).
+- [x] hooks/util-hooks/useMessage.tsx — no visual surface (hook only).
+
+## Batch 1 — Shared Components
+
+- [ ] components/breadcrumbs/BreadcrumbContext.tsx
+- [ ] components/breadcrumbs/Breadcrumbs.tsx
+- [ ] components/BrowseScopeSelect.tsx
+- [ ] components/collection/CollectionErrorAlert.tsx
+- [ ] components/collection/CollectionHero.tsx
+- [ ] components/collection/CollectionTitle.tsx
+- [ ] components/collection/LoadMoreButton.tsx
+- [ ] components/collection/MetaStatRow.tsx
+- [ ] components/EmptyState.tsx
+- [ ] components/ErrorFallBack.tsx
+- [ ] components/ExifDataDisplay.tsx
+- [ ] components/ExportModal.tsx
+- [ ] components/Heatmap/CalendarHeatmap.tsx
+- [ ] components/Heatmap/GitHubStyleHeatmap.tsx
+- [ ] components/Heatmap/Histogram.tsx
+- [ ] components/icons/LensIcon.tsx
+- [ ] components/icons/LivePhotos.tsx
+- [ ] components/MapComponent.tsx
+- [ ] components/MessageCenter.tsx
+- [ ] components/Notifications.tsx
+- [ ] components/PhotoMapView.tsx
+- [ ] components/PhotoPicker.tsx
+- [ ] components/ui/InlineTextEditor.tsx
+- [ ] components/ui/RatingComponent.tsx
+- [ ] components/ui/Sonner.tsx
+- [ ] components/UserAvatar.tsx
+
+## Batch 2 — Assets (gallery core)
+
+Highest-traffic surface. Watch: gallery virtualization width math,
+full-screen carousel + info panel (info should become a bottom
+sheet/drawer on phones), selection toolbar overflow on narrow widths.
+
+- [ ] features/assets/AssetsProvider.tsx
+- [ ] features/assets/components/page/AssetsGalleryPage.tsx
+- [ ] features/assets/components/page/FilterTool/FilterTool.tsx
+- [ ] features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx
+- [ ] features/assets/components/page/FullScreen/FullScreenInfo/AudioInfoView.tsx
+- [ ] features/assets/components/page/FullScreen/FullScreenInfo/FullScreenBasicInfo.tsx
+- [ ] features/assets/components/page/FullScreen/FullScreenInfo/PhotoInfoView.tsx
+- [ ] features/assets/components/page/FullScreen/FullScreenInfo/TagList.tsx
+- [ ] features/assets/components/page/FullScreen/FullScreenInfo/VideoInfoView.tsx
+- [ ] features/assets/components/page/JustifiedGallery/JustifiedGallery.tsx
+- [ ] features/assets/components/page/LoadingSkeleton.tsx
+- [ ] features/assets/components/page/SearchFAB.tsx
+- [ ] features/assets/components/page/SquareGallery/SquareGallery.tsx
+- [ ] features/assets/components/shared/AssetsPageHeader.tsx
+- [ ] features/assets/components/shared/MediaThumbnail.tsx
+- [ ] features/assets/components/shared/MediaViewer.tsx
+- [ ] features/assets/components/shared/StackCarouselOverlay.tsx
+- [ ] features/assets/components/shared/StackDetailModal.tsx
+- [ ] features/assets/components/shared/StackedThumbnail.tsx
+- [ ] features/assets/components/shared/TagPickerMenu.tsx
+- [ ] features/assets/hooks/useAssetActions.tsx
+- [ ] features/assets/hooks/useAssetsView.tsx
+- [ ] features/assets/hooks/useAssetTags.tsx
+- [ ] features/assets/hooks/usePinAssetsView.tsx
+- [ ] features/assets/hooks/useSelection.tsx
+- [ ] features/assets/routes/Assets.tsx
+- [ ] features/assets/routes/AssetsTrash.tsx
+
+## Batch 3 — Collections
+
+Rails (`Rail`/`RailCard`) are shared — fix once, all rails inherit. Grids
+should use `auto-fill/minmax` instead of fixed column counts.
+
+- [ ] features/collections/CollectionsProvider.tsx
+- [ ] features/collections/components/AlbumFormModal.tsx
+- [ ] features/collections/components/AlbumRail.tsx
+- [ ] features/collections/components/FoldersRail.tsx
+- [ ] features/collections/components/ImgStackGrid/ImgStackGrid.tsx
+- [ ] features/collections/components/ImgStackView/ImgStackView.tsx
+- [ ] features/collections/components/MapRail.tsx
+- [ ] features/collections/components/PeopleCollectionGrid.tsx
+- [ ] features/collections/components/PeopleRail.tsx
+- [ ] features/collections/components/Rail.tsx
+- [ ] features/collections/components/RailCard.tsx
+- [ ] features/collections/components/UtilitiesRail.tsx
+- [ ] features/collections/routes/AlbumDetails.tsx
+- [ ] features/collections/routes/Albums.tsx
+- [ ] features/collections/routes/Collections.tsx
+- [ ] features/collections/routes/Duplicates.tsx
+- [ ] features/collections/routes/FolderDetails.tsx
+- [ ] features/collections/routes/Folders.tsx
+- [ ] features/collections/routes/Liked.tsx
+- [ ] features/collections/routes/MapView.tsx
+- [ ] features/collections/routes/People.tsx
+- [ ] features/collections/routes/TagDetails.tsx
+- [ ] features/collections/routes/Tags.tsx
+- [ ] features/collections/routes/TripDetails.tsx
+- [ ] features/collections/routes/Utilities.tsx
+- [ ] features/collections/routes/UtilityClassifierAlbum.tsx
+
+## Batch 4 — Auth & Onboarding
+
+Centered-card pages; verify small-phone heights (keyboard overlap) and wide
+screens. Includes MFA/passkey flows.
+
+- [ ] features/auth/AuthProvider.tsx
+- [ ] features/auth/components/BootstrapGate.tsx
+- [ ] features/auth/components/PrimaryRepositoryGate.tsx
+- [ ] features/auth/components/ProtectedRoute.tsx
+- [ ] features/auth/components/RegistrationForm.tsx
+- [ ] features/auth/components/SetupGate.tsx
+- [ ] features/auth/components/ui.tsx
+- [ ] features/auth/routes/BootstrapWizard.tsx
+- [ ] features/auth/routes/ChangePasswordPage.tsx
+- [ ] features/auth/routes/LoginPage.tsx
+- [ ] features/auth/routes/MFAPage.tsx
+- [ ] features/auth/routes/RegisterPage.tsx
+
+## Batch 5 — Home, Settings, People, Manage, Updates, Portfolio
+
+Settings uses the renew (macOS inset-grouped) shell — keep its design
+language; the shell likely needs a single-column collapse below `md`.
+
+- [ ] features/home/components/GalleryGrid.tsx
+- [ ] features/home/components/SpacetimeMapCard.tsx
+- [ ] features/home/components/StatsCards.tsx
+- [ ] features/home/routes/Home.tsx
+- [ ] features/settings/components/renew/SettingsDropdown.tsx
+- [ ] features/settings/components/renew/SettingsGroup.tsx
+- [ ] features/settings/components/renew/SettingsPage.tsx
+- [ ] features/settings/components/renew/SettingsSaveBar.tsx
+- [ ] features/settings/components/renew/SettingsShell.tsx
+- [ ] features/settings/components/renew/tabs/AccountTab.tsx
+- [ ] features/settings/components/renew/tabs/AiTab.tsx
+- [ ] features/settings/components/renew/tabs/AppearanceTab.tsx
+- [ ] features/settings/components/renew/tabs/CloudTab.tsx
+- [ ] features/settings/components/renew/tabs/ServerTab.tsx
+- [ ] features/settings/components/renew/tabs/UsersTab.tsx
+- [ ] features/settings/components/renew/ThemePicker.tsx
+- [ ] features/settings/preferencesEffects.tsx
+- [ ] features/settings/routes/Settings.tsx
+- [ ] features/people/components/PersonFacesPanel.tsx
+- [ ] features/people/components/PersonPicker.tsx
+- [ ] features/people/components/PersonRenameModal.tsx
+- [ ] features/people/routes/PersonDetails.tsx
+- [ ] features/manage/components/RepositoryGrid.tsx
+- [ ] features/manage/routes/Manage.tsx
+- [ ] features/updates/routes/Updates.tsx
+- [ ] features/portfolio/routes/Portfolio.tsx
+
+## Batch 6 — Upload, Share, Monitor
+
+PublicShare is unauthenticated and mobile-heavy (shared links get opened on
+phones) — treat it as a first-class mobile surface.
+
+- [ ] features/upload/components/FileDropZone.tsx
+- [ ] features/upload/components/NavbarUploadQueue.tsx
+- [ ] features/upload/components/ProgressIndicator.tsx
+- [ ] features/upload/components/SupportedFormatsModal.tsx
+- [ ] features/upload/components/UnifiedUploadSection.tsx
+- [ ] features/upload/hooks/useUpload.tsx
+- [ ] features/upload/hooks/useUploadProcess.tsx
+- [ ] features/upload/UploadProvider.tsx
+- [ ] features/share/components/CreateShareLinkModal.tsx
+- [ ] features/share/components/PublicShareGrid.tsx
+- [ ] features/share/components/PublicShareHeader.tsx
+- [ ] features/share/components/PublicShareLightbox.tsx
+- [ ] features/share/routes/PublicShare.tsx
+- [ ] features/share/routes/SharedLinks.tsx
+- [ ] features/share/utils/shareBulkAction.tsx
+- [ ] features/monitor/components/CapabilitiesMonitor.tsx
+- [ ] features/monitor/components/MLMonitor.tsx
+- [ ] features/monitor/components/QueueSummaryList.tsx
+- [ ] features/monitor/components/StatMonitor.tsx
+- [ ] features/monitor/routes/Monitor.tsx
+
+## Batch 7 — Studio
+
+Canvas/editor layout: side panels should collapse to bottom drawers/tabs on
+narrow widths; viewport must keep correct canvas sizing on resize. Worker
+graph must stay DOM-free — breakpoint logic lives in React, never in workers.
+
+- [ ] features/studio/develop/BorderToolSection.tsx
+- [ ] features/studio/develop/DevelopPanel.tsx
+- [ ] features/studio/develop/SectionHeader.tsx
+- [ ] features/studio/develop/SliderRow.tsx
+- [ ] features/studio/editor/AssetPanel.tsx
+- [ ] features/studio/editor/StudioEditor.tsx
+- [ ] features/studio/editor/TopBar.tsx
+- [ ] features/studio/editor/Viewport.tsx
+- [ ] features/studio/home/RecentEditItem.tsx
+- [ ] features/studio/home/StudioHome.tsx
+- [ ] features/studio/routes/StudioEditMvp.tsx
+- [ ] features/studio/shared/PhotoThumb.tsx
+- [ ] features/studio/tools/border/BorderPanel.tsx
+
+## Batch 8 — Lumilio (agent chat + widgets)
+
+ChatDock and AgentBoard: on phones the dock should become full-width; widget
+tiles reflow to a single column. Keep pure daisyUI tokens.
+
+- [ ] features/lumilio/components/blocks/ConfirmBlock.tsx
+- [ ] features/lumilio/components/blocks/ReasoningBlock.tsx
+- [ ] features/lumilio/components/blocks/ToolCallBlock.tsx
+- [ ] features/lumilio/components/Board/AgentBoard.tsx
+- [ ] features/lumilio/components/Chat/ChatDock.tsx
+- [ ] features/lumilio/components/Chat/ChatMessages.tsx
+- [ ] features/lumilio/components/Chat/ContextChips.tsx
+- [ ] features/lumilio/components/Chat/MentionInput.tsx
+- [ ] features/lumilio/components/LumilioAvatar/LumilioAvatar.tsx
+- [ ] features/lumilio/components/LumilioMarkdown/Markdown.tsx
+- [ ] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/ImgBlock.tsx
+- [ ] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/index.tsx
+- [ ] features/lumilio/components/LumilioMarkdown/MarkdownBlocks/LinkBlock.tsx
+- [ ] features/lumilio/routes/LumilioChat.tsx
+- [ ] features/lumilio/widgets/chrome/BoardTile.tsx
+- [ ] features/lumilio/widgets/chrome/InlineWidgetCard.tsx
+- [ ] features/lumilio/widgets/chrome/LiveBadge.tsx
+- [ ] features/lumilio/widgets/chrome/MoreMenu.tsx
+- [ ] features/lumilio/widgets/chrome/TileBody.tsx
+- [ ] features/lumilio/widgets/chrome/TileHeader.tsx
+- [ ] features/lumilio/widgets/chrome/ViewSwitcher.tsx
+- [ ] features/lumilio/widgets/PinButton.tsx
+- [ ] features/lumilio/widgets/views/CoverView.tsx
+- [ ] features/lumilio/widgets/views/MosaicView.tsx
+- [ ] features/lumilio/widgets/views/states.tsx
+- [ ] features/lumilio/widgets/views/StatView.tsx
+- [ ] features/lumilio/widgets/views/TimelineView.tsx
+- [ ] features/lumilio/widgets/WidgetAssetThumbnail.tsx
+
+## Validation
+
+Per batch: `make web-test` + browser smoke at 375/768/1024/1440.
+
+Final pass (after Batch 8):
+
+- Walk every route in `routes/routes.tsx` at 375px and 1440px.
+- Confirm desktop (Wails at localhost:6680) is visually unchanged at
+  common window sizes — desktop is the primary product; no regressions there.
+- Check both a light and a dark daisyUI theme once.
+
+## Risks & Decisions
+
+- **Desktop regressions** are the main risk: mobile-first rewrites of
+  existing desktop-only classes must reproduce the current desktop look
+  exactly. When rewriting a class list, diff the ≥`lg` result mentally
+  against the original.
+- **Virtualized galleries**: JustifiedGallery/SquareGallery derive layout from
+  measured container width; the drawer collapse changes available width —
+  verify remeasure-on-resize works instead of adding breakpoint CSS there.
+- **Maps and canvas** (MapComponent, PhotoMapView, Studio Viewport) size via
+  JS; ensure resize observers fire after layout changes (drawer open/close).
+- **Hooks/providers with `.tsx`** often render no layout — mark them checked
+  with a "no visual surface" note rather than forcing changes.
+- **Scope creep**: this plan changes layout only. If a component's design
+  itself is inadequate on mobile (needs a genuinely new UI), file it in the
+  tech-debt tracker or ask for a Claude Design handoff instead of improvising
+  a redesign mid-batch.
+
+## Critical Files for Implementation
+
+- web/src/App.tsx
+- web/src/components/SideBar.tsx
+- web/src/components/NavBar.tsx
+- web/src/features/assets/components/page/AssetsGalleryPage.tsx
+- web/src/hooks/util-hooks/useBreakpoint.ts (new)

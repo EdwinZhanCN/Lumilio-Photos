@@ -1865,9 +1865,11 @@
     "badges": {
       "new": "NEW"
     },
+    "closeMenu": "Close menu",
     "collections": "Collections",
     "home": "Home",
     "manage": "Manage",
+    "openMenu": "Open menu",
     "portfolio": "Portfolio",
     "settings": "Settings",
     "status": {

@@ -40,29 +40,37 @@ function AppShellLayout(): React.ReactNode {
 
   return (
     <BreadcrumbProvider>
-      <div className="flex h-screen flex-col">
-        <div className="bg-base-100 shadow">
-          <NavBar />
-        </div>
-        <div className="flex flex-1 overflow-hidden">
-          <div className="w-auto bg-base-200 shadow-lg">
-            <SideBar />
+      <div className="drawer lg:drawer-open h-screen">
+        <input id="app-drawer" type="checkbox" className="drawer-toggle" />
+        <div className="drawer-content flex h-screen flex-col overflow-hidden">
+          <div className="bg-base-100 shadow">
+            <NavBar />
           </div>
           <div id="app-scroll-container" className="flex-1 overflow-y-auto overflow-x-hidden">
             <Breadcrumbs className="sticky top-0 z-10 bg-base-100/80 backdrop-blur" />
             <Outlet />
           </div>
+          <footer className="bg-base-100 text-base-content text-xs">
+            <div className="container mx-auto py-0.5">
+              <p className="text-center">
+                {t("footer.copyright", {
+                  year: new Date().getFullYear(),
+                })}
+              </p>
+            </div>
+          </footer>
+          {showAgentDock && <ChatDock variant="fab" />}
         </div>
-        <footer className="bg-base-100 text-base-content text-xs">
-          <div className="container mx-auto py-0.5">
-            <p className="text-center">
-              {t("footer.copyright", {
-                year: new Date().getFullYear(),
-              })}
-            </p>
+        <div className="drawer-side z-50">
+          <label
+            htmlFor="app-drawer"
+            aria-label={t("sidebar.closeMenu", { defaultValue: "Close menu" })}
+            className="drawer-overlay"
+          />
+          <div className="min-h-full bg-base-200 shadow-lg">
+            <SideBar />
           </div>
-        </footer>
-        {showAgentDock && <ChatDock variant="fab" />}
+        </div>
       </div>
     </BreadcrumbProvider>
   );
