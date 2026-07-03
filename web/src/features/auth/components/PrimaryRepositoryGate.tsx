@@ -40,7 +40,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
 
   if (setupQuery.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-base-200">
+      <div className="flex min-h-dvh items-center justify-center bg-base-200">
         <div className="flex flex-col items-center gap-4">
           <span className="loading loading-spinner loading-lg text-primary" />
           <p className="animate-pulse text-sm font-medium opacity-50">
@@ -85,7 +85,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
     : null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-base-200 px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-base-200 px-4">
       <div className="w-full max-w-xl rounded-lg border border-base-300 bg-base-100 p-6 shadow-xl">
         <div className="mb-6 flex items-start gap-4">
           <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">

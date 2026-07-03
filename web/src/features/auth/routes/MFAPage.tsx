@@ -425,7 +425,7 @@ export default function MFAPage(): React.ReactNode {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+    <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
       <AuthShell width={460} appName={t("app.name")}>
         {body}
       </AuthShell>

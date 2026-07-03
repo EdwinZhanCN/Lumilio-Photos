@@ -174,7 +174,7 @@ const LoginPage: React.FC = () => {
   if (challenge) {
     const isRecovery = mfaMethod === "recovery_code";
     return (
-      <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+      <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
         <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
           <CardHead
             icon={isRecovery ? KeyRound : Smartphone}
@@ -294,7 +294,7 @@ const LoginPage: React.FC = () => {
 
   /* ---------------------------------------------------------- login view --- */
   return (
-    <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+    <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
       <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
         <CardHead
           title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}

@@ -90,7 +90,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+    <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
       <AuthShell width={460} appName={appName}>
         {step !== "credentials" && <FlowSteps steps={steps} current={stepIndex[step] ?? 0} />}
 

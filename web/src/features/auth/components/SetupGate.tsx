@@ -39,7 +39,7 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (setupQuery.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-base-200">
+      <div className="flex min-h-dvh items-center justify-center bg-base-200">
         <div className="flex flex-col items-center gap-4">
           <span className="loading loading-spinner loading-lg text-primary" />
           <p className="animate-pulse text-sm font-medium opacity-50">
@@ -54,7 +54,7 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (setupQuery.isError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-base-200 px-4">
+      <div className="flex min-h-dvh items-center justify-center bg-base-200 px-4">
         <div className="alert alert-error max-w-md text-sm">
           <div className="flex flex-col gap-3">
             <span>
@@ -86,7 +86,7 @@ const SetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       : null;
 
     return (
-      <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+      <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
         <div className="w-full max-w-md rounded-2xl border border-base-200 bg-base-100 p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_44px_-18px_rgba(0,0,0,0.18)] sm:p-9">
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-base-200 text-base-content">
             <ShieldCheck size={24} />

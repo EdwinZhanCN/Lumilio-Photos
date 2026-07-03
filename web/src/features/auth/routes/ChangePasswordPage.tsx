@@ -102,7 +102,7 @@ export default function ChangePasswordPage(): React.ReactNode {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-base-200 px-4 py-12">
+    <div className="relative flex min-h-dvh w-full items-center justify-center overflow-hidden bg-base-200 px-4 py-12">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-48 -top-48 h-96 w-96 rounded-full bg-primary/8 blur-3xl" />
         <div className="absolute -bottom-48 -left-48 h-96 w-96 rounded-full bg-secondary/8 blur-3xl" />
