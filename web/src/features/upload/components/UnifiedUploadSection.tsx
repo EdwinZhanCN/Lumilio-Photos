@@ -118,7 +118,7 @@ function UnifiedUploadSection(): React.JSX.Element {
             </label>
             <div
               tabIndex={0}
-              className="dropdown-content z-10 card card-compact w-80 p-4 shadow-lg bg-base-200 text-base-content"
+              className="dropdown-content z-10 card card-compact w-80 max-w-[calc(100vw-2rem)] p-4 shadow-lg bg-base-200 text-base-content"
             >
               <div className="space-y-2 text-sm">
                 <h3 className="font-semibold text-base">
@@ -212,7 +212,7 @@ function UnifiedUploadSection(): React.JSX.Element {
       />
 
       {/* Control Bar */}
-      <div className="flex items-center justify-between gap-4 mt-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
         {/* Left side - Add Files */}
         <div className="flex items-center gap-3">
           <button

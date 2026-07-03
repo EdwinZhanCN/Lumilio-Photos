@@ -315,26 +315,38 @@ language; the shell likely needs a single-column collapse below `md`.
 PublicShare is unauthenticated and mobile-heavy (shared links get opened on
 phones) — treat it as a first-class mobile surface.
 
-- [ ] features/upload/components/FileDropZone.tsx
-- [ ] features/upload/components/NavbarUploadQueue.tsx
-- [ ] features/upload/components/ProgressIndicator.tsx
-- [ ] features/upload/components/SupportedFormatsModal.tsx
-- [ ] features/upload/components/UnifiedUploadSection.tsx
-- [ ] features/upload/hooks/useUpload.tsx
-- [ ] features/upload/hooks/useUploadProcess.tsx
-- [ ] features/upload/UploadProvider.tsx
-- [ ] features/share/components/CreateShareLinkModal.tsx
-- [ ] features/share/components/PublicShareGrid.tsx
-- [ ] features/share/components/PublicShareHeader.tsx
-- [ ] features/share/components/PublicShareLightbox.tsx
-- [ ] features/share/routes/PublicShare.tsx
-- [ ] features/share/routes/SharedLinks.tsx
-- [ ] features/share/utils/shareBulkAction.tsx
-- [ ] features/monitor/components/CapabilitiesMonitor.tsx
-- [ ] features/monitor/components/MLMonitor.tsx
-- [ ] features/monitor/components/QueueSummaryList.tsx
-- [ ] features/monitor/components/StatMonitor.tsx
-- [ ] features/monitor/routes/Monitor.tsx
+- [x] features/upload/components/FileDropZone.tsx — drop zone padding tightens
+      `p-8 sm:p-16` instead of a fixed large `p-16` on phones.
+- [x] features/upload/components/NavbarUploadQueue.tsx — already responsive
+      (icon-only on small screens, dropdown clamps to viewport — see Batch 0).
+- [x] features/upload/components/ProgressIndicator.tsx — already responsive.
+- [x] features/upload/components/SupportedFormatsModal.tsx — already responsive.
+- [x] features/upload/components/UnifiedUploadSection.tsx — info dropdown
+      clamps (`max-w-[calc(100vw-2rem)]`), control bar wraps (`flex-wrap`).
+- [x] features/upload/hooks/useUpload.tsx — no visual surface.
+- [x] features/upload/hooks/useUploadProcess.tsx — no visual surface.
+- [x] features/upload/UploadProvider.tsx — no visual surface (provider only).
+- [x] features/share/components/CreateShareLinkModal.tsx — already responsive
+      (Modal's bottom-sheet-on-mobile).
+- [x] features/share/components/PublicShareGrid.tsx — already responsive
+      (mobile-first `grid-cols-2 sm:grid-cols-3 ...`), built as a first-class
+      mobile surface per the plan's risk note.
+- [x] features/share/components/PublicShareHeader.tsx — already responsive (`flex-wrap`).
+- [x] features/share/components/PublicShareLightbox.tsx — already responsive
+      (`max-h-full max-w-full`).
+- [x] features/share/routes/PublicShare.tsx — `min-h-screen` → `min-h-dvh`
+      (unauthenticated standalone route, same mobile-chrome fix as auth).
+- [x] features/share/routes/SharedLinks.tsx — already responsive (table wrapped
+      in `overflow-x-auto`).
+- [x] features/share/utils/shareBulkAction.tsx — no visual surface (action factory).
+- [x] features/monitor/components/CapabilitiesMonitor.tsx — already responsive
+      (`stats-vertical xl:stats-horizontal`, `grid-cols-1 xl:grid-cols-2`).
+- [x] features/monitor/components/MLMonitor.tsx — already responsive.
+- [x] features/monitor/components/QueueSummaryList.tsx — already responsive
+      (`flex-col xl:flex-row`, `grid-cols-2 sm:grid-cols-3`).
+- [x] features/monitor/components/StatMonitor.tsx — already responsive
+      (`stats-vertical lg:stats-horizontal`).
+- [x] features/monitor/routes/Monitor.tsx — already responsive (`flex-wrap` header/tabs).
 
 ## Batch 7 — Studio
 
