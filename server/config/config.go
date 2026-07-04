@@ -141,7 +141,14 @@ type LumenConfig struct {
 	DiscoveryEnabled     bool   `toml:"discovery_enabled"`
 	DiscoveryMDNSEnabled bool   `toml:"discovery_mdns_enabled"`
 	DiscoveryHubURL      string `toml:"discovery_hub_url"`
-	ConnectionInsecure   bool   `toml:"connection_insecure"`
+}
+
+// Enabled reports whether the Lumen ML integration is active: discovery is on
+// and at least one discovery backend (mDNS or a gateway hub URL) is
+// configured. When false the server boots with ML features disabled instead of
+// failing startup.
+func (c LumenConfig) Enabled() bool {
+	return c.DiscoveryEnabled && (c.DiscoveryMDNSEnabled || strings.TrimSpace(c.DiscoveryHubURL) != "")
 }
 
 type tomlConfig struct {
@@ -261,7 +268,6 @@ func defaultAppConfigForEnvironment(environment string) AppConfig {
 		Lumen: LumenConfig{
 			DiscoveryEnabled:     true,
 			DiscoveryMDNSEnabled: lumenMDNS,
-			ConnectionInsecure:   true,
 		},
 	}
 }
@@ -484,9 +490,6 @@ func applyEnvOverrides(cfg *AppConfig, env envMap) {
 	}
 	if value := env.get("LUMEN_DISCOVERY_HUB_URL"); value != "" {
 		cfg.Lumen.DiscoveryHubURL = value
-	}
-	if value, ok := env.bool("LUMEN_CONNECTION_INSECURE"); ok {
-		cfg.Lumen.ConnectionInsecure = value
 	}
 }
 
