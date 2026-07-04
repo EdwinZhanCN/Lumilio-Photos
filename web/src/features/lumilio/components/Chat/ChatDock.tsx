@@ -289,7 +289,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   // (whose header also shows the avatar), so the avatar stays put and morphs.
   if (variant === "fab") {
     return createPortal(
-      <section className="fixed bottom-10 left-1/2 z-[10000] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2">
+      <section className="fixed bottom-10 left-1/2 z-[35] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2">
         {/* Expanded: panel + input */}
         <div
           aria-hidden={collapsed}
@@ -324,14 +324,14 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
             type="button"
             onMouseEnter={() => setFabHovered(true)}
             onMouseLeave={() => setFabHovered(false)}
-            className="btn h-auto min-h-0 items-center gap-1.5 rounded-full border border-base-300 bg-base-100/95 py-1.5 pl-2 pr-4 hover:bg-base-100"
+            className="btn h-auto min-h-0 items-center gap-1.5 rounded-full border border-base-300 bg-base-100/95 py-1.5 pl-2 pr-2 hover:bg-base-100 sm:pr-4"
             aria-controls="lumilio-chat-dock-panel"
             aria-expanded={false}
             title={toggleLabel}
             onClick={toggleCollapsed}
           >
             <LumilioAvatar start={fabHovered || isGenerating} size={0.13} />
-            <span className="text-sm font-semibold">
+            <span className="hidden text-sm font-semibold sm:inline">
               {t("lumilio.dock.title", "Lumilio Agent")}
             </span>
             {statusDot}

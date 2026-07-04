@@ -758,7 +758,7 @@ export default function RepositoryGrid() {
           {t("manage.repositories.empty")}
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {repositories.map((repository) => (
             <RepositoryCard
               key={repository.id}
