@@ -40,7 +40,6 @@ import (
 	"server/internal/storage/scanner"
 	"server/internal/utils/imaging"
 
-	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
@@ -176,7 +175,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	}
 	faceService := service.NewFaceService(queries, repoManager, pgxPool)
 
-	lumenService, embeddingService, classifierService, err := initMLServices(ctx, pgxPool, queries, workers, appLogger, lumenLogger, settingsService, faceService)
+	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, pgxPool, queries, workers, appLogger, lumenLogger, settingsService, faceService)
 	if err != nil {
 		return fmt.Errorf("initialize ML services: %w", err)
 	}
@@ -402,6 +401,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 
 func initMLServices(
 	ctx context.Context,
+	appConfig config.AppConfig,
 	pgxPool *pgxpool.Pool,
 	queries *repo.Queries,
 	workers *river.Workers,
@@ -412,21 +412,19 @@ func initMLServices(
 ) (service.LumenService, service.EmbeddingService, service.ClassifierService, error) {
 	appLogger.Info("initializing ML services", zap.String("operation", "ml.init"))
 
-	lumenCfg, err := lumenconfig.LoadConfig("")
+	lumenService, err := service.NewLumenServiceFromAppConfig(appConfig.Lumen, lumenLogger)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load lumen sdk config: %w", err)
-	}
-
-	lumenService, err := service.NewLumenService(lumenCfg, lumenLogger)
-	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("configure lumen service: %w", err)
 	}
 
 	err = lumenService.Start(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	appLogger.Info("lumen service initialized", zap.String("operation", "ml.init"))
+	appLogger.Info("lumen service initialized",
+		zap.String("operation", "ml.init"),
+		zap.Bool("enabled", appConfig.Lumen.Enabled()),
+	)
 
 	embeddingService := service.NewEmbeddingService(queries, pgxPool)
 	speciesService := service.NewSpeciesService(queries)
@@ -476,8 +474,12 @@ func initMLServices(
 	appLogger.Info("zero-shot classifier service and worker registered", zap.String("operation", "ml.init"))
 
 	// Build classifier prototypes in the background once the semantic text-embed
-	// task is reachable, so startup never blocks on ML node availability.
-	go buildClassifierPrototypes(lumenService, classifierService, appLogger.Named("classifier"))
+	// task is reachable, so startup never blocks on ML node availability. With
+	// the Lumen integration disabled the task can never appear, so skip the wait
+	// entirely.
+	if appConfig.Lumen.Enabled() {
+		go buildClassifierPrototypes(lumenService, classifierService, appLogger.Named("classifier"))
+	}
 
 	appLogger.Info("ML services initialization complete", zap.String("operation", "ml.init"))
 	return lumenService, embeddingService, classifierService, nil
