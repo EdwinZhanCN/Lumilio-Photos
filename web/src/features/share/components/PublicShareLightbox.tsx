@@ -56,7 +56,7 @@ export function PublicShareLightbox({
   if (!asset || !asset.asset_id) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-black/95">
+    <div className="fixed inset-0 z-[9990] flex flex-col bg-black/95">
       <div className="flex shrink-0 items-center justify-end gap-2 p-3">
         {canDownloadOriginal && downloadUrl && (
           <a

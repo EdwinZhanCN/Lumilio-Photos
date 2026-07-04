@@ -35,6 +35,7 @@ import { useFilterState, useFilterActions } from "@/features/assets/selectors";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import { useBrowseScope } from "@/features/settings";
+import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import { useStackActions } from "@/features/assets/hooks/useStackActions";
 import {
@@ -116,14 +117,7 @@ const AssetsPageHeader = ({
   const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
   // Scan follows the browse scope: it targets what the gallery is showing
   // (one repository, or every repository when the scope is "All").
-  const {
-    repositories,
-    selectedRepository,
-    scopeLabel,
-    scopedRepositoryId: browseScopeId,
-    getRepositoryLabel: getBrowseRepoLabel,
-    setBrowseRepositoryId,
-  } = useBrowseScope();
+  const { repositories, selectedRepository, scopeLabel } = useBrowseScope();
   const { scanRepositories, isScanning } = useRepositoryScan();
   const showScan = capabilities?.showScan ?? true;
 
@@ -706,24 +700,7 @@ const AssetsPageHeader = ({
             </ul>
           </div>
 
-          {!scopeControlHidden && repositories.length > 0 && (
-            <select
-              className="select select-sm select-bordered rounded-full w-auto max-w-[12rem]"
-              value={browseScopeId ?? ""}
-              onChange={(e) => setBrowseRepositoryId(e.target.value || null)}
-              title={t("assets.assetsPageHeader.scope.title", "Gallery scope")}
-              aria-label={t("assets.assetsPageHeader.scope.title", "Gallery scope")}
-            >
-              <option value="">
-                {t("navbar.repository.all", "All repositories")}
-              </option>
-              {repositories.map((repo) => (
-                <option key={repo.id} value={repo.id}>
-                  {getBrowseRepoLabel(repo)}
-                </option>
-              ))}
-            </select>
-          )}
+          {!scopeControlHidden && <BrowseScopeSelect className="max-w-[12rem]" />}
 
           <FilterTool
             initial={inboundDTO}
@@ -1026,6 +1003,19 @@ const AssetsPageHeader = ({
             lockedFields={lockedFilterFields}
           />
         </div>
+
+        {/*
+          Repository scope select in Compact Mode, placed outside the Ellipsis
+          dropdown-content: nesting a native <select> inside a CSS
+          :focus-within-driven dropdown closes the dropdown the instant the
+          native select popup opens (it steals focus), so the click never
+          reaches an option.
+        */}
+        {!scopeControlHidden && repositories.length > 0 && (
+          <div className="shrink-0 order-first w-full basis-full lg:hidden block">
+            <BrowseScopeSelect className="w-full" />
+          </div>
+        )}
       </PageHeader>
 
       {/* Bulk Action Confirmation Modal */}

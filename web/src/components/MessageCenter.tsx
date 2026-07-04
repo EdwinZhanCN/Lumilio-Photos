@@ -31,7 +31,11 @@ export default function MessageCenter() {
 
   return (
     <div className="dropdown dropdown-end">
-      <button type="button" tabIndex={0} className="btn btn-ghost gap-2 rounded-full">
+      <button
+        type="button"
+        tabIndex={0}
+        className="btn btn-sm sm:btn-md btn-ghost gap-1 sm:gap-2 rounded-full px-2 sm:px-3"
+      >
         <Bell className="w-5 h-5" />
         <span className="badge badge-secondary badge-sm">
           {unreadCount > 99 ? "99+" : unreadCount}

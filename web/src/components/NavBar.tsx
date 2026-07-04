@@ -38,11 +38,11 @@ function NavBar() {
       </div>
 
       <div className="flex flex-1 justify-end">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <MessageCenter />
           <NavbarUploadQueue />
           <label
-            className={`swap swap-rotate ${isFollowingSystem ? "cursor-not-allowed opacity-60" : ""}`}
+            className={`swap swap-rotate shrink-0 ${isFollowingSystem ? "cursor-not-allowed opacity-60" : ""}`}
             title={
               isFollowingSystem
                 ? t("settings.appearanceSettings.themes.followSystem.navbarHint")
@@ -61,8 +61,8 @@ function NavBar() {
               }}
             />
 
-            <Sun className="swap-off h-6 w-6" />
-            <Moon className="swap-on h-6 w-6" />
+            <Sun className="swap-off h-5 w-5 sm:h-6 sm:w-6" />
+            <Moon className="swap-on h-5 w-5 sm:h-6 sm:w-6" />
           </label>
 
           {user && (
@@ -70,12 +70,12 @@ function NavBar() {
               <button
                 type="button"
                 tabIndex={0}
-                className="btn btn-ghost h-auto min-h-0 rounded-full px-2 py-1"
+                className="btn btn-ghost h-auto min-h-0 rounded-full px-1 py-1 sm:px-2"
               >
                 <UserAvatar
                   assetId={user.avatar_asset_id}
                   name={displayName}
-                  size="size-10"
+                  size="size-8 sm:size-10"
                   textSize="text-sm"
                 />
                 <div className="hidden text-left sm:block">
