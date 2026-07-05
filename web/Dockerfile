@@ -25,8 +25,12 @@ ARG VERSION=dev
 # Copy package.txt and pnpm-lock.yaml files
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 
-# Install dependencies
-RUN vp install
+# Install dependencies. @edwinzhancn/docts resolves from GitHub Packages,
+# which requires a token even for public packages; mount it as a BuildKit
+# secret so it never lands in an image layer:
+#   docker build --secret id=npmrc,src=<file with //npm.pkg.github.com/:_authToken=...> ...
+# (CI passes GITHUB_TOKEN this way; without the secret the fetch 401s.)
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc vp install
 
 # Copy frontend source code
 COPY web/ ./
