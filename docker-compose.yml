@@ -92,10 +92,6 @@ services:
         build:
             context: .
             dockerfile: web/Dockerfile
-            args:
-                VITE_PLUGIN_REGISTRY_URL: ${VITE_PLUGIN_REGISTRY_URL:-https://registry.lumilio.org}
-                VITE_PLUGIN_CDN_ORIGIN: ${VITE_PLUGIN_CDN_ORIGIN:-https://cdn.lumilio.org}
-                VITE_STUDIO_PLUGIN_RUNTIME_ENABLED: ${VITE_STUDIO_PLUGIN_RUNTIME_ENABLED:-true}
         depends_on:
             server:
                 condition: service_healthy
