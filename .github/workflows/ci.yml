@@ -25,8 +25,8 @@ jobs:
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
         steps:
-            - uses: actions/checkout@v4
-            - uses: dorny/paths-filter@v3
+            - uses: actions/checkout@v7
+            - uses: dorny/paths-filter@v4
               id: filter
               with:
                   filters: |
@@ -53,9 +53,9 @@ jobs:
         if: needs.changes.outputs.server == 'true'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: actions/setup-go@v5
+            - uses: actions/setup-go@v6
               with:
                   go-version-file: server/go.mod
                   cache-dependency-path: server/go.sum
@@ -77,12 +77,12 @@ jobs:
             contents: read
             packages: read
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Enable pnpm via corepack
               run: corepack enable
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm
@@ -111,9 +111,9 @@ jobs:
         if: needs.changes.outputs.desktop == 'true'
         runs-on: macos-15
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: actions/setup-go@v5
+            - uses: actions/setup-go@v6
               with:
                   go-version-file: desktop/go.mod
                   cache-dependency-path: |
@@ -128,18 +128,52 @@ jobs:
 
             - run: make desktop-test
 
+    # W4 signal gathering: can the desktop module (server CGo: libvips+libraw)
+    # compile on Windows with the MSYS2/mingw-w64 toolchain? Experimental —
+    # failures do not block the gate.
+    desktop-windows:
+        name: desktop windows (experimental CGo)
+        needs: changes
+        if: needs.changes.outputs.desktop == 'true'
+        runs-on: windows-2025
+        continue-on-error: true
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: msys2/setup-msys2@v2
+              with:
+                  msystem: MINGW64
+                  update: false
+                  install: >-
+                      git
+                      mingw-w64-x86_64-go
+                      mingw-w64-x86_64-gcc
+                      mingw-w64-x86_64-pkgconf
+                      mingw-w64-x86_64-libvips
+                      mingw-w64-x86_64-libraw
+
+            - name: Compile desktop module (CGo via mingw64)
+              shell: msys2 {0}
+              run: |
+                  export CGO_ENABLED=1
+                  export GOFLAGS=-buildvcs=false
+                  go version
+                  pkgconf --modversion vips libraw
+                  cd desktop
+                  go build ./...
+
     site:
         name: site (vitepress build)
         needs: changes
         if: needs.changes.outputs.site == 'true'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Enable pnpm via corepack
               run: corepack enable
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm
