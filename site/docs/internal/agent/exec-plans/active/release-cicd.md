@@ -56,7 +56,7 @@ Scope: Lumilio-Photos (this repo) + coordination items in Lumen-SDK and Lumen-Hu
 
 ### W5 — release checklist (per-release)
 - Lumen-Hub tag published + `manifest.json` reachable; `lumilio.org/lumen/install.{sh,ps1}` worker serving latest.
-- registry.lumilio.org / cdn.lumilio.org (studio plugin registry) reachable or runtime flag off.
+- ~~registry.lumilio.org / cdn.lumilio.org~~ (studio plugin registry descoped from main 2026-07-05; build args/env typings removed — reintroduce alongside the feature branch when the plugin API stabilizes).
 - Auth limiter enabled; setup wizard rotates DB password (verify on fresh volume).
 - Fresh-install e2e on each artifact: boot → wizard → import → (with a hub on LAN) semantic/face/ocr jobs complete.
 - Docs: install pages for both modes incl. discovery modes matrix + Gatekeeper/SmartScreen notes.
