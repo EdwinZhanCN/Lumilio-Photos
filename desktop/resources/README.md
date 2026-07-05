@@ -42,7 +42,7 @@ directory (`ResourcesDir()` in `supervisor/resources.go`). When a tool is absent
 `fetch-resources.sh` pins the exact URLs + SHA-256 for ffmpeg/ffprobe/exiftool;
 bump the pins (or override via env) when you update versions.
 
-- **PostgreSQL 17 + pgvector + pg_textsearch + zhparser**: built from source — see
+- **PostgreSQL 17 + pgvector** (+ contrib pg_trgm): built from source — see
   `.github/workflows/build-postgres.yml`. Not fetched by `fetch-resources.sh`,
   because Homebrew/prebuilt PostgreSQL is not relocatable (absolute-path dylib
   links + baked-in paths break when moved into the bundle).
