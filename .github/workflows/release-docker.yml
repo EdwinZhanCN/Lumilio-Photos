@@ -63,6 +63,10 @@ jobs:
                   platforms: linux/${{ matrix.arch }}
                   build-args: |
                       VERSION=${{ github.ref_name }}
+                  # Only web/Dockerfile mounts this (GitHub Packages npm auth
+                  # for @edwinzhancn/docts); unused by server/db builds.
+                  secrets: |
+                      npmrc=//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
                   outputs: type=image,name=${{ env.IMAGE_BASE }}/lumilio-${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
                   cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
                   cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
