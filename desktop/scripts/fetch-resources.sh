@@ -21,7 +21,9 @@ FFPROBE_URL="${FFPROBE_URL:-https://www.osxexperts.net/ffprobe81arm.zip}"
 FFPROBE_SHA256="${FFPROBE_SHA256:-aab17ac7379c1178aaf400c3ef36cdb67db0b75b1a23eeef2cb9f658be8844e6}"
 
 EXIFTOOL_VERSION="${EXIFTOOL_VERSION:-13.59}"
-EXIFTOOL_URL="${EXIFTOOL_URL:-https://exiftool.org/Image-ExifTool-${EXIFTOOL_VERSION}.tar.gz}"
+# exiftool.org no longer serves files directly; official downloads redirect to
+# SourceForge (curl -L follows the mirror redirect, the SHA pin still verifies).
+EXIFTOOL_URL="${EXIFTOOL_URL:-https://sourceforge.net/projects/exiftool/files/Image-ExifTool-${EXIFTOOL_VERSION}.tar.gz/download}"
 EXIFTOOL_SHA256="${EXIFTOOL_SHA256:-668ea3acececb7235fbd0f4900e72d5f12c9b07e5c778fd36cb1e9b5828fd65a}"
 
 # ------------------------------------------------------------------------------
