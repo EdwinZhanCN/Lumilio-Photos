@@ -37,10 +37,10 @@ Scope: Lumilio-Photos (this repo) + coordination items in Lumen-SDK and Lumen-Hu
 - Makefile compose check is now lazy (`$(COMPOSE)` errors only when a docker target runs) so docker-free macOS runners work.
 - Version stamping: `server/internal/version.Version` (ldflags `-X`), surfaced in `GET /api/v1/health`; `server/Dockerfile` + `web/Dockerfile` take `ARG VERSION=dev` (web → `VITE_APP_VERSION`); `build-macos.sh` stamps the same version it writes to the plist. Release workflows (W2/W3) must pass `VERSION=<git tag>`.
 
-### W2 — Docker release (Linux)
-- `release-docker.yml` on tag: buildx multi-arch (amd64+arm64) for `server`, `web`, **`db`** (custom pg_textsearch image must be published, not built by users) → GHCR, tags `vX.Y.Z` + `latest`.
-- Ship `docker-compose.release.yml` referencing GHCR images, plus `compose.host-network.yml` overlay for Linux mDNS (`network_mode: host` on server; db via localhost; document port implications). Default remains bridge + gateway/static discovery.
-- Flip Dockerfile default `LUMEN_DISCOVERY_HUB_URL` to empty once static-node config exists; document the three discovery modes (host-net mDNS / gateway push / static).
+### W2 — Docker release (Linux) — **Done 2026-07-05** (pending first tag run)
+- `release-docker.yml`: native per-arch builds (ubuntu-24.04 + ubuntu-24.04-arm, no QEMU) push `lumilio-{server,web,db}` to GHCR by digest, then a merge job assembles multi-arch manifests. Tags: `vX.Y.Z` (+ `X.Y` + `latest` for stable), `edge` on manual dispatch.
+- `docker-compose.release.yml` (GHCR images, `LUMILIO_STORAGE` required, `LUMILIO_VERSION` pin) + `docker-compose.host-mdns.yml` Linux overlay (`network_mode: host` on server, db via `127.0.0.1:5433`, web upstream via host-gateway, needs compose ≥ 2.24 for `!reset`). All three discovery modes documented in the compose header.
+- **Fixed en route**: root `docker-compose.yml` preloaded `pg_textsearch` which the db image never contained — db could not boot; removed. Search actually uses pg_trgm + `to_tsvector('simple')` only, so `lumilio-db` = pgvector base image, and `build-postgres.yml` dropped its pg_textsearch/SCWS/zhparser steps (desktop bundle likewise only needs PG + pgvector).
 
 ### W3 — macOS desktop release
 - `release-desktop-macos.yml` on tag: stage PG artifact (from build-postgres.yml), `fetch-resources.sh`, `vp build` SPA, `build-macos.sh {arm64,amd64} --dmg`, ad-hoc sign, upload DMGs to the GitHub Release. Info.plist local-network key (P1). Notarization = future paid-account upgrade.

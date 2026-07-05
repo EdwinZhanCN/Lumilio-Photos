@@ -22,10 +22,6 @@ services:
             - db_data:/var/lib/postgresql/data
         command:
             - postgres
-            # pg_textsearch (BM25 access method) must be preloaded before its
-            # extension can be created; the baseline migration creates it.
-            - -c
-            - shared_preload_libraries=pg_textsearch
             - -c
             - maintenance_work_mem=256MB
             - -c

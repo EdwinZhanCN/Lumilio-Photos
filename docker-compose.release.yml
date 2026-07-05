@@ -1,0 +1,96 @@
+# Lumilio Photos — production compose using published GHCR images.
+#
+#   LUMILIO_STORAGE=/srv/photos docker compose -f docker-compose.release.yml up -d
+#
+# Pin a version with LUMILIO_VERSION=v1.0.0 (default: latest).
+#
+# ML discovery (all optional; the server runs fine without external ML):
+#   1. Linux + mDNS (recommended on Linux): add the host-network overlay —
+#      docker compose -f docker-compose.release.yml -f docker-compose.host-mdns.yml up -d
+#   2. Gateway push: run Lumen Gateway on a host and set
+#      LUMEN_DISCOVERY_HUB_URL=http://<gateway-host>:5866 on the server service.
+#   3. Static nodes: set LUMEN_DISCOVERY_STATIC_NODES=10.0.0.5:50051[,more]
+#      on the server service. Works from any network.
+
+services:
+    db:
+        image: ghcr.io/edwinzhancn/lumilio-db:${LUMILIO_VERSION:-latest}
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: lumiliophotos
+            POSTGRES_USER: postgres
+            # Temporary bootstrap credential. The first-run web setup wizard
+            # generates a high-entropy password and rotates this role via
+            # ALTER USER; the new secret is persisted under the mounted storage
+            # volume (.secrets/db_password) and used on every subsequent boot.
+            POSTGRES_PASSWORD: postgres
+        volumes:
+            - db_data:/var/lib/postgresql/data
+        command:
+            - postgres
+            - -c
+            - maintenance_work_mem=256MB
+            - -c
+            - max_parallel_maintenance_workers=4
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    server:
+        image: ghcr.io/edwinzhancn/lumilio-server:${LUMILIO_VERSION:-latest}
+        restart: unless-stopped
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            SERVER_PORT: 6680
+            SERVER_ENV: production
+            DB_HOST: db
+            DB_PORT: 5432
+            DB_USER: postgres
+            # Bootstrap password only; rotated by first-run setup (see db).
+            DB_PASSWORD: postgres
+            DB_NAME: lumiliophotos
+            DB_SSL: disable
+            STORAGE_PATH: /data/storage
+            LUMILIO_DB_PASSWORD_FILE: /data/storage/.secrets/db_password
+            LUMILIO_SECRET_KEY: /data/storage/.secrets/lumilio_secret_key
+            # mDNS cannot cross the bridge network; pick a discovery mode from
+            # the header comment (host-mdns overlay / hub URL / static nodes).
+            LUMEN_DISCOVERY_MDNS_ENABLED: "false"
+            LUMEN_DISCOVERY_HUB_URL: ""
+            LUMEN_DISCOVERY_STATIC_NODES: ""
+        # Uncomment for hardware-accelerated transcoding (Intel/AMD GPU):
+        # devices:
+        #     - /dev/dri:/dev/dri
+        volumes:
+            - ${LUMILIO_STORAGE:?set LUMILIO_STORAGE to your media root directory}:/data/storage
+        ports:
+            - "6680:6680"
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        healthcheck:
+            test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 20s
+
+    web:
+        image: ghcr.io/edwinzhancn/lumilio-web:${LUMILIO_VERSION:-latest}
+        restart: unless-stopped
+        depends_on:
+            server:
+                condition: service_healthy
+        environment:
+            LUMILIO_SITE_ADDRESS: ${LUMILIO_SITE_ADDRESS:-:80}
+            LUMILIO_API_UPSTREAM: ${LUMILIO_API_UPSTREAM:-h2c://server:6680}
+        ports:
+            - "${WEB_HTTP_PORT:-6657}:80"
+            - "${WEB_HTTPS_PORT:-6658}:443"
+            - "${WEB_HTTPS_PORT:-6658}:443/udp"
+
+volumes:
+    db_data:
