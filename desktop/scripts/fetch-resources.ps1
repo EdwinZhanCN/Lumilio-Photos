@@ -14,10 +14,12 @@ $FfmpegSha = if ($env:FFMPEG_SHA256) { $env:FFMPEG_SHA256 } else {
     "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec"
 }
 
-# exiftool.org no longer serves files directly; official downloads redirect to
-# SourceForge (Invoke-WebRequest follows the mirror redirect, SHA pin verifies).
+# exiftool.org no longer serves files directly; downloads live on SourceForge.
+# Use the automation endpoint (downloads.sourceforge.net redirects straight to
+# a mirror file) — the /files/.../download page can serve an HTML interstitial
+# to non-browser clients, which breaks the checksum. SHA pin still verifies.
 $ExiftoolUrl = if ($env:EXIFTOOL_URL) { $env:EXIFTOOL_URL } else {
-    "https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download"
+    "https://downloads.sourceforge.net/project/exiftool/exiftool-13.59_64.zip"
 }
 $ExiftoolSha = if ($env:EXIFTOOL_SHA256) { $env:EXIFTOOL_SHA256 } else {
     "44b512b25af500724ba579d0a53c8fc5851628b692dd5e5d94ae4a15c2cba9ec"
