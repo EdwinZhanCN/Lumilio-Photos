@@ -25,8 +25,11 @@ RUN go mod download
 # Copy source
 COPY server/. .
 
+# Product version stamped into the binary (surfaced via /api/v1/health).
+ARG VERSION=dev
+
 # Build API binary
-RUN go build -o /out/server ./cmd
+RUN go build -ldflags "-X server/internal/version.Version=${VERSION}" -o /out/server ./cmd
 
 ############################################
 # Runtime

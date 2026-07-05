@@ -1,0 +1,157 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    # Detect which subtrees changed so each gate only runs when relevant.
+    changes:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read
+        outputs:
+            server: ${{ steps.filter.outputs.server }}
+            web: ${{ steps.filter.outputs.web }}
+            desktop: ${{ steps.filter.outputs.desktop }}
+            site: ${{ steps.filter.outputs.site }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dorny/paths-filter@v3
+              id: filter
+              with:
+                  filters: |
+                      server:
+                          - 'server/**'
+                          - 'Makefile'
+                          - '.github/workflows/ci.yml'
+                      web:
+                          - 'web/**'
+                          - 'Makefile'
+                          - '.github/workflows/ci.yml'
+                      desktop:
+                          - 'desktop/**'
+                          - 'server/**'
+                          - 'Makefile'
+                          - '.github/workflows/ci.yml'
+                      site:
+                          - 'site/**'
+                          - '.github/workflows/ci.yml'
+
+    server:
+        name: server (make server-test)
+        needs: changes
+        if: needs.changes.outputs.server == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: server/go.sum
+
+            # CGO deps for govips + libraw (server/internal/utils/raw).
+            - name: Install libvips and libraw
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev
+
+            - run: make server-test
+
+    web:
+        name: web (make web-test)
+        needs: changes
+        if: needs.changes.outputs.web == 'true'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: read
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Enable pnpm via corepack
+              run: corepack enable
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+                  cache-dependency-path: web/pnpm-lock.yaml
+
+            - name: Install Vite+
+              run: |
+                  curl -fsSL https://vite.plus | bash
+                  echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+
+            # @edwinzhancn/docts lives on GitHub Packages, which requires a
+            # token even for public packages (web/.npmrc maps the scope).
+            - name: Authenticate GitHub Packages
+              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install dependencies
+              run: cd web && vp install
+
+            - run: make web-test
+
+    desktop:
+        name: desktop (make desktop-test)
+        needs: changes
+        if: needs.changes.outputs.desktop == 'true'
+        runs-on: macos-15
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version-file: desktop/go.mod
+                  cache-dependency-path: |
+                      desktop/go.sum
+                      server/go.sum
+
+            # CGO deps: the desktop module compiles the server module
+            # (govips/libraw) in-process. The PostgreSQL lifecycle test
+            # auto-skips because no PG is staged on the runner.
+            - name: Install libvips and libraw
+              run: brew install vips libraw
+
+            - run: make desktop-test
+
+    site:
+        name: site (vitepress build)
+        needs: changes
+        if: needs.changes.outputs.site == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Enable pnpm via corepack
+              run: corepack enable
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+                  cache-dependency-path: site/pnpm-lock.yaml
+
+            - name: Install Vite+
+              run: |
+                  curl -fsSL https://vite.plus | bash
+                  echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+
+            - name: Install dependencies
+              run: cd site && vp install
+
+            - name: Build docs site
+              run: cd site && ./node_modules/.bin/vitepress build docs

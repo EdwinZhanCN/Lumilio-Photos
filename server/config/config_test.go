@@ -72,7 +72,6 @@ hardware_accel = "none"
 discovery_enabled = false
 discovery_mdns_enabled = false
 discovery_hub_url = "https://lumen.example"
-connection_insecure = false
 
 [tools]
 exiftool_path = "/toml/exiftool"
@@ -186,5 +185,26 @@ func TestLoadAppConfigWithOptionsReportsExplicitMissingConfigFile(t *testing.T) 
 	}
 	if !strings.Contains(err.Error(), "missing.toml") {
 		t.Fatalf("missing config error should include path, got %v", err)
+	}
+}
+
+func TestLumenConfigEnabled(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  LumenConfig
+		want bool
+	}{
+		{"discovery off", LumenConfig{DiscoveryEnabled: false, DiscoveryMDNSEnabled: true}, false},
+		{"no backend", LumenConfig{DiscoveryEnabled: true}, false},
+		{"blank hub url is no backend", LumenConfig{DiscoveryEnabled: true, DiscoveryHubURL: "  "}, false},
+		{"mdns backend", LumenConfig{DiscoveryEnabled: true, DiscoveryMDNSEnabled: true}, true},
+		{"hub backend", LumenConfig{DiscoveryEnabled: true, DiscoveryHubURL: "http://gw:5866"}, true},
+		{"static backend", LumenConfig{DiscoveryEnabled: true, DiscoveryStaticNodes: []string{"10.0.0.5:50051"}}, true},
+		{"blank static entries are no backend", LumenConfig{DiscoveryEnabled: true, DiscoveryStaticNodes: []string{" ", ""}}, false},
+	}
+	for _, tc := range cases {
+		if got := tc.cfg.Enabled(); got != tc.want {
+			t.Errorf("%s: Enabled() = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }

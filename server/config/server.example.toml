@@ -147,7 +147,9 @@ hardware_accel = "auto"
 [lumen]
 # Lumen discovery is used for optional local ML service discovery.
 # Env overrides: LUMEN_DISCOVERY_ENABLED, LUMEN_DISCOVERY_MDNS_ENABLED,
-# LUMEN_DISCOVERY_HUB_URL, LUMEN_CONNECTION_INSECURE.
+# LUMEN_DISCOVERY_HUB_URL.
+# Set discovery_enabled = false (or leave mDNS off with no hub URL) to run
+# without external ML; the server boots and media management still works.
 discovery_enabled = true
 
 # mDNS is useful on desktop/local networks; disable in container environments
@@ -157,8 +159,12 @@ discovery_mdns_enabled = true
 # Optional Lumen hub URL. Container setups commonly inject this from env.
 discovery_hub_url = ""
 
-# Allow insecure local development connections. Disable when using trusted TLS.
-connection_insecure = true
+# Pinned Lumen node endpoints ("host:port"), used without dynamic discovery.
+# Works everywhere mDNS cannot (bridge-network containers, firewalled LANs,
+# fixed-IP NAS). Backends are additive: mDNS, hub URL, and static nodes all
+# run when configured. Env override: LUMEN_DISCOVERY_STATIC_NODES
+# (comma-separated).
+discovery_static_nodes = []
 
 [tools]
 # Absolute paths to external media tools. Empty means resolve via PATH. Desktop

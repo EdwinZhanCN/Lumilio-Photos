@@ -2,16 +2,19 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/client"
-	"github.com/edwinzhancn/lumen-sdk/pkg/config"
+	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	pb "github.com/edwinzhancn/lumen-sdk/proto"
 	"go.uber.org/zap"
 
+	"server/config"
 	"server/internal/utils/imagesource"
 )
 
@@ -46,7 +49,56 @@ type lumenService struct {
 	logger      *zap.Logger
 }
 
-func NewLumenService(cfg *config.Config, logger *zap.Logger) (LumenService, error) {
+// NewLumenServiceFromAppConfig builds the LumenService from the app-level
+// [lumen] configuration. A disabled integration (discovery off, or no backend
+// configured) yields a no-op service whose inference methods return
+// ErrLumenDisabled, so the server boots and media management degrades
+// gracefully without external ML.
+//
+// The app-owned fields (enabled/mDNS/hub URL) always come from cfg, which the
+// app config loader has already resolved with its TOML+env precedence.
+// SDK-only tuning knobs (deployment ID, timeouts, chunking) remain
+// env-configurable through the SDK's LUMEN_* variables.
+func NewLumenServiceFromAppConfig(cfg config.LumenConfig, logger *zap.Logger) (LumenService, error) {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	if !cfg.Enabled() {
+		if cfg.DiscoveryEnabled {
+			logger.Warn("lumen discovery is enabled but no backend is configured; ML features are disabled",
+				zap.String("hint", "set [lumen] discovery_mdns_enabled = true or discovery_hub_url"))
+		} else {
+			logger.Info("lumen ML integration disabled by config; media management runs without external ML")
+		}
+		return NewDisabledLumenService(), nil
+	}
+
+	sdkCfg, err := buildLumenSDKConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return NewLumenService(sdkCfg, logger)
+}
+
+// buildLumenSDKConfig maps the app-level Lumen config onto the SDK config:
+// SDK defaults, then LUMEN_* env for the SDK-only knobs, then the app-owned
+// discovery fields on top.
+func buildLumenSDKConfig(cfg config.LumenConfig) (*lumenconfig.Config, error) {
+	sdkCfg := lumenconfig.DefaultConfig()
+	if err := sdkCfg.LoadFromEnv(); err != nil {
+		return nil, fmt.Errorf("load lumen env overrides: %w", err)
+	}
+	sdkCfg.Discovery.Enabled = cfg.DiscoveryEnabled
+	sdkCfg.Discovery.MDNSEnabled = cfg.DiscoveryMDNSEnabled
+	sdkCfg.Discovery.HubURL = strings.TrimSpace(cfg.DiscoveryHubURL)
+	sdkCfg.Discovery.StaticNodes = cfg.StaticNodes()
+	if err := sdkCfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid lumen sdk config: %w", err)
+	}
+	return sdkCfg, nil
+}
+
+func NewLumenService(cfg *lumenconfig.Config, logger *zap.Logger) (LumenService, error) {
 	c, err := client.NewLumenClient(cfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("create lumen client: %w", err)
@@ -56,6 +108,54 @@ func NewLumenService(cfg *config.Config, logger *zap.Logger) (LumenService, erro
 		logger:      logger,
 	}, nil
 }
+
+// ErrLumenDisabled is returned by the disabled LumenService. Callers already
+// treat any inference error as "ML unavailable", so it flows through the same
+// degradation paths as a missing node.
+var ErrLumenDisabled = errors.New("lumen ML integration is disabled")
+
+// disabledLumenService keeps the server bootable when the Lumen integration is
+// disabled by configuration: inference fails with ErrLumenDisabled, no task is
+// ever available, and the pool reports zero nodes.
+type disabledLumenService struct{}
+
+// NewDisabledLumenService returns the no-op LumenService used when the Lumen
+// integration is disabled by configuration.
+func NewDisabledLumenService() LumenService { return disabledLumenService{} }
+
+func (disabledLumenService) SemanticTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
+	return nil, ErrLumenDisabled
+}
+
+func (disabledLumenService) SemanticTextEmbedFast(context.Context, []byte) (*types.EmbeddingV1, error) {
+	return nil, ErrLumenDisabled
+}
+
+func (disabledLumenService) SemanticImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
+	return nil, ErrLumenDisabled
+}
+
+func (disabledLumenService) BioClipClassify(context.Context, *imagesource.MLImage, int) ([]types.Label, error) {
+	return nil, ErrLumenDisabled
+}
+
+func (disabledLumenService) FaceRecognition(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
+	return nil, ErrLumenDisabled
+}
+
+func (disabledLumenService) OCR(context.Context, *imagesource.MLImage) (*types.OCRV1, error) {
+	return nil, ErrLumenDisabled
+}
+
+func (disabledLumenService) Start(context.Context) error { return nil }
+
+func (disabledLumenService) Close() error { return nil }
+
+func (disabledLumenService) PoolStats() PoolStats { return PoolStats{} }
+
+func (disabledLumenService) GetNodes() []*discovery.NodeInfo { return nil }
+
+func (disabledLumenService) IsTaskAvailable(string) bool { return false }
 
 func (s *lumenService) Start(ctx context.Context) error { return s.lumenClient.Start(ctx) }
 

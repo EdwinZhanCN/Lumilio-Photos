@@ -36,10 +36,9 @@ COMPOSE_BIN := $(shell \
 	elif command -v docker-compose >/dev/null 2>&1; then \
 		printf '%s' docker-compose; \
 	fi)
-ifeq ($(COMPOSE_BIN),)
-  $(error Docker Compose V2 is required. Install docker-compose-plugin or docker compose)
-endif
-COMPOSE := $(COMPOSE_BIN) -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT)
+# Lazily error only when a target actually needs compose, so docker-free
+# environments (e.g. macOS CI runners running desktop-test) still work.
+COMPOSE = $(if $(COMPOSE_BIN),$(COMPOSE_BIN) -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT),$(error Docker Compose V2 is required. Install docker-compose-plugin or docker compose))
 
 IN_DEV_CONTAINER := $(shell [ -f /.dockerenv ] && echo 1 || echo 0)
 ifeq ($(IN_DEV_CONTAINER),1)
