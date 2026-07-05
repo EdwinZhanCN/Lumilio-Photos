@@ -32,9 +32,10 @@ Scope: Lumilio-Photos (this repo) + coordination items in Lumen-SDK and Lumen-Hu
 2. ~~Lumen-SDK: watch route in shared REST; capability-fetch retry; static resolver.~~ **Done 2026-07-04**: `pkg/server/rest/node_watch.go` (shared by hubd + gateway; gateway go.mod now `replace => ../../`), `fetchCapabilitiesWithRetry` (5 attempts, Ready nodes published immediately), `StaticResolver` + `CompositeResolver` (backends now additive), `static_nodes` config + `LUMEN_DISCOVERY_STATIC_NODES`. Naming collision resolved 2026-07-04: `lumenhubd`→`lumengatewayd`, `lumenhub` CLI→`lumengateway` (dirs, binaries, ldflags paths, workflows, docs); "Lumen Hub" now only refers to the Rust inference server. Still open: remove dead `c.cancel` in `client.Start`. **Tag v1.3.0.**
 3. ~~Lumilio: bump SDK, wire static nodes.~~ **Done 2026-07-04** (SDK v1.3.0 + Hub v0.1.0-alpha.2 released): `server/go.mod` → v1.3.0, `[lumen] discovery_static_nodes` + `LUMEN_DISCOVERY_STATIC_NODES`, `Enabled()` counts static as a backend, desktop go.mod tidied. Remaining for W2: Dockerfile discovery-mode docs + e2e smoke against a real hub. (B1 + B2 fixed 2026-07-03.)
 
-### W1 — CI baseline (Lumilio has none today; only manual build-postgres.yml)
-- `ci.yml` on PR/main: server job (ubuntu, `libvips-dev libraw-dev`, `make server-test`), web job (`make web-test` with vp), desktop job (macOS runner, `make desktop-test`), docs build. Path filters per subtree.
-- Version stamping: single product version; git tag `v*` → server ldflags (`main.version`, surface in `/api/v1/health`), web `VITE_APP_VERSION`, desktop `CFBundleShortVersionString`, image tags.
+### W1 — CI baseline — **Done 2026-07-05** (pending first Actions run to confirm green)
+- `ci.yml`: dorny/paths-filter gates four jobs — server (ubuntu, libvips/libraw, `make server-test`), web (node 24 + corepack pnpm + Vite+ installer, `make web-test`), desktop (macos-15, brew vips/libraw, `make desktop-test`; PG test auto-skips), site (vitepress build).
+- Makefile compose check is now lazy (`$(COMPOSE)` errors only when a docker target runs) so docker-free macOS runners work.
+- Version stamping: `server/internal/version.Version` (ldflags `-X`), surfaced in `GET /api/v1/health`; `server/Dockerfile` + `web/Dockerfile` take `ARG VERSION=dev` (web → `VITE_APP_VERSION`); `build-macos.sh` stamps the same version it writes to the plist. Release workflows (W2/W3) must pass `VERSION=<git tag>`.
 
 ### W2 — Docker release (Linux)
 - `release-docker.yml` on tag: buildx multi-arch (amd64+arm64) for `server`, `web`, **`db`** (custom pg_textsearch image must be published, not built by users) → GHCR, tags `vX.Y.Z` + `latest`.
