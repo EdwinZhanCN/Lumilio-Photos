@@ -53,7 +53,7 @@ Scope: Lumilio-Photos (this repo) + coordination items in Lumen-SDK and Lumen-Hu
   1. `lock_other.go` is an always-error stub → real Windows single-instance lock (`LockFileEx` or exclusive-create pidfile).
   2. Windows PostgreSQL has **no Unix sockets** → `paths.go` `SocketDir` + `config.NewDesktopConfig` (DB host = socket dir) must switch to TCP `127.0.0.1:<port>` on Windows; `postgres.go` pg_ctl/initdb args likewise.
   3. `paths.go` app-data root → `%LOCALAPPDATA%\Lumilio Photos` on Windows.
-- **CGo toolchain (main risk now)**: libvips + libraw via MSYS2 mingw-w64 on a windows runner; add an experimental (continue-on-error) CI job to gather signal before committing to it.
+- ✅ **CGo toolchain verified (2026-07-05, PR #150)**: the `desktop-windows` CI job (MSYS2 mingw-w64 go/gcc/libvips/libraw) compiles the whole desktop module green on windows-2025. Packaging later needs `ntldd -R` DLL bundling next to the exe.
 - fetch-resources Windows variants (gyan.dev ffmpeg, exiftool Windows zip), Wails tray on Windows (proven by lumen-gateway), NSIS installer or portable zip, SmartScreen doc.
 - Recommendation stands: v1.0 = macOS Desktop + Linux Docker; Windows = v1.x beta channel.
 
