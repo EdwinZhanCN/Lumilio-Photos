@@ -45,7 +45,7 @@ require (
 	github.com/davidbyttow/govips/v2 v2.18.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
-	github.com/edwinzhancn/lumen-sdk v1.2.9 // indirect
+	github.com/edwinzhancn/lumen-sdk v1.3.0 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect
 	github.com/eino-contrib/ollama v0.1.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
