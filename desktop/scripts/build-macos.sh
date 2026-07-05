@@ -9,7 +9,7 @@
 # Developer account) per the exec plan's signing strategy.
 #
 # Prerequisites (staged before running — see desktop/resources/README.md):
-#   desktop/resources/postgres/17/<darwin-arch>/bin   PostgreSQL + pgvector + pg_textsearch + zhparser
+#   desktop/resources/postgres/17/<darwin-arch>/bin   PostgreSQL + pgvector (+ contrib pg_trgm)
 #   desktop/resources/ffmpeg/{ffmpeg,ffprobe}         static ffmpeg build
 #   desktop/resources/exiftool/exiftool               exiftool standalone
 # Build tools:
