@@ -28,9 +28,9 @@ Scope: Lumilio-Photos (this repo) + coordination items in Lumen-SDK and Lumen-Hu
 ## Workstreams
 
 ### W0 — contract + integration fixes (Lumen repos then Lumilio)
-1. Lumen-Hub: TXT keys `v/runtime/tasks`; addr-auto advertise. Tag a beta.
-2. Lumen-SDK: watch route in shared REST; capability-fetch retry; static resolver; remove dead `c.cancel` in `client.Start`; decide `lumenhubd` fate (fold watch into gateway, or rename artifacts — current releases titled "Lumen Hub" collide with the Rust repo's). Tag v1.3.0.
-3. Lumilio: B1 + B2; bump SDK; e2e smoke against a real hub (`server/internal/service/lumen_tensor_conformance_test.go` pattern).
+1. ~~Lumen-Hub: TXT keys `v/runtime/tasks`; addr-auto advertise.~~ **Done 2026-07-04** (`daemon/mdns.rs` `AdvertisedCapabilities`, `enable_addr_auto`, `ADVERTISE_IP` still overrides). Tag a beta.
+2. ~~Lumen-SDK: watch route in shared REST; capability-fetch retry; static resolver.~~ **Done 2026-07-04**: `pkg/server/rest/node_watch.go` (shared by hubd + gateway; gateway go.mod now `replace => ../../`), `fetchCapabilitiesWithRetry` (5 attempts, Ready nodes published immediately), `StaticResolver` + `CompositeResolver` (backends now additive), `static_nodes` config + `LUMEN_DISCOVERY_STATIC_NODES`. Naming collision resolved 2026-07-04: `lumenhubd`→`lumengatewayd`, `lumenhub` CLI→`lumengateway` (dirs, binaries, ldflags paths, workflows, docs); "Lumen Hub" now only refers to the Rust inference server. Still open: remove dead `c.cancel` in `client.Start`. **Tag v1.3.0.**
+3. ~~Lumilio: bump SDK, wire static nodes.~~ **Done 2026-07-04** (SDK v1.3.0 + Hub v0.1.0-alpha.2 released): `server/go.mod` → v1.3.0, `[lumen] discovery_static_nodes` + `LUMEN_DISCOVERY_STATIC_NODES`, `Enabled()` counts static as a backend, desktop go.mod tidied. Remaining for W2: Dockerfile discovery-mode docs + e2e smoke against a real hub. (B1 + B2 fixed 2026-07-03.)
 
 ### W1 — CI baseline (Lumilio has none today; only manual build-postgres.yml)
 - `ci.yml` on PR/main: server job (ubuntu, `libvips-dev libraw-dev`, `make server-test`), web job (`make web-test` with vp), desktop job (macOS runner, `make desktop-test`), docs build. Path filters per subtree.
