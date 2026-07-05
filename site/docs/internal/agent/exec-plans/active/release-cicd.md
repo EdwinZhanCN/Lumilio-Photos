@@ -42,13 +42,20 @@ Scope: Lumilio-Photos (this repo) + coordination items in Lumen-SDK and Lumen-Hu
 - `docker-compose.release.yml` (GHCR images, `LUMILIO_STORAGE` required, `LUMILIO_VERSION` pin) + `docker-compose.host-mdns.yml` Linux overlay (`network_mode: host` on server, db via `127.0.0.1:5433`, web upstream via host-gateway, needs compose ≥ 2.24 for `!reset`). All three discovery modes documented in the compose header.
 - **Fixed en route**: root `docker-compose.yml` preloaded `pg_textsearch` which the db image never contained — db could not boot; removed. Search actually uses pg_trgm + `to_tsvector('simple')` only, so `lumilio-db` = pgvector base image, and `build-postgres.yml` dropped its pg_textsearch/SCWS/zhparser steps (desktop bundle likewise only needs PG + pgvector).
 
-### W3 — macOS desktop release
-- `release-desktop-macos.yml` on tag: stage PG artifact (from build-postgres.yml), `fetch-resources.sh`, `vp build` SPA, `build-macos.sh {arm64,amd64} --dmg`, ad-hoc sign, upload DMGs to the GitHub Release. Info.plist local-network key (P1). Notarization = future paid-account upgrade.
+### W3 — macOS desktop release — **Done 2026-07-05** (arm64; pending first tag run)
+- `release-desktop-macos.yml` on tag: calls `build-postgres.yml` (`workflow_call` added) for a fresh PG artifact → `fetch-resources.sh` → web SPA (needs GH Packages token for docts) → `build-macos.sh arm64 --dmg` (ad-hoc sign inside) → DMG attached to the GitHub Release with Gatekeeper + local-network instructions.
+- Info.plist now carries `NSLocalNetworkUsageDescription` + `NSBonjourServices _lumen._tcp` + `LSUIElement` (tray-only, matches ActivationPolicyAccessory).
+- amd64 deferred: `fetch-resources.sh` pins arm64 ffmpeg/ffprobe only; add Intel URL+SHA pins + `macos-15-intel` matrix entry when wanted. Notarization = future paid-account upgrade.
 
-### W4 — Windows desktop (largest unknown; run spike first)
-- **Spike (gates the milestone): pg_textsearch + zhparser/SCWS on Windows MSVC.** If not buildable, decide fallback (ship without BM25/zh segmentation on Windows, or WSL-based path, or swap extension).
-- Then: supervisor Windows port (paths, pg_ctl, single-instance, no quarantine step), PG 17 Windows bundle (EDB zip + pgvector build), MSYS2/mingw CGo toolchain for libvips+libraw, ffmpeg/exiftool Windows binaries in fetch-resources, Wails tray on Windows, NSIS installer, SmartScreen doc.
-- Recommendation: release macOS Desktop + Linux Docker as v1.0; Windows Desktop as v1.1 beta channel unless the spike lands quickly.
+### W4 — Windows desktop (unblocked: BM25/zh-seg removal killed the PG spike)
+- ✅ **PG bundle (2026-07-05)**: `build-postgres.yml` `build-windows` job — EDB official binaries zip + pgvector via MSVC nmake; pg_trgm ships in the zip. Artifact `postgres-windows-amd64` matches the supervisor's `GOOS-GOARCH` resource lookup. Verify with a dispatch run.
+- **Supervisor port** (audit 2026-07-05 — smaller than feared; quarantine + resources are already build-tagged):
+  1. `lock_other.go` is an always-error stub → real Windows single-instance lock (`LockFileEx` or exclusive-create pidfile).
+  2. Windows PostgreSQL has **no Unix sockets** → `paths.go` `SocketDir` + `config.NewDesktopConfig` (DB host = socket dir) must switch to TCP `127.0.0.1:<port>` on Windows; `postgres.go` pg_ctl/initdb args likewise.
+  3. `paths.go` app-data root → `%LOCALAPPDATA%\Lumilio Photos` on Windows.
+- **CGo toolchain (main risk now)**: libvips + libraw via MSYS2 mingw-w64 on a windows runner; add an experimental (continue-on-error) CI job to gather signal before committing to it.
+- fetch-resources Windows variants (gyan.dev ffmpeg, exiftool Windows zip), Wails tray on Windows (proven by lumen-gateway), NSIS installer or portable zip, SmartScreen doc.
+- Recommendation stands: v1.0 = macOS Desktop + Linux Docker; Windows = v1.x beta channel.
 
 ### W5 — release checklist (per-release)
 - Lumen-Hub tag published + `manifest.json` reachable; `lumilio.org/lumen/install.{sh,ps1}` worker serving latest.
