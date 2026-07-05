@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -212,13 +213,49 @@ func (p *Postgres) statusCode(ctx context.Context) int {
 func (p *Postgres) Start(ctx context.Context) error {
 	p.logf("postgres: starting")
 	logPath := filepath.Join(p.logsDir, "postgres.log")
-	return p.run(ctx, "pg_ctl",
+	out, err := p.output(ctx, "pg_ctl",
 		"start",
 		"-D", p.dataDir,
 		"-l", logPath,
 		"-w",
 		"-t", "60",
 	)
+	if err == nil {
+		return nil
+	}
+	// pg_ctl's own failure message is only "could not start server / Examine
+	// the log output"; the actual postmaster error lives in postgres.log. Fold
+	// its tail into the error so the real cause is visible without hunting for
+	// the log file (which the setup UI cannot open).
+	msg := strings.TrimSpace(out)
+	if tail := tailFile(logPath, 4096); tail != "" {
+		msg = strings.TrimSpace(msg + "\n--- postgres.log ---\n" + tail)
+	}
+	return fmt.Errorf("pg_ctl start: %w\n%s", err, msg)
+}
+
+// tailFile returns up to maxBytes of the end of the file at path, or "" if it
+// cannot be read. Used to surface the postmaster log tail on a start failure.
+func tailFile(path string, maxBytes int64) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return ""
+	}
+	if size := info.Size(); size > maxBytes {
+		if _, err := f.Seek(size-maxBytes, 0); err != nil {
+			return ""
+		}
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // Stop performs a fast shutdown (rollback in-flight, then exit) bounded by a
@@ -298,6 +335,12 @@ func (p *Postgres) run(ctx context.Context, name string, args ...string) error {
 
 func (p *Postgres) output(ctx context.Context, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, p.bin(name), args...)
+	// Force the C locale for messages so the PostgreSQL tools emit English
+	// ASCII rather than the OS-locale encoding (e.g. GBK on a Chinese Windows),
+	// which would render as mojibake in the setup UI. The cluster's own
+	// encoding/locale is fixed at initdb time (--encoding=UTF8 --locale=C) and
+	// is unaffected by these message-only overrides.
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "LC_MESSAGES=C", "LANG=C")
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
