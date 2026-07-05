@@ -49,13 +49,10 @@ Scope: Lumilio-Photos (this repo) + coordination items in Lumen-SDK and Lumen-Hu
 
 ### W4 — Windows desktop (unblocked: BM25/zh-seg removal killed the PG spike)
 - ✅ **PG bundle (2026-07-05)**: `build-postgres.yml` `build-windows` job — EDB official binaries zip + pgvector via MSVC nmake; pg_trgm ships in the zip. Artifact `postgres-windows-amd64` matches the supervisor's `GOOS-GOARCH` resource lookup. Verify with a dispatch run.
-- **Supervisor port** (audit 2026-07-05 — smaller than feared; quarantine + resources are already build-tagged):
-  1. `lock_other.go` is an always-error stub → real Windows single-instance lock (`LockFileEx` or exclusive-create pidfile).
-  2. Windows PostgreSQL has **no Unix sockets** → `paths.go` `SocketDir` + `config.NewDesktopConfig` (DB host = socket dir) must switch to TCP `127.0.0.1:<port>` on Windows; `postgres.go` pg_ctl/initdb args likewise.
-  3. `paths.go` app-data root → `%LOCALAPPDATA%\Lumilio Photos` on Windows.
-- **CGo toolchain (main risk now)**: libvips + libraw via MSYS2 mingw-w64 on a windows runner; add an experimental (continue-on-error) CI job to gather signal before committing to it.
-- fetch-resources Windows variants (gyan.dev ffmpeg, exiftool Windows zip), Wails tray on Windows (proven by lumen-gateway), NSIS installer or portable zip, SmartScreen doc.
-- Recommendation stands: v1.0 = macOS Desktop + Linux Docker; Windows = v1.x beta channel.
+- ✅ **Supervisor port (2026-07-05)**: `lock_windows.go` (exclusive CreateFile, OS-released on crash); `Paths.DBHost()` — Unix socket dir on unix, `127.0.0.1` on Windows (no Unix sockets there) — flows into `PostgresOptions.Host` and the renamed `DesktopParams.DBHost`; `pgListenConf`/`pgHBAConf` emit loopback TCP + host-trust rules on Windows (unit-tested); app-data root prefers `%LOCALAPPDATA%`; `.exe` suffixes for PG binaries + bundled tools; Windows resources layout `<exedir>\resources`.
+- ✅ **CGo toolchain verified (2026-07-05, PR #150)**: MSYS2 mingw-w64 compiles the whole desktop module green on windows-2025.
+- ✅ **Packaging (2026-07-05)**: `fetch-resources.ps1` (gyan.dev ffmpeg 8.1.2 + exiftool 13.59, SHA-256 pinned), `build-windows.sh` (mingw64 build with `-H windowsgui`, `ntldd -R` DLL closure incl. vips modules, resource staging), and `release-desktop.yml` — the merged desktop release workflow: one build-postgres call + one shared SPA artifact feed the macOS DMG job and the Windows portable-zip job; both attach to the GitHub Release.
+- **Pending verification**: first tag run end-to-end; then a manual smoke on a real Windows machine (initdb→boot→browser, firewall/SmartScreen UX). NSIS installer + code signing remain future upgrades over the portable zip.
 
 ### W5 — release checklist (per-release)
 - Lumen-Hub tag published + `manifest.json` reachable; `lumilio.org/lumen/install.{sh,ps1}` worker serving latest.

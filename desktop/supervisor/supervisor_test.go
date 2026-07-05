@@ -22,7 +22,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 		WebRoot:       "/bundle/web",
 		LogDir:        "/Users/me/Library/Application Support/Lumilio Photos/logs",
 		StoragePath:   "/Volumes/Photos/Lumilio Library",
-		SocketDir:     "/Users/me/Library/Application Support/Lumilio Photos/postgres/17/run",
+		DBHost:        "/Users/me/Library/Application Support/Lumilio Photos/postgres/17/run",
 		PGPort:        "5487",
 		DBUser:        "lumilio",
 		DBName:        "lumiliophotos",
@@ -194,5 +194,36 @@ func TestSocketDirFallbackOnLongPath(t *testing.T) {
 	}
 	if !strings.HasPrefix(p2.SocketDir(), os.TempDir()) {
 		t.Errorf("long path: SocketDir() = %q, want a temp-dir fallback", p2.SocketDir())
+	}
+}
+
+func TestWindowsPGListenAndHBAConf(t *testing.T) {
+	// Windows PostgreSQL has no Unix sockets: loopback TCP + host hba rules.
+	winConf := pgListenConf("windows", "127.0.0.1")
+	if winConf != "listen_addresses = '127.0.0.1'" {
+		t.Errorf("windows listen conf = %q", winConf)
+	}
+	if hba := pgHBAConf("windows"); !strings.Contains(hba, "host   all   all   127.0.0.1/32   trust") {
+		t.Errorf("windows hba should trust loopback hosts, got %q", hba)
+	}
+
+	// unix keeps the socket-only posture (no TCP listener at all).
+	unixConf := pgListenConf("darwin", "/run/pg")
+	if !strings.Contains(unixConf, "listen_addresses = ''") ||
+		!strings.Contains(unixConf, "unix_socket_directories = '/run/pg'") {
+		t.Errorf("unix listen conf = %q", unixConf)
+	}
+	if hba := pgHBAConf("darwin"); !strings.Contains(hba, "local   all   all   trust") {
+		t.Errorf("unix hba should trust local socket, got %q", hba)
+	}
+}
+
+func TestDBHostPerGOOS(t *testing.T) {
+	p := &Paths{PGRun: "/short/run"}
+	if got := dbHostForGOOS("windows", p); got != "127.0.0.1" {
+		t.Errorf("windows DBHost = %q, want loopback", got)
+	}
+	if got := dbHostForGOOS("darwin", p); got != p.SocketDir() {
+		t.Errorf("darwin DBHost = %q, want socket dir %q", got, p.SocketDir())
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 const (
@@ -70,6 +71,13 @@ func resolveAppDataRoot() (string, error) {
 	if override := os.Getenv("LUMILIO_APP_DATA"); override != "" {
 		return override, nil
 	}
+	// On Windows os.UserConfigDir is %AppData% (Roaming); the PostgreSQL data
+	// directory must not roam between machines, so prefer %LocalAppData%.
+	if runtime.GOOS == "windows" {
+		if base := os.Getenv("LOCALAPPDATA"); base != "" {
+			return filepath.Join(base, appDirName), nil
+		}
+	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user config dir: %w", err)
@@ -113,11 +121,27 @@ func (p *Paths) SecretKeyFile() string { return filepath.Join(p.Secrets, "lumili
 
 // SocketDir returns the directory PostgreSQL should place its Unix socket in.
 // It prefers PGRun but falls back to a short /tmp path when the natural socket
-// path would exceed the platform limit (long usernames).
+// path would exceed the platform limit (long usernames). Only meaningful on
+// unix hosts; Windows PostgreSQL has no Unix sockets (see DBHost).
 func (p *Paths) SocketDir() string {
 	full := filepath.Join(p.PGRun, ".s.PGSQL."+pgPort)
 	if len(full) <= maxUnixSocketPath {
 		return p.PGRun
 	}
 	return filepath.Join(os.TempDir(), fmt.Sprintf("lumilio-%d", os.Getuid()))
+}
+
+// DBHost is what both PostgreSQL and the server config use to reach the
+// private cluster: the Unix socket directory on unix hosts, or the IPv4
+// loopback on Windows (whose PostgreSQL builds do not support Unix sockets;
+// the postmaster listens on 127.0.0.1:<pgPort> there).
+func (p *Paths) DBHost() string {
+	return dbHostForGOOS(runtime.GOOS, p)
+}
+
+func dbHostForGOOS(goos string, p *Paths) string {
+	if goos == "windows" {
+		return "127.0.0.1"
+	}
+	return p.SocketDir()
 }

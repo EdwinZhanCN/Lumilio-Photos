@@ -117,12 +117,18 @@ stage "$RESOURCES_SRC/exiftool"               "$RES_DIR/exiftool"
 
 echo "==> Staging web SPA"
 WEB_DIST="$ROOT/web/dist"
-if ! command -v vp >/dev/null 2>&1; then
-  echo "    ERROR: vp not found; install Vite+ tooling or run make setup before desktop-build." >&2
-  exit 1
+# CI stages a prebuilt web/dist artifact and sets LUMILIO_WEB_DIST_PREBUILT=1;
+# local builds always rebuild so a stale dist is never bundled.
+if [ "${LUMILIO_WEB_DIST_PREBUILT:-}" = "1" ] && [ -f "$WEB_DIST/index.html" ]; then
+  echo "    using prebuilt $WEB_DIST"
+else
+  if ! command -v vp >/dev/null 2>&1; then
+    echo "    ERROR: vp not found; install Vite+ tooling or run make setup before desktop-build." >&2
+    exit 1
+  fi
+  echo "    building web frontend (vp build)"
+  ( cd "$ROOT/web" && vp build )
 fi
-echo "    building web frontend (vp build)"
-( cd "$ROOT/web" && vp build )
 if [ -d "$WEB_DIST" ]; then
   mkdir -p "$RES_DIR/web"
   cp -R "$WEB_DIST/." "$RES_DIR/web/"

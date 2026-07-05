@@ -11,11 +11,14 @@ import (
 // DesktopParams contains the host-specific inputs needed to run the shared
 // server runtime from the desktop supervisor.
 type DesktopParams struct {
-	Port          string
-	WebRoot       string // empty = API only
-	LogDir        string
-	StoragePath   string
-	SocketDir     string
+	Port        string
+	WebRoot     string // empty = API only
+	LogDir      string
+	StoragePath string
+	// DBHost is what the server dials to reach the private PostgreSQL: a Unix
+	// socket directory on unix hosts, or 127.0.0.1 on Windows (whose
+	// PostgreSQL builds have no Unix sockets).
+	DBHost        string
 	PGPort        string
 	DBUser        string
 	DBName        string
@@ -50,7 +53,7 @@ func NewDesktopConfig(p DesktopParams) (AppConfig, error) {
 	cfg.LoggingConfig.ConsoleFormat = "console"
 	cfg.LoggingConfig.FileFormat = "json"
 	cfg.DatabaseConfig = DatabaseConfig{
-		Host:         strings.TrimSpace(p.SocketDir),
+		Host:         strings.TrimSpace(p.DBHost),
 		Port:         strings.TrimSpace(p.PGPort),
 		User:         strings.TrimSpace(p.DBUser),
 		PasswordFile: strings.TrimSpace(p.PasswordFile),
@@ -79,7 +82,7 @@ func validateDesktopParams(p DesktopParams) error {
 		"port":            p.Port,
 		"log_dir":         p.LogDir,
 		"storage_path":    p.StoragePath,
-		"socket_dir":      p.SocketDir,
+		"db_host":         p.DBHost,
 		"pg_port":         p.PGPort,
 		"db_user":         p.DBUser,
 		"db_name":         p.DBName,
