@@ -137,7 +137,7 @@ log_directory = '%s'
 log_filename = 'postgresql-%%Y-%%m-%%d.log'
 log_rotation_age = 1d
 log_rotation_size = 10MB
-`, pgListenConf(runtime.GOOS, p.host), p.port, pgConfEscape(p.logsDir))
+`, pgListenConf(runtime.GOOS, p.host), p.port, pgConfPathValue(p.logsDir))
 
 	if err := os.WriteFile(filepath.Join(p.dataDir, "postgresql.conf"), []byte(conf), 0o600); err != nil {
 		return fmt.Errorf("write postgresql.conf: %w", err)
@@ -156,7 +156,7 @@ func pgListenConf(goos, host string) string {
 	if goos == "windows" {
 		return "listen_addresses = '127.0.0.1'"
 	}
-	return fmt.Sprintf("listen_addresses = ''\nunix_socket_directories = '%s'", pgConfEscape(host))
+	return fmt.Sprintf("listen_addresses = ''\nunix_socket_directories = '%s'", pgConfPathValue(host))
 }
 
 // pgHBAConf returns client auth rules matching the listener setup: socket-only
@@ -351,4 +351,17 @@ func (p *Postgres) output(ctx context.Context, name string, args ...string) (str
 // pgConfEscape escapes single quotes for a PostgreSQL configuration string value.
 func pgConfEscape(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
+}
+
+// pgConfPathValue formats a filesystem path as a PostgreSQL configuration string
+// value. PostgreSQL accepts forward slashes on every platform, and its config
+// parser treats backslashes inside quoted strings as escape characters — so a
+// raw Windows path like C:\Users\...\logs would be silently mangled (\U, \l, …),
+// producing a bad log_directory and a postmaster that FATALs at startup while
+// initdb (which never reads the file) succeeds. Normalizing to forward slashes
+// avoids that; single quotes are still doubled. The backslash rewrite is
+// unconditional (not host-OS dependent) so a Windows path is normalized even
+// when the conf is generated or tested on another platform.
+func pgConfPathValue(path string) string {
+	return pgConfEscape(strings.ReplaceAll(path, `\`, "/"))
 }
