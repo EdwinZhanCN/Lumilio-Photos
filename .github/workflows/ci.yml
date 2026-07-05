@@ -73,6 +73,9 @@ jobs:
         needs: changes
         if: needs.changes.outputs.web == 'true'
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: read
         steps:
             - uses: actions/checkout@v4
 
@@ -89,6 +92,13 @@ jobs:
               run: |
                   curl -fsSL https://vite.plus | bash
                   echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+
+            # @edwinzhancn/docts lives on GitHub Packages, which requires a
+            # token even for public packages (web/.npmrc maps the scope).
+            - name: Authenticate GitHub Packages
+              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install dependencies
               run: cd web && vp install
