@@ -35,9 +35,9 @@ jobs:
                     - arch: arm64
                       runner: macos-15
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: actions/setup-go@v5
+            - uses: actions/setup-go@v6
               with:
                   go-version-file: desktop/go.mod
                   cache-dependency-path: |
@@ -50,7 +50,7 @@ jobs:
             - name: Enable pnpm via corepack
               run: corepack enable
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm
@@ -71,7 +71,7 @@ jobs:
               run: cd web && vp install && vp build
 
             - name: Stage PostgreSQL bundle
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   name: postgres-darwin-${{ matrix.arch }}
                   path: desktop/resources/postgres
@@ -89,7 +89,7 @@ jobs:
                   mv "desktop/build/Lumilio-Photos-${{ matrix.arch }}.dmg" \
                      "desktop/build/Lumilio-Photos-${{ github.ref_name }}-macos-${{ matrix.arch }}.dmg"
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: dmg-${{ matrix.arch }}
                   path: desktop/build/Lumilio-Photos-*-macos-${{ matrix.arch }}.dmg
@@ -104,13 +104,13 @@ jobs:
             contents: write
         steps:
             - name: Download DMGs
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   pattern: dmg-*
                   path: dist
                   merge-multiple: true
 
-            - uses: softprops/action-gh-release@v2
+            - uses: softprops/action-gh-release@v3
               with:
                   prerelease: ${{ contains(github.ref_name, '-') }}
                   fail_on_unmatched_files: true
