@@ -83,6 +83,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>LSUIElement</key><true/>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Lumilio Photos discovers Lumen ML servers on your local network via mDNS to enable optional AI features (semantic search, face recognition, OCR).</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_lumen._tcp</string>
+  </array>
 </dict>
 </plist>
 PLIST
