@@ -199,6 +199,8 @@ func TestLumenConfigEnabled(t *testing.T) {
 		{"blank hub url is no backend", LumenConfig{DiscoveryEnabled: true, DiscoveryHubURL: "  "}, false},
 		{"mdns backend", LumenConfig{DiscoveryEnabled: true, DiscoveryMDNSEnabled: true}, true},
 		{"hub backend", LumenConfig{DiscoveryEnabled: true, DiscoveryHubURL: "http://gw:5866"}, true},
+		{"static backend", LumenConfig{DiscoveryEnabled: true, DiscoveryStaticNodes: []string{"10.0.0.5:50051"}}, true},
+		{"blank static entries are no backend", LumenConfig{DiscoveryEnabled: true, DiscoveryStaticNodes: []string{" ", ""}}, false},
 	}
 	for _, tc := range cases {
 		if got := tc.cfg.Enabled(); got != tc.want {

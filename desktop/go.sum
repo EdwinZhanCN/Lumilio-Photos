@@ -91,9 +91,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/ebitengine/purego v0.9.1 h1:a/k2f2HQU3Pi399RPW1MOaZyhKJL9w/xFpKAg4q1s0A=
 github.com/ebitengine/purego v0.9.1/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/edwinzhancn/lumen-sdk v1.2.8 h1:4E+a0XIkJZkb8nKyWDe2NHhM+OQKyZLQ6MLzdXY37Jw=
-github.com/edwinzhancn/lumen-sdk v1.2.8/go.mod h1:OkZem99bY4ykxAFLFKijUe48Uuz0oRcgULdxwO9tnmQ=
-github.com/edwinzhancn/lumen-sdk v1.2.9/go.mod h1:OkZem99bY4ykxAFLFKijUe48Uuz0oRcgULdxwO9tnmQ=
+github.com/edwinzhancn/lumen-sdk v1.3.0 h1:mdYNKH8d211U53qXegW8oZpj5DY2eJu1UnfIbmYY/C8=
+github.com/edwinzhancn/lumen-sdk v1.3.0/go.mod h1:OkZem99bY4ykxAFLFKijUe48Uuz0oRcgULdxwO9tnmQ=
 github.com/eino-contrib/jsonschema v1.0.3 h1:2Kfsm1xlMV0ssY2nuxshS4AwbLFuqmPmzIjLVJ1Fsp0=
 github.com/eino-contrib/jsonschema v1.0.3/go.mod h1:cpnX4SyKjWjGC7iN2EbhxaTdLqGjCi0e9DxpLYxddD4=
 github.com/eino-contrib/ollama v0.1.0 h1:z1NaMdKW6X1ftP8g5xGGR5zDRPUtuTKFq35vBQgxsN4=

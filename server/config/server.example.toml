@@ -159,6 +159,13 @@ discovery_mdns_enabled = true
 # Optional Lumen hub URL. Container setups commonly inject this from env.
 discovery_hub_url = ""
 
+# Pinned Lumen node endpoints ("host:port"), used without dynamic discovery.
+# Works everywhere mDNS cannot (bridge-network containers, firewalled LANs,
+# fixed-IP NAS). Backends are additive: mDNS, hub URL, and static nodes all
+# run when configured. Env override: LUMEN_DISCOVERY_STATIC_NODES
+# (comma-separated).
+discovery_static_nodes = []
+
 [tools]
 # Absolute paths to external media tools. Empty means resolve via PATH. Desktop
 # injects bundled paths through typed config; containers normally use PATH.

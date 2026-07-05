@@ -54,9 +54,13 @@ func TestBuildLumenSDKConfigMapsAppFields(t *testing.T) {
 		DiscoveryEnabled:     true,
 		DiscoveryMDNSEnabled: false,
 		DiscoveryHubURL:      " http://gw:5866 ",
+		DiscoveryStaticNodes: []string{" 10.0.0.5:50051 ", ""},
 	})
 	if err != nil {
 		t.Fatalf("buildLumenSDKConfig: %v", err)
+	}
+	if len(sdkCfg.Discovery.StaticNodes) != 1 || sdkCfg.Discovery.StaticNodes[0] != "10.0.0.5:50051" {
+		t.Fatalf("Discovery.StaticNodes = %v, want trimmed [10.0.0.5:50051]", sdkCfg.Discovery.StaticNodes)
 	}
 	if !sdkCfg.Discovery.Enabled {
 		t.Fatal("Discovery.Enabled should map from app config")

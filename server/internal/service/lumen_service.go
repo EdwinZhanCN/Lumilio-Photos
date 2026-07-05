@@ -91,6 +91,7 @@ func buildLumenSDKConfig(cfg config.LumenConfig) (*lumenconfig.Config, error) {
 	sdkCfg.Discovery.Enabled = cfg.DiscoveryEnabled
 	sdkCfg.Discovery.MDNSEnabled = cfg.DiscoveryMDNSEnabled
 	sdkCfg.Discovery.HubURL = strings.TrimSpace(cfg.DiscoveryHubURL)
+	sdkCfg.Discovery.StaticNodes = cfg.StaticNodes()
 	if err := sdkCfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid lumen sdk config: %w", err)
 	}
