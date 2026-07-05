@@ -132,7 +132,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	pg := NewPostgres(PostgresOptions{
 		BinDir:       pgBinDir(resources),
 		DataDir:      paths.PGData,
-		SocketDir:    paths.SocketDir(),
+		Host:         paths.DBHost(),
 		LogsDir:      paths.PGLogs,
 		Port:         pgPort,
 		User:         dbUser,
@@ -168,7 +168,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		WebRoot:       bundledWebRoot(resources),
 		LogDir:        paths.Logs,
 		StoragePath:   storagePath,
-		SocketDir:     paths.SocketDir(),
+		DBHost:        paths.DBHost(),
 		PGPort:        pgPort,
 		DBUser:        dbUser,
 		DBName:        dbName,

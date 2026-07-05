@@ -53,7 +53,7 @@ func TestPostgresLifecycleSmoke(t *testing.T) {
 	pg := NewPostgres(PostgresOptions{
 		BinDir:       binDir,
 		DataDir:      dataDir,
-		SocketDir:    sockDir,
+		Host:         sockDir,
 		LogsDir:      logsDir,
 		Port:         "5489",
 		User:         "lumilio",

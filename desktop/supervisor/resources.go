@@ -9,9 +9,9 @@ import (
 
 // ResourcesDir resolves the directory that holds bundled runtime assets
 // (PostgreSQL, ffmpeg, exiftool). LUMILIO_RESOURCES_DIR overrides it for local
-// development, where there is no .app bundle; otherwise it is derived from the
-// executable location, which on macOS is <App>.app/Contents/MacOS/<bin> →
-// ../Resources.
+// development, where there is no bundle; otherwise it is derived from the
+// executable location: on macOS <App>.app/Contents/MacOS/<bin> → ../Resources,
+// on Windows a flat portable layout <dir>\lumilio-photos.exe → <dir>\resources.
 func ResourcesDir() (string, error) {
 	if v := os.Getenv("LUMILIO_RESOURCES_DIR"); v != "" {
 		return v, nil
@@ -23,7 +23,18 @@ func ResourcesDir() (string, error) {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
+	if runtime.GOOS == "windows" {
+		return filepath.Join(filepath.Dir(exe), "resources"), nil
+	}
 	return filepath.Clean(filepath.Join(filepath.Dir(exe), "..", "Resources")), nil
+}
+
+// toolExe appends the Windows executable suffix where needed.
+func toolExe(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + ".exe"
+	}
+	return name
 }
 
 // pgBinDir returns the directory containing the PostgreSQL binaries for the
@@ -51,15 +62,15 @@ func resolveToolPath(candidate string) string {
 }
 
 func bundledExifTool(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "exiftool", "exiftool"))
+	return resolveToolPath(filepath.Join(resources, "exiftool", toolExe("exiftool")))
 }
 
 func bundledFFmpeg(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "ffmpeg", "ffmpeg"))
+	return resolveToolPath(filepath.Join(resources, "ffmpeg", toolExe("ffmpeg")))
 }
 
 func bundledFFprobe(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "ffmpeg", "ffprobe"))
+	return resolveToolPath(filepath.Join(resources, "ffmpeg", toolExe("ffprobe")))
 }
 
 // bundledVipsHome returns the bundle-local libvips prefix if dynamic modules
