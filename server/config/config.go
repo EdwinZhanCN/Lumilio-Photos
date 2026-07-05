@@ -141,7 +141,31 @@ type LumenConfig struct {
 	DiscoveryEnabled     bool   `toml:"discovery_enabled"`
 	DiscoveryMDNSEnabled bool   `toml:"discovery_mdns_enabled"`
 	DiscoveryHubURL      string `toml:"discovery_hub_url"`
-	ConnectionInsecure   bool   `toml:"connection_insecure"`
+	// DiscoveryStaticNodes pins Lumen node gRPC endpoints ("host:port") that
+	// are used without dynamic discovery. Backends are additive: mDNS, the
+	// gateway hub URL, and static nodes all run when configured.
+	DiscoveryStaticNodes []string `toml:"discovery_static_nodes"`
+}
+
+// StaticNodes returns the configured static node endpoints with blank entries
+// removed.
+func (c LumenConfig) StaticNodes() []string {
+	nodes := make([]string, 0, len(c.DiscoveryStaticNodes))
+	for _, node := range c.DiscoveryStaticNodes {
+		if node = strings.TrimSpace(node); node != "" {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes
+}
+
+// Enabled reports whether the Lumen ML integration is active: discovery is on
+// and at least one discovery backend (mDNS, a gateway hub URL, or static
+// nodes) is configured. When false the server boots with ML features disabled
+// instead of failing startup.
+func (c LumenConfig) Enabled() bool {
+	return c.DiscoveryEnabled &&
+		(c.DiscoveryMDNSEnabled || strings.TrimSpace(c.DiscoveryHubURL) != "" || len(c.StaticNodes()) > 0)
 }
 
 type tomlConfig struct {
@@ -261,7 +285,6 @@ func defaultAppConfigForEnvironment(environment string) AppConfig {
 		Lumen: LumenConfig{
 			DiscoveryEnabled:     true,
 			DiscoveryMDNSEnabled: lumenMDNS,
-			ConnectionInsecure:   true,
 		},
 	}
 }
@@ -485,8 +508,14 @@ func applyEnvOverrides(cfg *AppConfig, env envMap) {
 	if value := env.get("LUMEN_DISCOVERY_HUB_URL"); value != "" {
 		cfg.Lumen.DiscoveryHubURL = value
 	}
-	if value, ok := env.bool("LUMEN_CONNECTION_INSECURE"); ok {
-		cfg.Lumen.ConnectionInsecure = value
+	if value := env.get("LUMEN_DISCOVERY_STATIC_NODES"); value != "" {
+		var nodes []string
+		for _, part := range strings.Split(value, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				nodes = append(nodes, part)
+			}
+		}
+		cfg.Lumen.DiscoveryStaticNodes = nodes
 	}
 }
 

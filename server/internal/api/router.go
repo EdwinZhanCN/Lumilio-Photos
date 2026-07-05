@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/version"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -299,8 +301,9 @@ func NewRouter(
 		// Health check
 		v1.GET("/health", func(c *gin.Context) {
 			JSONOK(c, struct {
-				Status string `json:"status"`
-			}{Status: "ok"})
+				Status  string `json:"status"`
+				Version string `json:"version"`
+			}{Status: "ok", Version: version.Version})
 		})
 		v1.GET("/capabilities", authController.OptionalAuthMiddleware(), capabilitiesController.GetCapabilities)
 
