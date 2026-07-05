@@ -218,6 +218,23 @@ func TestWindowsPGListenAndHBAConf(t *testing.T) {
 	}
 }
 
+func TestPGConfPathValueNormalizesBackslashes(t *testing.T) {
+	// PostgreSQL's config parser treats backslashes as escapes; a raw Windows
+	// path in postgresql.conf mangles the value and FATALs the postmaster. The
+	// generated conf must use forward slashes (accepted on every platform).
+	got := pgConfPathValue(`C:\Users\张三\AppData\Local\Lumilio Photos\logs`)
+	if strings.Contains(got, `\`) {
+		t.Errorf("conf path value still contains backslashes: %q", got)
+	}
+	if want := "C:/Users/张三/AppData/Local/Lumilio Photos/logs"; got != want {
+		t.Errorf("pgConfPathValue = %q, want %q", got, want)
+	}
+	// Single quotes are still doubled for conf-string safety.
+	if q := pgConfPathValue("/tmp/it's"); q != "/tmp/it''s" {
+		t.Errorf("pgConfPathValue quote-escape = %q", q)
+	}
+}
+
 func TestDBHostPerGOOS(t *testing.T) {
 	p := &Paths{PGRun: "/short/run"}
 	if got := dbHostForGOOS("windows", p); got != "127.0.0.1" {
