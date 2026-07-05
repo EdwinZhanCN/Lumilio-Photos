@@ -32,9 +32,16 @@ New-Item -ItemType Directory -Force -Path $Work | Out-Null
 
 function Get-Verified([string]$Url, [string]$Sha, [string]$OutFile) {
     Write-Host "==> Downloading $Url"
-    Invoke-WebRequest -Uri $Url -OutFile $OutFile
+    # curl.exe (ships with Windows) instead of Invoke-WebRequest: SourceForge
+    # mirrors serve HTML interstitials to some non-browser user agents, which
+    # IWR hits but curl does not.
+    & curl.exe -fSL --retry 3 -o $OutFile $Url
+    if ($LASTEXITCODE -ne 0) { throw "download failed ($LASTEXITCODE): $Url" }
     $actual = (Get-FileHash -Algorithm SHA256 $OutFile).Hash.ToLowerInvariant()
     if ($actual -ne $Sha.ToLowerInvariant()) {
+        $size = (Get-Item $OutFile).Length
+        $head = -join ([char[]](Get-Content $OutFile -AsByteStream -TotalCount 120 | ForEach-Object { if ($_ -ge 32 -and $_ -le 126) { [char]$_ } else { '.' } }))
+        Write-Host "    got $size bytes; first bytes: $head"
         throw "checksum mismatch for ${Url}: expected $Sha, got $actual (version bumped upstream? update the pin or override via env)"
     }
 }
