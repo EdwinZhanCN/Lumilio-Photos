@@ -19,6 +19,9 @@ ARG VITE_PLUGIN_REGISTRY_URL=https://registry.lumilio.org
 ARG VITE_PLUGIN_CDN_ORIGIN=https://cdn.lumilio.org
 ARG VITE_STUDIO_PLUGIN_RUNTIME_ENABLED=true
 
+# Product version stamped into the bundle (import.meta.env.VITE_APP_VERSION).
+ARG VERSION=dev
+
 # Copy package.txt and pnpm-lock.yaml files
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 
@@ -31,6 +34,7 @@ COPY web/ ./
 # Create env file at build time.
 RUN printf '%s\n' \
     "VITE_API_URL=RUNTIME_API_URL" \
+    "VITE_APP_VERSION=${VERSION}" \
     "VITE_PLUGIN_REGISTRY_URL=${VITE_PLUGIN_REGISTRY_URL}" \
     "VITE_PLUGIN_CDN_ORIGIN=${VITE_PLUGIN_CDN_ORIGIN}" \
     "VITE_STUDIO_PLUGIN_RUNTIME_ENABLED=${VITE_STUDIO_PLUGIN_RUNTIME_ENABLED}" \
