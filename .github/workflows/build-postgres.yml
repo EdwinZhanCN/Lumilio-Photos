@@ -16,9 +16,20 @@ on:
       pgvector_version:
         description: pgvector version (git tag)
         default: "v0.8.0"
+  # Callable from the desktop release workflows so the PG artifacts are built
+  # fresh within the same run (artifact retention is short).
+  workflow_call:
+    inputs:
+      pg_version:
+        type: string
+        default: "17.5"
+      pgvector_version:
+        type: string
+        default: "v0.8.0"
 
 jobs:
   build:
+    name: macOS (${{ matrix.platform }})
     strategy:
       fail-fast: false
       matrix:
@@ -77,5 +88,59 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: postgres-${{ matrix.platform }}
+          path: postgres/
+          retention-days: 7
+
+  # Windows bundle: EDB publishes official relocatable binaries (zip), so we
+  # only compile pgvector against them (pg_trgm ships in the zip already).
+  build-windows:
+    name: Windows (windows-amd64)
+    runs-on: windows-2025
+    steps:
+      - name: Download PostgreSQL ${{ inputs.pg_version }} binaries (EDB)
+        shell: pwsh
+        run: |
+          $ver = "${{ inputs.pg_version }}-1"
+          $url = "https://get.enterprisedb.com/postgresql/postgresql-$ver-windows-x64-binaries.zip"
+          Invoke-WebRequest -Uri $url -OutFile pg.zip
+          Expand-Archive pg.zip -DestinationPath .
+          # Layout after extraction: .\pgsql\{bin,lib,share,include,...}
+
+      - name: Build pgvector ${{ inputs.pgvector_version }}
+        shell: pwsh
+        run: |
+          git clone --branch "${{ inputs.pgvector_version }}" --depth 1 https://github.com/pgvector/pgvector.git
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Compile pgvector (nmake)
+        shell: cmd
+        working-directory: pgvector
+        run: |
+          set "PGROOT=%GITHUB_WORKSPACE%\pgsql"
+          nmake /F Makefile.win
+          nmake /F Makefile.win install
+
+      - name: Stage bundle layout
+        shell: pwsh
+        run: |
+          $out = "postgres/17/windows-amd64"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item -Recurse pgsql/bin, pgsql/lib, pgsql/share $out
+          # Slim: keep only the binaries the supervisor uses (plus the DLLs
+          # they load, which live alongside them in bin).
+          $keep = @('postgres.exe','initdb.exe','pg_ctl.exe','pg_isready.exe',
+                    'createdb.exe','pg_dump.exe','pg_restore.exe','pg_config.exe')
+          Get-ChildItem "$out/bin" -File | Where-Object {
+              $_.Extension -eq '.exe' -and $keep -notcontains $_.Name
+          } | Remove-Item
+          # Sanity: pgvector + pg_trgm extensions present.
+          if (-not (Test-Path "$out/share/extension/vector.control")) { throw "pgvector missing" }
+          if (-not (Test-Path "$out/share/extension/pg_trgm.control")) { throw "pg_trgm missing" }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-windows-amd64
           path: postgres/
           retention-days: 7
