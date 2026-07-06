@@ -90,10 +90,7 @@ import type NavbarUploadQueue from "./components/NavbarUploadQueue.tsx";
 import type ProgressIndicator from "./components/ProgressIndicator.tsx";
 import type UnifiedUploadSection from "./components/UnifiedUploadSection.tsx";
 import type { useUploadContext } from "./hooks/useUpload.tsx";
-import type {
-  FileUploadProgress,
-  useUploadProcess,
-} from "./hooks/useUploadProcess.tsx";
+import type { FileUploadProgress, useUploadProcess } from "./hooks/useUploadProcess.tsx";
 import type {
   useBatchUploadMutation,
   useChunkedUploadMutation,

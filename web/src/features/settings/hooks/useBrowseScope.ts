@@ -8,8 +8,7 @@ type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
 export function useBrowseScope() {
   const { t } = useI18n();
-  const [browseRepositoryId, setBrowseRepositoryIdPreference] =
-    usePreference("browseRepositoryId");
+  const [browseRepositoryId, setBrowseRepositoryIdPreference] = usePreference("browseRepositoryId");
   const repositoriesQuery = useIndexingRepositories();
   const repositories = repositoriesQuery.repositories;
   const normalizedBrowseId = browseRepositoryId?.trim() ?? "";
@@ -22,9 +21,7 @@ export function useBrowseScope() {
   const setBrowseRepositoryId = useCallback(
     (repositoryId?: string | null) => {
       const normalized = repositoryId?.trim();
-      setBrowseRepositoryIdPreference(
-        normalized && normalized.length > 0 ? normalized : undefined,
-      );
+      setBrowseRepositoryIdPreference(normalized && normalized.length > 0 ? normalized : undefined);
     },
     [setBrowseRepositoryIdPreference],
   );
