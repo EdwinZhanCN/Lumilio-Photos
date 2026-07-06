@@ -101,12 +101,20 @@ photo management.
   expensive PG startup) and returns `ErrPortInUse`; `app.go` shows a localized
   "Port 6680 is already in use — quit that process and relaunch" dialog.
   Reproduced and verified both paths on macOS (busy → fail-fast, free → SPA 200).
-- ⏳ **Root-cause the Windows "starting" hang**: collect from the tester —
-  `%LocalAppData%\Lumilio Photos\postgres\17\logs\postgres.log` (postmaster
-  actually ready?) and `%LocalAppData%\Lumilio Photos\logs\` (in-process server
-  log — prime suspect: migrations / `CREATE EXTENSION vector`, since pgvector is
-  nmake-built separately). The black window that *persists* is likely the
-  postmaster itself, i.e. PG is up and a later stage is stuck.
+- ✅ **Windows "starting" hang — root-caused & fixed.** Symptom: `postgres.log`
+  shows the postmaster "ready to accept connections" yet the tray hangs at
+  "starting database" forever, no `app.log`, both postgres and the app process
+  alive. Cause: `pg_ctl start` spawns the long-lived postmaster as a grandchild
+  that inherits `pg_ctl`'s stdout/stderr; when those are an `os/exec` capture
+  pipe (`output()` → `bytes.Buffer`), the postmaster holds the pipe's write end
+  open for its whole life, so the stdout-copier never sees EOF and `cmd.Wait()`
+  (thus `Postgres.Start`) blocks indefinitely even though PG is up — `app.Run`
+  is never reached. (Unix is immune: `pg_ctl` `setsid`s and redirects the
+  postmaster's stdio to the logfile.) Fix: `Postgres.Start` now uses
+  `runToFile` — pg_ctl's output goes to a real `pg_ctl.log` file, so Go passes
+  the handle directly with no pipe/copier and `Run` returns when pg_ctl exits.
+  Verified by the full PG lifecycle smoke on macOS; needs a fresh Windows build
+  to confirm on the tester's VM.
 
 ### W1 — staged startup with progress, per-stage timeout & failure surfacing — **landed**
 Split `Supervisor.Start` (`desktop/supervisor/supervisor.go`) into named,

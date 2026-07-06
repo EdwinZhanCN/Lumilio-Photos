@@ -31,7 +31,7 @@ mkdir -p "$APPDIR"
 echo "==> Building Go binary (windows/amd64, CGo via mingw64)"
 # -H windowsgui: no console window for the tray app.
 ( cd "$DESKTOP_DIR" && CGO_ENABLED=1 \
-    go build -ldflags "-X server/internal/version.Version=$VERSION -H windowsgui" -o "$EXE" . )
+    go build -ldflags "-X server/internal/version.Version=$VERSION -X main.buildVersion=$VERSION -H windowsgui" -o "$EXE" . )
 
 echo "==> Collecting mingw64 DLL closure"
 collect_dlls() { # binary destdir
