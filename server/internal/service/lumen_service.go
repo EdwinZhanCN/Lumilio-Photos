@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/client"
 	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
@@ -92,6 +93,13 @@ func buildLumenSDKConfig(cfg config.LumenConfig) (*lumenconfig.Config, error) {
 	sdkCfg.Discovery.MDNSEnabled = cfg.DiscoveryMDNSEnabled
 	sdkCfg.Discovery.HubURL = strings.TrimSpace(cfg.DiscoveryHubURL)
 	sdkCfg.Discovery.StaticNodes = cfg.StaticNodes()
+	// Cap the initial "wait for node capabilities" at startup. The SDK default is
+	// 10s, which — when no Lumen node is present (the common desktop case) — stalls
+	// the whole server boot in "starting server" for 10s on every launch even
+	// though ML is optional and off the critical path. 3s is enough for a node
+	// that is actually on the LAN to answer; discovery keeps running afterwards, so
+	// a node that appears later is still picked up when ML workers run.
+	sdkCfg.Discovery.ConnectTimeout = 3 * time.Second
 	if err := sdkCfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid lumen sdk config: %w", err)
 	}
