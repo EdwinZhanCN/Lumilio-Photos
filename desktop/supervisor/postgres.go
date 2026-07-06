@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Postgres manages the lifecycle of the private, bundled PostgreSQL instance:
@@ -319,8 +321,18 @@ func (p *Postgres) isReady(ctx context.Context) error {
 }
 
 // CreateDB creates the application database if it does not already exist. It is
-// idempotent: an "already exists" failure from createdb is treated as success.
+// idempotent: existence is checked against the cluster catalog first (see
+// databaseExists) so it does not depend on parsing createdb's translated
+// "already exists" message — critical because the bundle ships no psql and a
+// localized Windows PostgreSQL could emit that message in the OS language,
+// which would otherwise fail every launch after the first.
 func (p *Postgres) CreateDB(ctx context.Context) error {
+	if exists, err := p.databaseExists(ctx); err != nil {
+		p.logf("createdb: existence check failed, falling back to createdb: %v", err)
+	} else if exists {
+		return nil
+	}
+
 	out, err := p.output(ctx, "createdb",
 		"-h", p.host,
 		"-p", p.port,
@@ -331,10 +343,35 @@ func (p *Postgres) CreateDB(ctx context.Context) error {
 		p.logf("createdb: created database %q", p.dbName)
 		return nil
 	}
+	// Locale-independent primary check above already handled the common case; the
+	// English match remains only as a best-effort fallback (LC_ALL=C output).
 	if strings.Contains(out, "already exists") {
 		return nil
 	}
 	return fmt.Errorf("createdb %q: %w (%s)", p.dbName, err, strings.TrimSpace(out))
+}
+
+// databaseExists reports whether the application database is present, by querying
+// the cluster catalog on the maintenance ("postgres") database. Loopback (Windows)
+// and the Unix socket both use trust auth, so no password is needed.
+func (p *Postgres) databaseExists(ctx context.Context) (bool, error) {
+	connCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s dbname=postgres sslmode=disable", p.host, p.port, p.user)
+	conn, err := pgx.Connect(connCtx, dsn)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close(connCtx)
+
+	var exists bool
+	if err := conn.QueryRow(connCtx,
+		"SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", p.dbName,
+	).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 // run executes a bundled binary, surfacing combined output on failure.
