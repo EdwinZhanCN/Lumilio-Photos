@@ -124,6 +124,26 @@ flag), covering exactly the three desktop-only concerns:
 - Reuse the discarded onboarding commit's assets only where they fit this
   narrowed scope; do **not** reintroduce account/MFA/repo-strategy steps.
 
+**Design constraints** (this native window; distinct from the web app's daisyUI):
+- **shadcn/ui, minimalist.** Restrained, content-first layout; no chrome for its
+  own sake. This window is small and single-purpose.
+- **lucide** for iconography.
+- **Apple HIG conformance (at minimum).** Native spacing/type rhythm, clear
+  primary action, generous margins, standard control affordances.
+- **Preserve window safe-area.** Respect the OS-reserved insets — the Wails
+  title-bar/traffic-light region on macOS and the drag region on a
+  frameless/translucent window; content must not underlap them. Use CSS
+  `env(safe-area-inset-*)` and a defined drag region rather than fixed offsets.
+- **Offline-first caveat (must resolve, do not ignore):** first run may have no
+  network, and a local-first app must render its own setup UI offline. A live
+  runtime CDN fetch for lucide/shadcn assets would break that and clash with the
+  bundle's CSP. Resolution: **vendor** the lucide distributable (and any
+  shadcn/ui build output) into `desktop/assets/` so the window is fully
+  self-contained; "CDN" here means the upstream source we pin/copy from, not a
+  runtime dependency. If shadcn/ui (React + build) is too heavy for one small
+  window, port its visual language onto the existing vanilla-JS onboarding
+  assets rather than pulling in a build toolchain.
+
 ### W3 — Lumen/ML hint (thin) + defer local hub control
 - Add the optional one-line ML hint + skip to the onboarding window (W2). No
   config or downloads.
