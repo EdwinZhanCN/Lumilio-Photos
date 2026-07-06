@@ -101,6 +101,42 @@ needs a paid Apple Developer account — a clean future upgrade to the same DMG.
 > so a cask install of an ad-hoc app hits the same Gatekeeper prompt as the DMG —
 > all maintenance, no UX benefit.
 
+## Build (Windows: portable + installer)
+
+The Windows build is native — CGo via MSYS2/MINGW64, not a cross-compile from
+macOS (libvips + libraw would need the whole imaging stack cross-built). Run
+inside an MSYS2 MINGW64 shell with the toolchain from the `windows` job in
+`.github/workflows/release-desktop.yml` (`mingw-w64-x86_64-{go,gcc,pkgconf,libvips,libraw,ntldd}`):
+
+```sh
+# stage resources first: desktop/resources/postgres/17/windows-amd64,
+# ffmpeg/exiftool via desktop/scripts/fetch-resources.ps1, and web/dist (vp build)
+LUMILIO_VERSION=1.2.3 desktop/scripts/build-windows.sh   # → desktop/build/windows/Lumilio Photos/
+```
+
+Two distribution forms, both from GitHub Releases:
+
+- **Installer (recommended)** — `Lumilio-Photos-<ver>-windows-amd64-setup.exe`,
+  built from `packaging/windows/lumilio.iss` with Inno Setup 6.1+
+  (`ISCC.exe /DAppVersion=1.2.3 desktop\packaging\windows\lumilio.iss`). It
+  installs per-user to `%LocalAppData%\Programs\Lumilio Photos` (no UAC), ensures
+  the Edge **WebView2 Runtime** the first-run onboarding window needs, adds Start
+  Menu shortcuts, and registers an uninstaller (stops the app + bundled Postgres,
+  optional data removal with a photo-library safety prompt). See
+  [packaging/windows/README.md](packaging/windows/README.md).
+- **Portable** — zip the `Lumilio Photos` directory; the user extracts and runs
+  `lumilio-photos.exe`. Requires the WebView2 Runtime to already be present for
+  the setup window.
+
+Both are unsigned, so SmartScreen shows **More info → Run anyway** on first run —
+the same posture as the unsigned macOS DMG. Authenticode (ideally EV) signing
+removes it, tracked in `release-cicd.md`.
+
+There is **no Windows uninstaller script to maintain by hand**: the installer
+generates it. macOS deliberately has no uninstaller — drag the app to the Trash
+(the app data under `~/Library/Application Support/Lumilio Photos` can be removed
+manually).
+
 ## Status / remaining work
 
 Implemented: supervisor (PG lifecycle, typed config/secrets generation,
