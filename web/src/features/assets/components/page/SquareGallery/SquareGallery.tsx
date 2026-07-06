@@ -79,7 +79,7 @@ const SquareGalleryItem = memo(
       >
         {mounted ? (
           <>
-            <figure className="h-full w-full rounded-[1.25rem]">
+            <figure className="h-full w-full rounded-[0.25rem]">
               {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
                 <StackedThumbnail
                   asset={asset}
@@ -89,7 +89,7 @@ const SquareGalleryItem = memo(
                   onClick={(event) => onItemClick(item, asset, event)}
                   isSelected={isSelected}
                   isSelectionMode={isSelectionMode}
-                  className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                  className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                 />
               ) : (
                 <MediaThumbnail
@@ -98,11 +98,11 @@ const SquareGalleryItem = memo(
                   onClick={(event) => onItemClick(item, asset, event)}
                   isSelected={isSelected}
                   isSelectionMode={isSelectionMode}
-                  className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                  className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                 />
               )}
               {caption && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-2xl bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-[0.25rem] bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
                   {caption}
                 </div>
               )}
@@ -121,7 +121,7 @@ const SquareGalleryItem = memo(
             )}
           </>
         ) : (
-          <div className="skeleton absolute inset-0 h-full w-full rounded-[1.25rem] bg-base-300" />
+          <div className="skeleton absolute inset-0 h-full w-full rounded-[0.25rem] bg-base-300" />
         )}
       </div>
     );

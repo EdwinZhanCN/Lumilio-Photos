@@ -26,6 +26,8 @@ interface TagPickerMenuProps {
   noResultsText: string;
   autoFocus?: boolean;
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  /** Disable the search input and all tag rows (e.g. when the section toggle is off). */
+  disabled?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -53,6 +55,7 @@ export default function TagPickerMenu({
   noResultsText,
   autoFocus = false,
   onKeyDown,
+  disabled = false,
   className = "",
   style,
 }: TagPickerMenuProps) {
@@ -70,6 +73,7 @@ export default function TagPickerMenu({
           value={query}
           placeholder={placeholder}
           className="input input-xs w-full"
+          disabled={disabled}
           onChange={(e) => onQueryChange(e.target.value)}
           onKeyDown={onKeyDown}
         />
@@ -81,6 +85,7 @@ export default function TagPickerMenu({
             <button
               type="button"
               className="flex items-center gap-2"
+              disabled={disabled}
               onClick={() => onToggleChecked(item)}
             >
               <span className="flex items-center justify-center w-4 h-4 shrink-0 rounded bg-primary text-primary-content">
@@ -102,6 +107,7 @@ export default function TagPickerMenu({
             <button
               type="button"
               className="flex items-center gap-2"
+              disabled={disabled}
               onClick={() => onSelectSuggestion(item)}
             >
               <span className="w-4 h-4 shrink-0 rounded border border-base-content/30" />
