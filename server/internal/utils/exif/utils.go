@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"server/internal/utils/sysproc"
 	"time"
 )
 
@@ -14,6 +15,7 @@ func IsExifToolAvailable() bool {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-ver")
+	sysproc.HideConsole(cmd)
 	return cmd.Run() == nil
 }
 
@@ -23,6 +25,7 @@ func GetExifToolVersion() (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-ver")
+	sysproc.HideConsole(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -53,12 +56,14 @@ func checkExifToolSupport() error {
 
 	// Test JSON output support
 	cmd := exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-j", "-ver")
+	sysproc.HideConsole(cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("exiftool does not support JSON output: %w", err)
 	}
 
 	// Test stdin reading support
 	cmd = exec.CommandContext(ctx, DefaultConfig().ExifToolPath, "-j", "-")
+	sysproc.HideConsole(cmd)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("exiftool stdin pipe not available: %w", err)

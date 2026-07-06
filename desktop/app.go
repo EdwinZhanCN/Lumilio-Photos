@@ -74,6 +74,13 @@ func (d *desktopApp) run() error {
 		Description: "Local-first photo management",
 		// Accessory = menubar app: no dock icon, no default window.
 		Mac: application.MacOptions{ActivationPolicy: application.ActivationPolicyAccessory},
+		// This is a tray app; closing the first-run onboarding window (the only
+		// window it ever creates) must NOT quit it — otherwise the app exits after
+		// setup and before the runtime starts. On Windows/Linux the auto-quit is on
+		// by default, so disable it explicitly (macOS already defaults off). Quit
+		// happens only through the tray's "Quit" item.
+		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
+		Linux:   application.LinuxOptions{DisableQuitOnLastWindowClosed: true},
 		// The asset handler serves the first-run onboarding window (and its JSON
 		// API). It is only ever reached when that window is created.
 		Assets:     application.AssetOptions{Handler: d.onboardingHandler()},

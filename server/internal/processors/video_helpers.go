@@ -18,6 +18,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
+	"server/internal/utils/sysproc"
 )
 
 // VideoInfo holds video metadata.
@@ -169,6 +170,7 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 
 	args := buildTranscodeArgs(inputPath, outputPath, scaleFilter, approxWidth, approxHeight, cfg)
 	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), args...)
+	sysproc.HideConsole(cmd)
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ffmpeg transcode failed: %w", err)
@@ -303,6 +305,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 	)
 
 	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), args...)
+	sysproc.HideConsole(cmd)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -351,6 +354,7 @@ func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
 		"-select_streams", "v:0",
 		videoPath,
 	)
+	sysproc.HideConsole(cmd)
 
 	output, err := cmd.Output()
 	if err != nil {
