@@ -977,6 +977,7 @@ const TagSection = memo(function TagSection({
         noResultsText={t("assets.filterTool.tagSection.no_results")}
         checked={checked}
         suggestions={active ? suggestions : []}
+        disabled={!active}
         onToggleChecked={(item) => onValueChange(value.filter((name) => name !== item.name))}
         onSelectSuggestion={(item) => onValueChange([...value, item.name])}
         className="max-h-52"

@@ -107,6 +107,7 @@ const LikedContent = () => {
             viewKey="collections:liked"
             bulkActions={bulkActions}
             hiddenBulkActions={HIDDEN_LIKED_BULK_ACTIONS}
+            lockedFilterFields={["liked"]}
           />
         </WorkerProvider>
       </AssetsProvider>

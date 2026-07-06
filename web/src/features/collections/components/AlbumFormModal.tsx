@@ -156,6 +156,7 @@ export function AlbumFormModal({
       open={open}
       onClose={close}
       size="md"
+      className={isChoosingCover ? "h-[85vh]" : ""}
       dismissable={!isChoosingCover && !isSubmitting}
       icon={isEdit ? <FolderPen size={22} /> : <FolderPlus size={22} />}
       title={
