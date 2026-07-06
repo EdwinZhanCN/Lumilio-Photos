@@ -91,7 +91,17 @@ photo management.
 - ✅ C-locale for PG subprocess messages (no mojibake).
 - ✅ `postgres.log` tail folded into `pg_ctl start` errors.
 - ✅ `CREATE_NO_WINDOW` for all spawned console tools.
-- ⏳ **Root-cause the "starting" hang**: collect from the tester —
+- ✅ **Port-conflict pre-flight**: a foreign process on `localhost:6680` (a stale
+  `go run ./cmd` dev server, a prior instance, a container) fooled `waitForServer`
+  — the health probe accepts any status `< 500`, so a squatter's `404` reads as
+  "ready" at ~T+0 while the real in-process server (binding `:6680` only after the
+  ~10s Lumen mDNS timeout) then fails to bind and tears itself down (DB pool
+  closed). The browser reaches the squatter → 404 on a fresh library. Fixed:
+  `Supervisor.checkPortAvailable` binds `:6680` during *preparing* (before the
+  expensive PG startup) and returns `ErrPortInUse`; `app.go` shows a localized
+  "Port 6680 is already in use — quit that process and relaunch" dialog.
+  Reproduced and verified both paths on macOS (busy → fail-fast, free → SPA 200).
+- ⏳ **Root-cause the Windows "starting" hang**: collect from the tester —
   `%LocalAppData%\Lumilio Photos\postgres\17\logs\postgres.log` (postmaster
   actually ready?) and `%LocalAppData%\Lumilio Photos\logs\` (in-process server
   log — prime suspect: migrations / `CREATE EXTENSION vector`, since pgvector is

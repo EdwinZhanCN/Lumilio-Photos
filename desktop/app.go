@@ -156,8 +156,11 @@ func (d *desktopApp) refreshMenu() {
 func (d *desktopApp) startRuntime() {
 	if err := d.sup.Start(d.ctx); err != nil {
 		title := d.tr("failTitle")
-		if errors.Is(err, supervisor.ErrAlreadyRunning) {
+		switch {
+		case errors.Is(err, supervisor.ErrAlreadyRunning):
 			title = d.tr("alreadyTitle")
+		case errors.Is(err, supervisor.ErrPortInUse):
+			title = d.tr("portTitle")
 		}
 		log.Printf("desktop runtime failed to start: %v", err)
 		d.app.Dialog.Error().SetTitle(title).SetMessage(d.failureMessage(err)).Show()
@@ -180,6 +183,15 @@ func (d *desktopApp) startRuntime() {
 // where to find the logs.
 func (d *desktopApp) failureMessage(err error) string {
 	var b strings.Builder
+	// A port conflict has a clear, actionable explanation; lead with it instead of
+	// the raw bind error.
+	if errors.Is(err, supervisor.ErrPortInUse) {
+		b.WriteString(d.tr("portHint"))
+		if logDir := d.sup.LogDir(); logDir != "" {
+			fmt.Fprintf(&b, "\n\n%s", fmt.Sprintf(d.tr("logHint"), logDir))
+		}
+		return b.String()
+	}
 	if stage, ok := d.lastStage.Load().(string); ok && stage != "" {
 		fmt.Fprintf(&b, "%s\n\n", fmt.Sprintf(d.tr("failStage"), d.trStage(stage)))
 	}
