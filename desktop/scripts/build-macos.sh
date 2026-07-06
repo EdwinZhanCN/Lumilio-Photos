@@ -65,7 +65,7 @@ echo "==> Building Go binary ($PLATFORM)"
 # macOS the rpath must go through the external linker (clang) — the Go linker's
 # own -r flag is ELF-only and rejects the @executable_path token.
 ( cd "$DESKTOP_DIR" && CGO_ENABLED=1 GOOS=darwin GOARCH="$GOARCH" \
-    go build -ldflags "-X server/internal/version.Version=$VERSION -extldflags=-Wl,-rpath,@executable_path/../Frameworks" -o "$EXE" . )
+    go build -ldflags "-X server/internal/version.Version=$VERSION -X main.buildVersion=$VERSION -extldflags=-Wl,-rpath,@executable_path/../Frameworks" -o "$EXE" . )
 
 echo "==> Writing Info.plist"
 cat > "$APP/Contents/Info.plist" <<PLIST

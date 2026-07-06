@@ -1,0 +1,76 @@
+package main
+
+import "desktop/supervisor"
+
+// nativeStrings localizes the desktop-native chrome (tray menu, startup status,
+// failure dialogs) into the two supported languages. It is intentionally tiny and
+// independent of the in-browser app translations the web BootstrapWizard owns.
+var nativeStrings = map[string]map[string]string{
+	"en": {
+		"open":         "Open Lumilio Photos",
+		"quit":         "Quit Lumilio Photos",
+		"starting":     "Starting…",
+		"setup":        "Setting up…",
+		"running":      "Running — %s",
+		"failTitle":    "Lumilio Photos failed to start",
+		"alreadyTitle": "Lumilio Photos is already running",
+		"failStage":    "Failed while: %s",
+		"logHint":      "Logs: %s",
+	},
+	"zh": {
+		"open":         "打开 Lumilio Photos",
+		"quit":         "退出 Lumilio Photos",
+		"starting":     "正在启动…",
+		"setup":        "正在设置…",
+		"running":      "运行中 — %s",
+		"failTitle":    "Lumilio Photos 启动失败",
+		"alreadyTitle": "Lumilio Photos 已在运行",
+		"failStage":    "失败于：%s",
+		"logHint":      "日志目录：%s",
+	},
+}
+
+// stageStrings localizes each supervisor startup stage.
+var stageStrings = map[string]map[string]string{
+	"en": {
+		supervisor.StagePreparing:      "Preparing…",
+		supervisor.StageInitDB:         "Initializing database…",
+		supervisor.StageStartingDB:     "Starting database…",
+		supervisor.StageStartingServer: "Starting server…",
+		supervisor.StageReady:          "Ready",
+	},
+	"zh": {
+		supervisor.StagePreparing:      "正在准备…",
+		supervisor.StageInitDB:         "正在初始化数据库…",
+		supervisor.StageStartingDB:     "正在启动数据库…",
+		supervisor.StageStartingServer: "正在启动服务…",
+		supervisor.StageReady:          "就绪",
+	},
+}
+
+// tr looks up a native-chrome string in the current language, falling back to
+// English and then the key itself.
+func (d *desktopApp) tr(key string) string {
+	if m, ok := nativeStrings[d.lang]; ok {
+		if s, ok := m[key]; ok {
+			return s
+		}
+	}
+	if s, ok := nativeStrings["en"][key]; ok {
+		return s
+	}
+	return key
+}
+
+// trStage localizes a supervisor stage key.
+func (d *desktopApp) trStage(stage string) string {
+	if m, ok := stageStrings[d.lang]; ok {
+		if s, ok := m[stage]; ok {
+			return s
+		}
+	}
+	if s, ok := stageStrings["en"][stage]; ok {
+		return s
+	}
+	return stage
+}
