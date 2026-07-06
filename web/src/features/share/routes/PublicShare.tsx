@@ -43,7 +43,10 @@ export function PublicShare(): ReactNode {
       triggerBlobDownload(blob, filename);
     } catch (error) {
       console.error("Failed to download share:", error);
-      showMessage("error", t("share.public.header.downloadError", "Download failed. Please try again."));
+      showMessage(
+        "error",
+        t("share.public.header.downloadError", "Download failed. Please try again."),
+      );
     } finally {
       setIsDownloading(false);
     }

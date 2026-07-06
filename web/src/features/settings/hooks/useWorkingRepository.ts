@@ -56,8 +56,7 @@ export function useWorkingRepository() {
       return;
     }
 
-    const primary =
-      repositories.find((repository) => repository.isPrimary) ?? repositories[0];
+    const primary = repositories.find((repository) => repository.isPrimary) ?? repositories[0];
     if (primary && normalizedWorkingRepositoryId !== primary.id) {
       setWorkingRepositoryId(primary.id);
     }

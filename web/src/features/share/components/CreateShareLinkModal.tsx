@@ -134,7 +134,9 @@ export function CreateShareLinkModal({
       onClose={close}
       size="sm"
       icon={<Share2 size={20} />}
-      title={created ? t("share.create.createdTitle", "Link created") : t("share.create.title", "Share")}
+      title={
+        created ? t("share.create.createdTitle", "Link created") : t("share.create.title", "Share")
+      }
       footer={footer}
     >
       {created && created.token ? (
@@ -192,7 +194,10 @@ export function CreateShareLinkModal({
                   className={`btn join-item btn-sm ${expiresInDays === days ? "btn-primary" : "btn-outline"}`}
                   onClick={() => setExpiresInDays(days)}
                 >
-                  {t("share.create.fields.expiry.days", { count: days, defaultValue: "{{count}} days" })}
+                  {t("share.create.fields.expiry.days", {
+                    count: days,
+                    defaultValue: "{{count}} days",
+                  })}
                 </button>
               ))}
             </div>

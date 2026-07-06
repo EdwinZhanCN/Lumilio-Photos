@@ -1,6 +1,8 @@
 package supervisor
 
 import (
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,31 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 )
+
+func TestCheckPortAvailable(t *testing.T) {
+	s := New(Options{Logf: func(string, ...any) {}})
+
+	// Occupy the port the same way the server binds it (all interfaces), matching
+	// the real conflict the pre-flight guards against.
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		t.Fatalf("split host port: %v", err)
+	}
+
+	if err := s.checkPortAvailable(port); !errors.Is(err, ErrPortInUse) {
+		t.Errorf("occupied port: got %v, want ErrPortInUse", err)
+	}
+
+	// Once freed, the same port is available again.
+	_ = ln.Close()
+	if err := s.checkPortAvailable(port); err != nil {
+		t.Errorf("freed port: got %v, want nil", err)
+	}
+}
 
 // The desktop supervisor delegates runtime config construction to server/config.
 // The typed config is load-bearing; the generated TOML is only a debug copy.

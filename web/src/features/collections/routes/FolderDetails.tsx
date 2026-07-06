@@ -69,7 +69,8 @@ export default function FolderDetails() {
   }
 
   const basePath = `/collections/folders/${folderKey}`;
-  const title = summary?.display_name || identity.folderPath || t("collections.folders.root", "Root");
+  const title =
+    summary?.display_name || identity.folderPath || t("collections.folders.root", "Root");
   const isSummaryLoading = summaryQuery.isPending && !summary;
   const dateRangeLabel = formatDateRange(summary?.date_start, summary?.date_end);
 

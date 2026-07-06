@@ -17,6 +17,20 @@ type DesktopSettings struct {
 	// StoragePath is the user-chosen media library location. Empty means "use
 	// the default" (<appdata>/storage), resolved at startup.
 	StoragePath string `json:"storage_path,omitempty"`
+
+	// OnboardingCompleted gates the first-run native onboarding window. Once the
+	// user finishes onboarding (accepts the license, picks a storage location) it
+	// is set true and the window is never shown again.
+	OnboardingCompleted bool `json:"onboarding_completed,omitempty"`
+
+	// TOSAcceptedVersion records which version of the terms/open-source-license
+	// notice the user accepted, so a future revision can re-prompt.
+	TOSAcceptedVersion string `json:"tos_accepted_version,omitempty"`
+
+	// Language is the desktop-native UI language ("en" or "zh") for tray/dialog/
+	// onboarding chrome only. It is independent of the in-browser app language the
+	// web BootstrapWizard owns. Empty means "follow the OS locale".
+	Language string `json:"language,omitempty"`
 }
 
 // LoadSettings reads desktop-settings.json. A missing file yields zero-value

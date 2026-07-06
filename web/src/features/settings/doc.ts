@@ -121,11 +121,7 @@ import type {
   useValidateLLMSettings,
 } from "./hooks/useSystemSettings.ts";
 import type { useWorkingRepository } from "./hooks/useWorkingRepository.ts";
-import type {
-  useDebouncedPreference,
-  usePreference,
-  usePreferencesStore,
-} from "./preferences.ts";
+import type { useDebouncedPreference, usePreference, usePreferencesStore } from "./preferences.ts";
 import type { PREFERENCES_STORAGE_KEY } from "./settings.registry.ts";
 
 export {};
