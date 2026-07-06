@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -48,6 +49,12 @@ var ErrAlreadyRunning = errors.New("Lumilio Photos is already running")
 // ErrStorageUnreachable indicates the persisted media library location could not
 // be reached (e.g. an external drive is unmounted).
 var ErrStorageUnreachable = errors.New("configured storage location is unreachable")
+
+// ErrPortInUse indicates the fixed app port is already bound by another process
+// (a stale server, a dev instance, or an unrelated app). Without this pre-flight
+// the in-process server would fail to bind after a full PG startup, and the
+// browser would silently reach the foreign process instead — showing a 404.
+var ErrPortInUse = errors.New("the app port is already in use")
 
 // Supervisor owns the desktop runtime lifecycle. Start it once on app launch and
 // Stop it on quit.
@@ -189,6 +196,14 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 	s.lock = lock
+
+	// Fail fast (before the expensive PG startup) if the app port is taken. The
+	// single-instance lock already prevents a second desktop instance, so a busy
+	// port means a foreign process — otherwise the in-process server would boot,
+	// fail to bind, tear itself down, and leave the browser reaching the squatter.
+	if err := s.checkPortAvailable(serverPort); err != nil {
+		return err
+	}
 
 	resources, err := ResourcesDir()
 	if err != nil {
@@ -377,6 +392,17 @@ func (s *Supervisor) SetStoragePath(path string) error {
 	}
 	settings.StoragePath = path
 	return s.SaveSettings(settings)
+}
+
+// checkPortAvailable verifies the app port can be bound, matching the address
+// the in-process server listens on (all interfaces). It returns ErrPortInUse
+// (wrapping the bind error) when something else already holds the port.
+func (s *Supervisor) checkPortAvailable(port string) error {
+	ln, err := net.Listen("tcp", net.JoinHostPort("", port))
+	if err != nil {
+		return fmt.Errorf("%w (port %s): %v", ErrPortInUse, port, err)
+	}
+	return ln.Close()
 }
 
 // waitForServer polls the health endpoint until the server responds or fails.
