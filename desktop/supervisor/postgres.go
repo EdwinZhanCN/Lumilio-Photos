@@ -214,7 +214,17 @@ func (p *Postgres) statusCode(ctx context.Context) int {
 func (p *Postgres) Start(ctx context.Context) error {
 	p.logf("postgres: starting")
 	logPath := filepath.Join(p.logsDir, "postgres.log")
-	out, err := p.output(ctx, "pg_ctl",
+	// pg_ctl start spawns the long-lived postmaster as a grandchild. On Windows
+	// that grandchild inherits pg_ctl's stdout/stderr handles; if those are an
+	// os/exec capture pipe, the pipe never reaches EOF while the postmaster lives,
+	// so the stdout-copier — and therefore cmd.Wait / Start — blocks forever even
+	// though the server is already accepting connections (the tray hangs at
+	// "starting database"). Direct pg_ctl's own output to a real file instead: Go
+	// then passes the file handle directly (no pipe, no copier goroutine), so Run
+	// returns as soon as pg_ctl itself exits, and the postmaster inheriting the
+	// file handle is harmless.
+	ctlLogPath := filepath.Join(p.logsDir, "pg_ctl.log")
+	err := p.runToFile(ctx, ctlLogPath, "pg_ctl",
 		"start",
 		"-D", p.dataDir,
 		"-l", logPath,
@@ -226,9 +236,9 @@ func (p *Postgres) Start(ctx context.Context) error {
 	}
 	// pg_ctl's own failure message is only "could not start server / Examine
 	// the log output"; the actual postmaster error lives in postgres.log. Fold
-	// its tail into the error so the real cause is visible without hunting for
+	// both tails into the error so the real cause is visible without hunting for
 	// the log file (which the setup UI cannot open).
-	msg := strings.TrimSpace(out)
+	msg := strings.TrimSpace(tailFile(ctlLogPath, 4096))
 	if tail := tailFile(logPath, 4096); tail != "" {
 		msg = strings.TrimSpace(msg + "\n--- postgres.log ---\n" + tail)
 	}
@@ -334,6 +344,26 @@ func (p *Postgres) run(ctx context.Context, name string, args ...string) error {
 		return fmt.Errorf("%s: %w\n%s", name, err, strings.TrimSpace(out))
 	}
 	return nil
+}
+
+// runToFile executes a bundled binary with its stdout/stderr directed to a real
+// file at outPath rather than a captured pipe. This is required for commands that
+// leave a long-lived daemon behind (pg_ctl start): with a pipe, the daemon's
+// inherited write handle would keep the pipe open and block cmd.Wait forever on
+// Windows. With a plain file, Wait only waits for the direct child to exit.
+func (p *Postgres) runToFile(ctx context.Context, outPath, name string, args ...string) error {
+	f, err := os.Create(outPath)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", outPath, err)
+	}
+	defer f.Close()
+
+	cmd := exec.CommandContext(ctx, p.bin(name), args...)
+	hideConsole(cmd)
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "LC_MESSAGES=C", "LANG=C")
+	cmd.Stdout = f
+	cmd.Stderr = f
+	return cmd.Run()
 }
 
 func (p *Postgres) output(ctx context.Context, name string, args ...string) (string, error) {
