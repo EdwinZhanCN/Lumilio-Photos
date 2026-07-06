@@ -168,10 +168,23 @@ jobs:
                   Compress-Archive -Path "desktop/build/windows/Lumilio Photos" `
                       -DestinationPath "desktop/build/Lumilio-Photos-${{ github.ref_name }}-windows-amd64.zip"
 
+            - name: Build installer (Inno Setup)
+              shell: pwsh
+              env:
+                  LUMILIO_TAG: ${{ github.ref_name }}
+              run: |
+                  $ver = "${env:LUMILIO_TAG}".TrimStart('v')
+                  choco install innosetup --no-progress -y
+                  $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+                  & "$iscc" "/DAppVersion=$ver" "desktop/packaging/windows/lumilio.iss"
+                  if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
+
             - uses: actions/upload-artifact@v7
               with:
                   name: windows-amd64
-                  path: desktop/build/Lumilio-Photos-*-windows-amd64.zip
+                  path: |
+                      desktop/build/Lumilio-Photos-*-windows-amd64.zip
+                      desktop/build/Lumilio-Photos-*-windows-amd64-setup.exe
                   if-no-files-found: error
 
     release:
@@ -195,6 +208,7 @@ jobs:
                   fail_on_unmatched_files: true
                   files: |
                       dist/Lumilio-Photos-*.dmg
+                      dist/Lumilio-Photos-*-windows-amd64-setup.exe
                       dist/Lumilio-Photos-*.zip
                   body: |
                       ## macOS Desktop (Apple Silicon)
@@ -203,10 +217,15 @@ jobs:
                       2. First launch: the app is ad-hoc signed (not notarized), so approve it once via **System Settings → Privacy & Security → Open Anyway**.
                       3. Allow the **local network** prompt so Lumen ML servers can be discovered over mDNS (optional — the app works without ML).
 
-                      ## Windows Desktop (x64, portable)
+                      ## Windows Desktop (x64)
 
-                      1. Download `Lumilio-Photos-${{ github.ref_name }}-windows-amd64.zip` and extract it anywhere.
-                      2. Run `Lumilio Photos\lumilio-photos.exe`. SmartScreen may warn on the unsigned binary — choose **More info → Run anyway**.
-                      3. Allow the Windows Firewall prompt if you want LAN Lumen ML discovery (optional).
+                      **Installer (recommended):** download `Lumilio-Photos-${{ github.ref_name }}-windows-amd64-setup.exe` and run it.
+                      It installs per-user (no admin), ensures the Edge WebView2 Runtime, and adds Start Menu + uninstaller entries.
+                      SmartScreen may warn on the unsigned installer — choose **More info → Run anyway**.
+
+                      **Portable (zip):** download `Lumilio-Photos-${{ github.ref_name }}-windows-amd64.zip`, extract anywhere, and run `Lumilio Photos\lumilio-photos.exe`.
+                      Requires the Edge WebView2 Runtime to be present for the first-run setup window.
+
+                      On first launch, allow the Windows Firewall prompt if you want LAN Lumen ML discovery (optional).
 
                       Linux/Docker images: `ghcr.io/edwinzhancn/lumilio-{server,web,db}` — see `docker-compose.release.yml`.
