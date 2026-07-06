@@ -39,7 +39,10 @@ export function PublicShareHeader({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-content/60">
           <span className="inline-flex items-center gap-1">
             <ImageIcon className="size-3.5" />
-            {t("share.public.header.assetCount", { count: assetCount, defaultValue: "{{count}} items" })}
+            {t("share.public.header.assetCount", {
+              count: assetCount,
+              defaultValue: "{{count}} items",
+            })}
           </span>
           {expiryLabel && (
             <>

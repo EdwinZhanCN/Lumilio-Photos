@@ -17,7 +17,10 @@ import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
 } from "@/features/assets/components/shared/bulkActions";
-import { CreateShareLinkModal, type ShareSourceKind } from "@/features/share/components/CreateShareLinkModal";
+import {
+  CreateShareLinkModal,
+  type ShareSourceKind,
+} from "@/features/share/components/CreateShareLinkModal";
 import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
 
 type RebuildAlbumBioClipResponse = components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
