@@ -16,6 +16,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/utils/exif"
+	"server/internal/utils/sysproc"
 )
 
 // AudioInfo holds audio metadata.
@@ -118,6 +119,7 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 		"-y",
 		outputPath,
 	)
+	sysproc.HideConsole(cmd)
 
 	if audioInfo.Channels == 1 {
 		cmd.Args[len(cmd.Args)-4] = "1" // keep mono if source is mono
@@ -166,6 +168,7 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 		"-y",
 		outputPath,
 	)
+	sysproc.HideConsole(cmd)
 
 	if err := cmd.Run(); err != nil {
 		return nil // optional: ignore errors
@@ -195,6 +198,7 @@ func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
 		"-select_streams", "a:0",
 		audioPath,
 	)
+	sysproc.HideConsole(cmd)
 
 	output, err := cmd.Output()
 	if err != nil {

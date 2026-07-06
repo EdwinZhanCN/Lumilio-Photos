@@ -9,6 +9,7 @@ import (
 	"io"
 	"os/exec"
 	"server/internal/db/dbtypes"
+	"server/internal/utils/sysproc"
 	"sync"
 	"time"
 )
@@ -223,6 +224,7 @@ func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader,
 
 	// Create and configure command
 	cmd := exec.CommandContext(ctxWithTimeout, e.config.ExifToolPath, args...)
+	sysproc.HideConsole(cmd)
 
 	// Set up pipes
 	stdin, stdout, stderr, err := e.setupPipes(cmd)
