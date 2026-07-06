@@ -10,7 +10,10 @@ import { usePersonDetails } from "../hooks/usePeople";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import PersonRenameModal from "../components/PersonRenameModal";
-import { CreateShareLinkModal, type ShareSourceKind } from "@/features/share/components/CreateShareLinkModal";
+import {
+  CreateShareLinkModal,
+  type ShareSourceKind,
+} from "@/features/share/components/CreateShareLinkModal";
 import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
 import type {
   AssetsBulkActionContext,

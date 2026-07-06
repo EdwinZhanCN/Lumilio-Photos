@@ -67,7 +67,7 @@ function AppShellLayout(): React.ReactNode {
             aria-label={t("sidebar.closeMenu", { defaultValue: "Close menu" })}
             className="drawer-overlay"
           />
-          <div className="min-h-full bg-base-200 shadow-lg">
+          <div className="h-full overflow-hidden bg-base-200 shadow-lg">
             <SideBar />
           </div>
         </div>

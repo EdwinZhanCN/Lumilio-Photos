@@ -162,112 +162,112 @@ export function DevelopPanel({
           </div>
         </div>
 
-      {/* Scrollable groups */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3">
-        {/* Geometry */}
-        <div className="border-b border-base-300">
-          <SectionHeader
-            icon={Crop}
-            title={t("studio.develop.geometry", { defaultValue: "Geometry" })}
-            open={openMap.geometry}
-            modified={isGeometryModified(adjustments)}
-            onToggle={() => toggle("geometry")}
-          />
-          {openMap.geometry && (
-            <div className="pb-3.5 pt-1">
-              <div className="mb-2 flex gap-1.5">
-                <GeoButton
-                  icon={RotateCcw}
-                  label="Rotate left"
-                  disabled={disabled}
-                  onClick={() =>
-                    onGeometryChange("rotation", (adjustments.rotation - 90 + 360) % 360)
-                  }
-                />
-                <GeoButton
-                  icon={RotateCw}
-                  label="Rotate right"
-                  disabled={disabled}
-                  onClick={() => onGeometryChange("rotation", (adjustments.rotation + 90) % 360)}
-                />
-                <GeoButton
-                  icon={FlipHorizontal2}
-                  label="Flip horizontal"
-                  active={adjustments.flipHorizontal}
-                  disabled={disabled}
-                  onClick={() => onGeometryChange("flipHorizontal", !adjustments.flipHorizontal)}
-                />
-                <GeoButton
-                  icon={FlipVertical2}
-                  label="Flip vertical"
-                  active={adjustments.flipVertical}
-                  disabled={disabled}
-                  onClick={() => onGeometryChange("flipVertical", !adjustments.flipVertical)}
-                />
-              </div>
-              <div className="flex items-center justify-between px-1 text-[11px] text-base-content/45">
-                <span>{t("studio.develop.rotation", { defaultValue: "Rotation" })}</span>
-                <span className="font-mono tabular-nums">{adjustments.rotation}°</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Light / Color / Detail */}
-        {DEVELOP_GROUPS.map((group) => (
-          <div key={group.id} className="border-b border-base-300">
+        {/* Scrollable groups */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3">
+          {/* Geometry */}
+          <div className="border-b border-base-300">
             <SectionHeader
-              icon={group.icon}
-              title={t(groupI18nKeys[group.id], {
-                defaultValue: group.title,
-              })}
-              open={openMap[group.id]}
-              modified={isGroupModified(group, adjustments)}
-              onToggle={() => toggle(group.id)}
+              icon={Crop}
+              title={t("studio.develop.geometry", { defaultValue: "Geometry" })}
+              open={openMap.geometry}
+              modified={isGeometryModified(adjustments)}
+              onToggle={() => toggle("geometry")}
             />
-            {openMap[group.id] && (
-              <div className="pb-3 pl-1 pr-1">
-                {group.controls.map((control) => (
-                  <SliderRow
-                    key={control.key}
-                    control={control}
-                    value={adjustments[control.key]}
-                    defaultValue={DEFAULT_STUDIO_ADJUSTMENTS[control.key]}
+            {openMap.geometry && (
+              <div className="pb-3.5 pt-1">
+                <div className="mb-2 flex gap-1.5">
+                  <GeoButton
+                    icon={RotateCcw}
+                    label="Rotate left"
                     disabled={disabled}
-                    onChange={(v) => onAdjustmentChange(control.key, v)}
+                    onClick={() =>
+                      onGeometryChange("rotation", (adjustments.rotation - 90 + 360) % 360)
+                    }
                   />
-                ))}
+                  <GeoButton
+                    icon={RotateCw}
+                    label="Rotate right"
+                    disabled={disabled}
+                    onClick={() => onGeometryChange("rotation", (adjustments.rotation + 90) % 360)}
+                  />
+                  <GeoButton
+                    icon={FlipHorizontal2}
+                    label="Flip horizontal"
+                    active={adjustments.flipHorizontal}
+                    disabled={disabled}
+                    onClick={() => onGeometryChange("flipHorizontal", !adjustments.flipHorizontal)}
+                  />
+                  <GeoButton
+                    icon={FlipVertical2}
+                    label="Flip vertical"
+                    active={adjustments.flipVertical}
+                    disabled={disabled}
+                    onClick={() => onGeometryChange("flipVertical", !adjustments.flipVertical)}
+                  />
+                </div>
+                <div className="flex items-center justify-between px-1 text-[11px] text-base-content/45">
+                  <span>{t("studio.develop.rotation", { defaultValue: "Rotation" })}</span>
+                  <span className="font-mono tabular-nums">{adjustments.rotation}°</span>
+                </div>
               </div>
             )}
           </div>
-        ))}
 
-        {/* Tools (Border) */}
-        <BorderToolSection
-          open={openMap.tools}
-          onToggle={() => toggle("tools")}
-          value={borderParams}
-          onChange={onBorderParamsChange}
-          onApply={onApplyBorder}
-          onClear={onClearBorder}
-          isApplying={isApplyingBorder}
-          hasResult={hasBorderResult}
-          disabled={disabled}
-          exifSummary={borderExifSummary}
-        />
+          {/* Light / Color / Detail */}
+          {DEVELOP_GROUPS.map((group) => (
+            <div key={group.id} className="border-b border-base-300">
+              <SectionHeader
+                icon={group.icon}
+                title={t(groupI18nKeys[group.id], {
+                  defaultValue: group.title,
+                })}
+                open={openMap[group.id]}
+                modified={isGroupModified(group, adjustments)}
+                onToggle={() => toggle(group.id)}
+              />
+              {openMap[group.id] && (
+                <div className="pb-3 pl-1 pr-1">
+                  {group.controls.map((control) => (
+                    <SliderRow
+                      key={control.key}
+                      control={control}
+                      value={adjustments[control.key]}
+                      defaultValue={DEFAULT_STUDIO_ADJUSTMENTS[control.key]}
+                      disabled={disabled}
+                      onChange={(v) => onAdjustmentChange(control.key, v)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
 
-        <div className="h-4" />
-      </div>
+          {/* Tools (Border) */}
+          <BorderToolSection
+            open={openMap.tools}
+            onToggle={() => toggle("tools")}
+            value={borderParams}
+            onChange={onBorderParamsChange}
+            onApply={onApplyBorder}
+            onClear={onClearBorder}
+            isApplying={isApplyingBorder}
+            hasResult={hasBorderResult}
+            disabled={disabled}
+            exifSummary={borderExifSummary}
+          />
 
-      {/* Footer hint */}
-      <div className="border-t border-base-300 px-4 py-2.5">
-        <p className="flex items-center gap-1.5 text-[11px] text-base-content/40">
-          <MousePointerClick size={12} />
-          {t("studio.develop.hint", {
-            defaultValue: "Double-click any slider to reset it.",
-          })}
-        </p>
-      </div>
+          <div className="h-4" />
+        </div>
+
+        {/* Footer hint */}
+        <div className="border-t border-base-300 px-4 py-2.5">
+          <p className="flex items-center gap-1.5 text-[11px] text-base-content/40">
+            <MousePointerClick size={12} />
+            {t("studio.develop.hint", {
+              defaultValue: "Double-click any slider to reset it.",
+            })}
+          </p>
+        </div>
       </aside>
     </>
   );

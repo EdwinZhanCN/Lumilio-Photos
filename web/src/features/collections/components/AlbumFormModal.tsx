@@ -155,7 +155,7 @@ export function AlbumFormModal({
     <Modal
       open={open}
       onClose={close}
-      size="lg"
+      size="md"
       dismissable={!isChoosingCover && !isSubmitting}
       icon={isEdit ? <FolderPen size={22} /> : <FolderPlus size={22} />}
       title={
@@ -164,8 +164,8 @@ export function AlbumFormModal({
       footer={footer}
     >
       <form id="album-form" onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 items-start gap-6 p-5 md:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] md:p-6">
-          <div className="space-y-5">
+        <div className="grid grid-cols-1 items-start gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(11rem,14rem)] md:p-5">
+          <div className="space-y-4">
             <fieldset className="fieldset w-full py-0">
               <legend className="fieldset-legend pb-1 text-xs font-semibold uppercase tracking-wide text-base-content/55">
                 {t("collections.createModal.fields.name.label")}
@@ -185,7 +185,7 @@ export function AlbumFormModal({
                 {t("collections.createModal.fields.description.label")}
               </legend>
               <textarea
-                className="textarea textarea-bordered h-36 w-full resize-none"
+                className="textarea textarea-bordered h-24 w-full resize-none"
                 placeholder={t("collections.createModal.fields.description.placeholder")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

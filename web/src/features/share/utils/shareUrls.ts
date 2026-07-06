@@ -11,7 +11,11 @@ export const shareUrls = {
     return `${window.location.origin}/s/${token}`;
   },
 
-  getThumbnailUrl(token: string, assetId: string, size: "small" | "medium" | "large" = "small"): string {
+  getThumbnailUrl(
+    token: string,
+    assetId: string,
+    size: "small" | "medium" | "large" = "small",
+  ): string {
     return `${baseURL}/api/v1/public/shares/${token}/assets/${assetId}/thumbnail?size=${size}`;
   },
 
