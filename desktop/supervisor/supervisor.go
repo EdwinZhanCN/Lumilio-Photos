@@ -29,6 +29,18 @@ const (
 	pgStopTimeout      = 35 * time.Second
 )
 
+// Startup stages reported through Options.OnStage so the tray can show what the
+// runtime is doing instead of a single static "Starting…" that looks like a
+// freeze when a stage is slow. The values are stable machine keys; the host
+// maps them to localized labels.
+const (
+	StagePreparing      = "preparing"
+	StageInitDB         = "initializing_database"
+	StageStartingDB     = "starting_database"
+	StageStartingServer = "starting_server"
+	StageReady          = "ready"
+)
+
 // ErrAlreadyRunning is returned by AcquireLock / Start when another instance
 // already holds the single-instance lock.
 var ErrAlreadyRunning = errors.New("Lumilio Photos is already running")
@@ -40,7 +52,8 @@ var ErrStorageUnreachable = errors.New("configured storage location is unreachab
 // Supervisor owns the desktop runtime lifecycle. Start it once on app launch and
 // Stop it on quit.
 type Supervisor struct {
-	logf func(string, ...any)
+	logf    func(string, ...any)
+	onStage func(string)
 
 	paths *Paths
 	pg    *Postgres
@@ -56,6 +69,11 @@ type Supervisor struct {
 type Options struct {
 	// Logf receives human-readable lifecycle messages. Defaults to log.Printf.
 	Logf func(string, ...any)
+
+	// OnStage, if set, is called with a Stage* key each time Start advances to a
+	// new phase, letting the host surface progress. It may be called from a
+	// non-UI goroutine, so the host must marshal to its UI thread itself.
+	OnStage func(stage string)
 }
 
 // New constructs a Supervisor.
@@ -64,8 +82,86 @@ func New(opts Options) *Supervisor {
 	if logf == nil {
 		logf = log.Printf
 	}
-	return &Supervisor{logf: logf}
+	return &Supervisor{logf: logf, onStage: opts.OnStage}
 }
+
+// reportStage logs and, if configured, notifies the host that Start has entered
+// a new phase.
+func (s *Supervisor) reportStage(stage string) {
+	s.logf("desktop stage: %s", stage)
+	if s.onStage != nil {
+		s.onStage(stage)
+	}
+}
+
+// ensurePaths resolves the app-data path tree once, so onboarding helpers can run
+// before Start. Start also calls it; both share the same resolved Paths.
+func (s *Supervisor) ensurePaths() error {
+	if s.paths != nil {
+		return nil
+	}
+	paths, err := NewPaths()
+	if err != nil {
+		return err
+	}
+	if err := paths.EnsureDirs(); err != nil {
+		return err
+	}
+	s.paths = paths
+	return nil
+}
+
+// Settings returns the persisted desktop settings (storage path, onboarding
+// state, native language). Safe to call before Start.
+func (s *Supervisor) Settings() (DesktopSettings, error) {
+	if err := s.ensurePaths(); err != nil {
+		return DesktopSettings{}, err
+	}
+	return LoadSettings(s.paths.DesktopSettingsFile())
+}
+
+// SaveSettings persists the full desktop settings. Safe to call before Start.
+func (s *Supervisor) SaveSettings(settings DesktopSettings) error {
+	if err := s.ensurePaths(); err != nil {
+		return err
+	}
+	return SaveSettings(s.paths.DesktopSettingsFile(), settings)
+}
+
+// NeedsOnboarding reports whether the first-run native onboarding window should
+// be shown. A read error is treated as "needs onboarding" so a corrupt settings
+// file re-runs setup rather than booting with no validated storage location.
+func (s *Supervisor) NeedsOnboarding() bool {
+	settings, err := s.Settings()
+	if err != nil {
+		s.logf("read settings for onboarding check (treating as first run): %v", err)
+		return true
+	}
+	return !settings.OnboardingCompleted
+}
+
+// LogDir returns the in-process server/application log directory, so the host can
+// point the user at it in a failure dialog. Empty if paths cannot be resolved.
+func (s *Supervisor) LogDir() string {
+	if err := s.ensurePaths(); err != nil {
+		return ""
+	}
+	return s.paths.Logs
+}
+
+// DefaultStoragePath is the built-in media-library location used until the user
+// chooses one during onboarding (<appdata>/storage).
+func (s *Supervisor) DefaultStoragePath() (string, error) {
+	if err := s.ensurePaths(); err != nil {
+		return "", err
+	}
+	return s.paths.DefaultLib, nil
+}
+
+// StorageReachable reports whether the given media-library location exists or can
+// be created (its parent exists). Exposed for the onboarding window's live
+// validation.
+func StorageReachable(path string) bool { return storageReachable(path) }
 
 // ServerURL is the address the desktop host opens in the user's browser. It is
 // localhost (not 127.0.0.1, not a custom scheme) because WebAuthn/passkeys
@@ -82,14 +178,11 @@ func (s *Supervisor) Warnings() []string { return s.warnings }
 // API server in-process. It returns once the server is accepting requests so
 // the caller can show the UI window, or an error if any step fails.
 func (s *Supervisor) Start(ctx context.Context) error {
-	paths, err := NewPaths()
-	if err != nil {
+	s.reportStage(StagePreparing)
+	if err := s.ensurePaths(); err != nil {
 		return err
 	}
-	s.paths = paths
-	if err := paths.EnsureDirs(); err != nil {
-		return err
-	}
+	paths := s.paths
 
 	lock, err := AcquireLock(paths.LockFile())
 	if err != nil {
@@ -143,10 +236,13 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	s.pg = pg
 
 	if !pg.IsInitialized() {
+		s.reportStage(StageInitDB)
 		if err := pg.InitDB(ctx); err != nil {
 			return err
 		}
 	}
+
+	s.reportStage(StageStartingDB)
 	if err := pg.WriteConfigs(); err != nil {
 		return err
 	}
@@ -163,6 +259,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 
+	s.reportStage(StageStartingServer)
 	appConfig, err := serverconfig.NewDesktopConfig(serverconfig.DesktopParams{
 		Port:          serverPort,
 		WebRoot:       bundledWebRoot(resources),
@@ -195,6 +292,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	if err := s.waitForServer(ctx); err != nil {
 		return err
 	}
+	s.reportStage(StageReady)
 	s.logf("desktop runtime ready at %s", s.ServerURL())
 	return nil
 }
@@ -269,13 +367,16 @@ func (s *Supervisor) resolveStoragePath() (string, error) {
 	return settings.StoragePath, nil
 }
 
-// SetStoragePath persists a user-chosen media library location. It takes effect
-// on the next launch. An empty path resets to the default.
+// SetStoragePath persists a user-chosen media library location, preserving the
+// other persisted settings. It takes effect on the next launch. An empty path
+// resets to the default.
 func (s *Supervisor) SetStoragePath(path string) error {
-	if s.paths == nil {
-		return errors.New("supervisor not started")
+	settings, err := s.Settings()
+	if err != nil {
+		return err
 	}
-	return SaveSettings(s.paths.DesktopSettingsFile(), DesktopSettings{StoragePath: path})
+	settings.StoragePath = path
+	return s.SaveSettings(settings)
 }
 
 // waitForServer polls the health endpoint until the server responds or fails.

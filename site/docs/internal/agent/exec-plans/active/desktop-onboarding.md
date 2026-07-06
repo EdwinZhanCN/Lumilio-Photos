@@ -1,7 +1,9 @@
 # Desktop onboarding & boot experience
 
-Status: planning (2026-07-05). Triggered by beta.1 Windows boot failures on a
-tester's machine.
+Status: implemented (2026-07-06). Triggered by beta.1 Windows boot failures on a
+tester's machine. W0–W3 landed; verified by `make desktop-test` and an arm64 DMG
+build (`Lumilio-Photos-arm64.dmg`, v1.0.0-beta.3). Remaining: visual/UX pass of
+the onboarding window on a real display and a native Windows smoke.
 
 Scope: `desktop/` (Wails v3 host + supervisor) only. The in-browser first-run
 wizard is **out of scope** and must not be duplicated — see the boundary below.
@@ -96,33 +98,49 @@ photo management.
   nmake-built separately). The black window that *persists* is likely the
   postmaster itself, i.e. PG is up and a later stage is stuck.
 
-### W1 — staged startup with progress, per-stage timeout & failure surfacing
+### W1 — staged startup with progress, per-stage timeout & failure surfacing — **landed**
 Split `Supervisor.Start` (`desktop/supervisor/supervisor.go`) into named,
 individually-bounded stages, each reporting to a status callback so the tray
 (`desktop/app.go`) shows `Initializing database…` / `Starting database…` /
-`Running migrations…` / `Ready`, and on failure shows a human-readable reason +
+`Starting server…` / `Ready`, and on failure shows a human-readable reason +
 the log directory path — instead of one static `Starting…` that can hang ~2.5m.
-- Add a progress/status callback to `Options` (or a channel); `app.go`
-  `refreshMenu()` renders the current stage.
-- Keep per-stage timeouts (pg_ctl `-w -t`, `WaitReady`, server health) but make
-  the failing stage nameable in the error and in the tray.
-- Error dialogs (`app.go:97`) already show `err.Error()`; ensure each stage
-  error is actionable (cause + `%LocalAppData%\Lumilio Photos\logs`).
+- ✅ `Options.OnStage func(stage string)` reports stage keys
+  (`Stage{Preparing,InitDB,StartingDB,StartingServer,Ready}`); `app.go`'s
+  `onStage` localizes them and re-renders the tray via `refreshMenu()`.
+- ✅ Per-stage timeouts kept (pg_ctl `-w -t`, `WaitReady`, server health); the
+  most recent stage is tracked in `app.go` (`lastStage`).
+- ✅ The failure dialog (`failureMessage`) names the failing stage, shows the
+  cause, and points at `Supervisor.LogDir()`.
+- Note: migrations run inside `server/app.Run`; they are reported under
+  `Starting server…` (the honest granularity available without server hooks).
 
-### W2 — thin native onboarding window
-A small Wails window shown on first run (gated on a `desktop-settings.json`
-flag), covering exactly the three desktop-only concerns:
-1. **ToS / OSS license** acceptance (persist accepted version).
-2. **Storage root** picker + live writability/free-space validation; persist via
-   `Supervisor.SetStoragePath` → `desktop-settings.json`; only then start the
-   server so the browser wizard's read-only root is correct.
-3. Native-chrome **i18n** (tray menu, dialogs, this window) — a small zh/en
-   string table for desktop-native surfaces only (independent of the in-browser
-   language the wizard owns); default from OS locale.
-- Sequencing: onboarding window → validated storage path → `Supervisor.Start`
-  (staged, W1) → auto-open browser → in-browser `BootstrapWizard`.
-- Reuse the discarded onboarding commit's assets only where they fit this
-  narrowed scope; do **not** reintroduce account/MFA/repo-strategy steps.
+### W2 — thin native onboarding window — **landed**
+A small Wails webview window shown on first run (gated on
+`desktop-settings.json`'s `onboarding_completed`), covering exactly the three
+desktop-only concerns:
+1. ✅ **ToS / OSS license** acceptance (persisted as `tos_accepted_version`;
+   bump `tosVersion` in `onboarding.go` to re-prompt).
+2. ✅ **Storage root** picker (native `Dialog.OpenFile` directory chooser) + live
+   writability/free-space validation (`validateStorage` probes the nearest
+   existing ancestor, never creating the dir prematurely); persisted via
+   `Supervisor.SaveSettings` before the server starts, so the browser wizard's
+   read-only root is correct.
+3. ✅ Native-chrome **i18n** (`desktop/strings.go`): a small zh/en table for
+   tray/dialog/stage surfaces only, plus the window's own JS i18n; default from
+   OS locale (`detectOSLang`), overridden by the in-window language toggle.
+
+Implementation:
+- The window is the app's **only** webview. There is no Wails binding
+  generation: the setup page (`desktop/onboarding/index.html`, self-contained)
+  talks to Go through a plain-`fetch` JSON API served by the Wails asset handler
+  (`desktopApp.onboardingHandler`): `GET /__onb/state`, `POST /__onb/pick`,
+  `POST /__onb/complete`.
+- Sequencing (`app.go` `boot()`): `NeedsOnboarding` → show window → block on
+  `/__onb/complete` → close window → `Supervisor.Start` (staged, W1) →
+  auto-open browser → in-browser `BootstrapWizard`. Closing the window before
+  completion quits (no half-configured boot).
+- Cross-platform disk-free lives in `disk_unix.go` / `disk_windows.go`.
+- Did **not** reintroduce account/MFA/repo-strategy steps (web wizard's).
 
 **Design constraints** (this native window; distinct from the web app's daisyUI):
 - **shadcn/ui, minimalist.** Restrained, content-first layout; no chrome for its
@@ -143,16 +161,32 @@ flag), covering exactly the three desktop-only concerns:
   runtime dependency. If shadcn/ui (React + build) is too heavy for one small
   window, port its visual language onto the existing vanilla-JS onboarding
   assets rather than pulling in a build toolchain.
+- **Resolution taken:** a single self-contained `onboarding/index.html` — no
+  React, no build step, no node deps. It carries shadcn/ui-derived neutral
+  design tokens (light+dark via `prefers-color-scheme`), lucide icons inlined as
+  SVG (no runtime CDN), a top drag strip + `env(safe-area-inset-*)` padding so
+  content never underlaps the traffic lights, and an EN/中文 segmented toggle.
+  Framework permission was on the table but a build toolchain for one small
+  offline window was not worth its weight; the vanilla page matches the look.
 
-### W3 — Lumen/ML hint (thin) + defer local hub control
-- Add the optional one-line ML hint + skip to the onboarding window (W2). No
-  config or downloads.
-- Record the "local lumen-hub control is a future, isolated, opt-in subsystem"
-  decision here and in `release-cicd.md`; no implementation this cycle.
+### W3 — Lumen/ML hint (thin) + defer local hub control — **landed**
+- ✅ Optional one-line ML hint on the onboarding window (`ai.note`, zh/en): AI is
+  optional, provided by a Lumen node on this machine or the LAN, enable later in
+  Settings, nothing downloaded now. No config, no downloads, no action.
+- Local lumen-hub control remains a future, isolated, opt-in subsystem (see the
+  Lumen/ML posture section and `release-cicd.md`); no implementation this cycle.
 
 ## Verification
-- `make desktop-test` (supervisor unit tests; PG smoke auto-skips without
-  bundled binaries).
+- ✅ `make desktop-test` — supervisor unit tests + new main-package tests
+  (`onboarding_test.go`: `validateStorage`, `humanBytes`, `normalizeLang`, and
+  the `/__onb/state|complete` handlers incl. reject-on-decline / reject-on-
+  unwritable). PG smoke auto-skips without bundled binaries.
+- ✅ arm64 `.app` + DMG built (`desktop/scripts/build-macos.sh arm64 --dmg`,
+  v1.0.0-beta.3); onboarding assets confirmed embedded, version stamped.
+- ✅ Smoke-launched the built app with a throwaway `LUMILIO_APP_DATA`: boots the
+  onboarding path, Wails asset handler wired (`handler=true`), no errors.
+  (Automated screenshot blocked by the shell's macOS TCC permissions — visual
+  UX pass on a real display is the remaining manual step.)
 - Manual smoke on Windows: a Parallels **Windows 11** VM is sufficient for UX
   iteration (cmd windows, SmartScreen "More info → Run anyway", storage picker,
   staged progress, hang localization). Caveat: on Apple Silicon it runs
@@ -163,10 +197,17 @@ flag), covering exactly the three desktop-only concerns:
   pre-release upgrade over the portable zip — tracked in `release-cicd.md` W4.
 
 ## Critical files
-- `desktop/supervisor/supervisor.go` — staged `Start`, status callback (W1).
-- `desktop/app.go` — tray status/progress rendering + failure dialogs (W1).
-- `desktop/supervisor/postgres.go` — boot correctness fixes landed (W0).
+- `desktop/supervisor/supervisor.go` — staged `Start` + `OnStage` callback,
+  `Settings`/`SaveSettings`/`NeedsOnboarding`/`LogDir`/`DefaultStoragePath` (W1/W2).
+- `desktop/app.go` — tray status/progress rendering, onboarding gating in
+  `boot()`, failure dialog with stage + log dir (W1/W2).
+- `desktop/onboarding.go` — asset handler + JSON API, window creation,
+  `validateStorage`; `desktop/onboarding/index.html` — the self-contained UI.
+- `desktop/strings.go` — native-chrome zh/en tables (W2 i18n).
+- `desktop/disk_unix.go` / `desktop/disk_windows.go` — free-space per platform.
 - `desktop/supervisor/config.go` / `desktop-settings.json` — storage path +
-  onboarding/ToS flags persistence (W2).
+  `onboarding_completed` / `tos_accepted_version` / `language` persistence (W2).
+- `desktop/supervisor/postgres.go` — boot correctness fixes landed (W0).
+- `desktop/scripts/build-macos.sh` — stamps `main.buildVersion` (W2).
 - `web/src/features/auth/routes/BootstrapWizard.tsx` — the boundary reference;
   read-only storage root the desktop must feed (do not modify).

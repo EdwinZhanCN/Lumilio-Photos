@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Lumilio Photos — Setup</title>
+<style>
+  /* shadcn/ui-derived neutral design tokens (self-contained, no runtime CDN). */
+  :root {
+    --background: #ffffff;
+    --foreground: #09090b;
+    --muted: #f4f4f5;
+    --muted-foreground: #71717a;
+    --card: #ffffff;
+    --border: #e4e4e7;
+    --input: #e4e4e7;
+    --primary: #18181b;
+    --primary-foreground: #fafafa;
+    --accent: #f4f4f5;
+    --ring: #a1a1aa;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --radius: 10px;
+    /* Reserve space for the traffic lights / titlebar and notch-style insets. */
+    --titlebar: 30px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #09090b;
+      --foreground: #fafafa;
+      --muted: #18181b;
+      --muted-foreground: #a1a1aa;
+      --card: #0c0c0e;
+      --border: #27272a;
+      --input: #27272a;
+      --primary: #fafafa;
+      --primary-foreground: #18181b;
+      --accent: #1c1c1f;
+      --ring: #52525b;
+      --success: #22c55e;
+      --danger: #f87171;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+  /* Full-window drag region reserved at the top so content never underlaps the
+     macOS traffic lights; respects the OS safe-area inset. */
+  .titlebar {
+    height: calc(var(--titlebar) + env(safe-area-inset-top, 0px));
+    width: 100%;
+    --wails-draggable: drag;
+    flex: 0 0 auto;
+  }
+  .app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .scroll {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 8px 40px 0;
+  }
+  /* Header --------------------------------------------------------------- */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 11px;
+    display: grid; place-items: center;
+    background: linear-gradient(140deg, #6366f1, #8b5cf6);
+    color: #fff; flex: 0 0 auto;
+    box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  }
+  .brand h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand p { font-size: 12.5px; color: var(--muted-foreground); }
+  .spacer { flex: 1 1 auto; }
+  /* Segmented language control ------------------------------------------ */
+  .segment {
+    display: inline-flex;
+    background: var(--muted);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .segment button {
+    border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 500;
+    color: var(--muted-foreground);
+    padding: 4px 11px; border-radius: 6px;
+    transition: background .15s, color .15s;
+  }
+  .segment button[aria-selected="true"] {
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
+  }
+  /* Cards / sections ----------------------------------------------------- */
+  .lead { font-size: 13.5px; color: var(--muted-foreground); margin-bottom: 20px; max-width: 62ch; }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .card-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: grid; place-items: center; flex: 0 0 auto;
+    background: var(--accent); color: var(--muted-foreground);
+  }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-desc { font-size: 12.5px; color: var(--muted-foreground); margin-left: 40px; }
+  .card-body { margin-top: 12px; margin-left: 40px; }
+  /* Path row ------------------------------------------------------------- */
+  .path-row { display: flex; gap: 8px; align-items: stretch; }
+  .path-field {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--input); border-radius: 8px;
+    background: var(--background); padding: 8px 11px;
+    font-size: 12.5px;
+  }
+  .path-field code {
+    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    direction: rtl; text-align: left;
+  }
+  .btn {
+    border: 1px solid var(--input); background: var(--background); color: var(--foreground);
+    font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+    padding: 8px 14px; border-radius: 8px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background .15s, border-color .15s, opacity .15s;
+  }
+  .btn:hover { background: var(--accent); }
+  .btn:active { transform: translateY(0.5px); }
+  .btn-primary {
+    background: var(--primary); color: var(--primary-foreground); border-color: var(--primary);
+    padding: 9px 20px;
+  }
+  .btn-primary:hover { background: var(--primary); opacity: .9; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  /* Validation line ------------------------------------------------------ */
+  .valid {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 10px; font-size: 12px; min-height: 16px;
+    color: var(--muted-foreground);
+  }
+  .valid.ok { color: var(--success); }
+  .valid.err { color: var(--danger); }
+  .valid svg { flex: 0 0 auto; }
+  /* License agreement ---------------------------------------------------- */
+  .agree { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; user-select: none; }
+  .agree input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .checkbox {
+    width: 18px; height: 18px; border-radius: 5px; flex: 0 0 auto; margin-top: 1px;
+    border: 1.5px solid var(--input); background: var(--background);
+    display: grid; place-items: center; transition: background .15s, border-color .15s;
+    color: transparent;
+  }
+  .agree input:checked + .checkbox { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .agree input:focus-visible + .checkbox { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .agree-text { font-size: 12.5px; }
+  .agree-text a { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .licenses {
+    margin-top: 10px; margin-left: 40px; font-size: 11.5px; color: var(--muted-foreground);
+    background: var(--muted); border-radius: 8px; padding: 11px 13px; display: none;
+    max-height: 130px; overflow-y: auto; line-height: 1.6;
+  }
+  .licenses.open { display: block; }
+  .licenses b { color: var(--foreground); font-weight: 600; }
+  /* AI note -------------------------------------------------------------- */
+  .note {
+    display: flex; gap: 9px; align-items: flex-start;
+    font-size: 12px; color: var(--muted-foreground);
+    padding: 12px 4px 4px;
+  }
+  .note svg { flex: 0 0 auto; margin-top: 1px; color: var(--muted-foreground); }
+  /* Footer --------------------------------------------------------------- */
+  .footer {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 40px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border);
+    background: var(--card);
+  }
+  .footer .hint { font-size: 12px; color: var(--muted-foreground); }
+  .spin {
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid var(--primary-foreground); border-top-color: transparent;
+    animation: spin .7s linear infinite; display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-primary.loading .spin { display: inline-block; }
+  .btn-primary.loading .label { opacity: .8; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="titlebar"></div>
+    <div class="scroll">
+      <div class="header">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+          </div>
+          <div>
+            <h1>Lumilio Photos</h1>
+            <p data-i18n="tagline">Local-first photo management</p>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <div class="segment" role="tablist" aria-label="Language">
+          <button role="tab" data-lang="en" aria-selected="true">EN</button>
+          <button role="tab" data-lang="zh" aria-selected="false">中文</button>
+        </div>
+      </div>
+
+      <p class="lead" data-i18n="lead">Welcome. A couple of quick choices and Lumilio Photos will be ready. Your database and originals stay on this machine.</p>
+
+      <!-- Storage location -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+          </div>
+          <div class="card-title" data-i18n="storage.title">Photo library location</div>
+        </div>
+        <div class="card-desc" data-i18n="storage.desc">Where your original photos and videos are stored. Choose a drive with plenty of free space; you can move it later.</div>
+        <div class="card-body">
+          <div class="path-row">
+            <div class="path-field">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-foreground);flex:0 0 auto"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+              <code id="path" dir="ltr">—</code>
+            </div>
+            <button class="btn" id="choose" data-i18n="storage.choose">Choose…</button>
+          </div>
+          <div class="valid" id="valid"></div>
+        </div>
+      </div>
+
+      <!-- License agreement -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+          </div>
+          <div class="card-title" data-i18n="terms.title">Terms &amp; open-source licenses</div>
+        </div>
+        <div class="card-desc" data-i18n="terms.desc">Lumilio Photos is free and open source, and bundles other open-source software.</div>
+        <div class="card-body">
+          <label class="agree">
+            <input type="checkbox" id="agree" />
+            <span class="checkbox" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </span>
+            <span class="agree-text">
+              <span data-i18n="terms.agree">I have read and agree to the Terms of Use and the</span>
+              <a id="toggle-licenses" data-i18n="terms.view">bundled open-source licenses</a>.
+            </span>
+          </label>
+        </div>
+        <div class="licenses" id="licenses">
+          <p data-i18n="terms.body1"><b>Lumilio Photos</b> is distributed under its open-source license and provided “as is”, without warranty of any kind.</p>
+          <p style="margin-top:6px" data-i18n="terms.body2">This app bundles: <b>PostgreSQL</b> &amp; <b>pgvector</b> (PostgreSQL License), <b>FFmpeg</b> (LGPL/GPL), <b>ExifTool</b> (Perl/Artistic License), and <b>libvips</b> (LGPL). Each remains under its own license; full texts ship with the application.</p>
+        </div>
+      </div>
+
+      <!-- AI / Lumen note (W3) -->
+      <div class="note">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+        <span data-i18n="ai.note">AI features (semantic search, faces, OCR) are optional and provided by a Lumen node — this machine or another on your network. You can enable them later in Settings; nothing is downloaded now.</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="hint" id="hint" data-i18n="footer.hint">Choose a location and accept the terms to continue.</span>
+      <div class="spacer"></div>
+      <button class="btn btn-primary" id="continue" disabled>
+        <span class="spin" aria-hidden="true"></span>
+        <span class="label" data-i18n="footer.continue">Continue</span>
+      </button>
+    </div>
+  </div>
+
+<script>
+const I18N = {
+  en: {
+    tagline: "Local-first photo management",
+    lead: "Welcome. A couple of quick choices and Lumilio Photos will be ready. Your database and originals stay on this machine.",
+    "storage.title": "Photo library location",
+    "storage.desc": "Where your original photos and videos are stored. Choose a drive with plenty of free space; you can move it later.",
+    "storage.choose": "Choose…",
+    "terms.title": "Terms & open-source licenses",
+    "terms.desc": "Lumilio Photos is free and open source, and bundles other open-source software.",
+    "terms.agree": "I have read and agree to the Terms of Use and the",
+    "terms.view": "bundled open-source licenses",
+    "terms.body1": "Lumilio Photos is distributed under its open-source license and provided “as is”, without warranty of any kind.",
+    "terms.body2": "This app bundles: PostgreSQL & pgvector (PostgreSQL License), FFmpeg (LGPL/GPL), ExifTool (Perl/Artistic License), and libvips (LGPL). Each remains under its own license; full texts ship with the application.",
+    "ai.note": "AI features (semantic search, faces, OCR) are optional and provided by a Lumen node — this machine or another on your network. You can enable them later in Settings; nothing is downloaded now.",
+    "footer.hint": "Choose a location and accept the terms to continue.",
+    "footer.continue": "Continue",
+    "valid.checking": "Checking location…",
+    "valid.ok": "Writable · {free} free",
+    "valid.okNoFree": "Writable location",
+    "valid.notWritable": "This location isn’t writable. Pick another folder.",
+    "valid.unreachable": "This location can’t be reached. Pick another folder.",
+    "starting": "Starting Lumilio Photos…",
+  },
+  zh: {
+    tagline: "本地优先的照片管理",
+    lead: "欢迎。完成几个简单的选择，Lumilio Photos 即可就绪。你的数据库与原始文件都保存在本机。",
+    "storage.title": "照片库位置",
+    "storage.desc": "用于保存你的原始照片和视频。请选择剩余空间充足的磁盘；之后也可以更改。",
+    "storage.choose": "选择…",
+    "terms.title": "条款与开源许可",
+    "terms.desc": "Lumilio Photos 是免费开源软件，并捆绑了其他开源组件。",
+    "terms.agree": "我已阅读并同意《使用条款》以及",
+    "terms.view": "捆绑的开源许可",
+    "terms.body1": "Lumilio Photos 依据其开源许可分发，按“原样”提供，不作任何形式的担保。",
+    "terms.body2": "本应用捆绑：PostgreSQL 与 pgvector（PostgreSQL 许可）、FFmpeg（LGPL/GPL）、ExifTool（Perl/Artistic 许可）、libvips（LGPL）。各组件均遵循其自身许可，完整文本随应用一同提供。",
+    "ai.note": "AI 功能（语义搜索、人脸、OCR）为可选项，由 Lumen 节点提供——可以是本机或局域网内的其他设备。你可以稍后在“设置”中启用；现在不会下载任何内容。",
+    "footer.hint": "选择位置并接受条款后即可继续。",
+    "footer.continue": "继续",
+    "valid.checking": "正在检查位置…",
+    "valid.ok": "可写入 · 剩余 {free}",
+    "valid.okNoFree": "位置可写入",
+    "valid.notWritable": "该位置不可写入，请选择其他文件夹。",
+    "valid.unreachable": "无法访问该位置，请选择其他文件夹。",
+    "starting": "正在启动 Lumilio Photos…",
+  },
+};
+
+let state = { lang: "en", path: "", valid: false };
+
+function t(key, vars) {
+  let s = (I18N[state.lang] && I18N[state.lang][key]) || (I18N.en[key]) || key;
+  if (vars) for (const k in vars) s = s.replace("{" + k + "}", vars[k]);
+  return s;
+}
+
+function applyLang() {
+  document.documentElement.lang = state.lang === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  document.querySelectorAll(".segment button").forEach(b => {
+    b.setAttribute("aria-selected", String(b.dataset.lang === state.lang));
+  });
+  renderValid();
+}
+
+function iconOk() {
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+}
+function iconErr() {
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>';
+}
+
+function renderValid() {
+  const el = document.getElementById("valid");
+  const v = state.validation;
+  if (!v) { el.className = "valid"; el.innerHTML = ""; return; }
+  if (v.checking) { el.className = "valid"; el.innerHTML = t("valid.checking"); return; }
+  if (v.writable) {
+    el.className = "valid ok";
+    const msg = v.freeHuman ? t("valid.ok", { free: v.freeHuman }) : t("valid.okNoFree");
+    el.innerHTML = iconOk() + "<span>" + msg + "</span>";
+  } else {
+    el.className = "valid err";
+    const msg = v.reachable === false ? t("valid.unreachable") : t("valid.notWritable");
+    el.innerHTML = iconErr() + "<span>" + msg + "</span>";
+  }
+}
+
+function setPath(p, validation) {
+  state.path = p || "";
+  state.validation = validation;
+  state.valid = !!(validation && validation.writable);
+  document.getElementById("path").textContent = state.path || "—";
+  renderValid();
+  refreshContinue();
+}
+
+function refreshContinue() {
+  const agreed = document.getElementById("agree").checked;
+  document.getElementById("continue").disabled = !(state.valid && agreed);
+}
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) throw new Error("request failed: " + res.status);
+  return res.json();
+}
+
+async function init() {
+  try {
+    const s = await fetch("/__onb/state").then(r => r.json());
+    state.lang = s.lang === "zh" ? "zh" : "en";
+    applyLang();
+    setPath(s.path, s.validation);
+  } catch (e) {
+    console.error("onboarding state load failed", e);
+    applyLang();
+  }
+}
+
+// Wiring ------------------------------------------------------------------
+document.querySelectorAll(".segment button").forEach(b => {
+  b.addEventListener("click", () => { state.lang = b.dataset.lang; applyLang(); });
+});
+document.getElementById("agree").addEventListener("change", refreshContinue);
+document.getElementById("toggle-licenses").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("licenses").classList.toggle("open");
+});
+document.getElementById("choose").addEventListener("click", async () => {
+  try {
+    const r = await api("/__onb/pick", {});
+    if (r.cancelled) return;
+    setPath(r.path, r.validation);
+  } catch (e) { console.error("pick failed", e); }
+});
+document.getElementById("continue").addEventListener("click", async () => {
+  const btn = document.getElementById("continue");
+  btn.classList.add("loading");
+  btn.disabled = true;
+  document.getElementById("hint").textContent = t("starting");
+  try {
+    await api("/__onb/complete", {
+      path: state.path,
+      lang: state.lang,
+      agreed: document.getElementById("agree").checked,
+    });
+    // On success the host closes this window and the tray takes over.
+  } catch (e) {
+    console.error("complete failed", e);
+    btn.classList.remove("loading");
+    refreshContinue();
+  }
+});
+
+init();
+</script>
+</body>
+</html>
