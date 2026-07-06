@@ -198,6 +198,7 @@ func (p *Postgres) HandleStaleState(ctx context.Context) error {
 // 4 = bad data dir). Any non-ExitError is treated as "not running".
 func (p *Postgres) statusCode(ctx context.Context) int {
 	cmd := exec.CommandContext(ctx, p.bin("pg_ctl"), "status", "-D", p.dataDir)
+	hideConsole(cmd)
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -299,10 +300,12 @@ func (p *Postgres) WaitReady(ctx context.Context, timeout time.Duration) error {
 }
 
 func (p *Postgres) isReady(ctx context.Context) error {
-	return exec.CommandContext(ctx, p.bin("pg_isready"),
+	cmd := exec.CommandContext(ctx, p.bin("pg_isready"),
 		"-h", p.host,
 		"-p", p.port,
-	).Run()
+	)
+	hideConsole(cmd)
+	return cmd.Run()
 }
 
 // CreateDB creates the application database if it does not already exist. It is
@@ -335,6 +338,7 @@ func (p *Postgres) run(ctx context.Context, name string, args ...string) error {
 
 func (p *Postgres) output(ctx context.Context, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, p.bin(name), args...)
+	hideConsole(cmd)
 	// Force the C locale for messages so the PostgreSQL tools emit English
 	// ASCII rather than the OS-locale encoding (e.g. GBK on a Chinese Windows),
 	// which would render as mojibake in the setup UI. The cluster's own
