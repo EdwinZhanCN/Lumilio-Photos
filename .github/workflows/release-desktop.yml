@@ -179,12 +179,18 @@ jobs:
                   & "$iscc" "/DAppVersion=$ver" "desktop/packaging/windows/lumilio.iss"
                   if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
 
+            # Two separate artifacts so neither download wraps the other: the
+            # installer and the portable zip are parallel, independent downloads.
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: windows-amd64-setup
+                  path: desktop/build/Lumilio-Photos-*-windows-amd64-setup.exe
+                  if-no-files-found: error
+
             - uses: actions/upload-artifact@v7
               with:
                   name: windows-amd64
-                  path: |
-                      desktop/build/Lumilio-Photos-*-windows-amd64.zip
-                      desktop/build/Lumilio-Photos-*-windows-amd64-setup.exe
+                  path: desktop/build/Lumilio-Photos-*-windows-amd64.zip
                   if-no-files-found: error
 
     release:
@@ -198,7 +204,7 @@ jobs:
             - name: Download desktop artifacts
               uses: actions/download-artifact@v8
               with:
-                  pattern: "{dmg-*,windows-amd64}"
+                  pattern: "{dmg-*,windows-amd64,windows-amd64-setup}"
                   path: dist
                   merge-multiple: true
 
