@@ -43,6 +43,10 @@ type desktopApp struct {
 	ready  bool
 	status string
 
+	// Update availability, populated by an async post-launch check.
+	updateVersion string
+	updateURL     string
+
 	// Onboarding coordination.
 	onboardWin  *application.WebviewWindow
 	onboardOnce sync.Once
@@ -151,6 +155,15 @@ func (d *desktopApp) refreshMenu() {
 	open.SetEnabled(d.ready)
 	open.OnClick(func(*application.Context) { d.openInBrowser() })
 
+	if d.updateURL != "" {
+		upd := menu.Add(fmt.Sprintf(d.tr("updateAvailable"), d.updateVersion))
+		upd.OnClick(func(*application.Context) {
+			if err := d.app.Browser.OpenURL(d.updateURL); err != nil {
+				log.Printf("failed to open update URL: %v", err)
+			}
+		})
+	}
+
 	menu.AddSeparator()
 
 	quit := menu.Add(d.tr("quit"))
@@ -184,6 +197,23 @@ func (d *desktopApp) startRuntime() {
 
 	// Auto-open the app in the default browser on launch.
 	d.openInBrowser()
+
+	// Check for a newer release in the background (best-effort, off the critical
+	// path); surface it in the tray if found.
+	go d.checkUpdate()
+}
+
+// checkUpdate queries GitHub for a newer release and, if one exists, shows it in
+// the tray. Best-effort: any failure is silent.
+func (d *desktopApp) checkUpdate() {
+	info, ok := checkForUpdate(d.ctx, buildVersion)
+	if !ok {
+		return
+	}
+	log.Printf("update available: %s (current %s)", info.Version, buildVersion)
+	d.updateVersion = info.Version
+	d.updateURL = info.URL
+	d.refreshMenu()
 }
 
 // failureMessage composes an actionable error: which stage failed, the cause, and
