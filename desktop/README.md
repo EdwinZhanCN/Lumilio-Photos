@@ -137,6 +137,24 @@ generates it. macOS deliberately has no uninstaller — drag the app to the Tras
 (the app data under `~/Library/Application Support/Lumilio Photos` can be removed
 manually).
 
+## Updates
+
+The tray checks GitHub Releases once per launch (async, best-effort, silent on
+failure — `update.go`). If a newer semver release exists it adds an "Update
+available: vX.Y.Z" tray item that opens the release page; the user installs it
+manually (Windows: run the new setup.exe, which upgrades in place; macOS: drag
+the new app over the old). App data under the per-user data dir is untouched, and
+the server runs its embedded migrations on next launch.
+
+> Because installed builds carry real user data, **released schema changes must
+> be additive forward migrations** — the "edit the original migration in place"
+> habit only holds pre-release; once users have data, editing a shipped migration
+> desyncs their database on update.
+
+Full silent auto-update is deferred: it needs code-signing (Sparkle/Authenticode)
+we don't have yet, so today an "update" is a signed-out manual reinstall that
+preserves data.
+
 ## Status / remaining work
 
 Implemented: supervisor (PG lifecycle, typed config/secrets generation,
