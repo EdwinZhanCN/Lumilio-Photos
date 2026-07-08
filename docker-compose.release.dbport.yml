@@ -1,0 +1,22 @@
+# Benchmark-only overlay for docker-compose.release.yml.
+#
+# Exposes the bundled PostgreSQL port on the host so the upload benchmark
+# (server/tools/uploadbench) can read exact per-asset / per-job timing from
+# river_job.finalized_at (the API surface and status JSONB are only 1-second
+# precision). This does NOT change the release images — it only publishes a
+# port — so the "use GHCR-built images" goal is preserved.
+#
+#   docker compose -f docker-compose.release.yml -f docker-compose.release.dbport.yml up -d
+#
+# NOTE: first-run setup rotates the DB password. Read the live password from
+#   $LUMILIO_STORAGE/.secrets/db_password
+# and build the DSN as:
+#   postgres://postgres:<pw>@localhost:5432/lumiliophotos?sslmode=disable
+#
+# This overlay is intentionally not for production. Do not commit an equivalent
+# port mapping into docker-compose.release.yml.
+
+services:
+    db:
+        ports:
+            - "5432:5432"

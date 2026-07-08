@@ -363,7 +363,7 @@ export function AssetsGalleryPage({
   // can't recover a missing pin, so offer a way back to Lumilio instead.
   if (isPinMode && pinView.isExpired) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-16 text-center">
         <AlertTriangle className="size-8 text-warning" />
         <p className="max-w-md text-base-content/70">{t("assets.pin.expired")}</p>
         <Link to={pinOrigin?.from ?? "/lumilio"} className="btn btn-sm btn-outline gap-1.5">
@@ -378,7 +378,7 @@ export function AssetsGalleryPage({
   // doesn't trigger the full-screen ErrorBoundary and lock the user out.
   if (error && !isSearchActive) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-16 text-center">
         <AlertTriangle className="size-8 text-warning" />
         <p className="text-base-content/70">
           {t("assets.all.load_error", {
@@ -417,7 +417,7 @@ export function AssetsGalleryPage({
   };
 
   return (
-    <div>
+    <div className="flex h-full min-h-0 flex-col">
       <AssetsPageHeader
         sortBy={sortBy}
         onSortByChange={setSortBy}
@@ -433,19 +433,21 @@ export function AssetsGalleryPage({
         scopeControlHidden={baseFilter?.repository_id !== undefined}
       />
 
-      {hero}
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        {hero}
 
-      {isSearchActive ? (
-        renderSearchSections()
-      ) : isFetching && allAssets.length === 0 ? (
-        <PhotosLoadingSkeleton />
-      ) : (
-        <GalleryComponent key={`browse:${currentLayout}`} {...browseGalleryProps} />
-      )}
+        {isSearchActive ? (
+          renderSearchSections()
+        ) : isFetching && allAssets.length === 0 ? (
+          <PhotosLoadingSkeleton />
+        ) : (
+          <GalleryComponent key={`browse:${currentLayout}`} {...browseGalleryProps} />
+        )}
 
-      {showEndOfResults && (
-        <div className="text-center p-4 text-gray-500">{t("assets.all.end_of_results")}</div>
-      )}
+        {showEndOfResults && (
+          <div className="text-center p-4 text-gray-500">{t("assets.all.end_of_results")}</div>
+        )}
+      </div>
 
       {isCarouselOpen &&
         (activeBrowseAssets.length > 0 ? (
@@ -458,7 +460,7 @@ export function AssetsGalleryPage({
               onNavigate={openCarousel}
             />
             {isLocatingAsset && (
-              <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
+              <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center">
                 <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
                   <div className="loading loading-spinner loading-lg mb-4"></div>
                   <p className="text-lg font-medium mb-2">{t("assets.all.locating_asset")}</p>

@@ -31,7 +31,7 @@ export default function Monitor() {
 
   if (user?.role !== "admin") {
     return (
-      <div className="flex min-h-full items-center justify-center p-6">
+      <div className="flex h-full items-center justify-center p-6">
         <div className="rounded-3xl border border-base-300 bg-base-100 p-8 text-center shadow-sm">
           <div className="text-lg font-semibold">{t("monitor.adminOnlyTitle")}</div>
           <p className="mt-2 text-sm opacity-70">{t("monitor.adminOnlyDescription")}</p>
@@ -41,7 +41,7 @@ export default function Monitor() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={t("monitor.title")}
         subtitle={
@@ -99,18 +99,20 @@ export default function Monitor() {
         </div>
       </PageHeader>
 
-      <div className="container mx-auto w-full space-y-4 p-4 pb-6">
-        {view === "queue" ? (
-          <>
-            <StatMonitor />
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="container mx-auto w-full space-y-4 p-4 pb-6">
+          {view === "queue" ? (
+            <>
+              <StatMonitor />
 
-            <QueueSummaryList />
-          </>
-        ) : view === "ml" ? (
-          <MLMonitor localRepoId={localRepoId} />
-        ) : (
-          <CapabilitiesMonitor />
-        )}
+              <QueueSummaryList />
+            </>
+          ) : view === "ml" ? (
+            <MLMonitor localRepoId={localRepoId} />
+          ) : (
+            <CapabilitiesMonitor />
+          )}
+        </div>
       </div>
     </div>
   );

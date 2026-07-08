@@ -70,7 +70,7 @@ export function StudioEditMvp(): React.JSX.Element {
 
   if (view === "editor" && assetId) {
     return (
-      <div className="h-[calc(100vh-6rem)] overflow-hidden bg-base-100">
+      <div className="h-full overflow-hidden bg-base-100">
         <StudioEditor
           key={assetId}
           assetId={assetId}
@@ -84,7 +84,7 @@ export function StudioEditMvp(): React.JSX.Element {
 
   if (view === "picker") {
     return (
-      <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden bg-base-100">
+      <div className="flex h-full flex-col overflow-hidden bg-base-100">
         <div className="flex h-12 shrink-0 items-center border-b border-base-300 px-3">
           <button
             type="button"
@@ -98,7 +98,9 @@ export function StudioEditMvp(): React.JSX.Element {
         <div className="min-h-0 flex-1 overflow-hidden">
           <PhotoPicker
             scopeId="studio:editor"
-            title={t("studio.pickPhoto", { defaultValue: "Pick a photo to edit" })}
+            title={t("studio.pickPhoto", {
+              defaultValue: "Pick a photo to edit",
+            })}
             initialFilters={{ raw: false }}
             lockedFields={["type", "raw"]}
             onSelect={handlePicked}
@@ -109,7 +111,7 @@ export function StudioEditMvp(): React.JSX.Element {
   }
 
   return (
-    <div className="h-[calc(100vh-6rem)] overflow-hidden bg-base-100">
+    <div className="h-full overflow-hidden bg-base-100">
       <StudioHome
         recent={recent}
         onOpenEditor={() => openPicker(false)}

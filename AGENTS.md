@@ -24,7 +24,6 @@ The system is local-first: preserve original media, keep repository/storage sema
 - `site/docs/internal/agent/exec-plans/tech-debt-tracker.md`: small known debt that should not be forgotten.
 - `site/docs/internal/agent/vite-plus.md`: frontend Vite+ setup and command mapping.
 - `site/docs/internal/agent/docts.md`: the `doc.ts` architecture-doc convention (`@module` + `{@link}` backed by `import type`) and the `docts/link-needs-import` lint rule.
-- `site/docs/internal/frontend/`: frontend architecture (composition trees, data-flow seams, ADRs). Start at `internal/frontend/architecture.md`.
 
 ### TRACK THE CHANGES
 

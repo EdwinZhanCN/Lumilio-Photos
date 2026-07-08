@@ -48,21 +48,23 @@ const Manage = () => {
   const { t } = useI18n();
 
   return (
-    <div className="bg-base-100">
+    <div className="flex h-full min-h-0 flex-col bg-base-100">
       <ManageHeader />
-      <ErrorBoundary
-        FallbackComponent={(props) => (
-          <ErrorFallBack
-            code="500"
-            title={t("manage.errorBoundaryTitle")}
-            message={t("manage.errorBoundaryMessage")}
-            {...props}
-          />
-        )}
-      >
-        <UnifiedUploadSection />
-        <RepositoryGrid />
-      </ErrorBoundary>
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <ErrorBoundary
+          FallbackComponent={(props) => (
+            <ErrorFallBack
+              code="500"
+              title={t("manage.errorBoundaryTitle")}
+              message={t("manage.errorBoundaryMessage")}
+              {...props}
+            />
+          )}
+        >
+          <UnifiedUploadSection />
+          <RepositoryGrid />
+        </ErrorBoundary>
+      </div>
     </div>
   );
 };
