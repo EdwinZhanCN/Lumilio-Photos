@@ -74,7 +74,7 @@ function Home() {
         : t("home.map.empty");
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={t("routes.home")} icon={<HomeIcon className="w-6 h-6 text-primary" />}>
         <BrowseScopeSelect />
         <div role="tablist" aria-label={t("routes.home")} className="tabs tabs-box">
@@ -101,7 +101,7 @@ function Home() {
         </div>
       </PageHeader>
 
-      <div>
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {displayMode === "gallery" && (
           <div className="space-y-4">
             {isError && (

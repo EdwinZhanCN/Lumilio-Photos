@@ -42,13 +42,15 @@ function AppShellLayout(): React.ReactNode {
     <BreadcrumbProvider>
       <div className="drawer lg:drawer-open h-screen">
         <input id="app-drawer" type="checkbox" className="drawer-toggle" />
-        <div className="drawer-content flex h-screen flex-col overflow-hidden">
+        <div className="drawer-content flex h-screen min-h-0 flex-col overflow-hidden">
           <div className="bg-base-100 shadow">
             <NavBar />
           </div>
-          <div id="app-scroll-container" className="flex-1 overflow-y-auto overflow-x-hidden">
-            <Breadcrumbs className="sticky top-0 z-10 bg-base-100/80 backdrop-blur" />
-            <Outlet />
+          <div id="app-scroll-container" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <Breadcrumbs className="z-10 shrink-0 border-b border-base-300/60 bg-base-100/80 backdrop-blur" />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <Outlet />
+            </div>
           </div>
           <footer className="bg-base-100 text-base-content text-xs">
             <div className="container mx-auto py-0.5">
