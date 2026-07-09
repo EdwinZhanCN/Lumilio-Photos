@@ -31,6 +31,7 @@ type summary struct {
 
 	Upload struct {
 		Accepted        int     `json:"accepted"`
+		Duplicates      int     `json:"duplicates"`
 		Failed          int     `json:"failed"`
 		DurationSeconds float64 `json:"duration_seconds"`
 		FilesPerSec     float64 `json:"files_per_sec"`
@@ -55,6 +56,9 @@ type summary struct {
 		Complete100Percent bool    `json:"complete_100_percent"`
 	} `json:"photo_ready"`
 
+	// Instant is set only when -instant-pass re-uploaded the dataset after drain.
+	Instant *instantSummary `json:"instant,omitempty"`
+
 	Queues struct {
 		Before       []queueSummary `json:"before"`
 		After        []queueSummary `json:"after"`
@@ -63,6 +67,17 @@ type summary struct {
 
 	MLSettingsBefore mlSettings `json:"ml_settings_before"`
 	MLSettingsAfter  mlSettings `json:"ml_settings_after"`
+}
+
+// instantSummary reports the instant-upload pass: how much of the dataset the
+// server recognized as already-held content, and how fast it did so.
+type instantSummary struct {
+	Duplicates      int     `json:"duplicates"`
+	Ingested        int     `json:"ingested"`
+	Failed          int     `json:"failed"`
+	DurationSeconds float64 `json:"duration_seconds"`
+	FilesPerSec     float64 `json:"files_per_sec"`
+	BytesSkippedGB  float64 `json:"bytes_skipped_gb"`
 }
 
 func summarize(rc *runContext) *summary {
@@ -89,11 +104,16 @@ func summarize(rc *runContext) *summary {
 	var acceptedBytes int64
 	for _, f := range rc.mf.Files {
 		ok := f.UploadErr == "" && f.HTTPStatus >= 200 && f.HTTPStatus < 300
-		if ok {
+		switch {
+		case f.Duplicate:
+			// Instant upload: never staged, never ingested. Kept out of the
+			// acceptance rate so it cannot inflate transport throughput.
+			s.Upload.Duplicates++
+		case ok:
 			s.Upload.Accepted++
 			acceptedBytes += f.Size
 			reqLatMs = append(reqLatMs, float64(f.UploadEndNs-f.UploadStartNs)/1e6)
-		} else {
+		default:
 			s.Upload.Failed++
 			if f.HTTPStatus >= 400 || f.UploadErr != "" {
 				s.Upload.HTTPErrors++
@@ -138,6 +158,21 @@ func summarize(rc *runContext) *summary {
 	s.PhotoReady.LatencySecP95 = percentile(completionSec, 95)
 	s.PhotoReady.LatencySecP99 = percentile(completionSec, 99)
 	s.PhotoReady.Complete100Percent = s.Upload.Accepted > 0 && s.PhotoReady.Completed == s.Upload.Accepted
+
+	// Instant-upload pass.
+	if rc.instant != nil {
+		dur := rc.instant.Duration.Seconds()
+		s.Instant = &instantSummary{
+			Duplicates:      rc.instant.Duplicates,
+			Ingested:        rc.instant.Ingested,
+			Failed:          rc.instant.Failed,
+			DurationSeconds: dur,
+			BytesSkippedGB:  gb(rc.instant.BytesSkipped),
+		}
+		if dur > 0 {
+			s.Instant.FilesPerSec = float64(rc.instant.Duplicates) / dur
+		}
+	}
 
 	// Queues + ML evidence.
 	s.Queues.Before = rc.qBefore
@@ -220,10 +255,23 @@ func writeReport(rc *runContext, s *summary) error {
 	f("## Upload acceptance\n\n")
 	f("| Metric | Value |\n|---|---|\n")
 	f("| Accepted / failed | %d / %d |\n", s.Upload.Accepted, s.Upload.Failed)
+	f("| Duplicates (instant upload) | %d |\n", s.Upload.Duplicates)
 	f("| HTTP errors | %d |\n", s.Upload.HTTPErrors)
 	f("| Accept rate | %.1f files/s, %.1f MB/s |\n", s.Upload.FilesPerSec, s.Upload.MBPerSec)
 	f("| Request latency p50/p95/p99 | %.0f / %.0f / %.0f ms |\n\n",
 		s.Upload.ReqLatencyMsP50, s.Upload.ReqLatencyMsP95, s.Upload.ReqLatencyMsP99)
+
+	if s.Instant != nil {
+		f("## Instant upload (second pass)\n\n")
+		f("The same dataset re-uploaded after drain. Every file should be recognized\n")
+		f("as existing content: `ingested` above zero means a client fingerprint failed\n")
+		f("to match the one the server stored for the same bytes.\n\n")
+		f("| Metric | Value |\n|---|---|\n")
+		f("| Duplicates / re-ingested / failed | %d / %d / %d |\n", s.Instant.Duplicates, s.Instant.Ingested, s.Instant.Failed)
+		f("| Duration | %.1f s |\n", s.Instant.DurationSeconds)
+		f("| Rate | %.1f files/s |\n", s.Instant.FilesPerSec)
+		f("| Bytes not transported | %.2f GB |\n\n", s.Instant.BytesSkippedGB)
+	}
 
 	f("## ML exclusion evidence\n\n")
 	f("- ML settings before: `%+v`\n", s.MLSettingsBefore)

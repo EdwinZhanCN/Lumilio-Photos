@@ -47,6 +47,7 @@ type config struct {
 	outDir      string
 	disableML   bool
 	clientHash  bool
+	instantPass bool // re-upload the dataset after drain to measure instant upload
 	pollEvery   time.Duration
 	timeout     time.Duration
 	limit       int    // cap number of files (0 = all)
@@ -88,6 +89,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.outDir, "out", "", "output directory (default: ./benchruns/<run-id>)")
 	flag.BoolVar(&cfg.disableML, "disable-ml", true, "disable ML settings via the settings API before the run")
 	flag.BoolVar(&cfg.clientHash, "client-hash", true, "send client-computed BLAKE3 as X-Content-Hash (excludes server hashing from acceptance)")
+	flag.BoolVar(&cfg.instantPass, "instant-pass", false, "after drain, re-upload the dataset to measure the instant-upload (duplicate-skip) path")
 	flag.StringVar(&pollRaw, "poll-interval", "1s", "completion poll interval")
 	flag.StringVar(&toRaw, "timeout", "60m", "overall completion timeout")
 	flag.IntVar(&cfg.limit, "limit", 0, "cap number of files uploaded (0 = all; useful for smoke tests)")

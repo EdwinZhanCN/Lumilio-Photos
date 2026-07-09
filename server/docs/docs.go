@@ -5076,6 +5076,81 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.UploadPrecheckFileDTO": {
+                "properties": {
+                    "hash": {
+                        "example": "abcd1234567890",
+                        "type": "string"
+                    },
+                    "size": {
+                        "example": 1048576,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "hash",
+                    "size"
+                ],
+                "type": "object"
+            },
+            "dto.UploadPrecheckRequestDTO": {
+                "properties": {
+                    "files": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.UploadPrecheckFileDTO"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "repository_id": {
+                        "description": "RepositoryID is optional; the primary repository is used when it is empty,\nmirroring the upload endpoints.",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "files"
+                ],
+                "type": "object"
+            },
+            "dto.UploadPrecheckResponseDTO": {
+                "properties": {
+                    "duplicate_count": {
+                        "example": 3,
+                        "type": "integer"
+                    },
+                    "results": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.UploadPrecheckResultDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UploadPrecheckResultDTO": {
+                "properties": {
+                    "asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "duplicate": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "file_name": {
+                        "example": "photo.jpg",
+                        "type": "string"
+                    },
+                    "hash": {
+                        "example": "abcd1234567890",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UploadProgressResponseDTO": {
                 "properties": {
                     "sessions": {
@@ -8366,6 +8441,77 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Get photo map points",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/precheck": {
+            "post": {
+                "description": "Given client-computed BLAKE3 fingerprints, reports which files already exist in the repository so the client can skip transporting them.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UploadPrecheckRequestDTO",
+                                        "summary": "request",
+                                        "description": "Candidate files"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Candidate files",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.UploadPrecheckResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Precheck uploads against existing content hashes",
                 "tags": [
                     "assets"
                 ]

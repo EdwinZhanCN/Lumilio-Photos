@@ -39,6 +39,10 @@ import (
 	"github.com/riverqueue/river"
 )
 
+// uploadStatusDuplicate marks an upload the server skipped because identical
+// content already exists in the target repository.
+const uploadStatusDuplicate = "duplicate"
+
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
 	assetService    service.AssetService
@@ -96,6 +100,46 @@ func NewAssetHandler(
 	return handler
 }
 
+var (
+	errInvalidRepositoryID = errors.New("invalid repository ID")
+	errRepositoryNotFound  = errors.New("repository not found")
+	errNoRepository        = errors.New("no repository available")
+)
+
+// resolveUploadRepository resolves an explicit repository UUID, falling back to
+// the primary repository when repositoryID is empty.
+func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID string) (repo.Repository, error) {
+	if strings.TrimSpace(repositoryID) == "" {
+		repository, err := h.queries.GetPrimaryRepository(ctx)
+		if err != nil {
+			return repo.Repository{}, errNoRepository
+		}
+		return repository, nil
+	}
+
+	repoUUID, err := uuid.Parse(repositoryID)
+	if err != nil {
+		return repo.Repository{}, errInvalidRepositoryID
+	}
+	repository, err := h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
+	if err != nil {
+		return repo.Repository{}, errRepositoryNotFound
+	}
+	return repository, nil
+}
+
+// respondRepositoryError maps a resolveUploadRepository failure onto its HTTP response.
+func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, errInvalidRepositoryID):
+		api.GinBadRequest(c, err, "Invalid repository ID")
+	case errors.Is(err, errRepositoryNotFound):
+		api.GinNotFound(c, err, "Repository not found")
+	default:
+		api.GinBadRequest(c, err, "Please specify a repository_id or create a repository first")
+	}
+}
+
 // UploadAsset handles asset upload requests
 // @Summary Upload a single asset
 // @Description Upload a single photo, video, audio file, or document to the system. The file is staged in a repository and queued for processing.
@@ -142,28 +186,34 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	log.Printf("Validated file %s as %s with canonical MIME %s (RAW: %v)",
 		header.Filename, validationResult.AssetType, validationResult.MimeType, validationResult.IsRAW)
 
-	repositoryID := req.RepositoryID
-	var repository repo.Repository
-	if repositoryID != "" {
-		repoUUID, err := uuid.Parse(repositoryID)
-		if err != nil {
-			api.GinBadRequest(c, err, "Invalid repository ID")
-			return
-		}
-		repository, err = h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
-		if err != nil {
-			api.GinNotFound(c, err, "Repository not found")
-			return
-		}
-	} else {
-		repository, err = h.queries.GetPrimaryRepository(ctx)
-		if err != nil {
-			api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
-			return
-		}
+	repository, err := h.resolveUploadRepository(ctx, req.RepositoryID)
+	if err != nil {
+		h.respondRepositoryError(c, err)
+		return
 	}
 
 	clientHash := c.GetHeader("X-Content-Hash")
+
+	// Instant upload: a client-provided fingerprint that already exists in this
+	// repository means the bytes are already here, so skip staging entirely.
+	if clientHash != "" {
+		duplicate, err := h.findDuplicateByHash(ctx, clientHash, header.Size, repository.RepoID)
+		if err != nil {
+			api.GinInternalError(c, err, "Failed to check for duplicate content")
+			return
+		}
+		if duplicate != nil {
+			log.Printf("Duplicate upload skipped: %s matches asset %s (hash %s)", header.Filename, duplicate.assetID, clientHash)
+			api.JSONOK(c, dto.UploadResponseDTO{
+				Status:      uploadStatusDuplicate,
+				FileName:    header.Filename,
+				Size:        header.Size,
+				ContentHash: clientHash,
+				Message:     "File already exists in repository",
+			})
+			return
+		}
+	}
 
 	// Create staging file in repository
 	stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
@@ -264,14 +314,14 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	}
 
 	// Trigger automatic RAW+JPEG stack detection asynchronously after upload.
-	if repositoryID != "" {
+	if req.RepositoryID != "" {
 		go func(repoID string) {
 			if _, err := h.queueClient.Insert(context.Background(), jobs.DetectStacksArgs{
 				RepositoryID: repoID,
 			}, &river.InsertOpts{Queue: "detect_stacks"}); err != nil {
 				log.Printf("failed to enqueue detect stacks after upload: %v", err)
 			}
-		}(repositoryID)
+		}(req.RepositoryID)
 	}
 
 	api.JSONOK(c, response)
@@ -303,25 +353,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		if repositoryResolved {
 			return true
 		}
-		var err error
-		if repositoryID != "" {
-			repoUUID, err := uuid.Parse(repositoryID)
-			if err != nil {
-				api.GinBadRequest(c, err, "Invalid repository ID")
-				return false
-			}
-			repository, err = h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
-			if err != nil {
-				api.GinNotFound(c, err, "Repository not found")
-				return false
-			}
-		} else {
-			repository, err = h.queries.GetPrimaryRepository(ctx)
-			if err != nil {
-				api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
-				return false
-			}
+		resolved, err := h.resolveUploadRepository(ctx, repositoryID)
+		if err != nil {
+			h.respondRepositoryError(c, err)
+			return false
 		}
+		repository = resolved
 		repositoryResolved = true
 		return true
 	}
@@ -559,6 +596,91 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	}
 
 	api.JSONOK(c, dto.BatchUploadResponseDTO{Results: results})
+}
+
+// PrecheckUpload reports which of the candidate files already exist in the repository.
+// @Summary Precheck uploads against existing content hashes
+// @Description Given client-computed BLAKE3 fingerprints, reports which files already exist in the repository so the client can skip transporting them.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body dto.UploadPrecheckRequestDTO true "Candidate files"
+// @Success 200 {object} dto.UploadPrecheckResponseDTO
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 404 {object} api.ErrorResponse
+// @Failure 500 {object} api.ErrorResponse
+// @Router /api/v1/assets/precheck [post]
+func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req dto.UploadPrecheckRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	repository, err := h.resolveUploadRepository(ctx, req.RepositoryID)
+	if err != nil {
+		h.respondRepositoryError(c, err)
+		return
+	}
+
+	hashes := make([]string, 0, len(req.Files))
+	for _, file := range req.Files {
+		hashes = append(hashes, file.Hash)
+	}
+
+	rows, err := h.queries.GetAssetsByHashesAndRepository(ctx, repo.GetAssetsByHashesAndRepositoryParams{
+		Hashes:       hashes,
+		RepositoryID: repository.RepoID,
+	})
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to precheck uploads")
+		return
+	}
+
+	// Keyed by hash and size together: a quick hash only covers the first and
+	// last 1 MiB, so size is part of the identity we match on.
+	type fingerprint struct {
+		hash string
+		size int64
+	}
+	type existingAsset struct {
+		assetID  string
+		filename string
+	}
+	existing := make(map[fingerprint]existingAsset, len(rows))
+	for _, row := range rows {
+		if row.Hash == nil {
+			continue
+		}
+		key := fingerprint{hash: *row.Hash, size: row.FileSize}
+		if _, seen := existing[key]; seen {
+			continue
+		}
+		existing[key] = existingAsset{
+			assetID:  row.AssetID.String(),
+			filename: row.OriginalFilename,
+		}
+	}
+
+	results := make([]dto.UploadPrecheckResultDTO, 0, len(req.Files))
+	duplicateCount := 0
+	for _, file := range req.Files {
+		result := dto.UploadPrecheckResultDTO{Hash: file.Hash}
+		if match, ok := existing[fingerprint{hash: file.Hash, size: file.Size}]; ok {
+			result.Duplicate = true
+			result.AssetID = &match.assetID
+			result.FileName = &match.filename
+			duplicateCount++
+		}
+		results = append(results, result)
+	}
+
+	api.JSONOK(c, dto.UploadPrecheckResponseDTO{
+		Results:        results,
+		DuplicateCount: duplicateCount,
+	})
 }
 
 // GetUploadConfig returns current upload configuration
@@ -3640,20 +3762,27 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	finalContentType := validationResult.MimeType
 	log.Printf("Completed upload resolved canonical MIME %s for %s", finalContentType, header.Filename)
 
-	// Check for hash collision before enqueueing
-	collision, err := h.checkHashCollisionBeforeEnqueue(ctx, finalHash, header.Filename, uuid.UUID(repository.RepoID.Bytes).String())
+	// Instant upload: identical content already in the repository, so drop the
+	// staged bytes instead of ingesting a second copy.
+	duplicate, err := h.findDuplicateByHash(ctx, finalHash, header.Size, repository.RepoID)
 	if err != nil {
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "check hash collision before enqueue")
-		return nil, fmt.Errorf("failed to check hash collision: %w", err)
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "check duplicate content before enqueue")
+		return nil, fmt.Errorf("failed to check for duplicate content: %w", err)
 	}
 
-	if collision {
+	if duplicate != nil {
+		log.Printf("Duplicate upload skipped: %s matches asset %s (hash %s)", header.Filename, duplicate.assetID, finalHash)
 		h.removeUploadTempFile(stagingFilePath)
+		size := header.Size
+		status := uploadStatusDuplicate
+		message := "File already exists in repository"
 		return &dto.BatchUploadResultDTO{
-			Success:     false,
+			Success:     true,
 			FileName:    header.Filename,
 			ContentHash: finalHash,
-			Error:       stringPtr("File with same content already exists in repository"),
+			Status:      &status,
+			Size:        &size,
+			Message:     &message,
 		}, nil
 	}
 
@@ -3698,36 +3827,40 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	}, nil
 }
 
-// checkHashCollisionBeforeEnqueue checks if a file with the same hash already exists
-func (h *AssetHandler) checkHashCollisionBeforeEnqueue(ctx context.Context, hash string, filename string, repositoryID string) (bool, error) {
-	repoUUID, err := uuid.Parse(repositoryID)
-	if err != nil {
-		return false, fmt.Errorf("invalid repository ID: %w", err)
+// duplicateAsset identifies the already-stored asset that a candidate upload matches.
+type duplicateAsset struct {
+	assetID  string
+	filename string
+}
+
+// findDuplicateByHash reports the existing asset in the repository carrying the
+// same content fingerprint, or nil when the content is new. Hash equality is the
+// system's identity notion for asset content; size is compared alongside it
+// because files over hash.QuickHashThreshold carry a quick hash that only covers
+// their first and last chunk.
+func (h *AssetHandler) findDuplicateByHash(ctx context.Context, contentHash string, size int64, repositoryID pgtype.UUID) (*duplicateAsset, error) {
+	if contentHash == "" {
+		return nil, nil
 	}
 
-	// Check if asset with same hash exists in the repository using the new query
-	existing, err := h.queries.GetAssetByHashAndRepository(ctx, repo.GetAssetByHashAndRepositoryParams{
-		Hash:         &hash,
-		RepositoryID: pgtype.UUID{Bytes: repoUUID, Valid: true},
+	rows, err := h.queries.GetAssetsByHashesAndRepository(ctx, repo.GetAssetsByHashesAndRepositoryParams{
+		Hashes:       []string{contentHash},
+		RepositoryID: repositoryID,
 	})
-
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// No existing asset found, no collision
-			return false, nil
+		return nil, fmt.Errorf("failed to look up existing content hash: %w", err)
+	}
+
+	for _, row := range rows {
+		if row.FileSize != size {
+			continue
 		}
-		return false, fmt.Errorf("failed to check hash collision: %w", err)
+		return &duplicateAsset{
+			assetID:  row.AssetID.String(),
+			filename: row.OriginalFilename,
+		}, nil
 	}
-
-	// Found existing asset with same hash
-	if existing.OriginalFilename != filename {
-		log.Printf("Hash collision detected in repository %s: %s (new) vs %s (existing)", repositoryID, filename, existing.OriginalFilename)
-		return true, nil
-	}
-	// Same filename: likely a duplicate upload
-	log.Printf("Duplicate upload detected: %s with hash %s", filename, hash)
-
-	return false, nil
+	return nil, nil
 }
 
 // ReprocessAsset reprocesses a failed or warning asset

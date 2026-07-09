@@ -1,0 +1,17 @@
+# Generated artifacts. `linguist-generated` keeps them out of the repository
+# language statistics and collapses them by default in pull request diffs.
+# Regenerate rather than hand-edit: see the `dto` target in the Makefile for the
+# OpenAPI chain, and `wasm/` for the Rust crates behind the JS/WASM bundles.
+
+# OpenAPI: swag init -> openapi-typescript -> redocly build-docs (`make dto`)
+server/docs/docs.go             linguist-generated=true
+server/docs/swagger.json        linguist-generated=true
+server/docs/swagger.yaml        linguist-generated=true
+web/src/lib/http-commons/schema.d.ts linguist-generated=true
+site/docs/public/redoc-static.html   linguist-generated=true
+
+# wasm-bindgen output for the Rust crates under wasm/
+web/src/wasm/**                 linguist-generated=true
+
+# docts renders each feature's doc.ts into its sibling doc.md
+web/src/features/*/doc.md       linguist-generated=true

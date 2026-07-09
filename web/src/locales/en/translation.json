@@ -1986,6 +1986,7 @@
     "FileUploadProgress": {
       "chunked_badge": "Chunked",
       "status_completed": "Completed",
+      "status_duplicate": "Duplicate",
       "status_failed": "Failed",
       "status_pending": "Pending",
       "status_uploading": "Uploading"
@@ -1994,6 +1995,8 @@
       "active_one": "{{count}} active",
       "active_other": "{{count}} active",
       "backgroundHint": "Uploads keep running while you browse.",
+      "duplicate_one": "{{count}} duplicate",
+      "duplicate_other": "{{count}} duplicates",
       "failed_one": "{{count}} failed",
       "failed_other": "{{count}} failed",
       "openPage": "Open upload page",
@@ -2041,6 +2044,8 @@
     "UploadProcess": {
       "noResult": "No result returned",
       "processFailed": "Upload process failed",
+      "summaryDuplicates_one": "Uploaded {{count}} file, skipped {{duplicates}} already in your library.",
+      "summaryDuplicates_other": "Uploaded {{count}} files, skipped {{duplicates}} already in your library.",
       "summaryPartial": "Upload complete: {{succeeded}} succeeded, {{failed}} failed.",
       "summarySuccess_one": "Successfully uploaded {{count}} file.",
       "summarySuccess_other": "Successfully uploaded {{count}} files.",

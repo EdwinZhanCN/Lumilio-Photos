@@ -66,7 +66,20 @@ go run ./tools/uploadbench \
 
 Key flags: `-concurrency` (sweep 1/2/4/8/16/32 to find saturation),
 `-profile`, `-disable-ml` (default true), `-client-hash` (default true),
-`-timeout` (default 60m), `-limit` (cap files), `-run-id`, `-out`, `-db` (below).
+`-timeout` (default 60m), `-limit` (cap files), `-run-id`, `-out`,
+`-instant-pass` (below), `-db` (below).
+
+### Instant upload via `-instant-pass` (optional)
+
+With `-instant-pass`, the harness re-uploads the whole dataset once the first
+pass has drained. Every file should come back with status `duplicate`: the server
+recognizes the content hash, skips staging, and enqueues no ingest job. The report
+gains an **Instant upload** section with the duplicate count, wall time, and the
+bytes that never crossed the wire.
+
+`ingested` above zero in that section is a real failure signal, not noise. It
+means the fingerprint the client sent for a file does not match the one the server
+stored for the very same bytes — the two hash implementations have drifted apart.
 
 ### Exact timing via `-db` (optional)
 

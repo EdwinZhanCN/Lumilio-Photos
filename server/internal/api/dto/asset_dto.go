@@ -114,6 +114,40 @@ type BatchUploadResultDTO struct {
 	Error       *string `json:"error,omitempty"`
 }
 
+// UploadPrecheckFileDTO is one candidate file in an upload precheck request.
+// Hash is the client-computed BLAKE3 fingerprint, which for files over 100 MiB
+// is the quick hash (little-endian size plus the first and last 1 MiB chunk).
+// Size is matched alongside the hash so a quick-hash fingerprint cannot alias a
+// file of a different length.
+type UploadPrecheckFileDTO struct {
+	Hash string `json:"hash" binding:"required" example:"abcd1234567890"`
+	Size int64  `json:"size" binding:"required" example:"1048576"`
+}
+
+// UploadPrecheckRequestDTO is the body for POST /assets/precheck.
+type UploadPrecheckRequestDTO struct {
+	// RepositoryID is optional; the primary repository is used when it is empty,
+	// mirroring the upload endpoints.
+	RepositoryID string                  `json:"repository_id,omitempty" binding:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Files        []UploadPrecheckFileDTO `json:"files" binding:"required,min=1,dive"`
+}
+
+// UploadPrecheckResultDTO reports whether one candidate file already exists in
+// the target repository. When Duplicate is true the client can skip transport
+// entirely and mark the file as a duplicate.
+type UploadPrecheckResultDTO struct {
+	Hash      string  `json:"hash" example:"abcd1234567890"`
+	Duplicate bool    `json:"duplicate" example:"true"`
+	AssetID   *string `json:"asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FileName  *string `json:"file_name,omitempty" example:"photo.jpg"`
+}
+
+// UploadPrecheckResponseDTO is the response for POST /assets/precheck.
+type UploadPrecheckResponseDTO struct {
+	Results        []UploadPrecheckResultDTO `json:"results"`
+	DuplicateCount int                       `json:"duplicate_count" example:"3"`
+}
+
 // UploadConfigResponseDTO represents the response structure for upload configuration
 type UploadConfigResponseDTO struct {
 	ChunkSize           int64 `json:"chunk_size"`

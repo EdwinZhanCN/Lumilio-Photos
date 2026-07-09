@@ -4240,6 +4240,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/precheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Precheck uploads against existing content hashes
+         * @description Given client-computed BLAKE3 fingerprints, reports which files already exist in the repository so the client can skip transporting them.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Candidate files */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UploadPrecheckRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.UploadPrecheckResponseDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/rating/{rating}": {
         parameters: {
             query?: never;
@@ -12476,6 +12547,36 @@ export interface components {
             max_in_flight_requests?: number;
             memory_buffer?: number;
             merge_concurrency?: number;
+        };
+        "dto.UploadPrecheckFileDTO": {
+            /** @example abcd1234567890 */
+            hash: string;
+            /** @example 1048576 */
+            size: number;
+        };
+        "dto.UploadPrecheckRequestDTO": {
+            files: components["schemas"]["dto.UploadPrecheckFileDTO"][];
+            /**
+             * @description RepositoryID is optional; the primary repository is used when it is empty,
+             *     mirroring the upload endpoints.
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            repository_id?: string;
+        };
+        "dto.UploadPrecheckResponseDTO": {
+            /** @example 3 */
+            duplicate_count?: number;
+            results?: components["schemas"]["dto.UploadPrecheckResultDTO"][];
+        };
+        "dto.UploadPrecheckResultDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            asset_id?: string;
+            /** @example true */
+            duplicate?: boolean;
+            /** @example photo.jpg */
+            file_name?: string;
+            /** @example abcd1234567890 */
+            hash?: string;
         };
         "dto.UploadProgressResponseDTO": {
             sessions?: components["schemas"]["dto.SessionProgressDTO"][];
