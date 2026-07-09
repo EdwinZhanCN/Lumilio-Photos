@@ -12,17 +12,26 @@
 	root * /usr/share/caddy
 	encode zstd gzip
 
-	@api path /api/*
-	reverse_proxy @api {$LUMILIO_API_UPSTREAM} {
-		flush_interval -1
+	# API and SPA must be routed with mutually exclusive `handle` blocks. A bare
+	# `try_files {path} /index.html` is a rewrite, and Caddy orders rewrite
+	# BEFORE reverse_proxy, so an unscoped try_files rewrites /api/* to
+	# /index.html before the @api matcher runs — the proxy never fires and the
+	# SPA shell is served for every API call. Scoping the API into its own handle
+	# keeps try_files from ever seeing /api/* paths.
+	handle /api/* {
+		reverse_proxy {$LUMILIO_API_UPSTREAM} {
+			flush_interval -1
+		}
 	}
 
-	@immutable path *.js *.css *.wasm *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.woff *.woff2 *.ttf *.eot
-	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	handle {
+		@immutable path *.js *.css *.wasm *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.woff *.woff2 *.ttf *.eot
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
 
-	@wasm path *.wasm
-	header @wasm Content-Type "application/wasm"
+		@wasm path *.wasm
+		header @wasm Content-Type "application/wasm"
 
-	try_files {path} /index.html
-	file_server
+		try_files {path} /index.html
+		file_server
+	}
 }

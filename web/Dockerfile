@@ -45,7 +45,11 @@ FROM caddy:2-alpine
 # Default to local plain HTTP. Set LUMILIO_SITE_ADDRESS to a real domain in
 # production and Caddy will manage TLS certificates and HTTP/2 automatically.
 ENV LUMILIO_SITE_ADDRESS=:80
-ENV LUMILIO_API_UPSTREAM=h2c://server:6680
+# Plain HTTP/1.1 to the API: the Go server serves HTTP/1.1 only (no h2c), so an
+# h2c:// upstream makes Caddy speak HTTP/2 cleartext to a server that cannot
+# parse it and every /api request 502s. To restore end-to-end HTTP/2, wrap the
+# server handler in golang.org/x/net/http2/h2c first, then switch this back.
+ENV LUMILIO_API_UPSTREAM=http://server:6680
 
 # Copy built files from build stage to Caddy's static root.
 COPY --from=build /app/dist /usr/share/caddy
