@@ -54,6 +54,8 @@ stage() { # src dest
 stage "$RESOURCES_SRC/postgres" "$APPDIR/resources/postgres"
 stage "$RESOURCES_SRC/ffmpeg" "$APPDIR/resources/ffmpeg"
 stage "$RESOURCES_SRC/exiftool" "$APPDIR/resources/exiftool"
+# License texts (committed, also embedded in the binary for the setup window).
+stage "$DESKTOP_DIR/licenses" "$APPDIR/resources/licenses"
 
 echo "==> Staging web SPA"
 WEB_DIST="$ROOT/web/dist"

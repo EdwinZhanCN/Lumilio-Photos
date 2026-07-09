@@ -18,8 +18,9 @@ import (
 var onboardingHTML []byte
 
 // tosVersion is the accepted-terms revision persisted on completion. Bump it to
-// re-prompt users when the bundled licenses or terms change materially.
-const tosVersion = "2026-07"
+// re-prompt users when the bundled licenses or terms change materially
+// (NeedsOnboarding compares it against the persisted accepted version).
+const tosVersion = "2026-07-09"
 
 // validation is the live check the onboarding window shows for a chosen library
 // location: reachable (parent exists), writable, and free space.
@@ -43,6 +44,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			"path":       path,
 			"validation": validateStorage(path),
 			"version":    appVersion(),
+			"tosRev":     tosVersion,
 		})
 	})
 
@@ -106,6 +108,9 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		// double signal (the window-closing handler also fires).
 		d.markOnboardingDone()
 	})
+
+	mux.HandleFunc("/__onb/licenses", handleLicenseIndex)
+	mux.HandleFunc("/__onb/license", handleLicenseText)
 
 	// Everything else (notably "/") serves the single-page setup UI.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -85,17 +85,6 @@ func (p *Postgres) IsInitialized() bool {
 	return err == nil
 }
 
-// DataVersion returns the major version recorded in the data directory's
-// PG_VERSION file, or "" if the cluster is not initialized. Used to detect a
-// bundled-vs-data major mismatch that requires a dump/restore upgrade.
-func (p *Postgres) DataVersion() string {
-	data, err := os.ReadFile(filepath.Join(p.dataDir, "PG_VERSION"))
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
-}
-
 // InitDB initializes a fresh cluster owned by the configured user, trusting
 // local connections (no password over the Unix socket).
 func (p *Postgres) InitDB(ctx context.Context) error {

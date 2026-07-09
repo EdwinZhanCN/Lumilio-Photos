@@ -149,8 +149,11 @@ func TestOnboardingComplete(t *testing.T) {
 	if settings.TOSAcceptedVersion != tosVersion {
 		t.Errorf("TOSAcceptedVersion = %q, want %q", settings.TOSAcceptedVersion, tosVersion)
 	}
-	if d.sup.NeedsOnboarding() {
+	if d.sup.NeedsOnboarding(tosVersion) {
 		t.Error("NeedsOnboarding should be false after completion")
+	}
+	if !d.sup.NeedsOnboarding("some-newer-revision") {
+		t.Error("a bumped ToS revision should re-prompt a completed user")
 	}
 }
 
@@ -181,6 +184,42 @@ func TestOnboardingCompleteRejectsUnwritable(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/__onb/complete", strings.NewReader(body)))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 for unwritable location", rec.Code)
+	}
+}
+
+func TestLicenseEndpoints(t *testing.T) {
+	d := newTestApp(t)
+	h := d.onboardingHandler()
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/licenses", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("licenses status = %d", rec.Code)
+	}
+	var entries []licenseEntry
+	if err := json.Unmarshal(rec.Body.Bytes(), &entries); err != nil {
+		t.Fatalf("decode licenses: %v", err)
+	}
+	if len(entries) != len(licenseManifest) {
+		t.Fatalf("got %d entries, want %d", len(entries), len(licenseManifest))
+	}
+
+	// Every manifest entry must resolve to a non-empty embedded text.
+	for _, e := range licenseManifest {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/license?id="+e.ID, nil))
+		if rec.Code != http.StatusOK {
+			t.Errorf("license %q status = %d", e.ID, rec.Code)
+		}
+		if rec.Body.Len() < 500 {
+			t.Errorf("license %q text suspiciously short (%d bytes)", e.ID, rec.Body.Len())
+		}
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/license?id=nope", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unknown id status = %d, want 404", rec.Code)
 	}
 }
 

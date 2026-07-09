@@ -114,6 +114,8 @@ stage "$RESOURCES_SRC/postgres/17/$PLATFORM" "$RES_DIR/postgres/17/$PLATFORM"
 stage "$RESOURCES_SRC/ffmpeg/ffmpeg"          "$RES_DIR/ffmpeg/ffmpeg"
 stage "$RESOURCES_SRC/ffmpeg/ffprobe"         "$RES_DIR/ffmpeg/ffprobe"
 stage "$RESOURCES_SRC/exiftool"               "$RES_DIR/exiftool"
+# License texts (committed, also embedded in the binary for the setup window).
+stage "$DESKTOP_DIR/licenses"                 "$RES_DIR/licenses"
 
 echo "==> Staging web SPA"
 WEB_DIST="$ROOT/web/dist"
