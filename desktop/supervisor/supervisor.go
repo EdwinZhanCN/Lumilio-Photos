@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"desktop/lumen"
+
 	"server/app"
 	serverconfig "server/config"
 )
@@ -167,6 +169,15 @@ func (s *Supervisor) DefaultStoragePath() (string, error) {
 	return s.paths.DefaultLib, nil
 }
 
+// LumenDir is where the supervised Lumen Hub lives (build + config + model
+// cache). Safe to call before Start.
+func (s *Supervisor) LumenDir() (string, error) {
+	if err := s.ensurePaths(); err != nil {
+		return "", err
+	}
+	return s.paths.LumenDir(), nil
+}
+
 // StorageReachable reports whether the given media-library location exists or can
 // be created (its parent exists). Exposed for the onboarding window's live
 // validation.
@@ -291,6 +302,12 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		ExifToolPath:  bundledExifTool(resources),
 		FFmpegPath:    bundledFFmpeg(resources),
 		FFprobePath:   bundledFFprobe(resources),
+		// Always pin the supervised local hub endpoint: static entries are
+		// address facts (never expired, reconnect-managed by the SDK), so the
+		// pin is harmless while local AI is not installed/running and connects
+		// as soon as the hub comes up — no server restart when the user
+		// enables AI from the tray mid-session.
+		LumenStaticNodes: []string{lumen.GRPCEndpoint},
 	})
 	if err != nil {
 		return fmt.Errorf("build desktop server config: %w", err)

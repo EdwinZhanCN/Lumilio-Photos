@@ -99,6 +99,10 @@ func (p *Paths) EnsureDirs() error {
 // LockFile is the flock single-instance guard path.
 func (p *Paths) LockFile() string { return filepath.Join(p.AppData, "lumilio.lock") }
 
+// LumenDir holds the optional supervised Lumen Hub: the unpacked build,
+// its generated config, and the model cache. Always on local disk.
+func (p *Paths) LumenDir() string { return filepath.Join(p.AppData, "lumen") }
+
 // DesktopSettingsFile persists user choices that must survive relaunch (e.g. the
 // storage path). It is NOT regenerated, unlike ServerConfigFile.
 func (p *Paths) DesktopSettingsFile() string {

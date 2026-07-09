@@ -46,7 +46,9 @@ make desktop-test
 
 App data (always local, never on the user's relocatable media drive):
 `~/Library/Application Support/Lumilio Photos/` — `postgres/`, `secrets/`,
-`config/`, `backups/`, `lumilio.lock`. Override the root with `LUMILIO_APP_DATA`.
+`config/`, `backups/`, `lumen/` (optional local AI: the supervised Lumen Hub
+build, generated config, and model cache — installed from the tray, see
+`desktop/lumen`), `lumilio.lock`. Override the root with `LUMILIO_APP_DATA`.
 `config/server.local.toml` is a generated debug copy of the typed runtime config;
 desktop does not boot by reloading it.
 

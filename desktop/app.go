@@ -9,7 +9,9 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"desktop/lumen"
 	"desktop/supervisor"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -52,6 +54,11 @@ type desktopApp struct {
 	onboardOnce sync.Once
 	onboardCh   chan struct{}
 	onboardFlag atomic.Bool
+
+	// Local AI (supervised Lumen Hub) — see lumen_app.go.
+	lumenHub           *lumen.Hub
+	lumenState         string
+	lumenStopRequested atomic.Bool
 
 	lastStage atomic.Value // string: most recent startup stage, for failure dialogs
 }
@@ -164,6 +171,8 @@ func (d *desktopApp) refreshMenu() {
 		})
 	}
 
+	d.appendLumenMenu(menu)
+
 	menu.AddSeparator()
 
 	quit := menu.Add(d.tr("quit"))
@@ -201,6 +210,9 @@ func (d *desktopApp) startRuntime() {
 	// Check for a newer release in the background (best-effort, off the critical
 	// path); surface it in the tray if found.
 	go d.checkUpdate()
+
+	// Resume local AI if the user enabled it previously.
+	go d.autoStartLumen()
 }
 
 // checkUpdate queries GitHub for a newer release and, if one exists, shows it in
@@ -245,9 +257,15 @@ func (d *desktopApp) openInBrowser() {
 	}
 }
 
-// onShutdown drains the API server and stops PostgreSQL. Wails blocks
-// termination until this returns.
+// onShutdown stops the local AI hub, drains the API server, and stops
+// PostgreSQL. Wails blocks termination until this returns. The hub is stopped
+// before the context is cancelled so it gets a graceful signal rather than the
+// CommandContext kill.
 func (d *desktopApp) onShutdown() {
+	d.lumenStopRequested.Store(true)
+	if hub := d.lumenHub; hub != nil {
+		hub.Stop(10 * time.Second)
+	}
 	d.cancel()
 	if err := d.sup.Stop(); err != nil {
 		log.Printf("desktop shutdown error: %v", err)

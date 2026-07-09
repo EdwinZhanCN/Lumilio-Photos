@@ -27,6 +27,12 @@ type DesktopParams struct {
 	ExifToolPath  string // empty = resolve via PATH
 	FFmpegPath    string
 	FFprobePath   string
+	// LumenStaticNodes pins Lumen node gRPC endpoints ("host:port") in addition
+	// to mDNS discovery. The desktop host always pins the supervised local hub
+	// endpoint: the SDK treats static entries as address facts, not liveness
+	// claims, so the entry is harmless while the hub is not installed/running
+	// and connects as soon as it comes up (no server restart needed).
+	LumenStaticNodes []string
 }
 
 // NewDesktopConfig builds the server runtime config for the desktop host. It
@@ -67,6 +73,7 @@ func NewDesktopConfig(p DesktopParams) (AppConfig, error) {
 	cfg.Lumen.DiscoveryEnabled = true
 	cfg.Lumen.DiscoveryMDNSEnabled = true
 	cfg.Lumen.DiscoveryHubURL = ""
+	cfg.Lumen.DiscoveryStaticNodes = p.LumenStaticNodes
 	cfg.Tools = ToolsConfig{
 		ExifToolPath: strings.TrimSpace(p.ExifToolPath),
 		FFmpegPath:   strings.TrimSpace(p.FFmpegPath),
