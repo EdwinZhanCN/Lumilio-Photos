@@ -182,13 +182,26 @@
   .agree input:focus-visible + .checkbox { outline: 2px solid var(--ring); outline-offset: 2px; }
   .agree-text { font-size: 12.5px; }
   .agree-text a { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
-  .licenses {
+  .panel {
     margin-top: 10px; margin-left: 40px; font-size: 11.5px; color: var(--muted-foreground);
     background: var(--muted); border-radius: 8px; padding: 11px 13px; display: none;
-    max-height: 130px; overflow-y: auto; line-height: 1.6;
+    max-height: 200px; overflow-y: auto; line-height: 1.6;
   }
-  .licenses.open { display: block; }
-  .licenses b { color: var(--foreground); font-weight: 600; }
+  .panel.open { display: block; }
+  .panel b { color: var(--foreground); font-weight: 600; }
+  .panel p + p { margin-top: 6px; }
+  .lic-item {
+    display: flex; align-items: baseline; gap: 8px; padding: 2px 0; cursor: pointer;
+  }
+  .lic-item .lic-name { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+  .lic-item .lic-kind { margin-left: auto; text-align: right; }
+  .lic-text {
+    display: none; white-space: pre-wrap; overflow-wrap: anywhere;
+    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px; line-height: 1.45; margin: 4px 0 8px;
+    border-left: 2px solid var(--border); padding-left: 8px;
+  }
+  .lic-text.open { display: block; }
   /* AI note -------------------------------------------------------------- */
   .note {
     display: flex; gap: 9px; align-items: flex-start;
@@ -275,14 +288,23 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
             </span>
             <span class="agree-text">
-              <span data-i18n="terms.agree">I have read and agree to the Terms of Use and the</span>
-              <a id="toggle-licenses" data-i18n="terms.view">bundled open-source licenses</a>.
+              <span data-i18n="terms.agree1">I have read and agree to the</span>
+              <a id="toggle-terms" data-i18n="terms.linkTerms">Terms of Use</a>
+              <span data-i18n="terms.agree2">and the</span>
+              <a id="toggle-licenses" data-i18n="terms.linkLicenses">open-source licenses</a><span data-i18n="terms.dot">.</span>
             </span>
           </label>
         </div>
-        <div class="licenses" id="licenses">
-          <p data-i18n="terms.body1"><b>Lumilio Photos</b> is distributed under its open-source license and provided “as is”, without warranty of any kind.</p>
-          <p style="margin-top:6px" data-i18n="terms.body2">This app bundles: <b>PostgreSQL</b> &amp; <b>pgvector</b> (PostgreSQL License), <b>FFmpeg</b> (LGPL/GPL), <b>ExifTool</b> (Perl/Artistic License), and <b>libvips</b> (LGPL). Each remains under its own license; full texts ship with the application.</p>
+        <div class="panel" id="terms-panel">
+          <p><b data-i18n="terms.head">Terms of Use</b> <span id="tos-rev"></span></p>
+          <p data-i18n="terms.t1">Lumilio Photos is free, open-source software, licensed to you under the GNU General Public License v3.0 (full text in the license list).</p>
+          <p data-i18n="terms.t2">It is provided “as is”, without warranty of any kind, express or implied, including merchantability or fitness for a particular purpose. You use it at your own risk.</p>
+          <p data-i18n="terms.t3">The app is local-first: your photos, videos, and database are stored on this machine or the storage location you choose. Nothing is uploaded to us, and you are responsible for backing up your library.</p>
+          <p data-i18n="terms.t4">On launch the app checks GitHub for newer releases (a version query only). Optional AI features run on a Lumen node you operate on your own machine or local network.</p>
+          <p data-i18n="terms.t5">The app bundles third-party open-source components, each under its own license; the full texts are available in the license list and ship with the application.</p>
+        </div>
+        <div class="panel" id="licenses-panel">
+          <div id="lic-list" data-i18n="licenses.loading">Loading…</div>
         </div>
       </div>
 
@@ -294,6 +316,7 @@
     </div>
 
     <div class="footer">
+      <span class="hint" id="ver" style="opacity:.65"></span>
       <span class="hint" id="hint" data-i18n="footer.hint">Choose a location and accept the terms to continue.</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" id="continue" disabled>
@@ -313,10 +336,19 @@ const I18N = {
     "storage.choose": "Choose…",
     "terms.title": "Terms & open-source licenses",
     "terms.desc": "Lumilio Photos is free and open source, and bundles other open-source software.",
-    "terms.agree": "I have read and agree to the Terms of Use and the",
-    "terms.view": "bundled open-source licenses",
-    "terms.body1": "Lumilio Photos is distributed under its open-source license and provided “as is”, without warranty of any kind.",
-    "terms.body2": "This app bundles: PostgreSQL & pgvector (PostgreSQL License), FFmpeg (LGPL/GPL), ExifTool (Perl/Artistic License), and libvips (LGPL). Each remains under its own license; full texts ship with the application.",
+    "terms.agree1": "I have read and agree to the",
+    "terms.linkTerms": "Terms of Use",
+    "terms.agree2": "and the",
+    "terms.linkLicenses": "open-source licenses",
+    "terms.dot": ".",
+    "terms.head": "Terms of Use",
+    "terms.t1": "Lumilio Photos is free, open-source software, licensed to you under the GNU General Public License v3.0 (full text in the license list).",
+    "terms.t2": "It is provided “as is”, without warranty of any kind, express or implied, including merchantability or fitness for a particular purpose. You use it at your own risk.",
+    "terms.t3": "The app is local-first: your photos, videos, and database are stored on this machine or the storage location you choose. Nothing is uploaded to us, and you are responsible for backing up your library.",
+    "terms.t4": "On launch the app checks GitHub for newer releases (a version query only). Optional AI features run on a Lumen node you operate on your own machine or local network.",
+    "terms.t5": "The app bundles third-party open-source components, each under its own license; the full texts are available in the license list and ship with the application.",
+    "licenses.loading": "Loading…",
+    "licenses.error": "Could not load the license list.",
     "ai.note": "AI features (semantic search, faces, OCR) are optional and provided by a Lumen node — this machine or another on your network. You can enable them later in Settings; nothing is downloaded now.",
     "footer.hint": "Choose a location and accept the terms to continue.",
     "footer.continue": "Continue",
@@ -335,10 +367,19 @@ const I18N = {
     "storage.choose": "选择…",
     "terms.title": "条款与开源许可",
     "terms.desc": "Lumilio Photos 是免费开源软件，并捆绑了其他开源组件。",
-    "terms.agree": "我已阅读并同意《使用条款》以及",
-    "terms.view": "捆绑的开源许可",
-    "terms.body1": "Lumilio Photos 依据其开源许可分发，按“原样”提供，不作任何形式的担保。",
-    "terms.body2": "本应用捆绑：PostgreSQL 与 pgvector（PostgreSQL 许可）、FFmpeg（LGPL/GPL）、ExifTool（Perl/Artistic 许可）、libvips（LGPL）。各组件均遵循其自身许可，完整文本随应用一同提供。",
+    "terms.agree1": "我已阅读并同意",
+    "terms.linkTerms": "《使用条款》",
+    "terms.agree2": "与",
+    "terms.linkLicenses": "开源许可",
+    "terms.dot": "。",
+    "terms.head": "使用条款",
+    "terms.t1": "Lumilio Photos 是自由开源软件，依据 GNU 通用公共许可证 v3.0（GPL-3.0）授权给你使用（完整文本见开源许可列表）。",
+    "terms.t2": "本软件按“原样”提供，不作任何明示或默示的担保，包括适销性或特定用途适用性。使用风险由你自行承担。",
+    "terms.t3": "本应用为本地优先：你的照片、视频与数据库都保存在本机或你选择的存储位置，不会上传给我们；照片库的备份由你自行负责。",
+    "terms.t4": "应用启动时会向 GitHub 查询新版本（仅版本号查询）。可选的 AI 功能由你在本机或局域网内自行运行的 Lumen 节点提供。",
+    "terms.t5": "本应用捆绑了第三方开源组件，各组件均遵循其自身许可；完整文本见开源许可列表，并随应用一同分发。",
+    "licenses.loading": "加载中…",
+    "licenses.error": "无法加载许可列表。",
     "ai.note": "AI 功能（语义搜索、人脸、OCR）为可选项，由 Lumen 节点提供——可以是本机或局域网内的其他设备。你可以稍后在“设置”中启用；现在不会下载任何内容。",
     "footer.hint": "选择位置并接受条款后即可继续。",
     "footer.continue": "继续",
@@ -423,6 +464,10 @@ async function init() {
     state.lang = s.lang === "zh" ? "zh" : "en";
     applyLang();
     setPath(s.path, s.validation);
+    if (s.version && s.version !== "dev") {
+      document.getElementById("ver").textContent = "v" + s.version.replace(/^v/, "");
+    }
+    if (s.tosRev) document.getElementById("tos-rev").textContent = "(" + s.tosRev + ")";
   } catch (e) {
     console.error("onboarding state load failed", e);
     applyLang();
@@ -434,9 +479,55 @@ document.querySelectorAll(".segment button").forEach(b => {
   b.addEventListener("click", () => { state.lang = b.dataset.lang; applyLang(); });
 });
 document.getElementById("agree").addEventListener("change", refreshContinue);
-document.getElementById("toggle-licenses").addEventListener("click", (e) => {
+// Terms / licenses panels: opening one closes the other so the small window
+// never shows both walls of text at once.
+function togglePanel(id, otherId) {
+  const el = document.getElementById(id);
+  const open = !el.classList.contains("open");
+  el.classList.toggle("open", open);
+  if (open) document.getElementById(otherId).classList.remove("open");
+  return open;
+}
+document.getElementById("toggle-terms").addEventListener("click", (e) => {
   e.preventDefault();
-  document.getElementById("licenses").classList.toggle("open");
+  togglePanel("terms-panel", "licenses-panel");
+});
+
+let licensesLoaded = false;
+document.getElementById("toggle-licenses").addEventListener("click", async (e) => {
+  e.preventDefault();
+  if (!togglePanel("licenses-panel", "terms-panel") || licensesLoaded) return;
+  const list = document.getElementById("lic-list");
+  try {
+    const entries = await fetch("/__onb/licenses").then(r => r.json());
+    licensesLoaded = true;
+    list.textContent = "";
+    list.removeAttribute("data-i18n");
+    for (const entry of entries) {
+      const row = document.createElement("div");
+      row.className = "lic-item";
+      const name = document.createElement("span");
+      name.className = "lic-name";
+      name.textContent = entry.name;
+      const kind = document.createElement("span");
+      kind.className = "lic-kind";
+      kind.textContent = entry.license;
+      row.append(name, kind);
+      const text = document.createElement("pre");
+      text.className = "lic-text";
+      row.addEventListener("click", async () => {
+        if (!text.textContent) {
+          text.textContent = await fetch("/__onb/license?id=" + encodeURIComponent(entry.id))
+            .then(r => r.text()).catch(() => "");
+        }
+        text.classList.toggle("open");
+      });
+      list.append(row, text);
+    }
+  } catch (err) {
+    console.error("license list load failed", err);
+    list.textContent = t("licenses.error");
+  }
 });
 document.getElementById("choose").addEventListener("click", async () => {
   try {

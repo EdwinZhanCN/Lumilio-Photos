@@ -135,16 +135,18 @@ func (s *Supervisor) SaveSettings(settings DesktopSettings) error {
 	return SaveSettings(s.paths.DesktopSettingsFile(), settings)
 }
 
-// NeedsOnboarding reports whether the first-run native onboarding window should
-// be shown. A read error is treated as "needs onboarding" so a corrupt settings
-// file re-runs setup rather than booting with no validated storage location.
-func (s *Supervisor) NeedsOnboarding() bool {
+// NeedsOnboarding reports whether the native onboarding window should be shown:
+// on first run, or when the accepted terms revision is older than the required
+// one (so bumping the host's tosVersion re-prompts existing users). A read error
+// is treated as "needs onboarding" so a corrupt settings file re-runs setup
+// rather than booting with no validated storage location.
+func (s *Supervisor) NeedsOnboarding(requiredTOSVersion string) bool {
 	settings, err := s.Settings()
 	if err != nil {
 		s.logf("read settings for onboarding check (treating as first run): %v", err)
 		return true
 	}
-	return !settings.OnboardingCompleted
+	return !settings.OnboardingCompleted || settings.TOSAcceptedVersion != requiredTOSVersion
 }
 
 // LogDir returns the in-process server/application log directory, so the host can
@@ -380,18 +382,6 @@ func (s *Supervisor) resolveStoragePath() (string, error) {
 		return s.paths.DefaultLib, nil
 	}
 	return settings.StoragePath, nil
-}
-
-// SetStoragePath persists a user-chosen media library location, preserving the
-// other persisted settings. It takes effect on the next launch. An empty path
-// resets to the default.
-func (s *Supervisor) SetStoragePath(path string) error {
-	settings, err := s.Settings()
-	if err != nil {
-		return err
-	}
-	settings.StoragePath = path
-	return s.SaveSettings(settings)
 }
 
 // checkPortAvailable verifies the app port can be bound, matching the address

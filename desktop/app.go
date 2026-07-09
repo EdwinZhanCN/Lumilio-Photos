@@ -108,7 +108,7 @@ func (d *desktopApp) run() error {
 // runtime. It runs on its own goroutine; Wails window/tray methods marshal to the
 // UI thread internally.
 func (d *desktopApp) boot() {
-	if d.sup.NeedsOnboarding() {
+	if d.sup.NeedsOnboarding(tosVersion) {
 		d.status = d.tr("setup")
 		d.refreshMenu()
 		d.showOnboarding()
