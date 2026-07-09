@@ -3,6 +3,14 @@
 Keep this list short. Each item should have a concrete owner path and a reason it matters.
 
 - Docker image build is not currently verified in this workspace when the local Docker/Orbstack socket is unavailable.
+- **License bundle covers native components only, not Go/JS dependency notices.**
+  Owner: `desktop/licenses/` (+ `desktop/licenses.go` manifest). Onboarding now
+  ships full texts for the app (GPL-3) and the bundled native tools
+  (PostgreSQL, FFmpeg, libvips, ExifTool, Wails), but the Go module and npm
+  dependency license notices (MIT/BSD attribution requirements) are not
+  aggregated. Fix: generate a NOTICE file in CI (e.g. `go-licenses` +
+  `license-checker`) and stage it into `desktop/licenses/`; add it to the
+  onboarding license list.
 - **Assets permanent delete is intentionally deferred.** F4 in
   `exec-plans/active/assets-feature-review.md` resolves ordinary delete as
   Move to Trash + Restore, with no permanent-delete or automatic retention path
