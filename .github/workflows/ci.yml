@@ -126,7 +126,10 @@ jobs:
             - name: Install libvips and libraw
               run: brew install vips libraw
 
-            - run: make desktop-test
+            - name: Run desktop tests with fresh Go build cache
+              run: |
+                  go clean -cache
+                  make desktop-test
 
     # W4 signal gathering: can the desktop module (server CGo: libvips+libraw)
     # compile on Windows with the MSYS2/mingw-w64 toolchain? Experimental —
