@@ -28,7 +28,7 @@ import {
 } from "./features/auth";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { UploadProvider } from "@/features/upload";
-import { BreadcrumbProvider, Breadcrumbs } from "@/components/breadcrumbs";
+import { BreadcrumbProvider } from "@/components/breadcrumbs";
 
 const queryClient = new QueryClient();
 
@@ -43,24 +43,12 @@ function AppShellLayout(): React.ReactNode {
       <div className="drawer lg:drawer-open h-screen">
         <input id="app-drawer" type="checkbox" className="drawer-toggle" />
         <div className="drawer-content flex h-screen min-h-0 flex-col overflow-hidden">
-          <div className="bg-base-100 shadow">
-            <NavBar />
-          </div>
+          <NavBar />
           <div id="app-scroll-container" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <Breadcrumbs className="z-10 shrink-0 border-b border-base-300/60 bg-base-100/80 backdrop-blur" />
             <div className="min-h-0 flex-1 overflow-hidden">
               <Outlet />
             </div>
           </div>
-          <footer className="bg-base-100 text-base-content text-xs">
-            <div className="container mx-auto py-0.5">
-              <p className="text-center">
-                {t("footer.copyright", {
-                  year: new Date().getFullYear(),
-                })}
-              </p>
-            </div>
-          </footer>
           {showAgentDock && <ChatDock variant="fab" />}
         </div>
         <div className="drawer-side z-50">
@@ -69,7 +57,7 @@ function AppShellLayout(): React.ReactNode {
             aria-label={t("sidebar.closeMenu", { defaultValue: "Close menu" })}
             className="drawer-overlay"
           />
-          <div className="h-full overflow-hidden bg-base-200 shadow-lg">
+          <div className="flex h-full w-64 flex-col overflow-hidden bg-base-200 shadow-lg lg:w-56">
             <SideBar />
           </div>
         </div>

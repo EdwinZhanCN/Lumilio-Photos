@@ -14,7 +14,7 @@ export function Breadcrumbs({ className = "" }: { className?: string }): ReactNo
 
   return (
     <nav
-      className={`breadcrumbs max-w-full overflow-x-auto overflow-y-clip px-4 py-1.5 text-sm ${className}`}
+      className={`breadcrumbs max-w-full overflow-x-auto overflow-y-clip py-1.5 text-sm ${className}`}
       aria-label="Breadcrumb"
     >
       <ul>

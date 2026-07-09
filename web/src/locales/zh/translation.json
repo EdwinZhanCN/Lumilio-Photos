@@ -859,9 +859,6 @@
     "submitting": "提交中...",
     "viewOriginal": "在新标签页中查看原文件"
   },
-  "footer": {
-    "copyright": "© {{year}} Lumilio Photos，由 EdwinZhan 打造"
-  },
   "home": {
     "errors": {
       "featuredLoadFailed": "精选资源加载失败：{{message}}",
@@ -1849,22 +1846,22 @@
   },
   "sidebar": {
     "assets": "资源库",
-    "badges": {
-      "new": "新"
-    },
     "closeMenu": "关闭菜单",
     "collections": "合集",
     "home": "首页",
     "manage": "管理",
     "openMenu": "打开菜单",
-    "portfolio": "作品集",
     "settings": "设置",
     "status": {
+      "label": "状态",
       "offline": "离线",
       "online": "在线"
     },
     "studio": "工作室",
-    "updates": "更新"
+    "theme": {
+      "useDark": "使用深色模式",
+      "useLight": "使用浅色模式"
+    }
   },
   "studio": {
     "asset": {
