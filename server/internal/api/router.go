@@ -77,6 +77,7 @@ type AssetControllerInterface interface {
 // AuthControllerInterface defines the interface for authentication controllers
 type AuthControllerInterface interface {
 	StartRegistration(c *gin.Context)
+	GetLoginOptions(c *gin.Context)
 	Login(c *gin.Context)
 	BeginPasskeyLogin(c *gin.Context)
 	VerifyPasskeyLogin(c *gin.Context)
@@ -334,6 +335,7 @@ func NewRouter(
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/register/start", authController.StartRegistration)
+			auth.POST("/login/options", authController.GetLoginOptions)
 			auth.POST("/login", authController.Login)
 			auth.POST("/passkeys/login/options", authController.BeginPasskeyLogin)
 			auth.POST("/passkeys/login/verify", authController.VerifyPasskeyLogin)

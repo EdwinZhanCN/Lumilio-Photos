@@ -4739,6 +4739,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/login/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probe login options
+         * @description Identifier-first capability probe. Always returns password:true for valid usernames; passkey:true only when the active account has at least one passkey. Does not reveal TOTP enrollment. Unknown and inactive usernames match the password-only shape.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Username to probe */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.LoginOptionsRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Login options for the username */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.LoginOptionsResponseDTO"];
+                    };
+                };
+                /** @description Invalid request data */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -11681,6 +11743,15 @@ export interface components {
             offset?: number;
             /** @example 150 */
             total?: number;
+        };
+        "dto.LoginOptionsRequestDTO": {
+            username: string;
+        };
+        "dto.LoginOptionsResponseDTO": {
+            /** @example false */
+            passkey?: boolean;
+            /** @example true */
+            password?: boolean;
         };
         "dto.LoginRequestDTO": {
             password: string;

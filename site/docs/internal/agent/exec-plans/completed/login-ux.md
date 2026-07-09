@@ -1,6 +1,6 @@
 # Identifier-first login UX
 
-Status: planned (2026-07-09). Product review of the current Passkey / password /
+Status: completed (2026-07-09). Product review of the current Passkey / password /
 TOTP login surface. Auth mechanics are stable; the gap is UX branching.
 
 Scope: `web/src/features/auth` login flow + a small public auth capability probe
