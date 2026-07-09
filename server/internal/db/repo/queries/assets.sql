@@ -205,6 +205,12 @@ WHERE hash = $1 AND is_deleted = false;
 SELECT * FROM assets
 WHERE hash = $1 AND repository_id = $2 AND is_deleted = false;
 
+-- name: GetAssetsByHashesAndRepository :many
+SELECT asset_id, hash, file_size, original_filename FROM assets
+WHERE hash = ANY(sqlc.arg('hashes')::text[])
+  AND repository_id = sqlc.arg('repository_id')
+  AND is_deleted = false;
+
 -- name: GetAssetByRepositoryAndStoragePathAny :one
 SELECT * FROM assets
 WHERE repository_id = $1 AND storage_path = $2

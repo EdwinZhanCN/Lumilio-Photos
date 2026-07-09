@@ -11,9 +11,6 @@ const DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks for efficient streamin
 export interface WorkerMessage {
   type: "ABORT" | "GENERATE_HASH";
   data?: File[];
-  config?: {
-    memoryMultiplier?: number;
-  };
 }
 
 export interface SingleHashPayload {
@@ -50,8 +47,8 @@ async function calculateQuickHash(
 ): Promise<string> {
   const hasher = new StreamingHasher();
   const sizeBuf = new ArrayBuffer(8);
-  const sizeView = new BigUint64Array(sizeBuf);
-  sizeView[0] = BigInt(file.size);
+  const sizeView = new DataView(sizeBuf);
+  sizeView.setBigUint64(0, BigInt(file.size), true);
   hasher.update(new Uint8Array(sizeBuf));
 
   const firstChunk = await file.slice(0, chunkSize).arrayBuffer();
@@ -88,7 +85,7 @@ async function calculateFullHash(
 let abortController = new AbortController();
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
-  const { type, data, config } = e.data;
+  const { type, data } = e.data;
 
   switch (type) {
     case "ABORT":
@@ -98,11 +95,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
     case "GENERATE_HASH": {
       const signal = abortController.signal;
-      const memoryMultiplier = config?.memoryMultiplier || 1.0;
-
-      // Adjust chunk sizes based on memory multiplier
-      const chunkSize = Math.floor(DEFAULT_CHUNK_SIZE * memoryMultiplier);
-      const quickHashChunkSize = Math.floor(DEFAULT_QUICK_HASH_CHUNK_SIZE * memoryMultiplier);
 
       try {
         await initialize();
@@ -117,8 +109,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           try {
             const hash =
               asset.size > QUICK_HASH_THRESHOLD
-                ? await calculateQuickHash(asset, signal, quickHashChunkSize)
-                : await calculateFullHash(asset, signal, chunkSize);
+                ? await calculateQuickHash(asset, signal, DEFAULT_QUICK_HASH_CHUNK_SIZE)
+                : await calculateFullHash(asset, signal, DEFAULT_CHUNK_SIZE);
 
             self.postMessage({
               type: "HASH_SINGLE_COMPLETE",

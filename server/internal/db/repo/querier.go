@@ -212,6 +212,7 @@ type Querier interface {
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
 	GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error)
 	GetAssetsByHash(ctx context.Context, hash *string) ([]Asset, error)
+	GetAssetsByHashesAndRepository(ctx context.Context, arg GetAssetsByHashesAndRepositoryParams) ([]GetAssetsByHashesAndRepositoryRow, error)
 	GetAssetsByIDs(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error)
 	GetAssetsByIDsAny(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error)
 	GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerParams) ([]Asset, error)

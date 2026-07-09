@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CircleAlert, Loader2, Upload } from "lucide-react";
+import { CircleAlert, CopyCheck, Loader2, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useUploadContext } from "@/features/upload";
@@ -16,6 +16,8 @@ function getStatusBadgeClass(status: UploadRowStatus) {
       return "badge-success";
     case "uploading":
       return "badge-primary";
+    case "duplicate":
+      return "badge-warning";
     case "failed":
       return "badge-error";
     case "pending":
@@ -30,6 +32,8 @@ function getProgressClass(status: UploadRowStatus) {
       return "progress-success";
     case "uploading":
       return "progress-primary";
+    case "duplicate":
+      return "progress-warning";
     case "failed":
       return "progress-error";
     case "pending":
@@ -46,13 +50,17 @@ function getStatusOrder(status: UploadRowStatus) {
       return 1;
     case "failed":
       return 2;
+    case "duplicate":
+      return 3;
     case "completed":
     default:
-      return 3;
+      return 4;
   }
 }
 
-function getStatusLabel(t: (key: string) => string, status: UploadRowStatus) {
+type TranslateFn = ReturnType<typeof useI18n>["t"];
+
+function getStatusLabel(t: TranslateFn, status: UploadRowStatus) {
   switch (status) {
     case "pending":
       return t("upload.FileUploadProgress.status_pending");
@@ -60,6 +68,8 @@ function getStatusLabel(t: (key: string) => string, status: UploadRowStatus) {
       return t("upload.FileUploadProgress.status_uploading");
     case "completed":
       return t("upload.FileUploadProgress.status_completed");
+    case "duplicate":
+      return t("upload.FileUploadProgress.status_duplicate", "Duplicate");
     case "failed":
       return t("upload.FileUploadProgress.status_failed");
   }
@@ -100,6 +110,8 @@ export default function NavbarUploadQueue() {
     (item) => item.status === "pending" || item.status === "uploading",
   ).length;
   const failedCount = orderedItems.filter((item) => item.status === "failed").length;
+  // Duplicates are a success path — they must not put the queue into an error state.
+  const duplicateCount = orderedItems.filter((item) => item.status === "duplicate").length;
 
   useEffect(() => {
     if (orderedItems.length === 0) {
@@ -139,6 +151,8 @@ export default function NavbarUploadQueue() {
       <Loader2 className="size-4 animate-spin text-primary" />
     ) : failedCount > 0 ? (
       <CircleAlert className="size-4 text-error" />
+    ) : duplicateCount > 0 ? (
+      <CopyCheck className="size-4 text-warning" />
     ) : (
       <Upload className="size-4 text-primary" />
     );
@@ -152,6 +166,9 @@ export default function NavbarUploadQueue() {
       >
         {leadingIcon}
         <span className="badge badge-primary badge-sm">{orderedItems.length}</span>
+        {duplicateCount > 0 && (
+          <span className="badge badge-warning badge-sm">{duplicateCount}</span>
+        )}
         {failedCount > 0 && <span className="badge badge-error badge-sm">{failedCount}</span>}
       </button>
 
@@ -161,6 +178,13 @@ export default function NavbarUploadQueue() {
             <h3 className="font-semibold">{t("upload.NavbarQueue.title")}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span>{t("upload.NavbarQueue.active", { count: activeCount })}</span>
+              {duplicateCount > 0 && (
+                <span className="text-warning">
+                  {t("upload.NavbarQueue.duplicate", "{{count}} duplicate", {
+                    count: duplicateCount,
+                  })}
+                </span>
+              )}
               {failedCount > 0 && (
                 <span>{t("upload.NavbarQueue.failed", { count: failedCount })}</span>
               )}
