@@ -23,13 +23,14 @@ type LoadOptions struct {
 
 // DatabaseConfig holds PostgreSQL connection settings.
 type DatabaseConfig struct {
-	Host         string `toml:"host"`
-	Port         string `toml:"port"`
-	User         string `toml:"user"`
-	Password     string `toml:"password"`
-	PasswordFile string `toml:"password_file"`
-	DBName       string `toml:"name"`
-	SSL          string `toml:"ssl"`
+	Host              string `toml:"host"`
+	Port              string `toml:"port"`
+	User              string `toml:"user"`
+	Password          string `toml:"password"`
+	PasswordFile      string `toml:"password_file"`
+	DBName            string `toml:"name"`
+	SSL               string `toml:"ssl"`
+	BootstrapPassword string `toml:"-"`
 }
 
 // AppConfig is the single typed runtime contract consumed by server/app. It
@@ -523,6 +524,7 @@ func applyDBPasswordFile(cfg *AppConfig) {
 	if strings.TrimSpace(cfg.DatabaseConfig.PasswordFile) == "" {
 		cfg.DatabaseConfig.PasswordFile = defaultDBPasswordFilePath()
 	}
+	cfg.DatabaseConfig.BootstrapPassword = cfg.DatabaseConfig.Password
 	data, err := os.ReadFile(cfg.DatabaseConfig.PasswordFile)
 	if err != nil {
 		return
