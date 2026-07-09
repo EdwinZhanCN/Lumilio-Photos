@@ -31,6 +31,10 @@ type DesktopSettings struct {
 	// onboarding chrome only. It is independent of the in-browser app language the
 	// web BootstrapWizard owns. Empty means "follow the OS locale".
 	Language string `json:"language,omitempty"`
+
+	// LumenEnabled records that the user turned on local AI: the supervised
+	// Lumen Hub is started on every launch until it is disabled from the tray.
+	LumenEnabled bool `json:"lumen_enabled,omitempty"`
 }
 
 // LoadSettings reads desktop-settings.json. A missing file yields zero-value

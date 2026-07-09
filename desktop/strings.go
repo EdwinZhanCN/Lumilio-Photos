@@ -19,6 +19,13 @@ var nativeStrings = map[string]map[string]string{
 		"portHint":        "Another Lumilio Photos instance or a local server is using port 6680. Quit that process, then relaunch Lumilio Photos.",
 		"failStage":       "Failed while: %s",
 		"logHint":         "Logs: %s",
+		"aiEnable":        "Enable AI on This Machine…",
+		"aiDisable":       "Turn Off Local AI",
+		"aiRetry":         "Retry Enabling AI",
+		"aiInstalling":    "AI: downloading…",
+		"aiStarting":      "AI: starting (first run downloads models)…",
+		"aiRunning":       "AI: running on this machine",
+		"aiFailed":        "AI: failed to start — see logs",
 	},
 	"zh": {
 		"open":            "打开 Lumilio Photos",
@@ -33,6 +40,13 @@ var nativeStrings = map[string]map[string]string{
 		"portHint":        "另一个 Lumilio Photos 实例或本机服务正在占用端口 6680。请退出该程序后重新启动 Lumilio Photos。",
 		"failStage":       "失败于：%s",
 		"logHint":         "日志目录：%s",
+		"aiEnable":        "在本机启用 AI…",
+		"aiDisable":       "停用本机 AI",
+		"aiRetry":         "重试启用 AI",
+		"aiInstalling":    "AI：正在下载…",
+		"aiStarting":      "AI：正在启动（首次将下载模型）…",
+		"aiRunning":       "AI：正在本机运行",
+		"aiFailed":        "AI：启动失败——请查看日志",
 	},
 }
 

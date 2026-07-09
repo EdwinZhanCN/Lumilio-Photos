@@ -30,6 +30,9 @@ func TestNewDesktopConfigInvariants(t *testing.T) {
 		ExifToolPath:  "/bundle/exiftool",
 		FFmpegPath:    "/bundle/ffmpeg",
 		FFprobePath:   "/bundle/ffprobe",
+		LumenStaticNodes: []string{
+			"127.0.0.1:50051",
+		},
 	})
 	if err != nil {
 		t.Fatalf("NewDesktopConfig: %v", err)
@@ -55,6 +58,9 @@ func TestNewDesktopConfigInvariants(t *testing.T) {
 	}
 	if !cfg.Lumen.DiscoveryEnabled || !cfg.Lumen.DiscoveryMDNSEnabled {
 		t.Fatalf("desktop Lumen discovery should be enabled, got %+v", cfg.Lumen)
+	}
+	if got := strings.Join(cfg.Lumen.StaticNodes(), ","); got != "127.0.0.1:50051" {
+		t.Fatalf("lumen static nodes = %q, want pinned local hub endpoint", got)
 	}
 	if cfg.Tools.ExifToolPath != "/bundle/exiftool" || cfg.Tools.FFmpegPath != "/bundle/ffmpeg" || cfg.Tools.FFprobePath != "/bundle/ffprobe" {
 		t.Fatalf("unexpected tool paths: %+v", cfg.Tools)
