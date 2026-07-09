@@ -105,3 +105,6 @@ notes/
 # Local third-party source references
 3rd-party/
 .zread/
+
+# Benchmark run artifacts (uploadbench/immichbench default -out)
+server/benchruns/

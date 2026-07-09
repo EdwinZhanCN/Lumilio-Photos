@@ -1219,6 +1219,50 @@ func (q *Queries) GetAssetsByHash(ctx context.Context, hash *string) ([]Asset, e
 	return items, nil
 }
 
+const getAssetsByHashesAndRepository = `-- name: GetAssetsByHashesAndRepository :many
+SELECT asset_id, hash, file_size, original_filename FROM assets
+WHERE hash = ANY($1::text[])
+  AND repository_id = $2
+  AND is_deleted = false
+`
+
+type GetAssetsByHashesAndRepositoryParams struct {
+	Hashes       []string    `db:"hashes" json:"hashes"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+}
+
+type GetAssetsByHashesAndRepositoryRow struct {
+	AssetID          pgtype.UUID `db:"asset_id" json:"asset_id"`
+	Hash             *string     `db:"hash" json:"hash"`
+	FileSize         int64       `db:"file_size" json:"file_size"`
+	OriginalFilename string      `db:"original_filename" json:"original_filename"`
+}
+
+func (q *Queries) GetAssetsByHashesAndRepository(ctx context.Context, arg GetAssetsByHashesAndRepositoryParams) ([]GetAssetsByHashesAndRepositoryRow, error) {
+	rows, err := q.db.Query(ctx, getAssetsByHashesAndRepository, arg.Hashes, arg.RepositoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAssetsByHashesAndRepositoryRow
+	for rows.Next() {
+		var i GetAssetsByHashesAndRepositoryRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.Hash,
+			&i.FileSize,
+			&i.OriginalFilename,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetsByIDs = `-- name: GetAssetsByIDs :many
 SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id = ANY($1::uuid[])

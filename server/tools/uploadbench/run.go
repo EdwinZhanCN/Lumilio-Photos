@@ -20,6 +20,19 @@ var mlQueues = []string{"process_semantic", "process_bioclip", "process_ocr", "p
 // coreTasks are the tasks whose completion defines "photo-ready".
 var coreTasks = []string{"metadata_asset", "thumbnail_asset"}
 
+// uploadStatusDuplicate is the status the server returns for an upload it
+// satisfied from content it already holds.
+const uploadStatusDuplicate = "duplicate"
+
+// instantResult reports the optional second pass over the same dataset.
+type instantResult struct {
+	Duplicates   int
+	Ingested     int
+	Failed       int
+	BytesSkipped int64
+	Duration     time.Duration
+}
+
 // runContext bundles everything a single run needs after preflight.
 type runContext struct {
 	cfg      config
@@ -31,6 +44,7 @@ type runContext struct {
 	t0       time.Time // first upload request start
 	lastAcc  time.Time // last HTTP upload accepted
 	tEnd     time.Time // last photo-ready completion
+	instant  *instantResult
 	mlBefore systemSettings
 	mlAfter  systemSettings
 	qBefore  []queueSummary
@@ -85,6 +99,11 @@ func run(ctx context.Context, cfg config) error {
 	// 7. Completion poll.
 	if err := pollPhase(ctx, rc); err != nil {
 		log.Printf("WARNING: completion polling ended early: %v", err)
+	}
+
+	// 7b. Optional instant-upload pass over the same dataset.
+	if cfg.instantPass {
+		instantPhase(ctx, rc)
 	}
 
 	// 8-9. Post-run snapshots + ML evidence.
@@ -160,6 +179,7 @@ func uploadPhase(ctx context.Context, rc *runContext) {
 		firstStart atomic.Int64
 		lastAcc    atomic.Int64
 		accepted   atomic.Int64
+		duplicates atomic.Int64
 		failed     atomic.Int64
 		wg         sync.WaitGroup
 	)
@@ -181,6 +201,11 @@ func uploadPhase(ctx context.Context, rc *runContext) {
 				if err != nil {
 					f.UploadErr = err.Error()
 					failed.Add(1)
+					continue
+				}
+				if resp.Status == uploadStatusDuplicate {
+					f.Duplicate = true
+					duplicates.Add(1)
 					continue
 				}
 				f.TaskID = resp.TaskID
@@ -205,8 +230,69 @@ func uploadPhase(ctx context.Context, rc *runContext) {
 
 	rc.t0 = time.Unix(0, firstStart.Load())
 	rc.lastAcc = time.Unix(0, lastAcc.Load())
-	log.Printf("upload phase done: %d accepted, %d failed, drain window opens at +%s",
-		accepted.Load(), failed.Load(), rc.lastAcc.Sub(rc.t0).Round(time.Millisecond))
+	log.Printf("upload phase done: %d accepted, %d duplicate, %d failed, drain window opens at +%s",
+		accepted.Load(), duplicates.Load(), failed.Load(), rc.lastAcc.Sub(rc.t0).Round(time.Millisecond))
+}
+
+// instantPhase re-uploads the whole manifest after the first pass has drained.
+// Every file should now come back as a duplicate without its bytes being staged
+// or ingested, so the wall time measures the instant-upload path end to end.
+func instantPhase(ctx context.Context, rc *runContext) {
+	cfg := rc.cfg
+	repoField := ""
+	if cfg.profile == "default-nonml" {
+		repoField = rc.repo.ID // same target as the first pass
+	}
+	log.Printf("instant-upload pass: re-uploading %d files at concurrency %d...", len(rc.mf.Files), cfg.concurrency)
+
+	var (
+		duplicates   atomic.Int64
+		ingested     atomic.Int64
+		failed       atomic.Int64
+		bytesSkipped atomic.Int64
+		wg           sync.WaitGroup
+	)
+	jobs := make(chan *fileRec)
+	start := time.Now()
+
+	for i := 0; i < cfg.concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for f := range jobs {
+				resp, err := rc.cli.uploadFile(ctx, f.Path, f.Hash, f.MIME, repoField)
+				switch {
+				case err != nil:
+					failed.Add(1)
+				case resp.Status == uploadStatusDuplicate:
+					duplicates.Add(1)
+					bytesSkipped.Add(f.Size)
+				default:
+					// A miss here means the fingerprint the server stored does not
+					// match the one the client just sent for the same bytes.
+					ingested.Add(1)
+				}
+			}
+		}()
+	}
+	for _, f := range rc.mf.Files {
+		if ctx.Err() != nil {
+			break
+		}
+		jobs <- f
+	}
+	close(jobs)
+	wg.Wait()
+
+	rc.instant = &instantResult{
+		Duplicates:   int(duplicates.Load()),
+		Ingested:     int(ingested.Load()),
+		Failed:       int(failed.Load()),
+		BytesSkipped: bytesSkipped.Load(),
+		Duration:     time.Since(start),
+	}
+	log.Printf("instant-upload pass done in %s: %d duplicate, %d re-ingested, %d failed",
+		rc.instant.Duration.Round(time.Millisecond), rc.instant.Duplicates, rc.instant.Ingested, rc.instant.Failed)
 }
 
 // pollPhase polls /assets/list until every accepted upload is photo-ready, a
@@ -215,6 +301,9 @@ func pollPhase(ctx context.Context, rc *runContext) error {
 	deadline := time.Now().Add(rc.cfg.timeout)
 	expected := 0
 	for _, f := range rc.mf.Files {
+		if f.Duplicate {
+			continue // no ingest job was enqueued, so nothing will complete
+		}
 		if f.UploadErr == "" && f.HTTPStatus >= 200 && f.HTTPStatus < 300 {
 			expected++
 		}

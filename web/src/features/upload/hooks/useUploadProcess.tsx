@@ -4,8 +4,8 @@ import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useWorkingRepository } from "@/features/settings";
 import { useI18n } from "@/lib/i18n";
 import { HashcodeProgress, useGenerateHashcode } from "@/hooks/util-hooks/useGenerateHashcode";
-import type { BatchUploadResult } from "@/lib/upload/types";
-import { generateSessionId, shouldUseChunks } from "@/lib/upload/uploadTransport";
+import type { BatchUploadResult, UploadPrecheckResult } from "@/lib/upload/types";
+import { generateSessionId, precheckUploads, shouldUseChunks } from "@/lib/upload/uploadTransport";
 import {
   useBatchUploadMutation,
   useChunkedUploadMutation,
@@ -19,6 +19,10 @@ const FALLBACK_CHUNK_SIZE = 5 * 1024 * 1024;
 const FALLBACK_MAX_CONCURRENT = 3;
 const FALLBACK_MAX_IN_FLIGHT = 3;
 
+// Server-side status marking content that already exists in the repository, so
+// the upload was satisfied without transporting (or ingesting) the bytes.
+const DUPLICATE_STATUS = "duplicate";
+
 interface FailedFile {
   name: string;
   error: string;
@@ -26,10 +30,21 @@ interface FailedFile {
 
 interface ProcessResults {
   uploaded: string[];
+  duplicates: string[];
   failed: FailedFile[];
 }
 
 type ProcessFilesFn = (files: FileList | File[]) => Promise<ProcessResults>;
+
+// The server also reports duplicates the precheck missed, either because it was
+// unreachable or because the content landed between precheck and transport.
+const isDuplicateResult = (result: BatchUploadResult): boolean =>
+  result.status === DUPLICATE_STATUS;
+
+const resolveResultStatus = (result: BatchUploadResult): FileUploadProgress["status"] => {
+  if (isDuplicateResult(result)) return "duplicate";
+  return result.success ? "completed" : "failed";
+};
 
 interface FileUploadSession {
   file: File;
@@ -41,7 +56,7 @@ interface FileUploadSession {
 export interface FileUploadProgress {
   fileName: string;
   progress: number;
-  status: "pending" | "uploading" | "completed" | "failed";
+  status: "pending" | "uploading" | "completed" | "duplicate" | "failed";
   sessionId: string;
   isChunked: boolean;
   error?: string;
@@ -111,7 +126,7 @@ export function useUploadProcess(): useUploadProcessReturn {
 
   const processFiles: ProcessFilesFn = async (files) => {
     const fileArray = Array.from(files);
-    if (fileArray.length === 0) return { uploaded: [], failed: [] };
+    if (fileArray.length === 0) return { uploaded: [], duplicates: [], failed: [] };
 
     setIsUploading(true);
     const results: BatchUploadResult[] = [];
@@ -172,7 +187,44 @@ export function useUploadProcess(): useUploadProcessReturn {
       })),
     );
 
-    const uploadBatch = async (sessions: FileUploadSession[]) => {
+    // Instant upload: ask the server which fingerprints it already holds and mark
+    // those files as duplicates without transporting them. A precheck failure is
+    // never fatal — it only costs us the saved bytes.
+    const skipDuplicates = async (sessions: FileUploadSession[]): Promise<FileUploadSession[]> => {
+      if (sessions.length === 0) return sessions;
+
+      let precheckResults: UploadPrecheckResult[];
+      try {
+        const response = await precheckUploads(
+          sessions.map((s) => ({ hash: s.hash, size: s.file.size })),
+          scopedRepositoryId,
+        );
+        precheckResults = response.results ?? [];
+      } catch {
+        return sessions;
+      }
+
+      const pending: FileUploadSession[] = [];
+      sessions.forEach((session, index) => {
+        if (!precheckResults[index]?.duplicate) {
+          pending.push(session);
+          return;
+        }
+        results.push({
+          success: true,
+          file_name: session.file.name,
+          content_hash: session.hash,
+          status: DUPLICATE_STATUS,
+        });
+        updateFileProgress(session.sessionId, { status: "duplicate", progress: 100 });
+      });
+      return pending;
+    };
+
+    const uploadBatch = async (allSessions: FileUploadSession[]) => {
+      const sessions = await skipDuplicates(allSessions);
+      if (sessions.length === 0) return;
+
       await semaphore.acquire();
       try {
         sessions.forEach((s) =>
@@ -216,7 +268,7 @@ export function useUploadProcess(): useUploadProcessReturn {
             return;
           }
           updateFileProgress(match.sessionId, {
-            status: r.success ? "completed" : "failed",
+            status: resolveResultStatus(r),
             progress: r.success ? 100 : 0,
             error: r.success ? undefined : r.message || r.error,
           });
@@ -238,7 +290,10 @@ export function useUploadProcess(): useUploadProcessReturn {
       }
     };
 
-    const uploadChunked = async (session: FileUploadSession) => {
+    const uploadChunked = async (candidate: FileUploadSession) => {
+      const [session] = await skipDuplicates([candidate]);
+      if (!session) return;
+
       await semaphore.acquire();
       try {
         updateFileProgress(session.sessionId, {
@@ -267,7 +322,7 @@ export function useUploadProcess(): useUploadProcessReturn {
         };
         results.push(result);
         updateFileProgress(session.sessionId, {
-          status: result.success ? "completed" : "failed",
+          status: resolveResultStatus(result),
           progress: result.success ? 100 : 0,
           error: result.success ? undefined : result.message || result.error,
         });
@@ -330,7 +385,10 @@ export function useUploadProcess(): useUploadProcessReturn {
       await Promise.all(uploadTasks);
       await invalidateAssetQueries();
 
-      const uploaded = results.filter((r) => r.success).map((r) => r.file_name || "");
+      const duplicates = results.filter(isDuplicateResult).map((r) => r.file_name || "");
+      const uploaded = results
+        .filter((r) => r.success && !isDuplicateResult(r))
+        .map((r) => r.file_name || "");
       const failed = results
         .filter((r) => !r.success)
         .map((r) => ({
@@ -338,26 +396,39 @@ export function useUploadProcess(): useUploadProcessReturn {
           error: r.message || r.error || t("upload.UploadProcess.uploadFailed"),
         }));
 
-      if (failed.length === 0 && uploaded.length > 0) {
+      if (failed.length > 0) {
         showMessage(
-          "success",
-          t("upload.UploadProcess.summarySuccess", { count: uploaded.length }),
-        );
-      } else if (uploaded.length > 0 || failed.length > 0) {
-        showMessage(
-          failed.length > 0 ? "error" : "success",
+          "error",
           t("upload.UploadProcess.summaryPartial", {
             succeeded: uploaded.length,
             failed: failed.length,
           }),
         );
+      } else if (duplicates.length > 0) {
+        showMessage(
+          uploaded.length > 0 ? "success" : "info",
+          t(
+            "upload.UploadProcess.summaryDuplicates",
+            "Uploaded {{count}} files, skipped {{duplicates}} already in your library.",
+            {
+              count: uploaded.length,
+              duplicates: duplicates.length,
+            },
+          ),
+        );
+      } else if (uploaded.length > 0) {
+        showMessage(
+          "success",
+          t("upload.UploadProcess.summarySuccess", { count: uploaded.length }),
+        );
       }
 
-      return { uploaded, failed };
+      return { uploaded, duplicates, failed };
     } catch (error: any) {
       showMessage("error", error.message || t("upload.UploadProcess.processFailed"));
       return {
         uploaded: [],
+        duplicates: [],
         failed: fileArray.map((f) => ({
           name: f.name,
           error: t("upload.UploadProcess.processFailed"),

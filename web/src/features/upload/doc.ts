@@ -42,9 +42,29 @@
  *
  * Files are hashed before transport through `useGenerateHashcode`. Hashing is
  * pipelined with upload: each hashed large file can start chunked upload, and
- * small files are buffered into smart batches. After transport completes,
- * asset list/search queries are invalidated so repository-aware galleries can
- * show the newly indexed assets.
+ * small files are buffered into smart batches. The worker fingerprint mirrors
+ * the backend BLAKE3 policy exactly: full hash up to 100 MiB, then quick hash
+ * over little-endian file size plus fixed 1 MiB first/last chunks. After
+ * transport completes, asset list/search queries are invalidated so
+ * repository-aware galleries can show the newly indexed assets.
+ *
+ * ## Instant upload
+ *
+ * Because the worker fingerprint is byte-identical to the backend's, hashed
+ * files can be checked against the repository before any bytes move.
+ * {@link useUploadProcess} passes each hash and size to `precheckUploads`
+ * (`/api/v1/assets/precheck`) just before transport — batched with the small-file
+ * buffer, and as a single call ahead of each chunked upload. Files the server
+ * already holds are marked `duplicate` in {@link FileUploadProgress} and never
+ * transported.
+ *
+ * A duplicate is a success, not a failure: {@link NavbarUploadQueue} renders it in
+ * the warning color with its own count, separate from the error count, and the
+ * upload summary reports how many files were skipped. Precheck is an optimization
+ * only. If the request fails the files upload normally, and the server repeats the
+ * same check before ingest, returning the `duplicate` status the client also
+ * understands from a transport response. Size is matched alongside the hash
+ * because a quick hash only covers a large file's first and last chunk.
  *
  * ## Composition
  *

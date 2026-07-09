@@ -7,10 +7,7 @@
  * @since 1.1.0
  */
 
-import {
-  ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER,
-  detectDeviceCapabilities,
-} from "@/lib/utils/smartBatchSizing.ts";
+import { detectDeviceCapabilities } from "@/lib/utils/smartBatchSizing.ts";
 import type { LayoutBox, LayoutConfig, LayoutResult } from "@/lib/layout/justifiedLayout";
 
 export type WorkerType = "hash" | "justified" | "tool";
@@ -237,9 +234,6 @@ export class AppWorkerClient {
         worker.postMessage({
           type: "GENERATE_HASH",
           data: [file],
-          config: {
-            memoryMultiplier: ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER,
-          },
         });
       };
 

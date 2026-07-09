@@ -31,6 +31,9 @@ type fileRec struct {
 	HTTPStatus    int    `json:"http_status,omitempty"`
 	TaskID        int64  `json:"task_id,omitempty"`
 	UploadErr     string `json:"upload_err,omitempty"`
+	// Duplicate marks an upload the server satisfied from existing content, so
+	// no ingest job was enqueued and no completion will ever be observed.
+	Duplicate bool `json:"duplicate,omitempty"`
 
 	// Completion phase (first observation that both core tasks are complete).
 	AssetID    string `json:"asset_id,omitempty"`
