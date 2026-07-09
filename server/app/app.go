@@ -112,6 +112,14 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		return fmt.Errorf("ensure storage layout: %w", err)
 	}
 
+	// Try to self-heal database password if the volume was recreated/reset
+	if err := db.SelfHealPassword(ctx, &dbConfig); err != nil {
+		appLogger.Warn("database password self-healing failed",
+			zap.String("operation", "database.self_heal"),
+			zap.Error(err),
+		)
+	}
+
 	// Run database migrations
 	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
 		appLogger.Warn("failed to run migrations automatically",
