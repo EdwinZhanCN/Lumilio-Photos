@@ -6,6 +6,8 @@ import type {
   BatchUploadOptions,
   BatchUploadFile,
   ChunkedUploadOptions,
+  UploadPrecheckFile,
+  UploadPrecheckResponse,
 } from "@/lib/upload/types";
 
 const baseURL = import.meta.env.VITE_API_URL ?? "";
@@ -15,6 +17,32 @@ const attachAuthHeader = (headers: Record<string, string>) => {
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
+};
+
+/**
+ * Asks the server which of the given fingerprints already exist in the target
+ * repository. Files reported as duplicates never need their bytes transported.
+ */
+export const precheckUploads = async (
+  files: UploadPrecheckFile[],
+  repositoryId?: string,
+  signal?: AbortSignal,
+): Promise<UploadPrecheckResponse> => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  attachAuthHeader(headers);
+
+  const response = await fetch(`${baseURL}/api/v1/assets/precheck`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ files, repository_id: repositoryId }),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload precheck failed with status ${response.status}`);
+  }
+
+  return response.json();
 };
 
 export const uploadFile = async (

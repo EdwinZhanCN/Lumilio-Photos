@@ -1973,6 +1973,7 @@
     "FileUploadProgress": {
       "chunked_badge": "分块",
       "status_completed": "已完成",
+      "status_duplicate": "重复",
       "status_failed": "失败",
       "status_pending": "等待中",
       "status_uploading": "上传中"
@@ -1981,6 +1982,7 @@
       "active_one": "{{count}} 个进行中",
       "active_other": "{{count}} 个进行中",
       "backgroundHint": "浏览其他页面时上传仍会继续。",
+      "duplicate_other": "{{count}} 个重复",
       "failed_one": "{{count}} 个失败",
       "failed_other": "{{count}} 个失败",
       "openPage": "打开上传页面",
@@ -2028,6 +2030,7 @@
     "UploadProcess": {
       "noResult": "未返回结果",
       "processFailed": "上传流程失败",
+      "summaryDuplicates_other": "已上传 {{count}} 个文件，跳过 {{duplicates}} 个已在图库中的重复文件。",
       "summaryPartial": "上传完成：成功 {{succeeded}} 个，失败 {{failed}} 个。",
       "summarySuccess_one": "成功上传 {{count}} 个文件。",
       "summarySuccess_other": "成功上传 {{count}} 个文件。",
