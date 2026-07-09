@@ -30,6 +30,6 @@ services:
         environment:
             # The server is no longer reachable by service name from the
             # compose network; proxy through the host gateway instead.
-            LUMILIO_API_UPSTREAM: h2c://host.docker.internal:6680
+            LUMILIO_API_UPSTREAM: http://host.docker.internal:6680
         extra_hosts:
             - "host.docker.internal:host-gateway"

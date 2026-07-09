@@ -1,22 +1,44 @@
-# Benchmark-only overlay for docker-compose.release.yml.
-#
-# Exposes the bundled PostgreSQL port on the host so the upload benchmark
-# (server/tools/uploadbench) can read exact per-asset / per-job timing from
-# river_job.finalized_at (the API surface and status JSONB are only 1-second
-# precision). This does NOT change the release images — it only publishes a
-# port — so the "use GHCR-built images" goal is preserved.
+# Benchmark overlay for docker-compose.release.yml.
 #
 #   docker compose -f docker-compose.release.yml -f docker-compose.release.dbport.yml up -d
 #
-# NOTE: first-run setup rotates the DB password. Read the live password from
-#   $LUMILIO_STORAGE/.secrets/db_password
-# and build the DSN as:
-#   postgres://postgres:<pw>@localhost:5432/lumiliophotos?sslmode=disable
+# It does two things, both temporary and non-production:
 #
-# This overlay is intentionally not for production. Do not commit an equivalent
-# port mapping into docker-compose.release.yml.
+# 1. db: publishes PostgreSQL on the host so the upload benchmark
+#    (server/tools/uploadbench) can read exact per-asset / per-job timing from
+#    river_job.finalized_at (the API surface and status JSONB are only 1-second
+#    precision).
+#      NOTE: first-run setup rotates the DB password. Read the live password from
+#        $LUMILIO_STORAGE/.secrets/db_password
+#      and build the DSN as:
+#        postgres://postgres:<pw>@localhost:5432/lumiliophotos?sslmode=disable
+#
+# 2. web: overrides the baked-in web image config that shipped with two bugs
+#    (fixed in source at web/Caddyfile + the compose upstream default, but the
+#    published :edge/:latest images predate the fix). This overlay bind-mounts
+#    the corrected Caddyfile and forces a plain-HTTP upstream so /api/* proxies
+#    correctly through :6657 — otherwise the SPA setup wizard shows
+#    "Unable to verify system status". Once images are rebuilt from the fixed
+#    source, delete this web block (the db port block can stay for benchmarking).
+#
+# This overlay is intentionally not for production. Do not fold either block into
+# docker-compose.release.yml.
 
 services:
     db:
         ports:
             - "5432:5432"
+
+    server:
+        environment:
+            # The repository scanner is periodic (default every 300s), so it
+            # fires mid-run during a multi-minute benchmark and contends for a
+            # worker. Disable it so throughput reflects the upload pipeline only.
+            # Boot config (needs a container restart to take effect).
+            REPOSITORY_SCAN_ENABLED: "false"
+
+    web:
+        environment:
+            LUMILIO_API_UPSTREAM: http://server:6680
+        volumes:
+            - ./web/Caddyfile:/etc/caddy/Caddyfile:ro
