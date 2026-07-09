@@ -1,18 +1,20 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   Folders,
   Home,
   Image,
   LibraryBig,
+  Moon,
   Paintbrush,
   SlidersHorizontal,
+  Sun,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
 import { useAuth } from "@/features/auth";
+import { useResolvedThemeMode, useThemePreference } from "@/lib/theme";
+import UserAvatar from "@/components/UserAvatar";
 
 /** Unchecks the shell drawer checkbox so navigating on mobile auto-closes it. */
 function closeMobileDrawer() {
@@ -21,15 +23,35 @@ function closeMobileDrawer() {
 }
 
 function SideBar() {
-  const [messageCount] = useState<number>(0);
   const { online: isOnline } = useGlobal();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { t } = useI18n();
+  const [theme, setTheme] = useThemePreference();
+  const resolvedThemeMode = useResolvedThemeMode();
+  const isDarkMode = resolvedThemeMode === "dark";
+  const isFollowingSystem = theme.followSystem;
+  const displayName = user?.display_name || user?.username || "User";
 
   return (
-    <div className="select-none h-full">
-      <ul className="menu rounded-box mx-2 my-2 gap-2 w-64 lg:w-56">
+    <div className="flex h-full w-full min-w-0 select-none flex-col">
+      <div className="shrink-0 p-2 pb-1">
+        <Link
+          to="/"
+          onClick={closeMobileDrawer}
+          className="btn btn-ghost h-auto min-h-0 w-full justify-start gap-2 px-3 py-2"
+        >
+          <img
+            src="/logo.png"
+            className="size-6 shrink-0 bg-contain object-contain"
+            alt={t("app.name") + " Logo"}
+          />
+          <span className="truncate text-base font-semibold">{t("app.name")}</span>
+        </Link>
+      </div>
+
+      <ul className="menu min-h-0 w-full flex-1 gap-1 overflow-y-auto rounded-none p-2 pt-1">
         <li>
           <Link
             to="/"
@@ -38,7 +60,6 @@ function SideBar() {
           >
             <Home className="size-5" />
             {t("sidebar.home")}
-            <span className="badge badge-sm">{messageCount}</span>
           </Link>
         </li>
         <li>
@@ -62,17 +83,15 @@ function SideBar() {
           </Link>
         </li>
         <li>
-          <Link to={"/studio"} onClick={closeMobileDrawer}>
+          <Link
+            to="/studio"
+            onClick={closeMobileDrawer}
+            className={location.pathname.startsWith("/studio") ? "active" : ""}
+          >
             <Paintbrush className="size-5" />
             {t("sidebar.studio")}
           </Link>
         </li>
-        {/* <li>
-          <Link to={"/portfolio"}>
-            <BookOpenIcon className="size-5" />
-            {t("sidebar.portfolio")}
-          </Link>
-        </li> */}
         <li>
           <Link
             to="/manage"
@@ -84,51 +103,128 @@ function SideBar() {
           </Link>
         </li>
         <li>
-          <Link to="/settings" onClick={closeMobileDrawer}>
+          <Link
+            to="/settings"
+            onClick={closeMobileDrawer}
+            className={location.pathname.startsWith("/settings") ? "active" : ""}
+          >
             <SlidersHorizontal className="size-5" />
             {t("sidebar.settings")}
           </Link>
         </li>
-        {/* <li>
-          <Link
-            to="/updates"
-            className={location.pathname === "/updates" ? "active" : ""}
-          >
-            <InformationCircleIcon className="size-5" />
-            {t("sidebar.updates")}
-            {isUpdate && (
-              <span className="badge badge-sm badge-warning">
-                {t("sidebar.badges.new")}
-              </span>
-            )}
-          </Link>
-        </li> */}
         {user?.role === "admin" && (
           <li>
-            <Link to="/server-monitor" onClick={closeMobileDrawer}>
-              {isOnline ? (
-                <div className="flex items-center justify-center gap-2 text-success">
-                  <Activity className="size-5" />
-                  {t("sidebar.status.online")}
-                  <div className="inline-grid *:[grid-area:1/1]">
-                    <div className="status status-success animate-ping"></div>
-                    <div className="status status-success"></div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2 text-error">
-                  <Activity className="size-5" />
-                  {t("sidebar.status.offline")}
-                  <div className="inline-grid *:[grid-area:1/1]">
-                    <div className="status status-error animate-ping"></div>
-                    <div className="status status-error"></div>
-                  </div>
-                </div>
-              )}
+            <Link
+              to="/server-monitor"
+              onClick={closeMobileDrawer}
+              className={location.pathname.startsWith("/server-monitor") ? "active" : ""}
+              title={
+                isOnline
+                  ? t("sidebar.status.online")
+                  : t("sidebar.status.offline")
+              }
+            >
+              <Activity className={`size-5 ${isOnline ? "text-success" : "text-error"}`} />
+              {t("sidebar.status.label", { defaultValue: "Status" })}
+              <span className="ml-auto inline-grid *:[grid-area:1/1]">
+                <span
+                  className={`status ${isOnline ? "status-success animate-ping" : "status-error animate-ping"}`}
+                />
+                <span className={`status ${isOnline ? "status-success" : "status-error"}`} />
+              </span>
             </Link>
           </li>
         )}
       </ul>
+
+      {user && (
+        <div className="shrink-0 border-t border-base-300/60 p-2">
+          <div className="dropdown dropdown-top dropdown-end w-full">
+            <button
+              type="button"
+              tabIndex={0}
+              className="btn btn-ghost h-auto min-h-0 w-full justify-start gap-2 px-3 py-2"
+            >
+              <UserAvatar
+                assetId={user.avatar_asset_id}
+                name={displayName}
+                size="size-8"
+                textSize="text-sm"
+              />
+              <div className="min-w-0 flex-1 text-left">
+                <div className="truncate text-sm font-semibold leading-tight">{displayName}</div>
+                <div className="truncate text-xs leading-tight opacity-60">
+                  {(user.role ?? "user").toUpperCase()}
+                </div>
+              </div>
+            </button>
+            <ul
+              tabIndex={0}
+              className="menu dropdown-content z-20 mb-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
+            >
+              <li className="menu-title px-3 py-2">
+                <span className="font-semibold text-base-content">{displayName}</span>
+                {user.username && (
+                  <span className="text-xs text-base-content/70">@{user.username}</span>
+                )}
+              </li>
+              <li>
+                <Link to="/settings?tab=account" onClick={closeMobileDrawer}>
+                  {t("settings.account.title", { defaultValue: "Account" })}
+                </Link>
+              </li>
+              {user.role === "admin" && (
+                <li>
+                  <Link to="/settings?tab=users" onClick={closeMobileDrawer}>
+                    {t("settings.users.title", { defaultValue: "Users" })}
+                  </Link>
+                </li>
+              )}
+              <li>
+                <Link to="/settings?tab=appearance" onClick={closeMobileDrawer}>
+                  {t("settings.appearance", { defaultValue: "Appearance" })}
+                </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  disabled={isFollowingSystem}
+                  title={
+                    isFollowingSystem
+                      ? t("settings.appearanceSettings.themes.followSystem.navbarHint")
+                      : undefined
+                  }
+                  className={isFollowingSystem ? "opacity-60" : undefined}
+                  onClick={() => {
+                    if (isFollowingSystem) return;
+                    setTheme({
+                      ...theme,
+                      mode: isDarkMode ? "light" : "dark",
+                    });
+                  }}
+                >
+                  {isDarkMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                  {isDarkMode
+                    ? t("sidebar.theme.useLight", { defaultValue: "Use light mode" })
+                    : t("sidebar.theme.useDark", { defaultValue: "Use dark mode" })}
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobileDrawer();
+                    void logout();
+                    void navigate("/login", { replace: true });
+                  }}
+                >
+                  {t("auth.logout", { defaultValue: "Logout" })}
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -863,9 +863,6 @@
     "submitting": "Submitting...",
     "viewOriginal": "View Original in New Tab"
   },
-  "footer": {
-    "copyright": "© {{year}} Lumilio Photos, Brought to you by EdwinZhan"
-  },
   "home": {
     "errors": {
       "featuredLoadFailed": "Failed to load featured assets: {{message}}",
@@ -1862,22 +1859,22 @@
   },
   "sidebar": {
     "assets": "Assets",
-    "badges": {
-      "new": "NEW"
-    },
     "closeMenu": "Close menu",
     "collections": "Collections",
     "home": "Home",
     "manage": "Manage",
     "openMenu": "Open menu",
-    "portfolio": "Portfolio",
     "settings": "Settings",
     "status": {
+      "label": "Status",
       "offline": "Offline",
       "online": "Online"
     },
     "studio": "Studio",
-    "updates": "Updates"
+    "theme": {
+      "useDark": "Use dark mode",
+      "useLight": "Use light mode"
+    }
   },
   "studio": {
     "asset": {
