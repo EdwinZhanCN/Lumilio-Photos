@@ -5,7 +5,10 @@ export const enSidebar: DefaultTheme.Sidebar = {
     {
       text: "Introduction",
       collapsed: false,
-      items: [{ text: "Overview", link: "/user-manual/introduction/" }],
+      items: [
+        { text: "Overview", link: "/user-manual/introduction/" },
+        { text: "Installation", link: "/user-manual/introduction/installation" },
+      ],
     },
     {
       text: "Features",
