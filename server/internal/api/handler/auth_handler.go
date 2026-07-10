@@ -64,6 +64,37 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 	api.JSONOK(c, dto.ToAuthResponseDTO(response))
 }
 
+// GetLoginOptions returns which login methods to offer for a username.
+// @Summary Probe login options
+// @Description Identifier-first capability probe. Always returns password:true for valid usernames; passkey:true only when the active account has at least one passkey. Does not reveal TOTP enrollment. Unknown and inactive usernames match the password-only shape.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body dto.LoginOptionsRequestDTO true "Username to probe"
+// @Success 200 {object} dto.LoginOptionsResponseDTO "Login options for the username"
+// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/auth/login/options [post]
+func (h *AuthHandler) GetLoginOptions(c *gin.Context) {
+	var req dto.LoginOptionsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	options, err := h.authService.GetLoginOptions(c.Request.Context(), req.Username)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidUsernameFormat) {
+			api.GinBadRequest(c, err, err.Error())
+			return
+		}
+		api.GinInternalError(c, err, "Failed to load login options")
+		return
+	}
+
+	api.JSONOK(c, dto.ToLoginOptionsResponseDTO(options))
+}
+
 // Login handles user authentication
 // @Summary Login user
 // @Description Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.

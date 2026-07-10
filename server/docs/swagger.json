@@ -2906,6 +2906,30 @@
                 },
                 "type": "object"
             },
+            "dto.LoginOptionsRequestDTO": {
+                "properties": {
+                    "username": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "username"
+                ],
+                "type": "object"
+            },
+            "dto.LoginOptionsResponseDTO": {
+                "properties": {
+                    "passkey": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "password": {
+                        "example": true,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
             "dto.LoginRequestDTO": {
                 "properties": {
                     "password": {
@@ -10724,6 +10748,67 @@
                     }
                 },
                 "summary": "Login user",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/login/options": {
+            "post": {
+                "description": "Identifier-first capability probe. Always returns password:true for valid usernames; passkey:true only when the active account has at least one passkey. Does not reveal TOTP enrollment. Unknown and inactive usernames match the password-only shape.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.LoginOptionsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Username to probe"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Username to probe",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.LoginOptionsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Login options for the username"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Probe login options",
                 "tags": [
                     "auth"
                 ]
