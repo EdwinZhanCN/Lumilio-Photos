@@ -1,10 +1,37 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { $api } from "@/lib/http-commons/queryClient";
+import { $api, client } from "@/lib/http-commons/queryClient";
 
-type AutoDetectStacksResponse = {
-  repository_id?: string;
-  stacks_created?: number;
+const TERMINAL_SCAN_STATUSES = new Set(["completed", "failed", "cancelled"]);
+
+const wait = (durationMs: number) =>
+  new Promise<void>((resolve) => globalThis.setTimeout(resolve, durationMs));
+
+export const waitForRepositoryScan = async (
+  repositoryId: string,
+  requestedAt: number,
+  options: { intervalMs?: number; timeoutMs?: number } = {},
+) => {
+  const deadline = Date.now() + (options.timeoutMs ?? 10 * 60 * 1000);
+  while (Date.now() <= deadline) {
+    const { data, error, response } = await client.GET(
+      "/api/v1/repositories/{id}/scans/latest",
+      { params: { path: { id: repositoryId } } },
+    );
+    if (error && response.status !== 404) {
+      throw new Error(error.error || error.message || "Failed to load repository scan status");
+    }
+    const startedAt = data?.started_at ? Date.parse(data.started_at) : 0;
+    const belongsToRequest = startedAt >= requestedAt - 2_000;
+    if (belongsToRequest && data?.status && TERMINAL_SCAN_STATUSES.has(data.status)) {
+      if (data.status !== "completed") {
+        throw new Error(data.error || `Repository scan ${data.status}`);
+      }
+      return data;
+    }
+    await wait(options.intervalMs ?? 750);
+  }
+  throw new Error("Timed out waiting for repository scan completion");
 };
 
 const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof useQueryClient>) => {
@@ -21,21 +48,6 @@ const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof u
   ]);
 };
 
-const unwrapAutoDetectStacksResponse = (
-  response: unknown,
-): AutoDetectStacksResponse | undefined => {
-  if (!response || typeof response !== "object") {
-    return undefined;
-  }
-
-  const record = response as Record<string, unknown>;
-  if (typeof record.stacks_created === "number") {
-    return response as AutoDetectStacksResponse;
-  }
-
-  return undefined;
-};
-
 export function useRepositoryScan() {
   const queryClient = useQueryClient();
   const scanMutation = $api.useMutation("post", "/api/v1/repositories/{id}/scan");
@@ -47,6 +59,7 @@ export function useRepositoryScan() {
     async (repositoryId: string) => {
       setScanningIds((current) => new Set(current).add(repositoryId));
       try {
+        const requestedAt = Date.now();
         await scanMutation.mutateAsync({
           params: {
             path: {
@@ -57,6 +70,7 @@ export function useRepositoryScan() {
             force: false,
           },
         });
+        await waitForRepositoryScan(repositoryId, requestedAt);
         await invalidateRepositoryAwareQueries(queryClient);
       } finally {
         setScanningIds((current) => {
@@ -81,7 +95,7 @@ export function useRepositoryScan() {
           },
         });
         await invalidateRepositoryAwareQueries(queryClient);
-        return unwrapAutoDetectStacksResponse(response)?.stacks_created ?? 0;
+        return response?.stacks_created ?? 0;
       } finally {
         setDetectingIds((current) => {
           const next = new Set(current);
@@ -106,8 +120,9 @@ export function useRepositoryScan() {
 
       try {
         await Promise.all(
-          uniqueIds.map((repositoryId) =>
-            scanMutation.mutateAsync({
+          uniqueIds.map(async (repositoryId) => {
+            const requestedAt = Date.now();
+            await scanMutation.mutateAsync({
               params: {
                 path: {
                   id: repositoryId,
@@ -116,8 +131,9 @@ export function useRepositoryScan() {
               body: {
                 force: false,
               },
-            }),
-          ),
+            });
+            return waitForRepositoryScan(repositoryId, requestedAt);
+          }),
         );
         await invalidateRepositoryAwareQueries(queryClient);
       } finally {

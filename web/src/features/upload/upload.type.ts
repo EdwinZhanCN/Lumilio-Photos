@@ -25,6 +25,7 @@ export interface UploadState {
 export type UploadAction =
   | { type: "SET_DRAGGING"; payload: boolean }
   | { type: "ADD_FILES"; payload: { files: File[]; previews: string[] } }
+  | { type: "RETAIN_FILES"; payload: File[] }
   | {
       type: "UPDATE_PREVIEW_URLS";
       payload: { startIndex: number; urls: string[] };

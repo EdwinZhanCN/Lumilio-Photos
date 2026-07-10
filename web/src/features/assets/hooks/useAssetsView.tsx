@@ -1,5 +1,4 @@
 import { useCallback, useMemo } from "react";
-import type { InfiniteData, UseInfiniteQueryResult } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
 import { useFilterState, useSortBy } from "../selectors";
 import {
@@ -33,7 +32,6 @@ import {
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
-type QueryAssetsResponseDTO = components["schemas"]["dto.QueryAssetsResponseDTO"];
 type SearchAssetsRequestDTO = components["schemas"]["dto.SearchAssetsRequestDTO"];
 type SearchAssetsResponseDTO = components["schemas"]["dto.SearchAssetsResponseDTO"];
 
@@ -257,7 +255,7 @@ export const useAssetsViewQuery = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = lastPage as QueryAssetsResponseDTO | undefined;
+        const responseData = lastPage;
         const total = responseData?.total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
@@ -269,10 +267,10 @@ export const useAssetsViewQuery = (
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsResponseDTO>, unknown>;
+  );
 
   const assetsPages = useMemo(() => {
-    const pages = (query.data?.pages ?? []) as QueryAssetsResponseDTO[];
+    const pages = query.data?.pages ?? [];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {
@@ -432,7 +430,7 @@ export const usePhotoSearchView = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = lastPage as SearchAssetsResponseDTO | undefined;
+        const responseData = lastPage;
         const total = responseData?.results_total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
@@ -444,10 +442,10 @@ export const usePhotoSearchView = (
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<SearchAssetsResponseDTO>, unknown>;
+  );
 
   const searchPages = useMemo(() => {
-    const pages = (query.data?.pages ?? []) as SearchAssetsResponseDTO[];
+    const pages = query.data?.pages ?? [];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {

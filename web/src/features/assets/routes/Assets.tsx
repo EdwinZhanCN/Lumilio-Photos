@@ -7,7 +7,6 @@ import ErrorFallBack from "@/components/ErrorFallBack";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { components } from "@/lib/http-commons/schema.d.ts";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import type {
   AssetsBulkActionContext,
@@ -15,8 +14,6 @@ import type {
 } from "@/features/assets/components/shared/bulkActions";
 import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
 import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
-
-type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 
 interface AssetsOrigin {
   from?: string;
@@ -41,7 +38,7 @@ const Assets = () => {
     { params: { path: { id: pin ?? "" } } },
     { enabled: isPinMode, retry: false, staleTime: 60_000 },
   );
-  const pinMeta = pinMetaQuery.data as AgentPinDTO | undefined;
+  const pinMeta = pinMetaQuery.data;
   useBreadcrumbs(
     isPinMode
       ? [

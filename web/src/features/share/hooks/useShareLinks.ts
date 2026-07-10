@@ -30,7 +30,7 @@ export function useShareLinks() {
     async (body: CreateShareLinkRequestDTO): Promise<CreateShareLinkResponseDTO> => {
       const result = await createMutation.mutateAsync({ body });
       await invalidate();
-      return result as CreateShareLinkResponseDTO;
+      return result;
     },
     [createMutation, invalidate],
   );
@@ -39,7 +39,7 @@ export function useShareLinks() {
     async (shareId: string, body: UpdateShareLinkRequestDTO): Promise<ShareLinkDTO> => {
       const result = await updateMutation.mutateAsync({ params: { path: { id: shareId } }, body });
       await invalidate();
-      return result as ShareLinkDTO;
+      return result;
     },
     [invalidate, updateMutation],
   );
@@ -48,7 +48,7 @@ export function useShareLinks() {
     async (shareId: string): Promise<ShareLinkDTO> => {
       const result = await revokeMutation.mutateAsync({ params: { path: { id: shareId } } });
       await invalidate();
-      return result as ShareLinkDTO;
+      return result;
     },
     [invalidate, revokeMutation],
   );
@@ -62,7 +62,7 @@ export function useShareLinks() {
   );
 
   return {
-    links: (listQuery.data?.items ?? []) as ShareLinkDTO[],
+    links: listQuery.data?.items ?? [],
     isLoading: listQuery.isLoading,
     error: listQuery.error,
     refetch: listQuery.refetch,

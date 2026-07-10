@@ -45,6 +45,7 @@ function getProgressClass(status: UploadRowStatus) {
 function getStatusOrder(status: UploadRowStatus) {
   switch (status) {
     case "uploading":
+    case "processing":
       return 0;
     case "pending":
       return 1;
@@ -66,6 +67,8 @@ function getStatusLabel(t: TranslateFn, status: UploadRowStatus) {
       return t("upload.FileUploadProgress.status_pending");
     case "uploading":
       return t("upload.FileUploadProgress.status_uploading");
+    case "processing":
+      return t("upload.FileUploadProgress.status_processing", "Processing");
     case "completed":
       return t("upload.FileUploadProgress.status_completed");
     case "duplicate":
@@ -107,7 +110,8 @@ export default function NavbarUploadQueue() {
   );
 
   const activeCount = orderedItems.filter(
-    (item) => item.status === "pending" || item.status === "uploading",
+    (item) =>
+      item.status === "pending" || item.status === "uploading" || item.status === "processing",
   ).length;
   const failedCount = orderedItems.filter((item) => item.status === "failed").length;
   // Duplicates are a success path — they must not put the queue into an error state.

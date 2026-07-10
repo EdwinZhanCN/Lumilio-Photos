@@ -358,7 +358,7 @@ function DuplicatesContent() {
                   message:
                     summaryQuery.error instanceof Error
                       ? summaryQuery.error.message
-                      : String(summaryQuery.error ?? ""),
+                      : JSON.stringify(summaryQuery.error ?? ""),
                 })}
               </span>
             </div>

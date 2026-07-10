@@ -12,6 +12,36 @@ import type {
 
 const baseURL = import.meta.env.VITE_API_URL ?? "";
 
+const responseError = async (response: Response, operation: string): Promise<Error> => {
+  let detail = "";
+  try {
+    const payload: unknown = await response.json();
+    if (payload && typeof payload === "object") {
+      if ("error" in payload && typeof payload.error === "string") detail = payload.error;
+      else if ("message" in payload && typeof payload.message === "string") detail = payload.message;
+    }
+  } catch {
+    // The status code remains actionable when the response has no JSON body.
+  }
+  return new Error(`${operation} failed with status ${response.status}${detail ? `: ${detail}` : ""}`);
+};
+
+const parseSuccessfulJSON = async <T>(response: Response, operation: string): Promise<T> => {
+  if (!response.ok) throw await responseError(response, operation);
+  return response.json() as Promise<T>;
+};
+
+const parseSuccessfulXHR = <T>(xhr: XMLHttpRequest, operation: string): T => {
+  if (xhr.status < 200 || xhr.status >= 300) {
+    throw new Error(`${operation} failed with status ${xhr.status}`);
+  }
+  try {
+    return JSON.parse(xhr.responseText) as T;
+  } catch {
+    throw new Error(`${operation} returned an invalid response`);
+  }
+};
+
 const attachAuthHeader = (headers: Record<string, string>) => {
   const token = getToken();
   if (token) {
@@ -38,11 +68,7 @@ export const precheckUploads = async (
     signal,
   });
 
-  if (!response.ok) {
-    throw new Error(`Upload precheck failed with status ${response.status}`);
-  }
-
-  return response.json();
+  return parseSuccessfulJSON<UploadPrecheckResponse>(response, "Upload precheck");
 };
 
 export const uploadFile = async (
@@ -80,16 +106,20 @@ export const uploadFile = async (
 
       xhr.onload = () => {
         try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response);
-        } catch {
-          reject(new Error("Failed to parse response"));
+          resolve(parseSuccessfulXHR<UploadResponse>(xhr, "Upload"));
+        } catch (error) {
+          reject(error);
         }
       };
 
       xhr.onerror = () => reject(new Error("Upload failed"));
+      xhr.onabort = () => reject(new DOMException("Upload aborted", "AbortError"));
 
       if (options.signal) {
+        if (options.signal.aborted) {
+          reject(new DOMException("Upload aborted", "AbortError"));
+          return;
+        }
         options.signal.addEventListener("abort", () => xhr.abort());
       }
 
@@ -104,7 +134,7 @@ export const uploadFile = async (
     signal: options?.signal,
   });
 
-  return response.json();
+  return parseSuccessfulJSON<UploadResponse>(response, "Upload");
 };
 
 export const batchUploadFiles = async (
@@ -160,16 +190,20 @@ export const batchUploadFiles = async (
 
       xhr.onload = () => {
         try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response);
-        } catch {
-          reject(new Error("Failed to parse response"));
+          resolve(parseSuccessfulXHR<BatchUploadResponse>(xhr, "Batch upload"));
+        } catch (error) {
+          reject(error);
         }
       };
 
       xhr.onerror = () => reject(new Error("Batch upload failed"));
+      xhr.onabort = () => reject(new DOMException("Batch upload aborted", "AbortError"));
 
       if (options.signal) {
+        if (options.signal.aborted) {
+          reject(new DOMException("Batch upload aborted", "AbortError"));
+          return;
+        }
         options.signal.addEventListener("abort", () => xhr.abort());
       }
 
@@ -184,7 +218,7 @@ export const batchUploadFiles = async (
     signal: options?.signal,
   });
 
-  return response.json();
+  return parseSuccessfulJSON<BatchUploadResponse>(response, "Batch upload");
 };
 
 export const uploadFileInChunks = async (
@@ -227,9 +261,11 @@ export const uploadFileInChunks = async (
   let activeUploads = 0;
   let nextChunkIndex = 0;
   let completedChunks = 0;
+  let stopped = false;
 
   return new Promise((resolve, reject) => {
     const processNext = () => {
+      if (stopped) return;
       if (nextChunkIndex >= totalChunks) {
         if (activeUploads === 0 && lastResponse) {
           resolve(lastResponse);
@@ -255,6 +291,7 @@ export const uploadFileInChunks = async (
             processNext();
           })
           .catch((error) => {
+            stopped = true;
             reject(error);
           });
       }

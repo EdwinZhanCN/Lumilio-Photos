@@ -118,6 +118,12 @@ cd server && sqlc generate
 
 Do not hand-edit generated OpenAPI or frontend schema artifacts.
 
+Swag v2 currently emits an extra empty-object `oneOf` branch for body
+parameters in OpenAPI 3.1. The frontend DTO generator removes that branch only
+for required JSON request bodies in memory, then generates `schema.d.ts`.
+Optional empty payloads remain optional; backend annotations and DTO validation
+tags still define the contract.
+
 > **If the frontend is casting (`as { ... }`) around a response, the contract is
 > the bug — not the frontend.** Either the handler's `@Success ... {data=dto.X}`
 > annotation is missing/points at the wrong DTO, or the DTO is correct and the
@@ -145,6 +151,12 @@ River worker counts and queue config live in `internal/queue/queue_setup.go`. Wo
 - stack and live photo analysis
 - perceptual hashing
 - ML tasks through Lumen, including BioCLIP, OCR, face, semantic indexing, and zero-shot classifier tagging
+
+Accepted uploads expose their user-scoped ingest lifecycle at
+`GET /api/v1/assets/batch/jobs?task_ids=…`. Frontend upload completion means the
+River ingest job reached a terminal state, not merely that multipart transport
+returned 2xx. Repository scans expose run lifecycle through the existing
+`/api/v1/repositories/{id}/scans/latest` endpoint.
 
 ## ML, Lumen, And LLM
 

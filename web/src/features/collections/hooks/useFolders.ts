@@ -20,9 +20,6 @@ export function useFolders(repositoryId: string | undefined, parentPath: string)
         },
       },
     },
-    {
-      select: (response) => response as FolderListResponse,
-    },
   );
 }
 
@@ -44,7 +41,6 @@ export function useFolderSummary(repositoryId: string | undefined, folderPath: s
     },
     {
       enabled: Boolean(repositoryId),
-      select: (response) => response as FolderSummary,
     },
   );
 }

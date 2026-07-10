@@ -5,6 +5,8 @@
  * Used by the openapi-fetch client for authentication.
  */
 
+import { resetSessionExpiredNotification } from "@/features/auth/sessionEvents.ts";
+
 // JWT Token management
 const TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
@@ -30,7 +32,10 @@ export const getRefreshToken = () =>
 export const saveToken = (token: string, refreshToken: string) => {
   if (!hasStorage()) return;
   if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
   if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  else localStorage.removeItem(REFRESH_TOKEN_KEY);
+  resetSessionExpiredNotification();
 };
 
 export const getMediaToken = () => (hasStorage() ? localStorage.getItem(MEDIA_TOKEN_KEY) : null);

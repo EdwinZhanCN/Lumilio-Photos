@@ -37,6 +37,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // uploadStatusDuplicate marks an upload the server skipped because identical
@@ -792,6 +793,73 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 	}
 
 	api.JSONOK(c, response)
+}
+
+// GetUploadJobStatus returns lifecycle state for accepted ingest jobs.
+// @Summary Get upload materialization status
+// @Description Get backend ingest lifecycle state for upload task IDs owned by the current caller
+// @Tags assets
+// @Produce json
+// @Param task_ids query string true "Comma-separated upload task IDs"
+// @Success 200 {object} dto.UploadJobStatusResponseDTO "Upload materialization status"
+// @Failure 400 {object} api.ErrorResponse "Invalid task IDs"
+// @Router /api/v1/assets/batch/jobs [get]
+func (h *AssetHandler) GetUploadJobStatus(c *gin.Context) {
+	rawIDs := strings.Split(strings.TrimSpace(c.Query("task_ids")), ",")
+	if len(rawIDs) == 0 || len(rawIDs) > 100 || (len(rawIDs) == 1 && strings.TrimSpace(rawIDs[0]) == "") {
+		api.GinBadRequest(c, errors.New("task_ids must contain between 1 and 100 IDs"), "Invalid upload task IDs")
+		return
+	}
+
+	ids := make([]int64, 0, len(rawIDs))
+	for _, rawID := range rawIDs {
+		id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
+		if err != nil || id <= 0 {
+			api.GinBadRequest(c, errors.New("task_ids must be positive integers"), "Invalid upload task IDs")
+			return
+		}
+		ids = append(ids, id)
+	}
+
+	jobRows, err := h.queueClient.JobList(c.Request.Context(), river.NewJobListParams().IDs(ids...).Kinds(jobs.IngestAssetArgs{}.Kind()).First(len(ids)))
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to load upload status")
+		return
+	}
+
+	callerID := "anonymous"
+	if id, exists := c.Get("user_id"); exists {
+		callerID = fmt.Sprintf("%d", id)
+	}
+	statuses := make([]dto.UploadJobStatusDTO, 0, len(jobRows.Jobs))
+	for _, row := range jobRows.Jobs {
+		if status, ok := uploadJobStatusForCaller(row, callerID); ok {
+			statuses = append(statuses, status)
+		}
+	}
+
+	api.JSONOK(c, dto.UploadJobStatusResponseDTO{Jobs: statuses})
+}
+
+func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.UploadJobStatusDTO, bool) {
+	if row == nil {
+		return dto.UploadJobStatusDTO{}, false
+	}
+	var args jobs.IngestAssetArgs
+	if err := json.Unmarshal(row.EncodedArgs, &args); err != nil || args.UserID != callerID {
+		return dto.UploadJobStatusDTO{}, false
+	}
+	terminal := row.State == rivertype.JobStateCompleted || row.State == rivertype.JobStateCancelled || row.State == rivertype.JobStateDiscarded
+	success := row.State == rivertype.JobStateCompleted
+	var errorMessage *string
+	if len(row.Errors) > 0 && !success {
+		message := row.Errors[len(row.Errors)-1].Error
+		errorMessage = &message
+	}
+	return dto.UploadJobStatusDTO{
+		TaskID: row.ID, FileName: args.FileName, Status: string(row.State),
+		Terminal: terminal, Success: success, Error: errorMessage,
+	}, true
 }
 
 // GetAsset retrieves a single asset by ID

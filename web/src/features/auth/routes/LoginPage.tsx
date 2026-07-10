@@ -4,13 +4,7 @@ import { ArrowLeft, Fingerprint, KeyRound, Smartphone, User } from "lucide-react
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
-import type {
-  AuthResponse,
-  LoginOptionsResponse,
-  MFAMethod,
-  PasskeyOptionsResponse,
-  User as UserType,
-} from "../auth.type.ts";
+import type { MFAMethod, User as UserType } from "../auth.type.ts";
 import { getPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
 import {
   PASSWORD_HINT,
@@ -146,7 +140,7 @@ const LoginPage: React.FC = () => {
       const response = await loginOptionsMutation.mutateAsync({
         body: { username },
       });
-      const options = response as LoginOptionsResponse | undefined;
+      const options = response;
       if (!options) {
         throw new Error(
           t("auth.login.optionsError", {
@@ -206,8 +200,8 @@ const LoginPage: React.FC = () => {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({
         body: { username },
       });
-      const optionsData = optionsResponse as PasskeyOptionsResponse | undefined;
-      if (!optionsData) {
+      const optionsData = optionsResponse;
+      if (!optionsData?.challenge_token) {
         throw new Error(t("auth.login.passkeyStartError"));
       }
 
@@ -218,7 +212,7 @@ const LoginPage: React.FC = () => {
           credential,
         },
       });
-      const verifyData = verifyResponse as AuthResponse | undefined;
+      const verifyData = verifyResponse;
       if (!verifyData) {
         throw new Error(t("auth.login.passkeyVerifyError"));
       }

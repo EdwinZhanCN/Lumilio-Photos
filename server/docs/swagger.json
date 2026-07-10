@@ -5093,6 +5093,47 @@
                 },
                 "type": "object"
             },
+            "dto.UploadJobStatusDTO": {
+                "properties": {
+                    "error": {
+                        "example": "failed to materialize asset",
+                        "type": "string"
+                    },
+                    "file_name": {
+                        "example": "photo.jpg",
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "completed",
+                        "type": "string"
+                    },
+                    "success": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "task_id": {
+                        "example": 12345,
+                        "type": "integer"
+                    },
+                    "terminal": {
+                        "example": true,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UploadJobStatusResponseDTO": {
+                "properties": {
+                    "jobs": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.UploadJobStatusDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.UploadPrecheckFileDTO": {
                 "properties": {
                     "hash": {
@@ -7725,6 +7766,48 @@
                     }
                 },
                 "summary": "Get upload configuration",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/batch/jobs": {
+            "get": {
+                "description": "Get backend ingest lifecycle state for upload task IDs owned by the current caller",
+                "parameters": [
+                    {
+                        "description": "Comma-separated upload task IDs",
+                        "in": "query",
+                        "name": "task_ids",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.UploadJobStatusResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Upload materialization status"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid task IDs"
+                    }
+                },
+                "summary": "Get upload materialization status",
                 "tags": [
                     "assets"
                 ]

@@ -7,10 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const browserTestsEnabled = process.env.VITEST_BROWSER === "true";
-const browserPreview = browserTestsEnabled
-  ? (await import("vite-plus/test/browser-preview")).preview
-  : undefined;
+const productionSmokeEnabled = process.env.PRODUCTION_SMOKE === "true";
 const testProjects = [
   {
     extends: true,
@@ -22,23 +19,6 @@ const testProjects = [
       exclude: ["src/workers/*", "**/node_modules/**"],
     },
   },
-  ...(browserTestsEnabled
-    ? [
-        {
-          extends: true,
-          test: {
-            name: "browser",
-            include: ["src/workers/*"],
-            exclude: ["**/node_modules/**"],
-            browser: {
-              provider: browserPreview?.(),
-              instances: [{ browser: "chrome" }],
-              enabled: true,
-            },
-          },
-        },
-      ]
-    : []),
 ];
 
 export default defineConfig({
@@ -58,10 +38,24 @@ export default defineConfig({
       "Cross-Origin-Embedder-Policy": "credentialless",
     },
   },
+  preview: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "credentialless",
+    },
+  },
   plugins: [react(), tailwindcss(), docts({ root: "src" })],
 
   build: {
     target: "esnext",
+    rollupOptions: productionSmokeEnabled
+      ? {
+          input: {
+            app: path.resolve(__dirname, "index.html"),
+            "production-smoke": path.resolve(__dirname, "production-smoke.html"),
+          },
+        }
+      : undefined,
   },
 
   worker: {
@@ -79,8 +73,6 @@ export default defineConfig({
       "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
-      "src/lib/http-commons/openapi-fetch/**",
-      "src/lib/http-commons/openapi-react-query/**",
     ],
     jsPlugins: ["@edwinzhancn/docts/oxlint"],
     rules: {
@@ -110,8 +102,6 @@ export default defineConfig({
       "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
-      "src/lib/http-commons/openapi-fetch/**",
-      "src/lib/http-commons/openapi-react-query/**",
     ],
     semi: true,
     singleQuote: false,

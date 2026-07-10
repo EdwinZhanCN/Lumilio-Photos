@@ -185,6 +185,21 @@ type UploadProgressResponseDTO struct {
 	Summary  ProgressSummaryDTO   `json:"summary"`
 }
 
+// UploadJobStatusDTO reports whether an accepted upload has been materialized
+// by the ingest queue. Only jobs owned by the current caller are returned.
+type UploadJobStatusDTO struct {
+	TaskID   int64   `json:"task_id" example:"12345"`
+	FileName string  `json:"file_name" example:"photo.jpg"`
+	Status   string  `json:"status" example:"completed"`
+	Terminal bool    `json:"terminal" example:"true"`
+	Success  bool    `json:"success" example:"true"`
+	Error    *string `json:"error,omitempty" example:"failed to materialize asset"`
+}
+
+type UploadJobStatusResponseDTO struct {
+	Jobs []UploadJobStatusDTO `json:"jobs"`
+}
+
 // AssetDTO represents an asset
 type AssetDTO struct {
 	AssetID              string                          `json:"asset_id"`

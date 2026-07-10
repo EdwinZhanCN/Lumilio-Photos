@@ -40,6 +40,19 @@ export const uploadReducer = (state: UploadState, action: UploadAction): UploadS
       return { ...state, previews: newPreviews };
     }
 
+    case "RETAIN_FILES": {
+      const retained = new Set(action.payload);
+      const previews: string[] = [];
+      state.files.forEach((file, index) => {
+        if (retained.has(file)) {
+          previews.push(state.previews[index] ?? "");
+        } else if (state.previews[index]) {
+          URL.revokeObjectURL(state.previews[index]);
+        }
+      });
+      return { ...state, files: action.payload, previews };
+    }
+
     case "CLEAR_FILES":
       // Revoke all preview URLs to prevent memory leaks
       state.previews.forEach((url) => {

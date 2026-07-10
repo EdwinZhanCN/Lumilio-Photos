@@ -93,8 +93,12 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await uploadProcess.processFiles(state.files);
-      dispatch({ type: "CLEAR_FILES" });
+      const result = await uploadProcess.processFiles(state.files);
+      if (result.failed.length > 0) {
+        dispatch({ type: "RETAIN_FILES", payload: result.failed.map((failure) => failure.file) });
+      } else {
+        dispatch({ type: "CLEAR_FILES" });
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : t("upload.UploadProvider.upload_failed_generic");

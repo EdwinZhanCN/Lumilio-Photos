@@ -8,7 +8,6 @@ type FocalLengthDistributionResponse = Schemas["handler.FocalLengthDistributionR
 type CameraLensStatsResponse = Schemas["handler.CameraLensStatsResponse"];
 type TimeDistributionResponse = Schemas["handler.TimeDistributionResponse"];
 type HeatmapResponse = Schemas["handler.HeatmapResponse"];
-type AvailableYearsResponse = Schemas["handler.AvailableYearsResponse"];
 
 type TimeDistributionType = "hourly" | "monthly";
 
@@ -111,22 +110,22 @@ export function usePhotoStats(options: UsePhotoStatsOptions = {}): UsePhotoStats
         }),
       ]);
 
-      const focalData = focalResponse as FocalLengthDistributionResponse | undefined;
+      const focalData = focalResponse;
       if (focalData) {
         setFocalLengthData(focalData);
       }
 
-      const cameraLensData = cameraLensResponse as CameraLensStatsResponse | undefined;
+      const cameraLensData = cameraLensResponse;
       if (cameraLensData) {
         setCameraLensData(cameraLensData);
       }
 
-      const timeDistributionData = timeResponse as TimeDistributionResponse | undefined;
+      const timeDistributionData = timeResponse;
       if (timeDistributionData) {
         setTimeDistributionData(timeDistributionData);
       }
 
-      const yearsData = yearsResponse as AvailableYearsResponse | undefined;
+      const yearsData = yearsResponse;
       if (yearsData) {
         const years = yearsData.years ?? [];
         setAvailableYears(years);
@@ -145,7 +144,7 @@ export function usePhotoStats(options: UsePhotoStatsOptions = {}): UsePhotoStats
                 },
               },
             });
-            const heatmapData = heatmapResponse as HeatmapResponse | undefined;
+            const heatmapData = heatmapResponse;
             if (heatmapData) {
               setHeatmapData(heatmapData);
             }
@@ -186,7 +185,7 @@ export function usePhotoStats(options: UsePhotoStatsOptions = {}): UsePhotoStats
             },
           },
         });
-        const heatmapData = heatmapResponse as HeatmapResponse | undefined;
+        const heatmapData = heatmapResponse;
 
         if (heatmapData) {
           setHeatmapData(heatmapData);

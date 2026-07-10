@@ -36,10 +36,11 @@ reads from that source but does not persist repository selection
 preferences.
 
 Repository cards show a scoped asset count through `/api/v1/assets/list` and
-cloud status through [useRepositoryCloudStatus](@/features/settings/hooks/useCloudSync.ts). Maintenance mutations
-invalidate repository-aware asset queries after they change indexing,
-stacking, or imports, so galleries refresh without duplicating cache policy
-in Manage.
+cloud status through [useRepositoryCloudStatus](@/features/settings/hooks/useCloudSync.ts). A repository scan
+mutation only acknowledges a queued background job.
+[waitForRepositoryScan](./hooks/useRepositoryScan.ts) follows its scan run through running and
+terminal backend states; repository-aware queries are invalidated only after
+completion. Other maintenance mutations retain scoped invalidation behavior.
 
 The action scope is deliberately mixed:
 

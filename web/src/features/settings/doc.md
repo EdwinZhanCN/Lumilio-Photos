@@ -29,6 +29,9 @@ Repository preference state is deliberately split:
   upload. It resolves to a concrete repository, falling back to primary/first
   repository once repository options load.
 
+Both repository IDs are user-scoped session state. Authentication reset
+clears them while retaining device-level language, theme, and layout choices.
+
 ## Data
 
 [useSystemSettings](./hooks/useSystemSettings.ts) reads `/api/v1/settings/system`; mutations go

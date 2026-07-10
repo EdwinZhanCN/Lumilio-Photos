@@ -5,12 +5,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "./useAuth.ts";
 import { setupStatusQueryKey } from "./useSetupStatus.ts";
-import type {
-  AuthResponse,
-  PasskeyOptionsResponse,
-  RecoveryCodesResponse,
-  TOTPSetupResponse,
-} from "../auth.type.ts";
+import type { TOTPSetupResponse } from "../auth.type.ts";
 import { createPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
 
 type AuthRedirectState = {
@@ -136,7 +131,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
       const response = await registerMutation.mutateAsync({
         body: { username, password },
       });
-      const payload = response as AuthResponse | undefined;
+      const payload = response;
       if (!payload) {
         throw new Error(t("auth.register.startError"));
       }
@@ -148,8 +143,8 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
       await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
 
       const setupResponse = await totpSetupMutation.mutateAsync({});
-      const setupPayload = setupResponse as TOTPSetupResponse | undefined;
-      if (!setupPayload) {
+      const setupPayload = setupResponse;
+      if (!setupPayload?.setup_token) {
         throw new Error(t("auth.register.totpSetupStartError"));
       }
       setTotpSetup(setupPayload);
@@ -162,17 +157,18 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
 
   const handleCompleteTotp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!totpSetup) return;
+    const setupToken = totpSetup?.setup_token;
+    if (!setupToken) return;
     setFlowError(null);
 
     try {
       const response = await totpEnableMutation.mutateAsync({
         body: {
-          setup_token: totpSetup.setup_token,
+          setup_token: setupToken,
           code: totpCode,
         },
       });
-      const payload = response as RecoveryCodesResponse | undefined;
+      const payload = response;
       if (!payload) {
         throw new Error(t("auth.register.totpSetupCompleteError"));
       }
@@ -199,8 +195,8 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
     setFlowError(null);
     try {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({});
-      const optionsData = optionsResponse as PasskeyOptionsResponse | undefined;
-      if (!optionsData) {
+      const optionsData = optionsResponse;
+      if (!optionsData?.challenge_token) {
         throw new Error(t("auth.register.passkeyStartError"));
       }
 

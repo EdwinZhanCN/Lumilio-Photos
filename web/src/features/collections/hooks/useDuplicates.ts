@@ -1,13 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type {
-  DetectDuplicatesResponse,
   DuplicateGroup,
   DuplicateStatus,
-  DuplicateSummary,
-  ListDuplicateGroupsResponse,
   MergeDuplicateGroupRequest,
-  MergeDuplicateGroupResponse,
 } from "@/lib/duplicates/types";
 
 function isDuplicateQueryKey(queryKey: readonly unknown[]) {
@@ -36,9 +32,6 @@ export function useDuplicateSummary(repositoryId?: string) {
       params: {
         query: repositoryId ? { repository_id: repositoryId } : {},
       },
-    },
-    {
-      select: (response) => response as DuplicateSummary,
     },
   );
 }
@@ -72,9 +65,6 @@ export function useDuplicateGroups({
         },
       },
     },
-    {
-      select: (response) => response as ListDuplicateGroupsResponse,
-    },
   );
 }
 
@@ -96,7 +86,7 @@ export function useDetectDuplicates() {
       const result = await mutation.mutateAsync({
         body: { repository_id: repositoryId },
       });
-      return result as DetectDuplicatesResponse;
+      return result;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -121,7 +111,7 @@ export function useMergeDuplicateGroup() {
         params: { path: { id: groupId } },
         body,
       });
-      return result as MergeDuplicateGroupResponse;
+      return result;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({

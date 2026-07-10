@@ -38,6 +38,7 @@ interface GlobalContextType {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
+  resetSessionState: () => void;
   online: boolean;
   setOnline: Dispatch<SetStateAction<boolean>>;
 }
@@ -58,6 +59,7 @@ const defaultContext: GlobalContextType = {
   markNotificationRead: () => {},
   markAllNotificationsRead: () => {},
   clearNotifications: () => {},
+  resetSessionState: () => {},
   online: false,
   setOnline: () => {},
 };
@@ -125,6 +127,14 @@ export default function GlobalProvider({ children }: GlobalProviderProps) {
     setNotifications([]);
   }, []);
 
+  const resetSessionState = useCallback(() => {
+    setError("");
+    setSuccess("");
+    setHint("");
+    setInfo("");
+    setNotifications([]);
+  }, []);
+
   return (
     <GlobalContext.Provider
       value={{
@@ -142,6 +152,7 @@ export default function GlobalProvider({ children }: GlobalProviderProps) {
         markNotificationRead,
         markAllNotificationsRead,
         clearNotifications,
+        resetSessionState,
         online,
         setOnline,
       }}

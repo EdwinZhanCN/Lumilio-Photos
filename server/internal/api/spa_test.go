@@ -53,6 +53,16 @@ func TestRegisterSPAServesBundleWithFallback(t *testing.T) {
 	}
 }
 
+func TestRegisterSPAEnablesCrossOriginIsolation(t *testing.T) {
+	r := newSPATestRouter(t, writeSPABundle(t))
+
+	for _, path := range []string{"/", "/assets/app.js", "/gallery/123"} {
+		w := do(r, http.MethodGet, path)
+		require.Equal(t, "same-origin", w.Header().Get("Cross-Origin-Opener-Policy"))
+		require.Equal(t, "credentialless", w.Header().Get("Cross-Origin-Embedder-Policy"))
+	}
+}
+
 func TestRegisterSPADoesNotShadowAPIOrSwagger(t *testing.T) {
 	r := newSPATestRouter(t, writeSPABundle(t))
 

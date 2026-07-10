@@ -1992,6 +1992,7 @@
       "status_duplicate": "Duplicate",
       "status_failed": "Failed",
       "status_pending": "Pending",
+      "status_processing": "Processing",
       "status_uploading": "Uploading"
     },
     "NavbarQueue": {

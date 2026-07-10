@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { HashcodeProgress, useGenerateHashcode } from "@/hooks/util-hooks/useGenerateHashcode";
 import type { BatchUploadResult, UploadPrecheckResult } from "@/lib/upload/types";
 import { generateSessionId, precheckUploads, shouldUseChunks } from "@/lib/upload/uploadTransport";
+import { waitForUploadJobs } from "@/lib/upload/uploadLifecycle";
 import {
   useBatchUploadMutation,
   useChunkedUploadMutation,
@@ -26,6 +27,7 @@ const DUPLICATE_STATUS = "duplicate";
 interface FailedFile {
   name: string;
   error: string;
+  file: File;
 }
 
 interface ProcessResults {
@@ -43,7 +45,8 @@ const isDuplicateResult = (result: BatchUploadResult): boolean =>
 
 const resolveResultStatus = (result: BatchUploadResult): FileUploadProgress["status"] => {
   if (isDuplicateResult(result)) return "duplicate";
-  return result.success ? "completed" : "failed";
+  if (!result.success || !result.task_id) return "failed";
+  return "processing";
 };
 
 interface FileUploadSession {
@@ -56,7 +59,7 @@ interface FileUploadSession {
 export interface FileUploadProgress {
   fileName: string;
   progress: number;
-  status: "pending" | "uploading" | "completed" | "duplicate" | "failed";
+  status: "pending" | "uploading" | "processing" | "completed" | "duplicate" | "failed";
   sessionId: string;
   isChunked: boolean;
   error?: string;
@@ -130,6 +133,9 @@ export function useUploadProcess(): useUploadProcessReturn {
 
     setIsUploading(true);
     const results: BatchUploadResult[] = [];
+    const materializationSessions = new Map<number, FileUploadSession>();
+    const materializationResults = new Map<number, BatchUploadResult>();
+    const resultSessions = new Map<BatchUploadResult, FileUploadSession>();
     const uploadTasks: Promise<void>[] = [];
     const smallFileBuffer: FileUploadSession[] = [];
 
@@ -267,19 +273,46 @@ export function useUploadProcess(): useUploadProcessReturn {
           if (!match) {
             return;
           }
+          if (r.success && !isDuplicateResult(r) && !r.task_id) {
+            r.success = false;
+            r.error = t("upload.UploadProcess.noResult");
+          }
+          resultSessions.set(r, match);
           updateFileProgress(match.sessionId, {
             status: resolveResultStatus(r),
             progress: r.success ? 100 : 0,
             error: r.success ? undefined : r.message || r.error,
           });
+          if (r.task_id) {
+            materializationSessions.set(r.task_id, match);
+            materializationResults.set(r.task_id, r);
+          }
+        });
+        sessionsByFileName.forEach((remaining) => {
+          remaining.forEach((session) => {
+            const result: BatchUploadResult = {
+              success: false,
+              file_name: session.file.name,
+              error: t("upload.UploadProcess.noResult"),
+            };
+            results.push(result);
+            resultSessions.set(result, session);
+            updateFileProgress(session.sessionId, {
+              status: "failed",
+              progress: 0,
+              error: result.error,
+            });
+          });
         });
       } catch (err: any) {
         sessions.forEach((s) => {
-          results.push({
+          const result = {
             success: false,
             file_name: s.file.name,
             error: err.message,
-          });
+          };
+          results.push(result);
+          resultSessions.set(result, s);
           updateFileProgress(s.sessionId, {
             status: "failed",
             error: err.message,
@@ -299,7 +332,6 @@ export function useUploadProcess(): useUploadProcessReturn {
         updateFileProgress(session.sessionId, {
           status: "uploading",
         });
-
         const resp = await chunkedUploadMutation.mutateAsync({
           file: session.file,
           sessionId: session.sessionId,
@@ -318,20 +350,32 @@ export function useUploadProcess(): useUploadProcessReturn {
         const result = resp.results?.[0] || {
           success: false,
           file_name: session.file.name,
+          message: undefined,
           error: t("upload.UploadProcess.noResult"),
         };
+        if (result.success && !isDuplicateResult(result) && !result.task_id) {
+          result.success = false;
+          result.error = t("upload.UploadProcess.noResult");
+        }
         results.push(result);
+        resultSessions.set(result, session);
         updateFileProgress(session.sessionId, {
           status: resolveResultStatus(result),
           progress: result.success ? 100 : 0,
           error: result.success ? undefined : result.message || result.error,
         });
+        if (result.task_id) {
+          materializationSessions.set(result.task_id, session);
+          materializationResults.set(result.task_id, result);
+        }
       } catch (err: any) {
-        results.push({
+        const result = {
           success: false,
           file_name: session.file.name,
           error: err.message,
-        });
+        };
+        results.push(result);
+        resultSessions.set(result, session);
         updateFileProgress(session.sessionId, {
           status: "failed",
           error: err.message,
@@ -383,7 +427,48 @@ export function useUploadProcess(): useUploadProcessReturn {
       }
 
       await Promise.all(uploadTasks);
-      await invalidateAssetQueries();
+
+      const taskIds = Array.from(materializationSessions.keys());
+      if (taskIds.length > 0) {
+        try {
+          await waitForUploadJobs(taskIds, {
+            onUpdate: (job) => {
+              if (!job.task_id) return;
+              const session = materializationSessions.get(job.task_id);
+              if (!session) return;
+              if (!job.terminal) {
+                updateFileProgress(session.sessionId, { status: "processing", progress: 100 });
+                return;
+              }
+              const result = materializationResults.get(job.task_id);
+              if (!job.success && result) {
+                result.success = false;
+                result.error = job.error || t("upload.UploadProcess.processFailed");
+              }
+              updateFileProgress(session.sessionId, {
+                status: job.success ? "completed" : "failed",
+                progress: job.success ? 100 : 0,
+                error: job.success ? undefined : job.error,
+              });
+            },
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : t("upload.UploadProcess.processFailed");
+          taskIds.forEach((taskId) => {
+            const session = materializationSessions.get(taskId);
+            const result = materializationResults.get(taskId);
+            if (result) {
+              result.success = false;
+              result.error = message;
+            }
+            if (session) updateFileProgress(session.sessionId, { status: "failed", error: message });
+          });
+        }
+      }
+
+      if (results.some((result) => result.success && !isDuplicateResult(result))) {
+        await invalidateAssetQueries();
+      }
 
       const duplicates = results.filter(isDuplicateResult).map((r) => r.file_name || "");
       const uploaded = results
@@ -394,6 +479,7 @@ export function useUploadProcess(): useUploadProcessReturn {
         .map((r) => ({
           name: r.file_name || "Unknown",
           error: r.message || r.error || t("upload.UploadProcess.uploadFailed"),
+          file: resultSessions.get(r)?.file ?? fileArray[0],
         }));
 
       if (failed.length > 0) {
@@ -425,6 +511,13 @@ export function useUploadProcess(): useUploadProcessReturn {
 
       return { uploaded, duplicates, failed };
     } catch (error: any) {
+      await Promise.allSettled(uploadTasks);
+      plannedSessions.forEach((session) =>
+        updateFileProgress(session.sessionId, {
+          status: "failed",
+          error: error.message || t("upload.UploadProcess.processFailed"),
+        }),
+      );
       showMessage("error", error.message || t("upload.UploadProcess.processFailed"));
       return {
         uploaded: [],
@@ -432,6 +525,7 @@ export function useUploadProcess(): useUploadProcessReturn {
         failed: fileArray.map((f) => ({
           name: f.name,
           error: t("upload.UploadProcess.processFailed"),
+          file: f,
         })),
       };
     } finally {

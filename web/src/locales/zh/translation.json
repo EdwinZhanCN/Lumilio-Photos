@@ -1979,6 +1979,7 @@
       "status_duplicate": "重复",
       "status_failed": "失败",
       "status_pending": "等待中",
+      "status_processing": "处理中",
       "status_uploading": "上传中"
     },
     "NavbarQueue": {

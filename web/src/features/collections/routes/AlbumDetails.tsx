@@ -6,8 +6,6 @@ import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalle
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AlbumIcon, Bird, FolderMinus, RefreshCcw, Share2 } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { Album } from "@/lib/albums/types";
-import type { components } from "@/lib/http-commons/schema";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import AlbumFormModal from "../components/AlbumFormModal";
@@ -22,8 +20,6 @@ import {
   type ShareSourceKind,
 } from "@/features/share/components/CreateShareLinkModal";
 import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
-
-type RebuildAlbumBioClipResponse = components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
 
 const AlbumAssetsContent = () => {
   const { t, i18n } = useI18n();
@@ -54,7 +50,7 @@ const AlbumAssetsContent = () => {
     },
     { enabled: !!albumId },
   );
-  const album = albumQuery.data as Album | undefined;
+  const album = albumQuery.data;
   const isAlbumLoading = albumQuery.isLoading;
   useBreadcrumbs([
     { label: t("sidebar.home", "Home"), to: "/" },
@@ -94,7 +90,7 @@ const AlbumAssetsContent = () => {
         params: { path: { id: albumIdNumber } },
         body: {},
       });
-      const responseData = response as RebuildAlbumBioClipResponse | undefined;
+      const responseData = response;
       const queuedAssets = responseData?.queued_assets ?? 0;
 
       await queryClient.invalidateQueries({

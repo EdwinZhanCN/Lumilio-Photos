@@ -53,7 +53,7 @@ DB_USER ?= postgres
 DB_PASSWORD ?= postgres
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
-.PHONY: setup dev server-dev web-dev test server-test web-test dto db db-reset dev-reset clean \
+.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test dto db db-reset dev-reset clean \
 	desktop-dev desktop-build desktop-test \
 	.server-config .server-env .web-env
 
@@ -94,6 +94,9 @@ server-test:
 web-test:
 	cd $(WEB_DIR) && $(VP) check --no-fmt --no-lint && $(VP) lint && $(VP) test
 
+web-browser-test:
+	cd $(WEB_DIR) && PRODUCTION_SMOKE=true $(VP) build && $(VP) node scripts/run-browser-smoke.mjs
+
 desktop-dev:
 	@echo "==> Running desktop app (dev). PG_BIN_DIR=$(PG_BIN_DIR)"
 	@echo "    Serving the SPA from $(CURDIR)/$(WEB_DIR)/dist (run 'cd web && vp build' first)."
@@ -113,7 +116,7 @@ desktop-build:
 dto:
 	@echo "==> Generating OpenAPI spec, TypeScript types, and API documentation"
 	cd $(SERVER_DIR) && swag init --v3.1 -g cmd/main.go -o docs/
-	cd $(WEB_DIR) && ./node_modules/.bin/openapi-typescript ../server/docs/swagger.yaml -o ./src/lib/http-commons/schema.d.ts
+	cd $(WEB_DIR) && $(VP) node scripts/generate-openapi-types.mjs
 	cd $(SITE_DIR) && ./node_modules/.bin/redocly build-docs ../server/docs/swagger.yaml --output docs/public/redoc-static.html
 
 db-reset:

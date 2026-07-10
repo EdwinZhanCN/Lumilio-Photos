@@ -1,12 +1,9 @@
 import { useCallback, useMemo } from "react";
-import type { InfiniteData, UseInfiniteQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 
 type PublicShareMetadataDTO = components["schemas"]["dto.PublicShareMetadataDTO"];
 type PublicAssetDTO = components["schemas"]["dto.PublicAssetDTO"];
-type PublicShareAssetListResponseDTO = components["schemas"]["dto.PublicShareAssetListResponseDTO"];
-
 const PAGE_SIZE = 60;
 
 export interface PublicShareViewResult {
@@ -53,23 +50,22 @@ export function usePublicShareView(token: string | undefined): PublicShareViewRe
       pageParamName: "offset",
       retry: false,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = lastPage as PublicShareAssetListResponseDTO | undefined;
-        const total = payload?.total ?? 0;
+        const total = lastPage?.total ?? 0;
         const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = payload?.items?.length ?? 0;
+        const loadedCount = lastPage?.items?.length ?? 0;
         const hasMore = offset + loadedCount < total;
         return hasMore ? offset + PAGE_SIZE : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<PublicShareAssetListResponseDTO>, unknown>;
+  );
 
   const assets = useMemo(() => {
-    const pages = (assetsQuery.data?.pages ?? []) as PublicShareAssetListResponseDTO[];
+    const pages = assetsQuery.data?.pages ?? [];
     return pages.flatMap((page) => page.items ?? []);
   }, [assetsQuery.data]);
 
   const total = useMemo(() => {
-    const pages = (assetsQuery.data?.pages ?? []) as PublicShareAssetListResponseDTO[];
+    const pages = assetsQuery.data?.pages ?? [];
     return pages.length > 0 ? (pages[pages.length - 1]?.total ?? 0) : 0;
   }, [assetsQuery.data]);
 
