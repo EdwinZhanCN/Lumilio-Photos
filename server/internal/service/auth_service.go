@@ -38,6 +38,34 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// LoginOptions is the public capability probe for identifier-first login.
+// Password is always true for syntactically valid usernames so unknown and
+// inactive accounts are not distinguishable from password-only accounts.
+// Passkey is true only for active users with at least one enrolled passkey.
+// TOTP is intentionally omitted — it is revealed only after password success.
+type LoginOptions struct {
+	Password bool `json:"password"`
+	Passkey  bool `json:"passkey"`
+}
+
+func passwordOnlyLoginOptions() LoginOptions {
+	return LoginOptions{Password: true, Passkey: false}
+}
+
+func loginOptionsFromPasskeyCount(passkeyCount int64) LoginOptions {
+	return LoginOptions{Password: true, Passkey: passkeyCount > 0}
+}
+
+// resolveLoginOptions maps account lookup results to the public probe shape.
+// Unknown and inactive users match password-only so existence is not leaked
+// beyond the passkey bit already exposed by passkey login options.
+func resolveLoginOptions(found bool, active bool, passkeyCount int64) LoginOptions {
+	if !found || !active {
+		return passwordOnlyLoginOptions()
+	}
+	return loginOptionsFromPasskeyCount(passkeyCount)
+}
+
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refreshToken" binding:"required"`
 }
@@ -171,6 +199,34 @@ func normalizeConfiguredWebAuthnOrigins(values []string) []string {
 		origins = append(origins, normalized)
 	}
 	return origins
+}
+
+// GetLoginOptions returns which login methods the client should present after
+// the user enters a username. It does not start a WebAuthn ceremony.
+func (s *AuthService) GetLoginOptions(ctx context.Context, username string) (LoginOptions, error) {
+	normalized, err := normalizeUsername(username)
+	if err != nil {
+		return LoginOptions{}, err
+	}
+
+	user, err := s.queries.GetUserByUsername(ctx, normalized)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return resolveLoginOptions(false, false, 0), nil
+		}
+		return LoginOptions{}, fmt.Errorf("get user by username: %w", err)
+	}
+
+	if user.IsActive == nil || !*user.IsActive {
+		return resolveLoginOptions(true, false, 0), nil
+	}
+
+	status, err := s.queries.GetUserMFAStatus(ctx, user.UserID)
+	if err != nil {
+		return LoginOptions{}, fmt.Errorf("load mfa status: %w", err)
+	}
+
+	return resolveLoginOptions(true, true, status.PasskeyCount), nil
 }
 
 // Login authenticates a user and returns tokens

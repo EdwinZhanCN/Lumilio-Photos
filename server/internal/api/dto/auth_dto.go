@@ -12,6 +12,26 @@ type LoginRequestDTO struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// LoginOptionsRequestDTO is the identifier-first probe before password/passkey UI.
+type LoginOptionsRequestDTO struct {
+	Username string `json:"username" binding:"required"`
+}
+
+// LoginOptionsResponseDTO reports which login methods the client should offer.
+// Unknown/inactive usernames intentionally match the password-only shape.
+// TOTP is never included — it is revealed only after a successful password check.
+type LoginOptionsResponseDTO struct {
+	Password bool `json:"password" example:"true"`
+	Passkey  bool `json:"passkey" example:"false"`
+}
+
+func ToLoginOptionsResponseDTO(options service.LoginOptions) LoginOptionsResponseDTO {
+	return LoginOptionsResponseDTO{
+		Password: options.Password,
+		Passkey:  options.Passkey,
+	}
+}
+
 // RefreshTokenRequestDTO represents the request structure for token refresh
 type RefreshTokenRequestDTO struct {
 	RefreshToken string `json:"refreshToken" binding:"required"`
