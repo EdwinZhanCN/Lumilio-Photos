@@ -6,6 +6,7 @@ export const zhcnSidebar: DefaultTheme.Sidebar = {
             collapsed: false,
             items: [
                 { text: '概览', link: '/zh-cn/user-manual/introduction/' },
+                { text: '安装', link: '/zh-cn/user-manual/introduction/installation' },
             ]
         },
         {
