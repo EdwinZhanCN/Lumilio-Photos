@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { Album as AlbumDTO, ListAlbumsResponse } from "@/lib/albums/types";
+import type { Album as AlbumDTO } from "@/lib/albums/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
 
@@ -46,7 +46,7 @@ export function useAlbums(t: (key: string, options?: any) => string, repositoryI
           },
         },
       });
-      const payload = response as ListAlbumsResponse | undefined;
+      const payload = response;
       const total = payload?.total ?? 0;
 
       return {

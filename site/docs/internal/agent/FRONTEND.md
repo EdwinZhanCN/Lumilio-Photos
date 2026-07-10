@@ -109,6 +109,13 @@ For API changes:
 2. Run `make dto`.
 3. Update frontend hooks/components against generated types.
 
+The checked-in fetch/query runtime comes from the official `openapi-fetch`,
+`openapi-react-query`, and `openapi-typescript-helpers` packages. `make dto`
+runs `web/scripts/generate-openapi-types.mjs`, which removes the known empty
+object branch emitted by swag v2 for required JSON request bodies before type
+generation. Keep this normalization in the generator; never post-edit
+`schema.d.ts`.
+
 ## State Boundaries
 
 Use TanStack Query for server state:
@@ -124,6 +131,11 @@ Use Context for cross-cutting app state:
 - auth session
 - global online/notification behavior
 - worker runtime dependencies
+
+Session teardown is centralized in `features/auth/resetSession.ts`. Logout and
+refresh exhaustion must use that boundary so in-flight Query/Lumilio work and
+all user-scoped caches, notifications, repository choices, searches, and
+filters are cleared before another user authenticates.
 
 Use Zustand for feature-local interactive UI state:
 
@@ -183,6 +195,8 @@ The production web image uses Caddy:
 - supports HTTP/1, h2c on `:80`, and HTTP/1/2/3 on `:443`
 - sets immutable cache headers for static assets
 - serves WASM with `application/wasm`
+- serves the same COOP/COEP isolation headers as development; the desktop Go
+  SPA fallback also sets them on documents and static assets
 - falls back to `index.html` for SPA routes
 
 ## Quality Gate
@@ -191,6 +205,7 @@ Frontend gate:
 
 ```bash
 make web-test
+make web-browser-test
 ```
 
 Direct equivalent when intentionally scoped to `web/`:
@@ -199,4 +214,7 @@ Direct equivalent when intentionally scoped to `web/`:
 cd web && vp check --no-fmt --no-lint && vp lint && vp test
 ```
 
-Use `vp build` when changing bundling, Caddy/runtime behavior, WASM loading, workers, or production-only code paths.
+`web-browser-test` is the real-browser worker/release smoke job for cross-origin
+isolation, BLAKE3, upload recovery, and background lifecycle transitions. Use
+`vp build` when changing bundling, Caddy/runtime behavior, WASM loading,
+workers, or production-only code paths.

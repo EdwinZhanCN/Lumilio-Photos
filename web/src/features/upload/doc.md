@@ -43,9 +43,15 @@ Files are hashed before transport through `useGenerateHashcode`. Hashing is
 pipelined with upload: each hashed large file can start chunked upload, and
 small files are buffered into smart batches. The worker fingerprint mirrors
 the backend BLAKE3 policy exactly: full hash up to 100 MiB, then quick hash
-over little-endian file size plus fixed 1 MiB first/last chunks. After
-transport completes, asset list/search queries are invalidated so
-repository-aware galleries can show the newly indexed assets.
+over little-endian file size plus fixed 1 MiB first/last chunks. Hash and
+HTTP failures are terminal per-file failures: successful files leave the
+editor queue, while failed `File` objects remain available for retry.
+
+A successful HTTP response means transport was accepted, not that an asset
+exists yet. [waitForUploadJobs](@/lib/upload/uploadLifecycle.ts) follows the returned ingest task ids
+through `/api/v1/assets/batch/jobs`; [FileUploadProgress](./hooks/useUploadProcess.tsx) remains in
+`processing` until every task reaches a backend terminal state. Asset
+list/search queries are invalidated only after successful materialization.
 
 ## Instant upload
 

@@ -50,7 +50,7 @@ export function AgentBoard() {
   const { width, containerRef, mounted } = useContainerWidth();
 
   const pinsQuery = $api.useQuery("get", "/api/v1/agent/pins", {});
-  const pins = useMemo(() => (pinsQuery.data as AgentPinDTO[] | undefined) ?? [], [pinsQuery.data]);
+  const pins = useMemo(() => pinsQuery.data ?? [], [pinsQuery.data]);
 
   const layoutMutation = $api.useMutation("patch", "/api/v1/agent/pins/layout", {
     onMutate: async (variables) => {

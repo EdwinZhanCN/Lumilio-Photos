@@ -38,7 +38,7 @@ import { useCarouselContextContributor } from "@/features/lumilio/contributors/u
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
 import MediaViewer from "../../../shared/MediaViewer";
-import type { Asset, components } from "@/lib/http-commons";
+import type { Asset } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album } from "@/lib/albums/types";
 import {
@@ -64,8 +64,6 @@ interface FullScreenCarouselProps {
 type AssetWithSpecies = Asset & {
   species_predictions?: unknown;
 };
-
-type SpeciesReference = components["schemas"]["dto.SpeciesReferenceResponseDTO"];
 
 type SpeciesReferenceTriggerProps = {
   prediction: ParsedSpeciesPrediction;
@@ -100,7 +98,7 @@ const SpeciesReferenceTrigger = ({ prediction }: SpeciesReferenceTriggerProps) =
       retry: 1,
     },
   );
-  const reference = referenceQuery.data as SpeciesReference | undefined;
+  const reference = referenceQuery.data;
 
   const handleOpen = useCallback(() => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
@@ -380,7 +378,7 @@ const FullScreenCarousel = ({
       staleTime: 60_000,
     },
   );
-  const fieldGuideAsset = fieldGuideAssetQuery.data as AssetWithSpecies | undefined;
+  const fieldGuideAsset = fieldGuideAssetQuery.data;
 
   const slides = useMemo(() => {
     return photos.map((photo) => ({

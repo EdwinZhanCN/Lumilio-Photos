@@ -12,7 +12,7 @@
  * const mutation = $api.useMutation("post", "/api/v1/auth/login");
  * ```
  */
-import createClient from "@/lib/http-commons/openapi-react-query";
+import createClient from "openapi-react-query";
 import type { paths } from "./schema";
 import client from "./client";
 

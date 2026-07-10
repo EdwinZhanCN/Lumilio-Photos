@@ -1,11 +1,9 @@
 import { useEffect, useMemo } from "react";
-import { type InfiniteData, type UseInfiniteQueryResult } from "@tanstack/react-query";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { $api } from "@/lib/http-commons/queryClient";
 
 type Schemas = components["schemas"];
 type AssetMapPointDTO = Schemas["dto.AssetMapPointDTO"];
-type AssetMapPointListResponse = Schemas["dto.AssetMapPointListResponseDTO"];
 export type MapPhotoPoint = AssetMapPointDTO;
 
 const PAGE_SIZE = 1000;
@@ -35,9 +33,8 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
       gcTime: 15 * 60 * 1000,
       retry: 1,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = lastPage as AssetMapPointListResponse | undefined;
-        const pagePoints = payload?.points ?? [];
-        const total = payload?.total;
+        const pagePoints = lastPage?.points ?? [];
+        const total = lastPage?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
 
         if (typeof total === "number") {
@@ -47,7 +44,7 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
         return pagePoints.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<AssetMapPointListResponse>, unknown>;
+  );
 
   useEffect(() => {
     if (!query.hasNextPage || query.isFetchingNextPage || query.isLoading || query.isError) {

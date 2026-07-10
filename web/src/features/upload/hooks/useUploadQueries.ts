@@ -1,6 +1,4 @@
 import { $api } from "@/lib/http-commons/queryClient";
-import type { UseQueryResult } from "@tanstack/react-query";
-import type { UploadConfigResponse, UploadProgressResponse } from "@/lib/upload/types";
 
 /**
  * React Query hook for fetching upload configuration.
@@ -21,10 +19,7 @@ import type { UploadConfigResponse, UploadProgressResponse } from "@/lib/upload/
  * ```
  */
 export const useUploadConfig = () =>
-  $api.useQuery("get", "/api/v1/assets/batch/config", {}) as UseQueryResult<
-    UploadConfigResponse,
-    unknown
-  >;
+  $api.useQuery("get", "/api/v1/assets/batch/config", {});
 
 /**
  * React Query hook for fetching upload progress for multiple sessions.
@@ -66,4 +61,4 @@ export const useUploadProgress = (
       enabled: options?.enabled ?? Boolean(sessionIds),
       refetchInterval: options?.refetchInterval,
     },
-  ) as UseQueryResult<UploadProgressResponse, unknown>;
+  );

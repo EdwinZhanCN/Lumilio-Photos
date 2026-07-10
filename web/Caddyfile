@@ -11,6 +11,10 @@
 {$LUMILIO_SITE_ADDRESS} {
 	root * /usr/share/caddy
 	encode zstd gzip
+	header {
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "credentialless"
+	}
 
 	# API and SPA must be routed with mutually exclusive `handle` blocks. A bare
 	# `try_files {path} /index.html` is a rewrite, and Caddy orders rewrite

@@ -37,8 +37,5 @@ export function useTagSummaries({
         },
       },
     },
-    {
-      select: (response) => response as TagSummaryListResponse,
-    },
   );
 }

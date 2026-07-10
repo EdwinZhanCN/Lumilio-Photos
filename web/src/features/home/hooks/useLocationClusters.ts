@@ -1,11 +1,9 @@
 import { useMemo } from "react";
-import { type InfiniteData, type UseInfiniteQueryResult } from "@tanstack/react-query";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { $api } from "@/lib/http-commons/queryClient";
 
 type Schemas = components["schemas"];
 type LocationClusterDTO = Schemas["dto.LocationClusterDTO"];
-type LocationClusterListResponse = Schemas["dto.LocationClusterListResponseDTO"];
 
 export type LocationCluster = LocationClusterDTO;
 
@@ -36,9 +34,8 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
       gcTime: 15 * 60 * 1000,
       retry: 1,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = lastPage as LocationClusterListResponse | undefined;
-        const pageClusters = payload?.clusters ?? [];
-        const total = payload?.total;
+        const pageClusters = lastPage?.clusters ?? [];
+        const total = lastPage?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
 
         if (typeof total === "number") {
@@ -48,7 +45,7 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
         return pageClusters.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<LocationClusterListResponse>, unknown>;
+  );
 
   const clusters = useMemo(() => {
     const pages = query.data?.pages ?? [];

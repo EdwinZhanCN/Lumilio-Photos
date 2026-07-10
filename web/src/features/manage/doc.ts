@@ -37,10 +37,11 @@
  * preferences.
  *
  * Repository cards show a scoped asset count through `/api/v1/assets/list` and
- * cloud status through {@link useRepositoryCloudStatus}. Maintenance mutations
- * invalidate repository-aware asset queries after they change indexing,
- * stacking, or imports, so galleries refresh without duplicating cache policy
- * in Manage.
+ * cloud status through {@link useRepositoryCloudStatus}. A repository scan
+ * mutation only acknowledges a queued background job.
+ * {@link waitForRepositoryScan} follows its scan run through running and
+ * terminal backend states; repository-aware queries are invalidated only after
+ * completion. Other maintenance mutations retain scoped invalidation behavior.
  *
  * The action scope is deliberately mixed:
  *
@@ -93,7 +94,10 @@
  */
 import type Manage from "./routes/Manage.tsx";
 import type RepositoryGrid from "./components/RepositoryGrid.tsx";
-import type { useRepositoryScan } from "./hooks/useRepositoryScan.ts";
+import type {
+  useRepositoryScan,
+  waitForRepositoryScan,
+} from "./hooks/useRepositoryScan.ts";
 import type UnifiedUploadSection from "@/features/upload/components/UnifiedUploadSection.tsx";
 import type { useUploadContext } from "@/features/upload";
 import type { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates.ts";

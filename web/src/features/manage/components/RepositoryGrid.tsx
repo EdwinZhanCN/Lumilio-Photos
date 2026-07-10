@@ -67,7 +67,7 @@ function useRepositoryAssetCount(repositoryId: string) {
 
   return {
     ...query,
-    assetCount: (query.data?.total_assets ?? 0) as number,
+    assetCount: query.data?.total_assets ?? 0,
   };
 }
 

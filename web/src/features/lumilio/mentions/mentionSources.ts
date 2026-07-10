@@ -26,9 +26,9 @@ function fuzzyMatch(query: string, label: string): boolean {
 }
 
 export function createMentionSources(data: {
-  people: { person_id: number; name?: string | null }[];
-  albums: { album_id: number; album_name: string }[];
-  pins: { pin_id: string; title?: string | null; summary?: string | null }[];
+  people: { person_id?: number; name?: string | null }[];
+  albums: { album_id?: number; album_name?: string }[];
+  pins: { pin_id?: string; title?: string | null; summary?: string | null }[];
   cameras: string[];
   lenses: string[];
 }): MentionSource[] {
@@ -37,11 +37,14 @@ export function createMentionSources(data: {
       type: "person",
       search: (q) =>
         data.people
-          .filter((p) => p.name && fuzzyMatch(q, p.name))
+          .filter(
+            (p): p is { person_id: number; name: string } =>
+              p.person_id !== undefined && !!p.name && fuzzyMatch(q, p.name),
+          )
           .slice(0, 20)
           .map((p) => ({
             id: String(p.person_id),
-            label: p.name ?? String(p.person_id),
+            label: p.name,
             type: "person" as const,
           })),
     },
@@ -49,7 +52,10 @@ export function createMentionSources(data: {
       type: "album",
       search: (q) =>
         data.albums
-          .filter((a) => fuzzyMatch(q, a.album_name))
+          .filter(
+            (a): a is { album_id: number; album_name: string } =>
+              a.album_id !== undefined && !!a.album_name && fuzzyMatch(q, a.album_name),
+          )
           .slice(0, 20)
           .map((a) => ({
             id: String(a.album_id),
@@ -61,7 +67,8 @@ export function createMentionSources(data: {
       type: "pin",
       search: (q) =>
         data.pins
-          .filter((p) => {
+          .filter((p): p is typeof p & { pin_id: string } => {
+            if (!p.pin_id) return false;
             const label = p.title ?? p.summary ?? p.pin_id;
             return fuzzyMatch(q, label);
           })

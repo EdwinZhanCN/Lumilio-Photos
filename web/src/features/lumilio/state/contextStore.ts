@@ -19,6 +19,7 @@ interface ContextStore {
   /** Snapshot active contributions for send (respects exclusions). */
   snapshotForSend: () => ContextContribution[];
   clearExclusions: () => void;
+  resetSession: () => void;
 }
 
 export const useContextStore = create<ContextStore>((set, get) => ({
@@ -76,4 +77,5 @@ export const useContextStore = create<ContextStore>((set, get) => ({
   },
 
   clearExclusions: () => set({ excluded: new Set() }),
+  resetSession: () => set({ contributions: new Map(), excluded: new Set() }),
 }));

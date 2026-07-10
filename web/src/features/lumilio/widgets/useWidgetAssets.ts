@@ -51,7 +51,7 @@ export function useWidgetAssetsPreview(source: WidgetSource, limit: number) {
   }
 
   const query = source.kind === "ref" ? refQuery : pinQuery;
-  const payload = query.data as AgentRefAssetsDTO | undefined;
+  const payload = query.data;
   return {
     assets: payload?.assets ?? [],
     total: payload?.total ?? 0,
@@ -69,10 +69,13 @@ export function useWidgetAssetsInfinite(source: WidgetSource, pageSize: number) 
     initialPageParam: 0,
     retry: false,
     enabled,
-    getNextPageParam: (lastPage: unknown, _allPages: unknown[], lastPageParam: unknown) => {
-      const payload = lastPage as AgentRefAssetsDTO | undefined;
-      const fetched = (Number(lastPageParam ?? 0) || 0) + (payload?.assets?.length ?? 0);
-      return payload && fetched < (payload.total ?? 0) ? fetched : undefined;
+    getNextPageParam: (
+      lastPage: AgentRefAssetsDTO,
+      _allPages: AgentRefAssetsDTO[],
+      lastPageParam: unknown,
+    ) => {
+      const fetched = (Number(lastPageParam ?? 0) || 0) + (lastPage.assets?.length ?? 0);
+      return fetched < (lastPage.total ?? 0) ? fetched : undefined;
     },
   });
 

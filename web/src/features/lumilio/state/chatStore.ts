@@ -35,7 +35,10 @@ interface LumilioChatStore {
   ) => Promise<void>;
   confirmInterrupt: (interruptId: string, approved: boolean) => Promise<void>;
   newConversation: () => void;
+  resetSession: () => void;
 }
+
+let activeStreamController: AbortController | null = null;
 
 export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
   const callbacks = {
@@ -98,6 +101,9 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         label: m.label,
       }));
 
+      const controller = new AbortController();
+      activeStreamController?.abort();
+      activeStreamController = controller;
       try {
         await streamAgent(
           "/api/v1/agent/chat",
@@ -111,9 +117,12 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
             ...(mentionsPayload && mentionsPayload.length > 0 ? { mentions: mentionsPayload } : {}),
           },
           callbacks,
+          controller.signal,
         );
       } catch (error) {
-        callbacks.onError((error as Error).message);
+        if (!controller.signal.aborted) callbacks.onError((error as Error).message);
+      } finally {
+        if (activeStreamController === controller) activeStreamController = null;
       }
     },
 
@@ -131,14 +140,20 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         connectionError: null,
       }));
 
+      const controller = new AbortController();
+      activeStreamController?.abort();
+      activeStreamController = controller;
       try {
         await streamAgent(
           "/api/v1/agent/chat/resume",
           { thread_id: threadId, targets: { [interruptId]: { approved } } },
           callbacks,
+          controller.signal,
         );
       } catch (error) {
-        callbacks.onError((error as Error).message);
+        if (!controller.signal.aborted) callbacks.onError((error as Error).message);
+      } finally {
+        if (activeStreamController === controller) activeStreamController = null;
       }
     },
 
@@ -151,5 +166,17 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         connectionError: null,
         usage: null,
       }),
+    resetSession: () => {
+      activeStreamController?.abort();
+      activeStreamController = null;
+      set({
+        threadId: null,
+        messages: [],
+        isGenerating: false,
+        awaitingConfirmation: false,
+        connectionError: null,
+        usage: null,
+      });
+    },
   };
 });

@@ -1,12 +1,6 @@
 import { useMemo } from "react";
-import { type UseQueryResult } from "@tanstack/react-query";
-import type { components } from "@/lib/http-commons/schema.d.ts";
 import { $api } from "@/lib/http-commons/queryClient";
 import { encodeGeohash } from "@/lib/utils/geohash";
-
-type Schemas = components["schemas"];
-type LocationClusterDTO = Schemas["dto.LocationClusterDTO"];
-type LocationClusterListResponse = Schemas["dto.LocationClusterListResponseDTO"];
 
 type UseAssetLocationClusterOptions = {
   latitude?: number;
@@ -44,9 +38,9 @@ export function useAssetLocationCluster({
       gcTime: 30 * 60 * 1000,
       retry: 1,
     },
-  ) as UseQueryResult<LocationClusterListResponse, unknown>;
+  );
 
-  const cluster = query.data?.clusters?.[0] as LocationClusterDTO | undefined;
+  const cluster = query.data?.clusters?.[0];
 
   return {
     cluster,

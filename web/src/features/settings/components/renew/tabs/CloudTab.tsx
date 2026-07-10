@@ -200,10 +200,14 @@ export default function CloudTab() {
         setSuccessMsg(t("settings.cloud.messages.reconnected"));
       } else if (result.auth_status === "password_required") {
         setErrorMsg(t("settings.cloud.errors.sessionExpired"));
-      } else if (result.auth_status === "challenge_required" && result.challenge) {
-        setPendingCredential(result.credential as CloudCredential);
-        setPendingChallenge(result.challenge as CloudAuthChallenge);
-        setChallengeValues(fieldInitialValues((result.challenge as CloudAuthChallenge).fields));
+      } else if (
+        result.auth_status === "challenge_required" &&
+        result.challenge &&
+        result.credential
+      ) {
+        setPendingCredential(result.credential);
+        setPendingChallenge(result.challenge);
+        setChallengeValues(fieldInitialValues(result.challenge.fields));
         setSuccessMsg(t("settings.cloud.messages.challengeRequired"));
         setIsAddOpen(true);
       }

@@ -202,6 +202,19 @@ export class AppWorkerClient {
 
         const handler = (e: MessageEvent) => {
           if (e.data.type === "HASH_SINGLE_COMPLETE") {
+            if (hasError) {
+              worker.removeEventListener("message", handler);
+              activeWorkers--;
+              return;
+            }
+            if (e.data.payload?.error || !e.data.payload?.hash) {
+              worker.removeEventListener("message", handler);
+              activeWorkers--;
+              hasError = true;
+              this.abortGenerateHash();
+              reject(new Error(e.data.payload?.error || "Hash worker returned an empty digest"));
+              return;
+            }
             if (onItemComplete) {
               try {
                 onItemComplete({
@@ -226,6 +239,7 @@ export class AppWorkerClient {
           } else if (e.data.type === "ERROR") {
             worker.removeEventListener("message", handler);
             hasError = true;
+            this.abortGenerateHash();
             reject(new Error(e.data.payload?.error || "Hash Error"));
           }
         };

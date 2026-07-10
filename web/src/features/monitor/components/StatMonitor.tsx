@@ -1,6 +1,5 @@
 import { Activity, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { JobStatsResponse } from "../monitor.type";
 import { useI18n } from "@/lib/i18n.tsx";
 
 export function StatMonitor() {
@@ -16,7 +15,7 @@ export function StatMonitor() {
     },
   );
 
-  const stats = (statsQuery.data as JobStatsResponse | undefined) ?? null;
+  const stats = statsQuery.data ?? null;
   const loading = statsQuery.isLoading;
   const error = statsQuery.isError ? t("monitor.stats.fetchError") : null;
 

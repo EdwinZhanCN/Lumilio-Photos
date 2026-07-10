@@ -8,8 +8,6 @@ import {
   useEnableTOTP,
   useMFAStatus,
   useRegenerateRecoveryCodes,
-  type MFAStatus,
-  type RecoveryCodesResponse,
   type TOTPSetupResponse,
 } from "../hooks/useMFA.ts";
 import {
@@ -73,7 +71,7 @@ export default function MFAPage(): React.ReactNode {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [activeAction, setActiveAction] = useState<"disable" | "regenerate" | null>(null);
 
-  const status = statusQuery.data as MFAStatus | undefined;
+  const status = statusQuery.data;
   const shouldAutoStartSetup = searchParams.get("mfa") === "setup";
   const requestedAction = searchParams.get("action");
 
@@ -106,7 +104,7 @@ export default function MFAPage(): React.ReactNode {
     setError(null);
     try {
       const response = await beginSetupMutation.mutateAsync({});
-      const payload = response as TOTPSetupResponse | undefined;
+      const payload = response;
       if (payload) {
         setSetupResponse(payload);
         setVerificationCode("");
@@ -126,16 +124,17 @@ export default function MFAPage(): React.ReactNode {
   };
 
   const handleEnable = async () => {
-    if (!setupResponse || verificationCode.length < 6) return;
+    const setupToken = setupResponse?.setup_token;
+    if (!setupToken || verificationCode.length < 6) return;
     setError(null);
     try {
       const response = await enableTOTP.mutateAsync({
         body: {
-          setup_token: setupResponse.setup_token,
+          setup_token: setupToken,
           code: verificationCode,
         },
       });
-      const payload = response as RecoveryCodesResponse | undefined;
+      const payload = response;
       setRecoveryCodes(payload?.recovery_codes ?? []);
       setSetupResponse(null);
       setVerificationCode("");
@@ -178,7 +177,7 @@ export default function MFAPage(): React.ReactNode {
       const response = await regenerateRecoveryCodes.mutateAsync({
         body: { current_password: password },
       });
-      const payload = response as RecoveryCodesResponse | undefined;
+      const payload = response;
       setRecoveryCodes(payload?.recovery_codes ?? []);
       setActiveAction(null);
       setPassword("");

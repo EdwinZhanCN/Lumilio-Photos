@@ -63,6 +63,11 @@ const FLOW_INDEX: Record<string, number> = {
   recovery: 4,
 };
 
+const isStorageStrategy = (value?: string): value is "cas" | "date" | "flat" =>
+  value === "cas" || value === "date" || value === "flat";
+const isDuplicateHandling = (value?: string): value is "overwrite" | "rename" | "uuid" =>
+  value === "overwrite" || value === "rename" || value === "uuid";
+
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
   if (error && typeof error === "object") {
@@ -88,14 +93,18 @@ const BootstrapWizard: React.FC = () => {
   const defaults = setupQuery.data?.repository_defaults;
   const [repoName, setRepoName] = useState("Primary Storage");
   const [repoRoot, setRepoRoot] = useState("");
-  const [strategy, setStrategy] = useState("date");
-  const [duplicateHandling, setDuplicateHandling] = useState("rename");
+  const [strategy, setStrategy] = useState<"cas" | "date" | "flat">("date");
+  const [duplicateHandling, setDuplicateHandling] = useState<"overwrite" | "rename" | "uuid">(
+    "rename",
+  );
 
   useEffect(() => {
     if (!defaults) return;
     setRepoRoot((current) => current || defaults.default_root || "");
-    setStrategy(defaults.strategy || "date");
-    setDuplicateHandling(defaults.duplicate_handling || "rename");
+    setStrategy(isStorageStrategy(defaults.strategy) ? defaults.strategy : "date");
+    setDuplicateHandling(
+      isDuplicateHandling(defaults.duplicate_handling) ? defaults.duplicate_handling : "rename",
+    );
   }, [defaults]);
 
   const {
@@ -568,7 +577,9 @@ const BootstrapWizard: React.FC = () => {
                       <select
                         className="select select-bordered select-sm w-full"
                         value={strategy}
-                        onChange={(e) => setStrategy(e.target.value)}
+                        onChange={(e) => {
+                          if (isStorageStrategy(e.target.value)) setStrategy(e.target.value);
+                        }}
                         disabled={createRepoMutation.isPending}
                       >
                         <option value="date">date</option>
@@ -583,7 +594,11 @@ const BootstrapWizard: React.FC = () => {
                       <select
                         className="select select-bordered select-sm w-full"
                         value={duplicateHandling}
-                        onChange={(e) => setDuplicateHandling(e.target.value)}
+                        onChange={(e) => {
+                          if (isDuplicateHandling(e.target.value)) {
+                            setDuplicateHandling(e.target.value);
+                          }
+                        }}
                         disabled={createRepoMutation.isPending}
                       >
                         <option value="rename">rename</option>

@@ -13,7 +13,8 @@
  *
  * - {@link useLumilioChatStore} owns the thread id, streamed message blocks,
  *   generation/error state, confirmation interrupts, token usage, and the
- *   send/resume/new-conversation commands.
+ *   send/resume/new-conversation commands. Its session reset aborts the active
+ *   SSE request before clearing the conversation.
  * - {@link useContextStore} is the cross-surface context bus. Contributors
  *   register current asset selections or carousel viewing context, and
  *   {@link ContextChips} lets the user exclude a contribution before send.
@@ -82,6 +83,8 @@
  * Context is opt-out at send time. Contributions stay visible as chips, and
  * exclusions are cleared after sending so the next message starts from the
  * current page context rather than a hidden stale exclusion.
+ * Both Lumilio stores also expose a full session reset used by authentication;
+ * conversation, contributions, and exclusions never cross a user boundary.
  *
  * Pins are the durability boundary. Chat widgets are session refs; pinning
  * copies the result to `/api/v1/agent/pins`, after which layout, title, view,

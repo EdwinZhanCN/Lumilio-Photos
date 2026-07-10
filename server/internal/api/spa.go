@@ -35,6 +35,7 @@ func RegisterSPA(r *gin.Engine, webRoot string) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
+		setCrossOriginIsolationHeaders(c.Header)
 		if file, ok := resolveStaticFile(webRoot, p); ok {
 			c.File(file)
 			return
@@ -42,6 +43,14 @@ func RegisterSPA(r *gin.Engine, webRoot string) {
 		// SPA fallback: let the client-side router handle the path.
 		c.File(indexPath)
 	})
+}
+
+// setCrossOriginIsolationHeaders enables SharedArrayBuffer and other isolated
+// browser primitives for the desktop-hosted production SPA. Docker serves the
+// same headers from Caddy.
+func setCrossOriginIsolationHeaders(setHeader func(string, string)) {
+	setHeader("Cross-Origin-Opener-Policy", "same-origin")
+	setHeader("Cross-Origin-Embedder-Policy", "credentialless")
 }
 
 // resolveStaticFile maps a request path to an existing regular file inside

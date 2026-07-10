@@ -19,7 +19,7 @@ export interface useGenerateHashcodeReturn {
   generateHashCodes: (
     files: FileList | File[],
     onChunkProcessed?: (result: HashcodeResult) => void,
-  ) => Promise<HashcodeResult[] | undefined>;
+  ) => Promise<HashcodeResult[]>;
   cancelGeneration: () => void;
 }
 
@@ -38,7 +38,11 @@ export const useGenerateHashcode = (): useGenerateHashcodeReturn => {
   // 使用 Ref 存储最新进度，不触发渲染
   const progressRef = useRef({ processed: 0, total: 0 });
   // 用于 UI 渲染的 State，仅在 rAF 中更新
-  const [displayProgress, setDisplayProgress] = useState({ processed: 0, total: 0 });
+  const [displayProgress, setDisplayProgress] = useState<{
+    processed: number;
+    total: number;
+    error?: string;
+  }>({ processed: 0, total: 0 });
 
   // 节流渲染循环
   useEffect(() => {
@@ -66,7 +70,7 @@ export const useGenerateHashcode = (): useGenerateHashcodeReturn => {
     async (
       files: FileList | File[],
       onChunkProcessed?: (result: HashcodeResult) => void,
-    ): Promise<HashcodeResult[] | undefined> => {
+    ): Promise<HashcodeResult[]> => {
       setIsGenerating(true);
       const filesArray = Array.isArray(files) ? files : Array.from(files);
       progressRef.current = { processed: 0, total: filesArray.length };
@@ -87,8 +91,9 @@ export const useGenerateHashcode = (): useGenerateHashcodeReturn => {
         });
         return results;
       } catch (error) {
-        console.error("Batch processing failed", error);
-        return undefined;
+        const message = error instanceof Error ? error.message : "Hash generation failed";
+        setDisplayProgress((current) => ({ ...current, error: message }));
+        throw error;
       } finally {
         setIsGenerating(false);
       }
@@ -106,6 +111,7 @@ export const useGenerateHashcode = (): useGenerateHashcodeReturn => {
     progress: {
       numberProcessed: displayProgress.processed,
       total: displayProgress.total,
+      error: displayProgress.error,
     },
     generateHashCodes,
     cancelGeneration,

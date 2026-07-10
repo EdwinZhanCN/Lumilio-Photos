@@ -1,5 +1,4 @@
 import { useCallback, useMemo } from "react";
-import type { InfiniteData, UseInfiniteQueryResult } from "@tanstack/react-query";
 import {
   buildApiFilter,
   DEFAULT_ASSET_TYPES,
@@ -39,9 +38,7 @@ import type { Asset } from "@/lib/assets/types";
 type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 type AssetFilterDTO = components["schemas"]["dto.AssetFilterDTO"];
 type AssetQueryRequestDTO = components["schemas"]["dto.AssetQueryRequestDTO"];
-type QueryAssetsResponseDTO = components["schemas"]["dto.QueryAssetsResponseDTO"];
 type SearchAssetsRequestDTO = components["schemas"]["dto.SearchAssetsRequestDTO"];
-type SearchAssetsResponseDTO = components["schemas"]["dto.SearchAssetsResponseDTO"];
 
 const PAGE_SIZE = 60;
 
@@ -166,7 +163,7 @@ export function usePinAssetsView(
       pageParamName: "offset",
       retry: false,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = lastPage as QueryAssetsResponseDTO | undefined;
+        const payload = lastPage;
         const total = payload?.total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
@@ -177,7 +174,7 @@ export function usePinAssetsView(
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsResponseDTO>, unknown>;
+  );
 
   const createSearchRequest = useCallback(
     (): SearchAssetsRequestDTO => ({
@@ -209,7 +206,7 @@ export function usePinAssetsView(
       pageParamName: "offset",
       retry: false,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = lastPage as SearchAssetsResponseDTO | undefined;
+        const payload = lastPage;
         const total = payload?.results_total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
@@ -220,13 +217,13 @@ export function usePinAssetsView(
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<SearchAssetsResponseDTO>, unknown>;
+  );
 
-  const pin = pinMetaQuery.data as AgentPinDTO | undefined;
+  const pin = pinMetaQuery.data;
   const isExpired = enabled && pinMetaQuery.isError;
 
   const listPages = useMemo(() => {
-    const pages = (listQuery.data?.pages ?? []) as QueryAssetsResponseDTO[];
+    const pages = listQuery.data?.pages ?? [];
     const pageParams = listQuery.data?.pageParams ?? [];
     return pages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
@@ -261,7 +258,7 @@ export function usePinAssetsView(
   );
 
   const searchPages = useMemo(() => {
-    const pages = (searchQuery.data?.pages ?? []) as SearchAssetsResponseDTO[];
+    const pages = searchQuery.data?.pages ?? [];
     const pageParams = searchQuery.data?.pageParams ?? [];
     return pages.map((page, index) => ({
       topItems: page.top_items,

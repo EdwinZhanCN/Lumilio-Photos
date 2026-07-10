@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { AgentPinDTO, WidgetData, WidgetMode, WidgetSource } from "./types";
+import type { WidgetData, WidgetMode, WidgetSource } from "./types";
 import { useWidgetMetadata } from "./useWidgetMetadata";
 
 interface WidgetDataOverrides {
@@ -22,8 +22,9 @@ export function useWidgetData(
   const { metadata, facets, isLoading, isError } = useWidgetMetadata(source);
 
   return useMemo(() => {
-    const pin = source.kind === "pin" ? (metadata as AgentPinDTO | undefined) : undefined;
-    const mode: WidgetMode = overrides.mode ?? pin?.mode ?? "live";
+    const pinMode =
+      source.kind === "pin" && metadata && "mode" in metadata ? metadata.mode : undefined;
+    const mode: WidgetMode = overrides.mode ?? pinMode ?? "live";
     const count = overrides.count ?? metadata?.count ?? facets?.count ?? 0;
     // The facet summary reflects the set's current size; for a live pin that's
     // the replayed count to diff against the frozen snapshot.

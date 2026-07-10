@@ -5,6 +5,11 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { setupStatusQueryKey, useSetupStatus } from "../hooks/useSetupStatus.ts";
 
+const isStorageStrategy = (value?: string): value is "cas" | "date" | "flat" =>
+  value === "cas" || value === "date" || value === "flat";
+const isDuplicateHandling = (value?: string): value is "overwrite" | "rename" | "uuid" =>
+  value === "overwrite" || value === "rename" || value === "uuid";
+
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
   if (error && typeof error === "object") {
@@ -23,14 +28,18 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const primaryReady = setupQuery.data?.primary_repository_initialized ?? false;
   const [name, setName] = useState("Primary Storage");
   const [root, setRoot] = useState("");
-  const [strategy, setStrategy] = useState("date");
-  const [duplicateHandling, setDuplicateHandling] = useState("rename");
+  const [strategy, setStrategy] = useState<"cas" | "date" | "flat">("date");
+  const [duplicateHandling, setDuplicateHandling] = useState<"overwrite" | "rename" | "uuid">(
+    "rename",
+  );
 
   useEffect(() => {
     if (!defaults) return;
     setRoot((current) => current || defaults.default_root || "");
-    setStrategy(defaults.strategy || "date");
-    setDuplicateHandling(defaults.duplicate_handling || "rename");
+    setStrategy(isStorageStrategy(defaults.strategy) ? defaults.strategy : "date");
+    setDuplicateHandling(
+      isDuplicateHandling(defaults.duplicate_handling) ? defaults.duplicate_handling : "rename",
+    );
   }, [defaults]);
 
   const canSubmit = useMemo(
@@ -158,7 +167,9 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
               <select
                 className="select select-bordered w-full"
                 value={strategy}
-                onChange={(event) => setStrategy(event.target.value)}
+                onChange={(event) => {
+                  if (isStorageStrategy(event.target.value)) setStrategy(event.target.value);
+                }}
                 disabled={createMutation.isPending}
               >
                 <option value="date">date</option>
@@ -174,7 +185,11 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
               <select
                 className="select select-bordered w-full"
                 value={duplicateHandling}
-                onChange={(event) => setDuplicateHandling(event.target.value)}
+                onChange={(event) => {
+                  if (isDuplicateHandling(event.target.value)) {
+                    setDuplicateHandling(event.target.value);
+                  }
+                }}
                 disabled={createMutation.isPending}
               >
                 <option value="rename">rename</option>
