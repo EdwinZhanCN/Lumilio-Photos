@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
 import type {
   AuthResponse,
+  LoginOptionsResponse,
   MFAMethod,
   PasskeyOptionsResponse,
   User as UserType,
@@ -44,6 +45,8 @@ type LoginChallenge = {
   mfaMethods: MFAMethod[];
 };
 
+type LoginStep = "identify" | "passkey" | "password" | "mfa";
+
 function getApiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -59,17 +62,22 @@ function getApiMessage(error: unknown, fallback: string): string {
 const LoginPage: React.FC = () => {
   const { t } = useI18n();
   const { login, verifyMFA, completeAuth, dispatch, isAuthenticated, isLoading, error } = useAuth();
+  const loginOptionsMutation = $api.useMutation("post", "/api/v1/auth/login/options");
   const passkeyOptionsMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/options");
   const passkeyVerifyMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/verify");
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [step, setStep] = useState<LoginStep>("identify");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaMethod, setMfaMethod] = useState<MFAMethod>("totp");
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [passkeyUnsupportedNote, setPasskeyUnsupportedNote] = useState<string | null>(null);
+  const passwordInputRef = React.useRef<HTMLInputElement>(null);
 
   const redirectTo = useMemo(() => {
     const from = (location.state as AuthRedirectState | null)?.from;
@@ -81,7 +89,8 @@ const LoginPage: React.FC = () => {
   const displayName = challenge?.user?.display_name || challenge?.user?.username || username;
   const recoveryCodeAvailable = challenge?.mfaMethods.includes("recovery_code") ?? false;
   const passkeyBusy = passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
-  const displayError = passkeyError ?? error;
+  const identifyBusy = loginOptionsMutation.isPending;
+  const displayError = optionsError ?? passkeyError ?? error;
   const passkeySupportReason = passkeySupport.reasonKey ? t(passkeySupport.reasonKey) : null;
   const usernameValid = username.trim().length >= USERNAME_MIN_LENGTH;
 
@@ -91,9 +100,85 @@ const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated, isLoading, navigate, redirectTo]);
 
+  useEffect(() => {
+    if (step !== "password") return;
+    passwordInputRef.current?.focus();
+  }, [step]);
+
+  const clearStepErrors = () => {
+    setPasskeyError(null);
+    setOptionsError(null);
+    dispatch({ type: "AUTH_IDLE" });
+  };
+
+  const goToIdentify = () => {
+    setStep("identify");
+    setPassword("");
+    setPasskeyUnsupportedNote(null);
+    setChallenge(null);
+    setMfaCode("");
+    setMfaMethod("totp");
+    clearStepErrors();
+  };
+
+  const goToPassword = (note: string | null = null) => {
+    setStep("password");
+    setPassword("");
+    setPasskeyUnsupportedNote(note);
+    clearStepErrors();
+  };
+
+  const handleIdentify = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    clearStepErrors();
+    setPasskeyUnsupportedNote(null);
+
+    if (!usernameValid) {
+      setOptionsError(
+        t("auth.login.usernameRequired", {
+          defaultValue: "Enter your username to continue.",
+        }),
+      );
+      return;
+    }
+
+    try {
+      const response = await loginOptionsMutation.mutateAsync({
+        body: { username },
+      });
+      const options = response as LoginOptionsResponse | undefined;
+      if (!options) {
+        throw new Error(
+          t("auth.login.optionsError", {
+            defaultValue: "Unable to continue with this username.",
+          }),
+        );
+      }
+
+      if (options.passkey && passkeySupport.supported) {
+        setStep("passkey");
+        return;
+      }
+
+      const note =
+        options.passkey && !passkeySupport.supported ? passkeySupportReason : null;
+      goToPassword(note);
+    } catch (identifyError) {
+      setOptionsError(
+        getApiMessage(
+          identifyError,
+          t("auth.login.optionsError", {
+            defaultValue: "Unable to continue with this username.",
+          }),
+        ),
+      );
+    }
+  };
+
   const handlePasswordLogin = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     setPasskeyError(null);
+    setOptionsError(null);
     try {
       const result = await login(username, password);
       if (result.status === "mfa_required") {
@@ -104,6 +189,7 @@ const LoginPage: React.FC = () => {
             : (result.challenge.mfaMethods[0] ?? "totp"),
         );
         setMfaCode("");
+        setStep("mfa");
         return;
       }
       void navigate(redirectTo, { replace: true });
@@ -114,14 +200,7 @@ const LoginPage: React.FC = () => {
 
   const handlePasskeyLogin = async () => {
     setPasskeyError(null);
-    if (!usernameValid) {
-      setPasskeyError(
-        t("auth.login.usernameRequiredForPasskey", {
-          defaultValue: "Enter your username to continue with a passkey.",
-        }),
-      );
-      return;
-    }
+    setOptionsError(null);
 
     try {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({
@@ -163,15 +242,16 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleBackToLogin = () => {
+  const handleBackFromMFA = () => {
     setChallenge(null);
     setMfaCode("");
     setMfaMethod("totp");
-    dispatch({ type: "AUTH_IDLE" });
+    setStep("password");
+    clearStepErrors();
   };
 
   /* ----------------------------------------------------- MFA verify view --- */
-  if (challenge) {
+  if (step === "mfa" && challenge) {
     const isRecovery = mfaMethod === "recovery_code";
     return (
       <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
@@ -278,7 +358,7 @@ const LoginPage: React.FC = () => {
             )}
             <button
               type="button"
-              onClick={handleBackToLogin}
+              onClick={handleBackFromMFA}
               className="flex items-center gap-1 text-base-content/40 hover:text-base-content/65"
             >
               <ArrowLeft size={14} />{" "}
@@ -292,42 +372,82 @@ const LoginPage: React.FC = () => {
     );
   }
 
-  /* ---------------------------------------------------------- login view --- */
-  return (
-    <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
-      <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
-        <CardHead
-          title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
-          sub={t("auth.login.subtitle", {
-            defaultValue: "Use a passkey, or your username and password.",
-          })}
-        />
-
-        {displayError && (
-          <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
-        )}
-
-        <Field
-          label={t("auth.login.username", { defaultValue: "Username" })}
-          hint={t("auth.login.usernameHint", { defaultValue: USERNAME_HINT })}
-        >
-          <TextInput
-            icon={User}
-            type="text"
-            placeholder={t("auth.login.usernamePlaceholder", {
-              defaultValue: "your-username",
+  /* ------------------------------------------------------ identify step --- */
+  if (step === "identify") {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
+        <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
+          <CardHead
+            title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
+            sub={t("auth.login.identifySubtitle", {
+              defaultValue: "Enter your username to continue.",
             })}
-            value={username}
-            onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
-            pattern={USERNAME_PATTERN}
-            minLength={USERNAME_MIN_LENGTH}
-            maxLength={USERNAME_MAX_LENGTH}
-            autoComplete="username webauthn"
-            autoFocus
           />
-        </Field>
 
-        {passkeySupport.supported ? (
+          {displayError && (
+            <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
+          )}
+
+          <form className="flex flex-col gap-4" onSubmit={(e) => void handleIdentify(e)}>
+            <Field
+              label={t("auth.login.username", { defaultValue: "Username" })}
+              hint={t("auth.login.usernameHint", { defaultValue: USERNAME_HINT })}
+            >
+              <TextInput
+                icon={User}
+                type="text"
+                placeholder={t("auth.login.usernamePlaceholder", {
+                  defaultValue: "your-username",
+                })}
+                value={username}
+                onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
+                pattern={USERNAME_PATTERN}
+                minLength={USERNAME_MIN_LENGTH}
+                maxLength={USERNAME_MAX_LENGTH}
+                autoComplete="username webauthn"
+                autoFocus
+              />
+            </Field>
+            <Btn type="submit" variant="primary" loading={identifyBusy} disabled={!usernameValid}>
+              {t("auth.login.continue", {
+                defaultValue: "Continue",
+              })}
+            </Btn>
+          </form>
+
+          <div className="text-center text-sm text-base-content/55">
+            {t("auth.login.registerPrompt", { defaultValue: "New to Lumilio?" })}{" "}
+            <Link
+              to="/register"
+              state={location.state}
+              className="font-medium text-base-content underline-offset-2 hover:underline"
+            >
+              {t("auth.login.register", { defaultValue: "Create an account" })}
+            </Link>
+          </div>
+        </AuthShell>
+      </div>
+    );
+  }
+
+  /* -------------------------------------------------------- passkey step --- */
+  if (step === "passkey") {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
+        <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
+          <CardHead
+            icon={Fingerprint}
+            title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
+            sub={t("auth.login.passkeySubtitle", {
+              defaultValue: "Continue as {{username}} with a passkey.",
+              username,
+            })}
+          />
+
+          {displayError && (
+            <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
+          )}
+
           <Btn
             variant="primary"
             icon={Fingerprint}
@@ -338,18 +458,54 @@ const LoginPage: React.FC = () => {
               defaultValue: "Sign in with a passkey",
             })}
           </Btn>
-        ) : (
-          passkeySupportReason && (
-            <div className="rounded-xl border border-base-200 bg-base-200/50 px-4 py-3 text-sm text-base-content/65">
-              {passkeySupportReason}
-            </div>
-          )
+
+          <div className="flex flex-col items-center gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => goToPassword(null)}
+              className="font-medium text-base-content/55 hover:text-base-content"
+            >
+              {t("auth.login.usePasswordInstead", {
+                defaultValue: "Use password instead",
+              })}
+            </button>
+            <button
+              type="button"
+              onClick={goToIdentify}
+              className="flex items-center gap-1 text-base-content/40 hover:text-base-content/65"
+            >
+              <ArrowLeft size={14} />{" "}
+              {t("auth.login.backToUsername", {
+                defaultValue: "Use a different username",
+              })}
+            </button>
+          </div>
+        </AuthShell>
+      </div>
+    );
+  }
+
+  /* ------------------------------------------------------- password step --- */
+  return (
+    <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
+      <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
+        <CardHead
+          title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
+          sub={t("auth.login.passwordSubtitle", {
+            defaultValue: "Enter the password for {{username}}.",
+            username,
+          })}
+        />
+
+        {passkeyUnsupportedNote && (
+          <div className="rounded-xl border border-base-200 bg-base-200/50 px-4 py-3 text-sm text-base-content/65">
+            {passkeyUnsupportedNote}
+          </div>
         )}
 
-        <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-base-content/35">
-          <span className="h-px grow bg-base-200" /> {t("common.or", { defaultValue: "or" })}{" "}
-          <span className="h-px grow bg-base-200" />
-        </div>
+        {displayError && (
+          <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
+        )}
 
         <form className="flex flex-col gap-4" onSubmit={(e) => void handlePasswordLogin(e)}>
           <PasswordField
@@ -360,28 +516,26 @@ const LoginPage: React.FC = () => {
             value={password}
             onChange={setPassword}
             autoComplete="current-password"
+            inputRef={passwordInputRef}
           />
-          <Btn
-            type="submit"
-            variant="outline"
-            loading={isLoading}
-            disabled={!usernameValid || password.length === 0}
-          >
-            {t("auth.login.submit", {
-              defaultValue: "Continue with password",
+          <Btn type="submit" variant="primary" loading={isLoading} disabled={password.length === 0}>
+            {t("auth.login.signIn", {
+              defaultValue: "Sign in",
             })}
           </Btn>
         </form>
 
-        <div className="text-center text-sm text-base-content/55">
-          {t("auth.login.registerPrompt", { defaultValue: "New to Lumilio?" })}{" "}
-          <Link
-            to="/register"
-            state={location.state}
-            className="font-medium text-base-content underline-offset-2 hover:underline"
+        <div className="flex flex-col items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={goToIdentify}
+            className="flex items-center gap-1 text-base-content/40 hover:text-base-content/65"
           >
-            {t("auth.login.register", { defaultValue: "Create an account" })}
-          </Link>
+            <ArrowLeft size={14} />{" "}
+            {t("auth.login.backToUsername", {
+              defaultValue: "Use a different username",
+            })}
+          </button>
         </div>
       </AuthShell>
     </div>
