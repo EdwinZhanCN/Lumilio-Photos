@@ -68,8 +68,8 @@ func TestBuildLumenSDKConfigMapsAppFields(t *testing.T) {
 	if sdkCfg.Discovery.MDNSEnabled {
 		t.Fatal("Discovery.MDNSEnabled should map from app config (false)")
 	}
-	if sdkCfg.Discovery.HubURL != "http://gw:5866" {
-		t.Fatalf("Discovery.HubURL = %q, want trimmed app value", sdkCfg.Discovery.HubURL)
+	if sdkCfg.Discovery.BrokerURL != "http://gw:5866" {
+		t.Fatalf("Discovery.BrokerURL = %q, want trimmed app value", sdkCfg.Discovery.BrokerURL)
 	}
 	if sdkCfg.Discovery.ScanInterval <= 0 || sdkCfg.Discovery.ConnectTimeout <= 0 {
 		t.Fatalf("SDK defaults should be preserved, got %+v", sdkCfg.Discovery)
