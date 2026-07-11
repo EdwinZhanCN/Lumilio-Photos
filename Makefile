@@ -95,7 +95,7 @@ web-test:
 	cd $(WEB_DIR) && $(VP) check --no-fmt --no-lint && $(VP) lint && $(VP) test
 
 web-browser-test:
-	cd $(WEB_DIR) && PRODUCTION_SMOKE=true $(VP) build && $(VP) node scripts/run-browser-smoke.mjs
+	cd $(WEB_DIR) && PRODUCTION_SMOKE=true $(VP) build && $(VP) node scripts/check-bundle-budget.mjs && $(VP) node scripts/run-browser-smoke.mjs
 
 desktop-dev:
 	@echo "==> Running desktop app (dev). PG_BIN_DIR=$(PG_BIN_DIR)"

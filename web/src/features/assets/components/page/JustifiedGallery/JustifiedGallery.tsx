@@ -15,7 +15,10 @@ import type { BrowseGroup, BrowseItem } from "@/features/assets/types/assets.typ
 import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
 
 import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
-import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
+import {
+  intersectsGalleryWindow,
+  useGalleryViewportWindow,
+} from "@/features/assets/hooks/useGalleryViewportWindow";
 
 interface AbsoluteGalleryItemProps {
   top: number;
@@ -29,10 +32,8 @@ interface AbsoluteGalleryItemProps {
 
 /**
  * Shell element for each justified-layout tile.
- * - Always in the DOM (preserves container height + scrollbar).
- * - Mounts children only once the tile enters the viewport (useVisibleOnce).
- * - Applies content-visibility: auto for tiles whose children do not need to
- *   paint outside the tile bounds.
+ * Only viewport-windowed items reach this component. The parent layout keeps
+ * the complete scroll height while offscreen tiles leave the DOM entirely.
  */
 const AbsoluteGalleryItem = memo(
   ({
@@ -44,8 +45,6 @@ const AbsoluteGalleryItem = memo(
     allowOverflow = false,
     children,
   }: AbsoluteGalleryItemProps) => {
-    const [ref, mounted] = useVisibleOnce();
-
     const visibilityStyle = allowOverflow
       ? {}
       : {
@@ -55,7 +54,6 @@ const AbsoluteGalleryItem = memo(
 
     return (
       <div
-        ref={ref}
         className="absolute"
         role="listitem"
         style={
@@ -69,16 +67,95 @@ const AbsoluteGalleryItem = memo(
         }
         data-asset-id={dataAssetId}
       >
-        {mounted ? (
-          children
-        ) : (
-          <div className="skeleton absolute inset-0 h-full w-full rounded-[1.25rem] bg-base-300" />
-        )}
+        {children}
       </div>
     );
   },
 );
 AbsoluteGalleryItem.displayName = "AbsoluteGalleryItem";
+
+type VirtualizedJustifiedGroupProps = {
+  groupKey: string;
+  items: BrowseItem[];
+  layout: LayoutResult;
+  selection: ReturnType<typeof useOptionalKeyboardSelection>;
+  onItemClick: (
+    item: BrowseItem,
+    asset: Asset,
+    event: React.MouseEvent | React.KeyboardEvent,
+  ) => void;
+};
+
+function VirtualizedJustifiedGroup({
+  groupKey,
+  items,
+  layout,
+  selection,
+  onItemClick,
+}: VirtualizedJustifiedGroupProps) {
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const viewportWindow = useGalleryViewportWindow(layoutRef, layout.containerHeight);
+
+  return (
+    <div
+      ref={layoutRef}
+      className="relative w-full"
+      role="list"
+      style={{ height: layout.containerHeight }}
+      data-gallery-total={items.length}
+    >
+      {items.map((item, index) => {
+        const position = layout.positions[index];
+        if (!position || !intersectsGalleryWindow(position.top, position.height, viewportWindow)) {
+          return null;
+        }
+        const width = Math.max(1, position.width);
+        const height = Math.max(1, position.height);
+        const asset = getBrowseItemAsset(item);
+        const assetId = asset.asset_id;
+        const stackInfo = asset.stack;
+        const hasStackOverlay = Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
+        const thumbnailUrl = assetId
+          ? assetUrls.getThumbnailUrl(assetId, getThumbnailSize(width))
+          : undefined;
+
+        return (
+          <AbsoluteGalleryItem
+            key={`${groupKey}-${item.id}`}
+            top={position.top}
+            left={position.left}
+            width={width}
+            height={height}
+            dataAssetId={assetId}
+            allowOverflow={hasStackOverlay}
+          >
+            {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
+              <StackedThumbnail
+                asset={asset}
+                thumbnailUrl={thumbnailUrl}
+                stackInfo={stackInfo}
+                browseStack={item.type === "stack" ? item : undefined}
+                onClick={(event) => onItemClick(item, asset, event)}
+                isSelected={selection.isSelected(item.id)}
+                isSelectionMode={selection.enabled}
+                className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+              />
+            ) : (
+              <MediaThumbnail
+                asset={asset}
+                thumbnailUrl={thumbnailUrl}
+                onClick={(event) => onItemClick(item, asset, event)}
+                isSelected={selection.isSelected(item.id)}
+                isSelectionMode={selection.enabled}
+                className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+              />
+            )}
+          </AbsoluteGalleryItem>
+        );
+      })}
+    </div>
+  );
+}
 
 type LayoutState = {
   signature: string;
@@ -355,60 +432,13 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
             )}
 
             {layout ? (
-              <div
-                className="relative w-full"
-                role="list"
-                style={{ height: layout.containerHeight }}
-              >
-                {items.map((item, index) => {
-                  const position = layout.positions[index];
-                  if (!position) return null;
-                  const width = Math.max(1, position.width);
-                  const height = Math.max(1, position.height);
-                  const asset = getBrowseItemAsset(item);
-                  const assetId = asset.asset_id;
-                  const stackInfo = asset.stack;
-                  const hasStackOverlay =
-                    Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
-                  const thumbnailUrl = assetId
-                    ? assetUrls.getThumbnailUrl(assetId, getThumbnailSize(width))
-                    : undefined;
-
-                  return (
-                    <AbsoluteGalleryItem
-                      key={`${groupKey}-${item.id}`}
-                      top={position.top}
-                      left={position.left}
-                      width={width}
-                      height={height}
-                      dataAssetId={assetId}
-                      allowOverflow={hasStackOverlay}
-                    >
-                      {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
-                        <StackedThumbnail
-                          asset={asset}
-                          thumbnailUrl={thumbnailUrl}
-                          stackInfo={stackInfo}
-                          browseStack={item.type === "stack" ? item : undefined}
-                          onClick={(event) => handleAssetClick(item, asset, event)}
-                          isSelected={selection.isSelected(item.id)}
-                          isSelectionMode={selection.enabled}
-                          className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                        />
-                      ) : (
-                        <MediaThumbnail
-                          asset={asset}
-                          thumbnailUrl={thumbnailUrl}
-                          onClick={(event) => handleAssetClick(item, asset, event)}
-                          isSelected={selection.isSelected(item.id)}
-                          isSelectionMode={selection.enabled}
-                          className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                        />
-                      )}
-                    </AbsoluteGalleryItem>
-                  );
-                })}
-              </div>
+              <VirtualizedJustifiedGroup
+                groupKey={groupKey}
+                items={items}
+                layout={layout}
+                selection={selection}
+                onItemClick={handleAssetClick}
+              />
             ) : (
               <div className="flex h-16 items-center justify-center text-base-content/50">
                 <span className="loading loading-spinner loading-sm"></span>

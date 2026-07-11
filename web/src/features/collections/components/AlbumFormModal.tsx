@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Bird, FolderPen, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
+import { ALBUMS_QUERY_KEY } from "@/features/collections/hooks/useAlbums";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import PhotoPicker from "@/components/PhotoPicker";
@@ -102,7 +103,7 @@ export function AlbumFormModal({
           },
         });
       }
-      await queryClient.invalidateQueries({ queryKey: ["albums"] });
+      await queryClient.invalidateQueries({ queryKey: ALBUMS_QUERY_KEY });
       if (mode === "edit" && album?.album_id != null) {
         await queryClient.invalidateQueries({
           queryKey: ["get", "/api/v1/albums/{id}"],

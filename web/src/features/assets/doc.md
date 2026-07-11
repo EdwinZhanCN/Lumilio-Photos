@@ -70,6 +70,10 @@ keeps URL-backed carousel navigation in sync.
 and [SquareGallery](./components/page/SquareGallery/SquareGallery.tsx) render the browse model; [FullScreenCarousel](./components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx)
 inspects the current flattened asset set; [SearchFAB](./components/page/SearchFAB.tsx) writes to the
 shared search state and the selected source hook decides how to execute it.
+Both galleries use [useGalleryViewportWindow](./hooks/useGalleryViewportWindow.ts): the full layout height
+remains stable, while only an overscanned vertical slice mounts thumbnail
+components. Leaving that slice removes media nodes instead of retaining every
+tile ever visited. Inactive list/search queries have a short bounded GC time.
 
 ## Decisions
 

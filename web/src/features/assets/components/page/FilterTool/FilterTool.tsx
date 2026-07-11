@@ -7,6 +7,7 @@ import MapComponent from "@/components/MapComponent";
 import TagPickerMenu, {
   type TagPickerItem,
 } from "@/features/assets/components/shared/TagPickerMenu";
+import { useAssetFilterOptions } from "@/features/assets/hooks/useAssetFilterOptions";
 
 type TagOption = components["schemas"]["dto.TagDTO"];
 
@@ -218,14 +219,7 @@ function useFilterOptions({
   const canUseCustomFetchers = !!fetchCameraModels && !!fetchLenses;
   const shouldFetchDefault = open && !hasLoaded && needsOptions && !canUseCustomFetchers;
 
-  const filterOptionsQuery = $api.useQuery(
-    "get",
-    "/api/v1/assets/filter-options",
-    {},
-    {
-      enabled: shouldFetchDefault,
-    },
-  );
+  const filterOptionsQuery = useAssetFilterOptions(shouldFetchDefault);
   const loadingOptions = isCustomLoading || filterOptionsQuery.isFetching;
 
   useEffect(() => {

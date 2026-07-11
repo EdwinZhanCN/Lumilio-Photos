@@ -79,7 +79,6 @@
         "deleteSuccess_other": "已将 {{count}} 个资源移入回收站。",
         "downloadError": "启动下载失败",
         "downloadStart": "下载已开始",
-        "loadAlbumsError": "加载相册失败",
         "stackError": "堆叠所选资源失败。",
         "stackSuccess_one": "已堆叠 {{count}} 个资源。",
         "stackSuccess_other": "已堆叠 {{count}} 个资源。"
@@ -1332,6 +1331,13 @@
       "unavailable": "仓库选项暂时不可用"
     }
   },
+  "notFound": {
+    "back": "返回上一页",
+    "description": "地址可能已失效或输入有误。你的图库和照片仍然安全。",
+    "home": "前往图库",
+    "label": "错误 404",
+    "title": "此页面不存在"
+  },
   "people": {
     "cover": {
       "error": "设置封面失败：{{message}}",
@@ -1427,6 +1433,13 @@
     "stars_other": "{{count}} 星",
     "unrated": "未评分",
     "updateError": "更新评分失败"
+  },
+  "rootError": {
+    "description": "请重新加载应用以恢复。此错误不会改动你的原始照片或本地图库。",
+    "home": "返回首页",
+    "label": "应用错误",
+    "reload": "重新加载应用",
+    "title": "Lumilio 无法继续运行"
   },
   "routes": {
     "collections": "合集",

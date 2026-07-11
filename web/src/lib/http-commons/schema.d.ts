@@ -4238,6 +4238,14 @@ export interface paths {
                     offset?: number;
                     /** @description Optional repository UUID filter */
                     repository_id?: string;
+                    /** @description Viewport south latitude (-90 to 90) */
+                    south?: number;
+                    /** @description Viewport north latitude (-90 to 90) */
+                    north?: number;
+                    /** @description Viewport west longitude (-180 to 180) */
+                    west?: number;
+                    /** @description Viewport east longitude (-180 to 180) */
+                    east?: number;
                 };
                 header?: never;
                 path?: never;

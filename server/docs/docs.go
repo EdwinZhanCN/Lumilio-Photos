@@ -8504,6 +8504,38 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Viewport south latitude (-90 to 90)",
+                        "in": "query",
+                        "name": "south",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "description": "Viewport north latitude (-90 to 90)",
+                        "in": "query",
+                        "name": "north",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "description": "Viewport west longitude (-180 to 180)",
+                        "in": "query",
+                        "name": "west",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "description": "Viewport east longitude (-180 to 180)",
+                        "in": "query",
+                        "name": "east",
+                        "schema": {
+                            "type": "number"
+                        }
                     }
                 ],
                 "requestBody": {

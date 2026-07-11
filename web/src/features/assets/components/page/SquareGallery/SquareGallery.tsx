@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useRef } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
 import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
 import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
@@ -11,7 +11,10 @@ import EmptyState from "@/components/EmptyState";
 import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
 import type { BrowseItem } from "@/features/assets/types/assets.type";
 import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
-import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
+import {
+  intersectsGalleryWindow,
+  useGalleryViewportWindow,
+} from "@/features/assets/hooks/useGalleryViewportWindow";
 
 interface SquareGalleryProps extends AssetGalleryProps {
   renderTileCaption?: (asset: Asset, index: number, groupKey: string) => React.ReactNode;
@@ -39,11 +42,8 @@ interface SquareGalleryItemProps {
 
 /**
  * Individual cell in the square grid.
- * - Outer div (grid cell) always stays in the DOM.
- * - Content mounts once the cell enters the viewport (useVisibleOnce).
- * - content-visibility: auto + containIntrinsicSize skips paint for
- *   off-screen cells. "auto <fallback>" lets the browser remember the real
- *   rendered size so the scrollbar stays stable after first paint.
+ * Only viewport-windowed rows reach this component, so leaving the overscan
+ * region releases thumbnail DOM and browser media resources.
  */
 const SquareGalleryItem = memo(
   ({
@@ -56,78 +56,162 @@ const SquareGalleryItem = memo(
     isSelectionMode,
     onItemClick,
   }: SquareGalleryItemProps) => {
-    const [ref, mounted] = useVisibleOnce();
     const assetId = asset.asset_id;
     const stackInfo = asset.stack;
-    const hasStackOverlay = Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
-    const allowOverflow = render3DCard || hasStackOverlay;
-    const visibilityStyle = allowOverflow
-      ? {}
-      : {
-          contentVisibility: "auto",
-          // "auto" = remember last rendered size; 200px = initial fallback.
-          containIntrinsicSize: "auto 200px",
-        };
 
     return (
       <div
-        ref={ref}
         className={render3DCard ? "hover-3d relative aspect-square" : "relative aspect-square"}
         role="listitem"
         data-asset-id={assetId}
-        style={visibilityStyle as React.CSSProperties}
       >
-        {mounted ? (
-          <>
-            <figure className="h-full w-full rounded-[0.25rem]">
-              {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
-                <StackedThumbnail
-                  asset={asset}
-                  thumbnailUrl={thumbnailUrl}
-                  stackInfo={stackInfo}
-                  browseStack={item.type === "stack" ? item : undefined}
-                  onClick={(event) => onItemClick(item, asset, event)}
-                  isSelected={isSelected}
-                  isSelectionMode={isSelectionMode}
-                  className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                />
-              ) : (
-                <MediaThumbnail
-                  asset={asset}
-                  thumbnailUrl={thumbnailUrl}
-                  onClick={(event) => onItemClick(item, asset, event)}
-                  isSelected={isSelected}
-                  isSelectionMode={isSelectionMode}
-                  className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                />
-              )}
-              {caption && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-[0.25rem] bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
-                  {caption}
-                </div>
-              )}
-            </figure>
-            {render3DCard && (
-              <>
-                <div />
-                <div />
-                <div />
-                <div />
-                <div />
-                <div />
-                <div />
-                <div />
-              </>
+        <>
+          <figure className="h-full w-full rounded-[0.25rem]">
+            {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
+              <StackedThumbnail
+                asset={asset}
+                thumbnailUrl={thumbnailUrl}
+                stackInfo={stackInfo}
+                browseStack={item.type === "stack" ? item : undefined}
+                onClick={(event) => onItemClick(item, asset, event)}
+                isSelected={isSelected}
+                isSelectionMode={isSelectionMode}
+                className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+              />
+            ) : (
+              <MediaThumbnail
+                asset={asset}
+                thumbnailUrl={thumbnailUrl}
+                onClick={(event) => onItemClick(item, asset, event)}
+                isSelected={isSelected}
+                isSelectionMode={isSelectionMode}
+                className="rounded-[0.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+              />
             )}
-          </>
-        ) : (
-          <div className="skeleton absolute inset-0 h-full w-full rounded-[0.25rem] bg-base-300" />
-        )}
+            {caption && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-[0.25rem] bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
+                {caption}
+              </div>
+            )}
+          </figure>
+          {render3DCard && (
+            <>
+              <div />
+              <div />
+              <div />
+              <div />
+              <div />
+              <div />
+              <div />
+              <div />
+            </>
+          )}
+        </>
       </div>
     );
   },
 );
 SquareGalleryItem.displayName = "SquareGalleryItem";
+
+const GRID_GAP_PX = 2;
+
+type VirtualSquareGridProps = {
+  groupKey: string;
+  items: BrowseItem[];
+  columns: number;
+  render3DCard: boolean;
+  renderTileCaption?: (asset: Asset, index: number, groupKey: string) => React.ReactNode;
+  selection: ReturnType<typeof useOptionalKeyboardSelection>;
+  onItemClick: SquareGalleryItemProps["onItemClick"];
+};
+
+function VirtualSquareGrid({
+  groupKey,
+  items,
+  columns,
+  render3DCard,
+  renderTileCaption,
+  selection,
+  onItemClick,
+}: VirtualSquareGridProps) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window === "undefined" ? true : window.matchMedia("(min-width: 768px)").matches,
+  );
+  const columnCount = isDesktop ? Math.max(1, columns) : 2;
+  const cellSize =
+    containerWidth > 0
+      ? Math.max(1, (containerWidth - GRID_GAP_PX * (columnCount - 1)) / columnCount)
+      : 200;
+  const rowCount = Math.ceil(items.length / columnCount);
+  const contentHeight = Math.max(0, rowCount * cellSize + Math.max(0, rowCount - 1) * GRID_GAP_PX);
+  const viewportWindow = useGalleryViewportWindow(gridRef, contentHeight);
+
+  useEffect(() => {
+    const element = gridRef.current;
+    if (!element) return;
+    const media = window.matchMedia("(min-width: 768px)");
+    const update = () => {
+      setContainerWidth(element.getBoundingClientRect().width || element.clientWidth);
+      setIsDesktop(media.matches);
+    };
+    update();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(element);
+    media.addEventListener("change", update);
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      observer?.disconnect();
+      media.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={gridRef}
+      className="relative w-full"
+      role="list"
+      style={{ height: contentHeight }}
+      data-gallery-total={items.length}
+    >
+      {items.map((item, index) => {
+        const row = Math.floor(index / columnCount);
+        const column = index % columnCount;
+        const top = row * (cellSize + GRID_GAP_PX);
+        if (!intersectsGalleryWindow(top, cellSize, viewportWindow)) return null;
+        const asset = getBrowseItemAsset(item);
+        const assetId = asset.asset_id;
+        const thumbnailUrl = assetId ? assetUrls.getThumbnailUrl(assetId, "medium") : undefined;
+
+        return (
+          <div
+            key={`${groupKey}-${item.id}`}
+            className="absolute"
+            style={{
+              top,
+              left: column * (cellSize + GRID_GAP_PX),
+              width: cellSize,
+              height: cellSize,
+            }}
+          >
+            <SquareGalleryItem
+              item={item}
+              asset={asset}
+              thumbnailUrl={thumbnailUrl}
+              render3DCard={render3DCard}
+              caption={renderTileCaption?.(asset, index, groupKey)}
+              isSelected={selection.isSelected(item.id)}
+              isSelectionMode={selection.enabled}
+              onItemClick={onItemClick}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 
@@ -226,37 +310,15 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
               </div>
             )}
 
-            <div
-              className="grid grid-cols-2 gap-0.5 md:[grid-template-columns:repeat(var(--square-gallery-columns),minmax(0,1fr))]"
-              style={
-                {
-                  "--square-gallery-columns": String(columns),
-                } as React.CSSProperties
-              }
-            >
-              {items.map((item, index) => {
-                const asset = getBrowseItemAsset(item);
-                const assetId = asset.asset_id;
-                const thumbnailUrl = assetId
-                  ? assetUrls.getThumbnailUrl(assetId, "medium")
-                  : undefined;
-                const caption = renderTileCaption?.(asset, index, groupKey);
-
-                return (
-                  <SquareGalleryItem
-                    key={`${groupKey}-${item.id}`}
-                    item={item}
-                    asset={asset}
-                    thumbnailUrl={thumbnailUrl}
-                    render3DCard={render3DCard}
-                    caption={caption}
-                    isSelected={selection.isSelected(item.id)}
-                    isSelectionMode={selection.enabled}
-                    onItemClick={handleAssetClick}
-                  />
-                );
-              })}
-            </div>
+            <VirtualSquareGrid
+              groupKey={groupKey}
+              items={items}
+              columns={columns}
+              render3DCard={render3DCard}
+              renderTileCaption={renderTileCaption}
+              selection={selection}
+              onItemClick={handleAssetClick}
+            />
           </section>
         );
       })}

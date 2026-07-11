@@ -1,19 +1,38 @@
 import { useEffect, useMemo } from "react";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { $api } from "@/lib/http-commons/queryClient";
+import type { MapViewport } from "@/components/MapComponent";
 
 type Schemas = components["schemas"];
 type AssetMapPointDTO = Schemas["dto.AssetMapPointDTO"];
 export type MapPhotoPoint = AssetMapPointDTO;
 
-const PAGE_SIZE = 1000;
+const DEFAULT_PAGE_SIZE = 1000;
 
 export type UseMapPhotoAssetsOptions = {
   repositoryId?: string;
+  viewport?: MapViewport | null;
+  enabled?: boolean;
+  autoFetchAll?: boolean;
+  pageSize?: number;
 };
 
 export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
-  const { repositoryId } = options;
+  const {
+    repositoryId,
+    viewport,
+    enabled = true,
+    autoFetchAll = false,
+    pageSize = DEFAULT_PAGE_SIZE,
+  } = options;
+  const viewportQuery = viewport
+    ? {
+        west: viewport.bbox[0],
+        south: viewport.bbox[1],
+        east: viewport.bbox[2],
+        north: viewport.bbox[3],
+      }
+    : undefined;
 
   const query = $api.useInfiniteQuery(
     "get",
@@ -21,38 +40,48 @@ export function useMapPhotoAssets(options: UseMapPhotoAssetsOptions = {}) {
     {
       params: {
         query: {
-          limit: PAGE_SIZE,
+          limit: pageSize,
           repository_id: repositoryId,
+          ...viewportQuery,
         },
       },
     },
     {
       pageParamName: "offset",
       initialPageParam: 0,
+      enabled,
       staleTime: 2 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
+      gcTime: 2 * 60 * 1000,
       retry: 1,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const pagePoints = lastPage?.points ?? [];
         const total = lastPage?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
+        if (pagePoints.length === 0) return undefined;
 
         if (typeof total === "number") {
-          return offset + pagePoints.length < total ? offset + PAGE_SIZE : undefined;
+          return offset + pagePoints.length < total ? offset + pagePoints.length : undefined;
         }
 
-        return pagePoints.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;
+        return pagePoints.length >= pageSize ? offset + pagePoints.length : undefined;
       },
     },
   );
 
   useEffect(() => {
-    if (!query.hasNextPage || query.isFetchingNextPage || query.isLoading || query.isError) {
+    if (
+      !autoFetchAll ||
+      !query.hasNextPage ||
+      query.isFetchingNextPage ||
+      query.isLoading ||
+      query.isError
+    ) {
       return;
     }
 
     void query.fetchNextPage();
   }, [
+    autoFetchAll,
     query.fetchNextPage,
     query.hasNextPage,
     query.isError,

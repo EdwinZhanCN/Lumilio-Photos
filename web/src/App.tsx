@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import { BrowserRouter, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
@@ -29,8 +29,17 @@ import {
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { UploadProvider } from "@/features/upload";
 import { BreadcrumbProvider } from "@/components/breadcrumbs";
+import NotFound from "@/routes/NotFound";
 
 const queryClient = new QueryClient();
+
+function RouteLoadingFallback(): React.ReactNode {
+  return (
+    <div className="flex h-full items-center justify-center" role="status" aria-live="polite">
+      <span className="loading loading-spinner loading-lg text-primary" />
+    </div>
+  );
+}
 
 function AppShellLayout(): React.ReactNode {
   const { t } = useI18n();
@@ -146,10 +155,19 @@ function App(): React.ReactNode {
                     }
                   >
                     {appRoutes.map((route) => (
-                      <Route key={route.path} path={route.path} element={route.element} />
+                      <Route
+                        key={route.path}
+                        path={route.path}
+                        element={
+                          <Suspense fallback={<RouteLoadingFallback />}>{route.element}</Suspense>
+                        }
+                      />
                     ))}
                   </Route>
                 </Route>
+                {/* Keep the catch-all outside setup and authentication gates so an
+                    unknown URL always explains itself instead of redirecting. */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
           </AuthProvider>

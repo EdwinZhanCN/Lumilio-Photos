@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { MapIcon } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import BrowseScopeSelect from "@/components/BrowseScopeSelect";
-import MapComponent, { type PhotoLocation } from "@/components/MapComponent";
+import MapComponent, { type MapViewport, type PhotoLocation } from "@/components/MapComponent";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useBrowseScope } from "@/features/settings";
@@ -22,6 +22,18 @@ function MapViewContent() {
     { label: t("collections.sections.places", "Places") },
   ]);
   const { scopedRepositoryId } = useBrowseScope();
+  const [viewport, setViewport] = useState<MapViewport | null>(null);
+  const handleViewportChange = useCallback((nextViewport: MapViewport) => {
+    setViewport((current) => {
+      if (
+        current?.zoom === nextViewport.zoom &&
+        current.bbox.every((value, index) => Math.abs(value - nextViewport.bbox[index]) < 1e-5)
+      ) {
+        return current;
+      }
+      return nextViewport;
+    });
+  }, []);
 
   const {
     points: mapPoints,
@@ -30,11 +42,26 @@ function MapViewContent() {
     isLoading: isMapLoading,
     isFetchingNextPage: isMapFetchingNextPage,
     hasNextPage: mapHasNextPage,
-  } = useMapPhotoAssets({ repositoryId: scopedRepositoryId });
+  } = useMapPhotoAssets({
+    repositoryId: scopedRepositoryId,
+    viewport,
+    enabled: viewport !== null,
+  });
 
-  const { loadedClusters, totalClusters } = useLocationClusters({
+  const { clusters, loadedClusters, totalClusters } = useLocationClusters({
     repositoryId: scopedRepositoryId,
   });
+  const initialCenter = useMemo<[number, number] | undefined>(() => {
+    const cluster = clusters[0];
+    return typeof cluster?.centroid_latitude === "number" &&
+      typeof cluster.centroid_longitude === "number"
+      ? [cluster.centroid_latitude, cluster.centroid_longitude]
+      : undefined;
+  }, [clusters]);
+
+  useEffect(() => {
+    setViewport(null);
+  }, [scopedRepositoryId]);
 
   const photoLocations = useMemo(
     () =>
@@ -93,10 +120,13 @@ function MapViewContent() {
 
       <div className="flex-1 min-h-0 relative">
         <MapComponent
+          key={`${scopedRepositoryId ?? "all"}:${initialCenter?.join(",") ?? "default"}`}
           photoLocations={photoLocations}
           onPointClick={(assetId) => navigate(`/assets/${assetId}`)}
           height="100%"
           rounded={false}
+          center={initialCenter}
+          onViewportChange={handleViewportChange}
         />
 
         {/* Status overlay */}

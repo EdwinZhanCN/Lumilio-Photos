@@ -84,6 +84,7 @@ vi.mock("@/features/assets/hooks/useStackActions", () => ({
 
 vi.mock("@/lib/http-commons/queryClient", () => ({
   $api: {
+    useQuery: () => ({ data: { albums: [] }, isPending: false }),
     useMutation: () => ({
       mutateAsync: mocks.listAlbums,
     }),

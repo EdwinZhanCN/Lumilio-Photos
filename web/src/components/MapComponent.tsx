@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { convertCoordinatesForMap } from "@/lib/utils/mapUtils";
+import { convertFromGaodeCoordinates } from "@/lib/utils/coordinateConversion";
 import { Asset } from "@/lib/assets/types";
 
 // Fix Leaflet default icon issue
@@ -47,6 +48,7 @@ interface MapComponentProps {
   rounded?: boolean;
   showSinglePhoto?: boolean; // For single photo display (basic info view)
   boundsOverlay?: MapBoundsOverlay;
+  onViewportChange?: (viewport: MapViewport) => void;
 }
 
 type ClusterPointProperties = {
@@ -64,7 +66,7 @@ type ClusterPoint = PointFeature<ClusterPointProperties>;
 type MapCluster = ClusterFeature<Record<string, never>>;
 type ClusterResult = ClusterPoint | MapCluster;
 
-type MapViewport = {
+export type MapViewport = {
   bbox: BBox;
   zoom: number;
 };
@@ -245,6 +247,7 @@ function MapComponent({
   rounded = true,
   showSinglePhoto = false,
   boundsOverlay,
+  onViewportChange,
 }: MapComponentProps) {
   const [region] = usePreference("region");
   const { t } = useI18n();
@@ -373,18 +376,34 @@ function MapComponent({
     return [lng - 0.2, lat - 0.2, lng + 0.2, lat + 0.2];
   }, [fitBounds, initialCenter]);
 
-  const handleViewportChange = useCallback((nextViewport: MapViewport) => {
-    setViewport((currentViewport) => {
-      if (
-        currentViewport &&
-        currentViewport.zoom === nextViewport.zoom &&
-        isSameBBox(currentViewport.bbox, nextViewport.bbox)
-      ) {
-        return currentViewport;
+  const handleViewportChange = useCallback(
+    (nextViewport: MapViewport) => {
+      setViewport((currentViewport) => {
+        if (
+          currentViewport &&
+          currentViewport.zoom === nextViewport.zoom &&
+          isSameBBox(currentViewport.bbox, nextViewport.bbox)
+        ) {
+          return currentViewport;
+        }
+        return nextViewport;
+      });
+
+      if (!onViewportChange) return;
+      if (!isChina) {
+        onViewportChange(nextViewport);
+        return;
       }
-      return nextViewport;
-    });
-  }, []);
+      const [west, south, east, north] = nextViewport.bbox;
+      const southWest = convertFromGaodeCoordinates(west, south);
+      const northEast = convertFromGaodeCoordinates(east, north);
+      onViewportChange({
+        zoom: nextViewport.zoom,
+        bbox: [southWest.longitude, southWest.latitude, northEast.longitude, northEast.latitude],
+      });
+    },
+    [isChina, onViewportChange],
+  );
 
   const visibleFeatures = useMemo(() => {
     if (showSinglePhoto || points.length === 0) {

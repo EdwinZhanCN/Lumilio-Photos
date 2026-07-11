@@ -1,14 +1,11 @@
+import { lazy } from "react";
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
 import AssetsTrash from "@/features/assets/routes/AssetsTrash";
-import { StudioEditMvp } from "@/features/studio/routes/StudioEditMvp";
-import Settings from "@/features/settings/routes/Settings";
-import Monitor from "@/features/monitor/routes/Monitor";
 import Manage from "@/features/manage/routes/Manage";
 import Collections from "@/features/collections/routes/Collections";
 import Albums from "@/features/collections/routes/Albums";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
-import MapView from "@/features/collections/routes/MapView";
 import TripDetails from "@/features/collections/routes/TripDetails";
 import People from "@/features/collections/routes/People";
 import Utilities from "@/features/collections/routes/Utilities";
@@ -20,7 +17,6 @@ import FolderDetails from "@/features/collections/routes/FolderDetails";
 import Tags from "@/features/collections/routes/Tags";
 import TagDetails from "@/features/collections/routes/TagDetails";
 import PersonDetails from "@/features/people/routes/PersonDetails";
-import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import PublicShare from "@/features/share/routes/PublicShare.tsx";
 import SharedLinks from "@/features/share/routes/SharedLinks.tsx";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
@@ -29,6 +25,16 @@ import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
 import BootstrapWizard from "@/features/auth/routes/BootstrapWizard.tsx";
 import { Navigate } from "react-router-dom";
+
+const StudioEditMvp = lazy(() =>
+  import("@/features/studio/routes/StudioEditMvp").then((module) => ({
+    default: module.StudioEditMvp,
+  })),
+);
+const Settings = lazy(() => import("@/features/settings/routes/Settings"));
+const Monitor = lazy(() => import("@/features/monitor/routes/Monitor"));
+const MapView = lazy(() => import("@/features/collections/routes/MapView"));
+const LumilioChatPage = lazy(() => import("@/features/lumilio/routes/LumilioChat"));
 
 export const publicRoutes = [
   {

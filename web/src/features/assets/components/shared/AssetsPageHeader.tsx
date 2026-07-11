@@ -32,8 +32,7 @@ import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
 import { useFilterState, useFilterActions } from "@/features/assets/selectors";
-import { $api } from "@/lib/http-commons/queryClient";
-import type { Album } from "@/lib/albums/types";
+import { useAlbumOptions } from "@/features/collections/hooks/useAlbums";
 import { useBrowseScope } from "@/features/settings";
 import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
@@ -111,10 +110,10 @@ const AssetsPageHeader = ({
     useState<AssetsBulkActionItem | null>(null);
   const [isRunningCustomAction, setIsRunningCustomAction] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
-  const [albums, setAlbums] = useState<Album[]>([]);
-  const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
-  const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
+  const albumOptionsQuery = useAlbumOptions(isAlbumModalOpen);
+  const albums = albumOptionsQuery.data?.albums ?? [];
+  const isLoadingAlbums = albumOptionsQuery.isPending;
   // Scan follows the browse scope: it targets what the gallery is showing
   // (one repository, or every repository when the scope is "All").
   const { repositories, selectedRepository, scopeLabel } = useBrowseScope();
@@ -428,21 +427,8 @@ const AssetsPageHeader = ({
     }
   };
 
-  const handleAddToAlbumClick = async () => {
+  const handleAddToAlbumClick = () => {
     setIsAlbumModalOpen(true);
-    setIsLoadingAlbums(true);
-    try {
-      const response = await listAlbumsMutation.mutateAsync({
-        params: { query: { limit: 50 } },
-      });
-      if (response?.albums) {
-        setAlbums(response.albums || []);
-      }
-    } catch {
-      showMessage("error", t("assets.assetsPageHeader.messages.loadAlbumsError"));
-    } finally {
-      setIsLoadingAlbums(false);
-    }
   };
 
   const handleSelectAlbum = async (albumId: number) => {
@@ -790,7 +776,7 @@ const AssetsPageHeader = ({
                       type="button"
                       className="text-info"
                       onClick={() => {
-                        void handleAddToAlbumClick();
+                        handleAddToAlbumClick();
                         handleDropdownItemClick();
                       }}
                     >
@@ -950,7 +936,7 @@ const AssetsPageHeader = ({
                         <li>
                           <button
                             onClick={() => {
-                              void handleAddToAlbumClick();
+                              handleAddToAlbumClick();
                               handleDropdownItemClick();
                             }}
                           >

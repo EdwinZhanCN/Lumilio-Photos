@@ -236,6 +236,10 @@ type SearchAssetsResult struct {
 type QueryPhotoMapPointsParams struct {
 	RepositoryID *string
 	OwnerID      *int32
+	South        *float64
+	North        *float64
+	West         *float64
+	East         *float64
 	Limit        int
 	Offset       int
 }
@@ -1845,6 +1849,10 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 	total, err := s.queries.CountPhotoMapPoints(ctx, repo.CountPhotoMapPointsParams{
 		RepositoryID: repoUUID,
 		OwnerID:      params.OwnerID,
+		South:        params.South,
+		North:        params.North,
+		West:         params.West,
+		East:         params.East,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count photo map points: %w", err)
@@ -1853,6 +1861,10 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 	rows, err := s.queries.GetPhotoMapPoints(ctx, repo.GetPhotoMapPointsParams{
 		RepositoryID: repoUUID,
 		OwnerID:      params.OwnerID,
+		South:        params.South,
+		North:        params.North,
+		West:         params.West,
+		East:         params.East,
 		Limit:        int32(params.Limit),
 		Offset:       int32(params.Offset),
 	})

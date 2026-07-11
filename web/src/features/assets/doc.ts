@@ -71,6 +71,10 @@
  * and {@link SquareGallery} render the browse model; {@link FullScreenCarousel}
  * inspects the current flattened asset set; {@link SearchFAB} writes to the
  * shared search state and the selected source hook decides how to execute it.
+ * Both galleries use {@link useGalleryViewportWindow}: the full layout height
+ * remains stable, while only an overscanned vertical slice mounts thumbnail
+ * components. Leaving that slice removes media nodes instead of retaining every
+ * tile ever visited. Inactive list/search queries have a short bounded GC time.
  *
  * ## Decisions
  *
@@ -121,5 +125,6 @@ import type SquareGallery from "./components/page/SquareGallery/SquareGallery.ts
 import type FullScreenCarousel from "./components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx";
 import type { SearchFAB } from "./components/page/SearchFAB.tsx";
 import type { useGalleryContextContributor } from "@/features/lumilio/contributors/useGalleryContextContributor.ts";
+import type { useGalleryViewportWindow } from "./hooks/useGalleryViewportWindow.ts";
 
 export {};

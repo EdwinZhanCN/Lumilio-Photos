@@ -35,7 +35,9 @@
  *   table, just the existing `assets.liked` column filtered through the
  *   normal list/search endpoints.
  * - **Places / trips** — fully derived client-side. {@link useCityTrips} segments
- *   map points by geohashed city + time gaps into trips; there is **no backend
+ *   map points by geohashed city + time gaps into trips. It explicitly drains
+ *   both map-point and location-cluster pagination before claiming a complete
+ *   result; there is **no backend
  *   trip entity**, so a trip is identity-less and editing it is meaningless.
  * - **Folders** — derived from `assets.storage_path` prefixes; there is no
  *   folders table. {@link useFolders} lists immediate child folders (recursive

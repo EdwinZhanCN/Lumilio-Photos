@@ -2546,6 +2546,10 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 // @Param limit query int false "Page size (1-5000)" default(1000)
 // @Param offset query int false "Page offset" default(0)
 // @Param repository_id query string false "Optional repository UUID filter"
+// @Param south query number false "Viewport south latitude (-90 to 90)"
+// @Param north query number false "Viewport north latitude (-90 to 90)"
+// @Param west query number false "Viewport west longitude (-180 to 180)"
+// @Param east query number false "Viewport east longitude (-180 to 180)"
 // @Success 200 {object} dto.AssetMapPointListResponseDTO "Map points retrieved successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
@@ -2572,8 +2576,18 @@ func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 		repositoryID = &rawRepoID
 	}
 
+	south, north, west, east, err := parseOptionalMapViewport(c)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid viewport parameters")
+		return
+	}
+
 	points, total, err := h.assetService.QueryPhotoMapPoints(c.Request.Context(), applyMapPointOwnershipScope(c, service.QueryPhotoMapPointsParams{
 		RepositoryID: repositoryID,
+		South:        south,
+		North:        north,
+		West:         west,
+		East:         east,
 		Limit:        limit,
 		Offset:       offset,
 	}))
@@ -2603,6 +2617,38 @@ func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 		Offset: offset,
 	}
 	api.JSONOK(c, response)
+}
+
+func parseOptionalMapViewport(c *gin.Context) (*float64, *float64, *float64, *float64, error) {
+	names := []string{"south", "north", "west", "east"}
+	values := make([]*float64, len(names))
+	present := 0
+	for index, name := range names {
+		raw, exists := c.GetQuery(name)
+		if !exists || strings.TrimSpace(raw) == "" {
+			continue
+		}
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("parse %s: %w", name, err)
+		}
+		values[index] = &value
+		present++
+	}
+	if present == 0 {
+		return nil, nil, nil, nil, nil
+	}
+	if present != len(names) {
+		return nil, nil, nil, nil, errors.New("south, north, west, and east must be provided together")
+	}
+	south, north, west, east := *values[0], *values[1], *values[2], *values[3]
+	if south < -90 || south > 90 || north < -90 || north > 90 || south > north {
+		return nil, nil, nil, nil, errors.New("latitude bounds must satisfy -90 <= south <= north <= 90")
+	}
+	if west < -180 || west > 180 || east < -180 || east > 180 {
+		return nil, nil, nil, nil, errors.New("longitude bounds must be between -180 and 180")
+	}
+	return values[0], values[1], values[2], values[3], nil
 }
 
 func parseIntQueryWithRange(

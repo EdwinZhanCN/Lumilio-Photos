@@ -11,6 +11,7 @@ export type StatsCardsProps = {
 
 const StatsCards: React.FC<StatsCardsProps> = ({ className = "", repositoryId }) => {
   const { t } = useI18n();
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const {
     focalLengthData,
     cameraLensData,
@@ -20,15 +21,13 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "", repositoryId })
     heatmapLoading,
     isLoading,
     error,
-    refetchHeatmap,
   } = usePhotoStats({
     autoFetch: true,
     cameraLensLimit: 5,
     timeDistributionType: "hourly",
     repositoryId,
+    heatmapYear: selectedYear,
   });
-
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   // 设置默认年份为最新年份
   useEffect(() => {
@@ -44,7 +43,6 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "", repositoryId })
   // 当选择年份改变时重新获取热力图数据
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
-    void refetchHeatmap(year);
   };
 
   // Transform focal length data to percentage format

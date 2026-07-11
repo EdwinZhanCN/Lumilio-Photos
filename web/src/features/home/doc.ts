@@ -31,13 +31,14 @@
  * when no featured assets have loaded.
  *
  * {@link usePhotoStats} coordinates focal-length, camera/lens, time-of-day,
- * available-years, and daily-activity stats. The hook currently fetches these
- * endpoints together and lets {@link StatsCards} transform the raw response
- * into percentages and heatmap values.
+ * available-years, and daily-activity as independent TanStack Query entries.
+ * {@link StatsCards} owns only the selected heatmap year and transforms cached
+ * responses into percentages and heatmap values.
  *
  * {@link useMapPhotoAssets} reads paginated map points from
- * `/api/v1/assets/map-points` and automatically drains additional pages while
- * more map data is available. {@link useLocationClusters} reads paginated
+ * `/api/v1/assets/map-points`. Home enables its bounded preview only when the
+ * map card nears the viewport; the full Map route sends the visible bounding
+ * box and replaces its query as the viewport changes. {@link useLocationClusters} reads paginated
  * location clusters for the map badge. {@link SpacetimeMapCard} delegates map
  * rendering to {@link PhotoMapView}; clicking a point navigates to the owning
  * asset route instead of opening an editor inside Home.
@@ -72,9 +73,9 @@
  * Repository scope is browse scope. "All repositories" is a valid Home scope;
  * upload's concrete working repository is intentionally not used here.
  *
- * Map data is paginated but drained opportunistically. The page can render a
- * partial map while more points load, and the subtitle reports loaded/total
- * counts rather than blocking the whole dashboard.
+ * Map previews are deliberately bounded. Trips opt into exhaustive map and
+ * cluster pagination because their derived grouping requires the full scoped
+ * dataset; ordinary map rendering never drains the entire GPS library.
  *
  * @module
  */
