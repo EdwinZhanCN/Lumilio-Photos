@@ -63,14 +63,11 @@ func ProfileForHost() (string, error) {
 }
 
 func profileFor(goos, goarch string) (string, error) {
-	switch goos + "/" + goarch {
-	case "darwin/arm64":
-		return "darwin-arm64-metal", nil
-	case "windows/amd64":
-		return "windows-x64-gpu", nil
-	default:
-		return "", fmt.Errorf("%w (%s/%s)", ErrUnsupportedHost, goos, goarch)
+	choices, err := BackendChoicesFor(goos, goarch)
+	if err != nil {
+		return "", err
 	}
+	return choices[0].Profile, nil
 }
 
 // FetchManifest downloads and parses the release manifest.
@@ -107,6 +104,8 @@ func hubDir(dir string) string { return filepath.Join(dir, "hub") }
 
 func stateFile(dir string) string { return filepath.Join(dir, "installed.json") }
 
+func previousStateFile(dir string) string { return filepath.Join(dir, "installed.previous.json") }
+
 // HubBinary returns the path of the installed hub executable.
 func HubBinary(dir string) string {
 	name := "lumen-hub"
@@ -136,12 +135,30 @@ func Installed(dir string) (InstallState, bool) {
 // previous install), verifying the manifest's sha256. logf receives progress
 // lines. It does not start anything.
 func Install(ctx context.Context, dir, manifestURL string, logf func(string, ...any)) (InstallState, error) {
-	if logf == nil {
-		logf = func(string, ...any) {}
-	}
 	profile, err := ProfileForHost()
 	if err != nil {
 		return InstallState{}, err
+	}
+	return InstallProfile(ctx, dir, manifestURL, profile, logf)
+}
+
+// InstallProfile installs the selected launcher-compatible release profile.
+func InstallProfile(ctx context.Context, dir, manifestURL, profile string, logf func(string, ...any)) (InstallState, error) {
+	if logf == nil {
+		logf = func(string, ...any) {}
+	}
+	choices, err := BackendChoicesForHost()
+	if err != nil {
+		return InstallState{}, err
+	}
+	allowed := false
+	for _, choice := range choices {
+		if choice.Profile == profile {
+			allowed = true
+		}
+	}
+	if !allowed {
+		return InstallState{}, fmt.Errorf("%w: profile %q", ErrUnsupportedHost, profile)
 	}
 	if manifestURL == "" {
 		manifestURL = DefaultManifestURL
@@ -186,10 +203,20 @@ func Install(ctx context.Context, dir, manifestURL string, logf func(string, ...
 	if _, err := os.Stat(filepath.Join(next, "bin")); err != nil {
 		return InstallState{}, fmt.Errorf("hub archive %s has no bin/ directory", artifact.FileName)
 	}
-	if err := os.RemoveAll(hubDir(dir)); err != nil {
+	previous := hubDir(dir) + ".previous"
+	if err := os.RemoveAll(previous); err != nil {
 		return InstallState{}, err
 	}
+	if _, err := os.Stat(hubDir(dir)); err == nil {
+		if oldState, readErr := os.ReadFile(stateFile(dir)); readErr == nil {
+			_ = os.WriteFile(previousStateFile(dir), oldState, 0o600)
+		}
+		if err := os.Rename(hubDir(dir), previous); err != nil {
+			return InstallState{}, err
+		}
+	}
 	if err := os.Rename(next, hubDir(dir)); err != nil {
+		_ = os.Rename(previous, hubDir(dir))
 		return InstallState{}, err
 	}
 
@@ -200,6 +227,29 @@ func Install(ctx context.Context, dir, manifestURL string, logf func(string, ...
 	}
 	logf("lumen: installed %s (%s)", state.Version, state.Profile)
 	return state, nil
+}
+
+// RestorePrevious rolls back the most recent successful install swap. It is
+// used when the new binary cannot start or become ready.
+func RestorePrevious(dir string) bool {
+	previous := hubDir(dir) + ".previous"
+	if _, err := os.Stat(previous); err != nil {
+		return false
+	}
+	failed := hubDir(dir) + ".failed"
+	_ = os.RemoveAll(failed)
+	if err := os.Rename(hubDir(dir), failed); err != nil {
+		return false
+	}
+	if err := os.Rename(previous, hubDir(dir)); err != nil {
+		_ = os.Rename(failed, hubDir(dir))
+		return false
+	}
+	if data, err := os.ReadFile(previousStateFile(dir)); err == nil {
+		_ = os.WriteFile(stateFile(dir), data, 0o600)
+	}
+	_ = os.RemoveAll(failed)
+	return true
 }
 
 // downloadVerified streams url to path, failing unless the sha256 matches.

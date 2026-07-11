@@ -178,6 +178,38 @@ func TestExtractZipRejectsEscape(t *testing.T) {
 	}
 }
 
+func TestRestorePreviousInstall(t *testing.T) {
+	dir := t.TempDir()
+	current := hubDir(dir)
+	previous := current + ".previous"
+	if err := os.MkdirAll(filepath.Join(current, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(previous, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(current, "bin", "new"), []byte("new"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(previous, "bin", "old"), []byte("old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldState := `{"version":"old","profile":"darwin-arm64-cpu"}`
+	if err := os.WriteFile(previousStateFile(dir), []byte(oldState), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !RestorePrevious(dir) {
+		t.Fatal("RestorePrevious returned false")
+	}
+	if _, err := os.Stat(filepath.Join(current, "bin", "old")); err != nil {
+		t.Fatalf("old install not restored: %v", err)
+	}
+	state, err := os.ReadFile(stateFile(dir))
+	if err != nil || string(state) != oldState {
+		t.Fatalf("state=%q err=%v", state, err)
+	}
+}
+
 func TestWriteConfig(t *testing.T) {
 	dir := t.TempDir()
 	if err := WriteConfig(dir, "zh"); err != nil {

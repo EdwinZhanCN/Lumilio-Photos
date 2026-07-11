@@ -22,10 +22,20 @@ type Hub struct {
 // is a separate concern (WaitReady) because the first start downloads model
 // weights, which can take many minutes.
 func Start(ctx context.Context, dir, lang, logPath string) (*Hub, error) {
+	selection, err := DefaultConfigSelection(dir, lang)
+	if err != nil {
+		return nil, err
+	}
+	return StartWithConfig(ctx, dir, selection, logPath)
+}
+
+// StartWithConfig validates and writes the selected launcher-compatible config
+// before spawning the installed Hub.
+func StartWithConfig(ctx context.Context, dir string, selection ConfigSelection, logPath string) (*Hub, error) {
 	if _, ok := Installed(dir); !ok {
 		return nil, errors.New("lumen hub is not installed")
 	}
-	if err := WriteConfig(dir, lang); err != nil {
+	if err := WriteConfigFor(dir, selection); err != nil {
 		return nil, fmt.Errorf("write lumen config: %w", err)
 	}
 
