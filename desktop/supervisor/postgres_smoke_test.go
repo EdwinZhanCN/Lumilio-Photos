@@ -2,12 +2,15 @@ package supervisor
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // pgBinDirForTest resolves a PostgreSQL bin directory for the lifecycle smoke
@@ -50,6 +53,13 @@ func TestPostgresLifecycleSmoke(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(sockDir) })
 
+	// initdb sets the superuser password from this file (--pwfile); the cluster
+	// requires scram-sha-256 from its first start, so it must exist up front.
+	passwordFile := filepath.Join(root, "db_password")
+	if err := os.WriteFile(passwordFile, []byte("smoke-test-password"), 0o600); err != nil {
+		t.Fatalf("write password file: %v", err)
+	}
+
 	pg := NewPostgres(PostgresOptions{
 		BinDir:       binDir,
 		DataDir:      dataDir,
@@ -58,7 +68,7 @@ func TestPostgresLifecycleSmoke(t *testing.T) {
 		Port:         "5489",
 		User:         "lumilio",
 		DBName:       "lumilio_smoke",
-		PasswordFile: filepath.Join(root, "db_password"),
+		PasswordFile: passwordFile,
 		Logf:         t.Logf,
 	})
 
@@ -103,6 +113,18 @@ func TestPostgresLifecycleSmoke(t *testing.T) {
 	if err := pg.CreateDB(ctx); err != nil {
 		t.Fatalf("CreateDB (idempotent re-run): %v", err)
 	}
+
+	// The cluster must actually enforce scram: a wrong password has to be
+	// rejected, otherwise the generated pg_hba silently regressed to trust.
+	wrongCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	wrongDSN := fmt.Sprintf(
+		"host=%s port=5489 user=lumilio password=not-the-password dbname=postgres sslmode=disable", sockDir)
+	if conn, err := pgx.Connect(wrongCtx, wrongDSN); err == nil {
+		_ = conn.Close(wrongCtx)
+		t.Fatal("connection with a wrong password was accepted — auth regressed to trust")
+	}
+
 	if err := pg.Stop(ctx); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}

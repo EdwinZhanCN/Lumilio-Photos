@@ -184,6 +184,11 @@ type SettingsControllerInterface interface {
 	UpdateSystemSettings(c *gin.Context)
 	ValidateLLMSettings(c *gin.Context)
 	GetRuntimeInfo(c *gin.Context)
+	ListBackups(c *gin.Context)
+	CreateBackup(c *gin.Context)
+	DownloadBackup(c *gin.Context)
+	DeleteBackup(c *gin.Context)
+	RestoreBackup(c *gin.Context)
 }
 
 type ClassifierControllerInterface interface {
@@ -324,6 +329,11 @@ func NewRouter(
 			settings.PATCH("/system", settingsController.UpdateSystemSettings)
 			settings.POST("/system/validate-llm", settingsController.ValidateLLMSettings)
 			settings.GET("/runtime-info", settingsController.GetRuntimeInfo)
+			settings.GET("/backups", settingsController.ListBackups)
+			settings.POST("/backups", settingsController.CreateBackup)
+			settings.GET("/backups/:name/download", settingsController.DownloadBackup)
+			settings.DELETE("/backups/:name", settingsController.DeleteBackup)
+			settings.POST("/backups/:name/restore", settingsController.RestoreBackup)
 		}
 
 		classifiers := v1.Group("/classifiers")

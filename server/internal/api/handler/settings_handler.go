@@ -10,11 +10,12 @@ import (
 
 type SettingsHandler struct {
 	settingsService service.SettingsService
+	backupService   service.BackupService
 	runtimeInfo     dto.RuntimeInfoDTO
 }
 
-func NewSettingsHandler(settingsService service.SettingsService, runtimeInfo dto.RuntimeInfoDTO) *SettingsHandler {
-	return &SettingsHandler{settingsService: settingsService, runtimeInfo: runtimeInfo}
+func NewSettingsHandler(settingsService service.SettingsService, backupService service.BackupService, runtimeInfo dto.RuntimeInfoDTO) *SettingsHandler {
+	return &SettingsHandler{settingsService: settingsService, backupService: backupService, runtimeInfo: runtimeInfo}
 }
 
 // GetRuntimeInfo returns a read-only snapshot of the runtime-immutable

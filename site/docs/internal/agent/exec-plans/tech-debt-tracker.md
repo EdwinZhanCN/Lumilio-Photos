@@ -3,6 +3,12 @@
 Keep this list short. Each item should have a concrete owner path and a reason it matters.
 
 - Docker image build is not currently verified in this workspace when the local Docker/Orbstack socket is unavailable.
+- **PostgreSQL backups + major-version upgrades (both shapes) are planned, not
+  implemented.** Owner: `exec-plans/active/db-backup-upgrade.md` (supersedes
+  the earlier desktop-only note). Until Phase 3a lands, the desktop supervisor's
+  `DataDirVersionMismatch` error is the only guard; do not bump `pgMajorVersion`
+  (desktop) or the `db.Dockerfile` base image before that plan's upgrade path
+  ships in the same release.
 - **License bundle covers native components only, not Go/JS dependency notices.**
   Owner: `desktop/licenses/` (+ `desktop/licenses.go` manifest). Onboarding now
   ships full texts for the app (GPL-3) and the bundled native tools
