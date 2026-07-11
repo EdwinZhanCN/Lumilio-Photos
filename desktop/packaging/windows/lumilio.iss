@@ -63,6 +63,13 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+; On upgrade, wipe the previous program-files tree before copying the new
+; payload. {app} is only binaries/resources (user data lives under
+; %LocalAppData%\Lumilio Photos), so this is safe and prevents orphaned DLLs /
+; tools from an older build from lingering next to the new ones.
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\*"
+
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 

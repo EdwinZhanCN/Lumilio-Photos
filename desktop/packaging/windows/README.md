@@ -27,6 +27,10 @@
     requires a second explicit confirmation before deleting, because that is the
     user's original photos. An **external** library (e.g. `D:\Photos`) is never
     touched — the uninstaller only ever deletes the data dir.
+- **In-place upgrades** — the same `setup.exe` for a newer version reuses the
+  stable `AppId` and install dir. Before copying the new payload it deletes
+  everything under `{app}` (`[InstallDelete]`), so removed DLLs/tools from older
+  builds do not linger. App data and the photo library are never touched.
 
 Storage-path selection is deliberately **not** in the installer: it belongs to
 the app's first-run onboarding window (per-user, with live writability

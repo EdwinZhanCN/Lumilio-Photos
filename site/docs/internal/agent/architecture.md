@@ -32,6 +32,13 @@ This is the compact system map for agents. Keep details here stable and useful; 
 - `web/src/wasm` and `web/src/workers`: checked-in `blake3`/`studio` browser bundles and worker entry points for compute-heavy paths.
 - `wasm/*`: Rust source crates for `blake3-wasm`, `studio-wasm`, `thumbnail-wasm`, and `export-wasm`.
 
+## Desktop
+
+- `desktop/`: Wails v3 tray host; private PostgreSQL; runs `server/app` in-process
+  and serves the React SPA at `localhost:6680`. See `desktop/README.md`.
+- App updates (GitHub Releases → platform installer URL, CN download mirror,
+  desktop-only download region): [desktop-updates.md](./desktop-updates.md).
+
 ## Contracts
 
 - OpenAPI is the HTTP contract source of truth. Run `make dto` after backend API changes.
