@@ -158,6 +158,11 @@ River ingest job reached a terminal state, not merely that multipart transport
 returned 2xx. Repository scans expose run lifecycle through the existing
 `/api/v1/repositories/{id}/scans/latest` endpoint.
 
+`GET /api/v1/assets/map-points` accepts an optional complete
+`south,north,west,east` WGS-84 viewport. All four values must be supplied
+together; longitude bounds support antimeridian crossing. This keeps map
+rendering proportional to the visible region instead of the full GPS library.
+
 ## ML, Lumen, And LLM
 
 Lumen config is loaded by the Lumen SDK during `initMLServices`. ML feature switches are stored in settings and seeded from config on first initialization, including the zero-shot classifier toggle.

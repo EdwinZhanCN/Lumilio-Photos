@@ -1225,6 +1225,20 @@ WHERE a.is_deleted = false
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL
+  AND (
+    sqlc.narg('south')::float8 IS NULL
+    OR sqlc.narg('north')::float8 IS NULL
+    OR a.gps_latitude BETWEEN sqlc.narg('south')::float8 AND sqlc.narg('north')::float8
+  )
+  AND (
+    sqlc.narg('west')::float8 IS NULL
+    OR sqlc.narg('east')::float8 IS NULL
+    OR CASE
+      WHEN sqlc.narg('west')::float8 <= sqlc.narg('east')::float8
+        THEN a.gps_longitude BETWEEN sqlc.narg('west')::float8 AND sqlc.narg('east')::float8
+      ELSE a.gps_longitude >= sqlc.narg('west')::float8 OR a.gps_longitude <= sqlc.narg('east')::float8
+    END
+  )
 ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -1237,4 +1251,18 @@ WHERE a.is_deleted = false
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND a.gps_latitude IS NOT NULL
-  AND a.gps_longitude IS NOT NULL;
+  AND a.gps_longitude IS NOT NULL
+  AND (
+    sqlc.narg('south')::float8 IS NULL
+    OR sqlc.narg('north')::float8 IS NULL
+    OR a.gps_latitude BETWEEN sqlc.narg('south')::float8 AND sqlc.narg('north')::float8
+  )
+  AND (
+    sqlc.narg('west')::float8 IS NULL
+    OR sqlc.narg('east')::float8 IS NULL
+    OR CASE
+      WHEN sqlc.narg('west')::float8 <= sqlc.narg('east')::float8
+        THEN a.gps_longitude BETWEEN sqlc.narg('west')::float8 AND sqlc.narg('east')::float8
+      ELSE a.gps_longitude >= sqlc.narg('west')::float8 OR a.gps_longitude <= sqlc.narg('east')::float8
+    END
+  );

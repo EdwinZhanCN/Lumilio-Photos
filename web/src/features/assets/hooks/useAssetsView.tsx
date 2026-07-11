@@ -252,6 +252,7 @@ export const useAssetsViewQuery = (
     },
     {
       enabled: autoFetch && !disabled,
+      gcTime: 2 * 60 * 1000,
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
@@ -427,6 +428,7 @@ export const usePhotoSearchView = (
     },
     {
       enabled: autoFetch && !disabled && queryText.length > 0,
+      gcTime: 2 * 60 * 1000,
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {

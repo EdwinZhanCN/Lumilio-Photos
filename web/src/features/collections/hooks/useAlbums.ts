@@ -1,10 +1,11 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album as AlbumDTO } from "@/lib/albums/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
 
 const PAGE_SIZE = 60;
+export const ALBUMS_QUERY_KEY = ["get", "/api/v1/albums"] as const;
 
 /**
  * Maps a backend album DTO to the ImgStackGrid Album interface
@@ -31,30 +32,52 @@ export const mapAlbumToUI = (
  * Hook for fetching albums with infinite scrolling/pagination
  */
 export function useAlbums(t: (key: string, options?: any) => string, repositoryId?: string) {
-  const { mutateAsync: fetchAlbums } = $api.useMutation("get", "/api/v1/albums");
-
-  return useInfiniteQuery({
-    queryKey: ["albums", repositoryId ?? "all"],
-    initialPageParam: 0,
-    queryFn: async ({ pageParam }) => {
-      const response = await fetchAlbums({
-        params: {
-          query: {
-            limit: PAGE_SIZE,
-            offset: pageParam,
-            repository_id: repositoryId,
-          },
+  const query = $api.useInfiniteQuery(
+    "get",
+    "/api/v1/albums",
+    {
+      params: {
+        query: {
+          limit: PAGE_SIZE,
+          repository_id: repositoryId,
         },
-      });
-      const payload = response;
-      const total = payload?.total ?? 0;
-
-      return {
-        albums: (payload?.albums ?? []).map((album) => mapAlbumToUI(album, t)),
-        total,
-        nextOffset: pageParam + PAGE_SIZE < total ? pageParam + PAGE_SIZE : null,
-      };
+      },
     },
-    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
-  });
+    {
+      initialPageParam: 0,
+      pageParamName: "offset",
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      getNextPageParam: (lastPage, _pages, lastPageParam) => {
+        const offset = Number(lastPageParam ?? 0) || 0;
+        const loaded = lastPage.albums?.length ?? 0;
+        const total = lastPage.total ?? 0;
+        return offset + loaded < total ? offset + loaded : undefined;
+      },
+    },
+  );
+  const data = useMemo(
+    () =>
+      query.data
+        ? {
+            ...query.data,
+            pages: query.data.pages.map((page) => ({
+              ...page,
+              albums: (page.albums ?? []).map((album) => mapAlbumToUI(album, t)),
+            })),
+          }
+        : undefined,
+    [query.data, t],
+  );
+  return { ...query, data };
+}
+
+/** Shared small album list for pickers and mention sources. */
+export function useAlbumOptions(enabled = true) {
+  return $api.useQuery(
+    "get",
+    "/api/v1/albums",
+    { params: { query: { limit: 100, offset: 0 } } },
+    { enabled, staleTime: 60_000, gcTime: 5 * 60_000 },
+  );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BarChart3,
@@ -21,9 +21,12 @@ import { useContextStore } from "../../state/contextStore";
 import { useDockStore } from "../../state/dockStore";
 import { useSlashMacros } from "../../slash/slashMacros";
 import type { MentionPayload } from "../../mentions/mentionSources";
-import { ChatMessages } from "./ChatMessages";
 import { MentionInput } from "./MentionInput";
 import { ContextChips } from "./ContextChips";
+
+const ChatMessages = lazy(() =>
+  import("./ChatMessages").then((module) => ({ default: module.ChatMessages })),
+);
 
 /** Compact token formatting: 856 → "856", 12480 → "12.5k". */
 function formatTokens(count: number): string {
@@ -247,7 +250,15 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           </div>
         </div>
       ) : (
-        <ChatMessages messages={messages} isGenerating={isGenerating} />
+        <Suspense
+          fallback={
+            <div className="flex min-h-32 items-center justify-center">
+              <span className="loading loading-spinner loading-sm text-primary" />
+            </div>
+          }
+        >
+          <ChatMessages messages={messages} isGenerating={isGenerating} />
+        </Suspense>
       )}
     </div>
   );
@@ -305,9 +316,9 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
             className="overflow-hidden rounded-box border border-base-300 bg-base-100/95 backdrop-blur"
           >
             {header}
-            {body}
+            {!collapsed && body}
           </div>
-          {inputArea}
+          {!collapsed && inputArea}
         </div>
 
         {/* Collapsed: morphing avatar pill */}
@@ -356,7 +367,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         }`}
       >
         {header}
-        {body}
+        {!collapsed && body}
       </div>
 
       <div
@@ -392,7 +403,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         </button>
       </div>
 
-      {inputArea}
+      {!collapsed && inputArea}
     </section>
   );
 }

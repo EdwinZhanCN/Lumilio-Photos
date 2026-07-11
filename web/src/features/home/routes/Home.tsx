@@ -1,15 +1,18 @@
+import { lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import BrowseScopeSelect from "@/components/BrowseScopeSelect";
 import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";
-import SpacetimeMapCard from "../components/SpacetimeMapCard";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useLocationClusters } from "../hooks/useLocationClusters";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useBrowseScope } from "@/features/settings";
 import { AlertTriangleIcon, CameraIcon, HomeIcon, SparklesIcon } from "lucide-react";
+import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
+
+const SpacetimeMapCard = lazy(() => import("../components/SpacetimeMapCard"));
 
 function Home() {
   const { t } = useI18n();
@@ -17,6 +20,7 @@ function Home() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { scopedRepositoryId } = useBrowseScope();
   const displayMode = searchParams.get("tab") === "stats" ? "stats" : "gallery";
+  const [mapRef, mapVisible] = useVisibleOnce("400px 0px");
 
   const setDisplayMode = (nextMode: "gallery" | "stats") => {
     const params = new URLSearchParams(searchParams);
@@ -47,7 +51,11 @@ function Home() {
     isLoading: isMapLoading,
     isFetchingNextPage: isMapFetchingNextPage,
     hasNextPage: mapHasNextPage,
-  } = useMapPhotoAssets({ repositoryId: scopedRepositoryId });
+  } = useMapPhotoAssets({
+    repositoryId: scopedRepositoryId,
+    enabled: mapVisible,
+    pageSize: 250,
+  });
   const { loadedClusters, totalClusters } = useLocationClusters({
     repositoryId: scopedRepositoryId,
   });
@@ -125,23 +133,30 @@ function Home() {
           </div>
         )}
 
-        <SpacetimeMapCard
-          points={mapPoints}
-          subtitle={mapSubtitle}
-          headerRight={
-            loadedClusters > 0 ? (
-              <span className="badge badge-outline">
-                {t("home.map.placesCount", {
-                  count: totalClusters ?? loadedClusters,
-                })}
-              </span>
-            ) : undefined
-          }
-          onPointClick={(assetId) => {
-            void navigate(`/assets/${assetId}`);
-          }}
-          className="mx-4 mb-8"
-        />
+        <div ref={mapRef} className="mx-4 mb-8 min-h-72">
+          {mapVisible && (
+            <Suspense
+              fallback={<div className="skeleton aspect-[16/9] w-full rounded-box bg-base-300" />}
+            >
+              <SpacetimeMapCard
+                points={mapPoints}
+                subtitle={mapSubtitle}
+                headerRight={
+                  loadedClusters > 0 ? (
+                    <span className="badge badge-outline">
+                      {t("home.map.placesCount", {
+                        count: totalClusters ?? loadedClusters,
+                      })}
+                    </span>
+                  ) : undefined
+                }
+                onPointClick={(assetId) => {
+                  void navigate(`/assets/${assetId}`);
+                }}
+              />
+            </Suspense>
+          )}
+        </div>
       </div>
     </div>
   );

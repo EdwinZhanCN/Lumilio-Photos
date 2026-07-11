@@ -15,7 +15,7 @@ import { useBrowseScope } from "@/features/settings";
 import { CollectionsProvider, useCollections } from "../CollectionsProvider";
 import AlbumFormModal from "../components/AlbumFormModal";
 import { ImgStackGrid } from "../components/ImgStackGrid";
-import { useAlbums } from "../hooks/useAlbums";
+import { ALBUMS_QUERY_KEY, useAlbums } from "../hooks/useAlbums";
 
 function AlbumsContent() {
   const { t } = useI18n();
@@ -67,7 +67,7 @@ function AlbumsContent() {
         selectedAlbumIds.map((id) => deleteAlbumMutation.mutateAsync({ params: { path: { id } } })),
       );
 
-      await queryClient.invalidateQueries({ queryKey: ["albums"] });
+      await queryClient.invalidateQueries({ queryKey: ALBUMS_QUERY_KEY });
       showMessage("success", t("collections.messages.deleteSuccess"));
       dispatch({ type: "CLEAR_SELECTION" });
       dispatch({ type: "TOGGLE_SELECTION_MODE" });

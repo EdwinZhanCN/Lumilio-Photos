@@ -162,6 +162,7 @@ export function usePinAssetsView(
       initialPageParam: 0,
       pageParamName: "offset",
       retry: false,
+      gcTime: 2 * 60 * 1000,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const payload = lastPage;
         const total = payload?.total_visible;
@@ -205,6 +206,7 @@ export function usePinAssetsView(
       initialPageParam: 0,
       pageParamName: "offset",
       retry: false,
+      gcTime: 2 * 60 * 1000,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const payload = lastPage;
         const total = payload?.results_total_visible;

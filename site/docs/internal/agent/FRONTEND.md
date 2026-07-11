@@ -158,6 +158,10 @@ Public routes include login and register. Bootstrap routes handle first-user set
 
 Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll container, and footer. Notable route groups include:
 
+Studio, Map, Lumilio, Monitor, and Settings are route-level lazy chunks. The
+global ChatDock also lazy-loads its message renderer and does not mount its
+expanded body/input queries while collapsed.
+
 - `/`
 - `/assets`
 - `/assets/:assetId`
@@ -181,6 +185,12 @@ Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll
 
 Legacy compatibility routes also redirect `/upload-photos` to `/manage`.
 
+The final top-level `*` route renders a public 404 recovery page outside setup
+and authentication gates, so invalid URLs are explained rather than redirected.
+`main.tsx` wraps the complete application/provider tree in a root error boundary;
+its fallback deliberately uses a document link instead of router state so it
+still works when the router itself fails.
+
 ## Browser Runtime
 
 The Vite dev server sets:
@@ -198,6 +208,17 @@ The production web image uses Caddy:
 - serves the same COOP/COEP isolation headers as development; the desktop Go
   SPA fallback also sets them on documents and static assets
 - falls back to `index.html` for SPA routes
+
+## Large-library boundaries
+
+- Square and justified galleries preserve full scroll geometry but mount only
+  an overscanned viewport window. Offscreen thumbnail/media nodes are removed,
+  and inactive asset list/search queries use bounded garbage-collection times.
+- The Home map waits until visible and requests a bounded preview. The Map route
+  queries `/assets/map-points` with its current WGS-84 viewport; only Trips opts
+  into draining all map-point and location-cluster pages.
+- `web/scripts/check-bundle-budget.mjs` enforces a 420 KiB gzip budget for the
+  production entry chunk as part of `make web-browser-test`.
 
 ## Quality Gate
 

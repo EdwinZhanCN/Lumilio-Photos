@@ -139,6 +139,15 @@ export function AssetsGalleryPage({
   // view scoped by `baseFilter`.
   const activeView = isPinMode ? pinView : standardView;
 
+  const photoSearchView = useCurrentAssetsSearchView({
+    withGroups: false,
+    sortBy,
+    baseFilter,
+    viewKey: viewKey ? `${viewKey}:search` : undefined,
+    disabled: isPinMode || !searchEnabled,
+  });
+  const activeSearchView = isPinMode ? pinView : photoSearchView;
+  const displayedView = isSearchActive ? activeSearchView : activeView;
   const {
     assets: allAssets,
     browseGroups,
@@ -151,15 +160,7 @@ export function AssetsGalleryPage({
     hasMore: hasNextPage,
     isFetched,
     error,
-  } = activeView;
-  const photoSearchView = useCurrentAssetsSearchView({
-    withGroups: false,
-    sortBy,
-    baseFilter,
-    viewKey: viewKey ? `${viewKey}:search` : undefined,
-    disabled: isPinMode || !searchEnabled,
-  });
-  const activeSearchView = isPinMode ? pinView : photoSearchView;
+  } = displayedView;
   const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(null);
 
   const hasFetchedOnce = isFetched;
@@ -173,8 +174,8 @@ export function AssetsGalleryPage({
   const topResultsBrowseGroups = activeSearchView.topResultsBrowseGroups;
   const searchResultBrowseGroups = activeSearchView.resultBrowseGroups;
   const activeBrowseGroups = isSearchActive ? [] : browseGroups;
-  const activeBrowseItems = isSearchActive ? activeSearchView.browseItems : flatBrowseItems;
-  const activeBrowseAssets = isSearchActive ? activeSearchView.browseAssets : flatAssets;
+  const activeBrowseItems = flatBrowseItems;
+  const activeBrowseAssets = flatAssets;
 
   // Gallery selection becomes agent context. Selection state stores browse item
   // ids; resolve them to asset UUIDs before the chat request snapshots context.

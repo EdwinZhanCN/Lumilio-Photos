@@ -612,16 +612,41 @@ WHERE a.is_deleted = false
   AND ($2::integer IS NULL OR a.owner_id = $2)
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL
+  AND (
+    $3::float8 IS NULL
+    OR $4::float8 IS NULL
+    OR a.gps_latitude BETWEEN $3::float8 AND $4::float8
+  )
+  AND (
+    $5::float8 IS NULL
+    OR $6::float8 IS NULL
+    OR CASE
+      WHEN $5::float8 <= $6::float8
+        THEN a.gps_longitude BETWEEN $5::float8 AND $6::float8
+      ELSE a.gps_longitude >= $5::float8 OR a.gps_longitude <= $6::float8
+    END
+  )
 `
 
 type CountPhotoMapPointsParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
 	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	South        *float64    `db:"south" json:"south"`
+	North        *float64    `db:"north" json:"north"`
+	West         *float64    `db:"west" json:"west"`
+	East         *float64    `db:"east" json:"east"`
 }
 
 // Count query matching GetPhotoMapPoints.
 func (q *Queries) CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPhotoMapPoints, arg.RepositoryID, arg.OwnerID)
+	row := q.db.QueryRow(ctx, countPhotoMapPoints,
+		arg.RepositoryID,
+		arg.OwnerID,
+		arg.South,
+		arg.North,
+		arg.West,
+		arg.East,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -3147,13 +3172,31 @@ WHERE a.is_deleted = false
   AND ($2::integer IS NULL OR a.owner_id = $2)
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL
+  AND (
+    $3::float8 IS NULL
+    OR $4::float8 IS NULL
+    OR a.gps_latitude BETWEEN $3::float8 AND $4::float8
+  )
+  AND (
+    $5::float8 IS NULL
+    OR $6::float8 IS NULL
+    OR CASE
+      WHEN $5::float8 <= $6::float8
+        THEN a.gps_longitude BETWEEN $5::float8 AND $6::float8
+      ELSE a.gps_longitude >= $5::float8 OR a.gps_longitude <= $6::float8
+    END
+  )
 ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
-LIMIT $4 OFFSET $3
+LIMIT $8 OFFSET $7
 `
 
 type GetPhotoMapPointsParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
 	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	South        *float64    `db:"south" json:"south"`
+	North        *float64    `db:"north" json:"north"`
+	West         *float64    `db:"west" json:"west"`
+	East         *float64    `db:"east" json:"east"`
 	Offset       int32       `db:"offset" json:"offset"`
 	Limit        int32       `db:"limit" json:"limit"`
 }
@@ -3172,6 +3215,10 @@ func (q *Queries) GetPhotoMapPoints(ctx context.Context, arg GetPhotoMapPointsPa
 	rows, err := q.db.Query(ctx, getPhotoMapPoints,
 		arg.RepositoryID,
 		arg.OwnerID,
+		arg.South,
+		arg.North,
+		arg.West,
+		arg.East,
 		arg.Offset,
 		arg.Limit,
 	)

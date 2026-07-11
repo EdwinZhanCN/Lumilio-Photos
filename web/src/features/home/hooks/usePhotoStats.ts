@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 
@@ -16,6 +16,7 @@ interface UsePhotoStatsOptions {
   cameraLensLimit?: number;
   timeDistributionType?: TimeDistributionType;
   repositoryId?: string;
+  heatmapYear?: number | null;
 }
 
 interface UsePhotoStatsReturn {
@@ -28,7 +29,6 @@ interface UsePhotoStatsReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
-  refetchHeatmap: (year: number) => Promise<void>;
 }
 
 /**
@@ -42,181 +42,76 @@ export function usePhotoStats(options: UsePhotoStatsOptions = {}): UsePhotoStats
     cameraLensLimit = 10,
     timeDistributionType = "hourly",
     repositoryId,
+    heatmapYear,
   } = options;
-
-  const [focalLengthData, setFocalLengthData] = useState<FocalLengthDistributionResponse | null>(
-    null,
-  );
-  const [cameraLensData, setCameraLensData] = useState<CameraLensStatsResponse | null>(null);
-  const [timeDistributionData, setTimeDistributionData] = useState<TimeDistributionResponse | null>(
-    null,
-  );
-  const [heatmapData, setHeatmapData] = useState<HeatmapResponse | null>(null);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [heatmapLoading, setHeatmapLoading] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { mutateAsync: fetchFocalLength } = $api.useMutation("get", "/api/v1/stats/focal-length");
-  const { mutateAsync: fetchCameraLensStats } = $api.useMutation(
-    "get",
-    "/api/v1/stats/camera-lens",
-  );
-  const { mutateAsync: fetchTimeDistribution } = $api.useMutation(
-    "get",
-    "/api/v1/stats/time-distribution",
-  );
-  const { mutateAsync: fetchAvailableYears } = $api.useMutation(
-    "get",
-    "/api/v1/stats/available-years",
-  );
-  const { mutateAsync: fetchDailyActivity } = $api.useMutation(
-    "get",
-    "/api/v1/stats/daily-activity",
-  );
 
   const repositoryScope = useMemo(
     () => (repositoryId ? { repository_id: repositoryId } : undefined),
     [repositoryId],
   );
 
-  const fetchAllStats = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const [focalResponse, cameraLensResponse, timeResponse, yearsResponse] = await Promise.all([
-        fetchFocalLength({
-          params: { query: repositoryScope },
-        }),
-        fetchCameraLensStats({
-          params: {
-            query: {
-              limit: cameraLensLimit,
-              ...repositoryScope,
-            },
-          },
-        }),
-        fetchTimeDistribution({
-          params: {
-            query: {
-              type: timeDistributionType,
-              ...repositoryScope,
-            },
-          },
-        }),
-        fetchAvailableYears({
-          params: { query: repositoryScope },
-        }),
-      ]);
-
-      const focalData = focalResponse;
-      if (focalData) {
-        setFocalLengthData(focalData);
-      }
-
-      const cameraLensData = cameraLensResponse;
-      if (cameraLensData) {
-        setCameraLensData(cameraLensData);
-      }
-
-      const timeDistributionData = timeResponse;
-      if (timeDistributionData) {
-        setTimeDistributionData(timeDistributionData);
-      }
-
-      const yearsData = yearsResponse;
-      if (yearsData) {
-        const years = yearsData.years ?? [];
-        setAvailableYears(years);
-
-        // Fetch heatmap for the most recent year
-        setHeatmapLoading(true);
-        try {
-          if (years.length > 0) {
-            const latestYear = years[0];
-
-            const heatmapResponse = await fetchDailyActivity({
-              params: {
-                query: {
-                  year: latestYear,
-                  ...repositoryScope,
-                },
-              },
-            });
-            const heatmapData = heatmapResponse;
-            if (heatmapData) {
-              setHeatmapData(heatmapData);
-            }
-          }
-        } finally {
-          setHeatmapLoading(false);
-        }
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch statistics";
-      setError(errorMessage);
-      console.error("Error fetching photo stats:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    cameraLensLimit,
-    timeDistributionType,
-    repositoryScope,
-    fetchAvailableYears,
-    fetchCameraLensStats,
-    fetchDailyActivity,
-    fetchFocalLength,
-    fetchTimeDistribution,
-  ]);
-
-  const refetchHeatmap = useCallback(
-    async (year: number) => {
-      setHeatmapLoading(true);
-      setError(null);
-
-      try {
-        const heatmapResponse = await fetchDailyActivity({
-          params: {
-            query: {
-              year,
-              ...repositoryScope,
-            },
-          },
-        });
-        const heatmapData = heatmapResponse;
-
-        if (heatmapData) {
-          setHeatmapData(heatmapData);
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch heatmap";
-        setError(errorMessage);
-        console.error("Error fetching heatmap:", err);
-      } finally {
-        setHeatmapLoading(false);
-      }
-    },
-    [fetchDailyActivity, repositoryScope],
+  const commonOptions = {
+    enabled: autoFetch,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  } as const;
+  const focalQuery = $api.useQuery(
+    "get",
+    "/api/v1/stats/focal-length",
+    { params: { query: repositoryScope } },
+    commonOptions,
   );
-
-  useEffect(() => {
-    if (autoFetch) {
-      void fetchAllStats();
-    }
-  }, [autoFetch, fetchAllStats]);
+  const cameraQuery = $api.useQuery(
+    "get",
+    "/api/v1/stats/camera-lens",
+    { params: { query: { limit: cameraLensLimit, ...repositoryScope } } },
+    commonOptions,
+  );
+  const timeQuery = $api.useQuery(
+    "get",
+    "/api/v1/stats/time-distribution",
+    { params: { query: { type: timeDistributionType, ...repositoryScope } } },
+    commonOptions,
+  );
+  const yearsQuery = $api.useQuery(
+    "get",
+    "/api/v1/stats/available-years",
+    { params: { query: repositoryScope } },
+    commonOptions,
+  );
+  const heatmapQuery = $api.useQuery(
+    "get",
+    "/api/v1/stats/daily-activity",
+    {
+      params: {
+        query: {
+          year: heatmapYear ?? new Date().getFullYear(),
+          ...repositoryScope,
+        },
+      },
+    },
+    { ...commonOptions, enabled: autoFetch && heatmapYear !== null && heatmapYear !== undefined },
+  );
+  const queries = [focalQuery, cameraQuery, timeQuery, yearsQuery, heatmapQuery];
+  const firstError = queries.find((query) => query.error)?.error;
+  const refetch = useCallback(async () => {
+    await Promise.all(queries.map((query) => query.refetch()));
+  }, [focalQuery, cameraQuery, timeQuery, yearsQuery, heatmapQuery]);
 
   return {
-    focalLengthData,
-    cameraLensData,
-    timeDistributionData,
-    heatmapData,
-    availableYears,
-    heatmapLoading,
-    isLoading,
-    error,
-    refetch: fetchAllStats,
-    refetchHeatmap,
+    focalLengthData: focalQuery.data ?? null,
+    cameraLensData: cameraQuery.data ?? null,
+    timeDistributionData: timeQuery.data ?? null,
+    heatmapData: heatmapQuery.data ?? null,
+    availableYears: yearsQuery.data?.years ?? [],
+    heatmapLoading: heatmapQuery.isFetching,
+    isLoading: queries.some((query) => query.isLoading),
+    error:
+      firstError instanceof Error
+        ? firstError.message
+        : firstError
+          ? "Failed to fetch statistics"
+          : null,
+    refetch,
   };
 }

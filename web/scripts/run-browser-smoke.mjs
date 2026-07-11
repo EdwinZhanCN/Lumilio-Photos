@@ -4,9 +4,14 @@ import { chromium } from "playwright";
 const host = "127.0.0.1";
 const port = 4173;
 const origin = `http://${host}:${port}`;
-const preview = spawn("./node_modules/.bin/vp", ["preview", "--host", host, "--port", String(port)], {
-  stdio: ["ignore", "pipe", "pipe"],
-});
+const preview = spawn(
+  "./node_modules/.bin/vp",
+  ["preview", "--host", host, "--port", String(port)],
+  {
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
+  },
+);
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -15,6 +20,9 @@ const assert = (condition, message) => {
 const waitForPreview = async () => {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
+    if (preview.exitCode !== null) {
+      throw new Error(`Production preview exited before becoming ready (code ${preview.exitCode})`);
+    }
     try {
       const response = await fetch(`${origin}/production-smoke.html`);
       if (response.ok) return;
@@ -24,6 +32,26 @@ const waitForPreview = async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error("Timed out waiting for production preview");
+};
+
+const terminatePreview = async () => {
+  if (preview.exitCode !== null || !preview.pid) return;
+  try {
+    process.kill(-preview.pid, "SIGTERM");
+  } catch {
+    preview.kill("SIGTERM");
+  }
+  await Promise.race([
+    new Promise((resolve) => preview.once("exit", resolve)),
+    new Promise((resolve) => setTimeout(resolve, 2_000)),
+  ]);
+  if (preview.exitCode === null) {
+    try {
+      process.kill(-preview.pid, "SIGKILL");
+    } catch {
+      preview.kill("SIGKILL");
+    }
+  }
 };
 
 let browser;
@@ -42,7 +70,11 @@ try {
   assert(/^[a-f0-9]{64}$/.test(digest), "BLAKE3 worker returned an invalid digest");
 
   await page.route("**/api/v1/assets", (route) =>
-    route.fulfill({ status: 503, contentType: "application/json", body: '{"message":"storage unavailable"}' }),
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: '{"message":"storage unavailable"}',
+    }),
   );
   const failure = await page.evaluate(() => window.__lumilioProductionSmoke.uploadFailure());
   assert(failure.includes("503"), "non-2xx upload response was accepted");
@@ -68,7 +100,10 @@ try {
     });
   });
   const uploadStates = await page.evaluate(() => window.__lumilioProductionSmoke.uploadLifecycle());
-  assert(uploadStates.join(",") === "running,completed", "upload lifecycle did not reach completion");
+  assert(
+    uploadStates.join(",") === "running,completed",
+    "upload lifecycle did not reach completion",
+  );
 
   let scanPoll = 0;
   await page.route("**/api/v1/repositories/repo-1/scans/latest", (route) => {
@@ -86,8 +121,10 @@ try {
   const scanStatus = await page.evaluate(() => window.__lumilioProductionSmoke.scanLifecycle());
   assert(scanStatus === "completed", "repository scan lifecycle did not reach completion");
 
-  process.stdout.write("Production browser smoke passed: isolation, BLAKE3, upload recovery, and lifecycle transitions.\n");
+  process.stdout.write(
+    "Production browser smoke passed: isolation, BLAKE3, upload recovery, and lifecycle transitions.\n",
+  );
 } finally {
   await browser?.close();
-  preview.kill("SIGTERM");
+  await terminatePreview();
 }

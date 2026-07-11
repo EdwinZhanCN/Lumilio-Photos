@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { $api } from "@/lib/http-commons/queryClient";
 
@@ -11,10 +11,11 @@ const PAGE_SIZE = 100;
 
 export type UseLocationClustersOptions = {
   repositoryId?: string;
+  autoFetchAll?: boolean;
 };
 
 export function useLocationClusters(options: UseLocationClustersOptions = {}) {
-  const { repositoryId } = options;
+  const { repositoryId, autoFetchAll = false } = options;
 
   const query = $api.useInfiniteQuery(
     "get",
@@ -31,21 +32,42 @@ export function useLocationClusters(options: UseLocationClustersOptions = {}) {
       pageParamName: "offset",
       initialPageParam: 0,
       staleTime: 2 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
+      gcTime: 2 * 60 * 1000,
       retry: 1,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const pageClusters = lastPage?.clusters ?? [];
         const total = lastPage?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
+        if (pageClusters.length === 0) return undefined;
 
         if (typeof total === "number") {
-          return offset + pageClusters.length < total ? offset + PAGE_SIZE : undefined;
+          return offset + pageClusters.length < total ? offset + pageClusters.length : undefined;
         }
 
-        return pageClusters.length >= PAGE_SIZE ? offset + PAGE_SIZE : undefined;
+        return pageClusters.length >= PAGE_SIZE ? offset + pageClusters.length : undefined;
       },
     },
   );
+
+  useEffect(() => {
+    if (
+      !autoFetchAll ||
+      !query.hasNextPage ||
+      query.isFetchingNextPage ||
+      query.isLoading ||
+      query.isError
+    ) {
+      return;
+    }
+    void query.fetchNextPage();
+  }, [
+    autoFetchAll,
+    query.fetchNextPage,
+    query.hasNextPage,
+    query.isError,
+    query.isFetchingNextPage,
+    query.isLoading,
+  ]);
 
   const clusters = useMemo(() => {
     const pages = query.data?.pages ?? [];

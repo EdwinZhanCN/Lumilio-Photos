@@ -1,12 +1,15 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { I18nProvider } from "@/lib/i18n.tsx";
+import RootErrorBoundary from "@/components/RootErrorBoundary";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Failed to find the root element");
 
 createRoot(rootElement).render(
   <I18nProvider>
-    <App />
+    <RootErrorBoundary>
+      <App />
+    </RootErrorBoundary>
   </I18nProvider>,
 );

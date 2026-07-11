@@ -40,7 +40,7 @@ import { CreateShareLinkModal } from "@/features/share/components/CreateShareLin
 import MediaViewer from "../../../shared/MediaViewer";
 import type { Asset } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { Album } from "@/lib/albums/types";
+import { useAlbumOptions } from "@/features/collections/hooks/useAlbums";
 import {
   type ParsedSpeciesPrediction,
   type TaxonomyRank,
@@ -294,10 +294,10 @@ const FullScreenCarousel = ({
   const { t } = useI18n();
   const { toggleLike, deleteAsset } = useAssetActions();
   const navigate = useNavigate();
-  const [albums, setAlbums] = useState<Album[]>([]);
-  const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
-  const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
+  const albumOptionsQuery = useAlbumOptions();
+  const albums = albumOptionsQuery.data?.albums ?? [];
+  const isLoadingAlbums = albumOptionsQuery.isPending;
   const addToAlbumMutation = $api.useMutation("post", "/api/v1/albums/{id}/assets/{assetId}");
 
   const handleOpenStudio = useCallback(
@@ -312,28 +312,10 @@ const FullScreenCarousel = ({
     setShareAsset(asset);
   }, []);
 
-  const handleAddToAlbum = useCallback(
-    async (_asset: Asset) => {
-      setIsLoadingAlbums(true);
-      try {
-        const response = await listAlbumsMutation.mutateAsync({
-          params: { query: { limit: 50 } },
-        });
-        if (response?.albums) {
-          setAlbums(response.albums);
-        }
-        const modal = document.getElementById("album_picker_modal") as HTMLDialogElement | null;
-        modal?.showModal();
-      } catch {
-        setAlbums([]);
-        const modal = document.getElementById("album_picker_modal") as HTMLDialogElement | null;
-        modal?.showModal();
-      } finally {
-        setIsLoadingAlbums(false);
-      }
-    },
-    [listAlbumsMutation],
-  );
+  const handleAddToAlbum = useCallback(async (_asset: Asset) => {
+    const modal = document.getElementById("album_picker_modal") as HTMLDialogElement | null;
+    modal?.showModal();
+  }, []);
 
   const handleSelectAlbum = useCallback(
     async (albumId: number) => {

@@ -79,7 +79,6 @@
         "deleteSuccess_other": "Moved {{count}} assets to Trash.",
         "downloadError": "Failed to start download",
         "downloadStart": "Download started",
-        "loadAlbumsError": "Failed to load albums",
         "stackError": "Failed to stack selected assets.",
         "stackSuccess_one": "Stacked {{count}} asset.",
         "stackSuccess_other": "Stacked {{count}} assets."
@@ -1338,6 +1337,13 @@
       "unavailable": "Repository options unavailable"
     }
   },
+  "notFound": {
+    "back": "Go back",
+    "description": "The address may be outdated or mistyped. Your library and photos are still safe.",
+    "home": "Go to library",
+    "label": "Error 404",
+    "title": "This page does not exist"
+  },
   "people": {
     "cover": {
       "error": "Failed to set cover: {{message}}",
@@ -1438,6 +1444,13 @@
     "stars_other": "{{count}} stars",
     "unrated": "Unrated",
     "updateError": "Failed to update rating"
+  },
+  "rootError": {
+    "description": "Reload the application to recover. Your original photos and local library are not changed by this error.",
+    "home": "Return home",
+    "label": "Application error",
+    "reload": "Reload application",
+    "title": "Lumilio could not continue"
   },
   "routes": {
     "collections": "Collections",

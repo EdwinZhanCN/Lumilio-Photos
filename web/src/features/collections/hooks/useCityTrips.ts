@@ -110,12 +110,16 @@ export function useCityTrips(options: UseCityTripsOptions = {}) {
     points: mapPoints,
     isLoading: isMapLoading,
     hasNextPage: mapHasNextPage,
-  } = useMapPhotoAssets({ repositoryId });
+  } = useMapPhotoAssets({ repositoryId, autoFetchAll: true });
 
-  const { clusters, isLoading: isClustersLoading } = useLocationClusters({ repositoryId });
+  const {
+    clusters,
+    isLoading: isClustersLoading,
+    hasNextPage: clustersHaveNextPage,
+  } = useLocationClusters({ repositoryId, autoFetchAll: true });
 
   const isLoading = isMapLoading || isClustersLoading;
-  const isIncomplete = mapHasNextPage;
+  const isIncomplete = mapHasNextPage || clustersHaveNextPage;
 
   const trips = useMemo(() => {
     if (clusters.length === 0 || mapPoints.length === 0) {

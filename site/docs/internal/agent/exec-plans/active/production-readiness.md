@@ -67,7 +67,7 @@ Implementation record:
   `cd web && vp build`. Existing WASM resolution and large-chunk build warnings
   remain Phase 3 concerns.
 
-## Phase 3 — Large-library performance
+## Phase 3 — Large-library performance (completed 2026-07-10)
 
 - Replace mount-once galleries with real viewport windowing and bounded query/
   media retention.
@@ -77,6 +77,25 @@ Implementation record:
   as the first split points. Lazy-mount the expanded ChatDock body.
 - Consolidate duplicated server-state ownership for statistics, albums, filter
   options, and search. Split long files only along these behavior boundaries.
+
+Implementation record:
+
+- Replaced mount-once gallery tiles with bounded square-row and justified-tile
+  viewport windows. A 10,000-item regression fixture asserts that mounted media
+  DOM stays bounded, and inactive list/search queries now expire promptly.
+- Added WGS-84 viewport parameters to the map-point API. Home lazily requests a
+  small visible preview, Map follows its viewport without draining the library,
+  and Trips explicitly drains both point and cluster pagination before treating
+  its derived result as complete.
+- Split Studio, Map, Lumilio, Monitor, and Settings at route level. The ChatDock
+  message renderer loads on demand and its expanded body/input queries do not
+  mount while collapsed.
+- Moved statistics, album picker/list data, filter options, and active search
+  lifecycle under shared TanStack Query owners. Added an enforced 420 KiB gzip
+  production-entry budget; the normal Phase 3 build measures about 375 KiB gzip.
+- Verified with `make dto`, `make server-test`, `make desktop-test`,
+  `make web-test` (25 files / 100 tests), and `make web-browser-test`, including
+  the production bundle budget and browser worker/lifecycle smoke suite.
 
 ## Release gates
 
@@ -89,6 +108,15 @@ Implementation record:
   entry chunk has an enforced compressed-size budget.
 - Authenticated browser walkthrough passes at 375, 768, 1024, and 1440 px in
   light and dark themes; root error recovery and unknown-route handling exist.
+
+Release-hardening record:
+
+- Added a root render error boundary around the complete application/provider
+  tree, with router-independent reload and home recovery actions.
+- Added a top-level unknown-route page outside setup/authentication gates, with
+  localized home and browser-history recovery actions.
+- Covered both fallbacks with focused component tests. The authenticated
+  responsive light/dark walkthrough remains outstanding.
 
 ## Sequencing
 

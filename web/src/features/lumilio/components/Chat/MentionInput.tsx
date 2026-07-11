@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
+import { useAlbumOptions } from "@/features/collections/hooks/useAlbums";
+import { useAssetFilterOptions } from "@/features/assets/hooks/useAssetFilterOptions";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import {
   createMentionSources,
@@ -112,19 +114,22 @@ export function MentionInput({
   const peopleQuery = $api.useQuery("get", "/api/v1/people", {
     params: { query: { limit: 200, offset: 0 } },
   });
-  const albumsQuery = $api.useQuery("get", "/api/v1/albums", {
-    params: { query: { limit: 100, offset: 0 } },
-  });
+  const albumsQuery = useAlbumOptions();
   // Pins live behind the LLM-agent gate; when the agent is disabled the endpoint
   // returns 404 and would otherwise trip React Query's default retry loop on
   // every mount. Gate the query on the (cached) capabilities flag instead.
   const { capabilities } = useCapabilities();
   const agentEnabled = capabilities?.llm?.agentEnabled ?? false;
-  const pinsQuery = $api.useQuery("get", "/api/v1/agent/pins", {}, {
-    enabled: agentEnabled,
-    retry: false,
-  });
-  const filterOptionsQuery = $api.useQuery("get", "/api/v1/assets/filter-options");
+  const pinsQuery = $api.useQuery(
+    "get",
+    "/api/v1/agent/pins",
+    {},
+    {
+      enabled: agentEnabled,
+      retry: false,
+    },
+  );
+  const filterOptionsQuery = useAssetFilterOptions();
 
   const sources = useMemo(
     () =>
