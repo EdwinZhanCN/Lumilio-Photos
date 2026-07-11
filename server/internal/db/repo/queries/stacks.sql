@@ -101,6 +101,13 @@ ORDER BY a.original_filename;
 -- owner_id because auto-detected stacks never span owners.
 SELECT a.asset_id, a.owner_id, a.original_filename, a.mime_type,
        a.specific_metadata->>'is_raw' as is_raw,
+       COALESCE(a.specific_metadata->>'camera_model', '')::text as camera_model,
+       COALESCE(
+           NULLIF(a.exif_raw->>'BurstUUID', ''),
+           NULLIF(a.exif_raw->>'BurstID', ''),
+           NULLIF(a.exif_raw->>'BurstGroupID', ''),
+           ''
+       )::text as burst_id,
        a.taken_time, a.upload_time,
        regexp_replace(a.original_filename, '\.[^.]+$', '') as base_name
 FROM assets a

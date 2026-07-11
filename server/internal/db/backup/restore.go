@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -52,7 +53,7 @@ func RestoreDump(ctx context.Context, conn Conn, toolsBinDir, dumpPath string, l
 		dumpReader = gz
 	}
 
-	cmd := exec.CommandContext(ctx, filepath.Join(toolsBinDir, "psql"),
+	cmd := exec.CommandContext(ctx, filepath.Join(toolsBinDir, clientToolName("psql", runtime.GOOS)),
 		"--host", conn.Host,
 		"--port", conn.Port,
 		"--username", conn.User,
