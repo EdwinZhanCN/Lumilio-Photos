@@ -8,6 +8,7 @@ import "desktop/supervisor"
 var nativeStrings = map[string]map[string]string{
 	"en": {
 		"open":            "Open Lumilio Photos",
+		"dashboard":       "Control Panel",
 		"quit":            "Quit Lumilio Photos",
 		"updateAvailable": "Update available: %s",
 		"starting":        "Starting…",
@@ -29,6 +30,7 @@ var nativeStrings = map[string]map[string]string{
 	},
 	"zh": {
 		"open":            "打开 Lumilio Photos",
+		"dashboard":       "控制面板",
 		"quit":            "退出 Lumilio Photos",
 		"updateAvailable": "有新版本:%s",
 		"starting":        "正在启动…",

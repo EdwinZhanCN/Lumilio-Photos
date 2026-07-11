@@ -160,6 +160,23 @@ func (s *Supervisor) LogDir() string {
 	return s.paths.Logs
 }
 
+// DashboardPaths returns non-secret host paths which the private Desktop
+// control panel may display or reveal in Finder/Explorer.
+func (s *Supervisor) DashboardPaths() (map[string]string, error) {
+	if err := s.ensurePaths(); err != nil {
+		return nil, err
+	}
+	settings, _ := s.Settings()
+	storage := settings.StoragePath
+	if storage == "" {
+		storage = s.paths.DefaultLib
+	}
+	return map[string]string{
+		"appData": s.paths.AppData, "storage": storage, "logs": s.paths.Logs,
+		"backups": s.paths.Backups, "lumen": s.paths.LumenDir(),
+	}, nil
+}
+
 // DefaultStoragePath is the built-in media-library location used until the user
 // chooses one during onboarding (<appdata>/storage).
 func (s *Supervisor) DefaultStoragePath() (string, error) {

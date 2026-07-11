@@ -35,6 +35,16 @@ type DesktopSettings struct {
 	// LumenEnabled records that the user turned on local AI: the supervised
 	// Lumen Hub is started on every launch until it is disabled from the tray.
 	LumenEnabled bool `json:"lumen_enabled,omitempty"`
+
+	// LumenPreset, LumenBackend and LumenProfile are the launcher-compatible
+	// local AI choices. Empty values are migrated to the recommended defaults.
+	LumenPreset           string `json:"lumen_preset,omitempty"`
+	LumenBackend          string `json:"lumen_backend,omitempty"`
+	LumenProfile          string `json:"lumen_profile,omitempty"`
+	LumenCacheDir         string `json:"lumen_cache_dir,omitempty"`
+	LumenPreviousCacheDir string `json:"lumen_previous_cache_dir,omitempty"`
+	LumenInstalledVersion string `json:"lumen_installed_version,omitempty"`
+	LumenInstalledProfile string `json:"lumen_installed_profile,omitempty"`
 }
 
 // LoadSettings reads desktop-settings.json. A missing file yields zero-value

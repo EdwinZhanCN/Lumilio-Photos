@@ -59,6 +59,9 @@ type desktopApp struct {
 	lumenHub           *lumen.Hub
 	lumenState         string
 	lumenStopRequested atomic.Bool
+	lumenMu            sync.Mutex
+	lumenError         string
+	lumenLatestVersion string
 
 	lastStage atomic.Value // string: most recent startup stage, for failure dialogs
 }
@@ -120,11 +123,10 @@ func (d *desktopApp) boot() {
 		d.refreshMenu()
 		d.showOnboarding()
 		<-d.onboardCh // wait for /__onb/complete
-		if d.onboardWin != nil {
-			d.onboardWin.Close()
-		}
 		// Re-resolve language from the choice just made.
 		d.lang = d.onboardingLang()
+	} else {
+		d.markOnboardingDone()
 	}
 	d.startRuntime()
 }
@@ -161,6 +163,9 @@ func (d *desktopApp) refreshMenu() {
 	open := menu.Add(d.tr("open"))
 	open.SetEnabled(d.ready)
 	open.OnClick(func(*application.Context) { d.openInBrowser() })
+
+	dashboard := menu.Add(d.tr("dashboard"))
+	dashboard.OnClick(func(*application.Context) { d.showDashboard() })
 
 	if d.updateURL != "" {
 		upd := menu.Add(fmt.Sprintf(d.tr("updateAvailable"), d.updateVersion))
@@ -210,6 +215,7 @@ func (d *desktopApp) startRuntime() {
 	// Check for a newer release in the background (best-effort, off the critical
 	// path); surface it in the tray if found.
 	go d.checkUpdate()
+	go d.checkLumenUpdate()
 
 	// Resume local AI if the user enabled it previously.
 	go d.autoStartLumen()

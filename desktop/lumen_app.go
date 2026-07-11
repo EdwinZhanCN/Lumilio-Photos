@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"desktop/lumen"
+	"desktop/supervisor"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -57,12 +58,7 @@ func (d *desktopApp) enableLumen() {
 // disableLumen stops the hub and persists the choice.
 func (d *desktopApp) disableLumen() {
 	go func() {
-		d.lumenStopRequested.Store(true)
-		if hub := d.lumenHub; hub != nil {
-			hub.Stop(10 * time.Second)
-			d.lumenHub = nil
-		}
-		d.setLumenState(lumenOff)
+		d.stopLumen()
 
 		settings, err := d.sup.Settings()
 		if err == nil {
@@ -71,13 +67,25 @@ func (d *desktopApp) disableLumen() {
 				log.Printf("lumen: save settings: %v", err)
 			}
 		}
-		d.lumenStopRequested.Store(false)
 	}()
+}
+
+func (d *desktopApp) stopLumen() {
+	d.lumenStopRequested.Store(true)
+	d.setLumenState(lumenOff)
+	if hub := d.lumenHub; hub != nil {
+		hub.Stop(10 * time.Second)
+		d.lumenHub = nil
+	}
+	d.lumenStopRequested.Store(false)
 }
 
 // runLumen owns one full hub lifecycle: install if missing, start, wait ready,
 // then watch for exit. Blocking; run it on a goroutine.
 func (d *desktopApp) runLumen() {
+	d.lumenMu.Lock()
+	d.lumenError = ""
+	d.lumenMu.Unlock()
 	dir, err := d.sup.LumenDir()
 	if err != nil {
 		log.Printf("lumen: resolve dir: %v", err)
@@ -85,20 +93,39 @@ func (d *desktopApp) runLumen() {
 		return
 	}
 
-	if _, ok := lumen.Installed(dir); !ok {
+	settings, err := d.sup.Settings()
+	if err != nil {
+		d.failLumen(err)
+		return
+	}
+	selection, err := d.lumenSelection(dir, settings)
+	if err != nil {
+		d.failLumen(err)
+		return
+	}
+
+	installed, ok := lumen.Installed(dir)
+	if !ok || installed.Profile != selection.Profile {
 		d.setLumenState(lumenInstalling)
-		if _, err := lumen.Install(d.ctx, dir, "", log.Printf); err != nil {
+		installed, err = lumen.InstallProfile(d.ctx, dir, "", selection.Profile, log.Printf)
+		if err != nil {
 			log.Printf("lumen: install: %v", err)
-			d.setLumenState(lumenFailed)
+			d.failLumen(err)
 			return
 		}
+		settings.LumenInstalledVersion = installed.Version
+		settings.LumenInstalledProfile = installed.Profile
+		_ = d.sup.SaveSettings(settings)
 	}
 
 	d.setLumenState(lumenStarting)
-	hub, err := lumen.Start(d.ctx, dir, d.lang, d.lumenLogPath())
+	hub, err := lumen.StartWithConfig(d.ctx, dir, selection, d.lumenLogPath())
 	if err != nil {
 		log.Printf("lumen: start: %v", err)
-		d.setLumenState(lumenFailed)
+		if lumen.RestorePrevious(dir) {
+			log.Printf("lumen: restored previous Hub after start failure")
+		}
+		d.failLumen(err)
 		return
 	}
 	d.lumenHub = hub
@@ -108,23 +135,53 @@ func (d *desktopApp) runLumen() {
 			return // shutting down / deliberately disabled
 		}
 		log.Printf("lumen: %v", err)
-		d.setLumenState(lumenFailed)
+		if lumen.RestorePrevious(dir) {
+			log.Printf("lumen: restored previous Hub after readiness failure")
+		}
+		d.failLumen(err)
 		return
 	}
 	d.setLumenState(lumenRunning)
 	log.Printf("lumen: hub ready at %s", lumen.GRPCEndpoint)
 
 	// Block until the process exits; an exit we didn't ask for is a failure.
-	err, ok := <-hub.Done()
-	if d.ctx.Err() != nil || d.lumenStopRequested.Load() {
+	exitErr, channelOpen := <-hub.Done()
+	if d.ctx.Err() != nil || d.lumenStopRequested.Load() || d.lumenState == lumenOff {
 		return
 	}
-	if ok && err != nil {
-		log.Printf("lumen: hub exited: %v", err)
+	if channelOpen && exitErr != nil {
+		log.Printf("lumen: hub exited: %v", exitErr)
 	} else {
 		log.Printf("lumen: hub exited unexpectedly")
 	}
 	d.lumenHub = nil
+	d.failLumen(exitErr)
+}
+
+func (d *desktopApp) lumenSelection(dir string, settings supervisor.DesktopSettings) (lumen.ConfigSelection, error) {
+	defaults, err := lumen.DefaultConfigSelection(dir, d.lang)
+	if err != nil {
+		return lumen.ConfigSelection{}, err
+	}
+	if settings.LumenPreset != "" {
+		defaults.Preset = settings.LumenPreset
+	}
+	if settings.LumenBackend != "" {
+		defaults.Backend = settings.LumenBackend
+	}
+	if settings.LumenProfile != "" {
+		defaults.Profile = settings.LumenProfile
+	}
+	if settings.LumenCacheDir != "" {
+		defaults.CacheDir = settings.LumenCacheDir
+	}
+	return defaults, lumen.ValidateConfigSelection(defaults)
+}
+
+func (d *desktopApp) failLumen(err error) {
+	if err != nil {
+		d.lumenError = err.Error()
+	}
 	d.setLumenState(lumenFailed)
 }
 

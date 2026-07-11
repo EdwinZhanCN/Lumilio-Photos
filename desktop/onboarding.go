@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"desktop/lumen"
 	"desktop/supervisor"
 
+	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -39,12 +43,42 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 
 	mux.HandleFunc("/__onb/state", func(w http.ResponseWriter, r *http.Request) {
 		path := d.onboardingDefaultPath()
+		settings, _ := d.sup.Settings()
+		paths, _ := d.sup.DashboardPaths()
+		lumenDir, _ := d.sup.LumenDir()
+		cacheDir := settings.LumenCacheDir
+		if cacheDir == "" {
+			cacheDir = filepath.Join(lumenDir, "models")
+		}
+		cacheValidation := validateStorage(cacheDir)
+		if installed, ok := lumen.Installed(lumenDir); ok {
+			if settings.LumenInstalledVersion == "" {
+				settings.LumenInstalledVersion = installed.Version
+			}
+			if settings.LumenInstalledProfile == "" {
+				settings.LumenInstalledProfile = installed.Profile
+			}
+		}
+		choices, _ := lumen.BackendChoicesForHost()
+		ramGB := totalMemoryGB()
+		recommended := lumen.RecommendPreset(ramGB, float64(cacheValidation.FreeBytes)/(1<<30))
 		writeJSON(w, map[string]any{
+			"mode":       map[bool]string{true: "dashboard", false: "onboarding"}[settings.OnboardingCompleted],
 			"lang":       d.onboardingLang(),
 			"path":       path,
 			"validation": validateStorage(path),
 			"version":    appVersion(),
 			"tosRev":     tosVersion,
+			"ready":      d.ready,
+			"serverURL":  d.sup.ServerURL(),
+			"stage":      d.status,
+			"paths":      paths,
+			"lumen": map[string]any{"enabled": settings.LumenEnabled, "state": d.lumenState, "error": d.lumenError,
+				"preset": settings.LumenPreset, "backend": settings.LumenBackend, "profile": settings.LumenProfile,
+				"cacheDir": cacheDir, "previousCacheDir": settings.LumenPreviousCacheDir,
+				"installedVersion": settings.LumenInstalledVersion, "latestVersion": d.lumenLatestVersion},
+			"backends": choices, "presets": lumen.Presets(), "recommendedPreset": recommended,
+			"memoryGB": ramGB, "cacheValidation": cacheValidation,
 		})
 	})
 
@@ -71,9 +105,14 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 
 	mux.HandleFunc("/__onb/complete", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Path   string `json:"path"`
-			Lang   string `json:"lang"`
-			Agreed bool   `json:"agreed"`
+			Path        string `json:"path"`
+			Lang        string `json:"lang"`
+			Agreed      bool   `json:"agreed"`
+			EnableLumen bool   `json:"enableLumen"`
+			Preset      string `json:"preset"`
+			Backend     string `json:"backend"`
+			Profile     string `json:"profile"`
+			CacheDir    string `json:"cacheDir"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "bad request", http.StatusBadRequest)
@@ -97,6 +136,15 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		settings.Language = normalizeLang(body.Lang)
 		settings.TOSAcceptedVersion = tosVersion
 		settings.OnboardingCompleted = true
+		settings.LumenEnabled = body.EnableLumen
+		if body.EnableLumen {
+			selection := lumen.ConfigSelection{Preset: body.Preset, Backend: body.Backend, Profile: body.Profile, CacheDir: body.CacheDir, Region: regionForLang(body.Lang)}
+			if err := lumen.ValidateConfigSelection(selection); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			settings.LumenPreset, settings.LumenBackend, settings.LumenProfile, settings.LumenCacheDir = body.Preset, body.Backend, body.Profile, body.CacheDir
+		}
 		if err := d.sup.SaveSettings(settings); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -108,6 +156,28 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		// double signal (the window-closing handler also fires).
 		d.markOnboardingDone()
 	})
+
+	mux.HandleFunc("/__onb/pick-cache", func(w http.ResponseWriter, r *http.Request) { d.pickDashboardDir(w, "Choose model cache location") })
+	mux.HandleFunc("/__onb/open", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Path string `json:"path"`
+		}
+		if json.NewDecoder(r.Body).Decode(&body) != nil || strings.TrimSpace(body.Path) == "" {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		if err := d.app.Browser.OpenURL((&url.URL{Scheme: "file", Path: body.Path}).String()); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/__onb/open-app", func(w http.ResponseWriter, r *http.Request) {
+		d.openInBrowser()
+		writeJSON(w, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/__onb/lumen-save", d.handleLumenSave)
+	mux.HandleFunc("/__onb/lumen-action", d.handleLumenAction)
 
 	mux.HandleFunc("/__onb/licenses", handleLicenseIndex)
 	mux.HandleFunc("/__onb/license", handleLicenseText)
@@ -124,14 +194,23 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 // showOnboarding creates and shows the first-run setup window and blocks (via the
 // caller's channel) until completion is signalled. Window/dialog methods marshal
 // to the UI thread internally, so this is safe to call from boot()'s goroutine.
-func (d *desktopApp) showOnboarding() {
+func (d *desktopApp) showOnboarding() { d.showControlPanel() }
+
+func (d *desktopApp) showDashboard() { d.showControlPanel() }
+
+func (d *desktopApp) showControlPanel() {
+	if d.onboardWin != nil {
+		d.onboardWin.Show()
+		d.onboardWin.Focus()
+		return
+	}
 	win := d.app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:      "onboarding",
-		Title:     "Lumilio Photos Setup",
-		Width:     640,
-		Height:    660,
-		MinWidth:  580,
-		MinHeight: 600,
+		Name:      "control-panel",
+		Title:     "Lumilio Photos",
+		Width:     760,
+		Height:    720,
+		MinWidth:  640,
+		MinHeight: 620,
 		Mac: application.MacWindow{
 			// Transparent, content-under-titlebar chrome so the page owns its full
 			// surface (HIG); the page reserves a drag strip + safe-area insets so
@@ -148,11 +227,40 @@ func (d *desktopApp) showOnboarding() {
 		if !d.onboardingDone() {
 			d.app.Quit()
 		}
+		d.onboardWin = nil
 	})
 
 	win.Center()
 	win.Show()
 	win.Focus()
+}
+
+func (d *desktopApp) pickDashboardDir(w http.ResponseWriter, title string) {
+	dlg := d.app.Dialog.OpenFile().CanChooseDirectories(true).CanChooseFiles(false).CanCreateDirectories(true).SetTitle(title)
+	if d.onboardWin != nil {
+		dlg = dlg.AttachToWindow(d.onboardWin)
+	}
+	path, err := dlg.PromptForSingleSelection()
+	if err != nil || path == "" {
+		writeJSON(w, map[string]any{"cancelled": true})
+		return
+	}
+	writeJSON(w, map[string]any{"path": path, "validation": validateStorage(path)})
+}
+
+func regionForLang(lang string) string {
+	if normalizeLang(lang) == "zh" {
+		return "cn"
+	}
+	return "other"
+}
+
+func totalMemoryGB() float64 {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return 0
+	}
+	return float64(v.Total) / (1 << 30)
 }
 
 // onboardingDefaultPath is the path pre-filled in the setup window: a previously
