@@ -113,16 +113,21 @@ jobs:
             - name: Stage media tools (ffmpeg/ffprobe/exiftool)
               run: desktop/scripts/fetch-resources.sh
 
+            # github.ref_name is a tag on releases but a branch on manual
+            # dispatch, and branch names may contain '/' — which turns the
+            # artifact filename into a nonexistent directory. Sanitize once.
+            - name: Compute artifact-safe ref name
+              run: echo "SAFE_REF=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
+
             - name: Build .app and DMG
               run: |
-                  TAG="${{ github.ref_name }}"
-                  LUMILIO_VERSION="${TAG#v}" LUMILIO_WEB_DIST_PREBUILT=1 \
+                  LUMILIO_VERSION="${SAFE_REF#v}" LUMILIO_WEB_DIST_PREBUILT=1 \
                       desktop/scripts/build-macos.sh ${{ matrix.arch }} --dmg
 
             - name: Rename DMG for release
               run: |
                   mv "desktop/build/Lumilio-Photos-${{ matrix.arch }}.dmg" \
-                     "desktop/build/Lumilio-Photos-${{ github.ref_name }}-macos-${{ matrix.arch }}.dmg"
+                     "desktop/build/Lumilio-Photos-${SAFE_REF}-macos-${{ matrix.arch }}.dmg"
 
             - uses: actions/upload-artifact@v7
               with:
@@ -167,10 +172,17 @@ jobs:
               shell: pwsh
               run: desktop/scripts/fetch-resources.ps1
 
+            # Branch names from manual dispatch may contain '/', which would
+            # turn artifact filenames into nonexistent directories (see the
+            # matching step in the dmg job).
+            - name: Compute artifact-safe ref name
+              shell: bash
+              run: echo "SAFE_REF=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
+
             - name: Build portable app directory
               shell: msys2 {0}
               env:
-                  LUMILIO_TAG: ${{ github.ref_name }}
+                  LUMILIO_TAG: ${{ env.SAFE_REF }}
               run: |
                   export GOFLAGS=-buildvcs=false
                   LUMILIO_VERSION="${LUMILIO_TAG#v}" desktop/scripts/build-windows.sh
@@ -179,12 +191,12 @@ jobs:
               shell: pwsh
               run: |
                   Compress-Archive -Path "desktop/build/windows/Lumilio Photos" `
-                      -DestinationPath "desktop/build/Lumilio-Photos-${{ github.ref_name }}-windows-amd64.zip"
+                      -DestinationPath "desktop/build/Lumilio-Photos-${{ env.SAFE_REF }}-windows-amd64.zip"
 
             - name: Build installer (Inno Setup)
               shell: pwsh
               env:
-                  LUMILIO_TAG: ${{ github.ref_name }}
+                  LUMILIO_TAG: ${{ env.SAFE_REF }}
               run: |
                   $ver = "${env:LUMILIO_TAG}".TrimStart('v')
                   choco install innosetup --no-progress -y
