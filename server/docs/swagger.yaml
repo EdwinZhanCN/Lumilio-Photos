@@ -992,6 +992,44 @@ components:
         stacks_created:
           type: integer
       type: object
+    dto.BackupEntryDTO:
+      properties:
+        app_version:
+          example: 1.2.3
+          type: string
+        created_at:
+          type: string
+        name:
+          example: lumilio-db-backup-20260711T020000-v1.2.3-pg17.5.sql.gz
+          type: string
+        pg_version:
+          example: "17.5"
+          type: string
+        restore_point:
+          type: boolean
+        size_bytes:
+          example: 1048576
+          type: integer
+      type: object
+    dto.BackupListDTO:
+      properties:
+        backups:
+          items:
+            $ref: '#/components/schemas/dto.BackupEntryDTO'
+          type: array
+          uniqueItems: false
+      type: object
+    dto.BackupSettingsDTO:
+      properties:
+        enabled:
+          type: boolean
+        interval_hours:
+          example: 24
+          type: integer
+        keep_last:
+          example: 14
+          type: integer
+      type: object
     dto.BatchUploadResponseDTO:
       properties:
         results:
@@ -3288,6 +3326,8 @@ components:
       type: object
     dto.SystemSettingsDTO:
       properties:
+        backup:
+          $ref: '#/components/schemas/dto.BackupSettingsDTO'
         llm:
           $ref: '#/components/schemas/dto.LLMSettingsDTO'
         ml:
@@ -3404,6 +3444,19 @@ components:
           - $ref: '#/components/schemas/dbtypes.AudioSpecificMetadata'
           type: object
       type: object
+    dto.UpdateBackupSettingsDTO:
+      properties:
+        enabled:
+          type: boolean
+        interval_hours:
+          maximum: 720
+          minimum: 1
+          type: integer
+        keep_last:
+          maximum: 365
+          minimum: 1
+          type: integer
+      type: object
     dto.UpdateDescriptionRequestDTO:
       properties:
         description:
@@ -3511,6 +3564,8 @@ components:
       type: object
     dto.UpdateSystemSettingsDTO:
       properties:
+        backup:
+          $ref: '#/components/schemas/dto.UpdateBackupSettingsDTO'
         llm:
           $ref: '#/components/schemas/dto.UpdateLLMSettingsDTO'
         ml:
@@ -9929,6 +9984,189 @@ paths:
       summary: Auto-detect stacks
       tags:
       - repositories
+  /api/v1/settings/backups:
+    get:
+      description: List database dumps (routine backups and restore points), newest
+        first.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.BackupListDTO'
+          description: Backups listed successfully
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Unauthorized
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List database backups
+      tags:
+      - settings
+    post:
+      description: Enqueue an immediate database dump; it appears in the list when
+        the job finishes.
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.SuccessResponse'
+          description: Backup enqueued
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Unauthorized
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create a database backup now
+      tags:
+      - settings
+  /api/v1/settings/backups/{name}:
+    delete:
+      description: Delete one dump file from the backups directory.
+      parameters:
+      - description: Backup file name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.SuccessResponse'
+          description: Backup deleted
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid backup name
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Unauthorized
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Delete a database backup
+      tags:
+      - settings
+  /api/v1/settings/backups/{name}/download:
+    get:
+      description: Download one dump file as gzip.
+      parameters:
+      - description: Backup file name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/gzip:
+              schema:
+                type: file
+          description: Backup file
+        "400":
+          content:
+            application/gzip:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid backup name
+        "401":
+          content:
+            application/gzip:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Unauthorized
+        "404":
+          content:
+            application/gzip:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Backup not found
+      security:
+      - BearerAuth: []
+      summary: Download a database backup
+      tags:
+      - settings
+  /api/v1/settings/backups/{name}/restore:
+    post:
+      description: Restore the named dump. A restore point of the current database
+        is taken first; on failure the database is rolled back automatically. Synchronous
+        — the response arrives when the restore has finished.
+      parameters:
+      - description: Backup file name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.SuccessResponse'
+          description: Backup restored
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid backup name
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Unauthorized
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Another restore is already in progress
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Restore failed (database rolled back)
+      security:
+      - BearerAuth: []
+      summary: Restore a database backup
+      tags:
+      - settings
   /api/v1/settings/runtime-info:
     get:
       description: Read-only effective runtime-immutable configuration (changed only

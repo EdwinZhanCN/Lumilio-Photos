@@ -3,6 +3,7 @@ import { useRuntimeInfo } from "@/features/settings/hooks/useRuntimeInfo";
 import { useI18n } from "@/lib/i18n.tsx";
 import { GaugeIcon } from "lucide-react";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
+import BackupSection from "./BackupSection";
 
 function formatBoolean(value: boolean | undefined, t: (key: string) => string): string {
   return t(`settings.serverSettings.booleanValues.${value ? "true" : "false"}`);
@@ -86,6 +87,8 @@ export default function ServerTab() {
           </div>
         </SettingsBlock>
       </SettingsGroup>
+
+      <BackupSection />
 
       <SettingsGroup
         title={t("settings.serverSettings.runtimeInfoTitle", {

@@ -142,6 +142,46 @@ Implementation record (2026-07-11):
 - Web: minimal Settings > Backup tab (schedule/retention, list, create,
   download, delete, restore with confirm). No onboarding flow yet.
 
+Implementation record (2026-07-11):
+
+- Engine: `RestoreDump` streams (gunzip →) a preamble that terminates other
+  backends and resets `public`, then the dump, through
+  `psql --single-transaction --set ON_ERROR_STOP=on` — all-or-nothing. No
+  OWNER rewriting (single fixed DB user on both shapes).
+  `RestoreWithRollback` takes a `restore-point-` dump first and rolls back
+  automatically when restore, migrations, or verification fail; rollback runs
+  under `context.WithoutCancel`.
+- `service.BackupService`: list (provenance parsed from filenames),
+  trigger-now (forced `DatabaseBackupArgs{Force:true}`, unique-by-args so it
+  is not deduped against periodic ticks), delete, download path resolution,
+  synchronous restore guarded by a TryLock (single restore at a time).
+  `ResolvePath` accepts only grammar-matching names — path traversal is
+  rejected by construction. Deviation from the original sketch: restore is a
+  synchronous handler rather than a job handle — a restore job inside the
+  queue system it must pause would deadlock, and pre-production DB sizes
+  restore in seconds.
+- Hooks wired in `app.go`: Quiesce/Resume pause and resume all River queues
+  ("*"), Migrate re-runs `db.AutoMigrate`, Verify checks settings readability
+  and a non-empty users table. `Scheduler.Run(ctx, force)` now errors (rather
+  than skips) on unreachable storage for forced runs.
+- API (`/api/v1/settings/backups*`, admin-gated like the rest of the settings
+  group): list / create / download / delete / restore. Backup settings ride
+  the existing `GET/PATCH /settings/system` (backup section; UpsertSettings
+  extended, callers carry current row values so partial PATCHes cannot zero
+  other sections). `make dto` regenerated (swag → swagger docs →
+  `schema.d.ts`).
+- Web: `BackupSection` in Settings → Server tab (schedule/retention controls,
+  dump list with create/download/restore/delete, inline two-step confirm;
+  successful restore reloads the app). Hooks in
+  `features/settings/hooks/useBackups.ts` on the generated types.
+- Verified: real-PG smoke tests for restore (seed → dump → mutate → restore →
+  original state back) and rollback (corrupt dump → automatic rollback →
+  pre-restore state intact), plus full server suite. NOT verified in this
+  environment: web typecheck/lint/tests and i18n extraction — the pinned
+  `@edwinzhancn/docts` package lives on GitHub Packages and the sandbox has
+  no registry credentials (`pnpm install` 401). Run `make web-test` and
+  `vp exec i18next-cli extract` (+ zh fill) locally before release.
+
 ## Phase 3 — Major-version upgrade orchestration
 
 ### 3a. Desktop (automated)

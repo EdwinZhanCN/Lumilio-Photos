@@ -27,10 +27,13 @@ type Scheduler struct {
 	now func() time.Time
 }
 
-// RunDue performs one scheduler tick. Skips (disabled, not yet due, storage
-// unreachable) return nil — only actual dump/prune failures are errors, so
-// River retries real failures but never "retries" a skip.
-func (s *Scheduler) RunDue(ctx context.Context) error {
+// Run performs one scheduler pass. On a periodic tick (force=false), skips
+// (disabled, not yet due, storage unreachable) return nil — only actual
+// dump/prune failures are errors, so River retries real failures but never
+// "retries" a skip. A forced run (admin "back up now") bypasses the enabled
+// and due checks, and an unreachable storage root becomes an error the API
+// can surface instead of a silent skip.
+func (s *Scheduler) Run(ctx context.Context, force bool) error {
 	logf := s.Logf
 	if logf == nil {
 		logf = func(string, ...any) {}
@@ -44,22 +47,26 @@ func (s *Scheduler) RunDue(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("load backup settings: %w", err)
 	}
-	if !cfg.Enabled {
-		return nil
-	}
-
-	interval := time.Duration(cfg.IntervalHours) * time.Hour
-	if interval < time.Hour {
-		interval = time.Hour
-	}
-	if latest, ok := LatestRoutine(s.Dir); ok && nowFn().Sub(latest) < interval {
-		return nil
+	if !force {
+		if !cfg.Enabled {
+			return nil
+		}
+		interval := time.Duration(cfg.IntervalHours) * time.Hour
+		if interval < time.Hour {
+			interval = time.Hour
+		}
+		if latest, ok := LatestRoutine(s.Dir); ok && nowFn().Sub(latest) < interval {
+			return nil
+		}
 	}
 
 	// Resolved plan decision: when the media library (e.g. an unplugged
 	// external drive) is unreachable, skip with a warning rather than dump to
 	// a fallback location the user's media backup would not capture.
 	if _, err := os.Stat(s.StorageRoot); err != nil {
+		if force {
+			return fmt.Errorf("storage root %s unreachable: %w", s.StorageRoot, err)
+		}
 		logf("backup: storage root %s unreachable, skipping this run: %v", s.StorageRoot, err)
 		return nil
 	}

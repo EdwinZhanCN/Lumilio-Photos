@@ -20,8 +20,15 @@ import (
 type SystemSettings struct {
 	LLM       LLMSettings
 	ML        MLSettings
+	Backup    BackupSettings
 	UpdatedAt time.Time
 	UpdatedBy *int32
+}
+
+type BackupSettings struct {
+	Enabled       bool
+	IntervalHours int32
+	KeepLast      int32
 }
 
 type LLMSettings struct {
@@ -60,7 +67,14 @@ type MLSettings struct {
 type UpdateSystemSettingsInput struct {
 	LLM       *UpdateLLMSettingsInput
 	ML        *UpdateMLSettingsInput
+	Backup    *UpdateBackupSettingsInput
 	UpdatedBy *int32
+}
+
+type UpdateBackupSettingsInput struct {
+	Enabled       *bool
+	IntervalHours *int32
+	KeepLast      *int32
 }
 
 type UpdateLLMSettingsInput struct {
@@ -148,6 +162,9 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		MlBioclipEnabled:    row.MlBioclipEnabled,
 		MlOcrEnabled:        row.MlOcrEnabled,
 		MlFaceEnabled:       row.MlFaceEnabled,
+		BackupEnabled:       row.BackupEnabled,
+		BackupIntervalHours: row.BackupIntervalHours,
+		BackupKeepLast:      row.BackupKeepLast,
 		UpdatedBy:           input.UpdatedBy,
 	}
 
@@ -192,6 +209,18 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		}
 		if input.ML.FaceEnabled != nil {
 			params.MlFaceEnabled = *input.ML.FaceEnabled
+		}
+	}
+
+	if input.Backup != nil {
+		if input.Backup.Enabled != nil {
+			params.BackupEnabled = *input.Backup.Enabled
+		}
+		if input.Backup.IntervalHours != nil {
+			params.BackupIntervalHours = clampInt32(*input.Backup.IntervalHours, 1, 24*30)
+		}
+		if input.Backup.KeepLast != nil {
+			params.BackupKeepLast = clampInt32(*input.Backup.KeepLast, 1, 365)
 		}
 	}
 
@@ -288,6 +317,11 @@ func (s *settingsService) seedFromDefaults(ctx context.Context) error {
 		MlBioclipEnabled:    mlCfg.BioCLIPEnabled,
 		MlOcrEnabled:        mlCfg.OCREnabled,
 		MlFaceEnabled:       mlCfg.FaceEnabled,
+		// Mirror the migration's column defaults: this INSERT names the backup
+		// columns explicitly, so zero values here would override them.
+		BackupEnabled:       true,
+		BackupIntervalHours: 24,
+		BackupKeepLast:      14,
 	}
 
 	if params.LlmApiKeyConfigured {
@@ -338,9 +372,24 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 			OCREnabled:      row.MlOcrEnabled,
 			FaceEnabled:     row.MlFaceEnabled,
 		},
+		Backup: BackupSettings{
+			Enabled:       row.BackupEnabled,
+			IntervalHours: row.BackupIntervalHours,
+			KeepLast:      row.BackupKeepLast,
+		},
 		UpdatedAt: updatedAt,
 		UpdatedBy: row.UpdatedBy,
 	}
+}
+
+func clampInt32(v, lo, hi int32) int32 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 func normalizeStoredLLMProvider(raw string) string {
