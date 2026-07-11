@@ -70,9 +70,10 @@ type AssetControllerInterface interface {
 
 	// Stack operations
 	GetAssetStack(c *gin.Context)     // GET /assets/:id/stack - Get stack containing this asset
+	GetAssetMediaItem(c *gin.Context) // GET /assets/:id/media-item - Get logical media item and components
 	CreateManualStack(c *gin.Context) // POST /assets/stacks - Manually create a stack from assets
 	UnstackAsset(c *gin.Context)      // DELETE /assets/:id/stack - Remove asset from its stack
-	AutoDetectStacks(c *gin.Context)  // POST /repositories/:id/stacks/detect - Auto-detect RAW+JPEG stacks
+	AutoDetectStacks(c *gin.Context)  // POST /repositories/:id/stacks/detect - Merge structural media and detect bursts
 }
 
 // AuthControllerInterface defines the interface for authentication controllers
@@ -470,6 +471,7 @@ func NewRouter(
 			// Stack routes. Reads use optional auth (handler enforces
 			// per-asset ownership); mutations require authentication.
 			assets.GET("/:id/stack", assetController.GetAssetStack)
+			assets.GET("/:id/media-item", assetController.GetAssetMediaItem)
 			assets.DELETE("/:id/stack", authController.AuthMiddleware(), assetController.UnstackAsset)
 			assets.POST("/stacks", authController.AuthMiddleware(), assetController.CreateManualStack)
 		}

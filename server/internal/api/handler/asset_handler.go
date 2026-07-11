@@ -314,7 +314,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		Message:     fmt.Sprintf("File received and queued for processing in repository '%s'", repository.Name),
 	}
 
-	// Trigger automatic RAW+JPEG stack detection asynchronously after upload.
+	// Merge structural media components and detect bursts asynchronously after upload.
 	if req.RepositoryID != "" {
 		go func(repoID string) {
 			if _, err := h.queueClient.Insert(context.Background(), jobs.DetectStacksArgs{
@@ -583,7 +583,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		go h.cleanupExpiredSessions()
 	}
 
-	// Trigger automatic RAW+JPEG stack detection asynchronously.
+	// Merge structural media components and detect bursts asynchronously.
 	// This is best-effort: if metadata has not been extracted yet, the next
 	// scan or manual trigger will complete the stacking.
 	if repositoryID != "" {
@@ -4204,6 +4204,45 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 // Stack operations
 // ============================================================================
 
+// GetAssetMediaItem returns the logical media item containing an asset.
+// @Summary Get logical media item
+// @Description Returns the logical media item and its RAW/JPEG, Live Photo, or edited components
+// @Tags assets
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Success 200 {object} dto.MediaItemByAssetResponseDTO
+// @Failure 404 {object} api.ErrorResponse
+// @Router /api/v1/assets/{id}/media-item [get]
+// @Security BearerAuth
+func (h *AssetHandler) GetAssetMediaItem(c *gin.Context) {
+	assetID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+	if _, ok := h.getAuthorizedAssetForRead(c, assetID, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
+		return
+	}
+	item, err := h.stackService.GetMediaItemByAsset(c.Request.Context(), assetID, ownerScopeID(c))
+	if err != nil {
+		api.GinNotFound(c, err, "Media item not found")
+		return
+	}
+	components := make([]dto.MediaItemComponentDTO, 0, len(item.Components))
+	for _, component := range item.Components {
+		components = append(components, dto.MediaItemComponentDTO{
+			AssetID: component.AssetID.String(), Relation: string(component.Relation), Position: component.Position,
+		})
+	}
+	api.JSONOK(c, dto.MediaItemByAssetResponseDTO{
+		AssetID: assetID.String(),
+		MediaItem: dto.MediaItemDTO{
+			MediaItemID: item.MediaItemID.String(), MediaKind: item.Kind,
+			PrimaryAssetID: item.PrimaryAssetID.String(), Components: components,
+		},
+	})
+}
+
 // GetAssetStack returns the stack that contains the given asset.
 // @Summary Get asset stack
 // @Description Returns the stack (group) that contains the specified asset
@@ -4240,9 +4279,9 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 	members := make([]dto.StackMemberDTO, len(stackInfo.Members))
 	for i, m := range stackInfo.Members {
 		members[i] = dto.StackMemberDTO{
-			AssetID:  m.AssetID.String(),
-			Relation: string(m.Relation),
-			Position: m.Position,
+			MediaItemID:    m.MediaItemID.String(),
+			PrimaryAssetID: m.AssetID.String(),
+			Position:       m.Position,
 		}
 	}
 
@@ -4312,9 +4351,9 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 	members := make([]dto.StackMemberDTO, len(stackInfo.Members))
 	for i, m := range stackInfo.Members {
 		members[i] = dto.StackMemberDTO{
-			AssetID:  m.AssetID.String(),
-			Relation: string(m.Relation),
-			Position: m.Position,
+			MediaItemID:    m.MediaItemID.String(),
+			PrimaryAssetID: m.AssetID.String(),
+			Position:       m.Position,
 		}
 	}
 
@@ -4357,9 +4396,9 @@ func (h *AssetHandler) UnstackAsset(c *gin.Context) {
 	api.JSONOK(c, api.SuccessResponse{Message: "Asset removed from stack"})
 }
 
-// AutoDetectStacks triggers automatic RAW+JPEG stack detection for a repository.
+// AutoDetectStacks merges structural media components and detects burst stacks for a repository.
 // @Summary Auto-detect stacks
-// @Description Scans a repository for RAW+JPEG pairs and creates stacks automatically
+// @Description Merges RAW/JPEG and Live Photo components into logical media items, then detects burst presentation stacks
 // @Tags repositories
 // @Produce json
 // @Param id path string true "Repository ID"

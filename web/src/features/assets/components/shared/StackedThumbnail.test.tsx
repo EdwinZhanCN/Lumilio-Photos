@@ -38,7 +38,7 @@ const asset = {
   original_filename: "stack-cover.jpg",
   stack: {
     stack_id: "stack-1",
-    stack_kind: "raw_jpeg",
+    stack_kind: "burst",
     stack_size: 3,
     stack_cover: true,
   },
@@ -53,17 +53,6 @@ const plainBrowseStack = {
   memberAssetIds: ["stack-cover", "stack-member"],
   matchedMemberIds: [],
 } as const;
-
-const livePhotoAsset = {
-  asset_id: "live-photo-cover",
-  original_filename: "live-photo.jpg",
-  stack: {
-    stack_id: "stack-live",
-    stack_kind: "live_photo",
-    stack_size: 2,
-    stack_cover: true,
-  },
-} as Asset;
 
 describe("StackedThumbnail", () => {
   beforeEach(() => {
@@ -98,30 +87,6 @@ describe("StackedThumbnail", () => {
         asset={asset}
         stackInfo={asset.stack!}
         browseStack={plainBrowseStack as any}
-        onClick={handleClick}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "thumbnail" }));
-
-    expect(handleClick).toHaveBeenCalledTimes(1);
-  });
-
-  it("shows a non-interactive Live Photo badge for live photo stacks", () => {
-    render(<StackedThumbnail asset={livePhotoAsset} stackInfo={livePhotoAsset.stack!} />);
-
-    // The Live Photo badge is a decorative div, not a button
-    expect(screen.queryByRole("button", { name: /live photo/i })).toBeNull();
-    expect(screen.queryByText("stack-carousel-overlay")).not.toBeInTheDocument();
-  });
-
-  it("still allows clicking the thumbnail for live photo stacks", () => {
-    const handleClick = vi.fn();
-
-    render(
-      <StackedThumbnail
-        asset={livePhotoAsset}
-        stackInfo={livePhotoAsset.stack!}
         onClick={handleClick}
       />,
     );

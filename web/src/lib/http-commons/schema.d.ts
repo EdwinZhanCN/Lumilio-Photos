@@ -2479,6 +2479,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/{id}/media-item": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get logical media item
+         * @description Returns the logical media item and its RAW/JPEG, Live Photo, or edited components
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MediaItemByAssetResponseDTO"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/{id}/original": {
         parameters: {
             query?: never;
@@ -9168,7 +9219,7 @@ export interface paths {
         put?: never;
         /**
          * Auto-detect stacks
-         * @description Scans a repository for RAW+JPEG pairs and creates stacks automatically
+         * @description Merges RAW/JPEG and Live Photo components into logical media items, then detects burst presentation stacks
          */
         post: {
             parameters: {
@@ -11601,10 +11652,10 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             stack_id?: string;
             /**
-             * @example live_photo
+             * @example burst
              * @enum {string}
              */
-            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
+            stack_kind?: "burst" | "manual";
             /** @example 3 */
             stack_size?: number;
         };
@@ -12218,6 +12269,23 @@ export interface components {
             user_id?: number;
             username?: string;
         };
+        "dto.MediaItemByAssetResponseDTO": {
+            asset_id?: string;
+            media_item?: components["schemas"]["dto.MediaItemDTO"];
+        };
+        "dto.MediaItemComponentDTO": {
+            asset_id?: string;
+            position?: number;
+            /** @enum {string} */
+            relation?: "raw_original" | "jpeg_original" | "edited_version" | "alternative" | "live_photo_still" | "live_photo_video";
+        };
+        "dto.MediaItemDTO": {
+            components?: components["schemas"]["dto.MediaItemComponentDTO"][];
+            media_item_id?: string;
+            /** @enum {string} */
+            media_kind?: "photo" | "video" | "audio" | "live_photo";
+            primary_asset_id?: string;
+        };
         "dto.MediaTokenDTO": {
             expires_at?: string;
             token?: string;
@@ -12798,21 +12866,18 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             stack_id?: string;
             /**
-             * @example live_photo
+             * @example burst
              * @enum {string}
              */
-            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
+            stack_kind?: "burst" | "manual";
         };
         "dto.StackMemberDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440001 */
-            asset_id?: string;
+            media_item_id?: string;
             /** @example 0 */
             position?: number;
-            /**
-             * @description raw_original, jpeg_original, edited_version, alternative
-             * @example raw_original
-             */
-            relation?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440002 */
+            primary_asset_id?: string;
         };
         /** @description Stack fields (populated when stack mode is enabled) */
         "dto.StackPreviewDTO": {
@@ -12824,10 +12889,10 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             stack_id?: string;
             /**
-             * @example live_photo
+             * @example burst
              * @enum {string}
              */
-            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
+            stack_kind?: "burst" | "manual";
             /**
              * @description Number of members in the stack
              * @example 3

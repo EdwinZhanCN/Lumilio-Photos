@@ -184,19 +184,21 @@ type AssetQualityScore struct {
 }
 
 type AssetStack struct {
-	StackID   pgtype.UUID        `db:"stack_id" json:"stack_id"`
-	StackKind string             `db:"stack_kind" json:"stack_kind"`
-	GroupKey  *string            `db:"group_key" json:"group_key"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	StackID          pgtype.UUID        `db:"stack_id" json:"stack_id"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	StackKind        string             `db:"stack_kind" json:"stack_kind"`
+	CoverMediaItemID pgtype.UUID        `db:"cover_media_item_id" json:"cover_media_item_id"`
+	GroupKey         *string            `db:"group_key" json:"group_key"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type AssetStackMember struct {
-	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	StackID   pgtype.UUID        `db:"stack_id" json:"stack_id"`
-	Relation  StackRelation      `db:"relation" json:"relation"`
-	Position  *int32             `db:"position" json:"position"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	MediaItemID pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
+	StackID     pgtype.UUID        `db:"stack_id" json:"stack_id"`
+	Position    *int32             `db:"position" json:"position"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type AssetTag struct {
@@ -414,6 +416,25 @@ type LocationClusterAsset struct {
 	ClusterID pgtype.UUID        `db:"cluster_id" json:"cluster_id"`
 	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type MediaItem struct {
+	MediaItemID    pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
+	OwnerID        *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID   pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	MediaKind      string             `db:"media_kind" json:"media_kind"`
+	PrimaryAssetID pgtype.UUID        `db:"primary_asset_id" json:"primary_asset_id"`
+	GroupKey       *string            `db:"group_key" json:"group_key"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type MediaItemAsset struct {
+	AssetID     pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	MediaItemID pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
+	Relation    StackRelation      `db:"relation" json:"relation"`
+	Position    *int32             `db:"position" json:"position"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type OcrResult struct {

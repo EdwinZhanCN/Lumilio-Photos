@@ -12,28 +12,6 @@ interface StackDetailModalProps {
   onClose: () => void;
 }
 
-const RELATION_STYLES: Record<string, string> = {
-  raw_original: "border-emerald-500/20 bg-emerald-500/12 text-emerald-700",
-  jpeg_original: "border-sky-500/20 bg-sky-500/12 text-sky-700",
-  edited_version: "border-amber-500/20 bg-amber-500/14 text-amber-700",
-  alternative: "border-base-300 bg-base-200 text-base-content/70",
-};
-
-function getRelationLabel(t: (key: string) => string, relation: string) {
-  switch (relation) {
-    case "raw_original":
-      return t("assets.stackDetail.relation.raw_original");
-    case "jpeg_original":
-      return t("assets.stackDetail.relation.jpeg_original");
-    case "edited_version":
-      return t("assets.stackDetail.relation.edited_version");
-    case "alternative":
-      return t("assets.stackDetail.relation.alternative");
-    default:
-      return t("assets.stackDetail.relation.alternative");
-  }
-}
-
 const truncateAssetId = (assetId: string) => {
   if (assetId.length <= 12) return assetId;
   return `${assetId.slice(0, 8)}...${assetId.slice(-4)}`;
@@ -78,7 +56,7 @@ export default function StackDetailModal({
     return stackMembers.map((member) => ({
       ...member,
       isCover: member.position === coverPosition,
-      isCurrent: member.asset_id === asset.asset_id,
+      isCurrent: member.primary_asset_id === asset.asset_id,
     }));
   }, [asset.asset_id, stackQuery.data?.stack?.members]);
 
@@ -169,11 +147,9 @@ export default function StackDetailModal({
             ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {members.map((member) => {
-                  const relation = member.relation ?? "alternative";
                   const position = member.position ?? 0;
-                  const memberAssetId = member.asset_id ?? asset.asset_id ?? "";
+                  const memberAssetId = member.primary_asset_id ?? asset.asset_id ?? "";
                   const thumbnailUrl = assetUrls.getThumbnailUrl(memberAssetId, "medium");
-                  const badgeClass = RELATION_STYLES[relation] ?? RELATION_STYLES.alternative;
 
                   return (
                     <article key={memberAssetId} className={memberCardClasses(member.isCurrent)}>
@@ -213,17 +189,16 @@ export default function StackDetailModal({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-base-content">
-                              {getRelationLabel(t, relation)}
+                              {t("assets.stackDetail.frameLabel", {
+                                position: position + 1,
+                                defaultValue: "Frame {{position}}",
+                              })}
                             </p>
                             <p className="mt-1 font-mono text-xs text-base-content/50">
                               {truncateAssetId(memberAssetId)}
                             </p>
                           </div>
-                          <span
-                            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium ${badgeClass}`}
-                          >
-                            {relation}
-                          </span>
+                          <span className="badge badge-ghost shrink-0">#{position + 1}</span>
                         </div>
                       </div>
                     </article>

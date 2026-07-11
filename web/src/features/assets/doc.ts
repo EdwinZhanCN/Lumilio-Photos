@@ -34,6 +34,12 @@
  * {@link browseGroupsFromQueryLikePage}, and {@link flattenBrowseGroups} keep
  * ordinary assets and stacks in one flattened browse model so selection,
  * carousel positioning, and gallery tiles can share behavior.
+ * Physical files are composed into logical media items before they reach this
+ * browse surface: RAW/JPEG pairs and Live Photo still/video components render
+ * once through their primary asset, while burst/manual presentation stacks
+ * contain those logical items. {@link useAssetMediaItem} resolves components
+ * for {@link MediaViewer}; {@link useStackCarouselAssets} resolves one primary
+ * asset per logical stack member, so file counts never inflate burst counts.
  *
  * {@link usePinAssetsView} is the agent-board full-gallery adapter. It reads
  * `/api/v1/agent/pins/{id}/assets/list` and
@@ -126,5 +132,8 @@ import type FullScreenCarousel from "./components/page/FullScreen/FullScreenCaro
 import type { SearchFAB } from "./components/page/SearchFAB.tsx";
 import type { useGalleryContextContributor } from "@/features/lumilio/contributors/useGalleryContextContributor.ts";
 import type { useGalleryViewportWindow } from "./hooks/useGalleryViewportWindow.ts";
+import type { useAssetMediaItem } from "./hooks/useAssetMediaItem.ts";
+import type { useStackCarouselAssets } from "./hooks/useStackCarouselAssets.ts";
+import type MediaViewer from "./components/shared/MediaViewer.tsx";
 
 export {};

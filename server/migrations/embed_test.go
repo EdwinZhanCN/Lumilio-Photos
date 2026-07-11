@@ -36,3 +36,27 @@ func TestMLBaselineSeedsUtilityClassifiers(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectionsBaselineUsesLogicalMediaItems(t *testing.T) {
+	sql, err := FS.ReadFile("000004_collections_locations_duplicates.up.sql")
+	if err != nil {
+		t.Fatalf("read collections baseline migration: %v", err)
+	}
+	migration := string(sql)
+	for _, required := range []string{
+		"CREATE TABLE public.media_items",
+		"CREATE TABLE public.media_item_assets",
+		"CREATE TABLE public.asset_stacks",
+		"CREATE TABLE public.asset_stack_members",
+		"media_item_id uuid NOT NULL",
+		"stack_kind = ANY (ARRAY['manual'::text, 'burst'::text])",
+		"CREATE TRIGGER trg_assets_create_media_item",
+	} {
+		if !strings.Contains(migration, required) {
+			t.Fatalf("collections baseline missing logical-media contract %q", required)
+		}
+	}
+	if strings.Contains(migration, "'raw_jpeg'::text") {
+		t.Fatal("RAW/JPEG must be a media-item structure, not a presentation stack kind")
+	}
+}

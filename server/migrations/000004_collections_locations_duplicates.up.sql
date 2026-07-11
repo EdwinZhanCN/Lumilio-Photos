@@ -54,16 +54,60 @@ CREATE TABLE public.album_assets (
 
 
 --
+-- Name: media_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.media_items (
+    media_item_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id integer,
+    repository_id uuid,
+    media_kind text DEFAULT 'photo'::text NOT NULL,
+    primary_asset_id uuid,
+    group_key text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT media_items_pkey PRIMARY KEY (media_item_id),
+    CONSTRAINT media_items_media_kind_check CHECK (media_kind = ANY (ARRAY['photo'::text, 'video'::text, 'audio'::text, 'live_photo'::text])),
+    CONSTRAINT media_items_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(user_id),
+    CONSTRAINT media_items_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(repo_id),
+    CONSTRAINT media_items_primary_asset_id_fkey FOREIGN KEY (primary_asset_id) REFERENCES public.assets(asset_id) ON DELETE SET NULL
+);
+
+
+--
+-- Name: media_item_assets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.media_item_assets (
+    asset_id uuid NOT NULL,
+    media_item_id uuid NOT NULL,
+    relation public.stack_relation DEFAULT 'alternative'::public.stack_relation NOT NULL,
+    "position" integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT media_item_assets_pkey PRIMARY KEY (asset_id),
+    CONSTRAINT media_item_assets_asset_id_fkey FOREIGN KEY (asset_id) REFERENCES public.assets(asset_id) ON DELETE CASCADE,
+    CONSTRAINT media_item_assets_media_item_id_fkey FOREIGN KEY (media_item_id) REFERENCES public.media_items(media_item_id) ON DELETE CASCADE
+);
+
+
+--
 -- Name: asset_stacks; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.asset_stacks (
     stack_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id integer,
+    repository_id uuid,
     stack_kind text DEFAULT 'manual'::text NOT NULL,
+    cover_media_item_id uuid,
     group_key text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT asset_stacks_pkey PRIMARY KEY (stack_id)
+    CONSTRAINT asset_stacks_pkey PRIMARY KEY (stack_id),
+    CONSTRAINT asset_stacks_stack_kind_check CHECK (stack_kind = ANY (ARRAY['manual'::text, 'burst'::text])),
+    CONSTRAINT asset_stacks_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(user_id),
+    CONSTRAINT asset_stacks_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(repo_id),
+    CONSTRAINT asset_stacks_cover_media_item_id_fkey FOREIGN KEY (cover_media_item_id) REFERENCES public.media_items(media_item_id) ON DELETE SET NULL
 );
 
 
@@ -72,15 +116,52 @@ CREATE TABLE public.asset_stacks (
 --
 
 CREATE TABLE public.asset_stack_members (
-    asset_id uuid NOT NULL,
+    media_item_id uuid NOT NULL,
     stack_id uuid NOT NULL,
-    relation public.stack_relation DEFAULT 'alternative'::public.stack_relation NOT NULL,
     "position" integer DEFAULT 0,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT asset_stack_members_pkey PRIMARY KEY (asset_id),
-    CONSTRAINT asset_stack_members_asset_id_fkey FOREIGN KEY (asset_id) REFERENCES public.assets(asset_id) ON DELETE CASCADE,
+    CONSTRAINT asset_stack_members_pkey PRIMARY KEY (media_item_id),
+    CONSTRAINT asset_stack_members_media_item_id_fkey FOREIGN KEY (media_item_id) REFERENCES public.media_items(media_item_id) ON DELETE CASCADE,
     CONSTRAINT asset_stack_members_stack_id_fkey FOREIGN KEY (stack_id) REFERENCES public.asset_stacks(stack_id) ON DELETE CASCADE
 );
+
+
+-- Every physical asset starts as a one-component logical media item. Structural
+-- detectors later merge RAW/JPEG and Live Photo components into one item;
+-- presentation stacks only ever group media_item_id values.
+CREATE FUNCTION public.create_media_item_for_asset() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    new_media_item_id uuid;
+BEGIN
+    INSERT INTO public.media_items (
+        owner_id,
+        repository_id,
+        media_kind,
+        primary_asset_id
+    ) VALUES (
+        NEW.owner_id,
+        NEW.repository_id,
+        CASE lower(NEW.type)
+            WHEN 'video' THEN 'video'
+            WHEN 'audio' THEN 'audio'
+            ELSE 'photo'
+        END,
+        NEW.asset_id
+    )
+    RETURNING media_item_id INTO new_media_item_id;
+
+    INSERT INTO public.media_item_assets (asset_id, media_item_id, relation, "position")
+    VALUES (NEW.asset_id, new_media_item_id, 'alternative', 0);
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_assets_create_media_item
+AFTER INSERT ON public.assets
+FOR EACH ROW EXECUTE FUNCTION public.create_media_item_for_asset();
 
 
 --
@@ -267,6 +348,13 @@ CREATE INDEX idx_albums_user_id ON public.albums USING btree (user_id);
 
 CREATE INDEX idx_asset_stack_members_stack ON public.asset_stack_members USING btree (stack_id);
 
+CREATE UNIQUE INDEX idx_asset_stacks_burst_group_key ON public.asset_stacks USING btree (group_key)
+WHERE stack_kind = 'burst' AND group_key IS NOT NULL;
+
+CREATE INDEX idx_media_item_assets_item ON public.media_item_assets USING btree (media_item_id);
+
+CREATE INDEX idx_media_items_owner_repository ON public.media_items USING btree (owner_id, repository_id);
+
 
 --
 -- Name: idx_duplicate_group_assets_asset; Type: INDEX; Schema: public; Owner: -
@@ -348,4 +436,3 @@ CREATE TRIGGER trg_location_clusters_updated_at BEFORE UPDATE ON public.location
 --
 -- Name: album_assets album_assets_album_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
-
