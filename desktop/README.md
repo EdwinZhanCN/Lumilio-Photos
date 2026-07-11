@@ -44,6 +44,12 @@ make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@17/bin
 make desktop-test
 ```
 
+The private cluster requires `scram-sha-256` auth everywhere (never trust); the
+password is generated into `secrets/db_password` and set at initdb time via
+`--pwfile`. Data directories initialized before the scram switch have no
+password set and will fail auth on launch — delete `postgres/` under the
+app-data root to re-init (pre-production installs only).
+
 App data (always local, never on the user's relocatable media drive):
 `~/Library/Application Support/Lumilio Photos/` — `postgres/`, `secrets/`,
 `config/`, `backups/`, `lumen/` (optional local AI: the supervised Lumen Hub

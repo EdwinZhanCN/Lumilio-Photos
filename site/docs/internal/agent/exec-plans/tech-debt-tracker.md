@@ -3,6 +3,15 @@
 Keep this list short. Each item should have a concrete owner path and a reason it matters.
 
 - Docker image build is not currently verified in this workspace when the local Docker/Orbstack socket is unavailable.
+- **Desktop: PostgreSQL major-version upgrade migrator not implemented.** Owner:
+  `desktop/supervisor/` (`pgMajorVersion` in `paths.go`). The supervisor now
+  detects a data dir initialized by a different PG major (`DataDirStatus`) and
+  fails with a clear error instead of FATALing, but there is no dump/restore or
+  pg_upgrade path. Before shipping a bundle that bumps past the current major:
+  decide the mechanism and keep the previous major's binaries staged in the same
+  release (both pg_upgrade and dump/restore need the old binaries). The
+  `backups/` app-data dir is reserved for this. Related: no routine pg_dump
+  backups of the desktop DB yet — albums/people labels live only in the cluster.
 - **License bundle covers native components only, not Go/JS dependency notices.**
   Owner: `desktop/licenses/` (+ `desktop/licenses.go` manifest). Onboarding now
   ships full texts for the app (GPL-3) and the bundled native tools
