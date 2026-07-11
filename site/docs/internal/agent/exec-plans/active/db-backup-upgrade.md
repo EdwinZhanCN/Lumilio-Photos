@@ -178,10 +178,11 @@ Hook where `DataDirStatus == DataDirVersionMismatch` errors today
   past 17; until then the loud `DataDirVersionMismatch` error is the guard.
 - When this plan completes, remove the tech-debt tracker entry it replaces.
 
-## Open questions
+## Resolved questions (2026-07-11)
 
-- Windows desktop dump target: app-data vs storage dir when the library sits
-  on a removable drive that may be absent at 02:00 — current lean: write to
-  storage dir, skip with a logged warning when unreachable.
-- Whether Docker `lumilio-db` should also ship a cron-less `pg_dumpall`
-  convenience script for operators who bypass the app (lean: no; one path).
+- Desktop dump target when the library sits on a removable drive: write to the
+  storage dir; when it is unreachable at backup time, skip the run with a
+  logged warning (no fallback target — a backup the user's media backup does
+  not capture is a false comfort).
+- No operator-facing dump script in `lumilio-db`: one backup path, owned by
+  the app.
