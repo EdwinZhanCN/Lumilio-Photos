@@ -230,8 +230,8 @@ func TestWindowsPGListenAndHBAConf(t *testing.T) {
 	if winConf != "listen_addresses = '127.0.0.1'" {
 		t.Errorf("windows listen conf = %q", winConf)
 	}
-	if hba := pgHBAConf("windows"); !strings.Contains(hba, "host   all   all   127.0.0.1/32   trust") {
-		t.Errorf("windows hba should trust loopback hosts, got %q", hba)
+	if hba := pgHBAConf("windows"); !strings.Contains(hba, "host   all   all   127.0.0.1/32   scram-sha-256") {
+		t.Errorf("windows hba must require scram on the loopback (reachable by every local user), got %q", hba)
 	}
 
 	// unix keeps the socket-only posture (no TCP listener at all).
@@ -240,8 +240,8 @@ func TestWindowsPGListenAndHBAConf(t *testing.T) {
 		!strings.Contains(unixConf, "unix_socket_directories = '/run/pg'") {
 		t.Errorf("unix listen conf = %q", unixConf)
 	}
-	if hba := pgHBAConf("darwin"); !strings.Contains(hba, "local   all   all   trust") {
-		t.Errorf("unix hba should trust local socket, got %q", hba)
+	if hba := pgHBAConf("darwin"); !strings.Contains(hba, "local   all   all   scram-sha-256") {
+		t.Errorf("unix hba should require scram over the local socket, got %q", hba)
 	}
 }
 
