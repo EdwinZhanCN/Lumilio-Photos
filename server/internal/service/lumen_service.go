@@ -91,7 +91,7 @@ func buildLumenSDKConfig(cfg config.LumenConfig) (*lumenconfig.Config, error) {
 	}
 	sdkCfg.Discovery.Enabled = cfg.DiscoveryEnabled
 	sdkCfg.Discovery.MDNSEnabled = cfg.DiscoveryMDNSEnabled
-	sdkCfg.Discovery.HubURL = strings.TrimSpace(cfg.DiscoveryHubURL)
+	sdkCfg.Discovery.BrokerURL = strings.TrimSpace(cfg.DiscoveryHubURL)
 	sdkCfg.Discovery.StaticNodes = cfg.StaticNodes()
 	// Cap the initial "wait for node capabilities" at startup. The SDK default is
 	// 10s, which — when no Lumen node is present (the common desktop case) — stalls
