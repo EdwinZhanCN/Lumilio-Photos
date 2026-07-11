@@ -75,15 +75,28 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
+            - name: Install build dependencies
+              run: brew install vips libraw dylibbundler create-dmg
+
+            # cgo bakes versioned Homebrew Cellar paths
+            # (-L/opt/homebrew/Cellar/vips/<ver>/lib) into cached Go build
+            # artifacts. With a cache keyed only on go.sum, a runner-image brew
+            # bump restores objects that link against Cellar paths that no
+            # longer exist ("ld: library 'vips' not found"), so the native
+            # dependency versions must participate in the cache key.
+            - name: Record native dep versions for the Go cache key
+              run: |
+                  brew list --versions vips libraw $(brew deps vips libraw) \
+                      | sort > .brew-go-cache-key
+                  cat .brew-go-cache-key
+
             - uses: actions/setup-go@v6
               with:
                   go-version-file: desktop/go.mod
                   cache-dependency-path: |
                       desktop/go.sum
                       server/go.sum
-
-            - name: Install build dependencies
-              run: brew install vips libraw dylibbundler create-dmg
+                      .brew-go-cache-key
 
             - name: Stage web SPA
               uses: actions/download-artifact@v8
