@@ -1,6 +1,14 @@
 # Database Backup & Major-Version Upgrade
 
-Status: active
+Status: active — Phases 1–2 implemented; Phases 3–4 deliberately deferred
+(2026-07-11). Safe to defer because: the desktop supervisor fails loudly on a
+major-version mismatch instead of touching data, disaster recovery is already
+covered by Phase 2 (automatic dumps + Settings → Server restore), and PG 17 is
+supported upstream until 2029. Resume Phase 3 in the same release that first
+bumps `pgMajorVersion` (desktop) or the `db.Dockerfile` base image — never bump
+either without it (also tracked in tech-debt-tracker.md). Outstanding Phase 2
+follow-ups (sandbox could not run them): `make web-test`, i18n extract + zh
+fill for `settings.serverSettings.backup.*`.
 
 ## Goal
 
