@@ -26,7 +26,7 @@ func (d *desktopApp) handleLumenSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	selection := lumen.ConfigSelection{Preset: body.Preset, Backend: body.Backend, Profile: body.Profile, CacheDir: body.CacheDir, Region: regionForLang(d.lang)}
+	selection := lumen.ConfigSelection{Preset: body.Preset, Backend: body.Backend, Profile: body.Profile, CacheDir: body.CacheDir, Region: d.desktopRegion()}
 	if err := lumen.ValidateConfigSelection(selection); err != nil {
 		http.Error(w, err.Error(), 400)
 		return

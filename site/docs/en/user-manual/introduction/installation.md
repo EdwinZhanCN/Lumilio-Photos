@@ -34,8 +34,11 @@ nothing else to install. All downloads are on the
 
 ::: tip Updates
 When a newer release exists, the menu-bar menu shows **Update available** —
-it opens the release page; replace the app in Applications. Your library and
-database are untouched.
+click it to download the new `.dmg`, then replace the app in Applications.
+Your library and database are untouched. During setup (or later in the
+control panel) you can set **Download region** to Mainland China so the
+installer is fetched via a GitHub mirror; this is separate from in-app map
+region settings.
 :::
 
 App data (database, secrets, logs) lives under
@@ -58,6 +61,14 @@ menu bar, delete the app, and delete that folder if you also want the data gone
 
 Uninstall from **Settings → Apps & features**; the uninstaller stops the app
 and its database, and can optionally remove the app data.
+
+::: tip Updates
+When a newer release exists, the tray menu shows **Update available** — click
+it to download the new `setup.exe` and run it over the existing install. Your
+library and database are untouched. **Download region** (Mainland China vs
+other) controls whether the installer URL uses a GitHub mirror; it is separate
+from in-app map region settings.
+:::
 
 ## Docker (Linux server / NAS)
 

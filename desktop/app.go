@@ -224,7 +224,7 @@ func (d *desktopApp) startRuntime() {
 // checkUpdate queries GitHub for a newer release and, if one exists, shows it in
 // the tray. Best-effort: any failure is silent.
 func (d *desktopApp) checkUpdate() {
-	info, ok := checkForUpdate(d.ctx, buildVersion)
+	info, ok := checkForUpdate(d.ctx, buildVersion, d.desktopRegion())
 	if !ok {
 		return
 	}
@@ -232,6 +232,15 @@ func (d *desktopApp) checkUpdate() {
 	d.updateVersion = info.Version
 	d.updateURL = info.URL
 	d.refreshMenu()
+}
+
+// desktopRegion returns the persisted desktop download region (cn|other).
+func (d *desktopApp) desktopRegion() string {
+	settings, err := d.sup.Settings()
+	if err != nil {
+		return defaultRegion(d.lang)
+	}
+	return effectiveRegion(settings.Region, d.onboardingLang())
 }
 
 // failureMessage composes an actionable error: which stage failed, the cause, and

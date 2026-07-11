@@ -105,6 +105,16 @@ the download is quarantined and the app isn't notarized) approve it once via
 Removing that prompt entirely requires Developer-ID signing + notarization, which
 needs a paid Apple Developer account — a clean future upgrade to the same DMG.
 
+## App updates
+
+On launch the tray checks GitHub Releases (including prereleases), picks a
+platform installer (macOS `.dmg` / Windows `setup.exe`), and surfaces **Update
+available** in the menu. Click opens the download URL — install is still manual.
+**Download region** (`cn` | `other`) is chosen in onboarding / the control
+panel and is independent of in-browser map region; `cn` rewrites installer URLs
+through `https://gh-proxy.com/`. Details:
+`site/docs/internal/agent/desktop-updates.md`.
+
 > Homebrew Cask was intentionally not used: Homebrew quarantines casks by default,
 > so a cask install of an ad-hoc app hits the same Gatekeeper prompt as the DMG —
 > all maintenance, no UX benefit.

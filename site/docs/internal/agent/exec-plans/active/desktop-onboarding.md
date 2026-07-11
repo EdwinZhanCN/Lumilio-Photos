@@ -224,8 +224,13 @@ Implementation:
 - `desktop/strings.go` — native-chrome zh/en tables (W2 i18n).
 - `desktop/disk_unix.go` / `desktop/disk_windows.go` — free-space per platform.
 - `desktop/supervisor/config.go` / `desktop-settings.json` — storage path +
-  `onboarding_completed` / `tos_accepted_version` / `language` persistence (W2).
+  `onboarding_completed` / `tos_accepted_version` / `language` / `region`
+  persistence (W2 + download-region). Desktop `region` (`cn`|`other`) drives
+  app-update mirrors and Lumen model region; it is **not** the in-browser map
+  region. See [`desktop-updates.md`](../../desktop-updates.md).
 - `desktop/supervisor/postgres.go` — boot correctness fixes landed (W0).
 - `desktop/scripts/build-macos.sh` — stamps `main.buildVersion` (W2).
 - `web/src/features/auth/routes/BootstrapWizard.tsx` — the boundary reference;
   read-only storage root the desktop must feed (do not modify).
+- App update check / installer URL / CN mirror: `desktop/update.go` (see
+  [`desktop-updates.md`](../../desktop-updates.md)).

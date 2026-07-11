@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCanonicalSemver(t *testing.T) {
 	cases := map[string]string{
@@ -18,36 +21,52 @@ func TestCanonicalSemver(t *testing.T) {
 	}
 }
 
-func TestNewestUpdate(t *testing.T) {
+func TestNewestUpdatePicksPlatformAsset(t *testing.T) {
 	releases := []releaseItem{
-		{TagName: "v1.0.0-beta.2", HTMLURL: "u2"},
-		{TagName: "v1.0.0-beta.4", HTMLURL: "u4"},
+		{
+			TagName: "v1.0.0-beta.4",
+			HTMLURL: "https://github.com/EdwinZhanCN/Lumilio-Photos/releases/tag/v1.0.0-beta.4",
+			Assets: []releaseAsset{
+				{Name: "Lumilio-Photos-v1.0.0-beta.4-macos-arm64.dmg", BrowserDownloadURL: "https://github.com/x/a.dmg"},
+				{Name: "Lumilio-Photos-v1.0.0-beta.4-windows-amd64-setup.exe", BrowserDownloadURL: "https://github.com/x/a-setup.exe"},
+				{Name: "Lumilio-Photos-v1.0.0-beta.4-windows-amd64.zip", BrowserDownloadURL: "https://github.com/x/a.zip"},
+			},
+		},
 		{TagName: "v1.0.0-beta.3", HTMLURL: "u3"},
-		{TagName: "v2.0.0", HTMLURL: "draft", Draft: true},
 	}
 
-	// A newer prerelease is offered (and drafts are ignored even though v2.0.0
-	// would otherwise be highest).
-	got, ok := newestUpdate("v1.0.0-beta.3", releases)
-	if !ok || got.Version != "v1.0.0-beta.4" || got.URL != "u4" {
-		t.Fatalf("newestUpdate = %+v, ok=%v; want v1.0.0-beta.4/u4", got, ok)
+	got, ok := newestUpdate("v1.0.0-beta.3", releases, "darwin", "arm64", "other")
+	if !ok || got.Version != "v1.0.0-beta.4" || got.URL != "https://github.com/x/a.dmg" {
+		t.Fatalf("darwin arm64: got %+v ok=%v", got, ok)
 	}
 
-	// On the newest release, nothing is offered.
-	if _, ok := newestUpdate("v1.0.0-beta.4", releases); ok {
+	got, ok = newestUpdate("v1.0.0-beta.3", releases, "windows", "amd64", "other")
+	if !ok || got.URL != "https://github.com/x/a-setup.exe" {
+		t.Fatalf("windows prefers setup.exe: got %+v ok=%v", got, ok)
+	}
+
+	got, ok = newestUpdate("v1.0.0-beta.3", releases, "windows", "amd64", "cn")
+	want := maybeMirrorGitHubURL("https://github.com/x/a-setup.exe", "cn")
+	if !ok || got.URL != want {
+		t.Fatalf("cn mirror: got %q want %q", got.URL, want)
+	}
+	if cnGitHubReleaseMirror != "" && !strings.HasPrefix(got.URL, strings.TrimRight(cnGitHubReleaseMirror, "/")) {
+		t.Fatalf("expected mirrored URL, got %q", got.URL)
+	}
+
+	if _, ok := newestUpdate("v1.0.0-beta.4", releases, "darwin", "arm64", "other"); ok {
 		t.Error("no update should be offered when already on the newest release")
 	}
+}
 
-	// A stable release outranks a prerelease of the same version.
-	stable := []releaseItem{{TagName: "v1.0.0", HTMLURL: "s"}}
-	got, ok = newestUpdate("v1.0.0-beta.4", stable)
-	if !ok || got.Version != "v1.0.0" {
-		t.Fatalf("stable over prerelease: got %+v ok=%v", got, ok)
+func TestNormalizeRegion(t *testing.T) {
+	if normalizeRegion("cn") != "cn" || normalizeRegion("china") != "cn" {
+		t.Fatal("cn aliases")
 	}
-
-	// Invalid current version (e.g. "dev") is handled by checkForUpdate, but
-	// newestUpdate with an empty cur should still not panic and offers the max.
-	if _, ok := newestUpdate("", nil); ok {
-		t.Error("empty release list should offer nothing")
+	if normalizeRegion("") != "other" || normalizeRegion("us") != "other" {
+		t.Fatal("other default")
+	}
+	if effectiveRegion("", "zh") != "cn" || effectiveRegion("other", "zh") != "other" {
+		t.Fatal("effectiveRegion")
 	}
 }

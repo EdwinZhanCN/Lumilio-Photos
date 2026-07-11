@@ -65,6 +65,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		writeJSON(w, map[string]any{
 			"mode":       map[bool]string{true: "dashboard", false: "onboarding"}[settings.OnboardingCompleted],
 			"lang":       d.onboardingLang(),
+			"region":     effectiveRegion(settings.Region, d.onboardingLang()),
 			"path":       path,
 			"validation": validateStorage(path),
 			"version":    appVersion(),
@@ -107,6 +108,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		var body struct {
 			Path        string `json:"path"`
 			Lang        string `json:"lang"`
+			Region      string `json:"region"`
 			Agreed      bool   `json:"agreed"`
 			EnableLumen bool   `json:"enableLumen"`
 			Preset      string `json:"preset"`
@@ -134,11 +136,15 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		}
 		settings.StoragePath = body.Path
 		settings.Language = normalizeLang(body.Lang)
+		settings.Region = effectiveRegion(body.Region, settings.Language)
 		settings.TOSAcceptedVersion = tosVersion
 		settings.OnboardingCompleted = true
 		settings.LumenEnabled = body.EnableLumen
 		if body.EnableLumen {
-			selection := lumen.ConfigSelection{Preset: body.Preset, Backend: body.Backend, Profile: body.Profile, CacheDir: body.CacheDir, Region: regionForLang(body.Lang)}
+			selection := lumen.ConfigSelection{
+				Preset: body.Preset, Backend: body.Backend, Profile: body.Profile,
+				CacheDir: body.CacheDir, Region: settings.Region,
+			}
 			if err := lumen.ValidateConfigSelection(selection); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -155,6 +161,27 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		// Signal boot() to close the window and start the runtime. Guard against a
 		// double signal (the window-closing handler also fires).
 		d.markOnboardingDone()
+	})
+
+	mux.HandleFunc("/__onb/region", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Region string `json:"region"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		settings, err := d.sup.Settings()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		settings.Region = normalizeRegion(body.Region)
+		if err := d.sup.SaveSettings(settings); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "region": settings.Region})
 	})
 
 	mux.HandleFunc("/__onb/pick-cache", func(w http.ResponseWriter, r *http.Request) { d.pickDashboardDir(w, "Choose model cache location") })
@@ -246,13 +273,6 @@ func (d *desktopApp) pickDashboardDir(w http.ResponseWriter, title string) {
 		return
 	}
 	writeJSON(w, map[string]any{"path": path, "validation": validateStorage(path)})
-}
-
-func regionForLang(lang string) string {
-	if normalizeLang(lang) == "zh" {
-		return "cn"
-	}
-	return "other"
 }
 
 func totalMemoryGB() float64 {

@@ -32,6 +32,12 @@ type DesktopSettings struct {
 	// web BootstrapWizard owns. Empty means "follow the OS locale".
 	Language string `json:"language,omitempty"`
 
+	// Region is the desktop download/network region: "cn" (mainland China) or
+	// "other". It controls app-update mirrors and Lumen model download region.
+	// Independent of the in-browser preference "region" (maps / OSM). Empty means
+	// derive a default from Language / OS at read time.
+	Region string `json:"region,omitempty"`
+
 	// LumenEnabled records that the user turned on local AI: the supervised
 	// Lumen Hub is started on every launch until it is disabled from the tray.
 	LumenEnabled bool `json:"lumen_enabled,omitempty"`
