@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,23 +15,25 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // AssetFilterInput defines how the LLM calls filter_assets.
 type AssetFilterInput struct {
-	DateFrom string   `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
-	DateTo   string   `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
-	Type     string   `json:"type,omitempty" jsonschema:"enum=PHOTO,enum=VIDEO,enum=AUDIO,description=Asset type"`
-	Filename string   `json:"filename,omitempty" jsonschema:"description=Filename substring to search for"`
-	Raw      *bool    `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
-	Rating   *int     `json:"rating,omitempty" jsonschema:"description=Filter by exact rating (0-5)"`
-	Liked    *bool    `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
-	Place    string   `json:"place,omitempty" jsonschema:"description=Place name to match against the library's location clusters (e.g. Kyoto, Tokyo Tower)"`
-	Camera   string   `json:"camera,omitempty" jsonschema:"description=Camera model substring (e.g. Nikon Z8)"`
-	Lens     string   `json:"lens,omitempty" jsonschema:"description=Lens model substring"`
-	AlbumID  *int     `json:"album_id,omitempty" jsonschema:"description=Filter to assets in this album id"`
-	TagNames []string `json:"tag_names,omitempty" jsonschema:"description=Tag names to filter by (AND semantics — assets must have all listed tags)"`
+	DateFrom             string   `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
+	DateTo               string   `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
+	Type                 string   `json:"type,omitempty" jsonschema:"enum=PHOTO,enum=VIDEO,enum=AUDIO,description=Asset type"`
+	Filename             string   `json:"filename,omitempty" jsonschema:"description=Filename substring to search for"`
+	Raw                  *bool    `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
+	Rating               *int     `json:"rating,omitempty" jsonschema:"description=Filter by exact rating (0-5)"`
+	Liked                *bool    `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
+	Place                string   `json:"place,omitempty" jsonschema:"description=Place name to match against the library's location clusters (e.g. Kyoto, Tokyo Tower)"`
+	Camera               string   `json:"camera,omitempty" jsonschema:"description=Camera model substring (e.g. Nikon Z8)"`
+	Lens                 string   `json:"lens,omitempty" jsonschema:"description=Lens model substring"`
+	AlbumID              *int     `json:"album_id,omitempty" jsonschema:"description=Filter to assets in this album id"`
+	TagNames             []string `json:"tag_names,omitempty" jsonschema:"description=Tag names to filter by (AND semantics — assets must have all listed tags)"`
+	MinQualityPercentile *float64 `json:"min_quality_percentile,omitempty" jsonschema:"description=Keep only assets whose SigLIP aesthetic score is at/above this percentile (1-99) of the matched set's scored assets — e.g. 75 keeps the top quartile. Unscored assets are dropped."`
 }
 
 // RegisterFilterAssets registers the filter_assets producer: metadata
@@ -39,9 +42,10 @@ type AssetFilterInput struct {
 func RegisterFilterAssets() {
 	info := &schema.ToolInfo{
 		Name: "filter_assets",
-		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked, place, camera, lens, album, tags). " +
+		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked, place, camera, lens, album, tags) " +
+			"and optionally min_quality_percentile (keep scores at/above that percentile of the matched set; unscored dropped). " +
 			"Returns a ref: a handle for the matching set. Pass the ref to other tools " +
-			"(combine, describe, show, bulk_like_assets, tag_assets) to work with the set.",
+			"(combine, describe, show, bulk_like_assets, tag_assets, create_album) to work with the set.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
@@ -69,7 +73,21 @@ func RegisterFilterAssets() {
 			}
 
 			snapshot := fromPgUUIDs(rows)
+			qualityNote := ""
+			if input.MinQualityPercentile != nil {
+				filtered, note, qErr := applyMinQualityPercentile(ctx, deps, snapshot, *input.MinQualityPercentile)
+				if qErr != nil {
+					sendError(deps, info.Name, execID, start, qErr)
+					return errorOutput(qErr), nil
+				}
+				snapshot = filtered
+				qualityNote = note
+			}
+
 			summary := filterSummary(input, len(snapshot), truncated)
+			if qualityNote != "" {
+				summary += qualityNote
+			}
 			r := deps.RefStore.Create(
 				deps.Scope(),
 				ref.Plan{Op: info.Name, Params: filterPlanParams(input)},
@@ -82,6 +100,38 @@ func RegisterFilterAssets() {
 			return receiptOutput(r, summary), nil
 		})
 	})
+}
+
+func applyMinQualityPercentile(
+	ctx context.Context,
+	deps *core.ToolDependencies,
+	snapshot []uuid.UUID,
+	percentile float64,
+) ([]uuid.UUID, string, *ref.Error) {
+	if percentile < 1 || percentile > 99 {
+		return nil, "", ref.InvalidArgument(
+			fmt.Sprintf("min_quality_percentile %v is out of range 1-99", percentile))
+	}
+	if len(snapshot) == 0 {
+		return snapshot, "", nil
+	}
+
+	rows, err := deps.Queries.AgentAssetAestheticScores(ctx, toPgUUIDs(snapshot))
+	if err != nil {
+		return nil, "", ref.Internal("quality score query")
+	}
+	scoreOf := make(map[uuid.UUID]float32, len(rows))
+	for _, row := range rows {
+		scoreOf[uuid.UUID(row.AssetID.Bytes)] = row.Score
+	}
+
+	kept, cut, scored := keepAtOrAboveQualityPercentile(snapshot, scoreOf, percentile)
+	if scored == 0 {
+		return kept, " (no aesthetic scores in matched set — quality filter dropped all)", nil
+	}
+	note := fmt.Sprintf(" (min_quality_percentile=%.0f → cut≥%.2f over %d scored, kept %d)",
+		percentile, cut, scored, len(kept))
+	return kept, note, nil
 }
 
 func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams, *ref.Error) {
@@ -174,6 +224,8 @@ func filterHint(input *AssetFilterInput) string {
 		return "liked"
 	case len(input.TagNames) > 0:
 		return input.TagNames[0]
+	case input.MinQualityPercentile != nil:
+		return "quality"
 	default:
 		return "filter"
 	}
@@ -216,6 +268,9 @@ func filterPlanParams(input *AssetFilterInput) map[string]string {
 	}
 	if len(input.TagNames) > 0 {
 		params["tag_names"] = strings.Join(input.TagNames, ",")
+	}
+	if input.MinQualityPercentile != nil {
+		params["min_quality_percentile"] = strconv.FormatFloat(*input.MinQualityPercentile, 'f', -1, 64)
 	}
 	return params
 }

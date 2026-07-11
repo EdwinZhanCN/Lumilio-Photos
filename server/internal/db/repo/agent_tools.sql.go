@@ -12,6 +12,39 @@ import (
 	"server/internal/db/dbtypes"
 )
 
+const agentAssetAestheticScores = `-- name: AgentAssetAestheticScores :many
+SELECT asset_id, score
+FROM asset_quality_scores
+WHERE asset_id = ANY($1::uuid[])
+`
+
+type AgentAssetAestheticScoresRow struct {
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+	Score   float32     `db:"score" json:"score"`
+}
+
+// Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
+// omitted; callers that filter by quality percentile drop them.
+func (q *Queries) AgentAssetAestheticScores(ctx context.Context, assetIds []pgtype.UUID) ([]AgentAssetAestheticScoresRow, error) {
+	rows, err := q.db.Query(ctx, agentAssetAestheticScores, assetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentAssetAestheticScoresRow
+	for rows.Next() {
+		var i AgentAssetAestheticScoresRow
+		if err := rows.Scan(&i.AssetID, &i.Score); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const agentCapturedTimes = `-- name: AgentCapturedTimes :many
 SELECT COALESCE(taken_time, upload_time)::timestamptz AS captured_at
 FROM assets

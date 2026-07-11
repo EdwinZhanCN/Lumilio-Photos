@@ -19,6 +19,7 @@ const HIDDEN_TRASH_BULK_ACTIONS = [
   "set-rating",
   "set-liked",
   "stack-selected",
+  "add-tags",
   "add-to-album",
   "download",
   "delete-assets",

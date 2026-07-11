@@ -32,7 +32,11 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
   const message =
     action === "create_album" && title && typeof count === "number"
       ? t("lumilio.chat.confirmation.createAlbum", { count, title })
-      : getLegacyMessage(info);
+      : action === "add_to_album" && typeof count === "number"
+        ? t("lumilio.chat.confirmation.addToAlbum", "Add {{count}} photos to this album?", {
+            count,
+          })
+        : getLegacyMessage(info);
 
   return (
     <div className="my-3 rounded-xl border border-warning/30 bg-warning/5 p-4 max-w-md">

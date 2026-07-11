@@ -17,6 +17,9 @@ type Querier interface {
 	AddStackMember(ctx context.Context, arg AddStackMemberParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
 	AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error)
+	// Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
+	// omitted; callers that filter by quality percentile drop them.
+	AgentAssetAestheticScores(ctx context.Context, assetIds []pgtype.UUID) ([]AgentAssetAestheticScoresRow, error)
 	// Capture times for a set of assets, for the sample tool's distribution
 	// summary. Order is irrelevant; bucketing happens in Go.
 	AgentCapturedTimes(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.Timestamptz, error)

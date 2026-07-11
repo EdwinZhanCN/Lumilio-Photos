@@ -1,4 +1,5 @@
 import { useCallback, useContext, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import {
   AssetsStoreApi,
@@ -354,11 +355,13 @@ const filenameFromContentDisposition = (contentDisposition: string | null): stri
  */
 export const useBulkAssetOperations = (resolvedAssetIds?: string[]) => {
   const selection = useSelection();
+  const queryClient = useQueryClient();
   const { deleteAsset, batchUpdateAssets } = useAssetActions();
   const { mutateAsync: addAssetToAlbum } = $api.useMutation(
     "post",
     "/api/v1/albums/{id}/assets/{assetId}",
   );
+  const { mutateAsync: addAssetTag } = $api.useMutation("post", "/api/v1/assets/{id}/tags");
 
   const bulkUpdateRating = useCallback(
     async (rating: number): Promise<void> => {
@@ -477,12 +480,50 @@ export const useBulkAssetOperations = (resolvedAssetIds?: string[]) => {
     [resolvedAssetIds, selection.selectedIds, addAssetToAlbum],
   );
 
+  const bulkAddTags = useCallback(
+    async (tagNames: string[]): Promise<void> => {
+      const names = [
+        ...new Set(tagNames.map((name) => name.trim()).filter((name) => name.length > 0)),
+      ];
+      if (names.length === 0) return;
+
+      const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
+      await Promise.all(
+        ids.flatMap((assetId) =>
+          names.map((tagName) =>
+            addAssetTag({
+              params: { path: { id: assetId } },
+              body: { tag_name: tagName },
+            }),
+          ),
+        ),
+      );
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["get", "/api/v1/assets/{id}/tags"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["get", "/api/v1/assets/tags"],
+        }),
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const path = query.queryKey[1];
+            return path === "/api/v1/assets/list" || path === "/api/v1/assets/search";
+          },
+        }),
+      ]);
+    },
+    [resolvedAssetIds, selection.selectedIds, addAssetTag, queryClient],
+  );
+
   return {
     bulkUpdateRating,
     bulkSetLike,
     bulkDelete,
     bulkDownload: (assets?: Asset[]) => bulkDownload(assets),
     bulkAddToAlbum,
+    bulkAddTags,
     selectedCount: selection.selectedCount,
     hasSelection: selection.selectedCount > 0,
   };
