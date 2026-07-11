@@ -38,7 +38,8 @@ FROM debian:trixie-slim AS runtime
 
 ARG TARGETARCH
 
-# Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime.
+# Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime,
+# PostgreSQL client tools for the automatic database backups.
 #
 # On trixie, libheif uses a plugin architecture: each codec ships as a separate
 # package that --no-install-recommends would otherwise skip. We pin them so image
@@ -46,6 +47,12 @@ ARG TARGETARCH
 # path of the /assets/{id}/export endpoint; aomdec + libde265 cover reading
 # AVIF/HEIC sources. libvips-tools (rather than the versioned libvips42* package)
 # lets apt resolve the correct runtime soname across Debian releases.
+#
+# postgresql-client-17 matches the lumilio-db image (db.Dockerfile,
+# pgvector:pg17); the backup engine resolves /usr/lib/postgresql/<major>/bin
+# from the *server's* reported version, so when the db image bumps majors the
+# transition release must install both client packages (see
+# exec-plans/active/db-backup-upgrade.md).
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -59,7 +66,8 @@ RUN set -eux; \
         libheif-plugin-aomenc \
         libheif-plugin-aomdec \
         libheif-plugin-libde265 \
-        libraw23; \
+        libraw23 \
+        postgresql-client-17; \
     if [ "${TARGETARCH}" = "amd64" ]; then \
         apt-get install -y --no-install-recommends \
             intel-media-va-driver \

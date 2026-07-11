@@ -79,9 +79,12 @@ jobs:
           mkdir -p "$OUT"
           cp -R "$DIST/bin" "$DIST/lib" "$DIST/share" "$OUT/"
           # Keep only the binaries the supervisor uses to slim the bundle.
+          # psql is required by the backup engine's restore path
+          # (exec-plans/active/db-backup-upgrade.md Phase 2).
           find "$OUT/bin" -maxdepth 1 -type f \
             ! -name postgres ! -name initdb ! -name pg_ctl ! -name pg_isready \
-            ! -name createdb ! -name pg_dump ! -name pg_restore ! -name pg_config \
+            ! -name createdb ! -name pg_dump ! -name pg_restore ! -name psql \
+            ! -name pg_config \
             -delete
 
       - name: Upload artifact
@@ -129,8 +132,11 @@ jobs:
           Copy-Item -Recurse pgsql/bin, pgsql/lib, pgsql/share $out
           # Slim: keep only the binaries the supervisor uses (plus the DLLs
           # they load, which live alongside them in bin).
+          # psql.exe is required by the backup engine's restore path
+          # (exec-plans/active/db-backup-upgrade.md Phase 2).
           $keep = @('postgres.exe','initdb.exe','pg_ctl.exe','pg_isready.exe',
-                    'createdb.exe','pg_dump.exe','pg_restore.exe','pg_config.exe')
+                    'createdb.exe','pg_dump.exe','pg_restore.exe','psql.exe',
+                    'pg_config.exe')
           Get-ChildItem "$out/bin" -File | Where-Object {
               $_.Extension -eq '.exe' -and $keep -notcontains $_.Name
           } | Remove-Item

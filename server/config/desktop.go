@@ -27,6 +27,9 @@ type DesktopParams struct {
 	ExifToolPath  string // empty = resolve via PATH
 	FFmpegPath    string
 	FFprobePath   string
+	// PGBinDir is the bundled PostgreSQL bin directory; the backup engine uses
+	// its pg_dump/psql so the client always matches the private cluster.
+	PGBinDir string
 	// LumenStaticNodes pins Lumen node gRPC endpoints ("host:port") in addition
 	// to mDNS discovery. The desktop host always pins the supervised local hub
 	// endpoint: the SDK treats static entries as address facts, not liveness
@@ -65,6 +68,7 @@ func NewDesktopConfig(p DesktopParams) (AppConfig, error) {
 		PasswordFile: strings.TrimSpace(p.PasswordFile),
 		DBName:       strings.TrimSpace(p.DBName),
 		SSL:          "disable",
+		ToolsBinDir:  strings.TrimSpace(p.PGBinDir),
 	}
 	cfg.StorageConfig.Path = strings.TrimSpace(p.StoragePath)
 	cfg.Auth.SecretKeyPath = strings.TrimSpace(p.SecretKeyPath)

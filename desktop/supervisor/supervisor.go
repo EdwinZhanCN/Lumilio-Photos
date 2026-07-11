@@ -346,6 +346,9 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 		ExifToolPath:  bundledExifTool(resources),
 		FFmpegPath:    bundledFFmpeg(resources),
 		FFprobePath:   bundledFFprobe(resources),
+		// The backup engine dumps with the same bundled tools that run the
+		// cluster, so client and server versions can never diverge.
+		PGBinDir: pgBinDir(resources),
 		// Always pin the supervised local hub endpoint: static entries are
 		// address facts (never expired, reconnect-managed by the SDK), so the
 		// pin is harmless while local AI is not installed/running and connects
