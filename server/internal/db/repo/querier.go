@@ -118,7 +118,6 @@ type Querier interface {
 	CreateRepositoryScanRun(ctx context.Context, arg CreateRepositoryScanRunParams) (RepositoryScanRun, error)
 	CreateShareLink(ctx context.Context, arg CreateShareLinkParams) (ShareLink, error)
 	CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error)
-	CreateStack(ctx context.Context) (AssetStack, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
@@ -140,6 +139,7 @@ type Querier interface {
 	DeleteFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteLocationClustersForScope(ctx context.Context, arg DeleteLocationClustersForScopeParams) error
+	DeleteMediaItem(ctx context.Context, mediaItemID pgtype.UUID) error
 	DeleteOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	// ============================================================================
@@ -154,6 +154,7 @@ type Querier interface {
 	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
 	DeleteShareLink(ctx context.Context, arg DeleteShareLinkParams) (int64, error)
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	// Presentation stacks ------------------------------------------------------
 	DeleteStack(ctx context.Context, stackID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteUser(ctx context.Context, userID int32) error
@@ -164,15 +165,9 @@ type Querier interface {
 	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) error
 	ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLinkExpiryParams) (ShareLink, error)
 	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
-	// Find all assets sharing the same base filename (without extension and without iteration suffix)
-	FindAssetsByBaseName(ctx context.Context, arg FindAssetsByBaseNameParams) ([]FindAssetsByBaseNameRow, error)
-	// Find assets in the same repository that share a base filename pattern
-	// This is used for auto-detecting RAW+JPEG stacks
-	FindCandidatesForStacking(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingRow, error)
-	// Find assets that share base names but are not yet in any stack.
-	// Includes taken_time and upload_time for time-based clustering, and
-	// owner_id because auto-detected stacks never span owners.
+	// Structural and burst detection ------------------------------------------
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
+	FindMediaItemsForBurstDetection(ctx context.Context, repositoryID pgtype.UUID) ([]FindMediaItemsForBurstDetectionRow, error)
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
 	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID pgtype.UUID) (RepositoryCloudBinding, error)
 	GetActiveShareLinkByTokenHash(ctx context.Context, tokenHash []byte) (ShareLink, error)
@@ -305,6 +300,10 @@ type Querier interface {
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
 	GetManualFaceClusterMembershipsForScope(ctx context.Context, arg GetManualFaceClusterMembershipsForScopeParams) ([]GetManualFaceClusterMembershipsForScopeRow, error)
+	// Logical media items -------------------------------------------------------
+	GetMediaItemByAssetID(ctx context.Context, assetID pgtype.UUID) (MediaItem, error)
+	GetMediaItemComponents(ctx context.Context, arg GetMediaItemComponentsParams) ([]MediaItemAsset, error)
+	GetMediaItemsByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetMediaItemsByAssetIDsRow, error)
 	// Cluster attachment is owner-scoped only: a face may join a cluster whose
 	// members live in a different repository, same owner.
 	GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error)
@@ -342,18 +341,16 @@ type Querier interface {
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
 	GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, error)
 	GetStackByAssetID(ctx context.Context, assetID pgtype.UUID) (GetStackByAssetIDRow, error)
-	GetStackByID(ctx context.Context, stackID pgtype.UUID) (AssetStack, error)
 	GetStackMemberCount(ctx context.Context, arg GetStackMemberCountParams) (int64, error)
 	GetStackMemberCountAny(ctx context.Context, arg GetStackMemberCountAnyParams) (int64, error)
-	// owner_id restricts the member list to assets the caller may see (nil = admin).
-	GetStackMembers(ctx context.Context, arg GetStackMembersParams) ([]AssetStackMember, error)
-	// owner_id restricts the member list to assets the caller may see (nil = admin).
-	GetStackMembersAny(ctx context.Context, arg GetStackMembersAnyParams) ([]AssetStackMember, error)
+	GetStackMembers(ctx context.Context, arg GetStackMembersParams) ([]GetStackMembersRow, error)
+	GetStackMembersAny(ctx context.Context, arg GetStackMembersAnyParams) ([]GetStackMembersAnyRow, error)
 	// ============================================================================
 	// Duplicate detection candidate queries
 	// ============================================================================
-	// Each stacked asset in the repository mapped to its stack. Used to skip
-	// duplicate edges between intentional stack members (e.g. bursts, RAW+JPEG).
+	// Each asset is mapped to its presentation stack when present, otherwise to
+	// its logical media item. This skips duplicate edges both within RAW/JPEG or
+	// Live Photo components and within intentional burst/manual stacks.
 	GetStackMembershipForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]GetStackMembershipForRepositoryRow, error)
 	GetStacksByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetStacksByAssetIDsRow, error)
 	GetSystemState(ctx context.Context) (SystemState, error)
@@ -446,6 +443,7 @@ type Querier interface {
 	MergeFaceClustersForDuplicate(ctx context.Context, arg MergeFaceClustersForDuplicateParams) error
 	MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error)
 	MoveClusterMembersToClusterManual(ctx context.Context, arg MoveClusterMembersToClusterManualParams) error
+	MoveMediaItemComponent(ctx context.Context, arg MoveMediaItemComponentParams) error
 	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
 	// rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
 	// head when available, falling back to the legacy heuristic (rating, liked,
@@ -458,7 +456,7 @@ type Querier interface {
 	ReclaimInterruptedRepositoryScanRuns(ctx context.Context) (int64, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
-	RemoveStackMember(ctx context.Context, assetID pgtype.UUID) error
+	RemoveStackMemberByAssetID(ctx context.Context, assetID pgtype.UUID) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
 	RepositoryExists(ctx context.Context, path string) (bool, error)

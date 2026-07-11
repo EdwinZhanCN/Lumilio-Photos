@@ -1597,11 +1597,10 @@
                     },
                     "stack_kind": {
                         "enum": [
-                            "raw_jpeg",
-                            "live_photo",
+                            "burst",
                             "manual"
                         ],
-                        "example": "live_photo",
+                        "example": "burst",
                         "type": "string"
                     },
                     "stack_size": {
@@ -3189,6 +3188,66 @@
                 },
                 "type": "object"
             },
+            "dto.MediaItemByAssetResponseDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "media_item": {
+                        "$ref": "#/components/schemas/dto.MediaItemDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MediaItemComponentDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "relation": {
+                        "enum": [
+                            "raw_original",
+                            "jpeg_original",
+                            "edited_version",
+                            "alternative",
+                            "live_photo_still",
+                            "live_photo_video"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MediaItemDTO": {
+                "properties": {
+                    "components": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MediaItemComponentDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "media_item_id": {
+                        "type": "string"
+                    },
+                    "media_kind": {
+                        "enum": [
+                            "photo",
+                            "video",
+                            "audio",
+                            "live_photo"
+                        ],
+                        "type": "string"
+                    },
+                    "primary_asset_id": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.MediaTokenDTO": {
                 "properties": {
                     "expires_at": {
@@ -4624,11 +4683,10 @@
                     },
                     "stack_kind": {
                         "enum": [
-                            "raw_jpeg",
-                            "live_photo",
+                            "burst",
                             "manual"
                         ],
-                        "example": "live_photo",
+                        "example": "burst",
                         "type": "string"
                     }
                 },
@@ -4636,7 +4694,7 @@
             },
             "dto.StackMemberDTO": {
                 "properties": {
-                    "asset_id": {
+                    "media_item_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440001",
                         "type": "string"
                     },
@@ -4644,9 +4702,8 @@
                         "example": 0,
                         "type": "integer"
                     },
-                    "relation": {
-                        "description": "raw_original, jpeg_original, edited_version, alternative",
-                        "example": "raw_original",
+                    "primary_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440002",
                         "type": "string"
                     }
                 },
@@ -4666,11 +4723,10 @@
                     },
                     "stack_kind": {
                         "enum": [
-                            "raw_jpeg",
-                            "live_photo",
+                            "burst",
                             "manual"
                         ],
-                        "example": "live_photo",
+                        "example": "burst",
                         "type": "string"
                     },
                     "stack_size": {
@@ -9971,6 +10027,53 @@
                     }
                 },
                 "summary": "Update asset like status",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/{id}/media-item": {
+            "get": {
+                "description": "Returns the logical media item and its RAW/JPEG, Live Photo, or edited components",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MediaItemByAssetResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get logical media item",
                 "tags": [
                     "assets"
                 ]
@@ -15507,7 +15610,7 @@
         },
         "/api/v1/repositories/{id}/stacks/detect": {
             "post": {
-                "description": "Scans a repository for RAW+JPEG pairs and creates stacks automatically",
+                "description": "Merges RAW/JPEG and Live Photo components into logical media items, then detects burst presentation stacks",
                 "parameters": [
                     {
                         "description": "Repository ID",

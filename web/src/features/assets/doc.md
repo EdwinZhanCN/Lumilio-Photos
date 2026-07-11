@@ -33,6 +33,12 @@ arrays of assets. [createBrowseGroupsFromBrowseItemDTOs](./utils/browseItems.ts)
 [browseGroupsFromQueryLikePage](./utils/browseItems.ts), and [flattenBrowseGroups](./utils/browseItems.ts) keep
 ordinary assets and stacks in one flattened browse model so selection,
 carousel positioning, and gallery tiles can share behavior.
+Physical files are composed into logical media items before they reach this
+browse surface: RAW/JPEG pairs and Live Photo still/video components render
+once through their primary asset, while burst/manual presentation stacks
+contain those logical items. [useAssetMediaItem](./hooks/useAssetMediaItem.ts) resolves components
+for [MediaViewer](./components/shared/MediaViewer.tsx); [useStackCarouselAssets](./hooks/useStackCarouselAssets.ts) resolves one primary
+asset per logical stack member, so file counts never inflate burst counts.
 
 [usePinAssetsView](./hooks/usePinAssetsView.tsx) is the agent-board full-gallery adapter. It reads
 `/api/v1/agent/pins/{id}/assets/list` and

@@ -435,6 +435,23 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 	if err != nil {
 		return nil, fmt.Errorf("get stack memberships: %w", err)
 	}
+	mediaRows, err := s.queries.GetMediaItemsByAssetIDs(ctx, assetIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get logical media memberships: %w", err)
+	}
+	type mediaMembership struct {
+		itemID         uuid.UUID
+		primaryAssetID uuid.UUID
+	}
+	mediaByAssetID := make(map[uuid.UUID]mediaMembership, len(mediaRows))
+	for _, row := range mediaRows {
+		assetID, okAsset := uuidFromPgUUID(row.AssetID)
+		itemID, okItem := uuidFromPgUUID(row.MediaItemID)
+		primaryID, okPrimary := uuidFromPgUUID(row.PrimaryAssetID)
+		if okAsset && okItem && okPrimary {
+			mediaByAssetID[assetID] = mediaMembership{itemID: itemID, primaryAssetID: primaryID}
+		}
+	}
 
 	type membership struct {
 		stackID  uuid.UUID
@@ -528,6 +545,14 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 		}
 		missingCoverIDs = append(missingCoverIDs, pgtype.UUID{Bytes: coverID, Valid: true})
 	}
+	for _, membership := range mediaByAssetID {
+		if membership.primaryAssetID == uuid.Nil {
+			continue
+		}
+		if _, ok := assetByID[membership.primaryAssetID]; !ok {
+			missingCoverIDs = append(missingCoverIDs, pgtype.UUID{Bytes: membership.primaryAssetID, Valid: true})
+		}
+	}
 	if len(missingCoverIDs) > 0 {
 		coverAssets, err := s.queries.GetAssetsByIDs(ctx, missingCoverIDs)
 		if err != nil {
@@ -544,6 +569,7 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 
 	items := make([]BrowseItem, 0, len(assets))
 	seenStacks := make(map[uuid.UUID]struct{}, len(stackOrder))
+	seenMediaItems := make(map[uuid.UUID]struct{}, len(mediaRows))
 	for _, asset := range assets {
 		assetID, ok := uuidFromPgUUID(asset.AssetID)
 		if !ok {
@@ -552,6 +578,17 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 
 		membershipInfo, isStacked := membershipByAssetID[assetID]
 		if !isStacked {
+			media, ok := mediaByAssetID[assetID]
+			if ok {
+				if _, exists := seenMediaItems[media.itemID]; exists {
+					continue
+				}
+				seenMediaItems[media.itemID] = struct{}{}
+				if primary, exists := assetByID[media.primaryAssetID]; exists {
+					asset = primary
+					assetID = media.primaryAssetID
+				}
+			}
 			items = append(items, BrowseItem{
 				Type:  "asset",
 				ID:    "asset:" + assetID.String(),

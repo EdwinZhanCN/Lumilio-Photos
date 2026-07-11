@@ -40,7 +40,7 @@ export const resolveStackCarouselAssets = async (
 
   const assets = await Promise.allSettled(
     sortedMembers.map(async (member) => {
-      const memberAssetId = member.asset_id;
+      const memberAssetId = member.primary_asset_id;
       if (!memberAssetId) return undefined;
 
       if (currentAsset.asset_id === memberAssetId) {
@@ -76,7 +76,10 @@ export const useStackCarouselAssets = (asset: Asset, open: boolean) => {
   const memberSignature = useMemo(
     () =>
       members
-        .map((member) => `${member.asset_id ?? "missing"}:${member.position ?? "na"}`)
+        .map(
+          (member) =>
+            `${member.media_item_id ?? "missing"}:${member.primary_asset_id ?? "missing"}:${member.position ?? "na"}`,
+        )
         .join("|"),
     [members],
   );

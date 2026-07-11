@@ -1,119 +1,145 @@
--- name: CreateStack :one
-INSERT INTO asset_stacks DEFAULT VALUES
-RETURNING *;
+-- Logical media items -------------------------------------------------------
 
--- name: GetStackByID :one
-SELECT * FROM asset_stacks
-WHERE stack_id = $1;
+-- name: GetMediaItemByAssetID :one
+SELECT mi.*
+FROM media_items mi
+JOIN media_item_assets mia ON mia.media_item_id = mi.media_item_id
+WHERE mia.asset_id = $1;
+
+-- name: GetMediaItemComponents :many
+SELECT mia.asset_id, mia.media_item_id, mia.relation, mia.position, mia.created_at
+FROM media_item_assets mia
+JOIN assets a ON a.asset_id = mia.asset_id
+WHERE mia.media_item_id = sqlc.arg('media_item_id')
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+ORDER BY mia.position ASC, mia.created_at ASC;
+
+-- name: GetMediaItemsByAssetIDs :many
+SELECT mia.asset_id, mia.media_item_id, mi.primary_asset_id
+FROM media_item_assets mia
+JOIN media_items mi ON mi.media_item_id = mia.media_item_id
+WHERE mia.asset_id = ANY($1::uuid[]);
+
+-- name: MoveMediaItemComponent :exec
+UPDATE media_item_assets
+SET media_item_id = sqlc.arg('target_media_item_id'),
+    relation = sqlc.arg('relation'),
+    position = sqlc.arg('position')
+WHERE asset_id = sqlc.arg('asset_id');
+
+-- name: DeleteMediaItem :exec
+DELETE FROM media_items WHERE media_item_id = $1;
+
+-- Presentation stacks ------------------------------------------------------
 
 -- name: DeleteStack :exec
-DELETE FROM asset_stacks
-WHERE stack_id = $1;
+DELETE FROM asset_stacks WHERE stack_id = $1;
 
 -- name: AddStackMember :exec
-INSERT INTO asset_stack_members (asset_id, stack_id, relation, position)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (asset_id) DO UPDATE
-SET stack_id = EXCLUDED.stack_id,
-    relation = EXCLUDED.relation,
-    position = EXCLUDED.position;
+INSERT INTO asset_stack_members (media_item_id, stack_id, position)
+VALUES ($1, $2, $3);
 
--- name: RemoveStackMember :exec
-DELETE FROM asset_stack_members
-WHERE asset_id = $1;
+-- name: RemoveStackMemberByAssetID :exec
+DELETE FROM asset_stack_members asm
+USING media_item_assets mia
+WHERE mia.asset_id = $1
+  AND asm.media_item_id = mia.media_item_id;
 
 -- name: GetStackMembers :many
--- owner_id restricts the member list to assets the caller may see (nil = admin).
-SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
+SELECT asm.media_item_id, mi.primary_asset_id AS asset_id, asm.position, asm.created_at
 FROM asset_stack_members asm
-JOIN assets a ON a.asset_id = asm.asset_id
-WHERE asm.stack_id = sqlc.arg('stack_id') AND a.is_deleted = false
-  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+JOIN media_items mi ON mi.media_item_id = asm.media_item_id
+JOIN assets a ON a.asset_id = mi.primary_asset_id
+WHERE asm.stack_id = sqlc.arg('stack_id')
+  AND a.is_deleted = false
+  AND (sqlc.narg('owner_id')::integer IS NULL OR mi.owner_id = sqlc.narg('owner_id'))
 ORDER BY asm.position ASC, asm.created_at ASC;
 
 -- name: GetStackMembersAny :many
--- owner_id restricts the member list to assets the caller may see (nil = admin).
-SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position, asm.created_at
+SELECT asm.media_item_id, mi.primary_asset_id AS asset_id, asm.position, asm.created_at
 FROM asset_stack_members asm
-JOIN assets a ON a.asset_id = asm.asset_id
+JOIN media_items mi ON mi.media_item_id = asm.media_item_id
 WHERE asm.stack_id = sqlc.arg('stack_id')
-  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR mi.owner_id = sqlc.narg('owner_id'))
 ORDER BY asm.position ASC, asm.created_at ASC;
 
 -- name: GetStackByAssetID :one
-SELECT asm.stack_id, asm.relation, asm.position
-FROM asset_stack_members asm
-WHERE asm.asset_id = $1;
+SELECT asm.stack_id, asm.media_item_id, asm.position
+FROM media_item_assets mia
+JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
+WHERE mia.asset_id = $1;
 
 -- name: GetStacksByAssetIDs :many
-SELECT asm.asset_id, asm.stack_id, asm.relation, asm.position
-FROM asset_stack_members asm
-WHERE asm.asset_id = ANY($1::uuid[]);
+SELECT mia.asset_id, asm.media_item_id, asm.stack_id, asm.position
+FROM media_item_assets mia
+JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
+WHERE mia.asset_id = ANY($1::uuid[]);
 
 -- name: GetStackMemberCount :one
-SELECT COUNT(*) as count
+SELECT COUNT(*) AS count
 FROM asset_stack_members asm
-JOIN assets a ON a.asset_id = asm.asset_id
-WHERE asm.stack_id = sqlc.arg('stack_id') AND a.is_deleted = false
-  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'));
+JOIN media_items mi ON mi.media_item_id = asm.media_item_id
+JOIN assets a ON a.asset_id = mi.primary_asset_id
+WHERE asm.stack_id = sqlc.arg('stack_id')
+  AND a.is_deleted = false
+  AND (sqlc.narg('owner_id')::integer IS NULL OR mi.owner_id = sqlc.narg('owner_id'));
 
 -- name: GetStackMemberCountAny :one
-SELECT COUNT(*) as count
+SELECT COUNT(*) AS count
 FROM asset_stack_members asm
-JOIN assets a ON a.asset_id = asm.asset_id
+JOIN media_items mi ON mi.media_item_id = asm.media_item_id
 WHERE asm.stack_id = sqlc.arg('stack_id')
-  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'));
+  AND (sqlc.narg('owner_id')::integer IS NULL OR mi.owner_id = sqlc.narg('owner_id'));
 
--- name: FindCandidatesForStacking :many
--- Find assets in the same repository that share a base filename pattern
--- This is used for auto-detecting RAW+JPEG stacks
-SELECT a.asset_id, a.original_filename, a.mime_type,
-       a.specific_metadata->>'is_raw' as is_raw,
-       regexp_replace(a.original_filename, '\.[^.]+$', '') as base_name
-FROM assets a
-WHERE a.repository_id = $1
-  AND a.is_deleted = false
-  AND a.type = 'PHOTO'
-  AND a.asset_id NOT IN (
-      SELECT asm.asset_id FROM asset_stack_members asm
-  )
-ORDER BY base_name, a.original_filename;
-
--- name: FindAssetsByBaseName :many
--- Find all assets sharing the same base filename (without extension and without iteration suffix)
-SELECT a.asset_id, a.original_filename, a.mime_type,
-       a.specific_metadata->>'is_raw' as is_raw
-FROM assets a
-WHERE a.repository_id = $1
-  AND a.is_deleted = false
-  AND a.type = 'PHOTO'
-  AND (
-    -- Match exact base name (without extension)
-    a.original_filename ILIKE $2 || '.%'
-    -- Also match iteration suffixes like ABC001-1.JPG, ABC001-2.JPG
-    OR a.original_filename ILIKE $2 || '-%.%'
-  )
-ORDER BY a.original_filename;
+-- Structural and burst detection ------------------------------------------
 
 -- name: FindCandidatesForStackingByName :many
--- Find assets that share base names but are not yet in any stack.
--- Includes taken_time and upload_time for time-based clustering, and
--- owner_id because auto-detected stacks never span owners.
-SELECT a.asset_id, a.owner_id, a.original_filename, a.mime_type,
-       a.specific_metadata->>'is_raw' as is_raw,
-       COALESCE(a.specific_metadata->>'camera_model', '')::text as camera_model,
+SELECT a.asset_id,
+       mia.media_item_id,
+       a.owner_id,
+       a.original_filename,
+       a.mime_type,
+       a.specific_metadata->>'is_raw' AS is_raw,
+       COALESCE(a.specific_metadata->>'camera_model', '')::text AS camera_model,
        COALESCE(
            NULLIF(a.exif_raw->>'BurstUUID', ''),
            NULLIF(a.exif_raw->>'BurstID', ''),
            NULLIF(a.exif_raw->>'BurstGroupID', ''),
            ''
-       )::text as burst_id,
-       a.taken_time, a.upload_time,
-       regexp_replace(a.original_filename, '\.[^.]+$', '') as base_name
+       )::text AS burst_id,
+       a.taken_time,
+       a.upload_time,
+       regexp_replace(a.original_filename, '\.[^.]+$', '') AS base_name
 FROM assets a
-LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
+JOIN media_item_assets mia ON mia.asset_id = a.asset_id
 WHERE a.repository_id = $1
   AND a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND asm.asset_id IS NULL
 ORDER BY base_name, a.original_filename;
+
+-- name: FindMediaItemsForBurstDetection :many
+SELECT mi.media_item_id,
+       mi.owner_id,
+       mi.repository_id,
+       mi.primary_asset_id,
+       primary_asset.original_filename,
+       primary_asset.taken_time,
+       primary_asset.upload_time,
+       COALESCE(primary_asset.specific_metadata->>'camera_model', '')::text AS camera_model,
+       COALESCE(
+           MAX(NULLIF(component.exif_raw->>'BurstUUID', '')),
+           MAX(NULLIF(component.exif_raw->>'BurstID', '')),
+           MAX(NULLIF(component.exif_raw->>'BurstGroupID', '')),
+           ''
+       )::text AS burst_id
+FROM media_items mi
+JOIN assets primary_asset ON primary_asset.asset_id = mi.primary_asset_id
+JOIN media_item_assets mia ON mia.media_item_id = mi.media_item_id
+JOIN assets component ON component.asset_id = mia.asset_id
+LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
+WHERE mi.repository_id = $1
+  AND mi.media_kind = 'photo'
+  AND primary_asset.is_deleted = false
+  AND asm.media_item_id IS NULL
+GROUP BY mi.media_item_id, primary_asset.asset_id
+ORDER BY COALESCE(primary_asset.taken_time, primary_asset.upload_time), mi.media_item_id;

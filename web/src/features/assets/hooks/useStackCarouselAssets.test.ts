@@ -21,9 +21,9 @@ const createMember = (
   position?: number,
   overrides: Partial<StackMemberDTO> = {},
 ): StackMemberDTO => ({
-  asset_id: assetId,
+  media_item_id: `item-${assetId}`,
+  primary_asset_id: assetId,
   position,
-  relation: "alternative",
   ...overrides,
 });
 
@@ -39,7 +39,7 @@ describe("useStackCarouselAssets helpers", () => {
       createMember("a", 0),
     ]);
 
-    expect(members.map((member) => member.asset_id)).toEqual(["a", "b", "c"]);
+    expect(members.map((member) => member.primary_asset_id)).toEqual(["a", "b", "c"]);
   });
 
   it("reuses the current asset and preserves member order", async () => {

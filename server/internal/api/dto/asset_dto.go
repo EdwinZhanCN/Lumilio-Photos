@@ -923,7 +923,7 @@ type AssetQueryRequestDTO struct {
 
 type BrowseStackDTO struct {
 	StackID          string   `json:"stack_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	StackKind        string   `json:"stack_kind,omitempty" example:"live_photo" enums:"raw_jpeg,live_photo,manual"`
+	StackKind        string   `json:"stack_kind,omitempty" example:"burst" enums:"burst,manual"`
 	CoverAssetID     string   `json:"cover_asset_id" example:"550e8400-e29b-41d4-a716-446655440001"`
 	CoverAsset       AssetDTO `json:"cover_asset"`
 	StackSize        int      `json:"stack_size" example:"3"`

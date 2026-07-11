@@ -6,10 +6,6 @@ import "fmt"
 type StackKind string
 
 const (
-	// StackKindRawJpeg groups related camera originals such as RAW + JPEG pairs.
-	StackKindRawJpeg StackKind = "raw_jpeg"
-	// StackKindLivePhoto groups the still image and companion video for a Live Photo.
-	StackKindLivePhoto StackKind = "live_photo"
 	// StackKindBurst groups frames captured in the same camera burst.
 	StackKindBurst StackKind = "burst"
 	// StackKindManual groups assets explicitly placed together by the user.
@@ -23,7 +19,7 @@ func (sk StackKind) String() *string {
 
 func (sk StackKind) Valid() bool {
 	switch sk {
-	case StackKindRawJpeg, StackKindLivePhoto, StackKindBurst, StackKindManual:
+	case StackKindBurst, StackKindManual:
 		return true
 	default:
 		return false

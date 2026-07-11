@@ -13,7 +13,7 @@ import (
 
 type DetectStacksArgs = jobs.DetectStacksArgs
 
-// DetectStacksWorker executes automatic RAW+JPEG stack detection for a repository.
+// DetectStacksWorker merges structural components and detects burst stacks.
 type DetectStacksWorker struct {
 	river.WorkerDefaults[DetectStacksArgs]
 	StackService service.StackService

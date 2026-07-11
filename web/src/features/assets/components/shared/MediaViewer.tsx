@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
 
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -11,7 +11,7 @@ import "@vidstack/react/player/styles/default/layouts/audio.css";
 
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { useI18n } from "@/lib/i18n";
-import { useStackCarouselAssets } from "@/features/assets/hooks/useStackCarouselAssets";
+import { useAssetMediaItem } from "@/features/assets/hooks/useAssetMediaItem";
 import { useLivePhotoPlayback } from "@/features/assets/hooks/useLivePhotoPlayback";
 import { LivePhotos } from "@/components/icons/LivePhotos";
 
@@ -25,7 +25,7 @@ interface MediaViewerProps {
 /**
  * MediaViewer renders the appropriate viewer for an asset.
  *
- * For Live Photo stacks the still image is shown by default.  A Live Photo
+ * For Live Photo media items the still image is shown by default. A Live Photo
  * icon button appears in the top-left corner; hovering (or pressing on touch
  * devices) plays the motion video as a translucent layer over the still image,
  * replicating the native Apple Live Photo experience without any visible
@@ -34,15 +34,22 @@ interface MediaViewerProps {
 const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "", isActive = true }) => {
   const { t } = useI18n();
   const videoAsset = isVideo(asset);
-  const isLivePhoto = asset.stack?.stack_kind === "live_photo";
-
-  // Fetch stack members only for Live Photo assets.
-  const { assets: stackAssets } = useStackCarouselAssets(asset, isLivePhoto && isActive);
-
-  const motionAsset = isLivePhoto ? stackAssets.find((a) => isVideo(a)) : undefined;
-  const livePhotoVideoUrl = motionAsset?.asset_id
-    ? assetUrls.getWebVideoUrl(motionAsset.asset_id)
+  const mediaItemQuery = useAssetMediaItem(asset.asset_id, isActive);
+  const mediaItem = mediaItemQuery.data?.media_item;
+  const components = useMemo(() => mediaItem?.components ?? [], [mediaItem?.components]);
+  const isLivePhoto = mediaItem?.media_kind === "live_photo";
+  const motionComponent = components.find((component) => component.relation === "live_photo_video");
+  const livePhotoVideoUrl = motionComponent?.asset_id
+    ? assetUrls.getWebVideoUrl(motionComponent.asset_id)
     : undefined;
+  const visualComponents = components.filter(
+    (component) => component.relation === "raw_original" || component.relation === "jpeg_original",
+  );
+  const [selectedAssetId, setSelectedAssetId] = useState(asset.asset_id);
+
+  useEffect(() => {
+    setSelectedAssetId(mediaItem?.primary_asset_id ?? asset.asset_id);
+  }, [asset.asset_id, mediaItem?.primary_asset_id]);
 
   const { videoRef, isPlaying, handlePlay, handleStop, handleEnded } = useLivePhotoPlayback();
 
@@ -52,7 +59,9 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "", isActi
 
   // For photos, get large thumbnail as fallback to original
   const imageUrl =
-    !videoAsset && asset.asset_id ? assetUrls.getThumbnailUrl(asset.asset_id, "large") : undefined;
+    !videoAsset && selectedAssetId
+      ? assetUrls.getThumbnailUrl(selectedAssetId, "large")
+      : undefined;
 
   // ── Regular video player ──────────────────────────────────────────────────
   if (videoAsset && webVideoUrl) {
@@ -125,6 +134,28 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "", isActi
                 isPlaying ? "opacity-100" : "opacity-0",
               ].join(" ")}
             />
+          )}
+
+          {visualComponents.length > 1 && (
+            <div className="join absolute top-2.5 right-2.5 z-10 bg-base-100/80 shadow-lg backdrop-blur-md">
+              {visualComponents.map((component) => {
+                const label =
+                  component.relation === "raw_original"
+                    ? t("assets.mediaViewer.componentRaw", { defaultValue: "RAW" })
+                    : t("assets.mediaViewer.componentJpeg", { defaultValue: "JPEG" });
+                return (
+                  <button
+                    key={component.asset_id}
+                    type="button"
+                    className={`btn btn-xs join-item ${selectedAssetId === component.asset_id ? "btn-active" : "btn-ghost"}`}
+                    onClick={() => component.asset_id && setSelectedAssetId(component.asset_id)}
+                    aria-pressed={selectedAssetId === component.asset_id}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           )}
 
           {/* Live Photo icon button — anchored to the image's top-left corner */}

@@ -214,7 +214,7 @@ func (ScanRepositoryArgs) InsertOpts() river.InsertOpts {
 	}}
 }
 
-// DetectStacksArgs triggers automatic RAW+JPEG stack detection for a repository.
+// DetectStacksArgs triggers logical-media merging and burst detection for a repository.
 type DetectStacksArgs struct {
 	RepositoryID string `json:"repositoryId" river:"unique"`
 }

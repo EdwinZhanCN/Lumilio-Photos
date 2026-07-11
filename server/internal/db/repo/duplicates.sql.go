@@ -466,9 +466,10 @@ func (q *Queries) GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []p
 
 const getStackMembershipForRepository = `-- name: GetStackMembershipForRepository :many
 
-SELECT asm.asset_id, asm.stack_id
-FROM asset_stack_members asm
-INNER JOIN assets a ON a.asset_id = asm.asset_id
+SELECT mia.asset_id, COALESCE(asm.stack_id, mia.media_item_id) AS stack_id
+FROM media_item_assets mia
+LEFT JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
+INNER JOIN assets a ON a.asset_id = mia.asset_id
 WHERE a.repository_id = $1
   AND a.is_deleted = false
 `
@@ -481,8 +482,9 @@ type GetStackMembershipForRepositoryRow struct {
 // ============================================================================
 // Duplicate detection candidate queries
 // ============================================================================
-// Each stacked asset in the repository mapped to its stack. Used to skip
-// duplicate edges between intentional stack members (e.g. bursts, RAW+JPEG).
+// Each asset is mapped to its presentation stack when present, otherwise to
+// its logical media item. This skips duplicate edges both within RAW/JPEG or
+// Live Photo components and within intentional burst/manual stacks.
 func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]GetStackMembershipForRepositoryRow, error) {
 	rows, err := q.db.Query(ctx, getStackMembershipForRepository, repositoryID)
 	if err != nil {

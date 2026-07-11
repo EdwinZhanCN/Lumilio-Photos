@@ -396,7 +396,8 @@ WITH filtered AS MATERIALIZED (
     a.asset_id,
     asm.stack_id
   FROM assets a
-  LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
+  JOIN media_items mi ON mi.primary_asset_id = a.asset_id
+  LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
     AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
     AND ($3::text IS NULL OR a.original_filename ILIKE '%' || $3 || '%')
@@ -2594,7 +2595,8 @@ WITH filtered AS MATERIALIZED (
     asm.stack_id,
     asm.position
   FROM assets a
-  LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
+  JOIN media_items mi ON mi.primary_asset_id = a.asset_id
+  LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
     AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
     AND ($3::text IS NULL OR a.original_filename ILIKE '%' || $3 || '%')
@@ -2716,19 +2718,23 @@ WITH filtered AS MATERIALIZED (
 stack_covers AS MATERIALIZED (
   SELECT DISTINCT ON (asm.stack_id)
     asm.stack_id,
-    asm.asset_id AS cover_asset_id
+    COALESCE(cover_item.primary_asset_id, mi.primary_asset_id) AS cover_asset_id
   FROM asset_stack_members asm
-  JOIN assets a ON a.asset_id = asm.asset_id
+  JOIN asset_stacks s ON s.stack_id = asm.stack_id
+  JOIN media_items mi ON mi.media_item_id = asm.media_item_id
+  LEFT JOIN media_items cover_item ON cover_item.media_item_id = s.cover_media_item_id
+  JOIN assets a ON a.asset_id = mi.primary_asset_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
     AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
-  ORDER BY asm.stack_id, asm.position ASC NULLS LAST, asm.asset_id ASC
+  ORDER BY asm.stack_id, asm.position ASC NULLS LAST, asm.media_item_id ASC
 ),
 stack_members_all AS MATERIALIZED (
   SELECT
     asm.stack_id,
-    ARRAY_AGG(asm.asset_id ORDER BY asm.position ASC NULLS LAST, asm.asset_id ASC)::uuid[] AS member_asset_ids
+    ARRAY_AGG(mi.primary_asset_id ORDER BY asm.position ASC NULLS LAST, asm.media_item_id ASC)::uuid[] AS member_asset_ids
   FROM asset_stack_members asm
-  JOIN assets a ON a.asset_id = asm.asset_id
+  JOIN media_items mi ON mi.media_item_id = asm.media_item_id
+  JOIN assets a ON a.asset_id = mi.primary_asset_id
   WHERE a.is_deleted = COALESCE($1::boolean, false)
     AND ($2::uuid[] IS NULL OR a.asset_id = ANY($2::uuid[]))
   GROUP BY asm.stack_id

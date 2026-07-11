@@ -3,11 +3,13 @@
 -- ============================================================================
 
 -- name: GetStackMembershipForRepository :many
--- Each stacked asset in the repository mapped to its stack. Used to skip
--- duplicate edges between intentional stack members (e.g. bursts, RAW+JPEG).
-SELECT asm.asset_id, asm.stack_id
-FROM asset_stack_members asm
-INNER JOIN assets a ON a.asset_id = asm.asset_id
+-- Each asset is mapped to its presentation stack when present, otherwise to
+-- its logical media item. This skips duplicate edges both within RAW/JPEG or
+-- Live Photo components and within intentional burst/manual stacks.
+SELECT mia.asset_id, COALESCE(asm.stack_id, mia.media_item_id) AS stack_id
+FROM media_item_assets mia
+LEFT JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
+INNER JOIN assets a ON a.asset_id = mia.asset_id
 WHERE a.repository_id = sqlc.arg('repository_id')
   AND a.is_deleted = false;
 
