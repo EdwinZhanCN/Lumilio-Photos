@@ -22,6 +22,7 @@
     },
     "assetsPageHeader": {
       "actions": {
+        "addTags": "Add tags",
         "addToAlbum": "Add to Album",
         "affectsAssets": "{{selectedCount}} selected items will affect {{assetCount}} assets.",
         "affectsSelected_one": "{{count}} selected items.",
@@ -37,6 +38,17 @@
         "title": "Actions",
         "unlike": "Unliked",
         "unrated": "Unrated"
+      },
+      "addTagsModal": {
+        "apply_one": "Apply {{count}} tags",
+        "apply_other": "Apply {{count}} tags",
+        "create": "Create \"{{name}}\"",
+        "loading": "Loading tags…",
+        "message_one": "Add tags to {{count}} selected items.",
+        "message_other": "Add tags to {{count}} selected items.",
+        "noResults": "No matching tags",
+        "searchPlaceholder": "Search or create tags…",
+        "title": "Add tags"
       },
       "addToAlbumModal": {
         "itemCount_one": "{{count}} item",
@@ -68,6 +80,9 @@
         "title": "Move selected assets to Trash?"
       },
       "messages": {
+        "addTagsError": "Failed to add tags to selected assets.",
+        "addTagsSuccess_one": "Added tags to {{count}} assets.",
+        "addTagsSuccess_other": "Added tags to {{count}} assets.",
         "addToAlbumError": "Failed to add items to album",
         "addToAlbumSuccess_one": "Added {{count}} item to album.",
         "addToAlbumSuccess_other": "Added {{count}} items to album.",
@@ -924,6 +939,8 @@
     },
     "chat": {
       "confirmation": {
+        "addToAlbum_one": "Add {{count}} photos to this album?",
+        "addToAlbum_other": "Add {{count}} photos to this album?",
         "approved": "Confirmed",
         "confirm": "Confirm",
         "createAlbum_one": "Create album \"{{title}}\" with {{count}} photo?",

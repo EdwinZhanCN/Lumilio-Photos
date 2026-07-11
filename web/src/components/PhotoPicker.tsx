@@ -106,6 +106,7 @@ function PhotoPickerContent({
           "set-rating",
           "set-liked",
           "stack-selected",
+          "add-tags",
           "add-to-album",
           "download",
           "delete-assets",

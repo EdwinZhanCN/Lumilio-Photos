@@ -22,6 +22,7 @@
     },
     "assetsPageHeader": {
       "actions": {
+        "addTags": "添加标签",
         "addToAlbum": "添加到相册",
         "affectsAssets": "已选择 {{selectedCount}} 项，将影响 {{assetCount}} 个资源。",
         "affectsSelected_one": "已选择 {{count}} 项。",
@@ -37,6 +38,17 @@
         "title": "操作",
         "unlike": "取消喜欢",
         "unrated": "未评分"
+      },
+      "addTagsModal": {
+        "apply_one": "应用 {{count}} 个标签",
+        "apply_other": "应用 {{count}} 个标签",
+        "create": "创建「{{name}}」",
+        "loading": "正在加载标签…",
+        "message_one": "为 {{count}} 个所选项目添加标签。",
+        "message_other": "为 {{count}} 个所选项目添加标签。",
+        "noResults": "没有匹配的标签",
+        "searchPlaceholder": "搜索或创建标签…",
+        "title": "添加标签"
       },
       "addToAlbumModal": {
         "itemCount_one": "{{count}} 个项目",
@@ -68,6 +80,9 @@
         "title": "将所选资源移入回收站？"
       },
       "messages": {
+        "addTagsError": "为所选资源添加标签失败。",
+        "addTagsSuccess_one": "已为 {{count}} 个资源添加标签。",
+        "addTagsSuccess_other": "已为 {{count}} 个资源添加标签。",
         "addToAlbumError": "添加到相册失败",
         "addToAlbumSuccess_one": "已将 {{count}} 个项目添加到相册。",
         "addToAlbumSuccess_other": "已将 {{count}} 个项目添加到相册。",
@@ -920,6 +935,8 @@
     },
     "chat": {
       "confirmation": {
+        "addToAlbum_one": "将 {{count}} 张照片加入此相册？",
+        "addToAlbum_other": "将 {{count}} 张照片加入此相册？",
         "approved": "已确认",
         "confirm": "确认",
         "createAlbum_one": "创建相册「{{title}}」并加入 {{count}} 张照片？",

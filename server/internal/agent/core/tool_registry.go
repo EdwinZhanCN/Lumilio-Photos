@@ -161,12 +161,15 @@ var modeToolSets = map[string]map[string]bool{
 		"search_semantic": true,
 		"search_people":   true,
 		"lookup_people":   true,
+		"lookup_albums":   true,
 		"combine":         true,
 		"rank":            true,
 		"top":             true,
 		"sample":          true,
 		"dedupe":          true,
 		"describe":        true,
+		"create_album":    true,
+		"add_to_album":    true,
 		"show":            true,
 	},
 }
@@ -188,10 +191,14 @@ var modeInstructionExtras = map[string]string{
 		"Give data-driven insights (most-used focal length, peak shooting periods, how gear/lens and " +
 		"location choices shift over time) and use show to present supporting photos.",
 	"curate": "You are in CURATE MODE. Help the user pick the best photos: " +
-		"use filter to build a candidate pool, rank(quality) to sort (quality is based on the SigLIP " +
-		"aesthetic model score 1-10; scores cluster in the 5-7 range with median ~5.5-6, " +
-		"7+ is already a good photo and 8+ is extremely rare), top to trim. " +
-		"Watch for diversity — avoid burst/duplicate picks. Give brief selection rationale and show the result.",
+		"use filter to build a candidate pool (min_quality_percentile drops the lower aesthetic tier " +
+		"of the matched set — e.g. 75 keeps scores at/above that set's p75), rank(quality) to sort " +
+		"(quality is based on the SigLIP aesthetic model score 1-10; scores cluster in the 5-7 range " +
+		"with median ~5.5-6, 7+ is already a good photo and 8+ is extremely rare), " +
+		"dedupe to collapse bursts (keep_per_cluster>1 when the user wants a few frames per burst), " +
+		"top to trim. Watch for diversity — avoid burst/duplicate picks. " +
+		"Give brief selection rationale, show the result, and offer create_album or add_to_album " +
+		"so the shortlist becomes a durable delivery (user must confirm).",
 }
 
 // RetrieverSearch is the single-retriever search surface the producer tools

@@ -86,6 +86,15 @@ func TestModeHasTool(t *testing.T) {
 	if !ModeHasTool("curate", "dedupe") {
 		t.Error("curate should expose dedupe")
 	}
+	if !ModeHasTool("curate", "create_album") {
+		t.Error("curate should expose create_album")
+	}
+	if !ModeHasTool("curate", "add_to_album") {
+		t.Error("curate should expose add_to_album")
+	}
+	if !ModeHasTool("curate", "lookup_albums") {
+		t.Error("curate should expose lookup_albums for add_to_album")
+	}
 }
 
 func TestBuildInstructionGatesToolMentions(t *testing.T) {

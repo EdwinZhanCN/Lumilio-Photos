@@ -126,3 +126,10 @@ FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
   AND is_deleted = false
 ORDER BY upload_time ASC, asset_id ASC;
+
+-- name: AgentAssetAestheticScores :many
+-- Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
+-- omitted; callers that filter by quality percentile drop them.
+SELECT asset_id, score
+FROM asset_quality_scores
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[]);

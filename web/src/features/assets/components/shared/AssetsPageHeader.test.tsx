@@ -40,6 +40,7 @@ vi.mock("@/features/assets/hooks/useSelection", () => ({
     bulkDelete: vi.fn(),
     bulkDownload: vi.fn(),
     bulkAddToAlbum: vi.fn(),
+    bulkAddTags: vi.fn(),
     bulkUpdateRating: vi.fn(),
     bulkSetLike: vi.fn(),
   }),
@@ -131,6 +132,7 @@ describe("AssetsPageHeader bulk actions", () => {
           "set-rating",
           "set-liked",
           "stack-selected",
+          "add-tags",
           "add-to-album",
           "download",
           "delete-assets",
@@ -147,6 +149,7 @@ describe("AssetsPageHeader bulk actions", () => {
 
     expect(screen.queryByText("Set Rating")).not.toBeInTheDocument();
     expect(screen.queryByText("Add to Album")).not.toBeInTheDocument();
+    expect(screen.queryByText("Add tags")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByText("Custom action")[0]!);
 
@@ -159,6 +162,26 @@ describe("AssetsPageHeader bulk actions", () => {
         }),
       );
     });
+  });
+
+  it("shows Add tags by default and opens the tag picker modal", async () => {
+    render(
+      <AssetsPageHeader
+        sortBy="date_captured"
+        onSortByChange={vi.fn()}
+        title="Assets"
+        browseItems={browseItems}
+        hiddenBulkActions={["set-rating", "set-liked", "stack-selected", "download", "delete-assets"]}
+      />,
+    );
+
+    const addTagsButtons = screen.getAllByText("Add tags");
+    expect(addTagsButtons.length).toBeGreaterThan(0);
+    fireEvent.click(addTagsButtons[0]!);
+
+    expect(
+      screen.getByText("Add tags to {{count}} selected items.", { exact: false }),
+    ).toBeInTheDocument();
   });
 
   it("confirms custom actions that require confirmation", async () => {
@@ -174,6 +197,7 @@ describe("AssetsPageHeader bulk actions", () => {
           "set-rating",
           "set-liked",
           "stack-selected",
+          "add-tags",
           "add-to-album",
           "download",
           "delete-assets",

@@ -16,6 +16,7 @@ import {
   Star,
   ImageIcon,
   Layers2,
+  Tags,
 } from "lucide-react";
 import FilterTool, {
   FilterDTO,
@@ -50,6 +51,13 @@ import {
   type AssetsBulkActionInput,
   type AssetsBulkActionItem,
 } from "@/features/assets/components/shared/bulkActions";
+import TagPickerMenu, {
+  type TagPickerItem,
+} from "@/features/assets/components/shared/TagPickerMenu";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { components } from "@/lib/http-commons/schema.d.ts";
+
+type TagSuggestion = components["schemas"]["dto.TagDTO"];
 
 type ConfirmableBulkAction = { type: "rating"; rating: number } | { type: "liked"; liked: boolean };
 
@@ -111,9 +119,19 @@ const AssetsPageHeader = ({
   const [isRunningCustomAction, setIsRunningCustomAction] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
+  const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
+  const [isAddingTags, setIsAddingTags] = useState(false);
+  const [tagQuery, setTagQuery] = useState("");
+  const [pendingTags, setPendingTags] = useState<TagPickerItem[]>([]);
   const albumOptionsQuery = useAlbumOptions(isAlbumModalOpen);
   const albums = albumOptionsQuery.data?.albums ?? [];
   const isLoadingAlbums = albumOptionsQuery.isPending;
+  const tagSuggestionsQuery = $api.useQuery(
+    "get",
+    "/api/v1/assets/tags",
+    { params: { query: { q: tagQuery, limit: 20 } } },
+    { enabled: isTagsModalOpen, staleTime: 30_000 },
+  );
   // Scan follows the browse scope: it targets what the gallery is showing
   // (one repository, or every repository when the scope is "All").
   const { repositories, selectedRepository, scopeLabel } = useBrowseScope();
@@ -386,6 +404,7 @@ const AssetsPageHeader = ({
     !isDefaultActionHidden("set-liked") ||
     !isDefaultActionHidden("stack-selected") ||
     visibleCustomBulkActions.length > 0 ||
+    !isDefaultActionHidden("add-tags") ||
     !isDefaultActionHidden("add-to-album") ||
     !isDefaultActionHidden("download") ||
     !isDefaultActionHidden("delete-assets");
@@ -447,6 +466,92 @@ const AssetsPageHeader = ({
       showMessage("error", t("assets.assetsPageHeader.messages.addToAlbumError"));
     } finally {
       setIsAddingToAlbum(false);
+    }
+  };
+
+  const closeTagsModal = () => {
+    setIsTagsModalOpen(false);
+    setTagQuery("");
+    setPendingTags([]);
+  };
+
+  const handleAddTagsClick = () => {
+    setTagQuery("");
+    setPendingTags([]);
+    setIsTagsModalOpen(true);
+  };
+
+  const pendingTagNames = useMemo(
+    () => new Set(pendingTags.map((tag) => tag.name.toLowerCase())),
+    [pendingTags],
+  );
+
+  const tagSuggestionItems = useMemo<TagPickerItem[]>(() => {
+    const raw: TagSuggestion[] = tagSuggestionsQuery.data?.tags ?? [];
+    return raw
+      .filter(
+        (tag) =>
+          Boolean(tag.tag_name) && !pendingTagNames.has((tag.tag_name ?? "").toLowerCase()),
+      )
+      .map((tag) => ({
+        id: tag.tag_id ?? tag.tag_name!,
+        name: tag.tag_name!,
+      }));
+  }, [pendingTagNames, tagSuggestionsQuery.data?.tags]);
+
+  const trimmedTagQuery = tagQuery.trim();
+  const tagExactExists =
+    trimmedTagQuery.length > 0 &&
+    (pendingTagNames.has(trimmedTagQuery.toLowerCase()) ||
+      tagSuggestionItems.some(
+        (tag) => tag.name.toLowerCase() === trimmedTagQuery.toLowerCase(),
+      ));
+  const showCreateTag = trimmedTagQuery.length > 0 && !tagExactExists;
+
+  const addPendingTag = (item: TagPickerItem) => {
+    const name = item.name.trim();
+    if (!name) return;
+    setPendingTags((prev) => {
+      if (prev.some((tag) => tag.name.toLowerCase() === name.toLowerCase())) return prev;
+      return [...prev, { id: item.id, name }];
+    });
+    setTagQuery("");
+  };
+
+  const removePendingTag = (item: TagPickerItem) => {
+    setPendingTags((prev) =>
+      prev.filter((tag) => tag.name.toLowerCase() !== item.name.toLowerCase()),
+    );
+  };
+
+  const handleCreatePendingTag = () => {
+    if (!trimmedTagQuery) return;
+    addPendingTag({ id: trimmedTagQuery, name: trimmedTagQuery });
+  };
+
+  const handleApplyTags = async () => {
+    if (pendingTags.length === 0) return;
+    setIsAddingTags(true);
+    try {
+      await bulkOps.bulkAddTags(pendingTags.map((tag) => tag.name));
+      showMessage(
+        "success",
+        t("assets.assetsPageHeader.messages.addTagsSuccess", {
+          count: affectedAssetCount,
+          defaultValue: "Added tags to {{count}} assets.",
+        }),
+      );
+      closeTagsModal();
+      selection.clear();
+    } catch {
+      showMessage(
+        "error",
+        t("assets.assetsPageHeader.messages.addTagsError", {
+          defaultValue: "Failed to add tags to selected assets.",
+        }),
+      );
+    } finally {
+      setIsAddingTags(false);
     }
   };
 
@@ -767,9 +872,26 @@ const AssetsPageHeader = ({
                 {renderDefaultMetadataBulkActionItems()}
                 {renderStackSelectedBulkActionItem()}
                 {renderCustomBulkActionItems()}
-                {(!isDefaultActionHidden("add-to-album") ||
+                {(!isDefaultActionHidden("add-tags") ||
+                  !isDefaultActionHidden("add-to-album") ||
                   !isDefaultActionHidden("download") ||
                   !isDefaultActionHidden("delete-assets")) && <div className="divider my-1"></div>}
+                {!isDefaultActionHidden("add-tags") && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAddTagsClick();
+                        handleDropdownItemClick();
+                      }}
+                    >
+                      <Tags size={16} />
+                      {t("assets.assetsPageHeader.actions.addTags", {
+                        defaultValue: "Add tags",
+                      })}
+                    </button>
+                  </li>
+                )}
                 {!isDefaultActionHidden("add-to-album") && (
                   <li>
                     <button
@@ -932,6 +1054,21 @@ const AssetsPageHeader = ({
                       {renderDefaultMetadataBulkActionItems()}
                       {renderStackSelectedBulkActionItem()}
                       {renderCustomBulkActionItems()}
+                      {!isDefaultActionHidden("add-tags") && (
+                        <li>
+                          <button
+                            onClick={() => {
+                              handleAddTagsClick();
+                              handleDropdownItemClick();
+                            }}
+                          >
+                            <Tags size={16} />{" "}
+                            {t("assets.assetsPageHeader.actions.addTags", {
+                              defaultValue: "Add tags",
+                            })}
+                          </button>
+                        </li>
+                      )}
                       {!isDefaultActionHidden("add-to-album") && (
                         <li>
                           <button
@@ -1224,6 +1361,101 @@ const AssetsPageHeader = ({
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => setIsAlbumModalOpen(false)}></div>
+        </div>
+      )}
+
+      {/* Add Tags Modal */}
+      {isTagsModalOpen && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-md flex flex-col p-0 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-base-200 shrink-0">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Tags className="text-primary" size={20} />
+                {t("assets.assetsPageHeader.addTagsModal.title", {
+                  defaultValue: "Add tags",
+                })}
+              </h3>
+              <button className="btn btn-sm btn-circle btn-ghost" onClick={closeTagsModal}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm opacity-70 px-5 py-2 shrink-0">
+              {t("assets.assetsPageHeader.addTagsModal.message", {
+                count: selectedItemCount,
+                defaultValue: "Add tags to {{count}} selected items.",
+              })}
+              {showAffectedAssetCount && (
+                <span className="mt-1 block">{renderAffectedAssetHint()}</span>
+              )}
+            </p>
+
+            <div className="px-3 pb-3">
+              <TagPickerMenu
+                query={tagQuery}
+                onQueryChange={setTagQuery}
+                checked={pendingTags}
+                suggestions={tagSuggestionItems}
+                onToggleChecked={removePendingTag}
+                onSelectSuggestion={addPendingTag}
+                showCreate={showCreateTag}
+                createLabel={t("assets.assetsPageHeader.addTagsModal.create", {
+                  name: trimmedTagQuery,
+                  defaultValue: 'Create "{{name}}"',
+                })}
+                createName={trimmedTagQuery}
+                onCreate={handleCreatePendingTag}
+                loading={tagSuggestionsQuery.isFetching}
+                placeholder={t("assets.assetsPageHeader.addTagsModal.searchPlaceholder", {
+                  defaultValue: "Search or create tags…",
+                })}
+                loadingText={t("assets.assetsPageHeader.addTagsModal.loading", {
+                  defaultValue: "Loading tags…",
+                })}
+                noResultsText={t("assets.assetsPageHeader.addTagsModal.noResults", {
+                  defaultValue: "No matching tags",
+                })}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeTagsModal();
+                    return;
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (showCreateTag) {
+                      handleCreatePendingTag();
+                    } else if (tagSuggestionItems[0]) {
+                      addPendingTag(tagSuggestionItems[0]);
+                    }
+                  }
+                }}
+                className="max-h-72"
+              />
+            </div>
+
+            <div className="border-t border-base-200 px-5 py-3 shrink-0 flex justify-end gap-2">
+              <button className="btn btn-ghost btn-sm" onClick={closeTagsModal}>
+                {t("common.cancel")}
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={pendingTags.length === 0 || isAddingTags}
+                onClick={() => void handleApplyTags()}
+              >
+                {isAddingTags ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  t("assets.assetsPageHeader.addTagsModal.apply", {
+                    count: pendingTags.length,
+                    defaultValue: "Apply {{count}} tags",
+                  })
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={closeTagsModal}></div>
         </div>
       )}
     </>

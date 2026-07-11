@@ -5,6 +5,7 @@ export type AssetsBulkActionId =
   | "set-rating"
   | "set-liked"
   | "stack-selected"
+  | "add-tags"
   | "add-to-album"
   | "download"
   | "delete-assets"
@@ -41,6 +42,7 @@ export const DEFAULT_ASSETS_BULK_ACTION_IDS = [
   "set-rating",
   "set-liked",
   "stack-selected",
+  "add-tags",
   "add-to-album",
   "download",
   "delete-assets",
