@@ -282,7 +282,44 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		Settings:    settingsService.GetBackupConfig,
 		Logf:        func(format string, args ...any) { backupLogger.Infof(format, args...) },
 	}
-	river.AddWorker[queue.DatabaseBackupArgs](workers, &queue.DatabaseBackupWorker{Run: backupScheduler.RunDue})
+	river.AddWorker[queue.DatabaseBackupArgs](workers, &queue.DatabaseBackupWorker{Run: backupScheduler.Run})
+
+	// Admin backup surface (list/trigger/download/delete/restore). Restore
+	// pauses all queues ("*"), applies the dump with a restore point +
+	// automatic rollback, re-runs migrations, and health-checks before
+	// resuming the queues.
+	backupService := service.NewBackupService(service.BackupRuntime{
+		Conn:        backupScheduler.Conn,
+		Pool:        pgxPool,
+		ToolsBinDir: dbConfig.ToolsBinDir,
+		Dir:         appConfig.StorageConfig.BackupsDir(),
+		AppVersion:  version.Version,
+		Logf:        backupScheduler.Logf,
+		Hooks: dbbackup.RestoreHooks{
+			Quiesce: func(ctx context.Context) error {
+				return queueClient.QueuePause(ctx, "*", nil)
+			},
+			Resume: func(ctx context.Context) error {
+				return queueClient.QueueResume(ctx, "*", nil)
+			},
+			Migrate: func(ctx context.Context) error {
+				return db.AutoMigrate(ctx, dbConfig)
+			},
+			Verify: func(ctx context.Context) error {
+				if _, err := settingsService.GetSystemSettings(ctx); err != nil {
+					return fmt.Errorf("settings unreadable after restore: %w", err)
+				}
+				var users int
+				if err := pgxPool.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
+					return fmt.Errorf("users table unreadable after restore: %w", err)
+				}
+				if users == 0 {
+					return fmt.Errorf("no users present after restore")
+				}
+				return nil
+			},
+		},
+	}, queueClient)
 
 	// River's Start runs the client in a background goroutine until Stop is
 	// called; it returns once startup completes. context.Background is used (not
@@ -332,7 +369,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
-	settingsController := handler.NewSettingsHandler(settingsService, dto.NewRuntimeInfoDTO(appConfig))
+	settingsController := handler.NewSettingsHandler(settingsService, backupService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
 	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyPath, appConfig.StorageConfig.Path, appLogger.Named("cloud_sync"))

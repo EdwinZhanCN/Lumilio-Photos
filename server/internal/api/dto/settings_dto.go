@@ -8,10 +8,17 @@ import (
 )
 
 type SystemSettingsDTO struct {
-	LLM       LLMSettingsDTO `json:"llm"`
-	ML        MLSettingsDTO  `json:"ml"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	UpdatedBy *int32         `json:"updated_by,omitempty"`
+	LLM       LLMSettingsDTO    `json:"llm"`
+	ML        MLSettingsDTO     `json:"ml"`
+	Backup    BackupSettingsDTO `json:"backup"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	UpdatedBy *int32            `json:"updated_by,omitempty"`
+}
+
+type BackupSettingsDTO struct {
+	Enabled       bool  `json:"enabled"`
+	IntervalHours int32 `json:"interval_hours" example:"24"`
+	KeepLast      int32 `json:"keep_last" example:"14"`
 }
 
 type LLMSettingsDTO struct {
@@ -36,8 +43,15 @@ type RepositoryDefaultsDTO struct {
 }
 
 type UpdateSystemSettingsDTO struct {
-	LLM *UpdateLLMSettingsDTO `json:"llm,omitempty"`
-	ML  *UpdateMLSettingsDTO  `json:"ml,omitempty"`
+	LLM    *UpdateLLMSettingsDTO    `json:"llm,omitempty"`
+	ML     *UpdateMLSettingsDTO     `json:"ml,omitempty"`
+	Backup *UpdateBackupSettingsDTO `json:"backup,omitempty"`
+}
+
+type UpdateBackupSettingsDTO struct {
+	Enabled       *bool  `json:"enabled,omitempty"`
+	IntervalHours *int32 `json:"interval_hours,omitempty" binding:"omitempty,min=1,max=720"`
+	KeepLast      *int32 `json:"keep_last,omitempty" binding:"omitempty,min=1,max=365"`
 }
 
 type UpdateLLMSettingsDTO struct {
@@ -105,6 +119,11 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 			OCREnabled:      settings.ML.OCREnabled,
 			FaceEnabled:     settings.ML.FaceEnabled,
 		},
+		Backup: BackupSettingsDTO{
+			Enabled:       settings.Backup.Enabled,
+			IntervalHours: settings.Backup.IntervalHours,
+			KeepLast:      settings.Backup.KeepLast,
+		},
 		UpdatedAt: settings.UpdatedAt,
 		UpdatedBy: settings.UpdatedBy,
 	}
@@ -131,6 +150,14 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 			BioCLIPEnabled:  dto.ML.BioCLIPEnabled,
 			OCREnabled:      dto.ML.OCREnabled,
 			FaceEnabled:     dto.ML.FaceEnabled,
+		}
+	}
+
+	if dto.Backup != nil {
+		input.Backup = &service.UpdateBackupSettingsInput{
+			Enabled:       dto.Backup.Enabled,
+			IntervalHours: dto.Backup.IntervalHours,
+			KeepLast:      dto.Backup.KeepLast,
 		}
 	}
 

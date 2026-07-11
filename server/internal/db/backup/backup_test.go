@@ -142,7 +142,7 @@ func schedulerFixture(t *testing.T, cfg settings.Backup, now time.Time) (*Schedu
 func TestSchedulerSkipsWhenDisabled(t *testing.T) {
 	s, _ := schedulerFixture(t, settings.Backup{Enabled: false}, time.Now())
 	// Pool is nil: reaching the version probe would panic, proving the skip.
-	if err := s.RunDue(context.Background()); err != nil {
+	if err := s.Run(context.Background(), false); err != nil {
 		t.Fatalf("disabled scheduler should be a silent no-op, got %v", err)
 	}
 }
@@ -155,7 +155,7 @@ func TestSchedulerSkipsWhenNotDue(t *testing.T) {
 	}
 	touch(t, s.Dir, FileName(now.Add(-2*time.Hour), "v1", "17.5"), time.Time{})
 
-	if err := s.RunDue(context.Background()); err != nil {
+	if err := s.Run(context.Background(), false); err != nil {
 		t.Fatalf("not-due scheduler should be a silent no-op, got %v", err)
 	}
 }
@@ -167,7 +167,37 @@ func TestSchedulerSkipsWhenStorageUnreachable(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Unreachable storage skips before the version probe (nil Pool would panic).
-	if err := s.RunDue(context.Background()); err != nil {
+	if err := s.Run(context.Background(), false); err != nil {
 		t.Fatalf("unreachable storage must skip with a warning, got %v", err)
 	}
+}
+
+func TestSchedulerForcedRunErrorsOnUnreachableStorage(t *testing.T) {
+	s, storage := schedulerFixture(t, settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 3}, time.Now())
+	if err := os.RemoveAll(storage); err != nil {
+		t.Fatal(err)
+	}
+	// A forced run is an explicit admin action: surface the problem instead of
+	// silently skipping.
+	if err := s.Run(context.Background(), true); err == nil {
+		t.Fatal("forced run with unreachable storage must return an error")
+	}
+}
+
+func TestSchedulerForcedRunBypassesDisabledAndDue(t *testing.T) {
+	now := time.Date(2026, 7, 11, 3, 0, 0, 0, time.Local)
+	s, _ := schedulerFixture(t, settings.Backup{Enabled: false, IntervalHours: 24, KeepLast: 3}, now)
+	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	touch(t, s.Dir, FileName(now.Add(-time.Minute), "v1", "17.5"), time.Time{})
+
+	// Force proceeds past enabled/due into the version probe; the nil Pool
+	// panic proves the checks were bypassed (recovered into a pass).
+	defer func() {
+		if recover() == nil {
+			t.Fatal("forced run should have reached the version probe (nil Pool panic)")
+		}
+	}()
+	_ = s.Run(context.Background(), true)
 }

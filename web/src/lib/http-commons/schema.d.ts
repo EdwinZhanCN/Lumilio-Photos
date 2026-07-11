@@ -9199,6 +9199,320 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List database backups
+         * @description List database dumps (routine backups and restore points), newest first.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Backups listed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.BackupListDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a database backup now
+         * @description Enqueue an immediate database dump; it appears in the list when the job finishes.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Backup enqueued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/backups/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a database backup
+         * @description Delete one dump file from the backups directory.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Backup file name */
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Backup deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Invalid backup name */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/backups/{name}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a database backup
+         * @description Download one dump file as gzip.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Backup file name */
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Backup file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/gzip": Record<string, never>;
+                    };
+                };
+                /** @description Invalid backup name */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/gzip": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/gzip": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Backup not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/gzip": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/backups/{name}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a database backup
+         * @description Restore the named dump. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Backup file name */
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Backup restored */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Invalid backup name */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Another restore is already in progress */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Restore failed (database rolled back) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/runtime-info": {
         parameters: {
             query?: never;
@@ -11232,6 +11546,28 @@ export interface components {
             repository_id?: string;
             stacks_created?: number;
         };
+        "dto.BackupEntryDTO": {
+            /** @example 1.2.3 */
+            app_version?: string;
+            created_at?: string;
+            /** @example lumilio-db-backup-20260711T020000-v1.2.3-pg17.5.sql.gz */
+            name?: string;
+            /** @example 17.5 */
+            pg_version?: string;
+            restore_point?: boolean;
+            /** @example 1048576 */
+            size_bytes?: number;
+        };
+        "dto.BackupListDTO": {
+            backups?: components["schemas"]["dto.BackupEntryDTO"][];
+        };
+        "dto.BackupSettingsDTO": {
+            enabled?: boolean;
+            /** @example 24 */
+            interval_hours?: number;
+            /** @example 14 */
+            keep_last?: number;
+        };
         "dto.BatchUploadResponseDTO": {
             results?: components["schemas"]["dto.BatchUploadResultDTO"][];
         };
@@ -12547,6 +12883,7 @@ export interface components {
             y?: number;
         };
         "dto.SystemSettingsDTO": {
+            backup?: components["schemas"]["dto.BackupSettingsDTO"];
             llm?: components["schemas"]["dto.LLMSettingsDTO"];
             ml?: components["schemas"]["dto.MLSettingsDTO"];
             updated_at?: string;
@@ -12604,6 +12941,11 @@ export interface components {
         };
         "dto.UpdateAssetRequestDTO": {
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
+        };
+        "dto.UpdateBackupSettingsDTO": {
+            enabled?: boolean;
+            interval_hours?: number;
+            keep_last?: number;
         };
         "dto.UpdateDescriptionRequestDTO": {
             /** @example A beautiful sunset photo */
@@ -12663,6 +13005,7 @@ export interface components {
             title?: string;
         };
         "dto.UpdateSystemSettingsDTO": {
+            backup?: components["schemas"]["dto.UpdateBackupSettingsDTO"];
             llm?: components["schemas"]["dto.UpdateLLMSettingsDTO"];
             ml?: components["schemas"]["dto.UpdateMLSettingsDTO"];
         };

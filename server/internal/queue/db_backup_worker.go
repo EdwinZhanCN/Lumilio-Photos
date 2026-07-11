@@ -17,12 +17,12 @@ type DatabaseBackupArgs = jobs.DatabaseBackupArgs
 type DatabaseBackupWorker struct {
 	river.WorkerDefaults[DatabaseBackupArgs]
 
-	Run func(ctx context.Context) error
+	Run func(ctx context.Context, force bool) error
 }
 
 func (w *DatabaseBackupWorker) Work(ctx context.Context, job *river.Job[DatabaseBackupArgs]) error {
 	if w.Run == nil {
 		return fmt.Errorf("database backup worker missing Run")
 	}
-	return w.Run(ctx)
+	return w.Run(ctx, job.Args.Force)
 }

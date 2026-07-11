@@ -126,6 +126,12 @@ func LocateTools(binDirOverride string, major int) (string, error) {
 // and renamed only after pg_dump exits cleanly, so a completed filename always
 // means a complete dump.
 func Dump(ctx context.Context, conn Conn, toolsBinDir, destDir, appVersion, pgVersion string, logf Logf) (string, error) {
+	return DumpWithPrefix(ctx, conn, toolsBinDir, destDir, "", appVersion, pgVersion, logf)
+}
+
+// DumpWithPrefix is Dump with a filename prefix; RestorePointPrefix keeps
+// pre-restore safety dumps out of routine retention.
+func DumpWithPrefix(ctx context.Context, conn Conn, toolsBinDir, destDir, prefix, appVersion, pgVersion string, logf Logf) (string, error) {
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
@@ -133,7 +139,7 @@ func Dump(ctx context.Context, conn Conn, toolsBinDir, destDir, appVersion, pgVe
 		return "", fmt.Errorf("create backup dir %s: %w", destDir, err)
 	}
 
-	finalPath := filepath.Join(destDir, FileName(time.Now(), appVersion, pgVersion))
+	finalPath := filepath.Join(destDir, prefix+FileName(time.Now(), appVersion, pgVersion))
 	tmpPath := finalPath + TmpSuffix
 
 	cmd := exec.CommandContext(ctx, filepath.Join(toolsBinDir, "pg_dump"),
