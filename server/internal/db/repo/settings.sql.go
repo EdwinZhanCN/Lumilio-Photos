@@ -10,7 +10,7 @@ import (
 )
 
 const getSettings = `-- name: GetSettings :one
-SELECT id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled FROM settings
+SELECT id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled, backup_enabled, backup_interval_hours, backup_keep_last FROM settings
 WHERE id = 1
 `
 
@@ -34,6 +34,9 @@ func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
 		&i.UpdatedAt,
 		&i.UpdatedBy,
 		&i.MlBioclipEnabled,
+		&i.BackupEnabled,
+		&i.BackupIntervalHours,
+		&i.BackupKeepLast,
 	)
 	return i, err
 }
@@ -52,6 +55,9 @@ INSERT INTO settings (
     ml_bioclip_enabled,
     ml_ocr_enabled,
     ml_face_enabled,
+    backup_enabled,
+    backup_interval_hours,
+    backup_keep_last,
     updated_by
 )
 VALUES (
@@ -67,7 +73,10 @@ VALUES (
     $9,
     $10,
     $11,
-    $12
+    $12,
+    $13,
+    $14,
+    $15
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -81,9 +90,12 @@ ON CONFLICT (id) DO UPDATE SET
     ml_bioclip_enabled = EXCLUDED.ml_bioclip_enabled,
     ml_ocr_enabled = EXCLUDED.ml_ocr_enabled,
     ml_face_enabled = EXCLUDED.ml_face_enabled,
+    backup_enabled = EXCLUDED.backup_enabled,
+    backup_interval_hours = EXCLUDED.backup_interval_hours,
+    backup_keep_last = EXCLUDED.backup_keep_last,
     updated_at = NOW(),
     updated_by = EXCLUDED.updated_by
-RETURNING id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled
+RETURNING id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, created_at, updated_at, updated_by, ml_bioclip_enabled, backup_enabled, backup_interval_hours, backup_keep_last
 `
 
 type UpsertSettingsParams struct {
@@ -98,6 +110,9 @@ type UpsertSettingsParams struct {
 	MlBioclipEnabled    bool   `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
 	MlOcrEnabled        bool   `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
 	MlFaceEnabled       bool   `db:"ml_face_enabled" json:"ml_face_enabled"`
+	BackupEnabled       bool   `db:"backup_enabled" json:"backup_enabled"`
+	BackupIntervalHours int32  `db:"backup_interval_hours" json:"backup_interval_hours"`
+	BackupKeepLast      int32  `db:"backup_keep_last" json:"backup_keep_last"`
 	UpdatedBy           *int32 `db:"updated_by" json:"updated_by"`
 }
 
@@ -114,6 +129,9 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		arg.MlBioclipEnabled,
 		arg.MlOcrEnabled,
 		arg.MlFaceEnabled,
+		arg.BackupEnabled,
+		arg.BackupIntervalHours,
+		arg.BackupKeepLast,
 		arg.UpdatedBy,
 	)
 	var i Setting
@@ -134,6 +152,9 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		&i.UpdatedAt,
 		&i.UpdatedBy,
 		&i.MlBioclipEnabled,
+		&i.BackupEnabled,
+		&i.BackupIntervalHours,
+		&i.BackupKeepLast,
 	)
 	return i, err
 }

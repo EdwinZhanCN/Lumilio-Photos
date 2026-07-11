@@ -28,6 +28,7 @@ import (
 	"server/internal/api/handler"
 	"server/internal/cloud"
 	"server/internal/db"
+	dbbackup "server/internal/db/backup"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/processors"
@@ -39,6 +40,7 @@ import (
 	"server/internal/storage"
 	"server/internal/storage/scanner"
 	"server/internal/utils/imaging"
+	"server/internal/version"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -258,6 +260,67 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		EnqueueAll: repositoryScanner.EnqueueAllPeriodicScans,
 	})
 
+	// Automatic database backups (exec-plans/active/db-backup-upgrade.md,
+	// Phase 1): dumps land next to the media so one storage backup captures
+	// assets and metadata together. Policy (enabled/interval/retention) is
+	// read from runtime settings on every tick, so the periodic job below can
+	// stay a fixed hourly heartbeat.
+	backupLogger := appLogger.Named("db_backup").Sugar()
+	backupScheduler := &dbbackup.Scheduler{
+		Conn: dbbackup.Conn{
+			Host:     dbConfig.Host,
+			Port:     dbConfig.Port,
+			User:     dbConfig.User,
+			Password: dbConfig.Password,
+			DBName:   dbConfig.DBName,
+		},
+		Pool:        pgxPool,
+		ToolsBinDir: dbConfig.ToolsBinDir,
+		StorageRoot: appConfig.StorageConfig.Path,
+		Dir:         appConfig.StorageConfig.BackupsDir(),
+		AppVersion:  version.Version,
+		Settings:    settingsService.GetBackupConfig,
+		Logf:        func(format string, args ...any) { backupLogger.Infof(format, args...) },
+	}
+	river.AddWorker[queue.DatabaseBackupArgs](workers, &queue.DatabaseBackupWorker{Run: backupScheduler.Run})
+
+	// Admin backup surface (list/trigger/download/delete/restore). Restore
+	// pauses all queues ("*"), applies the dump with a restore point +
+	// automatic rollback, re-runs migrations, and health-checks before
+	// resuming the queues.
+	backupService := service.NewBackupService(service.BackupRuntime{
+		Conn:        backupScheduler.Conn,
+		Pool:        pgxPool,
+		ToolsBinDir: dbConfig.ToolsBinDir,
+		Dir:         appConfig.StorageConfig.BackupsDir(),
+		AppVersion:  version.Version,
+		Logf:        backupScheduler.Logf,
+		Hooks: dbbackup.RestoreHooks{
+			Quiesce: func(ctx context.Context) error {
+				return queueClient.QueuePause(ctx, "*", nil)
+			},
+			Resume: func(ctx context.Context) error {
+				return queueClient.QueueResume(ctx, "*", nil)
+			},
+			Migrate: func(ctx context.Context) error {
+				return db.AutoMigrate(ctx, dbConfig)
+			},
+			Verify: func(ctx context.Context) error {
+				if _, err := settingsService.GetSystemSettings(ctx); err != nil {
+					return fmt.Errorf("settings unreadable after restore: %w", err)
+				}
+				var users int
+				if err := pgxPool.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
+					return fmt.Errorf("users table unreadable after restore: %w", err)
+				}
+				if users == 0 {
+					return fmt.Errorf("no users present after restore")
+				}
+				return nil
+			},
+		},
+	}, queueClient)
+
 	// River's Start runs the client in a background goroutine until Stop is
 	// called; it returns once startup completes. context.Background is used (not
 	// the run context) so a shutdown signal triggers a graceful drain via Stop
@@ -280,6 +343,18 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		))
 	}
 
+	// Hourly database-backup heartbeat. RunOnStart also gives a fresh install
+	// its first dump immediately; the worker's due-check (interval from
+	// runtime settings, storage reachability) turns superfluous ticks into
+	// silent no-ops.
+	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
+		river.PeriodicInterval(time.Hour),
+		func() (river.JobArgs, *river.InsertOpts) {
+			return jobs.DatabaseBackupArgs{}, nil
+		},
+		&river.PeriodicJobOpts{ID: "database_backup", RunOnStart: true},
+	))
+
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
@@ -294,7 +369,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
-	settingsController := handler.NewSettingsHandler(settingsService, dto.NewRuntimeInfoDTO(appConfig))
+	settingsController := handler.NewSettingsHandler(settingsService, backupService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
 	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyPath, appConfig.StorageConfig.Path, appLogger.Named("cloud_sync"))

@@ -347,6 +347,25 @@ func (TranscodeArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
 }
 
+// DatabaseBackupArgs is the periodic database-backup tick. The worker decides
+// from runtime settings whether a dump is actually due, so ticks are cheap and
+// schedule changes need no periodic-job re-registration. Force marks an admin
+// "back up now" request: it bypasses the enabled/due checks, and ByArgs keeps
+// it from being deduped against a recent periodic tick.
+type DatabaseBackupArgs struct {
+	Force bool `json:"force,omitempty"`
+}
+
+func (DatabaseBackupArgs) Kind() string { return "database_backup" }
+
+func (DatabaseBackupArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue:       "db_backup",
+		MaxAttempts: 3,
+		UniqueOpts:  river.UniqueOpts{ByArgs: true, ByPeriod: 30 * time.Minute},
+	}
+}
+
 // ScheduleRepositoryScansArgs is a periodic trigger that lists all active
 // repositories and enqueues a ScanRepositoryArgs job for each one.
 type ScheduleRepositoryScansArgs struct{}

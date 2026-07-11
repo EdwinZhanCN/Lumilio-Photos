@@ -59,6 +59,15 @@ func (c ML) HasRuntimeDemand() bool {
 	return c.HasManualTasksEnabled()
 }
 
+// Backup holds the runtime-mutable database-backup settings. Seed values are
+// the settings table's column defaults (see migration 000007), so this type has
+// no entry in Default.
+type Backup struct {
+	Enabled       bool
+	IntervalHours int
+	KeepLast      int
+}
+
 // Settings is the full set of runtime-mutable settings owned by the settings
 // service. Repository behaviour defaults are owned by the storage package, not
 // here.

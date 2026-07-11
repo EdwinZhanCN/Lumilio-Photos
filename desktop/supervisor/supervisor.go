@@ -196,8 +196,11 @@ func (s *Supervisor) Warnings() []string { return s.warnings }
 
 // Start brings up PostgreSQL, generates runtime configuration, and launches the
 // API server in-process. It returns once the server is accepting requests so
-// the caller can show the UI window, or an error if any step fails.
-func (s *Supervisor) Start(ctx context.Context) error {
+// the caller can show the UI window, or an error if any step fails. On failure
+// it tears down whatever it already started — most importantly PostgreSQL,
+// whose postmaster is a detached grandchild of pg_ctl and would otherwise keep
+// running in the background after the host shows its error dialog and quits.
+func (s *Supervisor) Start(ctx context.Context) (err error) {
 	s.reportStage(StagePreparing)
 	if err := s.ensurePaths(); err != nil {
 		return err
@@ -209,6 +212,31 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 	s.lock = lock
+
+	pgStarted := false
+	defer func() {
+		if err == nil {
+			return
+		}
+		// Signal the in-process server goroutine (if launched) to shut down;
+		// the host is about to show an error and quit, so it is not awaited.
+		if s.cancel != nil {
+			s.cancel()
+			s.cancel = nil
+		}
+		if pgStarted && s.pg != nil {
+			stopCtx, cancel := context.WithTimeout(context.Background(), pgStopTimeout)
+			if stopErr := s.pg.Stop(stopCtx); stopErr != nil {
+				s.logf("cleanup after failed start: postgres stop error: %v", stopErr)
+			}
+			cancel()
+			s.pg = nil
+		}
+		if s.lock != nil {
+			_ = s.lock.Release()
+			s.lock = nil
+		}
+	}()
 
 	// Fail fast (before the expensive PG startup) if the app port is taken. The
 	// single-instance lock already prevents a second desktop instance, so a busy
@@ -263,7 +291,22 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	})
 	s.pg = pg
 
-	if !pg.IsInitialized() {
+	dataStatus, foundMajor := pg.DataDirStatus(pgMajorVersion)
+	switch dataStatus {
+	case DataDirVersionMismatch:
+		// Never re-init over user data. The versioned layout (postgres/<major>/data)
+		// makes this unreachable in normal operation, but a restored backup or a
+		// hand-moved directory must fail loudly instead of FATALing in postgres.log.
+		return fmt.Errorf(
+			"database directory %s was initialized by PostgreSQL %s, but this build bundles PostgreSQL %s; automatic major-version upgrades are not implemented yet",
+			paths.PGData, foundMajor, pgMajorVersion)
+	case DataDirIncomplete:
+		s.logf("recovery: clearing leftovers of an interrupted initdb in %s", paths.PGData)
+		if err := pg.ResetDataDir(); err != nil {
+			return err
+		}
+	}
+	if dataStatus != DataDirValid {
 		s.reportStage(StageInitDB)
 		if err := pg.InitDB(ctx); err != nil {
 			return err
@@ -280,6 +323,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	if err := pg.Start(ctx); err != nil {
 		return err
 	}
+	pgStarted = true
 	if err := pg.WaitReady(ctx, pgReadyTimeout); err != nil {
 		return err
 	}
@@ -302,6 +346,9 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		ExifToolPath:  bundledExifTool(resources),
 		FFmpegPath:    bundledFFmpeg(resources),
 		FFprobePath:   bundledFFprobe(resources),
+		// The backup engine dumps with the same bundled tools that run the
+		// cluster, so client and server versions can never diverge.
+		PGBinDir: pgBinDir(resources),
 		// Always pin the supervised local hub endpoint: static entries are
 		// address facts (never expired, reconnect-managed by the SDK), so the
 		// pin is harmless while local AI is not installed/running and connects

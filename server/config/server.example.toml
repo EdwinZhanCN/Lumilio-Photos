@@ -66,13 +66,21 @@ repository_audit_verbose = ""
 # but real deployments should supply database wiring from the process
 # environment or a supervisor.
 
+# Optional: pin the PostgreSQL client-tools directory (pg_dump/psql) used by
+# the automatic database backups. Empty autodetects: the Debian layout
+# /usr/lib/postgresql/<server major>/bin first, then PATH (accepted only when
+# the client major matches the server). Backup schedule/retention are
+# runtime-MUTABLE settings stored in the database, not here.
+#   [database]
+#   tools_bin_dir = ""
+
 [storage]
 # The single immutable storage root. This is the only path Lumilio reads and
 # writes (non-desktop). Well-known subdirectories are derived by convention and
 # are NOT configurable: <path>/primary (primary repo), <path>/.secrets
-# (db_password, app secret key), <path>/.cloud (cloud sync). Additional
-# repositories live under <path>/<name>. Set this once; changing it requires a
-# restart and re-setup.
+# (db_password, app secret key), <path>/.cloud (cloud sync), <path>/backups
+# (automatic database dumps). Additional repositories live under <path>/<name>.
+# Set this once; changing it requires a restart and re-setup.
 # Env override: STORAGE_PATH.
 path = "./data/storage"
 
