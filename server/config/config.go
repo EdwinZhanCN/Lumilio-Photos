@@ -31,6 +31,11 @@ type DatabaseConfig struct {
 	DBName            string `toml:"name"`
 	SSL               string `toml:"ssl"`
 	BootstrapPassword string `toml:"-"`
+	// ToolsBinDir optionally pins the directory holding version-matched
+	// PostgreSQL client tools (pg_dump/psql) for the backup engine. Desktop
+	// sets it to the bundled bin dir; empty means autodetect (Debian layout,
+	// then PATH with a major-version check).
+	ToolsBinDir string `toml:"tools_bin_dir"`
 }
 
 // AppConfig is the single typed runtime contract consumed by server/app. It
@@ -79,6 +84,7 @@ const (
 	secretsDirName = ".secrets"
 	cloudDirName   = ".cloud"
 	primaryDirName = "primary"
+	backupsDirName = "backups"
 
 	dbPasswordFileName = "db_password"
 	secretKeyFileName  = "lumilio_secret_key"
@@ -97,6 +103,12 @@ func (c StorageConfig) CloudDir() string {
 // PrimaryDir is <path>/primary, the primary repository's physical location.
 func (c StorageConfig) PrimaryDir() string {
 	return filepath.Join(c.Path, primaryDirName)
+}
+
+// BackupsDir is <path>/backups. Database dumps live with the media on purpose:
+// backing up the storage root then captures assets and metadata together.
+func (c StorageConfig) BackupsDir() string {
+	return filepath.Join(c.Path, backupsDirName)
 }
 
 // DBPasswordPath is the rotated database password secret file.

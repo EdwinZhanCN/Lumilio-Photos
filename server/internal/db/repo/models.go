@@ -534,6 +534,9 @@ type Setting struct {
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	UpdatedBy           *int32             `db:"updated_by" json:"updated_by"`
 	MlBioclipEnabled    bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
+	BackupEnabled       bool               `db:"backup_enabled" json:"backup_enabled"`
+	BackupIntervalHours int32              `db:"backup_interval_hours" json:"backup_interval_hours"`
+	BackupKeepLast      int32              `db:"backup_keep_last" json:"backup_keep_last"`
 }
 
 type ShareLink struct {

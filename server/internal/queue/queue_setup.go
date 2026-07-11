@@ -55,6 +55,7 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers, logger *slog.Logger) (*ri
 		"reindex_assets":            {MaxWorkers: 1},
 		"rebuild_location_clusters": {MaxWorkers: 1},
 		"scan_repository":           {MaxWorkers: 1},
+		"db_backup":                 {MaxWorkers: 1},
 		"detect_stacks":             {MaxWorkers: 1},
 		"match_live_photo":          {MaxWorkers: 2},
 		"process_semantic":          {MaxWorkers: 2},

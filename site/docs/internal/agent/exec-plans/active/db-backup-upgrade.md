@@ -105,6 +105,29 @@ supervisor, and both ends of every binary.
   a real PG (gated like `desktop/supervisor/postgres_smoke_test.go`) covering
   dump → gunzip → sanity-psql.
 
+Implementation record (2026-07-11):
+
+- `server/internal/db/backup`: `ServerVersion` (asks the server, never the
+  binaries), `LocateTools` (override → Debian layout → PATH with major check,
+  loud `ErrUnsupportedTools`), `Dump` (pg_dump --clean --if-exists | gzip,
+  .tmp + atomic rename, stderr tail in errors), `Prune` (count-based, spares
+  restore points, sweeps stale .tmp), `LatestRoutine`, and filename
+  build/parse. `Scheduler.RunDue` reads runtime settings per tick; skips
+  (disabled / not due / storage unreachable) return nil so River retries only
+  real failures.
+- Migration 000007 adds `backup_enabled/backup_interval_hours/backup_keep_last`
+  to `settings` (column defaults are the seed; UpsertSettings untouched);
+  sqlc regenerated; `SettingsService.GetBackupConfig` exposes them.
+- `db_backup` queue (MaxWorkers 1), thin `DatabaseBackupWorker`, hourly
+  `database_backup` periodic job with RunOnStart in `server/app/app.go`.
+- `Database.ToolsBinDir` config (TOML `tools_bin_dir`), desktop plumbs the
+  bundled bin dir via `DesktopParams.PGBinDir`; `StorageConfig.BackupsDir()`.
+- `server/Dockerfile` installs `postgresql-client-17`; the PG bundle workflow
+  now also keeps `psql` (needed by Phase 2 restore) on both platforms.
+- Verified: backup-package unit tests; real-PG dump smoke test (initdb →
+  seed → Dump → gunzip → DDL/data/`DROP TABLE IF EXISTS` present) against
+  PostgreSQL 16; full `server` and `desktop/supervisor` suites green.
+
 ## Phase 2 — Restore engine + admin API
 
 - `backup.Restore(ctx, ...)` implementing decision 5, with a progress callback

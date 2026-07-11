@@ -84,6 +84,7 @@ type SettingsService interface {
 	UpdateSystemSettings(ctx context.Context, input UpdateSystemSettingsInput) (SystemSettings, error)
 	GetLLMConfig(ctx context.Context) (settings.LLM, error)
 	GetMLConfig(ctx context.Context) (settings.ML, error)
+	GetBackupConfig(ctx context.Context) (settings.Backup, error)
 	GetEffectiveMLConfig(ctx context.Context) (settings.ML, error)
 	ValidateLLMSettings(ctx context.Context) error
 }
@@ -241,6 +242,19 @@ func (s *settingsService) GetMLConfig(ctx context.Context) (settings.ML, error) 
 
 func (s *settingsService) GetEffectiveMLConfig(ctx context.Context) (settings.ML, error) {
 	return s.GetMLConfig(ctx)
+}
+
+func (s *settingsService) GetBackupConfig(ctx context.Context) (settings.Backup, error) {
+	row, err := s.getSettingsRow(ctx)
+	if err != nil {
+		return settings.Backup{}, err
+	}
+
+	return settings.Backup{
+		Enabled:       row.BackupEnabled,
+		IntervalHours: int(row.BackupIntervalHours),
+		KeepLast:      int(row.BackupKeepLast),
+	}, nil
 }
 
 func (s *settingsService) ValidateLLMSettings(ctx context.Context) error {
