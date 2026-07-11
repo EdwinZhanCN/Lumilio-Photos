@@ -632,6 +632,83 @@ CREATE INDEX idx_classifier_definitions_enabled ON public.classifier_definitions
 
 
 --
+-- Seed the utility classifiers exposed by the web application. Prototypes are
+-- intentionally left NULL and are built against the active semantic model at
+-- runtime by ClassifierService.EnsurePrototypes.
+--
+
+INSERT INTO public.classifier_definitions (
+    slug,
+    display_name,
+    tag_name,
+    category,
+    positive_prompts,
+    negative_prompts,
+    threshold
+) VALUES
+(
+    'documents',
+    'Documents',
+    'document',
+    'smart_album',
+    ARRAY[
+        'a scanned document',
+        'a photo of a page of text',
+        'a document or paperwork',
+        'a page from a book or contract',
+        'an official form or letter'
+    ],
+    ARRAY[
+        'a receipt or invoice',
+        'a natural scene photograph',
+        'a photo of people',
+        'a drawing or illustration'
+    ],
+    0.0
+),
+(
+    'receipts',
+    'Receipts',
+    'receipt',
+    'smart_album',
+    ARRAY[
+        'a receipt',
+        'a store receipt',
+        'a restaurant receipt',
+        'a photo of an invoice',
+        'a bill or purchase receipt'
+    ],
+    ARRAY[
+        'a page from a book or contract',
+        'an official form or letter',
+        'a natural scene photograph',
+        'a photo of people'
+    ],
+    0.0
+),
+(
+    'illustration',
+    'Illustration',
+    'illustration',
+    'smart_album',
+    ARRAY[
+        'a digital illustration',
+        'a drawing or artwork',
+        'a cartoon or anime image',
+        'a painting',
+        'computer generated art'
+    ],
+    ARRAY[
+        'a real photograph',
+        'a photo taken with a camera',
+        'a natural scene photograph',
+        'a photo of people'
+    ],
+    0.0
+);
+
+
+--
 -- Name: idx_species_predictions_asset_id; Type: INDEX; Schema: public; Owner: -
 --
 

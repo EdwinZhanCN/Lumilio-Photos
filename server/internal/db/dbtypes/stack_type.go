@@ -10,6 +10,8 @@ const (
 	StackKindRawJpeg StackKind = "raw_jpeg"
 	// StackKindLivePhoto groups the still image and companion video for a Live Photo.
 	StackKindLivePhoto StackKind = "live_photo"
+	// StackKindBurst groups frames captured in the same camera burst.
+	StackKindBurst StackKind = "burst"
 	// StackKindManual groups assets explicitly placed together by the user.
 	StackKindManual StackKind = "manual"
 )
@@ -21,7 +23,7 @@ func (sk StackKind) String() *string {
 
 func (sk StackKind) Valid() bool {
 	switch sk {
-	case StackKindRawJpeg, StackKindLivePhoto, StackKindManual:
+	case StackKindRawJpeg, StackKindLivePhoto, StackKindBurst, StackKindManual:
 		return true
 	default:
 		return false

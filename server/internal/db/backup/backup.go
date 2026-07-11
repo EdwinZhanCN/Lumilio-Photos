@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -90,7 +91,7 @@ func LocateTools(binDirOverride string, major int) (string, error) {
 	tried := make([]string, 0, 3)
 
 	if dir := strings.TrimSpace(binDirOverride); dir != "" {
-		if _, err := os.Stat(filepath.Join(dir, "pg_dump")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, clientToolName("pg_dump", runtime.GOOS))); err == nil {
 			return dir, nil
 		}
 		tried = append(tried, dir)
@@ -142,7 +143,7 @@ func DumpWithPrefix(ctx context.Context, conn Conn, toolsBinDir, destDir, prefix
 	finalPath := filepath.Join(destDir, prefix+FileName(time.Now(), appVersion, pgVersion))
 	tmpPath := finalPath + TmpSuffix
 
-	cmd := exec.CommandContext(ctx, filepath.Join(toolsBinDir, "pg_dump"),
+	cmd := exec.CommandContext(ctx, filepath.Join(toolsBinDir, clientToolName("pg_dump", runtime.GOOS)),
 		"--clean",
 		"--if-exists",
 		"--host", conn.Host,
@@ -208,6 +209,13 @@ func DumpWithPrefix(ctx context.Context, conn Conn, toolsBinDir, destDir, prefix
 
 	logf("backup: wrote %s", finalPath)
 	return finalPath, nil
+}
+
+func clientToolName(name, goos string) string {
+	if goos == "windows" {
+		return name + ".exe"
+	}
+	return name
 }
 
 // Prune enforces count-based retention on routine backups in dir (newest kept

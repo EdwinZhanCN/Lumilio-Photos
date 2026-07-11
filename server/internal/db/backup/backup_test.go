@@ -115,6 +115,18 @@ func TestLocateToolsPrefersOverride(t *testing.T) {
 	}
 }
 
+func TestClientToolName(t *testing.T) {
+	if got := clientToolName("pg_dump", "windows"); got != "pg_dump.exe" {
+		t.Fatalf("windows pg_dump = %q", got)
+	}
+	if got := clientToolName("psql", "windows"); got != "psql.exe" {
+		t.Fatalf("windows psql = %q", got)
+	}
+	if got := clientToolName("pg_dump", "darwin"); got != "pg_dump" {
+		t.Fatalf("darwin pg_dump = %q", got)
+	}
+}
+
 func TestLocateToolsFailsLoudlyWhenNothingMatches(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // hide any real pg_dump
 	_, err := LocateTools("", 99)
