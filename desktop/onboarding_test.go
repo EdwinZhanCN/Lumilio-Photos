@@ -187,39 +187,18 @@ func TestOnboardingCompleteRejectsUnwritable(t *testing.T) {
 	}
 }
 
-func TestLicenseEndpoints(t *testing.T) {
+func TestLegalEndpoints(t *testing.T) {
 	d := newTestApp(t)
 	h := d.onboardingHandler()
-
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/licenses", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("licenses status = %d", rec.Code)
-	}
-	var entries []licenseEntry
-	if err := json.Unmarshal(rec.Body.Bytes(), &entries); err != nil {
-		t.Fatalf("decode licenses: %v", err)
-	}
-	if len(entries) != len(licenseManifest) {
-		t.Fatalf("got %d entries, want %d", len(entries), len(licenseManifest))
-	}
-
-	// Every manifest entry must resolve to a non-empty embedded text.
-	for _, e := range licenseManifest {
+	for _, path := range []string{"/__onb/legal/license", "/__onb/legal/third-party"} {
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/license?id="+e.ID, nil))
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK {
-			t.Errorf("license %q status = %d", e.ID, rec.Code)
+			t.Errorf("%s status = %d", path, rec.Code)
 		}
 		if rec.Body.Len() < 500 {
-			t.Errorf("license %q text suspiciously short (%d bytes)", e.ID, rec.Body.Len())
+			t.Errorf("%s text suspiciously short (%d bytes)", path, rec.Body.Len())
 		}
-	}
-
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/license?id=nope", nil))
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("unknown id status = %d, want 404", rec.Code)
 	}
 }
 

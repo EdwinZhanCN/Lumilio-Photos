@@ -1,3 +1,4 @@
 # Completed Exec Plans
 
-Move finished plans here when they are useful as implementation history.
+Keep short records of shipped behavior, durable decisions, and validation
+boundaries. Implementation chronology belongs in Git history.

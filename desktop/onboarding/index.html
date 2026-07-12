@@ -1,48 +1,1015 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lumilio Photos</title>
-<style>
-:root{color-scheme:light dark;--bg:#f7f7f5;--surface:#fff;--text:#171716;--muted:#6e6e68;--line:#e4e4df;--accent:#315c47;--soft:#edf3ef;--danger:#a13d35;--radius:14px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-size:14px}.shell{height:100vh;display:flex;flex-direction:column}.titlebar{height:30px;flex:none;-webkit-app-region:drag}.top{display:flex;align-items:center;padding:14px 34px 18px;border-bottom:1px solid var(--line)}.brand{font-size:18px;font-weight:680;letter-spacing:-.02em}.tag{margin-left:10px;color:var(--muted);font-size:12px}.lang{margin-left:auto;display:flex;gap:2px;background:var(--line);padding:2px;border-radius:8px}.lang button{border:0;background:transparent;padding:5px 9px;border-radius:6px;color:var(--muted)}.lang button.active{background:var(--surface);color:var(--text)}main{width:min(680px,calc(100% - 56px));margin:auto;flex:1;overflow:auto;padding:34px 0}.screen{display:none;animation:enter .22s ease}.screen.active{display:block}@keyframes enter{from{opacity:0;transform:translateY(5px)}}h1{font-size:28px;letter-spacing:-.035em;margin:0 0 8px}h2{font-size:17px;margin:0}.lead{color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 30px;max-width:550px}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px}.row{display:flex;gap:10px;align-items:center}.choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.choice{position:relative;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:18px;min-height:170px;color:inherit;cursor:pointer;transition:border-color .15s,transform .15s,background .15s}.choice:hover{transform:translateY(-1px)}.choice.selected{border-color:var(--accent);background:var(--soft);box-shadow:0 0 0 1px var(--accent)}.choice svg{width:22px;height:22px;margin-bottom:23px}.choice strong{display:block;font-size:15px;margin-bottom:7px}.choice p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}.choice small{display:block;margin-top:12px;color:var(--muted);font-size:10px}.recommend{position:absolute;right:10px;top:10px;font-size:9px;color:var(--accent);font-weight:650}.path{display:flex;align-items:center;gap:10px;padding:11px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px}.path code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11px}.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);padding:9px 13px;border-radius:9px;font-weight:600;cursor:pointer}.btn:hover{border-color:#b7b7b0}.btn.primary{background:var(--accent);border-color:var(--accent);color:white}.btn.link{border:0;background:transparent;color:var(--muted);font-weight:500}.btn:disabled{opacity:.45;cursor:not-allowed}.check{margin-top:8px;color:var(--muted);font-size:11px}.agree{display:flex;gap:9px;margin-top:22px;color:var(--muted);font-size:12px;line-height:1.45}.agree a{text-decoration:underline;cursor:pointer}.footer{border-top:1px solid var(--line);padding:13px 34px 17px;display:flex;align-items:center;gap:8px}.footer .spacer{flex:1}.dots{display:flex;gap:5px}.dot{width:6px;height:6px;border-radius:9px;background:var(--line)}.dot.active{width:17px;background:var(--accent)}.backend-list{display:grid;gap:10px}.backend{display:flex;align-items:center;width:100%;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:inherit;text-align:left}.backend.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.backend b{font-size:15px}.backend span{color:var(--muted);font-size:12px;margin-left:8px}.backend em{margin-left:auto;font-style:normal;color:var(--accent);font-size:10px}.cache{margin-top:24px}.cache label{display:block;font-weight:620;margin-bottom:8px}.dashboard{padding-top:6px}.dash-head{display:flex;align-items:flex-start;margin-bottom:32px}.dash-head .actions{margin-left:auto;display:flex;gap:8px}.section{padding:20px 0;border-top:1px solid var(--line)}.section-head{display:flex;align-items:center;margin-bottom:14px}.section-head .status{margin-left:auto}.status{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px}.pulse{width:7px;height:7px;border-radius:8px;background:#aaa}.pulse.ok{background:#45a36b}.pulse.busy{background:#d69a35;animation:pulse 1.2s infinite}.pulse.bad{background:var(--danger)}@keyframes pulse{50%{opacity:.35}}.facts{display:grid;grid-template-columns:140px 1fr;gap:8px 16px;font-size:12px}.facts dt{color:var(--muted)}.facts dd{margin:0;overflow:hidden;text-overflow:ellipsis}.section-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.error{color:var(--danger);font-size:11px;margin-top:10px}.paths{display:grid;grid-template-columns:1fr 1fr;gap:8px}.path-button{text-align:left;padding:12px;border:1px solid var(--line);background:var(--surface);border-radius:10px;color:inherit;cursor:pointer}.path-button b{display:block;font-size:12px}.path-button span{display:block;color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px}.terms{display:none;margin-top:12px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--muted);font-size:11px;line-height:1.6}.terms.open{display:block}@media(prefers-color-scheme:dark){:root{--bg:#171816;--surface:#20211f;--text:#f1f1ec;--muted:#a3a39c;--line:#343631;--accent:#7eb69a;--soft:#24342c}}
-</style></head><body><div class="shell"><div class="titlebar"></div><header class="top"><span class="brand">Lumilio Photos</span><span class="tag" data-i18n="tag">Local control panel</span><div class="lang"><button data-lang="en">EN</button><button data-lang="zh">中文</button></div></header>
-<main>
-<section id="step-storage" class="screen"><div class="eyebrow" data-i18n="step1">Step 1 of 3</div><h1 data-i18n="welcome">Set up your library</h1><p class="lead" data-i18n="welcomeDesc">Choose where originals are stored. Lumilio Photos and its database stay on this computer.</p><div class="path"><code id="storage-path">—</code><button class="btn" id="pick-storage" data-i18n="choose">Choose…</button></div><div class="check" id="storage-check"></div>
-<div class="region" style="margin:16px 0 8px">
-  <div class="eyebrow" style="margin:0 0 8px" data-i18n="regionLabel">Download region</div>
-  <div class="lang" style="margin:0">
-    <button type="button" data-region="other" class="active">Other</button>
-    <button type="button" data-region="cn">中国大陆</button>
-  </div>
-  <p class="lead" style="margin:8px 0 0;font-size:12px" data-i18n="regionHint">Mainland China uses a download mirror for app updates. This is separate from in-app map region.</p>
-</div>
-<label class="agree"><input type="checkbox" id="agree"><span><span data-i18n="agree">I agree to the terms of use and open-source licenses.</span> <a id="show-terms" data-i18n="read">Read</a></span></label><div class="terms" id="terms"><b data-i18n="termsTitle">Terms and licenses</b><p data-i18n="termsBody">Lumilio Photos is free, open-source software provided as-is. Your library remains local and you are responsible for backups.</p><button class="btn link" id="licenses" data-i18n="licenses">View bundled licenses</button></div></section>
-<section id="step-backend" class="screen"><div class="eyebrow" data-i18n="step2">Step 2 of 3</div><h1 data-i18n="hardware">Use this computer for analysis</h1><p class="lead" data-i18n="hardwareDesc">Choose the processing backend. The recommended option is selected for this computer.</p><div class="backend-list" id="backend-list"></div></section>
-<section id="step-preset" class="screen"><div class="eyebrow" data-i18n="step3">Step 3 of 3</div><h1 data-i18n="analysis">Choose analysis features</h1><p class="lead" data-i18n="analysisDesc">You can change this later. Models download in the background after Photos starts.</p><div class="choice-grid" id="presets"></div><div class="cache"><label data-i18n="cache">Model cache</label><div class="path"><code id="cache-path">—</code><button class="btn" id="pick-cache" data-i18n="choose">Choose…</button></div><div class="check" id="cache-check"></div></div></section>
-<section id="dashboard" class="screen dashboard"><div class="dash-head"><div><h1 data-i18n="control">Control panel</h1><p class="lead" style="margin:5px 0 0" data-i18n="controlDesc">Local services and storage at a glance.</p></div><div class="actions"><button class="btn primary" id="open-app" data-i18n="openPhotos">Open Photos</button><button class="btn" id="refresh" data-i18n="refresh">Refresh</button></div></div><div class="section"><div class="section-head"><h2>Lumilio Photos</h2><span class="status" id="photos-status"></span></div><dl class="facts"><dt data-i18n="version">Version</dt><dd id="app-version">—</dd><dt data-i18n="address">Address</dt><dd id="server-url">—</dd></dl></div><div class="section"><div class="section-head"><h2>Lumen Hub</h2><span class="status" id="lumen-status"></span></div><dl class="facts"><dt data-i18n="configuration">Configuration</dt><dd id="lumen-config">—</dd><dt data-i18n="hubVersion">Installed / latest</dt><dd id="lumen-version">—</dd><dt data-i18n="modelCache">Model cache</dt><dd id="lumen-cache">—</dd></dl><div class="error" id="lumen-error"></div><div class="section-actions"><button class="btn" id="lumen-toggle"></button><button class="btn" id="lumen-restart" data-i18n="restart">Restart</button><button class="btn" id="lumen-check" data-i18n="checkUpdate">Check update</button><button class="btn primary" id="lumen-update" data-i18n="update">Update</button><button class="btn" id="lumen-configure" data-i18n="configure">Configure</button></div></div><div class="section"><div class="section-head"><h2 data-i18n="regionLabel">Download region</h2></div>
-<div class="lang" style="margin:0 0 8px">
-  <button type="button" data-region="other">Other</button>
-  <button type="button" data-region="cn">中国大陆</button>
-</div>
-<p class="lead" style="margin:0;font-size:12px" data-i18n="regionHint">Mainland China uses a download mirror for app updates. This is separate from in-app map region.</p>
-</div>
-<div class="section"><div class="section-head"><h2 data-i18n="paths">Local paths</h2></div><div class="paths" id="paths"></div></div></section>
-</main><footer class="footer" id="wizard-footer"><button class="btn link" id="back" data-i18n="back">Back</button><div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div><div class="spacer"></div><button class="btn link" id="skip" data-i18n="skip">Set up later</button><button class="btn primary" id="next" data-i18n="next">Continue</button></footer></div>
-<script>
-const I={en:{tag:"Local control panel",step1:"Step 1 of 3",step2:"Step 2 of 3",step3:"Step 3 of 3",welcome:"Set up your library",welcomeDesc:"Choose where originals are stored. Lumilio Photos and its database stay on this computer.",regionLabel:"Download region",regionHint:"Mainland China uses a download mirror for app updates. Separate from in-app map settings.",regionOther:"Other regions",regionCN:"Mainland China",choose:"Choose…",agree:"I agree to the terms of use and open-source licenses.",read:"Read",termsTitle:"Terms and licenses",termsBody:"Lumilio Photos is free, open-source software provided as-is. Your library remains local and you are responsible for backups.",licenses:"View bundled licenses",hardware:"Use this computer for analysis",hardwareDesc:"Choose the processing backend. The recommended option is selected for this computer.",analysis:"Choose analysis features",analysisDesc:"You can change this later. Models download in the background after Photos starts.",cache:"Model cache",control:"Control panel",controlDesc:"Local services and storage at a glance.",openPhotos:"Open Photos",refresh:"Refresh",version:"Version",address:"Address",configuration:"Configuration",hubVersion:"Installed / latest",modelCache:"Model cache",restart:"Restart",checkUpdate:"Check update",update:"Update",configure:"Configure",paths:"Local paths",back:"Back",skip:"Set up later",next:"Continue",finish:"Finish and install",recommended:"Recommended",minimal:"Minimal",basic:"Basic",brave:"Brave",minimalDesc:"Image semantic analysis · Person recognition",basicDesc:"Image semantic analysis · Person recognition · BioCLIP species identification · OCR text recognition",braveDesc:"Stronger image semantic analysis · Person recognition · Full BioCLIP species identification · OCR text recognition",writable:"Writable · {free} free",invalid:"Choose a writable location",running:"Running",starting:"Starting",off:"Off",failed:"Failed",enable:"Enable",disable:"Turn off",photos:"Photos",logs:"Logs",backups:"Backups",appData:"App data",oldCache:"Previous model cache"},zh:{tag:"本机控制面板",step1:"第 1 步，共 3 步",step2:"第 2 步，共 3 步",step3:"第 3 步，共 3 步",welcome:"设置照片库",welcomeDesc:"选择原始照片和视频的保存位置。Lumilio Photos 与数据库都保留在本机。",regionLabel:"下载地区",regionHint:"中国大陆使用应用更新下载镜像，与应用内地图地区设置相互独立。",regionOther:"其他国家和地区",regionCN:"中国大陆",choose:"选择…",agree:"我同意使用条款与开源许可。",read:"阅读",termsTitle:"条款与许可",termsBody:"Lumilio Photos 是免费开源软件，按原样提供。照片库保留在本机，备份由你负责。",licenses:"查看捆绑的开源许可",hardware:"使用本机进行分析",hardwareDesc:"选择计算后端。已根据这台电脑选中推荐项。",analysis:"选择分析能力",analysisDesc:"之后仍可更改。Photos 启动后，模型将在后台下载。",cache:"模型缓存",control:"控制面板",controlDesc:"快速查看本机服务与存储。",openPhotos:"打开 Photos",refresh:"刷新",version:"版本",address:"地址",configuration:"配置",hubVersion:"已安装 / 最新",modelCache:"模型缓存",restart:"重新启动",checkUpdate:"检查更新",update:"更新",configure:"配置",paths:"本机路径",back:"返回",skip:"稍后设置",next:"继续",finish:"完成并安装",recommended:"推荐",minimal:"最小",basic:"基础",brave:"激进",minimalDesc:"图像语义分析 · 人物识别",basicDesc:"图像语义分析 · 人物识别 · BioCLIP 生物识别 · OCR 文字识别",braveDesc:"更强的图像语义分析 · 人物识别 · 完整 BioCLIP 生物识别 · OCR 文字识别",writable:"可写入 · 剩余 {free}",invalid:"请选择可写入的位置",running:"运行中",starting:"正在启动",off:"已停用",failed:"失败",enable:"启用",disable:"停用",photos:"照片库",logs:"日志",backups:"备份",appData:"应用数据",oldCache:"旧模型缓存"}};
-const icons={minimal:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg>`,basic:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>`,brave:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>`};
-let s={lang:"en",region:"other",step:0,data:null,path:"",validation:null,cache:"",cacheValidation:null,backend:null,preset:null,reconfig:false};const t=(k,v={})=>{let x=(I[s.lang]||I.en)[k]||k;for(const q in v)x=x.replace(`{${q}}`,v[q]);return x};
-async function api(path,body){const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});if(!r.ok)throw new Error(await r.text());return r.json()}
-function lang(){document.documentElement.lang=s.lang==="zh"?"zh-CN":"en";document.querySelectorAll("[data-i18n]").forEach(e=>e.textContent=t(e.dataset.i18n));document.querySelectorAll("[data-lang]").forEach(e=>e.classList.toggle("active",e.dataset.lang===s.lang));document.querySelectorAll("[data-region]").forEach(e=>{e.classList.toggle("active",e.dataset.region===s.region);if(e.dataset.region==="other")e.textContent=t("regionOther");if(e.dataset.region==="cn")e.textContent=t("regionCN")});render()}
-function show(id){document.querySelectorAll(".screen").forEach(e=>e.classList.toggle("active",e.id===id))}
-function valid(v){return v&&v.writable?t("writable",{free:v.freeHuman||"—"}):t("invalid")}
-function render(){if(!s.data)return;if(s.data.mode==="dashboard"||s.step===3){show("dashboard");document.getElementById("wizard-footer").style.display="none";renderDash();return}document.getElementById("wizard-footer").style.display="flex";show(["step-storage","step-backend","step-preset"][s.step]);document.querySelectorAll(".dot").forEach((e,i)=>e.classList.toggle("active",i===s.step));document.getElementById("back").style.visibility=s.step?"visible":"hidden";document.getElementById("skip").style.display=s.step>0?"block":"none";document.getElementById("next").textContent=s.step===2?t("finish"):t("next");document.getElementById("storage-path").textContent=s.path||"—";document.getElementById("storage-check").textContent=valid(s.validation);document.getElementById("cache-path").textContent=s.cache||"—";document.getElementById("cache-check").textContent=valid(s.cacheValidation);renderBackends();renderPresets()}
-function renderBackends(){const el=document.getElementById("backend-list");el.innerHTML="";(s.data.backends||[]).forEach((b,i)=>{const x=document.createElement("button");x.className="backend"+(s.backend&&s.backend.profile===b.profile?" selected":"");x.innerHTML=`<b>${b.name.toUpperCase()}</b><span>${b.profile}</span>${b.recommended?`<em>${t("recommended")}</em>`:""}`;x.onclick=()=>{s.backend=b;render()};el.append(x)})}
-function renderPresets(){const el=document.getElementById("presets");el.innerHTML="";(s.data.presets||[]).forEach(p=>{const x=document.createElement("button");x.className="choice"+(s.preset===p.name?" selected":"");x.innerHTML=`${p.name===s.data.recommendedPreset?`<i class="recommend">${t("recommended")}</i>`:""}${icons[p.name]}<strong>${t(p.name)}</strong><p>${t(p.name+"Desc")}</p><small>${p.minRamGB} GB RAM · ${p.minDiskGB} GB</small>`;x.onclick=()=>{s.preset=p.name;render()};el.append(x)})}
-function status(state){const busy=["installing","starting","checking","stopping"].includes(state),bad=state==="failed",ok=state==="running";return `<i class="pulse ${ok?"ok":busy?"busy":bad?"bad":""}"></i>${ok?t("running"):busy?t("starting"):bad?t("failed"):t("off")}`}
-function renderDash(){const d=s.data,l=d.lumen||{};document.getElementById("photos-status").innerHTML=status(d.ready?"running":"starting");document.getElementById("app-version").textContent=d.version||"dev";document.getElementById("server-url").textContent=d.serverURL||"—";document.getElementById("lumen-status").innerHTML=status(l.state||"");document.getElementById("lumen-config").textContent=[l.preset,l.backend,l.profile].filter(Boolean).join(" · ")||"—";document.getElementById("lumen-version").textContent=`${l.installedVersion||"—"} / ${l.latestVersion||"—"}`;document.getElementById("lumen-cache").textContent=l.cacheDir||"—";document.getElementById("lumen-error").textContent=l.error||"";const toggle=document.getElementById("lumen-toggle");toggle.textContent=l.enabled?t("disable"):t("enable");toggle.onclick=()=>action(l.enabled?"disable":"enable");document.getElementById("lumen-update").style.display=l.latestVersion&&l.latestVersion!==l.installedVersion?"inline-block":"none";const paths=document.getElementById("paths");paths.innerHTML="";const names={storage:"photos",logs:"logs",backups:"backups",appData:"appData"};for(const k in names)if(d.paths&&d.paths[k])pathButton(paths,t(names[k]),d.paths[k]);if(l.previousCacheDir)pathButton(paths,t("oldCache"),l.previousCacheDir)}
-function pathButton(root,label,path){const b=document.createElement("button");b.className="path-button";b.innerHTML=`<b>${label}</b><span>${path}</span>`;b.onclick=()=>api("/__onb/open",{path});root.append(b)}
-async function load(){const d=await fetch("/__onb/state").then(r=>r.json());s.data=d;s.lang=d.lang==="zh"?"zh":"en";s.region=d.region==="cn"?"cn":"other";s.path=d.path;s.validation=d.validation;s.cache=d.lumen.cacheDir;s.cacheValidation=d.cacheValidation;s.backend=(d.backends||[]).find(b=>b.profile===d.lumen.profile)||(d.backends||[])[0];s.preset=d.lumen.preset||d.recommendedPreset;lang()}
-async function complete(enable){if(s.reconfig){await api("/__onb/lumen-save",{preset:s.preset,backend:s.backend&&s.backend.name,profile:s.backend&&s.backend.profile,cacheDir:s.cache});s.reconfig=false}else{await api("/__onb/complete",{path:s.path,lang:s.lang,region:s.region,agreed:document.getElementById("agree").checked,enableLumen:enable,preset:s.preset,backend:s.backend&&s.backend.name,profile:s.backend&&s.backend.profile,cacheDir:s.cache})}s.step=3;s.data.mode="dashboard";render();setTimeout(load,700)}
-async function action(a){await api("/__onb/lumen-action",{action:a});setTimeout(load,350)}
-document.querySelectorAll("[data-lang]").forEach(b=>b.onclick=()=>{s.lang=b.dataset.lang;lang()});
-document.querySelectorAll("[data-region]").forEach(b=>b.onclick=async()=>{s.region=b.dataset.region==="cn"?"cn":"other";lang();if(s.data&&s.data.mode==="dashboard"){await api("/__onb/region",{region:s.region})}});document.getElementById("pick-storage").onclick=async()=>{const x=await api("/__onb/pick");if(!x.cancelled){s.path=x.path;s.validation=x.validation;render()}};document.getElementById("pick-cache").onclick=async()=>{const x=await api("/__onb/pick-cache");if(!x.cancelled){s.cache=x.path;s.cacheValidation=x.validation;render()}};document.getElementById("show-terms").onclick=()=>document.getElementById("terms").classList.toggle("open");document.getElementById("licenses").onclick=async()=>{const list=await fetch("/__onb/licenses").then(r=>r.json());alert(list.map(x=>`${x.name} — ${x.license}`).join("\n"))};document.getElementById("back").onclick=()=>{if(s.reconfig&&s.step===1){s.reconfig=false;s.data.mode="dashboard";s.step=3}else{s.step--}render()};document.getElementById("next").onclick=()=>{if(s.step===0){if(!s.validation?.writable||!document.getElementById("agree").checked)return;s.step=1;render()}else if(s.step===1){if(!s.backend)return;s.step=2;render()}else complete(true)};document.getElementById("skip").onclick=()=>s.reconfig?(s.reconfig=false,s.data.mode="dashboard",s.step=3,render()):complete(false);document.getElementById("open-app").onclick=()=>api("/__onb/open-app");document.getElementById("refresh").onclick=load;document.getElementById("lumen-restart").onclick=()=>action("restart");document.getElementById("lumen-check").onclick=()=>action("check");document.getElementById("lumen-update").onclick=()=>confirm(t("update")+"?")&&action("update");document.getElementById("lumen-configure").onclick=()=>{s.reconfig=true;s.data.mode="onboarding";s.step=1;document.getElementById("wizard-footer").style.display="flex";render()};setInterval(()=>{if(s.data?.mode==="dashboard")load()},2500);load();
-</script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Lumilio Photos</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f7f5;
+        --surface: #fff;
+        --text: #171716;
+        --muted: #6e6e68;
+        --line: #e4e4df;
+        --accent: #315c47;
+        --soft: #edf3ef;
+        --danger: #a13d35;
+        --radius: 14px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+      }
+      .shell {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .titlebar {
+        height: 30px;
+        flex: none;
+        -webkit-app-region: drag;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        padding: 14px 34px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        font-size: 18px;
+        font-weight: 680;
+        letter-spacing: -0.02em;
+      }
+      .tag {
+        margin-left: 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .lang {
+        margin-left: auto;
+        display: flex;
+        gap: 2px;
+        background: var(--line);
+        padding: 2px;
+        border-radius: 8px;
+      }
+      .lang button {
+        border: 0;
+        background: transparent;
+        padding: 5px 9px;
+        border-radius: 6px;
+        color: var(--muted);
+      }
+      .lang button.active {
+        background: var(--surface);
+        color: var(--text);
+      }
+      main {
+        width: min(680px, calc(100% - 56px));
+        margin: auto;
+        flex: 1;
+        overflow: auto;
+        padding: 34px 0;
+      }
+      .screen {
+        display: none;
+        animation: enter 0.22s ease;
+      }
+      .screen.active {
+        display: block;
+      }
+      @keyframes enter {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+      }
+      h1 {
+        font-size: 28px;
+        letter-spacing: -0.035em;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font-size: 17px;
+        margin: 0;
+      }
+      .lead {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+        margin: 0 0 30px;
+        max-width: 550px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .choice-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .choice {
+        position: relative;
+        text-align: left;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 18px;
+        min-height: 170px;
+        color: inherit;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          transform 0.15s,
+          background 0.15s;
+      }
+      .choice:hover {
+        transform: translateY(-1px);
+      }
+      .choice.selected {
+        border-color: var(--accent);
+        background: var(--soft);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+      .choice svg {
+        width: 22px;
+        height: 22px;
+        margin-bottom: 23px;
+      }
+      .choice strong {
+        display: block;
+        font-size: 15px;
+        margin-bottom: 7px;
+      }
+      .choice p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .choice small {
+        display: block;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .recommend {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        font-size: 9px;
+        color: var(--accent);
+        font-weight: 650;
+      }
+      .path {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .path code {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        font-size: 11px;
+      }
+      .btn {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+        padding: 9px 13px;
+        border-radius: 9px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn:hover {
+        border-color: #b7b7b0;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+      .btn.link {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .check {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .agree {
+        display: flex;
+        gap: 9px;
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .agree a {
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .footer {
+        border-top: 1px solid var(--line);
+        padding: 13px 34px 17px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .footer .spacer {
+        flex: 1;
+      }
+      .dots {
+        display: flex;
+        gap: 5px;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 9px;
+        background: var(--line);
+      }
+      .dot.active {
+        width: 17px;
+        background: var(--accent);
+      }
+      .backend-list {
+        display: grid;
+        gap: 10px;
+      }
+      .backend {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        color: inherit;
+        text-align: left;
+      }
+      .backend.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+      .backend b {
+        font-size: 15px;
+      }
+      .backend span {
+        color: var(--muted);
+        font-size: 12px;
+        margin-left: 8px;
+      }
+      .backend em {
+        margin-left: auto;
+        font-style: normal;
+        color: var(--accent);
+        font-size: 10px;
+      }
+      .cache {
+        margin-top: 24px;
+      }
+      .cache label {
+        display: block;
+        font-weight: 620;
+        margin-bottom: 8px;
+      }
+      .dashboard {
+        padding-top: 6px;
+      }
+      .dash-head {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 32px;
+      }
+      .dash-head .actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .section {
+        padding: 20px 0;
+        border-top: 1px solid var(--line);
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .section-head .status {
+        margin-left: auto;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .pulse {
+        width: 7px;
+        height: 7px;
+        border-radius: 8px;
+        background: #aaa;
+      }
+      .pulse.ok {
+        background: #45a36b;
+      }
+      .pulse.busy {
+        background: #d69a35;
+        animation: pulse 1.2s infinite;
+      }
+      .pulse.bad {
+        background: var(--danger);
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.35;
+        }
+      }
+      .facts {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 8px 16px;
+        font-size: 12px;
+      }
+      .facts dt {
+        color: var(--muted);
+      }
+      .facts dd {
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .section-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+      .error {
+        color: var(--danger);
+        font-size: 11px;
+        margin-top: 10px;
+      }
+      .paths {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .path-button {
+        text-align: left;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 10px;
+        color: inherit;
+        cursor: pointer;
+      }
+      .path-button b {
+        display: block;
+        font-size: 12px;
+      }
+      .path-button span {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-top: 4px;
+      }
+      .terms {
+        display: none;
+        margin-top: 12px;
+        padding: 14px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      .terms.open {
+        display: block;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #171816;
+          --surface: #20211f;
+          --text: #f1f1ec;
+          --muted: #a3a39c;
+          --line: #343631;
+          --accent: #7eb69a;
+          --soft: #24342c;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="titlebar"></div>
+      <header class="top">
+        <span class="brand">Lumilio Photos</span
+        ><span class="tag" data-i18n="tag">Local control panel</span>
+        <div class="lang">
+          <button data-lang="en">EN</button><button data-lang="zh">中文</button>
+        </div>
+      </header>
+      <main>
+        <section id="step-storage" class="screen">
+          <div class="eyebrow" data-i18n="step1">Step 1 of 3</div>
+          <h1 data-i18n="welcome">Set up your library</h1>
+          <p class="lead" data-i18n="welcomeDesc">
+            Choose where originals are stored. Lumilio Photos and its database stay on this
+            computer.
+          </p>
+          <div class="path">
+            <code id="storage-path">—</code
+            ><button class="btn" id="pick-storage" data-i18n="choose">Choose…</button>
+          </div>
+          <div class="check" id="storage-check"></div>
+          <div class="region" style="margin: 16px 0 8px">
+            <div class="eyebrow" style="margin: 0 0 8px" data-i18n="regionLabel">
+              Download region
+            </div>
+            <div class="lang" style="margin: 0">
+              <button type="button" data-region="other" class="active">Other</button>
+              <button type="button" data-region="cn">中国大陆</button>
+            </div>
+            <p class="lead" style="margin: 8px 0 0; font-size: 12px" data-i18n="regionHint">
+              Mainland China uses a download mirror for app updates. This is separate from in-app
+              map region.
+            </p>
+          </div>
+          <label class="agree"
+            ><input type="checkbox" id="agree" /><span
+              ><span data-i18n="agree">I agree to the Terms of Use.</span>
+              <a id="show-terms" data-i18n="read">Read</a></span
+            ></label
+          >
+          <div class="terms" id="terms">
+            <b data-i18n="termsTitle">Terms of Use</b>
+            <p data-i18n="termsBody">
+              Lumilio Photos is provided as-is, without warranty. You remain responsible for your
+              media, backups, account security, and compliance with laws that apply to your use. The
+              software does not transfer ownership of your media.
+            </p>
+            <button class="btn link" id="licenses" data-i18n="appLicense">
+              Lumilio Photos open-source license</button
+            ><button class="btn link" id="third-party" data-i18n="thirdParty">
+              Third-party software notices
+            </button>
+          </div>
+        </section>
+        <section id="step-backend" class="screen">
+          <div class="eyebrow" data-i18n="step2">Step 2 of 3</div>
+          <h1 data-i18n="hardware">Use this computer for analysis</h1>
+          <p class="lead" data-i18n="hardwareDesc">
+            Choose the processing backend. The recommended option is selected for this computer.
+          </p>
+          <div class="backend-list" id="backend-list"></div>
+        </section>
+        <section id="step-preset" class="screen">
+          <div class="eyebrow" data-i18n="step3">Step 3 of 3</div>
+          <h1 data-i18n="analysis">Choose analysis features</h1>
+          <p class="lead" data-i18n="analysisDesc">
+            You can change this later. Models download in the background after Photos starts.
+          </p>
+          <div class="choice-grid" id="presets"></div>
+          <div class="cache">
+            <label data-i18n="cache">Model cache</label>
+            <div class="path">
+              <code id="cache-path">—</code
+              ><button class="btn" id="pick-cache" data-i18n="choose">Choose…</button>
+            </div>
+            <div class="check" id="cache-check"></div>
+          </div>
+        </section>
+        <section id="dashboard" class="screen dashboard">
+          <div class="dash-head">
+            <div>
+              <h1 data-i18n="control">Control panel</h1>
+              <p class="lead" style="margin: 5px 0 0" data-i18n="controlDesc">
+                Local services and storage at a glance.
+              </p>
+            </div>
+            <div class="actions">
+              <button class="btn primary" id="open-app" data-i18n="openPhotos">Open Photos</button
+              ><button class="btn" id="refresh" data-i18n="refresh">Refresh</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-head">
+              <h2>Lumilio Photos</h2>
+              <span class="status" id="photos-status"></span>
+            </div>
+            <dl class="facts">
+              <dt data-i18n="version">Version</dt>
+              <dd id="app-version">—</dd>
+              <dt data-i18n="address">Address</dt>
+              <dd id="server-url">—</dd>
+            </dl>
+          </div>
+          <div class="section">
+            <div class="section-head">
+              <h2>Lumen Hub</h2>
+              <span class="status" id="lumen-status"></span>
+            </div>
+            <dl class="facts">
+              <dt data-i18n="configuration">Configuration</dt>
+              <dd id="lumen-config">—</dd>
+              <dt data-i18n="hubVersion">Installed / latest</dt>
+              <dd id="lumen-version">—</dd>
+              <dt data-i18n="modelCache">Model cache</dt>
+              <dd id="lumen-cache">—</dd>
+            </dl>
+            <div class="error" id="lumen-error"></div>
+            <div class="section-actions">
+              <button class="btn" id="lumen-toggle"></button
+              ><button class="btn" id="lumen-restart" data-i18n="restart">Restart</button
+              ><button class="btn" id="lumen-check" data-i18n="checkUpdate">Check update</button
+              ><button class="btn primary" id="lumen-update" data-i18n="update">Update</button
+              ><button class="btn" id="lumen-configure" data-i18n="configure">Configure</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-head"><h2 data-i18n="regionLabel">Download region</h2></div>
+            <div class="lang" style="margin: 0 0 8px">
+              <button type="button" data-region="other">Other</button>
+              <button type="button" data-region="cn">中国大陆</button>
+            </div>
+            <p class="lead" style="margin: 0; font-size: 12px" data-i18n="regionHint">
+              Mainland China uses a download mirror for app updates. This is separate from in-app
+              map region.
+            </p>
+          </div>
+          <div class="section">
+            <div class="section-head"><h2 data-i18n="paths">Local paths</h2></div>
+            <div class="paths" id="paths"></div>
+          </div>
+        </section>
+      </main>
+      <footer class="footer" id="wizard-footer">
+        <button class="btn link" id="back" data-i18n="back">Back</button>
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="spacer"></div>
+        <button class="btn link" id="skip" data-i18n="skip">Set up later</button
+        ><button class="btn primary" id="next" data-i18n="next">Continue</button>
+      </footer>
+    </div>
+    <script>
+      const I = {
+        en: {
+          tag: "Local control panel",
+          step1: "Step 1 of 3",
+          step2: "Step 2 of 3",
+          step3: "Step 3 of 3",
+          welcome: "Set up your library",
+          welcomeDesc:
+            "Choose where originals are stored. Lumilio Photos and its database stay on this computer.",
+          regionLabel: "Download region",
+          regionHint:
+            "Mainland China uses a download mirror for app updates. Separate from in-app map settings.",
+          regionOther: "Other regions",
+          regionCN: "Mainland China",
+          choose: "Choose…",
+          agree: "I agree to the terms of use and open-source licenses.",
+          read: "Read",
+          termsTitle: "Terms and licenses",
+          termsBody:
+            "Lumilio Photos is free, open-source software provided as-is. Your library remains local and you are responsible for backups.",
+          licenses: "View bundled licenses",
+          hardware: "Use this computer for analysis",
+          hardwareDesc:
+            "Choose the processing backend. The recommended option is selected for this computer.",
+          analysis: "Choose analysis features",
+          analysisDesc:
+            "You can change this later. Models download in the background after Photos starts.",
+          cache: "Model cache",
+          control: "Control panel",
+          controlDesc: "Local services and storage at a glance.",
+          openPhotos: "Open Photos",
+          refresh: "Refresh",
+          version: "Version",
+          address: "Address",
+          configuration: "Configuration",
+          hubVersion: "Installed / latest",
+          modelCache: "Model cache",
+          restart: "Restart",
+          checkUpdate: "Check update",
+          update: "Update",
+          configure: "Configure",
+          paths: "Local paths",
+          back: "Back",
+          skip: "Set up later",
+          next: "Continue",
+          finish: "Finish and install",
+          recommended: "Recommended",
+          minimal: "Minimal",
+          basic: "Basic",
+          brave: "Brave",
+          minimalDesc: "Image semantic analysis · Person recognition",
+          basicDesc:
+            "Image semantic analysis · Person recognition · BioCLIP species identification · OCR text recognition",
+          braveDesc:
+            "Stronger image semantic analysis · Person recognition · Full BioCLIP species identification · OCR text recognition",
+          writable: "Writable · {free} free",
+          invalid: "Choose a writable location",
+          running: "Running",
+          starting: "Starting",
+          off: "Off",
+          failed: "Failed",
+          enable: "Enable",
+          disable: "Turn off",
+          photos: "Photos",
+          logs: "Logs",
+          backups: "Backups",
+          appData: "App data",
+          oldCache: "Previous model cache",
+        },
+        zh: {
+          tag: "本机控制面板",
+          step1: "第 1 步，共 3 步",
+          step2: "第 2 步，共 3 步",
+          step3: "第 3 步，共 3 步",
+          welcome: "设置照片库",
+          welcomeDesc: "选择原始照片和视频的保存位置。Lumilio Photos 与数据库都保留在本机。",
+          regionLabel: "下载地区",
+          regionHint: "中国大陆使用应用更新下载镜像，与应用内地图地区设置相互独立。",
+          regionOther: "其他国家和地区",
+          regionCN: "中国大陆",
+          choose: "选择…",
+          agree: "我同意使用条款与开源许可。",
+          read: "阅读",
+          termsTitle: "条款与许可",
+          termsBody: "Lumilio Photos 是免费开源软件，按原样提供。照片库保留在本机，备份由你负责。",
+          licenses: "查看捆绑的开源许可",
+          hardware: "使用本机进行分析",
+          hardwareDesc: "选择计算后端。已根据这台电脑选中推荐项。",
+          analysis: "选择分析能力",
+          analysisDesc: "之后仍可更改。Photos 启动后，模型将在后台下载。",
+          cache: "模型缓存",
+          control: "控制面板",
+          controlDesc: "快速查看本机服务与存储。",
+          openPhotos: "打开 Photos",
+          refresh: "刷新",
+          version: "版本",
+          address: "地址",
+          configuration: "配置",
+          hubVersion: "已安装 / 最新",
+          modelCache: "模型缓存",
+          restart: "重新启动",
+          checkUpdate: "检查更新",
+          update: "更新",
+          configure: "配置",
+          paths: "本机路径",
+          back: "返回",
+          skip: "稍后设置",
+          next: "继续",
+          finish: "完成并安装",
+          recommended: "推荐",
+          minimal: "最小",
+          basic: "基础",
+          brave: "激进",
+          minimalDesc: "图像语义分析 · 人物识别",
+          basicDesc: "图像语义分析 · 人物识别 · BioCLIP 生物识别 · OCR 文字识别",
+          braveDesc: "更强的图像语义分析 · 人物识别 · 完整 BioCLIP 生物识别 · OCR 文字识别",
+          writable: "可写入 · 剩余 {free}",
+          invalid: "请选择可写入的位置",
+          running: "运行中",
+          starting: "正在启动",
+          off: "已停用",
+          failed: "失败",
+          enable: "启用",
+          disable: "停用",
+          photos: "照片库",
+          logs: "日志",
+          backups: "备份",
+          appData: "应用数据",
+          oldCache: "旧模型缓存",
+        },
+      };
+      const icons = {
+        minimal: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg>`,
+        basic: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>`,
+        brave: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>`,
+      };
+      let s = {
+        lang: "en",
+        region: "other",
+        step: 0,
+        data: null,
+        path: "",
+        validation: null,
+        cache: "",
+        cacheValidation: null,
+        backend: null,
+        preset: null,
+        reconfig: false,
+      };
+      const t = (k, v = {}) => {
+        let x = (I[s.lang] || I.en)[k] || k;
+        for (const q in v) x = x.replace(`{${q}}`, v[q]);
+        return x;
+      };
+      async function api(path, body) {
+        const r = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body || {}),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        return r.json();
+      }
+      function lang() {
+        document.documentElement.lang = s.lang === "zh" ? "zh-CN" : "en";
+        document
+          .querySelectorAll("[data-i18n]")
+          .forEach((e) => (e.textContent = t(e.dataset.i18n)));
+        document
+          .querySelectorAll("[data-lang]")
+          .forEach((e) => e.classList.toggle("active", e.dataset.lang === s.lang));
+        document.querySelectorAll("[data-region]").forEach((e) => {
+          e.classList.toggle("active", e.dataset.region === s.region);
+          if (e.dataset.region === "other") e.textContent = t("regionOther");
+          if (e.dataset.region === "cn") e.textContent = t("regionCN");
+        });
+        render();
+      }
+      function show(id) {
+        document
+          .querySelectorAll(".screen")
+          .forEach((e) => e.classList.toggle("active", e.id === id));
+      }
+      function valid(v) {
+        return v && v.writable ? t("writable", { free: v.freeHuman || "—" }) : t("invalid");
+      }
+      function render() {
+        if (!s.data) return;
+        if (s.data.mode === "dashboard" || s.step === 3) {
+          show("dashboard");
+          document.getElementById("wizard-footer").style.display = "none";
+          renderDash();
+          return;
+        }
+        document.getElementById("wizard-footer").style.display = "flex";
+        show(["step-storage", "step-backend", "step-preset"][s.step]);
+        document
+          .querySelectorAll(".dot")
+          .forEach((e, i) => e.classList.toggle("active", i === s.step));
+        document.getElementById("back").style.visibility = s.step ? "visible" : "hidden";
+        document.getElementById("skip").style.display = s.step > 0 ? "block" : "none";
+        document.getElementById("next").textContent = s.step === 2 ? t("finish") : t("next");
+        document.getElementById("storage-path").textContent = s.path || "—";
+        document.getElementById("storage-check").textContent = valid(s.validation);
+        document.getElementById("cache-path").textContent = s.cache || "—";
+        document.getElementById("cache-check").textContent = valid(s.cacheValidation);
+        renderBackends();
+        renderPresets();
+      }
+      function renderBackends() {
+        const el = document.getElementById("backend-list");
+        el.innerHTML = "";
+        (s.data.backends || []).forEach((b, i) => {
+          const x = document.createElement("button");
+          x.className =
+            "backend" + (s.backend && s.backend.profile === b.profile ? " selected" : "");
+          x.innerHTML = `<b>${b.name.toUpperCase()}</b><span>${b.profile}</span>${b.recommended ? `<em>${t("recommended")}</em>` : ""}`;
+          x.onclick = () => {
+            s.backend = b;
+            render();
+          };
+          el.append(x);
+        });
+      }
+      function renderPresets() {
+        const el = document.getElementById("presets");
+        el.innerHTML = "";
+        (s.data.presets || []).forEach((p) => {
+          const x = document.createElement("button");
+          x.className = "choice" + (s.preset === p.name ? " selected" : "");
+          x.innerHTML = `${p.name === s.data.recommendedPreset ? `<i class="recommend">${t("recommended")}</i>` : ""}${icons[p.name]}<strong>${t(p.name)}</strong><p>${t(p.name + "Desc")}</p><small>${p.minRamGB} GB RAM · ${p.minDiskGB} GB</small>`;
+          x.onclick = () => {
+            s.preset = p.name;
+            render();
+          };
+          el.append(x);
+        });
+      }
+      function status(state) {
+        const busy = ["installing", "starting", "checking", "stopping"].includes(state),
+          bad = state === "failed",
+          ok = state === "running";
+        return `<i class="pulse ${ok ? "ok" : busy ? "busy" : bad ? "bad" : ""}"></i>${ok ? t("running") : busy ? t("starting") : bad ? t("failed") : t("off")}`;
+      }
+      function renderDash() {
+        const d = s.data,
+          l = d.lumen || {};
+        document.getElementById("photos-status").innerHTML = status(
+          d.ready ? "running" : "starting",
+        );
+        document.getElementById("app-version").textContent = d.version || "dev";
+        document.getElementById("server-url").textContent = d.serverURL || "—";
+        document.getElementById("lumen-status").innerHTML = status(l.state || "");
+        document.getElementById("lumen-config").textContent =
+          [l.preset, l.backend, l.profile].filter(Boolean).join(" · ") || "—";
+        document.getElementById("lumen-version").textContent =
+          `${l.installedVersion || "—"} / ${l.latestVersion || "—"}`;
+        document.getElementById("lumen-cache").textContent = l.cacheDir || "—";
+        document.getElementById("lumen-error").textContent = l.error || "";
+        const toggle = document.getElementById("lumen-toggle");
+        toggle.textContent = l.enabled ? t("disable") : t("enable");
+        toggle.onclick = () => action(l.enabled ? "disable" : "enable");
+        document.getElementById("lumen-update").style.display =
+          l.latestVersion && l.latestVersion !== l.installedVersion ? "inline-block" : "none";
+        const paths = document.getElementById("paths");
+        paths.innerHTML = "";
+        const names = { storage: "photos", logs: "logs", backups: "backups", appData: "appData" };
+        for (const k in names)
+          if (d.paths && d.paths[k]) pathButton(paths, t(names[k]), d.paths[k]);
+        if (l.previousCacheDir) pathButton(paths, t("oldCache"), l.previousCacheDir);
+      }
+      function pathButton(root, label, path) {
+        const b = document.createElement("button");
+        b.className = "path-button";
+        b.innerHTML = `<b>${label}</b><span>${path}</span>`;
+        b.onclick = () => api("/__onb/open", { path });
+        root.append(b);
+      }
+      async function load() {
+        const d = await fetch("/__onb/state").then((r) => r.json());
+        s.data = d;
+        s.lang = d.lang === "zh" ? "zh" : "en";
+        s.region = d.region === "cn" ? "cn" : "other";
+        s.path = d.path;
+        s.validation = d.validation;
+        s.cache = d.lumen.cacheDir;
+        s.cacheValidation = d.cacheValidation;
+        s.backend =
+          (d.backends || []).find((b) => b.profile === d.lumen.profile) || (d.backends || [])[0];
+        s.preset = d.lumen.preset || d.recommendedPreset;
+        lang();
+      }
+      async function complete(enable) {
+        if (s.reconfig) {
+          await api("/__onb/lumen-save", {
+            preset: s.preset,
+            backend: s.backend && s.backend.name,
+            profile: s.backend && s.backend.profile,
+            cacheDir: s.cache,
+          });
+          s.reconfig = false;
+        } else {
+          await api("/__onb/complete", {
+            path: s.path,
+            lang: s.lang,
+            region: s.region,
+            agreed: document.getElementById("agree").checked,
+            enableLumen: enable,
+            preset: s.preset,
+            backend: s.backend && s.backend.name,
+            profile: s.backend && s.backend.profile,
+            cacheDir: s.cache,
+          });
+        }
+        s.step = 3;
+        s.data.mode = "dashboard";
+        render();
+        setTimeout(load, 700);
+      }
+      async function action(a) {
+        await api("/__onb/lumen-action", { action: a });
+        setTimeout(load, 350);
+      }
+      document.querySelectorAll("[data-lang]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            s.lang = b.dataset.lang;
+            lang();
+          }),
+      );
+      document.querySelectorAll("[data-region]").forEach(
+        (b) =>
+          (b.onclick = async () => {
+            s.region = b.dataset.region === "cn" ? "cn" : "other";
+            lang();
+            if (s.data && s.data.mode === "dashboard") {
+              await api("/__onb/region", { region: s.region });
+            }
+          }),
+      );
+      document.getElementById("pick-storage").onclick = async () => {
+        const x = await api("/__onb/pick");
+        if (!x.cancelled) {
+          s.path = x.path;
+          s.validation = x.validation;
+          render();
+        }
+      };
+      document.getElementById("pick-cache").onclick = async () => {
+        const x = await api("/__onb/pick-cache");
+        if (!x.cancelled) {
+          s.cache = x.path;
+          s.cacheValidation = x.validation;
+          render();
+        }
+      };
+      document.getElementById("show-terms").onclick = () =>
+        document.getElementById("terms").classList.toggle("open");
+      document.getElementById("back").onclick = () => {
+        if (s.reconfig && s.step === 1) {
+          s.reconfig = false;
+          s.data.mode = "dashboard";
+          s.step = 3;
+        } else {
+          s.step--;
+        }
+        render();
+      };
+      document.getElementById("next").onclick = () => {
+        if (s.step === 0) {
+          if (!s.validation?.writable || !document.getElementById("agree").checked) return;
+          s.step = 1;
+          render();
+        } else if (s.step === 1) {
+          if (!s.backend) return;
+          s.step = 2;
+          render();
+        } else complete(true);
+      };
+      document.getElementById("skip").onclick = () =>
+        s.reconfig
+          ? ((s.reconfig = false), (s.data.mode = "dashboard"), (s.step = 3), render())
+          : complete(false);
+      document.getElementById("open-app").onclick = () => api("/__onb/open-app");
+      document.getElementById("refresh").onclick = load;
+      document.getElementById("lumen-restart").onclick = () => action("restart");
+      document.getElementById("lumen-check").onclick = () => action("check");
+      document.getElementById("lumen-update").onclick = () =>
+        confirm(t("update") + "?") && action("update");
+      document.getElementById("lumen-configure").onclick = () => {
+        s.reconfig = true;
+        s.data.mode = "onboarding";
+        s.step = 1;
+        document.getElementById("wizard-footer").style.display = "flex";
+        render();
+      };
+      setInterval(() => {
+        if (s.data?.mode === "dashboard") load();
+      }, 2500);
+      load();
+    </script>
+    <script>
+      Object.assign(I.en, {
+        agree: "I agree to the Terms of Use.",
+        termsTitle: "Terms of Use",
+        termsBody:
+          "Lumilio Photos is provided as-is, without warranty. You remain responsible for your media, backups, account security, and compliance with laws that apply to your use. The software does not transfer ownership of your media.",
+        appLicense: "Lumilio Photos open-source license",
+        thirdParty: "Third-party software notices",
+      });
+      Object.assign(I.zh, {
+        agree: "我同意使用条款。",
+        termsTitle: "使用条款",
+        termsBody:
+          "Lumilio Photos 按原样提供，不附带任何保证。你需要自行负责媒体文件、备份、账户安全以及遵守适用于你的法律。软件不会取得你的媒体文件所有权。",
+        appLicense: "Lumilio Photos 开源许可",
+        thirdParty: "第三方软件声明",
+      });
+      document.getElementById("licenses").onclick = () =>
+        window.open("/__onb/legal/license", "_blank");
+      document.getElementById("third-party").onclick = () =>
+        window.open("/__onb/legal/third-party", "_blank");
+    </script>
+  </body>
+</html>

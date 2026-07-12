@@ -206,8 +206,8 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 	mux.HandleFunc("/__onb/lumen-save", d.handleLumenSave)
 	mux.HandleFunc("/__onb/lumen-action", d.handleLumenAction)
 
-	mux.HandleFunc("/__onb/licenses", handleLicenseIndex)
-	mux.HandleFunc("/__onb/license", handleLicenseText)
+	mux.HandleFunc("/__onb/legal/license", serveLegalText("licenses/GPL-3.0.txt"))
+	mux.HandleFunc("/__onb/legal/third-party", serveLegalText("licenses/THIRD_PARTY_NOTICES.txt"))
 
 	// Everything else (notably "/") serves the single-page setup UI.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

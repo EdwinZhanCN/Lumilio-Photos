@@ -41,6 +41,13 @@ jobs:
                   cache: pnpm
                   cache-dependency-path: web/pnpm-lock.yaml
 
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: desktop/go.mod
+                  cache-dependency-path: |
+                      desktop/go.sum
+                      server/go.sum
+
             - name: Install Vite+
               run: |
                   curl -fsSL https://vite.plus | bash
@@ -53,12 +60,21 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Build web SPA
-              run: cd web && vp install && vp build
+              run: |
+                  cd web && vp install && vp build
+                  cd .. && node desktop/scripts/generate-third-party-notices.mjs
 
             - uses: actions/upload-artifact@v7
               with:
                   name: web-dist
                   path: web/dist
+                  if-no-files-found: error
+                  retention-days: 1
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: third-party-notices
+                  path: desktop/licenses/THIRD_PARTY_NOTICES.txt
                   if-no-files-found: error
                   retention-days: 1
 
@@ -103,6 +119,12 @@ jobs:
               with:
                   name: web-dist
                   path: web/dist
+
+            - name: Stage third-party notices
+              uses: actions/download-artifact@v8
+              with:
+                  name: third-party-notices
+                  path: desktop/licenses
 
             - name: Stage PostgreSQL bundle
               uses: actions/download-artifact@v8
@@ -161,6 +183,12 @@ jobs:
               with:
                   name: web-dist
                   path: web/dist
+
+            - name: Stage third-party notices
+              uses: actions/download-artifact@v8
+              with:
+                  name: third-party-notices
+                  path: desktop/licenses
 
             - name: Stage PostgreSQL bundle
               uses: actions/download-artifact@v8
