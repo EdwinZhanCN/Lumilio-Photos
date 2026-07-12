@@ -1,77 +1,78 @@
 # Tech Debt Tracker
 
-Keep this list short. Each item should have a concrete owner path and a reason it matters.
+Keep this list short. Each item must describe current behavior, name a concrete
+owner path, and explain the user or release impact. Completed history belongs in
+the relevant exec plan, not in this file.
 
-- Docker image build is not currently verified in this workspace when the local Docker/Orbstack socket is unavailable.
-- **PostgreSQL backups + major-version upgrades (both shapes) are planned, not
-  implemented.** Owner: `exec-plans/active/db-backup-upgrade.md` (supersedes
-  the earlier desktop-only note). Until Phase 3a lands, the desktop supervisor's
-  `DataDirVersionMismatch` error is the only guard; do not bump `pgMajorVersion`
-  (desktop) or the `db.Dockerfile` base image before that plan's upgrade path
-  ships in the same release.
-- **License bundle covers native components only, not Go/JS dependency notices.**
-  Owner: `desktop/licenses/` (+ `desktop/licenses.go` manifest). Onboarding now
-  ships full texts for the app (GPL-3) and the bundled native tools
-  (PostgreSQL, FFmpeg, libvips, ExifTool, Wails), but the Go module and npm
-  dependency license notices (MIT/BSD attribution requirements) are not
-  aggregated. Fix: generate a NOTICE file in CI (e.g. `go-licenses` +
-  `license-checker`) and stage it into `desktop/licenses/`; add it to the
-  onboarding license list.
-- **Assets permanent delete is intentionally deferred.** F4 in
-  `exec-plans/active/assets-feature-review.md` resolves ordinary delete as
-  Move to Trash + Restore, with no permanent-delete or automatic retention path
-  in the current milestone. A future implementation must be Trash-only,
-  owner-scoped, strongly confirmed, explicit about deleting original media, and
-  distinct from ordinary library delete.
-- ~~Lumilio Agent RichInput temporarily offline~~ **(resolved 2026-06-12)** — mention/slash were rebuilt natively in `web/src/features/lumilio/components/Chat/MentionInput.tsx` (textarea + popover, no contentEditable) and the legacy `components/RichInput/` directory was deleted. See `exec-plans/active/agent-context-mention-slash.md` v2.
-- ~~`/assets/filter-options` response under-typed / cast in `MentionInput`~~ **(resolved 2026-06-13)** — root cause was a stale `make dto`, not a missing DTO: `dto.OptionsResponseDTO` (`camera_models`, `lenses`) and the handler `@Success` annotation were already correct, but `schema.d.ts` was stale so it surfaced as `Record<string, never>`. Regenerated with `make dto` and removed all `as` casts from `MentionInput.tsx` (now fully type-safe). Rule materialized in [FRONTEND.md](FRONTEND.md)/[BACKEND.md](BACKEND.md): an `as`-cast on an API response means check DTO/annotation and re-run `make dto`, never cast.
-- **Auth: refresh token stored in `localStorage` (XSS-exposed).** Owner:
-  `web/src/lib/http-commons/auth.ts`. Tokens (access + refresh) live in
-  `localStorage`, so any XSS can exfiltrate the refresh token. Moving the refresh
-  token to an `HttpOnly` cookie is a cross-cutting change (CSRF strategy, the
-  desktop in-process host at `localhost:6680`, and media-element auth which
-  relies on a queryable token) and is deliberately deferred. Decided out of
-  scope for `exec-plans/active/auth-feature-review.md`; promote to its own plan
-  before changing the storage model.
-- **Auth: no rate limiting / brute-force protection on auth endpoints.** Owner:
-  `server/internal/api/router.go` + a future shared middleware. `login`,
-  `passkeys/login`, and `mfa/verify` have no per-IP/per-account throttle, so
-  online password/TOTP guessing is unbounded. Needs a dedicated hardening plan
-  (shared limiter middleware + lockout policy); intentionally out of scope for
-  the auth review fix plan.
-- **Auth: refresh-rotation/reuse logic has no DB-backed regression test.** Owner:
+Last aligned with the codebase: 2026-07-12.
+
+## Release and operations
+
+- **PostgreSQL major-version upgrades are not implemented.** Owner:
+  `exec-plans/active/db-backup-upgrade.md`. Routine backup, retention,
+  admin restore, restore points, and rollback are implemented for both runtime
+  shapes. What remains is the Desktop dump/restore major-upgrade orchestrator,
+  the Docker `pg_upgrade` transition image, and the optional restore-onboarding
+  stub. Until Phase 3 ships, do not bump Desktop `pgMajorVersion` or the
+  `server/db.Dockerfile` PostgreSQL major. The completed backup UI still needs
+  its recorded `make web-test` and i18n extract/status follow-up.
+- **Desktop distribution is not fully signed or available on macOS Intel.**
+  Owners: `.github/workflows/release-desktop.yml`,
+  `desktop/scripts/fetch-resources.sh`. macOS arm64 and Windows amd64 packaging
+  are wired. Remaining distribution work is Intel ffmpeg/ffprobe pins plus a
+  `macos-15-intel` build, Apple notarization and Windows Authenticode/installer
+  when signing is available, and the corresponding real-machine smoke. Updates
+  remain release-page/manual-install based until signed platform updaters are
+  viable.
+## Security and test coverage
+
+- **Refresh tokens are stored in `localStorage`.** Owner:
+  `web/src/lib/http-commons/auth.ts`. An XSS can exfiltrate both access and
+  refresh tokens. Moving the refresh token to an `HttpOnly` cookie requires an
+  explicit CSRF design and must preserve Desktop localhost and authenticated
+  media behavior; track that cross-cutting change in its own hardening plan.
+- **Authentication endpoints have no brute-force rate limit.** Owner:
+  `server/internal/api/router.go` plus a future shared limiter. Password login,
+  passkey login verification, and MFA verification have no per-IP or
+  per-account throttle/lockout policy, so online password or TOTP guessing is
+  unbounded. This remains a pre-public-deployment hardening item.
+- **Refresh-token rotation/reuse lacks a DB-backed regression test.** Owner:
   `server/internal/service/auth_service.go` (`RefreshToken`). The fail-closed
-  rotation + token-family reuse-revocation added in the auth review is covered by
-  build + code review only; `s.queries` is a concrete `*repo.Queries` (not an
-  interface), and the service test suite has no Postgres harness, so a real
-  regression test needs the integration DB (`make db`) or a queries interface to
-  mock. Add when the integration-test harness lands.
-- **Desktop bundle: native binaries + signing not yet wired into a release.** The
-  desktop module (`desktop/`) is code-complete and compiles, but packaging is
-  unfinished and needs a macOS build host with staged binaries:
-  - Stage PG16+pgvector / ffmpeg / exiftool into `desktop/resources/` (see its
-    README; `.github/workflows/build-postgres.yml` builds the PG artifact).
-  - Build + stage the web SPA: `cd web && vp build`, then the build script copies
-    `web/dist` into `Resources/web` (the supervisor sets `server.web_root` to it).
-  - `desktop/scripts/build-macos.sh` runs `dylibbundler` + ad-hoc `codesign`;
-    verify `@rpath` resolves and RAW decode works (libraw via libvips).
-  - Publish the ad-hoc-signed DMG(s) (arm64 + amd64) to GitHub Releases. No
-    Homebrew cask (it quarantines by default, so it would gain nothing over a DMG
-    for an ad-hoc app). Notarization (needs a paid Apple Developer account) is the
-    only way to remove the one-time "Open Anyway" prompt — a future upgrade.
-  - Passkeys now run in the real browser (the app is a tray + browser, no
-    webview), so the WKWebView entitlement spike is moot — just confirm Touch ID
-    registration works in Safari/Chrome against `localhost` once the SPA ships.
-  - **Phase 2 UI**: native storage-location picker + "reconnect external drive"
-    dialog (supervisor currently persists/falls back but has no picker UI).
+  rotation and token-family reuse revocation exist, but the service owns a
+  concrete `*repo.Queries` and the suite has no PostgreSQL auth harness. Add an
+  integration test, or introduce the smallest query seam needed to test the
+  transaction behavior without weakening the current contract.
+
+## Product paths
+
+- **Assets have no permanent-delete or automatic Trash retention path.**
+  Owners: `server/internal/service/asset_service.go`,
+  `server/internal/db/repo/queries/assets.sql`, and
+  `web/src/features/assets/routes/AssetsTrash.tsx`. The current app-level path
+  is database soft-delete plus restore; the lower-level repository trash purge
+  helper is not exposed as the product operation. Any future permanent delete
+  must be Trash-only, owner-scoped, strongly confirmed, and explicit that it
+  destroys original media.
+- **The S3/R2 cloud provider is a runtime placeholder.** Owner:
+  `server/internal/cloud/provider_s3.go`. `List` and `Download` always return
+  `s3 provider not implemented`; it is not currently wired into a usable import
+  path. Either implement and wire the existing `CloudProvider` contract or
+  remove the placeholder when the provider is formally descoped.
+- **Desktop has no reconnect flow for an unavailable external library.**
+  Owners: `desktop/supervisor/supervisor.go` (`resolveStoragePath`) and
+  `desktop/onboarding.go`. First-run native storage selection is implemented,
+  but a previously selected unmounted drive only produces a warning and falls
+  back to the default library for that launch. Add a native reconnect/change
+  dialog that makes the active fallback explicit and does not silently create a
+  second library where the user expected the external one.
+- **Asset reprocessing has no user-visible submission result.** Owner:
+  `web/src/components/ExportModal.tsx`. The retry flow closes and writes to the
+  console on success, and only writes to the console on failure. Replace the two
+  TODOs with the existing app notification/message mechanism so users can tell
+  whether the job was accepted.
 - **AgentBoard has no mobile column reflow.** Owner:
-  `web/src/features/lumilio/components/Board/AgentBoard.tsx`. The board is a
-  react-grid-layout drag grid with a fixed 12-column layout persisted
-  server-side (`x/y/w/h` per pin via `/api/v1/agent/pins/layout`) — there is
-  only one stored layout, not one per breakpoint. On phones the 12 columns
-  compress into narrow slivers instead of reflowing to 1-2 columns. Fixing it
-  needs either a second persisted layout keyed by breakpoint or a client-only
-  column remap, and either approach needs visual verification in a real
-  browser against a running backend (not available when this was surveyed —
-  see `exec-plans/completed/responsive.md` Batch 8). File as its own plan
-  before changing it.
+  `web/src/features/lumilio/components/Board/AgentBoard.tsx`. It renders one
+  persisted 12-column layout at every width, so phone columns compress into
+  narrow slivers. Add a client-only narrow-screen remap or a separately
+  persisted breakpoint layout, then verify it against a live backend without
+  corrupting the canonical desktop layout.

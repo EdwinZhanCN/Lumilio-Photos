@@ -1,9 +1,10 @@
 # Bundled license texts
 
 Full license texts for Lumilio Photos and the native components the desktop
-build bundles. They are embedded into the desktop binary (`desktop/licenses.go`)
-so the first-run onboarding window can display them, and the build scripts stage
-this directory into the bundle (`Resources/licenses` on macOS,
+build bundles, plus the generated `THIRD_PARTY_NOTICES.txt` covering runtime Go
+modules and npm packages. The application license and notices are embedded into
+the desktop binary for the legal links, and the build scripts stage this
+directory into the bundle (`Resources/licenses` on macOS,
 `resources\licenses` on Windows) so the texts also ship as plain files.
 
 Provenance: canonical SPDX texts, fetched with
@@ -18,5 +19,13 @@ curl -fsSL -o MIT-Wails.txt https://raw.githubusercontent.com/wailsapp/wails/mas
 ```
 
 `GPL-3.0.txt` is a copy of the repository root `LICENSE` (the app's own
-license). The component ↔ license mapping lives in `desktop/licenses.go`
-(`licenseManifest`); update both when the set of bundled components changes.
+license). Regenerate dependency notices after dependency changes:
+
+```sh
+cd web && vp install
+cd .. && node desktop/scripts/generate-third-party-notices.mjs
+```
+
+The generator inventories runtime Go packages from `desktop/` and `server/`,
+then installed packages from `web/node_modules`, preserving package license and
+NOTICE files in one distributable artifact.

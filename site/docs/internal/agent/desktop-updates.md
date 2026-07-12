@@ -74,5 +74,5 @@ Release asset naming must keep matching `pickReleaseAssetURL` (see
 ## Related
 
 - User-facing install notes: `site/docs/{en,zh-cn}/user-manual/introduction/installation.md`
-- Onboarding UX plan: `exec-plans/active/desktop-onboarding.md`
+- Onboarding UX record: `exec-plans/completed/desktop-onboarding.md`
 - Desktop module overview: `desktop/README.md`
