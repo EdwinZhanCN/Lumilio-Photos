@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
 
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -20,6 +20,8 @@ interface MediaViewerProps {
   className?: string;
   /** Whether this slide is the currently active one in the carousel. */
   isActive?: boolean;
+  selectedAssetId?: string;
+  onSelectedAssetChange?: (assetId: string) => void;
 }
 
 /**
@@ -31,7 +33,13 @@ interface MediaViewerProps {
  * replicating the native Apple Live Photo experience without any visible
  * player controls.
  */
-const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "", isActive = true }) => {
+const MediaViewer: React.FC<MediaViewerProps> = ({
+  asset,
+  className = "",
+  isActive = true,
+  selectedAssetId: controlledSelectedAssetId,
+  onSelectedAssetChange,
+}) => {
   const { t } = useI18n();
   const videoAsset = isVideo(asset);
   const mediaItemQuery = useAssetMediaItem(asset.asset_id, isActive);
@@ -45,11 +53,22 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "", isActi
   const visualComponents = components.filter(
     (component) => component.relation === "raw_original" || component.relation === "jpeg_original",
   );
-  const [selectedAssetId, setSelectedAssetId] = useState(asset.asset_id);
+  const [internalSelectedAssetId, setInternalSelectedAssetId] = useState(asset.asset_id);
+  const selectedAssetId = controlledSelectedAssetId ?? internalSelectedAssetId;
+  const componentTabGroupName = useId();
 
   useEffect(() => {
-    setSelectedAssetId(mediaItem?.primary_asset_id ?? asset.asset_id);
-  }, [asset.asset_id, mediaItem?.primary_asset_id]);
+    if (controlledSelectedAssetId !== undefined) return;
+    setInternalSelectedAssetId(mediaItem?.primary_asset_id ?? asset.asset_id);
+  }, [asset.asset_id, controlledSelectedAssetId, mediaItem?.primary_asset_id]);
+
+  const selectAsset = (assetId?: string) => {
+    if (!assetId) return;
+    if (controlledSelectedAssetId === undefined) {
+      setInternalSelectedAssetId(assetId);
+    }
+    onSelectedAssetChange?.(assetId);
+  };
 
   const { videoRef, isPlaying, handlePlay, handleStop, handleEnded } = useLivePhotoPlayback();
 
@@ -137,22 +156,28 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "", isActi
           )}
 
           {visualComponents.length > 1 && (
-            <div className="join absolute top-2.5 right-2.5 z-10 bg-base-100/80 shadow-lg backdrop-blur-md">
+            <div
+              role="tablist"
+              aria-label={t("assets.mediaViewer.componentTabs", {
+                defaultValue: "Media components",
+              })}
+              className="tabs tabs-box absolute top-2.5 right-2.5 z-10 shadow-lg"
+            >
               {visualComponents.map((component) => {
                 const label =
                   component.relation === "raw_original"
                     ? t("assets.mediaViewer.componentRaw", { defaultValue: "RAW" })
                     : t("assets.mediaViewer.componentJpeg", { defaultValue: "JPEG" });
                 return (
-                  <button
+                  <input
                     key={component.asset_id}
-                    type="button"
-                    className={`btn btn-xs join-item ${selectedAssetId === component.asset_id ? "btn-active" : "btn-ghost"}`}
-                    onClick={() => component.asset_id && setSelectedAssetId(component.asset_id)}
-                    aria-pressed={selectedAssetId === component.asset_id}
-                  >
-                    {label}
-                  </button>
+                    type="radio"
+                    name={componentTabGroupName}
+                    className="tab"
+                    aria-label={label}
+                    checked={selectedAssetId === component.asset_id}
+                    onChange={() => selectAsset(component.asset_id)}
+                  />
                 );
               })}
             </div>

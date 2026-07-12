@@ -39,6 +39,9 @@ once through their primary asset, while burst/manual presentation stacks
 contain those logical items. [useAssetMediaItem](./hooks/useAssetMediaItem.ts) resolves components
 for [MediaViewer](./components/shared/MediaViewer.tsx); [useStackCarouselAssets](./hooks/useStackCarouselAssets.ts) resolves one primary
 asset per logical stack member, so file counts never inflate burst counts.
+In [FullScreenCarousel](./components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx), the logical primary remains the Swiper item,
+while RAW/JPEG selection is lifted into an active physical component that
+drives metadata and asset-level actions without duplicating carousel slides.
 
 [usePinAssetsView](./hooks/usePinAssetsView.tsx) is the agent-board full-gallery adapter. It reads
 `/api/v1/agent/pins/{id}/assets/list` and

@@ -278,6 +278,7 @@
       "asset_alt_text": "Asset",
       "componentJpeg": "JPEG",
       "componentRaw": "RAW",
+      "componentTabs": "Media components",
       "media_not_available": "Media not available",
       "unknown_file": "Unknown file",
       "unknown_type": "Unknown type",

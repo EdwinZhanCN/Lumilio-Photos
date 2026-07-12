@@ -228,10 +228,11 @@ func (s *lumenService) tensorImageRequest(ctx context.Context, taskName string, 
 // ---- Inference methods ----
 
 func (s *lumenService) SemanticTextEmbed(ctx context.Context, text []byte) (*types.EmbeddingV1, error) {
-	// The service is set to be empty
-	req := types.NewInferRequest("semantic_text_embed").
-		ForSemanticTextEmbed(string(text)).
-		Build()
+	_, serviceName, ok := s.lumenClient.FindTaskContract(types.TaskSemanticTextEmbed)
+	if !ok || strings.TrimSpace(serviceName) == "" {
+		return nil, fmt.Errorf("semantic text embed: task contract is unavailable")
+	}
+	req := buildSemanticTextEmbedRequest(text, serviceName)
 
 	resp, err := s.lumenClient.Infer(ctx, req)
 	if err != nil {
@@ -243,6 +244,13 @@ func (s *lumenService) SemanticTextEmbed(ctx context.Context, text []byte) (*typ
 	}
 	s.logger.Debug("semantic text embedding", zap.String("model", embedResp.ModelID), zap.Int("dim", len(embedResp.Vector)))
 	return embedResp, nil
+}
+
+func buildSemanticTextEmbedRequest(text []byte, serviceName string) *pb.InferRequest {
+	return types.NewInferRequest(types.TaskSemanticTextEmbed).
+		ForSemanticTextEmbed(string(text)).
+		WithService(serviceName).
+		Build()
 }
 
 func (s *lumenService) SemanticTextEmbedFast(ctx context.Context, text []byte) (*types.EmbeddingV1, error) {

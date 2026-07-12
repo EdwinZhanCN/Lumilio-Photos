@@ -278,6 +278,7 @@
       "asset_alt_text": "资源",
       "componentJpeg": "JPEG",
       "componentRaw": "RAW",
+      "componentTabs": "媒体组件",
       "media_not_available": "媒体不可用",
       "unknown_file": "未知文件",
       "unknown_type": "未知类型",

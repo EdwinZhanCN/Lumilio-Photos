@@ -664,7 +664,7 @@ INSERT INTO public.classifier_definitions (
         'a photo of people',
         'a drawing or illustration'
     ],
-    0.0
+    0.03
 ),
 (
     'receipts',
@@ -684,7 +684,7 @@ INSERT INTO public.classifier_definitions (
         'a natural scene photograph',
         'a photo of people'
     ],
-    0.0
+    0.03
 ),
 (
     'illustration',
@@ -696,7 +696,12 @@ INSERT INTO public.classifier_definitions (
         'a drawing or artwork',
         'a cartoon or anime image',
         'a painting',
-        'computer generated art'
+        'computer generated art',
+        'a comic book page',
+        'a manga page with text and speech bubbles',
+        'a comic panel with dialogue',
+        'an illustrated story page',
+        'a screenshot of a digital comic'
     ],
     ARRAY[
         'a real photograph',
@@ -704,7 +709,7 @@ INSERT INTO public.classifier_definitions (
         'a natural scene photograph',
         'a photo of people'
     ],
-    0.0
+    0.03
 );
 
 

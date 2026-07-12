@@ -40,6 +40,9 @@
  * contain those logical items. {@link useAssetMediaItem} resolves components
  * for {@link MediaViewer}; {@link useStackCarouselAssets} resolves one primary
  * asset per logical stack member, so file counts never inflate burst counts.
+ * In {@link FullScreenCarousel}, the logical primary remains the Swiper item,
+ * while RAW/JPEG selection is lifted into an active physical component that
+ * drives metadata and asset-level actions without duplicating carousel slides.
  *
  * {@link usePinAssetsView} is the agent-board full-gallery adapter. It reads
  * `/api/v1/agent/pins/{id}/assets/list` and

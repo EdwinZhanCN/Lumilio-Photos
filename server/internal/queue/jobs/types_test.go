@@ -3,6 +3,7 @@ package jobs
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/riverqueue/river"
 )
@@ -60,8 +61,8 @@ func TestMLProcessArgsInsertOpts(t *testing.T) {
 			if !opts.UniqueOpts.ByArgs {
 				t.Fatalf("expected %s jobs to be unique by args", name)
 			}
-			if opts.UniqueOpts.ByPeriod == 0 {
-				t.Fatalf("expected %s jobs to use uniqueness by period", name)
+			if opts.UniqueOpts.ByPeriod != 5*time.Minute {
+				t.Fatalf("expected %s jobs to use a 5-minute uniqueness period, got %s", name, opts.UniqueOpts.ByPeriod)
 			}
 		})
 	}

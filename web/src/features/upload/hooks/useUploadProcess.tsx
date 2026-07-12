@@ -108,7 +108,7 @@ export function useUploadProcess(): useUploadProcessReturn {
   );
 
   const invalidateAssetQueries = useCallback(() => {
-    return queryClient.invalidateQueries({
+    return queryClient.resetQueries({
       predicate: (query) => {
         const key = query.queryKey;
         if (Array.isArray(key)) {
@@ -453,7 +453,8 @@ export function useUploadProcess(): useUploadProcessReturn {
             },
           });
         } catch (error) {
-          const message = error instanceof Error ? error.message : t("upload.UploadProcess.processFailed");
+          const message =
+            error instanceof Error ? error.message : t("upload.UploadProcess.processFailed");
           taskIds.forEach((taskId) => {
             const session = materializationSessions.get(taskId);
             const result = materializationResults.get(taskId);
@@ -461,7 +462,8 @@ export function useUploadProcess(): useUploadProcessReturn {
               result.success = false;
               result.error = message;
             }
-            if (session) updateFileProgress(session.sessionId, { status: "failed", error: message });
+            if (session)
+              updateFileProgress(session.sessionId, { status: "failed", error: message });
           });
         }
       }

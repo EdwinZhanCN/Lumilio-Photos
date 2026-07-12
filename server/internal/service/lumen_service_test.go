@@ -5,8 +5,21 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/edwinzhancn/lumen-sdk/pkg/types"
+
 	"server/config"
 )
+
+func TestBuildSemanticTextEmbedRequestIncludesResolvedService(t *testing.T) {
+	req := buildSemanticTextEmbedRequest([]byte("a photo"), types.ServiceSigLIP)
+
+	if got := req.Meta[types.MetaService]; got != types.ServiceSigLIP {
+		t.Fatalf("semantic text request service = %q, want %q", got, types.ServiceSigLIP)
+	}
+	if req.Task != types.TaskSemanticTextEmbed {
+		t.Fatalf("semantic text request task = %q, want %q", req.Task, types.TaskSemanticTextEmbed)
+	}
+}
 
 func TestNewLumenServiceFromAppConfigDisabled(t *testing.T) {
 	cases := []struct {

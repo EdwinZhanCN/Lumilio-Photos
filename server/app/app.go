@@ -568,19 +568,31 @@ func initMLServices(
 	return lumenService, embeddingService, classifierService, nil
 }
 
-// buildClassifierPrototypes waits (bounded) for the semantic text-embed task to
-// become available, then builds/refreshes classifier prototypes. It is a no-op
-// when semantic classification is disabled (no enabled definitions are scored).
+// buildClassifierPrototypes waits (bounded) for the semantic text-embed task and
+// its capability contract to become available, then builds/refreshes classifier
+// prototypes. Task availability can become visible just before the full
+// capability snapshot, so failed builds are retried within the startup window.
 func buildClassifierPrototypes(lumenService service.LumenService, classifierService service.ClassifierService, logger *zap.Logger) {
-	for i := 0; i < 30; i++ {
-		if lumenService != nil && lumenService.IsTaskAvailable("semantic_text_embed") {
-			break
-		}
-		time.Sleep(10 * time.Second)
-	}
 	buildCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	if err := classifierService.EnsurePrototypes(buildCtx); err != nil {
-		logger.Warn("failed to build classifier prototypes", zap.Error(err))
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		if lumenService != nil && lumenService.IsTaskAvailable("semantic_text_embed") {
+			if err := classifierService.EnsurePrototypes(buildCtx); err == nil {
+				return
+			} else {
+				logger.Warn("failed to build classifier prototypes; retrying", zap.Error(err))
+			}
+		}
+
+		select {
+		case <-buildCtx.Done():
+			logger.Warn("timed out building classifier prototypes", zap.Error(buildCtx.Err()))
+			return
+		case <-ticker.C:
+		}
 	}
 }
