@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   buildApiFilter,
   DEFAULT_ASSET_TYPES,
@@ -32,8 +33,10 @@ import {
   mergeAdjacentBrowseGroups,
 } from "@/features/assets/utils/browseItems";
 import { $api } from "@/lib/http-commons/queryClient";
+import { client } from "@/lib/http-commons/client";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import type { Asset } from "@/lib/assets/types";
+import { withBodyPaginationOffset } from "@/features/assets/utils/bodyPagination";
 
 type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 type AssetFilterDTO = components["schemas"]["dto.AssetFilterDTO"];
@@ -150,32 +153,38 @@ export function usePinAssetsView(
     [apiFilter, pageSize, sortBy, viewerTimeZone],
   );
 
-  const listQuery = $api.useInfiniteQuery(
-    "post",
-    "/api/v1/agent/pins/{id}/assets/list",
-    {
-      params: { path: { id: pinId ?? "" } },
-      body: createListRequest(),
+  const listRequest = useMemo(() => createListRequest(), [createListRequest]);
+  const listQuery = useInfiniteQuery({
+    queryKey: [
+      "post",
+      "/api/v1/agent/pins/{id}/assets/list",
+      { params: { path: { id: pinId ?? "" } }, body: listRequest },
+    ],
+    queryFn: async ({ pageParam, signal }) => {
+      const { data, error } = await client.POST("/api/v1/agent/pins/{id}/assets/list", {
+        params: { path: { id: pinId ?? "" } },
+        body: withBodyPaginationOffset(listRequest, Number(pageParam) || 0),
+        signal,
+      });
+      if (error) throw error;
+      return data;
     },
-    {
-      enabled: enabled && !isSearchActive,
-      initialPageParam: 0,
-      pageParamName: "offset",
-      retry: false,
-      gcTime: 2 * 60 * 1000,
-      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = lastPage;
-        const total = payload?.total_visible;
-        const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countLoadedBrowseRowsFromPage({
-          items: payload?.items,
-        });
-        const hasMore =
-          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
-        return hasMore ? offset + pageSize : undefined;
-      },
+    enabled: enabled && !isSearchActive,
+    initialPageParam: 0,
+    retry: false,
+    gcTime: 2 * 60 * 1000,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+      const payload = lastPage;
+      const total = payload?.total_visible;
+      const offset = Number(lastPageParam ?? 0) || 0;
+      const loadedCount = countLoadedBrowseRowsFromPage({
+        items: payload?.items,
+      });
+      const hasMore =
+        typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
+      return hasMore && loadedCount > 0 ? offset + loadedCount : undefined;
     },
-  );
+  });
 
   const createSearchRequest = useCallback(
     (): SearchAssetsRequestDTO => ({
@@ -194,32 +203,38 @@ export function usePinAssetsView(
     [apiFilter, pageSize, queryText, sortBy, viewerTimeZone],
   );
 
-  const searchQuery = $api.useInfiniteQuery(
-    "post",
-    "/api/v1/agent/pins/{id}/assets/search",
-    {
-      params: { path: { id: pinId ?? "" } },
-      body: createSearchRequest(),
+  const searchRequest = useMemo(() => createSearchRequest(), [createSearchRequest]);
+  const searchQuery = useInfiniteQuery({
+    queryKey: [
+      "post",
+      "/api/v1/agent/pins/{id}/assets/search",
+      { params: { path: { id: pinId ?? "" } }, body: searchRequest },
+    ],
+    queryFn: async ({ pageParam, signal }) => {
+      const { data, error } = await client.POST("/api/v1/agent/pins/{id}/assets/search", {
+        params: { path: { id: pinId ?? "" } },
+        body: withBodyPaginationOffset(searchRequest, Number(pageParam) || 0),
+        signal,
+      });
+      if (error) throw error;
+      return data;
     },
-    {
-      enabled: enabled && isSearchActive,
-      initialPageParam: 0,
-      pageParamName: "offset",
-      retry: false,
-      gcTime: 2 * 60 * 1000,
-      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const payload = lastPage;
-        const total = payload?.results_total_visible;
-        const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countLoadedBrowseRowsFromPage({
-          items: payload?.result_items,
-        });
-        const hasMore =
-          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
-        return hasMore ? offset + pageSize : undefined;
-      },
+    enabled: enabled && isSearchActive,
+    initialPageParam: 0,
+    retry: false,
+    gcTime: 2 * 60 * 1000,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+      const payload = lastPage;
+      const total = payload?.results_total_visible;
+      const offset = Number(lastPageParam ?? 0) || 0;
+      const loadedCount = countLoadedBrowseRowsFromPage({
+        items: payload?.result_items,
+      });
+      const hasMore =
+        typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
+      return hasMore && loadedCount > 0 ? offset + loadedCount : undefined;
     },
-  );
+  });
 
   const pin = pinMetaQuery.data;
   const isExpired = enabled && pinMetaQuery.isError;

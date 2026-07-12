@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
 import { useFilterState, useSortBy } from "../selectors";
 import {
@@ -13,7 +14,7 @@ import {
 } from "@/features/assets/types/assets.type";
 import { generateViewKey } from "../utils/viewKey";
 import { selectFilterAsAssetFilter, selectFiltersEnabled } from "../slices/filters.slice";
-import { $api } from "@/lib/http-commons/queryClient";
+import { client } from "@/lib/http-commons/client";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { Asset } from "@/lib/assets/types";
 import { useBrowseScope } from "@/features/settings";
@@ -29,6 +30,7 @@ import {
   getBrowseItemAsset,
   mergeAdjacentBrowseGroups,
 } from "../utils/browseItems";
+import { withBodyPaginationOffset } from "../utils/bodyPagination";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
@@ -244,39 +246,41 @@ export const useAssetsViewQuery = (
     return request;
   }, [apiFilter, definition, pageSize, viewerTimeZone]);
 
-  const query = $api.useInfiniteQuery(
-    "post",
-    "/api/v1/assets/list",
-    {
-      body: createUnifiedRequest(),
+  const unifiedRequest = useMemo(() => createUnifiedRequest(), [createUnifiedRequest]);
+  const query = useInfiniteQuery({
+    queryKey: ["post", "/api/v1/assets/list", { body: unifiedRequest }],
+    queryFn: async ({ pageParam, signal }) => {
+      const { data, error } = await client.POST("/api/v1/assets/list", {
+        body: withBodyPaginationOffset(unifiedRequest, Number(pageParam) || 0),
+        signal,
+      });
+      if (error) throw error;
+      return data;
     },
-    {
-      enabled: autoFetch && !disabled,
-      gcTime: 2 * 60 * 1000,
-      initialPageParam: 0,
-      pageParamName: "offset",
-      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = lastPage;
-        const total = responseData?.total_visible;
-        const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countLoadedBrowseRowsFromPage({
-          items: responseData?.items,
-        });
-        const hasMore =
-          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
+    enabled: autoFetch && !disabled,
+    gcTime: 2 * 60 * 1000,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+      const responseData = lastPage;
+      const total = responseData?.total_visible;
+      const offset = Number(lastPageParam ?? 0) || 0;
+      const loadedCount = countLoadedBrowseRowsFromPage({
+        items: responseData?.items,
+      });
+      const hasMore =
+        typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
 
-        return hasMore ? offset + pageSize : undefined;
-      },
+      return hasMore && loadedCount > 0 ? offset + loadedCount : undefined;
     },
-  );
+  });
 
   const assetsPages = useMemo(() => {
     const pages = query.data?.pages ?? [];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {
-      const offset = Number(pageParams[index] ?? 0) || 0;
       const responseData = page;
+      const offset = Number(pageParams[index] ?? 0) || 0;
       const browseGroups = browseGroupsFromQueryLikePage({
         items: responseData?.items,
         sortBy,
@@ -420,31 +424,33 @@ export const usePhotoSearchView = (
     [apiFilter, definition.sortBy, pageSize, queryText, viewerTimeZone],
   );
 
-  const query = $api.useInfiniteQuery(
-    "post",
-    "/api/v1/assets/search",
-    {
-      body: createSearchRequest(),
+  const searchRequest = useMemo(() => createSearchRequest(), [createSearchRequest]);
+  const query = useInfiniteQuery({
+    queryKey: ["post", "/api/v1/assets/search", { body: searchRequest }],
+    queryFn: async ({ pageParam, signal }) => {
+      const { data, error } = await client.POST("/api/v1/assets/search", {
+        body: withBodyPaginationOffset(searchRequest, Number(pageParam) || 0),
+        signal,
+      });
+      if (error) throw error;
+      return data;
     },
-    {
-      enabled: autoFetch && !disabled && queryText.length > 0,
-      gcTime: 2 * 60 * 1000,
-      initialPageParam: 0,
-      pageParamName: "offset",
-      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = lastPage;
-        const total = responseData?.results_total_visible;
-        const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countLoadedBrowseRowsFromPage({
-          items: responseData?.result_items,
-        });
-        const hasMore =
-          typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
+    enabled: autoFetch && !disabled && queryText.length > 0,
+    gcTime: 2 * 60 * 1000,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+      const responseData = lastPage;
+      const total = responseData?.results_total_visible;
+      const offset = Number(lastPageParam ?? 0) || 0;
+      const loadedCount = countLoadedBrowseRowsFromPage({
+        items: responseData?.result_items,
+      });
+      const hasMore =
+        typeof total === "number" ? offset + loadedCount < total : loadedCount >= pageSize;
 
-        return hasMore ? offset + pageSize : undefined;
-      },
+      return hasMore && loadedCount > 0 ? offset + loadedCount : undefined;
     },
-  );
+  });
 
   const searchPages = useMemo(() => {
     const pages = query.data?.pages ?? [];

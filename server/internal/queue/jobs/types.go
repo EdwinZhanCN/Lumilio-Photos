@@ -31,7 +31,7 @@ func (ProcessSemanticArgs) InsertOpts() river.InsertOpts {
 		// version re-allows a re-run.
 		UniqueOpts: river.UniqueOpts{
 			ByArgs:   true,
-			ByPeriod: 1 * time.Hour,
+			ByPeriod: MLProcessUniquePeriod,
 		},
 	}
 }
@@ -39,6 +39,7 @@ func (ProcessSemanticArgs) InsertOpts() river.InsertOpts {
 const (
 	MLPreprocessVersionV1 = "ml-image-v1"
 	MLProcessMaxAttempts  = 8
+	MLProcessUniquePeriod = 5 * time.Minute
 	LocalToolMaxAttempts  = 5
 )
 
@@ -63,7 +64,7 @@ func (ZeroshotClassifyArgs) InsertOpts() river.InsertOpts {
 		// version re-allows a re-run.
 		UniqueOpts: river.UniqueOpts{
 			ByArgs:   true,
-			ByPeriod: 1 * time.Hour,
+			ByPeriod: MLProcessUniquePeriod,
 		},
 	}
 }
@@ -89,7 +90,7 @@ func (ProcessBioClipArgs) InsertOpts() river.InsertOpts {
 		// version re-allows a re-run.
 		UniqueOpts: river.UniqueOpts{
 			ByArgs:   true,
-			ByPeriod: 1 * time.Hour,
+			ByPeriod: MLProcessUniquePeriod,
 		},
 	}
 }
@@ -133,7 +134,7 @@ func (ProcessOcrArgs) InsertOpts() river.InsertOpts {
 		// version re-allows a re-run.
 		UniqueOpts: river.UniqueOpts{
 			ByArgs:   true,
-			ByPeriod: 1 * time.Hour,
+			ByPeriod: MLProcessUniquePeriod,
 		},
 	}
 }
@@ -159,7 +160,7 @@ func (ProcessFaceArgs) InsertOpts() river.InsertOpts {
 		// version re-allows a re-run.
 		UniqueOpts: river.UniqueOpts{
 			ByArgs:   true,
-			ByPeriod: 1 * time.Hour,
+			ByPeriod: MLProcessUniquePeriod,
 		},
 	}
 }

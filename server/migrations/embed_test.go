@@ -15,6 +15,20 @@ func TestMLBaselineSeedsUtilityClassifiers(t *testing.T) {
 	if !strings.Contains(migration, "INSERT INTO public.classifier_definitions") {
 		t.Fatal("ML baseline migration does not seed classifier definitions")
 	}
+	for _, required := range []string{
+		"a comic book page",
+		"a manga page with text and speech bubbles",
+		"a comic panel with dialogue",
+		"an illustrated story page",
+		"a screenshot of a digital comic",
+	} {
+		if !strings.Contains(migration, required) {
+			t.Fatalf("ML baseline migration missing illustration prompt %q", required)
+		}
+	}
+	if count := strings.Count(migration, "    0.03\n"); count != 3 {
+		t.Fatalf("ML baseline migration seeds %d classifiers at threshold 0.03, want 3", count)
+	}
 
 	for slug, classifier := range map[string]struct {
 		displayName string

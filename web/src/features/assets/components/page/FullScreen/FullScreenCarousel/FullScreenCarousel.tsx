@@ -289,7 +289,27 @@ const FullScreenCarousel = ({
     const index = slideIndex !== undefined ? slideIndex : initialSlide;
     return photos[index] || photos[0] || null;
   });
-  useCarouselContextContributor(currentAsset?.asset_id);
+  const [activeComponentId, setActiveComponentId] = useState<string | undefined>(
+    currentAsset?.asset_id,
+  );
+  const activeComponentQuery = $api.useQuery(
+    "get",
+    "/api/v1/assets/{id}",
+    {
+      params: { path: { id: activeComponentId ?? "" } },
+    },
+    {
+      enabled: Boolean(
+        activeComponentId && currentAsset?.asset_id && activeComponentId !== currentAsset.asset_id,
+      ),
+      staleTime: 60_000,
+    },
+  );
+  const activeAsset =
+    activeComponentId === currentAsset?.asset_id
+      ? currentAsset
+      : (activeComponentQuery.data ?? null);
+  useCarouselContextContributor(activeAsset?.asset_id ?? currentAsset?.asset_id);
   const [isDeleting, setIsDeleting] = useState(false);
   const { t } = useI18n();
   const { toggleLike, deleteAsset } = useAssetActions();
@@ -319,12 +339,12 @@ const FullScreenCarousel = ({
 
   const handleSelectAlbum = useCallback(
     async (albumId: number) => {
-      if (!currentAsset?.asset_id) return;
+      if (!activeAsset?.asset_id) return;
       setIsAddingToAlbum(true);
       try {
         await addToAlbumMutation.mutateAsync({
           params: {
-            path: { id: albumId, assetId: currentAsset.asset_id },
+            path: { id: albumId, assetId: activeAsset.asset_id },
           },
           body: {},
         });
@@ -336,7 +356,7 @@ const FullScreenCarousel = ({
         setIsAddingToAlbum(false);
       }
     },
-    [currentAsset, addToAlbumMutation],
+    [activeAsset, addToAlbumMutation],
   );
 
   const fieldGuideAssetQuery = $api.useQuery(
@@ -344,7 +364,7 @@ const FullScreenCarousel = ({
     "/api/v1/assets/{id}",
     {
       params: {
-        path: { id: currentAsset?.asset_id ?? "" },
+        path: { id: activeAsset?.asset_id ?? "" },
         query: {
           include_thumbnails: false,
           include_tags: false,
@@ -356,7 +376,7 @@ const FullScreenCarousel = ({
       },
     },
     {
-      enabled: Boolean(currentAsset?.asset_id),
+      enabled: Boolean(activeAsset?.asset_id),
       staleTime: 60_000,
     },
   );
@@ -372,9 +392,9 @@ const FullScreenCarousel = ({
     () =>
       normalizeSpeciesPredictions(
         fieldGuideAsset?.species_predictions ??
-          (currentAsset as AssetWithSpecies | null)?.species_predictions,
+          (activeAsset as AssetWithSpecies | null)?.species_predictions,
       ),
-    [currentAsset, fieldGuideAsset?.species_predictions],
+    [activeAsset, fieldGuideAsset?.species_predictions],
   );
   const parsedSpeciesPredictions = useMemo(
     () =>
@@ -429,6 +449,10 @@ const FullScreenCarousel = ({
   }, [photos, slideIndex, initialSlide, currentAsset?.asset_id]);
 
   useEffect(() => {
+    setActiveComponentId(currentAsset?.asset_id);
+  }, [currentAsset?.asset_id]);
+
+  useEffect(() => {
     const handler = () => setShowInfo((s) => !s);
     window.addEventListener("fullscreen:toggleInfo", handler);
     return () => window.removeEventListener("fullscreen:toggleInfo", handler);
@@ -458,7 +482,9 @@ const FullScreenCarousel = ({
   }, [handleClose]);
 
   const handleAssetUpdate = (updatedAsset: Asset) => {
-    setCurrentAsset(updatedAsset);
+    if (updatedAsset.asset_id === currentAsset?.asset_id) {
+      setCurrentAsset(updatedAsset);
+    }
     if (onAssetUpdate) {
       onAssetUpdate(updatedAsset);
     }
@@ -466,21 +492,21 @@ const FullScreenCarousel = ({
 
   const [, startTransition] = useTransition();
   const [optimisticLiked, setOptimisticLiked] = useOptimistic(
-    currentAsset?.liked ?? false,
+    activeAsset?.liked ?? false,
     (_state, newLiked: boolean) => newLiked,
   );
 
   const handleLikeToggle = () => {
-    if (!currentAsset?.asset_id) return;
+    if (!activeAsset?.asset_id) return;
     const newLiked = !optimisticLiked;
-    const assetId = currentAsset.asset_id;
+    const assetId = activeAsset.asset_id;
 
     startTransition(async () => {
       setOptimisticLiked(newLiked);
       try {
         await toggleLike(assetId, newLiked);
         handleAssetUpdate({
-          ...currentAsset,
+          ...activeAsset,
           liked: newLiked,
         });
       } catch (error) {
@@ -548,7 +574,12 @@ const FullScreenCarousel = ({
                   </div>
                 }
               >
-                <MediaViewer asset={slide.asset} isActive={isActive} />
+                <MediaViewer
+                  asset={slide.asset}
+                  isActive={isActive}
+                  selectedAssetId={isActive ? activeComponentId : slide.asset.asset_id}
+                  onSelectedAssetChange={isActive ? setActiveComponentId : undefined}
+                />
               </ErrorBoundary>
             )}
           </SwiperSlide>
@@ -556,8 +587,8 @@ const FullScreenCarousel = ({
       </Swiper>
 
       {/* Info panel */}
-      {showInfo && currentAsset && (
-        <FullScreenBasicInfo asset={currentAsset} onAssetUpdate={handleAssetUpdate} />
+      {showInfo && activeAsset && (
+        <FullScreenBasicInfo asset={activeAsset} onAssetUpdate={handleAssetUpdate} />
       )}
 
       {showFieldGuide && (
@@ -718,7 +749,7 @@ const FullScreenCarousel = ({
 
       {/* Export modal */}
       <ExportModal
-        asset={currentAsset}
+        asset={activeAsset ?? undefined}
         onOpenStudio={handleOpenStudio}
         onAddToAlbum={handleAddToAlbum}
         onShare={handleShare}
