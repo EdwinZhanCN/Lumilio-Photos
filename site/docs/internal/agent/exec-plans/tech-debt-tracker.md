@@ -8,14 +8,6 @@ Last aligned with the codebase: 2026-07-12.
 
 ## Release and operations
 
-- **PostgreSQL major-version upgrades are not implemented.** Owner:
-  `exec-plans/active/db-backup-upgrade.md`. Routine backup, retention,
-  admin restore, restore points, and rollback are implemented for both runtime
-  shapes. What remains is the Desktop dump/restore major-upgrade orchestrator,
-  the Docker `pg_upgrade` transition image, and the optional restore-onboarding
-  stub. Until Phase 3 ships, do not bump Desktop `pgMajorVersion` or the
-  `server/db.Dockerfile` PostgreSQL major. The completed backup UI still needs
-  its recorded `make web-test` and i18n extract/status follow-up.
 - **Desktop distribution is not fully signed or available on macOS Intel.**
   Owners: `.github/workflows/release-desktop.yml`,
   `desktop/scripts/fetch-resources.sh`. macOS arm64 and Windows amd64 packaging
@@ -65,6 +57,17 @@ Last aligned with the codebase: 2026-07-12.
   back to the default library for that launch. Add a native reconnect/change
   dialog that makes the active fallback explicit and does not silently create a
   second library where the user expected the external one.
+- **External repositories need a Desktop-owned authorization flow.** Owners:
+  `desktop/onboarding.go`, `desktop/supervisor/supervisor.go`, and
+  `server/internal/storage/repo_provisioning.go`. Repository creation is
+  intentionally confined to the configured storage root for both Desktop and
+  Docker. A future Desktop-only external repository feature must obtain the
+  directory through the native Finder/File Explorer picker, persist an
+  explicit host grant, and surface unavailable or moved paths for reconnection;
+  it must not reintroduce an arbitrary client-supplied root on the shared HTTP
+  API. Docker should remain limited to its configured, explicitly mounted
+  storage root because container paths cannot safely prove or repair host
+  mounts.
 - **Asset reprocessing has no user-visible submission result.** Owner:
   `web/src/components/ExportModal.tsx`. The retry flow closes and writes to the
   console on success, and only writes to the console on failure. Replace the two

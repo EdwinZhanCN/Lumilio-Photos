@@ -1,4 +1,4 @@
-import React, { type FormEvent } from "react";
+import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Fingerprint, Info, KeyRound, Smartphone, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -84,9 +84,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     : { credentials: 0, totp: 1, recovery: 2 };
 
   const submitTotp = () => {
-    void handleCompleteTotp({
-      preventDefault: () => undefined,
-    } as FormEvent<HTMLFormElement>);
+    void handleCompleteTotp();
   };
 
   return (

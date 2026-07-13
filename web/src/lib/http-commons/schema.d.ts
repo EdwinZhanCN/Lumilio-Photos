@@ -11821,8 +11821,6 @@ export interface components {
              * @enum {string}
              */
             role?: "primary" | "regular";
-            /** @example /data/storage */
-            root?: string;
             /**
              * @example date
              * @enum {string}

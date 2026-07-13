@@ -73,7 +73,6 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
       body: {
         name: name.trim(),
         role: "primary",
-        root: root.trim(),
         storage_strategy: strategy,
         duplicate_handling: duplicateHandling,
       },

@@ -169,9 +169,7 @@ const BootstrapWizard: React.FC = () => {
   ];
 
   const submitTotp = () => {
-    void handleCompleteTotp({
-      preventDefault: () => undefined,
-    } as FormEvent<HTMLFormElement>);
+    void handleCompleteTotp();
   };
 
   const canSubmitRepo = useMemo(
@@ -186,7 +184,6 @@ const BootstrapWizard: React.FC = () => {
       body: {
         name: repoName.trim(),
         role: "primary",
-        root: repoRoot.trim(),
         storage_strategy: strategy,
         duplicate_handling: duplicateHandling,
       },
