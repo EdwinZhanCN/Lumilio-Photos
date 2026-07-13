@@ -60,6 +60,7 @@ flowchart TD
     SHELL --> ACCOUNT["AccountTab"]
     SHELL --> APPEAR["AppearanceTab"]
     SHELL --> SERVER["ServerTab"]
+    SHELL --> ABOUT["AboutTab"]
     SHELL -. admin .-> AI["AiTab"]
     SHELL -. admin .-> CLOUD["CloudTab"]
     SHELL -. admin .-> USERS["UsersTab"]
@@ -71,7 +72,7 @@ flowchart TD
 
 [Settings](./routes/Settings.tsx) renders the route header and delegates the tabbed surface to
 [SettingsShell](./components/renew/SettingsShell.tsx). The shell always shows [AccountTab](./components/renew/tabs/AccountTab.tsx),
-[AppearanceTab](./components/renew/tabs/AppearanceTab.tsx), and [ServerTab](./components/renew/tabs/ServerTab.tsx); admin users additionally see
+[AppearanceTab](./components/renew/tabs/AppearanceTab.tsx), [ServerTab](./components/renew/tabs/ServerTab.tsx), and [AboutTab](./components/renew/tabs/AboutTab.tsx); admin users additionally see
 [AiTab](./components/renew/tabs/AiTab.tsx), [CloudTab](./components/renew/tabs/CloudTab.tsx), and [UsersTab](./components/renew/tabs/UsersTab.tsx). The visual hierarchy is
 centralized in [SettingsPage](./components/renew/SettingsPage.tsx), [SettingsGroup](./components/renew/SettingsGroup.tsx),
 [SettingsRow](./components/renew/SettingsGroup.tsx), and [SettingsBlock](./components/renew/SettingsGroup.tsx); tabs should compose those

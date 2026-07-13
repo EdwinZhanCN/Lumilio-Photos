@@ -1470,6 +1470,24 @@
     "topResults": "最佳结果"
   },
   "settings": {
+    "about": {
+      "legalDescription": "查看适用于当前安装的条款与许可证。",
+      "legalTitle": "法律信息",
+      "licenseDescription": "Lumilio Photos 依据 GNU GPL 第 3 版发布。",
+      "licenseTitle": "开源许可证",
+      "noticesDescription": "随应用捆绑的 Go、npm 和原生依赖的归属及许可证文本。",
+      "noticesTitle": "第三方软件声明",
+      "openRepository": "打开项目仓库",
+      "pageDescription": "查看使用条款、开源许可证和项目信息。",
+      "projectDescription": "源代码、发布历史与问题反馈。",
+      "projectTitle": "项目",
+      "read": "阅读",
+      "termsDescription": "用户责任、Beta 软件风险、自动分析、无担保声明与责任限制。",
+      "termsTitle": "使用条款",
+      "title": "关于",
+      "viewLicense": "查看许可证",
+      "viewNotices": "查看声明"
+    },
     "account": {
       "avatarPhoto": "头像照片",
       "changeAvatar": "更换照片",
