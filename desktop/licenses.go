@@ -22,3 +22,11 @@ func serveLegalText(file string) http.HandlerFunc {
 		_, _ = w.Write(data)
 	}
 }
+
+func handleTermsOfUse(w http.ResponseWriter, r *http.Request) {
+	file := "licenses/TERMS-OF-USE.en.txt"
+	if r.URL.Query().Get("lang") == "zh" {
+		file = "licenses/TERMS-OF-USE.zh-CN.txt"
+	}
+	serveLegalText(file)(w, r)
+}

@@ -7,6 +7,10 @@ the desktop binary for the legal links, and the build scripts stage this
 directory into the bundle (`Resources/licenses` on macOS,
 `resources\licenses` on Windows) so the texts also ship as plain files.
 
+The English and Simplified Chinese Terms of Use are stored alongside these
+files as `TERMS-OF-USE.en.txt` and `TERMS-OF-USE.zh-CN.txt` and are selected by
+the onboarding interface language.
+
 Provenance: canonical SPDX texts, fetched with
 
 ```sh

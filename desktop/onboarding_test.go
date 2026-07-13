@@ -190,7 +190,7 @@ func TestOnboardingCompleteRejectsUnwritable(t *testing.T) {
 func TestLegalEndpoints(t *testing.T) {
 	d := newTestApp(t)
 	h := d.onboardingHandler()
-	for _, path := range []string{"/__onb/legal/license", "/__onb/legal/third-party"} {
+	for _, path := range []string{"/__onb/legal/license", "/__onb/legal/third-party", "/__onb/legal/terms", "/__onb/legal/terms?lang=zh"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK {
