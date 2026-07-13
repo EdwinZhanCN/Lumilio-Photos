@@ -4,6 +4,7 @@ import { useAuth } from "@/features/auth";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
   CloudIcon,
+  InfoIcon,
   PaintbrushIcon,
   ServerIcon,
   SparklesIcon,
@@ -17,8 +18,9 @@ import AiTab from "./tabs/AiTab";
 import AccountTab from "./tabs/AccountTab";
 import CloudTab from "./tabs/CloudTab";
 import UsersTab from "./tabs/UsersTab";
+import AboutTab from "./tabs/AboutTab";
 
-type SettingsTabKey = "account" | "appearance" | "ai" | "cloud" | "server" | "users";
+type SettingsTabKey = "account" | "appearance" | "ai" | "cloud" | "server" | "users" | "about";
 
 const DEFAULT_TAB: SettingsTabKey = "account";
 
@@ -46,6 +48,7 @@ export default function SettingsShell() {
     },
     { key: "appearance", label: t("settings.appearance"), icon: PaintbrushIcon },
     { key: "server", label: t("settings.server"), icon: ServerIcon },
+    { key: "about", label: t("settings.about.title", "About"), icon: InfoIcon },
   ];
   if (isAdmin) {
     tabs.splice(2, 0, { key: "ai", label: t("settings.ai"), icon: SparklesIcon });
@@ -116,6 +119,15 @@ export default function SettingsShell() {
       }),
       icon: Users2Icon,
     },
+    about: {
+      key: "about",
+      label: t("settings.about.title", "About"),
+      title: t("settings.about.title", "About"),
+      description: t("settings.about.pageDescription", {
+        defaultValue: "Review legal terms, open-source licenses, and project information.",
+      }),
+      icon: InfoIcon,
+    },
   };
 
   const requestedTab = searchParams.get("tab");
@@ -148,6 +160,8 @@ export default function SettingsShell() {
         return <CloudTab />;
       case "users":
         return <UsersTab />;
+      case "about":
+        return <AboutTab />;
       default:
         return <AppearanceTab />;
     }

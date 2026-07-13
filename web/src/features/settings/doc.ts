@@ -61,6 +61,7 @@
  *     SHELL --> ACCOUNT["AccountTab"]
  *     SHELL --> APPEAR["AppearanceTab"]
  *     SHELL --> SERVER["ServerTab"]
+ *     SHELL --> ABOUT["AboutTab"]
  *     SHELL -. admin .-> AI["AiTab"]
  *     SHELL -. admin .-> CLOUD["CloudTab"]
  *     SHELL -. admin .-> USERS["UsersTab"]
@@ -72,7 +73,7 @@
  *
  * {@link Settings} renders the route header and delegates the tabbed surface to
  * {@link SettingsShell}. The shell always shows {@link AccountTab},
- * {@link AppearanceTab}, and {@link ServerTab}; admin users additionally see
+ * {@link AppearanceTab}, {@link ServerTab}, and {@link AboutTab}; admin users additionally see
  * {@link AiTab}, {@link CloudTab}, and {@link UsersTab}. The visual hierarchy is
  * centralized in {@link SettingsPage}, {@link SettingsGroup},
  * {@link SettingsRow}, and {@link SettingsBlock}; tabs should compose those
@@ -108,6 +109,7 @@ import type AiTab from "./components/renew/tabs/AiTab.tsx";
 import type CloudTab from "./components/renew/tabs/CloudTab.tsx";
 import type ServerTab from "./components/renew/tabs/ServerTab.tsx";
 import type UsersTab from "./components/renew/tabs/UsersTab.tsx";
+import type AboutTab from "./components/renew/tabs/AboutTab.tsx";
 import type { useAISettingsDraft } from "./hooks/useAISettingsDraft.ts";
 import type { useBrowseScope } from "./hooks/useBrowseScope.ts";
 import type {

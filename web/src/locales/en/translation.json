@@ -1481,6 +1481,24 @@
     "topResults": "Top Results"
   },
   "settings": {
+    "about": {
+      "legalDescription": "Review the terms and licenses that apply to this installation.",
+      "legalTitle": "Legal",
+      "licenseDescription": "Lumilio Photos is licensed under GNU GPL version 3.",
+      "licenseTitle": "Open-source license",
+      "noticesDescription": "Attribution and license texts for bundled Go, npm, and native dependencies.",
+      "noticesTitle": "Third-party software notices",
+      "openRepository": "Open repository",
+      "pageDescription": "Review legal terms, open-source licenses, and project information.",
+      "projectDescription": "Source code, release history, and issue reporting.",
+      "projectTitle": "Project",
+      "read": "Read",
+      "termsDescription": "Responsibilities, beta software risks, automated analysis, warranty, and liability.",
+      "termsTitle": "Terms of Use",
+      "title": "About",
+      "viewLicense": "View license",
+      "viewNotices": "View notices"
+    },
     "account": {
       "avatarPhoto": "Avatar photo",
       "changeAvatar": "Change photo",
