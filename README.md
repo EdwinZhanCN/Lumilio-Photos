@@ -1,111 +1,132 @@
 <div align="center">
 
 # Lumilio Photos
-<img width="128" height="148" alt="logo" src="https://github.com/user-attachments/assets/9e51f2dd-af9c-47da-9232-cff9a6e6bf4f" />
 
-[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
+**English** | [简体中文](README.zh-CN.md)
+
+<img width="128" height="148" alt="Lumilio Photos logo" src="https://github.com/user-attachments/assets/9e51f2dd-af9c-47da-9232-cff9a6e6bf4f" />
+
+Local-first photo and video management for your own library.
+
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=f5f5f5)](https://www.postgresql.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge&logo=gnu)](LICENSE)
 
 </div>
 
->[!WARNING]
->🚧 This Project is Under Active Development. 🚧
+> [!WARNING]
+> Lumilio Photos is free, open-source beta software under active development. Back up important libraries before upgrading and review the release notes for known limitations.
 
-## Tech Stack
+Lumilio Photos keeps your originals and application data on infrastructure you control. It provides one workspace for browsing, importing, organizing, searching, and processing large media libraries. AI-assisted features are optional: the core library remains usable without a model server or external AI provider.
 
-### Web
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.1-646CFF?logo=vite&logoColor=f5f5f5)](https://vitejs.dev/)
-[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-06B6D4?logo=tailwind-css)](https://tailwindcss.com/)
-[![DaisyUI](https://img.shields.io/badge/DaisyUI-5.1-5A0EF8?logo=daisyui)](https://daisyui.com/)
-[![React Query](https://img.shields.io/badge/React_Query-5.74-FF4154?logo=tanstack)](https://tanstack.com/query/latest)
-[![Rust](https://img.shields.io/badge/Rust-1.82-000000?logo=rust)](https://www.rust-lang.org/)
-[![WebAssembly](https://img.shields.io/badge/WebAssembly-1.0-654FF0?logo=webassembly&logoColor=f5f5f5)](https://webassembly.org/)
+## Features
 
-### Server
-[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev/)
-[![Gin](https://img.shields.io/badge/Gin-1.10-00ADD8?logo=gin)](https://gin-gonic.com/)
-[![pgvector](https://img.shields.io/badge/pgvector-0.3-4169E1?logo=postgresql&logoColor=f5f5f5)](https://github.com/pgvector/pgvector)
-[![River](https://img.shields.io/badge/River-0.24-5D3F6A?logo=riverqueue)](https://riverqueue.com/)
-[![LibRaw](https://img.shields.io/badge/LibRaw-0.20-FF5722?logo=libraw)](https://www.libraw.org/)
+- Local-first photo and video library with explicit storage repositories
+- Albums, people, places, stacks, favorites, and duplicate management
+- Upload, folder scanning, metadata extraction, thumbnails, and transcoding
+- Search and filters across library metadata
+- Optional semantic search, face recognition, OCR, and classification through Lumen
+- Responsive web interface plus macOS and Windows desktop packages
+- Multi-user authentication with optional MFA and passkeys
 
-## Quick Start
+## Install
 
-### Production (Docker)
+Choose the distribution that matches where the library will run:
+
+| Environment | Recommended method |
+| --- | --- |
+| macOS (Apple Silicon) | Download the `.dmg` from [GitHub Releases](https://github.com/EdwinZhanCN/Lumilio-Photos/releases) |
+| Windows 10/11 (x64) | Download the `setup.exe` from [GitHub Releases](https://github.com/EdwinZhanCN/Lumilio-Photos/releases) |
+| Linux server or NAS | Use the published Docker Compose images below |
+| Contributor workstation | Build from source with `make setup` and `make dev` |
+
+Desktop packages include a private PostgreSQL runtime and the required media tools. They run in the system tray or macOS menu bar and open the interface in your default browser at `http://localhost:6680`. See the [installation guide](site/docs/en/user-manual/introduction/installation.md) for platform-specific setup and current signing limitations.
+
+### Docker Compose
+
+Docker with the Compose plugin is required. Set `LUMILIO_STORAGE` to the host directory that will contain the media library and persistent secrets.
 
 ```bash
-git clone https://github.com/EdwinZhanCN/Lumilio-Photos.git
-cd Lumilio-Photos
-docker compose up -d
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
+LUMILIO_STORAGE=/srv/photos docker compose -f docker-compose.release.yml up -d
 ```
 
-Access:
-- Web UI: http://localhost:6657
-- API: http://localhost:6680
-- API Docs: http://localhost:6680/swagger/index.html
+Then open `http://localhost:6657` and complete the first-run wizard. The web UI listens on port `6657` (HTTP) and `6658` (HTTPS); the API listens on `6680`.
 
-Security key behavior:
-- `LUMILIO_SECRET_KEY` is treated as a key file path (not raw key text).
-- If the file does not exist, server auto-generates and persists it.
-- The same key file is used to derive JWT signing key and settings encryption key.
-
-### Development
-
-**Prerequisites:** Go 1.25+, Node.js 23+, Docker, Make
+To pin a release instead of following `latest`:
 
 ```bash
-# Clone and setup
+LUMILIO_VERSION=v1.0.0 LUMILIO_STORAGE=/srv/photos \
+  docker compose -f docker-compose.release.yml up -d
+```
+
+> [!IMPORTANT]
+> `LUMILIO_SECRET_KEY` is a key **file path**, not raw key text. The server creates the file when needed and uses it to derive JWT signing and settings-encryption keys. The release Compose file persists it beneath `LUMILIO_STORAGE`.
+
+## Development
+
+### Prerequisites
+
+- Go 1.25+
+- [Vite+](https://viteplus.dev/) and its supported Node.js runtime
+- Docker with Compose v2
+- Make
+- Rust and `wasm-pack` for rebuilding browser WASM packages
+
+Clone and start the development stack:
+
+```bash
 git clone https://github.com/EdwinZhanCN/Lumilio-Photos.git
 cd Lumilio-Photos
 make setup
-
-# Start everything (database + server + web)
 make dev
 ```
 
-Access:
-- Web UI: http://localhost:6657
-- API: http://localhost:6680/api/v1/health
-- API Docs: http://localhost:6680/swagger/index.html
+`make dev` starts PostgreSQL on host port `5433`, the API on `6680`, and the web app on `6657`. Local configuration is copied from `server/config/server.example.toml` to the ignored `server/config/server.local.toml` during setup.
 
-**Note:** Database runs on port 5433. `make db` starts the development PostgreSQL service.
-`LUMILIO_SECRET_KEY` defaults to `./data/storage/.secrets/lumilio_secret_key` in local dev templates.
-
-#### Dev Container
-
-Open the repo in a Dev Container (`.devcontainer/`). Compose starts PostgreSQL (`5433`) and the dev image; run `make dev` inside the container for API (`6680`) and Vite (`6657`).
-
-### Make Commands
+### Useful commands
 
 ```bash
-make dev            # Start database, server, and web (recommended)
-make db             # Start development PostgreSQL
-make server-dev     # Start API server only
-make web-dev        # Start web dev server only
-make test           # Run backend and frontend checks
-make server-test    # Run Go tests
-make db-reset       # Reset database (⚠️ deletes all data)
-make dto            # Generate DTO schemas for both backend and frontend
-make clean          # Clean generated files
+make dev              # Start database, server, and web
+make db               # Start the development PostgreSQL service
+make server-dev       # Start only the API server
+make web-dev          # Start only the web development server
+make test             # Run backend and frontend quality gates
+make server-test      # Run Go server tests
+make web-test         # Run frontend type, lint, and unit checks
+make web-browser-test # Build and run production browser smoke checks
+make desktop-test     # Run desktop module tests
+make dto              # Regenerate OpenAPI and frontend API types
+make db-reset         # Delete development database state (destructive)
 ```
 
-### Manual Setup
+The repository also includes a Dev Container configuration under `.devcontainer/`. Open the project in the container, run `make setup`, and then use the same `make dev` workflow.
 
-If `make dev` doesn't work for you:
+## Optional AI with Lumen
 
-```bash
-# Terminal 1: Database
-make db
+Semantic embeddings, face recognition, OCR, and classification are provided by a separate [Lumen Hub](https://github.com/EdwinZhanCN/Lumen-Hub) inference node. They are opt-in and are not required for importing, browsing, or organizing media.
 
-# Terminal 2: Server
-cd server
-cp -n config/server.example.toml config/server.local.toml
-SERVER_ENV=development SERVER_CONFIG_FILE=config/server.local.toml go run ./cmd
+- On desktop, use **Enable AI on This Machine** from the tray or menu-bar app. Lumilio Photos downloads and supervises a compatible local Hub.
+- For Docker or a remote machine, run Lumen Hub separately and configure node discovery. See [AI and Lumen](site/docs/en/user-manual/introduction/installation.md#optional-ai-features) for setup details.
 
-# Terminal 3: Web
-cd web
-vp dev --host --port 6657
-```
+## Project Layout
+
+| Path | Purpose |
+| --- | --- |
+| `server/` | Go API, processing queues, storage, database migrations, and integrations |
+| `web/` | React 19 and TypeScript web application |
+| `desktop/` | Wails v3 desktop host and private PostgreSQL supervisor |
+| `wasm/` | Rust WebAssembly packages used by browser-side media workflows |
+| `site/` | VitePress user and developer documentation |
+
+## Documentation
+
+- [User installation guide](site/docs/en/user-manual/introduction/installation.md)
+- [User manual](site/docs/en/user-manual/features/index.md)
+- [Desktop development and packaging](desktop/README.md)
+- [Contributor guide](AGENTS.md)
+
+## License
+
+Lumilio Photos is licensed under the [GNU General Public License v3.0](LICENSE).
