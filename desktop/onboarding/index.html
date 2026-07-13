@@ -270,7 +270,7 @@
         display: flex;
         align-items: center;
         width: 100%;
-        padding: 16px;
+        padding: 20px;
         border: 1px solid var(--line);
         border-radius: 12px;
         background: var(--surface);
@@ -422,6 +422,52 @@
       .terms.open {
         display: block;
       }
+      .legal-viewer {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: none;
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+        backdrop-filter: blur(8px);
+        padding: 42px;
+      }
+      .legal-viewer.open {
+        display: flex;
+      }
+      .legal-panel {
+        width: min(820px, 100%);
+        max-height: 100%;
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+      .legal-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .legal-head b {
+        flex: 1;
+      }
+      .legal-text {
+        margin: 0;
+        padding: 20px;
+        overflow: auto;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: var(--text);
+        font:
+          12px/1.65 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #171816;
@@ -440,7 +486,7 @@
       <div class="titlebar"></div>
       <header class="top">
         <span class="brand">Lumilio Photos</span
-        ><span class="tag" data-i18n="tag">Local control panel</span>
+        ><span class="tag" data-i18n="tag">Desktop control panel</span>
         <div class="lang">
           <button data-lang="en">EN</button><button data-lang="zh">中文</button>
         </div>
@@ -450,8 +496,7 @@
           <div class="eyebrow" data-i18n="step1">Step 1 of 3</div>
           <h1 data-i18n="welcome">Set up your library</h1>
           <p class="lead" data-i18n="welcomeDesc">
-            Choose where originals are stored. Lumilio Photos and its database stay on this
-            computer.
+            Choose a local storage location. Media and the database remain on this computer.
           </p>
           <div class="path">
             <code id="storage-path">—</code
@@ -467,8 +512,7 @@
               <button type="button" data-region="cn">中国大陆</button>
             </div>
             <p class="lead" style="margin: 8px 0 0; font-size: 12px" data-i18n="regionHint">
-              Mainland China uses a download mirror for app updates. This is separate from in-app
-              map region.
+              Mainland China uses a GitHub proxy mirror to download GitHub resources.
             </p>
           </div>
           <label class="agree"
@@ -479,11 +523,9 @@
           >
           <div class="terms" id="terms">
             <b data-i18n="termsTitle">Terms of Use</b>
-            <p data-i18n="termsBody">
-              Lumilio Photos is provided as-is, without warranty. You remain responsible for your
-              media, backups, account security, and compliance with laws that apply to your use. The
-              software does not transfer ownership of your media.
-            </p>
+            <button class="btn link" id="full-terms" data-i18n="fullTerms">
+              Read the full Terms of Use
+            </button>
             <button class="btn link" id="licenses" data-i18n="appLicense">
               Lumilio Photos open-source license</button
             ><button class="btn link" id="third-party" data-i18n="thirdParty">
@@ -493,17 +535,17 @@
         </section>
         <section id="step-backend" class="screen">
           <div class="eyebrow" data-i18n="step2">Step 2 of 3</div>
-          <h1 data-i18n="hardware">Use this computer for analysis</h1>
+          <h1 data-i18n="hardware">Local machine learning</h1>
           <p class="lead" data-i18n="hardwareDesc">
-            Choose the processing backend. The recommended option is selected for this computer.
+            Choose a compute backend.
           </p>
           <div class="backend-list" id="backend-list"></div>
         </section>
         <section id="step-preset" class="screen">
           <div class="eyebrow" data-i18n="step3">Step 3 of 3</div>
-          <h1 data-i18n="analysis">Choose analysis features</h1>
+          <h1 data-i18n="analysis">Choose capabilities</h1>
           <p class="lead" data-i18n="analysisDesc">
-            You can change this later. Models download in the background after Photos starts.
+            You can change this later. Models download in the background.
           </p>
           <div class="choice-grid" id="presets"></div>
           <div class="cache">
@@ -520,11 +562,11 @@
             <div>
               <h1 data-i18n="control">Control panel</h1>
               <p class="lead" style="margin: 5px 0 0" data-i18n="controlDesc">
-                Local services and storage at a glance.
+                View local services and storage.
               </p>
             </div>
             <div class="actions">
-              <button class="btn primary" id="open-app" data-i18n="openPhotos">Open Photos</button
+              <button class="btn primary" id="open-app" data-i18n="openPhotos">Open in browser</button
               ><button class="btn" id="refresh" data-i18n="refresh">Refresh</button>
             </div>
           </div>
@@ -569,8 +611,7 @@
               <button type="button" data-region="cn">中国大陆</button>
             </div>
             <p class="lead" style="margin: 0; font-size: 12px" data-i18n="regionHint">
-              Mainland China uses a download mirror for app updates. This is separate from in-app
-              map region.
+              Mainland China uses a GitHub proxy mirror to download GitHub resources.
             </p>
           </div>
           <div class="section">
@@ -579,6 +620,15 @@
           </div>
         </section>
       </main>
+      <div class="legal-viewer" id="legal-viewer" role="dialog" aria-modal="true">
+        <div class="legal-panel">
+          <div class="legal-head">
+            <b id="legal-title"></b>
+            <button class="btn" id="legal-close" data-i18n="close">Close</button>
+          </div>
+          <pre class="legal-text" id="legal-text"></pre>
+        </div>
+      </div>
       <footer class="footer" id="wizard-footer">
         <button class="btn link" id="back" data-i18n="back">Back</button>
         <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
@@ -590,35 +640,30 @@
     <script>
       const I = {
         en: {
-          tag: "Local control panel",
+          tag: "Desktop control panel",
           step1: "Step 1 of 3",
           step2: "Step 2 of 3",
           step3: "Step 3 of 3",
           welcome: "Set up your library",
           welcomeDesc:
-            "Choose where originals are stored. Lumilio Photos and its database stay on this computer.",
+            "Choose a local storage location. Media and the database remain on this computer.",
           regionLabel: "Download region",
-          regionHint:
-            "Mainland China uses a download mirror for app updates. Separate from in-app map settings.",
+          regionHint: "Mainland China uses a GitHub proxy mirror to download GitHub resources.",
           regionOther: "Other regions",
           regionCN: "Mainland China",
           choose: "Choose…",
           agree: "I agree to the terms of use and open-source licenses.",
           read: "Read",
           termsTitle: "Terms and licenses",
-          termsBody:
-            "Lumilio Photos is free, open-source software provided as-is. Your library remains local and you are responsible for backups.",
           licenses: "View bundled licenses",
-          hardware: "Use this computer for analysis",
-          hardwareDesc:
-            "Choose the processing backend. The recommended option is selected for this computer.",
-          analysis: "Choose analysis features",
-          analysisDesc:
-            "You can change this later. Models download in the background after Photos starts.",
+          hardware: "Local machine learning",
+          hardwareDesc: "Choose a compute backend.",
+          analysis: "Choose capabilities",
+          analysisDesc: "You can change this later. Models download in the background.",
           cache: "Model cache",
           control: "Control panel",
-          controlDesc: "Local services and storage at a glance.",
-          openPhotos: "Open Photos",
+          controlDesc: "View local services and storage.",
+          openPhotos: "Open in browser",
           refresh: "Refresh",
           version: "Version",
           address: "Address",
@@ -638,11 +683,11 @@
           minimal: "Minimal",
           basic: "Basic",
           brave: "Brave",
-          minimalDesc: "Image semantic analysis · Person recognition",
+          minimalDesc: "Supports image semantic analysis and person recognition",
           basicDesc:
-            "Image semantic analysis · Person recognition · BioCLIP species identification · OCR text recognition",
+            "Supports image semantic analysis, person recognition, BioCLIP species identification, and OCR text recognition",
           braveDesc:
-            "Stronger image semantic analysis · Person recognition · Full BioCLIP species identification · OCR text recognition",
+            "Stronger image semantic analysis, person recognition, broader BioCLIP species identification, and OCR text recognition",
           writable: "Writable · {free} free",
           invalid: "Choose a writable location",
           running: "Running",
@@ -651,37 +696,36 @@
           failed: "Failed",
           enable: "Enable",
           disable: "Turn off",
-          photos: "Photos",
+          photos: "Media library",
           logs: "Logs",
           backups: "Backups",
           appData: "App data",
           oldCache: "Previous model cache",
         },
         zh: {
-          tag: "本机控制面板",
+          tag: "桌面控制面板",
           step1: "第 1 步，共 3 步",
           step2: "第 2 步，共 3 步",
           step3: "第 3 步，共 3 步",
           welcome: "设置照片库",
-          welcomeDesc: "选择原始照片和视频的保存位置。Lumilio Photos 与数据库都保留在本机。",
+          welcomeDesc: "选择本地存储位置，媒体与数据库都保留在本机。",
           regionLabel: "下载地区",
-          regionHint: "中国大陆使用应用更新下载镜像，与应用内地图地区设置相互独立。",
+          regionHint: "中国大陆将使用Github Proxy镜像下载GitHub资源",
           regionOther: "其他国家和地区",
           regionCN: "中国大陆",
           choose: "选择…",
           agree: "我同意使用条款与开源许可。",
           read: "阅读",
           termsTitle: "条款与许可",
-          termsBody: "Lumilio Photos 是免费开源软件，按原样提供。照片库保留在本机，备份由你负责。",
           licenses: "查看捆绑的开源许可",
-          hardware: "使用本机进行分析",
-          hardwareDesc: "选择计算后端。已根据这台电脑选中推荐项。",
-          analysis: "选择分析能力",
-          analysisDesc: "之后仍可更改。Photos 启动后，模型将在后台下载。",
+          hardware: "本地机器学习",
+          hardwareDesc: "选择计算后端。",
+          analysis: "选择能力",
+          analysisDesc: "之后仍可更改，模型将在后台下载。",
           cache: "模型缓存",
           control: "控制面板",
-          controlDesc: "快速查看本机服务与存储。",
-          openPhotos: "打开 Photos",
+          controlDesc: "查看本机服务与存储。",
+          openPhotos: "在浏览器中打开",
           refresh: "刷新",
           version: "版本",
           address: "地址",
@@ -701,9 +745,9 @@
           minimal: "最小",
           basic: "基础",
           brave: "激进",
-          minimalDesc: "图像语义分析 · 人物识别",
-          basicDesc: "图像语义分析 · 人物识别 · BioCLIP 生物识别 · OCR 文字识别",
-          braveDesc: "更强的图像语义分析 · 人物识别 · 完整 BioCLIP 生物识别 · OCR 文字识别",
+          minimalDesc: "支持图像语义分析和人物识别",
+          basicDesc: "支持图像语义分析, 人物识别, BioCLIP 生物识别和OCR 文字识别",
+          braveDesc: "更强的图像语义分析, 人物识别, 更加完整的 BioCLIP 生物识别和OCR 文字识别",
           writable: "可写入 · 剩余 {free}",
           invalid: "请选择可写入的位置",
           running: "运行中",
@@ -712,7 +756,7 @@
           failed: "失败",
           enable: "启用",
           disable: "停用",
-          photos: "照片库",
+          photos: "媒体库",
           logs: "日志",
           backups: "备份",
           appData: "应用数据",
@@ -993,23 +1037,41 @@
       Object.assign(I.en, {
         agree: "I agree to the Terms of Use.",
         termsTitle: "Terms of Use",
-        termsBody:
-          "Lumilio Photos is provided as-is, without warranty. You remain responsible for your media, backups, account security, and compliance with laws that apply to your use. The software does not transfer ownership of your media.",
+        fullTerms: "Read the full Terms of Use",
         appLicense: "Lumilio Photos open-source license",
         thirdParty: "Third-party software notices",
+        close: "Close",
       });
       Object.assign(I.zh, {
         agree: "我同意使用条款。",
         termsTitle: "使用条款",
-        termsBody:
-          "Lumilio Photos 按原样提供，不附带任何保证。你需要自行负责媒体文件、备份、账户安全以及遵守适用于你的法律。软件不会取得你的媒体文件所有权。",
+        fullTerms: "阅读完整使用条款",
         appLicense: "Lumilio Photos 开源许可",
         thirdParty: "第三方软件声明",
+        close: "关闭",
       });
+      const legalViewer = document.getElementById("legal-viewer");
+      const legalText = document.getElementById("legal-text");
+      async function showLegal(url, title) {
+        document.getElementById("legal-title").textContent = title;
+        legalText.textContent = "…";
+        legalViewer.classList.add("open");
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+          legalText.textContent = await response.text();
+          legalText.scrollTop = 0;
+        } catch (error) {
+          legalText.textContent = String(error);
+        }
+      }
+      document.getElementById("legal-close").onclick = () => legalViewer.classList.remove("open");
       document.getElementById("licenses").onclick = () =>
-        window.open("/__onb/legal/license", "_blank");
+        showLegal("/__onb/legal/license", t("appLicense"));
+      document.getElementById("full-terms").onclick = () =>
+        showLegal(`/__onb/legal/terms?lang=${s.lang}`, t("fullTerms"));
       document.getElementById("third-party").onclick = () =>
-        window.open("/__onb/legal/third-party", "_blank");
+        showLegal("/__onb/legal/third-party", t("thirdParty"));
     </script>
   </body>
 </html>

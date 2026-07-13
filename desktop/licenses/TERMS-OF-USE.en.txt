@@ -1,0 +1,69 @@
+LUMILIO PHOTOS TERMS OF USE
+
+Last updated: July 12, 2026
+
+Please read these Terms before installing or using Lumilio Photos.
+
+1. Nature of the software
+
+Lumilio Photos is free, open-source, pre-release beta software for managing media locally. Its source code is licensed under the GNU General Public License version 3 (GPL-3.0).
+
+These Terms explain the software's operation, user responsibilities, and risks. They do not limit, replace, or revoke any right granted by GPL-3.0. If these Terms conflict with GPL-3.0 regarding the licensed software code, GPL-3.0 controls.
+
+2. Local data and file operations
+
+Lumilio Photos primarily processes media, databases, caches, thumbnails, models, and other application data on your devices or storage locations you configure.
+
+You are responsible for selecting the correct library, database, cache, and backup locations; maintaining tested, independent backups; ensuring storage devices are available, reliable, and have sufficient capacity; and reviewing the results of imports, moves, deletions, restores, reprocessing, and upgrades.
+
+Lumilio Photos is not a substitute for an independent and verified backup system.
+
+3. Beta software risks
+
+As pre-release beta software, Lumilio Photos may contain defects, incomplete features, compatibility problems, or upgrade paths that have not been fully validated. It may crash, fail tasks, produce incorrect metadata or analysis, require database or configuration migrations, or behave differently in later releases.
+
+Before using it with important or irreplaceable data, maintain independent backups and verify that restoration works.
+
+4. Automated analysis
+
+Lumilio Photos may provide machine-learning, image recognition, OCR, face recognition, species recognition, semantic search, and other automated analysis features. Generated labels, identities, text, classifications, similarities, and suggestions may be incomplete, inaccurate, or biased.
+
+Do not rely solely on automated results for decisions involving safety, health, law, finance, identity, or other high-risk matters.
+
+5. Third-party software and services
+
+Lumilio Photos includes or invokes third-party open-source components, media tools, databases, models, and other software. Their respective licenses and notices are provided in the Third-Party Software Notices distributed with the application.
+
+External services, download sources, model services, cloud storage, or other systems you configure are governed by their providers' terms, privacy policies, and fees. The Lumilio Photos contributors do not control their availability, security, content, or future changes.
+
+6. Account and device security
+
+If you enable accounts, remote access, network sharing, or external services, you are responsible for protecting passwords, credentials, keys, tokens, configuration files, devices, networks, and backups, and for applying appropriate security updates and access controls.
+
+7. Lawful use
+
+You are responsible for ensuring that you have the right to store, view, process, import, export, or share content managed through Lumilio Photos and for complying with applicable privacy, copyright, data-protection, and other laws.
+
+This section does not restrict your GPL-3.0 rights to use, study, modify, or distribute the software code.
+
+8. Disclaimer of warranty
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, LUMILIO PHOTOS IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, DATA INTEGRITY, CONTINUOUS AVAILABILITY, OR ACCURACY OF RESULTS.
+
+The disclaimer in Section 15 of GPL-3.0 also applies.
+
+9. Limitation of liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE AUTHORS, CONTRIBUTORS, AND DISTRIBUTORS WILL NOT BE LIABLE FOR DATA LOSS, FILE DAMAGE, BUSINESS INTERRUPTION, LOST PROFITS, PRIVACY LOSS, OR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES ARISING FROM INSTALLING, USING, OR BEING UNABLE TO USE LUMILIO PHOTOS.
+
+Some jurisdictions do not permit certain warranty exclusions or liability limitations. In those jurisdictions, these provisions apply only to the extent permitted by law. The limitation in Section 16 of GPL-3.0 also applies.
+
+10. Changes
+
+These Terms may be updated for later releases when features, security, law, or distribution methods change. Material changes should be identified through release notes, the application, or project documentation. An update to these Terms will not retroactively restrict rights already granted under GPL-3.0.
+
+11. Licenses and notices
+
+Lumilio Photos software license: GNU General Public License version 3.
+Third-party software: see THIRD_PARTY_NOTICES.txt distributed with the application.
+Source code and issue reporting: see the Lumilio Photos project repository.
