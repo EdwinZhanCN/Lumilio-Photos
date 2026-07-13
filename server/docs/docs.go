@@ -2038,10 +2038,6 @@ const docTemplate = `{
                         "example": "regular",
                         "type": "string"
                     },
-                    "root": {
-                        "example": "/data/storage",
-                        "type": "string"
-                    },
                     "storage_strategy": {
                         "enum": [
                             "date",

@@ -85,7 +85,7 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	dbRepo, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
 		Name:              name,
 		Role:              role,
-		Root:              firstNonEmptyString(req.Root, h.storageRoot),
+		Root:              h.storageRoot,
 		OwnerID:           ownerID,
 		StorageStrategy:   req.StorageStrategy,
 		DuplicateHandling: req.DuplicateHandling,

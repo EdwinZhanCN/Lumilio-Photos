@@ -845,7 +845,6 @@ export const TotpSetupPanel: React.FC<{
               <OtpInput
                 value={code}
                 onChange={onCodeChange}
-                onComplete={onVerify}
                 invalid={invalid}
                 autoFocus={false}
               />

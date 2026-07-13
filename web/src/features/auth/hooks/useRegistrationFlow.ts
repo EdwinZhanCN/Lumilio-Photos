@@ -36,7 +36,7 @@ type RegistrationFlowState = {
   displayError: string | null;
   isBusy: boolean;
   handleStartRegistration: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  handleCompleteTotp: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  handleCompleteTotp: () => Promise<void>;
   handleSkipTotp: () => void;
   handleCreatePasskey: () => Promise<void>;
   handleSkipPasskey: () => void;
@@ -155,8 +155,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
     }
   };
 
-  const handleCompleteTotp = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleCompleteTotp = async () => {
     const setupToken = totpSetup?.setup_token;
     if (!setupToken) return;
     setFlowError(null);

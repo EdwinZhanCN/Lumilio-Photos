@@ -5,7 +5,6 @@ import "time"
 type CreateRepositoryRequestDTO struct {
 	Name              string `json:"name" binding:"required" example:"Family Photos"`
 	Role              string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
-	Root              string `json:"root,omitempty" example:"/data/storage"`
 	StorageStrategy   string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
 	DuplicateHandling string `json:"duplicate_handling,omitempty" binding:"omitempty,oneof=rename uuid overwrite" example:"rename"`
 	CloudCredentialID string `json:"cloud_credential_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
