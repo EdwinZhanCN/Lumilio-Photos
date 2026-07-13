@@ -51,8 +51,9 @@ OutputBaseFilename=Lumilio-Photos-{#AppVersion}-windows-amd64-setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile={#SourcePath}\..\..\assets\lumilio-photos.ico
 UninstallDisplayName={#MyAppName}
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\lumilio-photos.ico
 SetupLogging=yes
 
 [Languages]
@@ -72,10 +73,11 @@ Type: filesandordirs; Name: "{app}\*"
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#SourcePath}\..\..\assets\lumilio-photos.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\lumilio-photos.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\lumilio-photos.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
