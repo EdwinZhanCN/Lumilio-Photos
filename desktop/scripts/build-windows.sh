@@ -4,7 +4,7 @@
 # installed (see the desktop-windows CI job / release workflow).
 #
 # Prerequisites (staged before running):
-#   desktop/resources/postgres/17/windows-amd64   PostgreSQL + pgvector (artifact)
+#   desktop/resources/postgres/18/windows-amd64   PostgreSQL + pgvector (artifact)
 #   desktop/resources/ffmpeg/{ffmpeg,ffprobe}.exe fetch-resources.ps1
 #   desktop/resources/exiftool/exiftool.exe       fetch-resources.ps1
 #   web/dist                                      vp build output
@@ -43,6 +43,19 @@ collect_dlls "$EXE" "$APPDIR"
 
 echo "==> Staging bundled runtime resources"
 mkdir -p "$APPDIR/resources"
+PG_SRC="$RESOURCES_SRC/postgres/18/windows-amd64"
+for tool in postgres initdb pg_ctl pg_isready createdb pg_dump pg_restore psql; do
+  if [ ! -f "$PG_SRC/bin/$tool.exe" ]; then
+    echo "    ERROR: missing required PostgreSQL tool: $PG_SRC/bin/$tool.exe" >&2
+    exit 1
+  fi
+done
+for extension in vector pg_trgm; do
+  if [ ! -f "$PG_SRC/share/extension/$extension.control" ]; then
+    echo "    ERROR: missing required PostgreSQL extension: $extension" >&2
+    exit 1
+  fi
+done
 stage() { # src dest
   if [ ! -e "$1" ]; then
     echo "    WARNING: missing $1 — bundle will fall back to PATH at runtime" >&2
@@ -51,7 +64,7 @@ stage() { # src dest
   mkdir -p "$(dirname "$2")"
   cp -R "$1" "$2"
 }
-stage "$RESOURCES_SRC/postgres" "$APPDIR/resources/postgres"
+stage "$PG_SRC" "$APPDIR/resources/postgres/18/windows-amd64"
 stage "$RESOURCES_SRC/ffmpeg" "$APPDIR/resources/ffmpeg"
 stage "$RESOURCES_SRC/exiftool" "$APPDIR/resources/exiftool"
 # License texts (committed, also embedded in the binary for the setup window).

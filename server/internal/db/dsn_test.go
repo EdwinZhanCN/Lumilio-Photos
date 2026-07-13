@@ -43,7 +43,7 @@ func TestQuoteDSNValue(t *testing.T) {
 // including one containing spaces (the macOS Application Support path).
 func TestSocketDSNParsesWithSpaces(t *testing.T) {
 	cfg := config.DatabaseConfig{
-		Host:     "/Users/me/Library/Application Support/Lumilio Photos/postgres/17/run",
+		Host:     "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run",
 		Port:     "5487",
 		User:     "lumilio",
 		Password: "deadbeef",

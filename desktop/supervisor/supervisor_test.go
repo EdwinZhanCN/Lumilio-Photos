@@ -49,7 +49,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 		WebRoot:       "/bundle/web",
 		LogDir:        "/Users/me/Library/Application Support/Lumilio Photos/logs",
 		StoragePath:   "/Volumes/Photos/Lumilio Library",
-		DBHost:        "/Users/me/Library/Application Support/Lumilio Photos/postgres/17/run",
+		DBHost:        "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run",
 		PGPort:        "5487",
 		DBUser:        "lumilio",
 		DBName:        "lumiliophotos",
@@ -68,7 +68,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if got, want := strings.Join(cfg.Auth.WebAuthnRPOrigins, ","), "http://localhost:6680"; got != want {
 		t.Fatalf("webauthn origins = %q, want %q", got, want)
 	}
-	if cfg.DatabaseConfig.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/17/run" {
+	if cfg.DatabaseConfig.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run" {
 		t.Fatalf("database host = %q", cfg.DatabaseConfig.Host)
 	}
 
@@ -113,7 +113,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if decoded.Logging.Dir != "/Users/me/Library/Application Support/Lumilio Photos/logs" {
 		t.Fatalf("unexpected generated log dir: %q", decoded.Logging.Dir)
 	}
-	if decoded.Database.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/17/run" || decoded.Database.Name != "lumiliophotos" {
+	if decoded.Database.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run" || decoded.Database.Name != "lumiliophotos" {
 		t.Fatalf("unexpected generated database config: %+v", decoded.Database)
 	}
 	if decoded.Storage.Path != "/Volumes/Photos/Lumilio Library" {
