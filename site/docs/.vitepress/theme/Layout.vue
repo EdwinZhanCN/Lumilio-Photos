@@ -2,8 +2,9 @@
 import DefaultTheme from 'vitepress/theme'
 import { useData, inBrowser } from 'vitepress'
 import { watchEffect } from 'vue'
+import ChineseLanding from '../components/ChineseLanding.vue'
 
-const { lang } = useData()
+const { lang, frontmatter } = useData()
 watchEffect(() => {
   if (inBrowser) {
     document.cookie = `nf_lang=${lang.value}; expires=Mon, 1 Jan 2030 00:00:00 UTC; path=/`
@@ -12,5 +13,6 @@ watchEffect(() => {
 </script>
 
 <template>
-  <DefaultTheme.Layout />
+  <ChineseLanding v-if="frontmatter.landing === 'lumilio-zh'" />
+  <DefaultTheme.Layout v-else />
 </template>
