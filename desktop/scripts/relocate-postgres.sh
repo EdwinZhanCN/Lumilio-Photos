@@ -14,7 +14,7 @@
 # valid one). Idempotent.
 #
 # Usage: relocate-postgres.sh <postgres platform dir containing bin/ and lib/>
-#   e.g. relocate-postgres.sh desktop/resources/postgres/17/darwin-arm64
+#   e.g. relocate-postgres.sh desktop/resources/postgres/18/darwin-arm64
 set -euo pipefail
 
 ROOT="$(cd "${1:?usage: relocate-postgres.sh <dir with bin/ and lib/>}" && pwd)"

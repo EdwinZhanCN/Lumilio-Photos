@@ -9,7 +9,7 @@
 # Developer account) per the exec plan's signing strategy.
 #
 # Prerequisites (staged before running — see desktop/resources/README.md):
-#   desktop/resources/postgres/17/<darwin-arch>/bin   PostgreSQL + pgvector (+ contrib pg_trgm)
+#   desktop/resources/postgres/18/<darwin-arch>/bin   PostgreSQL + pgvector (+ contrib pg_trgm)
 #   desktop/resources/ffmpeg/{ffmpeg,ffprobe}         static ffmpeg build
 #   desktop/resources/exiftool/exiftool               exiftool standalone
 # Build tools:
@@ -102,6 +102,20 @@ fi
 cp "$APP_ICON" "$RES_DIR/$APP_ICON_NAME.icns"
 
 echo "==> Staging bundled runtime resources"
+PG_SRC="$RESOURCES_SRC/postgres/18/$PLATFORM"
+for tool in postgres initdb pg_ctl pg_isready createdb pg_dump pg_restore psql; do
+  if [ ! -x "$PG_SRC/bin/$tool" ]; then
+    echo "    ERROR: missing required PostgreSQL tool: $PG_SRC/bin/$tool" >&2
+    echo "    Build/download the postgres-$PLATFORM artifact before packaging." >&2
+    exit 1
+  fi
+done
+for extension in vector pg_trgm; do
+  if [ ! -f "$PG_SRC/share/extension/$extension.control" ]; then
+    echo "    ERROR: missing required PostgreSQL extension: $extension" >&2
+    exit 1
+  fi
+done
 stage() { # src dest
   if [ ! -e "$1" ]; then
     echo "    WARNING: missing $1 — bundle will fall back to PATH at runtime" >&2
@@ -110,7 +124,7 @@ stage() { # src dest
   mkdir -p "$(dirname "$2")"
   cp -R "$1" "$2"
 }
-stage "$RESOURCES_SRC/postgres/17/$PLATFORM" "$RES_DIR/postgres/17/$PLATFORM"
+stage "$PG_SRC"                                "$RES_DIR/postgres/18/$PLATFORM"
 stage "$RESOURCES_SRC/ffmpeg/ffmpeg"          "$RES_DIR/ffmpeg/ffmpeg"
 stage "$RESOURCES_SRC/ffmpeg/ffprobe"         "$RES_DIR/ffmpeg/ffprobe"
 stage "$RESOURCES_SRC/exiftool"               "$RES_DIR/exiftool"

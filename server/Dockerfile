@@ -48,12 +48,16 @@ ARG TARGETARCH
 # AVIF/HEIC sources. libvips-tools (rather than the versioned libvips42* package)
 # lets apt resolve the correct runtime soname across Debian releases.
 #
-# postgresql-client-17 matches the lumilio-db image (db.Dockerfile,
-# pgvector:pg17); the backup engine resolves /usr/lib/postgresql/<major>/bin
-# from the *server's* reported version, so when the db image bumps majors the
-# transition release must install both client packages (see
-# exec-plans/active/db-backup-upgrade.md).
+# postgresql-client-18 matches the lumilio-db image. Debian trixie predates
+# PostgreSQL 18, so install the client from the official PostgreSQL APT repo.
 RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl; \
+    install -d /usr/share/postgresql-common/pgdg; \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc; \
+    echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -67,7 +71,7 @@ RUN set -eux; \
         libheif-plugin-aomdec \
         libheif-plugin-libde265 \
         libraw23 \
-        postgresql-client-17; \
+        postgresql-client-18; \
     if [ "${TARGETARCH}" = "amd64" ]; then \
         apt-get install -y --no-install-recommends \
             intel-media-va-driver \

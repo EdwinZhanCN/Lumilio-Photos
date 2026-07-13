@@ -13,9 +13,9 @@ const (
 	appDirName = "Lumilio Photos"
 
 	// pgMajorVersion encodes the bundled PostgreSQL major version in the data
-	// directory layout (postgres/17/...) so a future major upgrade can detect a
+	// directory layout (postgres/18/...) so a future major upgrade can detect a
 	// version mismatch and run a dump/restore. Bump alongside the bundled PG.
-	pgMajorVersion = "17"
+	pgMajorVersion = "18"
 
 	// pgPort only affects the Unix socket filename (.s.PGSQL.<port>); no TCP
 	// port is opened (listen_addresses is empty). It must still be unique enough

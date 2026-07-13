@@ -1,6 +1,6 @@
 # Lumilio Photos — Desktop (Wails v3)
 
-A macOS desktop build that bundles a private PostgreSQL 17 runtime and runs the
+A macOS desktop build that bundles a private PostgreSQL 18 runtime and runs the
 existing Go API server **in-process**, reusing the same bootstrap (`server/app`)
 and the same React UI over HTTP. See the full design in
 `site/docs/internal/agent/exec-plans/active/desktop-wails-v3.md`.
@@ -11,7 +11,7 @@ and the same React UI over HTTP. See the full design in
 Wails v3 system tray (menubar app, no webview)
   → "Open Lumilio Photos" opens the default browser at http://localhost:6680
 desktop/supervisor
-  → manages a private PostgreSQL 17 (initdb / pg_ctl / pg_isready / createdb)
+  → manages a private PostgreSQL 18 (initdb / pg_ctl / pg_isready / createdb)
   → generates secrets under the app-data dir
   → builds typed server config through server/config.NewDesktopConfig(...)
   → writes config/server.local.toml as a debug copy only
@@ -37,7 +37,7 @@ and CI.
 
 ```sh
 # Run the app against a locally installed PostgreSQL (no bundling required):
-make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@17/bin
+make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin
 # (or any local PostgreSQL, e.g. .../postgresql@14/bin — version-agnostic for dev)
 
 # Run the Go tests (the PostgreSQL lifecycle test auto-skips when no PG is found):
@@ -83,7 +83,7 @@ LUMILIO_E2E=1 LUMILIO_PG_BIN_DIR=/opt/homebrew/opt/postgresql@14/bin \
 ```sh
 brew install vips dylibbundler create-dmg      # build-time deps
 desktop/scripts/fetch-resources.sh             # ffmpeg/ffprobe/exiftool (pinned + sha256)
-# also stage PostgreSQL 17 + pgvector into resources/postgres/17/<platform>/ (from source), then:
+# also stage PostgreSQL 18.4 + pgvector into resources/postgres/18/<platform>/ (from source), then:
 make desktop-build                             # → desktop/build/Lumilio Photos.app
 desktop/scripts/build-macos.sh arm64 --dmg     # also produce a DMG
 ```
@@ -127,7 +127,7 @@ inside an MSYS2 MINGW64 shell with the toolchain from the `windows` job in
 `.github/workflows/release-desktop.yml` (`mingw-w64-x86_64-{go,gcc,pkgconf,libvips,libraw,ntldd}`):
 
 ```sh
-# stage resources first: desktop/resources/postgres/17/windows-amd64,
+# stage resources first: desktop/resources/postgres/18/windows-amd64,
 # ffmpeg/exiftool via desktop/scripts/fetch-resources.ps1, and web/dist (vp build)
 LUMILIO_VERSION=1.2.3 desktop/scripts/build-windows.sh   # → desktop/build/windows/Lumilio Photos/
 ```

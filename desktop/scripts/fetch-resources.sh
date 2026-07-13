@@ -109,4 +109,4 @@ fetch_static_binary ffprobe "$FFPROBE_URL" "$FFPROBE_SHA256"
 fetch_exiftool
 
 echo "==> Done. PostgreSQL+pgvector is not fetched here — build it from source"
-echo "    (.github/workflows/build-postgres.yml) into resources/postgres/17/<platform>/."
+echo "    (.github/workflows/build-postgres.yml) into resources/postgres/18/<platform>/."

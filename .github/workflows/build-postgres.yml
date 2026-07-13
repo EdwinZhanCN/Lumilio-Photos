@@ -1,8 +1,8 @@
 name: Build PostgreSQL (desktop bundle)
 
-# Builds a relocatable PostgreSQL 17 + pgvector (+ contrib pg_trgm) for the
+# Builds a relocatable PostgreSQL 18 + pgvector (+ contrib pg_trgm) for the
 # macOS desktop bundle. Run on demand; the resulting artifacts are staged
-# into desktop/resources/postgres/17/<platform>/ before packaging.
+# into desktop/resources/postgres/18/<platform>/ before packaging.
 #
 # Search relies on pg_trgm + to_tsvector('simple') only; pg_textsearch (BM25)
 # and zhparser/SCWS were removed 2026-07-05 as unused by the server.
@@ -12,20 +12,20 @@ on:
     inputs:
       pg_version:
         description: PostgreSQL version
-        default: "17.5"
+        default: "18.4"
       pgvector_version:
         description: pgvector version (git tag)
-        default: "v0.8.0"
+        default: "v0.8.2"
   # Callable from the desktop release workflows so the PG artifacts are built
   # fresh within the same run (artifact retention is short).
   workflow_call:
     inputs:
       pg_version:
         type: string
-        default: "17.5"
+        default: "18.4"
       pgvector_version:
         type: string
-        default: "v0.8.0"
+        default: "v0.8.2"
 
 jobs:
   build:
@@ -75,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           DIST="$PWD/pg-dist"
-          OUT="postgres/17/${{ matrix.platform }}"
+          OUT="postgres/18/${{ matrix.platform }}"
           mkdir -p "$OUT"
           cp -R "$DIST/bin" "$DIST/lib" "$DIST/share" "$OUT/"
           # Keep only the binaries the supervisor uses to slim the bundle.
@@ -86,6 +86,11 @@ jobs:
             ! -name createdb ! -name pg_dump ! -name pg_restore ! -name psql \
             ! -name pg_config \
             -delete
+          for tool in postgres initdb pg_ctl pg_isready createdb pg_dump pg_restore psql pg_config; do
+            test -x "$OUT/bin/$tool" || { echo "missing PostgreSQL tool: $OUT/bin/$tool"; exit 1; }
+          done
+          test -f "$OUT/share/extension/vector.control"
+          test -f "$OUT/share/extension/pg_trgm.control"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -127,7 +132,7 @@ jobs:
       - name: Stage bundle layout
         shell: pwsh
         run: |
-          $out = "postgres/17/windows-amd64"
+          $out = "postgres/18/windows-amd64"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           Copy-Item -Recurse pgsql/bin, pgsql/lib, pgsql/share $out
           # Slim: keep only the binaries the supervisor uses (plus the DLLs
@@ -143,6 +148,9 @@ jobs:
           # Sanity: pgvector + pg_trgm extensions present.
           if (-not (Test-Path "$out/share/extension/vector.control")) { throw "pgvector missing" }
           if (-not (Test-Path "$out/share/extension/pg_trgm.control")) { throw "pg_trgm missing" }
+          foreach ($tool in $keep) {
+            if (-not (Test-Path "$out/bin/$tool")) { throw "missing PostgreSQL tool: $out/bin/$tool" }
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
