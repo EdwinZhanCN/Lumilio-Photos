@@ -110,8 +110,12 @@ for tool in postgres initdb pg_ctl pg_isready createdb pg_dump pg_restore psql; 
     exit 1
   fi
 done
+PG_EXTENSION_DIR="$PG_SRC/share/extension"
+if [ -d "$PG_SRC/share/postgresql/extension" ]; then
+  PG_EXTENSION_DIR="$PG_SRC/share/postgresql/extension"
+fi
 for extension in vector pg_trgm; do
-  if [ ! -f "$PG_SRC/share/extension/$extension.control" ]; then
+  if [ ! -f "$PG_EXTENSION_DIR/$extension.control" ]; then
     echo "    ERROR: missing required PostgreSQL extension: $extension" >&2
     exit 1
   fi

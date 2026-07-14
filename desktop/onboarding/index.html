@@ -15,8 +15,9 @@
         --accent: #315c47;
         --soft: #edf3ef;
         --danger: #a13d35;
-        --radius: 14px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --radius: 16px;
+        --ink: #10271d;
+        font-family: Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       * {
         box-sizing: border-box;
@@ -42,6 +43,8 @@
         align-items: center;
         padding: 14px 34px 18px;
         border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+        backdrop-filter: blur(18px);
       }
       .brand {
         font-size: 18px;
@@ -73,7 +76,7 @@
         color: var(--text);
       }
       main {
-        width: min(680px, calc(100% - 56px));
+        width: min(920px, calc(100% - 56px));
         margin: auto;
         flex: 1;
         overflow: auto;
@@ -304,12 +307,12 @@
         margin-bottom: 8px;
       }
       .dashboard {
-        padding-top: 6px;
+        padding-top: 2px;
       }
       .dash-head {
         display: flex;
         align-items: flex-start;
-        margin-bottom: 32px;
+        margin-bottom: 24px;
       }
       .dash-head .actions {
         margin-left: auto;
@@ -320,6 +323,56 @@
         padding: 20px 0;
         border-top: 1px solid var(--line);
       }
+      .service-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .service-card {
+        position: relative;
+        min-width: 0;
+        padding: 20px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        transition: transform 0.25s ease, border-color 0.25s ease;
+      }
+      .service-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+      .service-card.primary-service { background: var(--ink); color: #f5f7f4; border-color: var(--ink); }
+      .service-card.primary-service .facts dt,
+      .service-card.primary-service .service-copy { color: #a9b8b0; }
+      .service-card .section-head { margin-bottom: 12px; }
+      .service-copy { color: var(--muted); font-size: 12px; line-height: 1.5; min-height: 36px; margin: 0 0 18px; }
+      .service-card .facts { grid-template-columns: 96px minmax(0, 1fr); }
+      .service-card .section-actions { margin-top: 18px; }
+      .service-card.primary-service .btn { border-color: #42584d; background: #203a2e; color: #fff; }
+      .operations {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        overflow: hidden;
+        margin-top: 12px;
+      }
+      .operations > .section-head { padding: 17px 20px; margin: 0; border-bottom: 1px solid var(--line); }
+      .log-toolbar { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+      .log-tabs { display: flex; gap: 3px; padding: 4px; background: var(--bg); border-radius: 9px; }
+      .log-tabs button { border: 0; background: transparent; color: var(--muted); padding: 5px 9px; border-radius: 6px; cursor: pointer; font-size: 11px; }
+      .log-tabs button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px #00000012; }
+      .log-output {
+        height: 230px;
+        margin: 0;
+        padding: 16px 20px;
+        overflow: auto;
+        background: #101512;
+        color: #c8d5cd;
+        font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .log-meta { padding: 9px 20px; color: var(--muted); font-size: 10px; border-top: 1px solid var(--line); }
+      .settings-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 24px; align-items: start; }
       .section-head {
         display: flex;
         align-items: center;
@@ -479,6 +532,15 @@
           --soft: #24342c;
         }
       }
+      @media (max-width: 720px) {
+        .service-grid, .settings-grid { grid-template-columns: 1fr; }
+        .dash-head { display: block; }
+        .dash-head .actions { margin: 16px 0 0; }
+        .log-toolbar { align-items: flex-end; flex-direction: column; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      }
     </style>
   </head>
   <body>
@@ -560,9 +622,9 @@
         <section id="dashboard" class="screen dashboard">
           <div class="dash-head">
             <div>
-              <h1 data-i18n="control">Control panel</h1>
+              <h1 data-i18n="control">Your library, running locally</h1>
               <p class="lead" style="margin: 5px 0 0" data-i18n="controlDesc">
-                View local services and storage.
+                Services, diagnostics and storage in one place.
               </p>
             </div>
             <div class="actions">
@@ -570,53 +632,35 @@
               ><button class="btn" id="refresh" data-i18n="refresh">Refresh</button>
             </div>
           </div>
-          <div class="section">
-            <div class="section-head">
-              <h2>Lumilio Photos</h2>
-              <span class="status" id="photos-status"></span>
-            </div>
-            <dl class="facts">
-              <dt data-i18n="version">Version</dt>
-              <dd id="app-version">—</dd>
-              <dt data-i18n="address">Address</dt>
-              <dd id="server-url">—</dd>
-            </dl>
+          <div class="service-grid">
+            <article class="service-card primary-service">
+              <div class="section-head"><h2>Lumilio Photos</h2><span class="status" id="photos-status"></span></div>
+              <p class="service-copy" data-i18n="photosDesc">The database, media pipeline and browser app run together.</p>
+              <dl class="facts"><dt data-i18n="version">Version</dt><dd id="app-version">—</dd><dt data-i18n="address">Address</dt><dd id="server-url">—</dd></dl>
+              <div class="section-actions"><button class="btn" id="open-app-card" data-i18n="openPhotos">Open in browser</button></div>
+            </article>
+            <article class="service-card">
+              <div class="section-head"><h2>Lumen Hub</h2><span class="status" id="lumen-status"></span></div>
+              <p class="service-copy" data-i18n="lumenDesc">Optional local AI for semantic search, faces, species and OCR.</p>
+              <dl class="facts"><dt data-i18n="configuration">Configuration</dt><dd id="lumen-config">—</dd><dt data-i18n="hubVersion">Installed / latest</dt><dd id="lumen-version">—</dd><dt data-i18n="modelCache">Model cache</dt><dd id="lumen-cache">—</dd></dl>
+              <div class="error" id="lumen-error"></div>
+              <div class="section-actions"><button class="btn primary" id="lumen-toggle"></button><button class="btn" id="lumen-restart" data-i18n="restart">Restart</button><button class="btn" id="lumen-configure" data-i18n="configure">Configure</button><button class="btn" id="lumen-check" data-i18n="checkUpdate">Check update</button><button class="btn" id="lumen-update" data-i18n="update">Update</button></div>
+            </article>
           </div>
-          <div class="section">
-            <div class="section-head">
-              <h2>Lumen Hub</h2>
-              <span class="status" id="lumen-status"></span>
-            </div>
-            <dl class="facts">
-              <dt data-i18n="configuration">Configuration</dt>
-              <dd id="lumen-config">—</dd>
-              <dt data-i18n="hubVersion">Installed / latest</dt>
-              <dd id="lumen-version">—</dd>
-              <dt data-i18n="modelCache">Model cache</dt>
-              <dd id="lumen-cache">—</dd>
-            </dl>
-            <div class="error" id="lumen-error"></div>
-            <div class="section-actions">
-              <button class="btn" id="lumen-toggle"></button
-              ><button class="btn" id="lumen-restart" data-i18n="restart">Restart</button
-              ><button class="btn" id="lumen-check" data-i18n="checkUpdate">Check update</button
-              ><button class="btn primary" id="lumen-update" data-i18n="update">Update</button
-              ><button class="btn" id="lumen-configure" data-i18n="configure">Configure</button>
-            </div>
-          </div>
-          <div class="section">
-            <div class="section-head"><h2 data-i18n="regionLabel">Download region</h2></div>
+          <section class="operations">
+            <div class="section-head"><div><h2 data-i18n="liveLogs">Live diagnostics</h2><p class="service-copy" style="margin:4px 0 0;min-height:0" data-i18n="logsDesc">Recent local logs. Nothing leaves this computer.</p></div><div class="log-toolbar"><div class="log-tabs" id="log-tabs"><button data-log="app" class="active" data-i18n="appLog">App</button><button data-log="error" data-i18n="errorLog">Errors</button><button data-log="postgres" data-i18n="dbLog">Database</button><button data-log="lumen">Lumen</button></div><button class="btn" id="refresh-log" data-i18n="refresh">Refresh</button></div></div>
+            <pre class="log-output" id="log-output"></pre><div class="log-meta" id="log-meta">—</div>
+          </section>
+          <div class="section settings-grid">
+            <div><div class="section-head"><h2 data-i18n="regionLabel">Download region</h2></div>
             <div class="lang" style="margin: 0 0 8px">
               <button type="button" data-region="other">Other</button>
               <button type="button" data-region="cn">中国大陆</button>
             </div>
             <p class="lead" style="margin: 0; font-size: 12px" data-i18n="regionHint">
               Mainland China uses a GitHub proxy mirror to download GitHub resources.
-            </p>
-          </div>
-          <div class="section">
-            <div class="section-head"><h2 data-i18n="paths">Local paths</h2></div>
-            <div class="paths" id="paths"></div>
+            </p></div>
+            <div><div class="section-head"><h2 data-i18n="paths">Local paths</h2></div><div class="paths" id="paths"></div></div>
           </div>
         </section>
       </main>
@@ -661,8 +705,17 @@
           analysis: "Choose capabilities",
           analysisDesc: "You can change this later. Models download in the background.",
           cache: "Model cache",
-          control: "Control panel",
-          controlDesc: "View local services and storage.",
+          control: "Your library, running locally",
+          controlDesc: "Services, diagnostics and storage in one place.",
+          photosDesc: "The database, media pipeline and browser app run together.",
+          lumenDesc: "Optional local AI for semantic search, faces, species and OCR.",
+          liveLogs: "Live diagnostics",
+          logsDesc: "Recent local logs. Nothing leaves this computer.",
+          appLog: "App",
+          errorLog: "Errors",
+          dbLog: "Database",
+          emptyLog: "No entries yet for this service.",
+          logUnavailable: "Could not read this log.",
           openPhotos: "Open in browser",
           refresh: "Refresh",
           version: "Version",
@@ -723,8 +776,17 @@
           analysis: "选择能力",
           analysisDesc: "之后仍可更改，模型将在后台下载。",
           cache: "模型缓存",
-          control: "控制面板",
-          controlDesc: "查看本机服务与存储。",
+          control: "你的照片库，正在本机运行",
+          controlDesc: "集中查看服务、诊断与存储。",
+          photosDesc: "数据库、媒体处理与浏览器应用由桌面端统一运行。",
+          lumenDesc: "可选的本地 AI，用于语义搜索、人脸、生物识别与 OCR。",
+          liveLogs: "实时诊断",
+          logsDesc: "查看最近的本机日志，内容不会离开此电脑。",
+          appLog: "应用",
+          errorLog: "错误",
+          dbLog: "数据库",
+          emptyLog: "该服务暂时没有日志。",
+          logUnavailable: "无法读取该日志。",
           openPhotos: "在浏览器中打开",
           refresh: "刷新",
           version: "版本",
@@ -780,6 +842,7 @@
         backend: null,
         preset: null,
         reconfig: false,
+        logSource: "app",
       };
       const t = (k, v = {}) => {
         let x = (I[s.lang] || I.en)[k] || k;
@@ -903,6 +966,23 @@
           if (d.paths && d.paths[k]) pathButton(paths, t(names[k]), d.paths[k]);
         if (l.previousCacheDir) pathButton(paths, t("oldCache"), l.previousCacheDir);
       }
+      async function loadLog() {
+        const output = document.getElementById("log-output");
+        output.textContent = "…";
+        document.querySelectorAll("[data-log]").forEach((button) =>
+          button.classList.toggle("active", button.dataset.log === s.logSource),
+        );
+        try {
+          const response = await fetch(`/__onb/log?source=${encodeURIComponent(s.logSource)}`);
+          if (!response.ok) throw new Error(await response.text());
+          const data = await response.json();
+          output.textContent = data.content || t("emptyLog");
+          document.getElementById("log-meta").textContent = data.path || "—";
+          output.scrollTop = output.scrollHeight;
+        } catch (error) {
+          output.textContent = `${t("logUnavailable")} ${String(error)}`;
+        }
+      }
       function pathButton(root, label, path) {
         const b = document.createElement("button");
         b.className = "path-button";
@@ -923,6 +1003,7 @@
           (d.backends || []).find((b) => b.profile === d.lumen.profile) || (d.backends || [])[0];
         s.preset = d.lumen.preset || d.recommendedPreset;
         lang();
+        if (d.mode === "dashboard" && !document.getElementById("log-output").textContent) loadLog();
       }
       async function complete(enable) {
         if (s.reconfig) {
@@ -1016,7 +1097,15 @@
           ? ((s.reconfig = false), (s.data.mode = "dashboard"), (s.step = 3), render())
           : complete(false);
       document.getElementById("open-app").onclick = () => api("/__onb/open-app");
+      document.getElementById("open-app-card").onclick = () => api("/__onb/open-app");
       document.getElementById("refresh").onclick = load;
+      document.getElementById("refresh-log").onclick = loadLog;
+      document.querySelectorAll("[data-log]").forEach((button) =>
+        (button.onclick = () => {
+          s.logSource = button.dataset.log;
+          loadLog();
+        }),
+      );
       document.getElementById("lumen-restart").onclick = () => action("restart");
       document.getElementById("lumen-check").onclick = () => action("check");
       document.getElementById("lumen-update").onclick = () =>
@@ -1031,6 +1120,9 @@
       setInterval(() => {
         if (s.data?.mode === "dashboard") load();
       }, 2500);
+      setInterval(() => {
+        if (s.data?.mode === "dashboard" && !document.hidden) loadLog();
+      }, 5000);
       load();
     </script>
     <script>
