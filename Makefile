@@ -53,7 +53,7 @@ DB_USER ?= postgres
 DB_PASSWORD ?= postgres
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
-.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test dto db db-reset dev-reset clean \
+.PHONY: setup dev server-dev web-dev dev-seed dev-seed-check test server-test web-test web-browser-test dto db db-reset dev-reset clean \
 	desktop-dev desktop-build desktop-test \
 	.server-config .server-env .web-env
 
@@ -85,6 +85,18 @@ server-dev: .server-config .server-env
 web-dev: .web-env
 	@echo "==> Starting web"
 	cd $(WEB_DIR) && $(VP) dev --host --port 6657
+
+dev-seed:
+	@test -n "$$LUMILIO_ADMIN_PASSWORD" || { \
+		echo "LUMILIO_ADMIN_PASSWORD is required (development only; it is not written to the repository)" >&2; \
+		exit 1; \
+	}
+	@echo "==> Seeding the 225-photo development library through scan and upload paths"
+	cd $(SERVER_DIR) && LUMILIO_API_URL="$(API_URL)" $(GO) run ./tools/devseed --dataset ../demo/seed/library
+
+dev-seed-check:
+	@echo "==> Validating the tracked 225-photo development seed"
+	cd $(SERVER_DIR) && $(GO) run ./tools/devseed --dataset ../demo/seed/library --check
 
 test: server-test web-test
 

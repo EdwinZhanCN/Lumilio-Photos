@@ -28,6 +28,57 @@ func burstCandidate(index int, filename string, capturedAt time.Time, burstID st
 	}
 }
 
+func structuralCandidate(index int, filename string, capturedAt time.Time) repo.FindCandidatesForStackingByNameRow {
+	itemID := uuid.MustParse(fmt.Sprintf("30000000-0000-0000-0000-%012d", index+1))
+	assetID := uuid.MustParse(fmt.Sprintf("40000000-0000-0000-0000-%012d", index+1))
+	ownerID := int32(7)
+	return repo.FindCandidatesForStackingByNameRow{
+		AssetID:          pgtype.UUID{Bytes: assetID, Valid: true},
+		MediaItemID:      pgtype.UUID{Bytes: itemID, Valid: true},
+		OwnerID:          &ownerID,
+		OriginalFilename: filename,
+		TakenTime:        pgtype.Timestamptz{Time: capturedAt, Valid: true},
+		UploadTime:       pgtype.Timestamptz{Time: capturedAt.Add(time.Hour), Valid: true},
+	}
+}
+
+func TestTimeClusterDoesNotTreatNumericSequenceAsEdits(t *testing.T) {
+	base := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+	candidates := []repo.FindCandidatesForStackingByNameRow{
+		structuralCandidate(0, "scan-001.jpg", base),
+		structuralCandidate(1, "scan-002.jpg", base.Add(time.Second)),
+		structuralCandidate(2, "scan-003.jpg", base.Add(2*time.Second)),
+	}
+	if clusters := timeCluster(candidates); len(clusters) != 0 {
+		t.Fatalf("ordinary numeric filename sequence must not merge as edit iterations, got %#v", clusters)
+	}
+}
+
+func TestTimeClusterRequiresUnsuffixedEditAnchor(t *testing.T) {
+	base := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+	candidates := []repo.FindCandidatesForStackingByNameRow{
+		structuralCandidate(0, "portrait.jpg", base),
+		structuralCandidate(1, "portrait-1.jpg", base.Add(time.Second)),
+		structuralCandidate(2, "portrait-2.jpg", base.Add(2*time.Second)),
+	}
+	clusters := timeCluster(candidates)
+	if len(clusters) != 1 || !clusters[0].HasAnchoredIteration || len(clusters[0].Members) != 3 {
+		t.Fatalf("expected anchored edit iteration cluster, got %#v", clusters)
+	}
+}
+
+func TestTimeClusterKeepsNumericRawJPEGPair(t *testing.T) {
+	base := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+	candidates := []repo.FindCandidatesForStackingByNameRow{
+		structuralCandidate(0, "DSC-001.CR3", base),
+		structuralCandidate(1, "DSC-001.JPG", base.Add(time.Second)),
+	}
+	clusters := timeCluster(candidates)
+	if len(clusters) != 1 || clusters[0].BaseName != "dsc-001" || len(clusters[0].Members) != 2 {
+		t.Fatalf("expected numeric RAW/JPEG structural pair, got %#v", clusters)
+	}
+}
+
 func TestBurstClustersPreferExactMetadata(t *testing.T) {
 	base := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
 	clusters := burstClusters([]repo.FindMediaItemsForBurstDetectionRow{

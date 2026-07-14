@@ -86,13 +86,16 @@ const burstMaxTimeGap = time.Second
 var iterationPattern = regexp.MustCompile(`^(.+?)-(\d+)$`)
 var sequencePattern = regexp.MustCompile(`^(.*?)(\d+)$`)
 
-func baseName(filename string) string {
-	ext := filepath.Ext(filename)
-	name := strings.TrimSuffix(filename, ext)
-	if matches := iterationPattern.FindStringSubmatch(name); matches != nil {
-		return strings.ToLower(matches[1])
+func filenameStem(filename string) string {
+	return strings.ToLower(strings.TrimSuffix(filename, filepath.Ext(filename)))
+}
+
+func iterationBaseName(filename string) (string, bool) {
+	matches := iterationPattern.FindStringSubmatch(strings.TrimSuffix(filename, filepath.Ext(filename)))
+	if matches == nil {
+		return "", false
 	}
-	return strings.ToLower(name)
+	return strings.ToLower(matches[1]), true
 }
 
 func classifyRelation(filename string) repo.StackRelation {
@@ -124,26 +127,37 @@ func effectiveTime(taken, upload pgtype.Timestamptz) time.Time {
 	return time.Time{}
 }
 
-func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []struct {
-	BaseName string
-	Members  []repo.FindCandidatesForStackingByNameRow
-} {
+type structuralCluster struct {
+	BaseName             string
+	Members              []repo.FindCandidatesForStackingByNameRow
+	HasAnchoredIteration bool
+}
+
+func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []structuralCluster {
 	type key struct {
 		owner int64
 		name  string
 	}
+	// A numeric suffix is only an edit marker when the unsuffixed original is
+	// present. This keeps ordinary camera/import sequences such as scan-001.jpg,
+	// scan-002.jpg from collapsing into one logical media item.
+	stems := make(map[key]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		stems[key{owner: detectionOwnerKey(candidate.OwnerID), name: filenameStem(candidate.OriginalFilename)}] = struct{}{}
+	}
 	groups := make(map[key][]repo.FindCandidatesForStackingByNameRow)
 	for _, candidate := range candidates {
-		groups[key{owner: detectionOwnerKey(candidate.OwnerID), name: baseName(candidate.OriginalFilename)}] = append(
-			groups[key{owner: detectionOwnerKey(candidate.OwnerID), name: baseName(candidate.OriginalFilename)}],
-			candidate,
-		)
+		groupKey := key{owner: detectionOwnerKey(candidate.OwnerID), name: filenameStem(candidate.OriginalFilename)}
+		if iterationBase, ok := iterationBaseName(candidate.OriginalFilename); ok {
+			anchoredKey := key{owner: groupKey.owner, name: iterationBase}
+			if _, anchored := stems[anchoredKey]; anchored {
+				groupKey = anchoredKey
+			}
+		}
+		groups[groupKey] = append(groups[groupKey], candidate)
 	}
 
-	var result []struct {
-		BaseName string
-		Members  []repo.FindCandidatesForStackingByNameRow
-	}
+	var result []structuralCluster
 	for groupKey, group := range groups {
 		if len(group) < 2 {
 			continue
@@ -158,10 +172,17 @@ func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []struct 
 			}
 			if i-start >= 2 {
 				members := append([]repo.FindCandidatesForStackingByNameRow(nil), group[start:i]...)
-				result = append(result, struct {
-					BaseName string
-					Members  []repo.FindCandidatesForStackingByNameRow
-				}{BaseName: groupKey.name, Members: members})
+				hasAnchor, hasIteration := false, false
+				for _, member := range members {
+					hasAnchor = hasAnchor || filenameStem(member.OriginalFilename) == groupKey.name
+					iterationBase, ok := iterationBaseName(member.OriginalFilename)
+					hasIteration = hasIteration || (ok && iterationBase == groupKey.name)
+				}
+				result = append(result, structuralCluster{
+					BaseName:             groupKey.name,
+					Members:              members,
+					HasAnchoredIteration: hasAnchor && hasIteration,
+				})
 			}
 			start = i
 		}
@@ -177,14 +198,13 @@ func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.U
 	}
 
 	for _, cluster := range timeCluster(candidates) {
-		hasRaw, hasIteration := false, false
+		hasRaw := false
 		for _, candidate := range cluster.Members {
 			if classifyRelation(candidate.OriginalFilename) == repo.StackRelationRawOriginal {
 				hasRaw = true
 			}
-			hasIteration = hasIteration || isIteration(candidate.OriginalFilename)
 		}
-		if !hasRaw && !hasIteration {
+		if !hasRaw && !cluster.HasAnchoredIteration {
 			continue
 		}
 		if err := s.mergeStructuralMediaItem(ctx, cluster.BaseName, cluster.Members); err != nil {

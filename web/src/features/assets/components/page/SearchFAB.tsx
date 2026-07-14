@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 import { useSearchQuery, useUIActions } from "@/features/assets/selectors";
 
 interface SearchFABProps {
@@ -7,6 +8,7 @@ interface SearchFABProps {
 }
 
 export function SearchFAB({ className }: SearchFABProps) {
+  const { t } = useI18n();
   const searchQuery = useSearchQuery();
   const { setSearchQuery } = useUIActions();
 
@@ -104,7 +106,7 @@ export function SearchFAB({ className }: SearchFABProps) {
               aria-label="Search photos"
               value={localValue}
               onChange={handleChange}
-              placeholder="Search photos…"
+              placeholder={t("assets.searchPlaceholder", "Search assets...")}
               className="input input-bordered rounded-full w-72 max-w-[calc(100vw-6rem)] bg-base-100 shadow-md text-sm"
             />
             {localValue && (
