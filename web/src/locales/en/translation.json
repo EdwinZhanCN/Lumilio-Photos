@@ -329,6 +329,7 @@
       "modeLive": "Live"
     },
     "pinTrailLabel": "Selection",
+    "searchPlaceholder": "Search assets...",
     "stackCarousel": {
       "error": "Stack assets are temporarily unavailable.",
       "errorHint": "Try again in a moment.",

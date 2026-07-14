@@ -81,6 +81,7 @@ server/.cache/
 web/docs/
 /site/docs/.vitepress/dist/
 /site/docs/.vitepress/cache/
+/site/media/
 
 /share/
 /pml/build
@@ -108,3 +109,4 @@ notes/
 
 # Benchmark run artifacts (uploadbench/immichbench default -out)
 server/benchruns/
+demo/

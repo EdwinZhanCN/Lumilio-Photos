@@ -9,7 +9,9 @@ SELECT
     MIN(COALESCE(a.taken_time, a.upload_time))::timestamptz AS date_from,
     MAX(COALESCE(a.taken_time, a.upload_time))::timestamptz AS date_to,
     COUNT(*) FILTER (WHERE a.liked = true) AS liked_count,
-    MIN(a.capture_offset_minutes)::smallint AS capture_offset_minutes
+    -- sqlc maps this aggregate to int16. Preserve the existing zero-as-unknown
+    -- FacetSummary convention while ensuring an all-NULL set remains scannable.
+    COALESCE(MIN(a.capture_offset_minutes), 0)::smallint AS capture_offset_minutes
 FROM assets a
 WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
   AND a.is_deleted = false;

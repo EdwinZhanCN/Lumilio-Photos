@@ -5,10 +5,20 @@ import { loadEnv } from 'vite'
 // @ts-ignore
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
 import { withMermaid } from "vitepress-plugin-mermaid";
+import mediaManifest from '../media-manifest.json'
 
 
 const mode = process.env.NODE_ENV || 'development'
 const { VITE_BASE_URL = '/' } = loadEnv(mode, process.cwd())
+const mediaOrigin = (process.env.DOCS_MEDIA_ORIGIN || 'https://media.docs.lumilio.org').replace(/\/$/, '')
+
+function externalizeMediaUrls(code: string) {
+    return code.replace(/(["'(])\/(images|videos)\/[^"')\s]+/g, (match) => {
+        const pathStart = match.slice(1)
+        const objectKey = mediaManifest[pathStart as keyof typeof mediaManifest]
+        return objectKey ? `${match[0]}${mediaOrigin}/${objectKey}` : match
+    })
+}
 
 export const sharedConfig = withMermaid(defineConfig({
     head: [
@@ -47,6 +57,17 @@ export const sharedConfig = withMermaid(defineConfig({
             chunkSizeWarningLimit: 1600
         },
         plugins: [
+            {
+                name: 'lumilio-r2-docs-media',
+                enforce: 'pre',
+                transform(code, id) {
+                    const sourceId = id.split('?', 1)[0]
+                    if (!sourceId.includes('/docs/')) return null
+
+                    const transformed = externalizeMediaUrls(code)
+                    return transformed === code ? null : { code: transformed, map: null }
+                },
+            },
             groupIconVitePlugin()
         ],
         server: {

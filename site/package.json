@@ -9,7 +9,10 @@
     "preview": "vitepress preview docs --host 0.0.0.0",
     "docs:dev": "vitepress dev docs --host 0.0.0.0",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs --host 0.0.0.0"
+    "docs:preview": "vitepress preview docs --host 0.0.0.0",
+    "media:manifest": "node scripts/media.mjs manifest",
+    "media:sync": "node scripts/media.mjs sync",
+    "media:verify": "node scripts/media.mjs verify"
   },
   "dependencies": {
     "@braintree/sanitize-url": "^7.1.2",
