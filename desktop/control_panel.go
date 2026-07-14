@@ -1,12 +1,85 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"desktop/lumen"
 )
+
+const dashboardLogTailLines = 240
+
+var dashboardLogFiles = map[string]string{
+	"app":      "app.log",
+	"error":    "error.log",
+	"postgres": "postgres.log",
+	"lumen":    "lumen-hub.log",
+}
+
+// handleDashboardLog exposes a bounded, read-only tail of known local logs to
+// the private control-panel webview. The fixed key map deliberately prevents a
+// caller from using this endpoint as an arbitrary file reader.
+func (d *desktopApp) handleDashboardLog(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("source")
+	name, ok := dashboardLogFiles[key]
+	if !ok {
+		http.Error(w, "unknown log source", http.StatusBadRequest)
+		return
+	}
+	content, err := tailFile(filepath.Join(d.sup.LogDir(), name), dashboardLogTailLines)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"source": key, "path": filepath.Join(d.sup.LogDir(), name), "content": content})
+}
+
+func tailFile(path string, limit int) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	const maxRead = int64(8 << 20)
+	if size, seekErr := f.Seek(0, io.SeekEnd); seekErr != nil {
+		return "", seekErr
+	} else if size > maxRead {
+		if _, seekErr = f.Seek(-maxRead, io.SeekEnd); seekErr != nil {
+			return "", seekErr
+		}
+	} else if _, seekErr = f.Seek(0, io.SeekStart); seekErr != nil {
+		return "", seekErr
+	}
+
+	lines := make([]string, 0, limit)
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64<<10), 1<<20)
+	for scanner.Scan() {
+		if len(lines) == limit {
+			copy(lines, lines[1:])
+			lines = lines[:limit-1]
+		}
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("read log: %w", err)
+	}
+	if len(lines) == 0 {
+		return "", nil
+	}
+	result := lines[0]
+	for _, line := range lines[1:] {
+		result += "\n" + line
+	}
+	return result, nil
+}
 
 type lumenSaveRequest struct {
 	Preset   string `json:"preset"`

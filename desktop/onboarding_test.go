@@ -4,12 +4,36 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"desktop/supervisor"
 )
+
+func TestDashboardLogEndpoint(t *testing.T) {
+	d := newTestApp(t)
+	logDir := d.sup.LogDir()
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(logDir, "app.log"), []byte("first\nsecond\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	d.onboardingHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/log?source=app", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "second") {
+		t.Fatalf("log response = %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	d.onboardingHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/log?source=../../secrets", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("arbitrary log source status = %d, want 400", rec.Code)
+	}
+}
 
 func newTestApp(t *testing.T) *desktopApp {
 	t.Helper()

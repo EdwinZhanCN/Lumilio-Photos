@@ -45,7 +45,8 @@ jobs:
           set -euo pipefail
           PGVER="${{ inputs.pg_version }}"
           DIST="$PWD/pg-dist"
-          curl -fsSL -O "https://ftp.postgresql.org/pub/source/v${PGVER}/postgresql-${PGVER}.tar.bz2"
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -O \
+            "https://ftp.postgresql.org/pub/source/v${PGVER}/postgresql-${PGVER}.tar.bz2"
           tar xf "postgresql-${PGVER}.tar.bz2"
           cd "postgresql-${PGVER}"
           ./configure \
@@ -79,8 +80,6 @@ jobs:
           mkdir -p "$OUT"
           cp -R "$DIST/bin" "$DIST/lib" "$DIST/share" "$OUT/"
           # Keep only the binaries the supervisor uses to slim the bundle.
-          # psql is required by the backup engine's restore path
-          # (exec-plans/active/db-backup-upgrade.md Phase 2).
           find "$OUT/bin" -maxdepth 1 -type f \
             ! -name postgres ! -name initdb ! -name pg_ctl ! -name pg_isready \
             ! -name createdb ! -name pg_dump ! -name pg_restore ! -name psql \
@@ -89,8 +88,16 @@ jobs:
           for tool in postgres initdb pg_ctl pg_isready createdb pg_dump pg_restore psql pg_config; do
             test -x "$OUT/bin/$tool" || { echo "missing PostgreSQL tool: $OUT/bin/$tool"; exit 1; }
           done
-          test -f "$OUT/share/extension/vector.control"
-          test -f "$OUT/share/extension/pg_trgm.control"
+          EXTENSION_DIR="$OUT/share/extension"
+          if [ -d "$OUT/share/postgresql/extension" ]; then
+            EXTENSION_DIR="$OUT/share/postgresql/extension"
+          fi
+          for extension in vector pg_trgm; do
+            test -f "$EXTENSION_DIR/$extension.control" || {
+              echo "missing PostgreSQL extension: $EXTENSION_DIR/$extension.control"
+              exit 1
+            }
+          done
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -136,9 +143,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           Copy-Item -Recurse pgsql/bin, pgsql/lib, pgsql/share $out
           # Slim: keep only the binaries the supervisor uses (plus the DLLs
-          # they load, which live alongside them in bin).
-          # psql.exe is required by the backup engine's restore path
-          # (exec-plans/active/db-backup-upgrade.md Phase 2).
           $keep = @('postgres.exe','initdb.exe','pg_ctl.exe','pg_isready.exe',
                     'createdb.exe','pg_dump.exe','pg_restore.exe','psql.exe',
                     'pg_config.exe')
