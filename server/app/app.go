@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"strings"
 	"time"
 
@@ -54,18 +53,30 @@ import (
 // in site/docs/internal/agent/exec-plans/active/desktop-wails-v3.md.
 const shutdownTimeout = 10 * time.Second
 
+// OperatorControls are explicit, single-run host controls. They do not modify
+// AppConfig and are never read from the environment inside the application.
+type OperatorControls struct {
+	PprofAddr          string
+	AgentAuditLogPath  string
+	BreakGlass         bool
+	BreakGlassUsername string
+}
+
 // Run boots the API server from an already-resolved configuration and blocks
 // until ctx is cancelled (e.g. SIGINT/SIGTERM for the CLI, or the desktop
 // supervisor cancelling on app quit), then performs a graceful shutdown. It
 // returns a non-nil error only on a fatal startup failure or an unexpected
 // server error; a clean shutdown returns nil.
-func Run(ctx context.Context, appConfig config.AppConfig) error {
+func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorControls) error {
+	if !appConfig.LoadedFromManifest() {
+		return errors.New("app config was not produced by the strict manifest loader")
+	}
 	dbConfig := appConfig.DatabaseConfig
 
-	return run(ctx, appConfig, dbConfig)
+	return run(ctx, appConfig, dbConfig, controls)
 }
 
-func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.DatabaseConfig) error {
+func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.DatabaseConfig, controls OperatorControls) error {
 	logRuntime, err := logging.NewLogger(logging.Config{
 		Level:         appConfig.LoggingConfig.Level,
 		LogDir:        appConfig.LoggingConfig.LogDir,
@@ -86,15 +97,16 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	processorLogger := logRuntime.Named("processor")
 	indexingLogger := logRuntime.Named("indexing")
 	scannerLogger := logRuntime.Named("repository_scanner")
-	repoAuditVerbose := strings.EqualFold(strings.TrimSpace(appConfig.LoggingConfig.RepositoryAuditVerbose), "true") ||
-		strings.TrimSpace(appConfig.LoggingConfig.RepositoryAuditVerbose) == "1"
-	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), repoAuditVerbose)
+	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), appConfig.LoggingConfig.RepositoryAuditVerbose)
 
 	appLogger.Info("starting Lumilio Photos API",
 		zap.String("operation", "server.start"),
 		zap.String("db_host", dbConfig.Host),
 		zap.String("db_port", dbConfig.Port),
 		zap.String("db_name", dbConfig.DBName),
+		zap.String("config_path", appConfig.ManifestPath),
+		zap.Int("config_schema_version", appConfig.SchemaVersion),
+		zap.String("config_sha256", appConfig.ManifestSHA256),
 	)
 
 	// Derive a cancelable context from the caller's so shutdown can be triggered
@@ -142,14 +154,14 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	pgxPool := database.Pool
 	queries := database.Queries
 
-	settingsService := service.NewSettingsService(queries, settings.Default(appConfig.Environment), appConfig.Auth.SecretKeyPath)
+	settingsService := service.NewSettingsService(queries, settings.Default(appConfig.Environment), appConfig.Auth.SecretKeyFile)
 	if err := settingsService.EnsureInitialized(ctx); err != nil {
 		return fmt.Errorf("initialize system settings: %w", err)
 	}
 
 	// Single source of truth for first-run bootstrap progress. Reconcile at boot
 	// so the cached phase reflects the current gates.
-	bootstrapService := service.NewBootstrapService(queries, dbConfig.PasswordFile)
+	bootstrapService := service.NewBootstrapService(queries, dbConfig.RotatedPasswordFile)
 	if phase, err := bootstrapService.Reconcile(ctx); err != nil {
 		appLogger.Warn("failed to reconcile bootstrap phase", zap.Error(err))
 	} else {
@@ -207,14 +219,16 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
 	duplicateService := service.NewDuplicateService(queries, pgxPool, appLogger.Named("duplicate"), assetService)
-	authService := service.NewAuthService(queries, pgxPool, appConfig.Auth, appLogger.Named("auth"))
+	authService, err := service.NewAuthService(queries, pgxPool, appConfig.Auth, appLogger.Named("auth"))
+	if err != nil {
+		return fmt.Errorf("initialize auth service: %w", err)
+	}
 	albumService := service.NewAlbumService(queries)
 	userService := service.NewUserService(queries, pgxPool)
 
-	// Break-glass recovery: when LUMILIO_BREAK_GLASS is set, reset a locked-out
-	// admin (oldest active admin, or LUMILIO_BREAK_GLASS_USERNAME) to a random
-	// temporary password and clear all MFA factors, printing the password once.
-	runBreakGlassIfRequested(ctx, userService, appLogger)
+	// Break-glass recovery is an explicit single-run host control, separate from
+	// immutable AppConfig.
+	runBreakGlassIfRequested(ctx, userService, controls.BreakGlass, controls.BreakGlassUsername, appLogger)
 
 	// Initialize Agent Service. The ref store is shared between the agent
 	// tool chain and the hydration API handler; its janitor bounds memory
@@ -223,14 +237,14 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	go refStore.RunJanitor(ctx, 10*time.Minute)
 	conversations := core.NewConversationStore(core.DefaultConversationTTL)
 	go conversations.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, settingsService, refStore, assetService, conversations)
+	agentService := core.NewAgentService(queries, settingsService, refStore, assetService, conversations, controls.AgentAuditLogPath)
 	agentPins := pins.NewService(queries, refStore, assetService)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
 	// Share links reuse the same asset-set-source query path pins use
 	// (resolveSourceAssetIDs -> AssetService.QueryAssets / agentPins.AssetIDs),
 	// so it's constructed here once both dependencies exist.
-	shareLinkService := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyPath)
+	shareLinkService := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyFile)
 
 	// Register agent tools
 	tools.RegisterAll()
@@ -372,7 +386,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	settingsController := handler.NewSettingsHandler(settingsService, backupService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
-	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyPath, appConfig.StorageConfig.Path, appLogger.Named("cloud_sync"))
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyFile, appConfig.StorageConfig.Path, appLogger.Named("cloud_sync"))
 	// Reconcile import runs left "running"/"queued" by a previous crash/restart
 	// so repositories are not stuck with an import that never finishes.
 	if err := cloudSyncService.RecoverInterruptedRuns(ctx); err != nil {
@@ -449,9 +463,8 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		}
 	}()
 
-	// Conditionally start a pprof server on a separate port (env-gated).
-	// Set LUMILIO_PPROF_ADDR=:6060 to enable CPU/heap/goroutine profiling.
-	if pprofAddr := os.Getenv("LUMILIO_PPROF_ADDR"); pprofAddr != "" {
+	// Conditionally start pprof from the explicit CLI operator control.
+	if pprofAddr := strings.TrimSpace(controls.PprofAddr); pprofAddr != "" {
 		go func() {
 			appLogger.Info("pprof server listening", zap.String("addr", pprofAddr))
 			if err := http.ListenAndServe(pprofAddr, nil); err != nil {

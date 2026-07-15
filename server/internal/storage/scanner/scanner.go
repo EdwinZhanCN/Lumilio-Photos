@@ -80,19 +80,6 @@ func NewScanner(queries *repo.Queries, queue *river.Client[pgx.Tx], cfg config.R
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	if cfg.IntervalSeconds <= 0 {
-		cfg.IntervalSeconds = 300
-	}
-	if cfg.SettleSeconds <= 0 {
-		cfg.SettleSeconds = 5
-	}
-	if cfg.MaxConcurrentRepos <= 0 {
-		cfg.MaxConcurrentRepos = 1
-	}
-	if cfg.BatchSize <= 0 {
-		cfg.BatchSize = 500
-	}
-
 	return &Scanner{
 		queries: queries,
 		queue:   queue,

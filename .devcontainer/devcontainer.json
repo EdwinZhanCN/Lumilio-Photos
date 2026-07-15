@@ -98,6 +98,6 @@
     "postCreateCommand": "echo '==> Installing project dependencies...' && cd /workspace && make setup",
 
     // Run after postCreateCommand, each time the container starts.
-    // Ensures env files exist and storage directories are ready.
-    "postStartCommand": "cd /workspace && make env-dev && make env-web-dev && mkdir -p server/data/storage/primary"
+    // Ensures the complete local manifest and bootstrap secret exist.
+    "postStartCommand": "cd /workspace && make setup && mkdir -p server/data/storage/primary"
 }

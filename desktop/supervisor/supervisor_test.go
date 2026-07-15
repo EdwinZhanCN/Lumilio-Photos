@@ -7,10 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	serverconfig "server/config"
-
-	"github.com/pelletier/go-toml/v2"
 )
 
 func TestCheckPortAvailable(t *testing.T) {
@@ -20,7 +16,7 @@ func TestCheckPortAvailable(t *testing.T) {
 	// the real conflict the pre-flight guards against.
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
-		t.Fatalf("listen: %v", err)
+		t.Skipf("sandbox does not permit loopback listeners: %v", err)
 	}
 	_, port, err := net.SplitHostPort(ln.Addr().String())
 	if err != nil {
@@ -38,29 +34,26 @@ func TestCheckPortAvailable(t *testing.T) {
 	}
 }
 
-// The desktop supervisor delegates runtime config construction to server/config.
-// The typed config is load-bearing; the generated TOML is only a debug copy.
+// The generated desktop TOML is written privately and then loaded through the
+// same strict server/config boundary used by standalone.
 func TestDesktopServerConfigInvariants(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "server.local.toml")
+	path := filepath.Join(dir, "server.toml")
+	bootstrap := filepath.Join(dir, "bootstrap")
+	if err := os.WriteFile(bootstrap, []byte("bootstrap-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
-	cfg, err := serverconfig.NewDesktopConfig(serverconfig.DesktopParams{
-		Port:          "6680",
-		WebRoot:       "/bundle/web",
-		LogDir:        "/Users/me/Library/Application Support/Lumilio Photos/logs",
-		StoragePath:   "/Volumes/Photos/Lumilio Library",
-		DBHost:        "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run",
-		PGPort:        "5487",
-		DBUser:        "lumilio",
-		DBName:        "lumiliophotos",
-		PasswordFile:  "/secrets/db_password",
-		SecretKeyPath: "/secrets/lumilio_secret_key",
-		ExifToolPath:  "/bundle/exiftool",
-		FFmpegPath:    "/bundle/ffmpeg",
-		FFprobePath:   "/bundle/ffprobe",
+	cfg, err := compileAndLoadServerManifest(path, serverManifestBindings{
+		Port: "6680", BrowserOrigin: "http://localhost:6680", WebRoot: "/bundle/web",
+		LogDir: "/Users/me/Library/Application Support/Lumilio Photos/logs", StoragePath: "/Volumes/Photos/Lumilio Library",
+		DBHost: "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run", DBPort: "5487", DBUser: "lumilio", DBName: "lumiliophotos",
+		BootstrapPasswordFile: bootstrap, RotatedPasswordFile: filepath.Join(dir, "rotated"), SecretKeyFile: "/secrets/lumilio_secret_key",
+		PGBinDir: "/bundle/postgres/bin", ExifToolPath: "/bundle/exiftool", FFmpegPath: "/bundle/ffmpeg", FFprobePath: "/bundle/ffprobe",
+		LumenStaticNode: "127.0.0.1:50051",
 	})
 	if err != nil {
-		t.Fatalf("NewDesktopConfig: %v", err)
+		t.Fatalf("compileAndLoadServerManifest: %v", err)
 	}
 	if cfg.Auth.WebAuthnRPID != "localhost" {
 		t.Fatalf("webauthn rp id = %q, want localhost", cfg.Auth.WebAuthnRPID)
@@ -72,58 +65,43 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 		t.Fatalf("database host = %q", cfg.DatabaseConfig.Host)
 	}
 
-	if err := serverconfig.WriteGeneratedTOML(path, cfg); err != nil {
-		t.Fatalf("WriteGeneratedTOML: %v", err)
-	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	var decoded struct {
-		Server struct {
-			Port    string `toml:"port"`
-			WebRoot string `toml:"web_root"`
-		} `toml:"server"`
-		Logging struct {
-			Dir string `toml:"dir"`
-		} `toml:"logging"`
-		Database struct {
-			Host string `toml:"host"`
-			Name string `toml:"name"`
-		} `toml:"database"`
-		Storage struct {
-			Path string `toml:"path"`
-		} `toml:"storage"`
-		Auth struct {
-			WebAuthnRPID      string   `toml:"webauthn_rp_id"`
-			WebAuthnRPOrigins []string `toml:"webauthn_rp_origins"`
-		} `toml:"auth"`
-		Tools struct {
-			ExifToolPath string `toml:"exiftool_path"`
-			FFmpegPath   string `toml:"ffmpeg_path"`
-			FFprobePath  string `toml:"ffprobe_path"`
-		} `toml:"tools"`
+	if !strings.Contains(string(data), "/bundle/web") || strings.Contains(string(data), "bootstrap-secret") {
+		t.Fatalf("generated manifest must contain bindings but no secret content:\n%s", data)
 	}
-	if err := toml.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("generated debug config should parse: %v\n%s", err, string(data))
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("manifest mode = %v, err=%v", info.Mode().Perm(), err)
 	}
-	if decoded.Server.Port != "6680" || decoded.Server.WebRoot != "/bundle/web" {
-		t.Fatalf("unexpected generated server config: %+v", decoded.Server)
+	if !cfg.LoadedFromManifest() || cfg.ManifestPath != path || cfg.ServerConfig.Port != "6680" {
+		t.Fatalf("manifest was not strict-loaded: %+v", cfg)
 	}
-	if decoded.Logging.Dir != "/Users/me/Library/Application Support/Lumilio Photos/logs" {
-		t.Fatalf("unexpected generated log dir: %q", decoded.Logging.Dir)
+	if cfg.Auth.WebAuthnRPID != "localhost" || strings.Join(cfg.Auth.WebAuthnRPOrigins, ",") != "http://localhost:6680" {
+		t.Fatalf("unexpected auth config: %+v", cfg.Auth)
 	}
-	if decoded.Database.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run" || decoded.Database.Name != "lumiliophotos" {
-		t.Fatalf("unexpected generated database config: %+v", decoded.Database)
+	if cfg.DatabaseConfig.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run" || cfg.Tools.FFmpegPath != "/bundle/ffmpeg" {
+		t.Fatalf("unexpected generated config: db=%+v tools=%+v", cfg.DatabaseConfig, cfg.Tools)
 	}
-	if decoded.Storage.Path != "/Volumes/Photos/Lumilio Library" {
-		t.Fatalf("unexpected generated storage path: %q", decoded.Storage.Path)
+}
+
+func TestDesktopManifestWriteFailureBlocksLoad(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-directory")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if decoded.Auth.WebAuthnRPID != "localhost" || strings.Join(decoded.Auth.WebAuthnRPOrigins, ",") != "http://localhost:6680" {
-		t.Fatalf("unexpected generated auth config: %+v", decoded.Auth)
+	_, err := compileAndLoadServerManifest(filepath.Join(blocker, "server.toml"), serverManifestBindings{})
+	if err == nil || !strings.Contains(err.Error(), "write desktop server manifest") {
+		t.Fatalf("expected write failure, got %v", err)
 	}
-	if decoded.Tools.ExifToolPath != "/bundle/exiftool" || decoded.Tools.FFmpegPath != "/bundle/ffmpeg" || decoded.Tools.FFprobePath != "/bundle/ffprobe" {
-		t.Fatalf("unexpected generated tool paths: %+v", decoded.Tools)
+}
+
+func TestDesktopTemplateRejectsMissingBindingsOnStrictReload(t *testing.T) {
+	_, err := compileAndLoadServerManifest(filepath.Join(t.TempDir(), "server.toml"), serverManifestBindings{})
+	if err == nil || !strings.Contains(err.Error(), "reload generated desktop server manifest") {
+		t.Fatalf("expected incomplete bindings to fail strict reload, got %v", err)
 	}
 }
 

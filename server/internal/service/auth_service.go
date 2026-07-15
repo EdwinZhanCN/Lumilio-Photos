@@ -133,24 +133,20 @@ const mediaTokenScope = "media"
 // NewAuthService creates a new authentication service. An optional zap logger
 // can be supplied for structured auth/audit logging; when omitted, a no-op
 // logger is used so callers (and tests) without logging stay valid.
-func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConfig, loggers ...*zap.Logger) *AuthService {
+func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConfig, loggers ...*zap.Logger) (*AuthService, error) {
 	logger := zap.NewNop()
 	if len(loggers) > 0 && loggers[0] != nil {
 		logger = loggers[0]
 	}
-	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(cfg.SecretKeyPath))
+	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(cfg.SecretKeyFile))
 	if err != nil {
-		panic(fmt.Sprintf("failed to initialize root secret key: %v", err))
+		return nil, fmt.Errorf("initialize root secret key: %w", err)
 	}
 	jwtSecret := secretbox.DeriveScopedSecret(rootSecret, "jwt.signing.v1")
 	mfaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "mfa.signing.v1")
 	passkeyTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "passkey.signing.v1")
 	mediaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "media.url.signing.v1")
 	mfaEncryptKey := secretbox.DeriveScopedSecret(rootSecret, "mfa.encryption.v1")
-
-	accessTokenTTL := parseDurationOrDefault(cfg.AccessTokenTTL, 15*time.Minute)
-	refreshTokenTTL := parseDurationOrDefault(cfg.RefreshTokenTTL, 7*24*time.Hour)
-	mediaTokenTTL := parseDurationOrDefault(cfg.MediaTokenTTL, 10*time.Minute)
 
 	return &AuthService{
 		queries:                queries,
@@ -160,28 +156,14 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConf
 		passkeyTokenSecret:     passkeyTokenSecret,
 		mediaTokenSecret:       mediaTokenSecret,
 		mfaEncryptKey:          mfaEncryptKey,
-		accessTokenTTL:         accessTokenTTL,
-		refreshTokenTTL:        refreshTokenTTL,
-		mediaTokenTTL:          mediaTokenTTL,
-		webauthnRPDisplayName:  webAuthnRPDisplayName(cfg),
+		accessTokenTTL:         cfg.AccessTokenTTL,
+		refreshTokenTTL:        cfg.RefreshTokenTTL,
+		mediaTokenTTL:          cfg.MediaTokenTTL,
+		webauthnRPDisplayName:  cfg.WebAuthnRPName,
 		webauthnRPID:           strings.TrimSpace(cfg.WebAuthnRPID),
 		webauthnAllowedOrigins: normalizeConfiguredWebAuthnOrigins(cfg.WebAuthnRPOrigins),
 		logger:                 logger,
-	}
-}
-
-func parseDurationOrDefault(raw string, fallback time.Duration) time.Duration {
-	if parsed, err := time.ParseDuration(strings.TrimSpace(raw)); err == nil {
-		return parsed
-	}
-	return fallback
-}
-
-func webAuthnRPDisplayName(cfg config.AuthConfig) string {
-	if value := strings.TrimSpace(cfg.WebAuthnRPName); value != "" {
-		return value
-	}
-	return defaultWebAuthnRPDisplayName
+	}, nil
 }
 
 func normalizeConfiguredWebAuthnOrigins(values []string) []string {

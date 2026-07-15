@@ -8,7 +8,6 @@ import (
 	"server/internal/settings"
 
 	"github.com/cloudwego/eino-ext/components/model/ark"
-	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/ollama"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/components/model"
@@ -22,12 +21,16 @@ const (
 	ollamaProvider   = "ollama"
 )
 
-func NewChatModel(ctx context.Context, cfg settings.LLM) (model.ToolCallingChatModel, error) {
+func NewChatModel(ctx context.Context, cfg settings.LLM, auditPaths ...string) (model.ToolCallingChatModel, error) {
 	inner, err := newProviderChatModel(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	return maybeWrapAudit(inner), nil
+	auditPath := ""
+	if len(auditPaths) > 0 {
+		auditPath = strings.TrimSpace(auditPaths[0])
+	}
+	return maybeWrapAudit(inner, auditPath), nil
 }
 
 func newProviderChatModel(ctx context.Context, cfg settings.LLM) (model.ToolCallingChatModel, error) {
@@ -44,7 +47,11 @@ func newProviderChatModel(ctx context.Context, cfg settings.LLM) (model.ToolCall
 			BaseURL: baseURL,
 		})
 	case deepseekProvider:
-		return deepseek.NewChatModel(ctx, &deepseek.ChatModelConfig{
+		// DeepSeek exposes an OpenAI-compatible API. Reuse the OpenAI transport
+		// instead of the dedicated adapter: that adapter loads .env internally
+		// when its request timeout is unset, which would reintroduce an ambient
+		// runtime configuration source outside the settings boundary.
+		return openai.NewChatModel(ctx, &openai.ChatModelConfig{
 			APIKey:  apiKey,
 			Model:   modelName,
 			BaseURL: baseURL,

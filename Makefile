@@ -40,24 +40,13 @@ COMPOSE_BIN := $(shell \
 # environments (e.g. macOS CI runners running desktop-test) still work.
 COMPOSE = $(if $(COMPOSE_BIN),$(COMPOSE_BIN) -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT),$(error Docker Compose V2 is required. Install docker-compose-plugin or docker compose))
 
-IN_DEV_CONTAINER := $(shell [ -f /.dockerenv ] && echo 1 || echo 0)
-ifeq ($(IN_DEV_CONTAINER),1)
-  DB_HOST ?= db
-  DB_PORT ?= 5432
-else
-  DB_HOST ?= localhost
-  DB_PORT ?= 5433
-endif
-DB_NAME ?= lumiliophotos
-DB_USER ?= postgres
-DB_PASSWORD ?= postgres
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
 .PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test dto db db-reset dev-reset clean \
 	desktop-dev desktop-build desktop-test \
-	.server-config .server-env .web-env
+	.server-config .server-secret .web-env
 
-setup: .server-config
+setup: .server-config .server-secret
 	@echo "==> Installing Go dependencies"
 	cd $(SERVER_DIR) && $(GO) mod download
 	@echo "==> Installing web dependencies"
@@ -70,7 +59,7 @@ setup: .server-config
 	@command -v swag >/dev/null 2>&1 || { $(GO) install github.com/swaggo/swag/v2/cmd/swag@v2.0.0-rc5; }
 	@echo "==> Setup complete"
 
-db:
+db: .server-secret
 	@echo "==> Starting database and waiting for healthy status"
 	@$(COMPOSE) up -d --wait db
 
@@ -78,9 +67,9 @@ dev: db
 	@echo "==> Starting server and web"
 	$(MAKE) -j2 server-dev web-dev
 
-server-dev: .server-config .server-env
+server-dev: .server-config .server-secret
 	@echo "==> Starting server"
-	cd $(SERVER_DIR) && SERVER_ENV=development $(GO) run ./cmd
+	cd $(SERVER_DIR) && $(GO) run ./cmd --config config/server.local.toml
 
 web-dev: .web-env
 	@echo "==> Starting web"
@@ -128,11 +117,14 @@ db-reset:
 	fi
 	@rm -f $(SERVER_DIR)/data/storage/.secrets/db_password
 
-dev-reset: db-reset clean
+dev-reset: db-reset
+	@echo "==> Removing incompatible pre-manifest local state"
+	rm -f $(SERVER_CONFIG_LOCAL)
+	rm -rf $(SERVER_DIR)/config/.secrets $(SERVER_DIR)/data
+	$(MAKE) .server-config .server-secret
 
 clean:
 	@echo "==> Cleaning generated local development state"
-	rm -f $(SERVER_DIR)/.env.development
 	rm -f $(WEB_DIR)/.env.development
 	rm -rf $(SERVER_DIR)/data
 
@@ -142,25 +134,9 @@ clean:
 		cp "$(SERVER_CONFIG_EXAMPLE)" "$(SERVER_CONFIG_LOCAL)"; \
 	fi
 
-.server-env:
-	@mkdir -p $(SERVER_DIR)/data/storage/primary
-	@echo "==> Writing $(SERVER_DIR)/.env.development"
-	@printf '%s\n' \
-	"SERVER_ENV=development" \
-	"SERVER_CONFIG_FILE=config/server.local.toml" \
-	"SERVER_PORT=6680" \
-	"" \
-	"DB_HOST=$(DB_HOST)" \
-	"DB_PORT=$(DB_PORT)" \
-	"DB_USER=$(DB_USER)" \
-	"DB_PASSWORD=$(DB_PASSWORD)" \
-	"DB_NAME=$(DB_NAME)" \
-	"DB_SSL=disable" \
-	"" \
-	"STORAGE_PATH=./data/storage" \
-	"" \
-	"LUMILIO_SECRET_KEY=./data/storage/.secrets/lumilio_secret_key" \
-	> $(SERVER_DIR)/.env.development
+.server-secret:
+	@echo "==> Ensuring local database bootstrap secret"
+	@cd $(SERVER_DIR) && $(GO) run ./tools/secretinit config/.secrets/db_bootstrap_password
 
 .web-env:
 	@printf '%s\n' \

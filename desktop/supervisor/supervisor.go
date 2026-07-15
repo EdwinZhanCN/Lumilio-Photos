@@ -18,7 +18,6 @@ import (
 	"desktop/lumen"
 
 	"server/app"
-	serverconfig "server/config"
 )
 
 const (
@@ -288,13 +287,9 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 		return fmt.Errorf("create storage path %s: %w", storagePath, err)
 	}
 
-	if err := ensureSecret(paths.DBPasswordFile()); err != nil {
+	if err := ensureSecret(paths.DBBootstrapPasswordFile()); err != nil {
 		return err
 	}
-	if err := ensureSecret(paths.SecretKeyFile()); err != nil {
-		return err
-	}
-
 	pg := NewPostgres(PostgresOptions{
 		BinDir:       pgBinDir(resources),
 		DataDir:      paths.PGData,
@@ -303,12 +298,21 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 		Port:         pgPort,
 		User:         dbUser,
 		DBName:       dbName,
-		PasswordFile: paths.DBPasswordFile(),
+		PasswordFile: paths.DBBootstrapPasswordFile(),
 		Logf:         s.logf,
 	})
 	s.pg = pg
 
 	dataStatus, foundMajor := pg.DataDirStatus(pgMajorVersion)
+	// A valid existing cluster has already passed first-run rotation, so desktop
+	// tools authenticate with the rotated file. A fresh/reset cluster must be
+	// initialized from bootstrap even if a stale rotated file remains; the server
+	// self-heal state machine will then reapply that rotated credential.
+	if dataStatus == DataDirValid {
+		if info, statErr := os.Stat(paths.DBRotatedPasswordFile()); statErr == nil && info.Size() > 0 {
+			pg.passwordFile = paths.DBRotatedPasswordFile()
+		}
+	}
 	switch dataStatus {
 	case DataDirVersionMismatch:
 		// Never re-init over user data. The versioned layout (postgres/<major>/data)
@@ -349,35 +353,17 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	}
 
 	s.reportStage(StageStartingServer)
-	appConfig, err := serverconfig.NewDesktopConfig(serverconfig.DesktopParams{
-		Port:          serverPort,
-		WebRoot:       bundledWebRoot(resources),
-		LogDir:        paths.Logs,
-		StoragePath:   storagePath,
-		DBHost:        paths.DBHost(),
-		PGPort:        pgPort,
-		DBUser:        dbUser,
-		DBName:        dbName,
-		PasswordFile:  paths.DBPasswordFile(),
-		SecretKeyPath: paths.SecretKeyFile(),
-		ExifToolPath:  bundledExifTool(resources),
-		FFmpegPath:    bundledFFmpeg(resources),
-		FFprobePath:   bundledFFprobe(resources),
-		// The backup engine dumps with the same bundled tools that run the
-		// cluster, so client and server versions can never diverge.
-		PGBinDir: pgBinDir(resources),
-		// Always pin the supervised local hub endpoint: static entries are
-		// address facts (never expired, reconnect-managed by the SDK), so the
-		// pin is harmless while local AI is not installed/running and connects
-		// as soon as the hub comes up — no server restart when the user
-		// enables AI from the tray mid-session.
-		LumenStaticNodes: []string{lumen.GRPCEndpoint},
+	appConfig, err := compileAndLoadServerManifest(paths.ServerConfigFile(), serverManifestBindings{
+		Port: serverPort, BrowserOrigin: "http://localhost:" + serverPort,
+		WebRoot: bundledWebRoot(resources), LogDir: paths.Logs, StoragePath: storagePath,
+		DBHost: paths.DBHost(), DBPort: pgPort, DBUser: dbUser, DBName: dbName,
+		BootstrapPasswordFile: paths.DBBootstrapPasswordFile(), RotatedPasswordFile: paths.DBRotatedPasswordFile(),
+		SecretKeyFile: paths.SecretKeyFile(), PGBinDir: pgBinDir(resources),
+		ExifToolPath: bundledExifTool(resources), FFmpegPath: bundledFFmpeg(resources), FFprobePath: bundledFFprobe(resources),
+		LumenStaticNode: lumen.GRPCEndpoint,
 	})
 	if err != nil {
-		return fmt.Errorf("build desktop server config: %w", err)
-	}
-	if err := serverconfig.WriteGeneratedTOML(paths.ServerConfigFile(), appConfig); err != nil {
-		s.logf("write generated server config debug copy (non-fatal): %v", err)
+		return fmt.Errorf("compile desktop server manifest: %w", err)
 	}
 
 	// Run the API server in-process. It blocks until srvCtx is cancelled (Stop)
@@ -385,7 +371,7 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	srvCtx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	s.serverErr = make(chan error, 1)
-	go func() { s.serverErr <- app.Run(srvCtx, appConfig) }()
+	go func() { s.serverErr <- app.Run(srvCtx, appConfig, app.OperatorControls{}) }()
 
 	if err := s.waitForServer(ctx); err != nil {
 		return err

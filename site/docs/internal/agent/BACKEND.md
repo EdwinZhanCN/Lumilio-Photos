@@ -13,8 +13,9 @@ This document describes the current Go backend as implemented in `server/`.
 
 Startup ownership is split between the thin CLI host and the shared app runtime:
 
-1. `server/cmd/main.go` loads `.env`, resolves TOML config plus env overrides, and
-   hands the typed `config.AppConfig` to `app.Run(ctx, cfg)`.
+1. `server/cmd/main.go` requires `--config <path>`, strictly loads that complete
+   TOML manifest, collects explicit single-run operator controls, and hands the
+   resolved `config.AppConfig` to `app.Run(ctx, cfg, controls)`.
 2. `server/app.Run` owns the actual runtime bootstrap:
    - initialize logging
    - start libvips runtime
@@ -25,39 +26,30 @@ Startup ownership is split between the thin CLI host and the shared app runtime:
 
 ## Configuration Boundary
 
-Runtime defaults belong in `server/config/server.example.toml`; local runtime choices belong in the ignored `server/config/server.local.toml`. Env is for bootstrap, secrets, deployment wiring, and machine-specific overrides.
+Runtime-immutable configuration is a complete schema v1 manifest, not a defaults
+or override layer. Missing, unknown, legacy, contradictory, or invalid fields
+fail startup. Relative paths use the manifest directory. Startup logs the
+absolute path, schema version, and source SHA-256 without logging secret content.
 
 Desktop is a host wrapper, not a second server bootstrap: the supervisor prepares
 private PostgreSQL, app-data paths, secrets, bundled media tools, and the SPA
-root, then calls `config.NewDesktopConfig` and `app.Run(ctx, cfg)`. The generated
-desktop `server.local.toml` under app data is a debug copy only and is not used
-as the runtime input.
+root, compiles `desktop/supervisor/server.template.toml`, atomically writes
+app-data `config/server.toml` with mode `0600`, reloads it through the same
+strict loader, then calls `app.Run`. A write or reload error blocks startup.
 
-Keep in env:
+TOML contains all immutable database/server/logging/storage/scanner/geocoding/
+auth/transcode/Lumen/tool decisions. Database bootstrap, rotated database, and
+app root secrets are file references only. Bootstrap must be readable and
+non-empty; rotated may be absent until setup; the app key may be created at its
+explicit path. No secret value appears in TOML, generated desktop manifests, or
+logs.
 
-- `SERVER_ENV`
-- `SERVER_CONFIG_FILE`
-- `SERVER_PORT`
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`
-- `STORAGE_PATH` when the local or mounted path differs
-- `LUMILIO_SECRET_KEY`
-- `LLM_API_KEY` and other provider secrets
-
-Keep in TOML:
-
-- `[database].password_file` as the path to the rotated local database password
-- logging format and log directory
-- CORS defaults
-- storage strategy and duplicate handling
-- repository scan cadence
-- geocoding defaults
-- ML task defaults, including zero-shot classification
-- auth token TTLs and WebAuthn defaults
-- transcoding mode
-- Lumen discovery defaults
-- external tool paths under `[tools]` for `exiftool`, `ffmpeg`, and `ffprobe`
-
-`config.ApplyRuntimeEnvDefaults` exists to keep older package-level `os.Getenv` reads working after TOML is parsed. Prefer passing typed config into new code.
+Standalone accepts diagnostics through `--pprof-addr` and
+`--agent-audit-log`. Only `LUMILIO_BREAK_GLASS` and
+`LUMILIO_BREAK_GLASS_USERNAME` remain as product runtime env controls, read by
+the CLI host and passed separately from `AppConfig`. Desktop resource-location
+env, test/conformance opt-ins, and third-party container env are host/harness
+contracts, not server configuration.
 
 ## Important Packages
 
@@ -165,9 +157,10 @@ rendering proportional to the visible region instead of the full GPS library.
 
 ## ML, Lumen, And LLM
 
-Lumen config is loaded by the Lumen SDK during `initMLServices`. ML feature switches are stored in settings and seeded from config on first initialization, including the zero-shot classifier toggle.
-
-LLM settings are represented by `config.LLMConfig`, persisted through the settings service, and validated through `internal/llm`. Zero-shot classifier preview is exposed through `/api/v1/classifiers/preview` and backed by the classifier service.
+Photos maps every Lumen SDK field it consumes directly from `[lumen]`; it never
+calls SDK defaults or env loading. ML and LLM feature settings remain
+runtime-mutable PostgreSQL settings and do not belong in `AppConfig`. Zero-shot
+classifier preview is exposed through `/api/v1/classifiers/preview`.
 
 The app should remain useful when ML/LLM features are disabled.
 

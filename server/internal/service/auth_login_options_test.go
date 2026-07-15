@@ -68,9 +68,10 @@ func TestGetLoginOptions_InvalidUsername(t *testing.T) {
 	t.Parallel()
 
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
-	svc := NewAuthService(nil, nil, config.AuthConfig{SecretKeyPath: keyFile})
+	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
+	require.NoError(t, err)
 
-	_, err := svc.GetLoginOptions(context.Background(), "ab")
+	_, err = svc.GetLoginOptions(context.Background(), "ab")
 	require.ErrorIs(t, err, ErrInvalidUsernameFormat)
 
 	_, err = svc.GetLoginOptions(context.Background(), "")

@@ -4,13 +4,9 @@
 #
 # Pin a version with LUMILIO_VERSION=v1.0.0 (default: latest).
 #
-# ML discovery (all optional; the server runs fine without external ML):
-#   1. Linux + mDNS (recommended on Linux): add the host-network overlay —
-#      docker compose -f docker-compose.release.yml -f docker-compose.host-mdns.yml up -d
-#   2. Gateway push: run Lumen Gateway on a host and set
-#      LUMEN_DISCOVERY_HUB_URL=http://<gateway-host>:5866 on the server service.
-#   3. Static nodes: set LUMEN_DISCOVERY_STATIC_NODES=10.0.0.5:50051[,more]
-#      on the server service. Works from any network.
+# The image consumes its complete /app/config/server.toml manifest. To change
+# immutable policy (including Lumen discovery), mount another complete schema v1
+# manifest at that path; environment variables do not override it.
 
 services:
     db:
@@ -19,11 +15,9 @@ services:
         environment:
             POSTGRES_DB: lumiliophotos
             POSTGRES_USER: postgres
-            # Temporary bootstrap credential. The first-run web setup wizard
-            # generates a high-entropy password and rotates this role via
-            # ALTER USER; the new secret is persisted under the mounted storage
-            # volume (.secrets/db_password) and used on every subsequent boot.
-            POSTGRES_PASSWORD: postgres
+            POSTGRES_PASSWORD_FILE: /run/secrets/db_bootstrap_password
+        secrets:
+            - db_bootstrap_password
         volumes:
             - db_data:/var/lib/postgresql/data
         command:
@@ -44,24 +38,8 @@ services:
         depends_on:
             db:
                 condition: service_healthy
-        environment:
-            SERVER_PORT: 6680
-            SERVER_ENV: production
-            DB_HOST: db
-            DB_PORT: 5432
-            DB_USER: postgres
-            # Bootstrap password only; rotated by first-run setup (see db).
-            DB_PASSWORD: postgres
-            DB_NAME: lumiliophotos
-            DB_SSL: disable
-            STORAGE_PATH: /data/storage
-            LUMILIO_DB_PASSWORD_FILE: /data/storage/.secrets/db_password
-            LUMILIO_SECRET_KEY: /data/storage/.secrets/lumilio_secret_key
-            # mDNS cannot cross the bridge network; pick a discovery mode from
-            # the header comment (host-mdns overlay / hub URL / static nodes).
-            LUMEN_DISCOVERY_MDNS_ENABLED: "false"
-            LUMEN_DISCOVERY_HUB_URL: ""
-            LUMEN_DISCOVERY_STATIC_NODES: ""
+        secrets:
+            - db_bootstrap_password
         # Uncomment for hardware-accelerated transcoding (Intel/AMD GPU):
         # devices:
         #     - /dev/dri:/dev/dri
@@ -94,3 +72,7 @@ services:
 
 volumes:
     db_data:
+
+secrets:
+    db_bootstrap_password:
+        file: ${LUMILIO_BOOTSTRAP_PASSWORD_FILE:?set LUMILIO_BOOTSTRAP_PASSWORD_FILE to a non-empty 0600 secret file}

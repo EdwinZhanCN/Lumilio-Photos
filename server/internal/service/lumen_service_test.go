@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 
@@ -25,10 +26,7 @@ func TestNewLumenServiceFromAppConfigDisabled(t *testing.T) {
 	cases := []struct {
 		name string
 		cfg  config.LumenConfig
-	}{
-		{"discovery off", config.LumenConfig{DiscoveryEnabled: false, DiscoveryMDNSEnabled: true}},
-		{"no backend configured", config.LumenConfig{DiscoveryEnabled: true}},
-	}
+	}{{"discovery off", config.LumenConfig{DiscoveryEnabled: false, DiscoveryMDNSEnabled: true}}}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			svc, err := NewLumenServiceFromAppConfig(tc.cfg, nil)
@@ -64,10 +62,11 @@ func TestNewLumenServiceFromAppConfigDisabled(t *testing.T) {
 
 func TestBuildLumenSDKConfigMapsAppFields(t *testing.T) {
 	sdkCfg, err := buildLumenSDKConfig(config.LumenConfig{
-		DiscoveryEnabled:     true,
-		DiscoveryMDNSEnabled: false,
-		DiscoveryHubURL:      " http://gw:5866 ",
-		DiscoveryStaticNodes: []string{" 10.0.0.5:50051 ", ""},
+		DiscoveryEnabled: true, DiscoveryMDNSEnabled: false, DiscoveryHubURL: " http://gw:5866 ",
+		DiscoveryStaticNodes: []string{"10.0.0.5:50051"}, DiscoveryServiceType: "_test._tcp", DiscoveryDomain: "example",
+		DeploymentID: "manifest-deployment", ResolveTimeout: time.Second, ConnectTimeout: 2 * time.Second,
+		RediscoveryBackoffMin: 3 * time.Second, RediscoveryBackoffMax: 4 * time.Second, ScanInterval: 5 * time.Second,
+		ChunkAuto: true, ChunkThresholdBytes: 1000, ChunkMaxBytes: 250,
 	})
 	if err != nil {
 		t.Fatalf("buildLumenSDKConfig: %v", err)
@@ -84,25 +83,26 @@ func TestBuildLumenSDKConfigMapsAppFields(t *testing.T) {
 	if sdkCfg.Discovery.BrokerURL != "http://gw:5866" {
 		t.Fatalf("Discovery.BrokerURL = %q, want trimmed app value", sdkCfg.Discovery.BrokerURL)
 	}
-	if sdkCfg.Discovery.ScanInterval <= 0 || sdkCfg.Discovery.ConnectTimeout <= 0 {
-		t.Fatalf("SDK defaults should be preserved, got %+v", sdkCfg.Discovery)
+	if sdkCfg.Discovery.ServiceType != "_test._tcp" || sdkCfg.Discovery.Domain != "example" || sdkCfg.Discovery.DeploymentID != "manifest-deployment" || sdkCfg.Discovery.ResolveTimeout != time.Second || sdkCfg.Discovery.ConnectTimeout != 2*time.Second || sdkCfg.Discovery.RediscoveryBackoffMin != 3*time.Second || sdkCfg.Discovery.RediscoveryBackoffMax != 4*time.Second || sdkCfg.Discovery.ScanInterval != 5*time.Second {
+		t.Fatalf("discovery fields did not map exactly: %+v", sdkCfg.Discovery)
+	}
+	if !sdkCfg.Chunk.EnableAuto || sdkCfg.Chunk.Threshold != 1000 || sdkCfg.Chunk.MaxChunkBytes != 250 {
+		t.Fatalf("chunk fields did not map exactly: %+v", sdkCfg.Chunk)
 	}
 }
 
-func TestBuildLumenSDKConfigKeepsSDKEnvKnobs(t *testing.T) {
+func TestBuildLumenSDKConfigIgnoresAmbientSDKEnv(t *testing.T) {
 	t.Setenv("LUMEN_DISCOVERY_DEPLOYMENT_ID", "unit-test-deployment")
-	// App-owned fields must win over the same env vars the SDK also reads.
 	t.Setenv("LUMEN_DISCOVERY_MDNS_ENABLED", "false")
 
 	sdkCfg, err := buildLumenSDKConfig(config.LumenConfig{
-		DiscoveryEnabled:     true,
-		DiscoveryMDNSEnabled: true,
+		DiscoveryEnabled: true, DiscoveryMDNSEnabled: true, DeploymentID: "manifest-deployment",
 	})
 	if err != nil {
 		t.Fatalf("buildLumenSDKConfig: %v", err)
 	}
-	if sdkCfg.Discovery.DeploymentID != "unit-test-deployment" {
-		t.Fatalf("DeploymentID = %q, want SDK env knob to apply", sdkCfg.Discovery.DeploymentID)
+	if sdkCfg.Discovery.DeploymentID != "manifest-deployment" {
+		t.Fatalf("DeploymentID = %q, ambient env changed manifest value", sdkCfg.Discovery.DeploymentID)
 	}
 	if !sdkCfg.Discovery.MDNSEnabled {
 		t.Fatal("app-owned MDNSEnabled must override the SDK env value")

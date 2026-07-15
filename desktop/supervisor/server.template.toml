@@ -1,0 +1,77 @@
+# Generated from the version-controlled desktop schema v1 template.
+# This file is the authoritative runtime input for the in-process server.
+schema_version = 1
+environment = "production"
+
+[database]
+host = {{toml .DBHost}}
+port = {{toml .DBPort}}
+user = {{toml .DBUser}}
+name = {{toml .DBName}}
+ssl = "disable"
+bootstrap_password_file = {{toml .BootstrapPasswordFile}}
+rotated_password_file = {{toml .RotatedPasswordFile}}
+tools_bin_dir = {{toml .PGBinDir}}
+
+[server]
+port = {{toml .Port}}
+cors_allowed_origins = [{{toml .BrowserOrigin}}]
+web_root = {{toml .WebRoot}}
+
+[logging]
+level = "info"
+dir = {{toml .LogDir}}
+console_format = "console"
+file_format = "json"
+repository_audit_verbose = false
+
+[storage]
+path = {{toml .StoragePath}}
+
+[repository_scan]
+enabled = true
+interval_seconds = 300
+settle_seconds = 5
+max_concurrent_repos = 1
+batch_size = 500
+
+[geocoding]
+provider = "disabled"
+nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
+language = "en"
+user_agent = "Lumilio-Photos/1.0"
+
+[auth]
+secret_key_file = {{toml .SecretKeyFile}}
+access_token_ttl = "15m"
+refresh_token_ttl = "168h"
+media_token_ttl = "10m"
+webauthn_rp_name = "Lumilio Photos"
+webauthn_rp_mode = "fixed"
+webauthn_rp_id = "localhost"
+webauthn_rp_origins = [{{toml .BrowserOrigin}}]
+
+[transcode]
+hardware_accel = "auto"
+
+[lumen]
+discovery_enabled = true
+discovery_mdns_enabled = true
+discovery_hub_url = ""
+discovery_static_nodes = [{{toml .LumenStaticNode}}]
+discovery_service_type = "_lumen._tcp"
+discovery_domain = "local"
+deployment_id = "desktop"
+resolve_timeout = "3s"
+connect_timeout = "3s"
+rediscovery_backoff_min = "10s"
+rediscovery_backoff_max = "2m"
+scan_interval = "30s"
+chunk_auto = true
+chunk_threshold_bytes = 1048576
+chunk_max_bytes = 262144
+
+[tools]
+exiftool_path = {{toml .ExifToolPath}}
+ffmpeg_path = {{toml .FFmpegPath}}
+ffprobe_path = {{toml .FFprobePath}}

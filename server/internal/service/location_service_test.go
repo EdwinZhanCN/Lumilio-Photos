@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -67,7 +68,11 @@ func TestReverseGeocoderDefaultsToDisabled(t *testing.T) {
 
 func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	var requested bool
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("sandbox does not permit loopback listeners: %v", err)
+	}
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requested = true
 		require.Equal(t, "Lumilio-Test/1.0", r.Header.Get("User-Agent"))
 		require.Equal(t, "jsonv2", r.URL.Query().Get("format"))
@@ -75,6 +80,8 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 		require.Equal(t, "0.00000000", r.URL.Query().Get("lon"))
 		fmt.Fprint(w, `{"display_name":"Null Island","address":{"country":"Ocean","state":"Equator","city":"Prime Meridian"}}`)
 	}))
+	server.Listener = listener
+	server.Start()
 	defer server.Close()
 
 	geocoder := newReverseGeocoder(config.GeocodingConfig{

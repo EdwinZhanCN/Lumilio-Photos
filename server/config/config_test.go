@@ -1,210 +1,221 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
-func TestLoadAppConfigWithOptionsResolvesPrecedenceWithoutAmbientEnv(t *testing.T) {
-	dir := t.TempDir()
-	passwordFile := filepath.Join(dir, "db_password")
-	if err := os.WriteFile(passwordFile, []byte("rotated-secret\n"), 0o600); err != nil {
-		t.Fatalf("write password file: %v", err)
-	}
-
-	configFile := filepath.Join(dir, "server.local.toml")
-	if err := os.WriteFile(configFile, []byte(`
-environment = "production"
-
-[server]
-port = "9000"
-log_level = "warn"
-cors_allowed_origins = ["http://toml.example"]
-web_root = "/toml/web"
-
-[logging]
-level = "warn"
-dir = "/toml/logs"
-console_format = "json"
-file_format = "json"
-repository_audit_verbose = "toml"
-
+const completeManifest = `schema_version = 1
+environment = "development"
 [database]
-host = "toml-db"
-port = "15432"
-user = "toml-user"
-password = "toml-bootstrap"
-password_file = "`+passwordFile+`"
-name = "tomldb"
-ssl = "require"
-
-[storage]
-path = "/toml/storage"
-
-[repository_scan]
-enabled = false
-interval_seconds = 600
-settle_seconds = 9
-max_concurrent_repos = 3
-batch_size = 99
-
-[geocoding]
-provider = "nominatim"
-nominatim_endpoint = "https://geo.example/reverse"
-language = "en"
-user_agent = "TomlAgent/1.0"
-
-[auth]
-secret_key_path = "/toml/secret"
-access_token_ttl = "10m"
-refresh_token_ttl = "24h"
-media_token_ttl = "5m"
-webauthn_rp_name = "Toml RP"
-webauthn_rp_id = "toml.example"
-webauthn_rp_origins = ["https://toml.example"]
-
-[transcode]
-hardware_accel = "none"
-
-[lumen]
-discovery_enabled = false
-discovery_mdns_enabled = false
-discovery_hub_url = "https://lumen.example"
-
-[tools]
-exiftool_path = "/toml/exiftool"
-ffmpeg_path = "/toml/ffmpeg"
-ffprobe_path = "/toml/ffprobe"
-`), 0o600); err != nil {
-		t.Fatalf("write config file: %v", err)
-	}
-
-	t.Setenv("SERVER_PORT", "9999")
-	t.Setenv("DB_PASSWORD", "ambient-password")
-	t.Setenv("STORAGE_PATH", "/ambient/storage")
-
-	cfg, err := LoadAppConfigWithOptions(LoadOptions{
-		Environment: "development",
-		ConfigFile:  configFile,
-		Env: map[string]string{
-			"SERVER_ENV":                   "development",
-			"SERVER_PORT":                  "6680",
-			"SERVER_LOG_LEVEL":             "debug",
-			"LOG_DIR":                      "/env/logs",
-			"DB_HOST":                      "env-db",
-			"DB_PASSWORD":                  "env-bootstrap",
-			"STORAGE_PATH":                 "/env/storage",
-			"LUMILIO_SECRET_KEY":           "/env/secret",
-			"LUMEN_DISCOVERY_MDNS_ENABLED": "true",
-			"EXIFTOOL_PATH":                "/env/exiftool",
-		},
-	})
-	if err != nil {
-		t.Fatalf("LoadAppConfigWithOptions: %v", err)
-	}
-
-	if cfg.Environment != "development" {
-		t.Fatalf("Environment = %q, want development from explicit env map", cfg.Environment)
-	}
-	if cfg.ServerConfig.Port != "6680" {
-		t.Fatalf("ServerConfig.Port = %q, want env-map override 6680", cfg.ServerConfig.Port)
-	}
-	if cfg.ServerConfig.LogLevel != "debug" || cfg.LoggingConfig.Level != "debug" {
-		t.Fatalf("SERVER_LOG_LEVEL should update server and logging levels, got server=%q logging=%q", cfg.ServerConfig.LogLevel, cfg.LoggingConfig.Level)
-	}
-	if cfg.LoggingConfig.LogDir != "/env/logs" {
-		t.Fatalf("LoggingConfig.LogDir = %q, want env-map override /env/logs", cfg.LoggingConfig.LogDir)
-	}
-	if cfg.DatabaseConfig.Host != "env-db" {
-		t.Fatalf("DatabaseConfig.Host = %q, want env-map override env-db", cfg.DatabaseConfig.Host)
-	}
-	if cfg.DatabaseConfig.Password != "rotated-secret" {
-		t.Fatalf("DatabaseConfig.Password = %q, want password_file to beat env bootstrap password", cfg.DatabaseConfig.Password)
-	}
-	if cfg.StorageConfig.Path != "/env/storage" {
-		t.Fatalf("StorageConfig.Path = %q, want env-map override /env/storage", cfg.StorageConfig.Path)
-	}
-	if cfg.Auth.SecretKeyPath != "/env/secret" {
-		t.Fatalf("Auth.SecretKeyPath = %q, want env-map override /env/secret", cfg.Auth.SecretKeyPath)
-	}
-	if !cfg.Lumen.DiscoveryMDNSEnabled {
-		t.Fatalf("Lumen.DiscoveryMDNSEnabled = false, want env-map override true")
-	}
-	if cfg.Tools.ExifToolPath != "/env/exiftool" || cfg.Tools.FFmpegPath != "/toml/ffmpeg" {
-		t.Fatalf("unexpected tool paths after env-map override: %+v", cfg.Tools)
-	}
-}
-
-func TestLoadAppConfigWithOptionsValidatesConfigValues(t *testing.T) {
-	dir := t.TempDir()
-	configFile := filepath.Join(dir, "server.local.toml")
-	if err := os.WriteFile(configFile, []byte(`
+host = "localhost"
+port = "5433"
+user = "postgres"
+name = "lumiliophotos"
+ssl = "disable"
+bootstrap_password_file = ".secrets/bootstrap"
+rotated_password_file = "data/rotated"
+tools_bin_dir = ""
 [server]
 port = "6680"
-log_level = "verbose"
-
+cors_allowed_origins = []
+web_root = ""
+[logging]
+level = "debug"
+dir = "logs"
+console_format = "console"
+file_format = "json"
+repository_audit_verbose = false
+[storage]
+path = "data/storage"
+[repository_scan]
+enabled = true
+interval_seconds = 300
+settle_seconds = 5
+max_concurrent_repos = 1
+batch_size = 500
 [geocoding]
-provider = "somewhere"
-
+provider = "disabled"
+nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
+language = "en"
+user_agent = "Lumilio-Photos/1.0"
+[auth]
+secret_key_file = "data/storage/.secrets/key"
+access_token_ttl = "15m"
+refresh_token_ttl = "168h"
+media_token_ttl = "10m"
+webauthn_rp_name = "Lumilio Photos"
+webauthn_rp_mode = "origin-derived"
+webauthn_rp_id = ""
+webauthn_rp_origins = []
 [transcode]
-hardware_accel = "magic"
-`), 0o600); err != nil {
-		t.Fatalf("write config file: %v", err)
-	}
+hardware_accel = "auto"
+[lumen]
+discovery_enabled = true
+discovery_mdns_enabled = true
+discovery_hub_url = ""
+discovery_static_nodes = []
+discovery_service_type = "_lumen._tcp"
+discovery_domain = "local"
+deployment_id = "local"
+resolve_timeout = "3s"
+connect_timeout = "3s"
+rediscovery_backoff_min = "10s"
+rediscovery_backoff_max = "2m"
+scan_interval = "30s"
+chunk_auto = true
+chunk_threshold_bytes = 1048576
+chunk_max_bytes = 262144
+[tools]
+exiftool_path = "exiftool"
+ffmpeg_path = "bin/ffmpeg"
+ffprobe_path = "/opt/ffprobe"
+`
 
-	_, err := LoadAppConfigWithOptions(LoadOptions{
-		Environment: "development",
-		ConfigFile:  configFile,
-	})
-	if err == nil {
-		t.Fatal("expected invalid config values to fail validation")
+func writeManifestFixture(t *testing.T, contents string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".secrets"), 0o700); err != nil {
+		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, ".secrets", "bootstrap"), []byte("bootstrap-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "server.toml")
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
-	message := err.Error()
-	for _, field := range []string{
-		"server.log_level",
-		"geocoding.provider",
-		"transcode.hardware_accel",
+func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
+	path := writeManifestFixture(t, completeManifest)
+	t.Setenv("SERVER_PORT", "9999")
+	t.Setenv("DB_PASSWORD", "ambient-secret")
+	t.Setenv("LUMEN_DISCOVERY_ENABLED", "false")
+
+	cfg, err := LoadAppConfig(path)
+	if err != nil {
+		t.Fatalf("LoadAppConfig: %v", err)
+	}
+	base := filepath.Dir(path)
+	if !cfg.LoadedFromManifest() || cfg.SchemaVersion != 1 || cfg.ManifestPath != path || len(cfg.ManifestSHA256) != 64 {
+		t.Fatalf("missing manifest provenance: %+v", cfg)
+	}
+	if cfg.ServerConfig.Port != "6680" || cfg.DatabaseConfig.Password != "bootstrap-secret" || !cfg.Lumen.DiscoveryEnabled {
+		t.Fatalf("ambient environment changed config: %+v", cfg)
+	}
+	if cfg.StorageConfig.Path != filepath.Join(base, "data/storage") {
+		t.Fatalf("storage path = %q", cfg.StorageConfig.Path)
+	}
+	if cfg.Tools.FFmpegPath != filepath.Join(base, "bin/ffmpeg") || cfg.Tools.ExifToolPath != "exiftool" || cfg.Tools.FFprobePath != "/opt/ffprobe" {
+		t.Fatalf("tool path resolution = %+v", cfg.Tools)
+	}
+	if cfg.Auth.AccessTokenTTL != 15*time.Minute {
+		t.Fatalf("access ttl = %v", cfg.Auth.AccessTokenTTL)
+	}
+}
+
+func TestLoadAppConfigUsesRotatedSecretWhenPresent(t *testing.T) {
+	path := writeManifestFixture(t, completeManifest)
+	rotated := filepath.Join(filepath.Dir(path), "data", "rotated")
+	if err := os.MkdirAll(filepath.Dir(rotated), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rotated, []byte("rotated-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadAppConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DatabaseConfig.Password != "rotated-secret" || cfg.DatabaseConfig.BootstrapPassword != "bootstrap-secret" {
+		t.Fatalf("unexpected secrets: %+v", cfg.DatabaseConfig)
+	}
+}
+
+func TestLoadAppConfigRejectsUnknownAndLegacyFields(t *testing.T) {
+	for name, contents := range map[string]string{
+		"unknown":           completeManifest + "\nunknown_field = true\n",
+		"legacy password":   strings.Replace(completeManifest, "host = \"localhost\"", "host = \"localhost\"\npassword = \"plaintext\"", 1),
+		"legacy server log": strings.Replace(completeManifest, "port = \"6680\"", "port = \"6680\"\nlog_level = \"debug\"", 1),
 	} {
-		if !strings.Contains(message, field) {
-			t.Fatalf("validation error %q should mention %s", message, field)
-		}
+		t.Run(name, func(t *testing.T) {
+			_, err := LoadAppConfig(writeManifestFixture(t, contents))
+			if err == nil || !strings.Contains(err.Error(), "strict mode") {
+				t.Fatalf("expected strict unknown-field error, got %v", err)
+			}
+		})
 	}
 }
 
-func TestLoadAppConfigWithOptionsReportsExplicitMissingConfigFile(t *testing.T) {
-	_, err := LoadAppConfigWithOptions(LoadOptions{
-		Environment:       "development",
-		ConfigFile:        filepath.Join(t.TempDir(), "missing.toml"),
-		RequireConfigFile: true,
-	})
+func TestLoadAppConfigAggregatesMissingFields(t *testing.T) {
+	path := writeManifestFixture(t, "schema_version = 1\n")
+	_, err := LoadAppConfig(path)
 	if err == nil {
-		t.Fatal("expected missing required config file to fail")
+		t.Fatal("expected incomplete manifest to fail")
 	}
-	if !strings.Contains(err.Error(), "missing.toml") {
-		t.Fatalf("missing config error should include path, got %v", err)
+	for _, want := range []string{"environment is required", "[database] is required", "[tools] is required"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not contain %q", err, want)
+		}
 	}
 }
 
-func TestLumenConfigEnabled(t *testing.T) {
-	cases := []struct {
-		name string
-		cfg  LumenConfig
-		want bool
-	}{
-		{"discovery off", LumenConfig{DiscoveryEnabled: false, DiscoveryMDNSEnabled: true}, false},
-		{"no backend", LumenConfig{DiscoveryEnabled: true}, false},
-		{"blank hub url is no backend", LumenConfig{DiscoveryEnabled: true, DiscoveryHubURL: "  "}, false},
-		{"mdns backend", LumenConfig{DiscoveryEnabled: true, DiscoveryMDNSEnabled: true}, true},
-		{"hub backend", LumenConfig{DiscoveryEnabled: true, DiscoveryHubURL: "http://gw:5866"}, true},
-		{"static backend", LumenConfig{DiscoveryEnabled: true, DiscoveryStaticNodes: []string{"10.0.0.5:50051"}}, true},
-		{"blank static entries are no backend", LumenConfig{DiscoveryEnabled: true, DiscoveryStaticNodes: []string{" ", ""}}, false},
-	}
-	for _, tc := range cases {
-		if got := tc.cfg.Enabled(); got != tc.want {
-			t.Errorf("%s: Enabled() = %v, want %v", tc.name, got, tc.want)
+func TestEveryManifestFieldIsRequired(t *testing.T) {
+	lines := strings.Split(strings.TrimSpace(completeManifest), "\n")
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "[") || strings.HasPrefix(trimmed, "#") {
+			continue
 		}
+		name := strings.TrimSpace(strings.SplitN(trimmed, "=", 2)[0])
+		t.Run(fmt.Sprintf("%s_%d", name, index), func(t *testing.T) {
+			without := append([]string(nil), lines[:index]...)
+			without = append(without, lines[index+1:]...)
+			if _, err := LoadAppConfig(writeManifestFixture(t, strings.Join(without, "\n"))); err == nil {
+				t.Fatalf("manifest unexpectedly loaded without line %q", line)
+			}
+		})
+	}
+}
+
+func TestLoadAppConfigAggregatesInvalidValues(t *testing.T) {
+	contents := strings.ReplaceAll(completeManifest, "interval_seconds = 300", "interval_seconds = 0")
+	contents = strings.ReplaceAll(contents, "connect_timeout = \"3s\"", "connect_timeout = \"never\"")
+	contents = strings.ReplaceAll(contents, "chunk_max_bytes = 262144", "chunk_max_bytes = 2097152")
+	_, err := LoadAppConfig(writeManifestFixture(t, contents))
+	if err == nil {
+		t.Fatal("expected invalid manifest")
+	}
+	for _, want := range []string{"repository_scan.interval_seconds", "lumen.connect_timeout", "lumen.chunk_max_bytes"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not contain %q", err, want)
+		}
+	}
+}
+
+func TestLoadAppConfigRequiresReadableNonEmptyBootstrapSecret(t *testing.T) {
+	path := writeManifestFixture(t, completeManifest)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(path), ".secrets", "bootstrap"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadAppConfig(path)
+	if err == nil || !strings.Contains(err.Error(), "secret file is empty") {
+		t.Fatalf("expected empty secret error, got %v", err)
+	}
+}
+
+func TestLoadAppConfigRequiresExplicitPath(t *testing.T) {
+	if _, err := LoadAppConfig(""); err == nil {
+		t.Fatal("expected empty path to fail")
+	}
+	missing := filepath.Join(t.TempDir(), "missing.toml")
+	if _, err := LoadAppConfig(missing); err == nil || !strings.Contains(err.Error(), missing) {
+		t.Fatalf("expected path in error, got %v", err)
 	}
 }

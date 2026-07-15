@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -87,7 +88,13 @@ func TestInstallFromManifest(t *testing.T) {
 	sum := sha256.Sum256(zipData)
 
 	mux := http.NewServeMux()
-	server := httptest.NewServer(mux)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("sandbox does not permit loopback listeners: %v", err)
+	}
+	server := httptest.NewUnstartedServer(mux)
+	server.Listener = listener
+	server.Start()
 	defer server.Close()
 	mux.HandleFunc("/hub.zip", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(zipData)

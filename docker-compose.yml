@@ -8,11 +8,9 @@ services:
         environment:
             POSTGRES_DB: lumiliophotos
             POSTGRES_USER: postgres
-            # Temporary bootstrap credential. The first-run web setup wizard
-            # generates a high-entropy password and rotates this role via
-            # ALTER USER; the new secret is persisted under the mounted storage
-            # volume (.secrets/db_password) and used on every subsequent boot.
-            POSTGRES_PASSWORD: postgres
+            POSTGRES_PASSWORD_FILE: /run/secrets/db_bootstrap_password
+        secrets:
+            - db_bootstrap_password
         # Database ingress is reachable on the internal application network as
         # `db:5432`. The host port mapping below is optional and only needed for
         # external tooling; comment it out to keep the database fully internal.
@@ -39,28 +37,8 @@ services:
         depends_on:
             db:
                 condition: service_healthy
-        environment:
-            SERVER_CONFIG_FILE: /app/config/server.local.toml
-            SERVER_PORT: 6680
-            SERVER_ENV: production
-            DB_HOST: db
-            DB_PORT: 5432
-            DB_USER: postgres
-            # Temporary bootstrap password used only until first-run setup
-            # rotates the credential. Once database.password_file exists, the
-            # rotated secret on disk takes precedence over this value.
-            DB_PASSWORD: postgres
-            DB_NAME: lumiliophotos
-            DB_SSL: disable
-            # The single immutable storage root. Must match the mount target
-            # below; secrets and the .cloud workspace are derived from it. Set
-            # explicitly so it never falls back to a CWD-relative default.
-            STORAGE_PATH: /data/storage
-            # Optional override for server.local.toml [database].password_file.
-            # Lives under the mounted storage volume so it persists alongside
-            # the user's media and survives container/volume recreation.
-            LUMILIO_DB_PASSWORD_FILE: /data/storage/.secrets/db_password
-            LUMILIO_SECRET_KEY: /data/storage/.secrets/lumilio_secret_key
+        secrets:
+            - db_bootstrap_password
         # Uncomment below to enable hardware-accelerated transcoding (Intel/AMD GPU):
         # devices:
         #     - /dev/dri:/dev/dri
@@ -106,3 +84,7 @@ services:
 
 volumes:
     db_data:
+
+secrets:
+    db_bootstrap_password:
+        file: ./server/config/.secrets/db_bootstrap_password

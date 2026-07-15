@@ -45,11 +45,18 @@ Desktop packages include a private PostgreSQL runtime and the required media too
 
 ### Docker Compose
 
-Docker with the Compose plugin is required. Set `LUMILIO_STORAGE` to the host directory that will contain the media library and persistent secrets.
+Docker with the Compose plugin is required. Set `LUMILIO_STORAGE` to the host media directory and `LUMILIO_BOOTSTRAP_PASSWORD_FILE` to a non-empty private file used by both PostgreSQL initialization and the server manifest.
 
 ```bash
 curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
-LUMILIO_STORAGE=/srv/photos docker compose -f docker-compose.release.yml up -d
+export LUMILIO_STORAGE=/srv/photos
+export LUMILIO_BOOTSTRAP_PASSWORD_FILE=/srv/lumilio-secrets/db_bootstrap_password
+# Create the secret with a password manager, or use the image's idempotent helper:
+mkdir -p "$(dirname "$LUMILIO_BOOTSTRAP_PASSWORD_FILE")"
+docker run --rm --entrypoint secretinit \
+  -v "$(dirname "$LUMILIO_BOOTSTRAP_PASSWORD_FILE"):/secrets" \
+  ghcr.io/edwinzhancn/lumilio-server:latest /secrets/db_bootstrap_password
+docker compose -f docker-compose.release.yml up -d
 ```
 
 Then open `http://localhost:6657` and complete the first-run wizard. The web UI listens on port `6657` (HTTP) and `6658` (HTTPS); the API listens on `6680`.
@@ -62,7 +69,7 @@ LUMILIO_VERSION=v1.0.0 LUMILIO_STORAGE=/srv/photos \
 ```
 
 > [!IMPORTANT]
-> `LUMILIO_SECRET_KEY` is a key **file path**, not raw key text. The server creates the file when needed and uses it to derive JWT signing and settings-encryption keys. The release Compose file persists it beneath `LUMILIO_STORAGE`.
+> The complete runtime manifest is baked into the image at `/app/config/server.toml`; ordinary environment variables do not override it. It references the Compose bootstrap secret and creates the app root key beneath `LUMILIO_STORAGE`. Mount a different complete schema v1 manifest at that path to change immutable policy.
 
 ## Development
 
@@ -83,7 +90,7 @@ make setup
 make dev
 ```
 
-`make dev` starts PostgreSQL on host port `5433`, the API on `6680`, and the web app on `6657`. Local configuration is copied from `server/config/server.example.toml` to the ignored `server/config/server.local.toml` during setup.
+`make dev` starts PostgreSQL on host port `5433`, the API on `6680`, and the web app on `6657`. `make setup` copies the complete schema v1 manifest to ignored `server/config/server.local.toml` and idempotently creates its bootstrap secret. The server has no config defaults or env overrides; after pulling this breaking change, run `make dev-reset` to discard the incompatible pre-manifest development database/config state.
 
 ### Useful commands
 
@@ -99,6 +106,7 @@ make web-browser-test # Build and run production browser smoke checks
 make desktop-test     # Run desktop module tests
 make dto              # Regenerate OpenAPI and frontend API types
 make db-reset         # Delete development database state (destructive)
+make dev-reset        # Recreate config, bootstrap secret, and DB state (destructive)
 ```
 
 The repository also includes a Dev Container configuration under `.devcontainer/`. Open the project in the container, run `make setup`, and then use the same `make dev` workflow.
