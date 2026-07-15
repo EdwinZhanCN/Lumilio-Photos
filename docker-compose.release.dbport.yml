@@ -30,12 +30,10 @@ services:
             - "5432:5432"
 
     server:
-        environment:
-            # The repository scanner is periodic (default every 300s), so it
-            # fires mid-run during a multi-minute benchmark and contends for a
-            # worker. Disable it so throughput reflects the upload pipeline only.
-            # Boot config (needs a container restart to take effect).
-            REPOSITORY_SCAN_ENABLED: "false"
+        # Supply a complete schema v1 manifest with
+        # repository_scan.enabled=false. Runtime env does not override config.
+        volumes:
+            - ${LUMILIO_BENCHMARK_CONFIG:?set LUMILIO_BENCHMARK_CONFIG to a complete benchmark manifest}:/app/config/server.toml:ro
 
     web:
         environment:

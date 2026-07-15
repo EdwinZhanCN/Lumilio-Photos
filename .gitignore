@@ -49,6 +49,7 @@ MANIFEST
 # Development
 *.development
 server/config/server.local.toml
+server/config/.secrets/
 
 # IDE specific files
 .idea/

@@ -4,6 +4,14 @@
 name: lumilio-photos-devcontainer
 
 services:
+    secretinit:
+        image: golang:1.25.0-trixie
+        working_dir: /workspace
+        volumes:
+            - ..:/workspace:ro
+            - db-bootstrap-secret:/secrets
+        command: go run ./server/tools/secretinit /secrets/db_bootstrap_password
+
     db:
         build:
             context: ..
@@ -13,11 +21,12 @@ services:
         environment:
             POSTGRES_DB: lumiliophotos
             POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-        ports:
-            - "5433:5432"
+            POSTGRES_PASSWORD_FILE: /run/secrets/db_bootstrap_password
         volumes:
             - db_data:/var/lib/postgresql/data
+            - db-bootstrap-secret:/run/secrets:ro
+        ports:
+            - "5433:5432"
         command:
             - postgres
             - -c
@@ -29,6 +38,9 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
+        depends_on:
+            secretinit:
+                condition: service_completed_successfully
     devcontainer:
         network_mode: "host"
         build:
@@ -40,32 +52,18 @@ services:
             - go-mod-cache:/root/go
             - pnpm-store:/root/.local/share/pnpm
             - cargo-cache:/usr/local/cargo/registry
+            - db-bootstrap-secret:/workspace/server/config/.secrets:ro
         environment:
-            DB_HOST: localhost
-            DB_PORT: "5433"
-            DB_USER: postgres
-            DB_PASSWORD: postgres
-            DB_NAME: lumiliophotos
-            DB_SSL: disable
-
             CGO_ENABLED: "1"
             GOFLAGS: -buildvcs=false
 
             RUSTUP_HOME: /usr/local/rustup
             CARGO_HOME: /usr/local/cargo
 
-            SERVER_ENV: development
-            SERVER_CONFIG_FILE: /workspace/server/config/server.local.toml
-            SERVER_PORT: "6680"
-            STORAGE_PATH: /workspace/server/data/storage
-
-            ML_SEMANTIC_ENABLED: ${ML_SEMANTIC_ENABLED:-false}
-            ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
-            ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
-            ML_FACE_ENABLED: ${ML_FACE_ENABLED:-false}
-
             VITE_API_URL: http://localhost:6680
         depends_on:
+            secretinit:
+                condition: service_completed_successfully
             db:
                 condition: service_healthy
         command: /bin/bash -c "while sleep 1000; do :; done"
@@ -78,3 +76,4 @@ volumes:
     go-mod-cache:
     pnpm-store:
     cargo-cache:
+    db-bootstrap-secret:

@@ -22,7 +22,6 @@ import (
 const (
 	geocoderProviderDisabled  = "disabled"
 	geocoderProviderNominatim = "nominatim"
-	defaultGeocodeLanguage    = "en"
 	defaultGeocodeLimit       = 500
 )
 
@@ -309,20 +308,11 @@ type nominatimGeocoder struct {
 func newReverseGeocoder(cfg config.GeocodingConfig) ReverseGeocoder {
 	provider := strings.ToLower(strings.TrimSpace(cfg.Provider))
 	endpoint := strings.TrimSpace(cfg.NominatimEndpoint)
-	if provider == "" && endpoint != "" {
-		provider = geocoderProviderNominatim
-	}
-	if provider != geocoderProviderNominatim || endpoint == "" {
+	if provider != geocoderProviderNominatim {
 		return disabledGeocoder{}
 	}
 	language := strings.TrimSpace(cfg.Language)
-	if language == "" {
-		language = defaultGeocodeLanguage
-	}
 	userAgent := strings.TrimSpace(cfg.UserAgent)
-	if userAgent == "" {
-		userAgent = "Lumilio-Photos/1.0"
-	}
 	return &nominatimGeocoder{
 		endpoint:   endpoint,
 		language:   language,

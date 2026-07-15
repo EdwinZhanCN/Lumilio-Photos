@@ -94,7 +94,7 @@ func NewSetupService(dbConfig config.DatabaseConfig) *SetupService {
 	return &SetupService{
 		dbConfig:   dbConfig,
 		rotator:    &pgxCredentialRotator{cfg: dbConfig},
-		secretPath: strings.TrimSpace(dbConfig.PasswordFile),
+		secretPath: strings.TrimSpace(dbConfig.RotatedPasswordFile),
 	}
 }
 
@@ -109,7 +109,7 @@ func NewSetupServiceWithPool(dbConfig config.DatabaseConfig, pool *pgxpool.Pool,
 	return &SetupService{
 		dbConfig:     dbConfig,
 		rotator:      rotator,
-		secretPath:   strings.TrimSpace(dbConfig.PasswordFile),
+		secretPath:   strings.TrimSpace(dbConfig.RotatedPasswordFile),
 		bootstrap:    bootstrap,
 		repoDefaults: repoDefaults,
 		storageRoot:  strings.TrimSpace(storageRoot),

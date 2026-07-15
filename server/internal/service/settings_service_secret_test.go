@@ -33,12 +33,11 @@ func TestLoadOrCreateLumilioSecretKey_AutoGenerateAndReuse(t *testing.T) {
 
 func TestLoadOrCreateLumilioSecretKey_RejectsRawText(t *testing.T) {
 	_, err := secretbox.LoadOrCreateLumilioSecretKey("my-raw-secret-value")
-	require.ErrorContains(t, err, "must be a key file path")
+	require.ErrorContains(t, err, "must be absolute")
 }
 
-func TestSettingsService_LoadsSecretFromPathEnv(t *testing.T) {
+func TestSettingsService_LoadsSecretFromInjectedPath(t *testing.T) {
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
-	t.Setenv("LUMILIO_SECRET_KEY", keyFile)
 
 	svc := &settingsService{
 		secretPath: keyFile,

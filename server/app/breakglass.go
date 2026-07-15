@@ -2,26 +2,20 @@ package app
 
 import (
 	"context"
-	"os"
-	"strings"
 
 	"server/internal/service"
 
 	"go.uber.org/zap"
 )
 
-// runBreakGlassIfRequested performs an operator-triggered admin recovery when the
-// LUMILIO_BREAK_GLASS env flag is set. It resets a locked-out admin to a random
-// temporary password and clears all MFA factors, printing the password to the
-// logs once. The operator should unset the flag and restart afterwards.
-func runBreakGlassIfRequested(ctx context.Context, userService service.UserService, logger *zap.Logger) {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("LUMILIO_BREAK_GLASS"))) {
-	case "true", "1", "yes", "on":
-	default:
+// runBreakGlassIfRequested performs recovery from the explicit host control. It
+// resets a locked-out admin to a random temporary password and clears all MFA
+// factors, printing the password once. Environment interpretation belongs to
+// the standalone CLI host, not this application package.
+func runBreakGlassIfRequested(ctx context.Context, userService service.UserService, enabled bool, username string, logger *zap.Logger) {
+	if !enabled {
 		return
 	}
-
-	username := strings.TrimSpace(os.Getenv("LUMILIO_BREAK_GLASS_USERNAME"))
 	result, target, err := userService.BreakGlassReset(ctx, username)
 	if err != nil {
 		logger.Error("break-glass reset failed",

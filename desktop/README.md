@@ -12,10 +12,11 @@ Wails v3 system tray (menubar app, no webview)
   → "Open Lumilio Photos" opens the default browser at http://localhost:6680
 desktop/supervisor
   → manages a private PostgreSQL 18 (initdb / pg_ctl / pg_isready / createdb)
-  → generates secrets under the app-data dir
-  → builds typed server config through server/config.NewDesktopConfig(...)
-  → writes config/server.local.toml as a debug copy only
-  → runs server/app.Run(ctx, cfg) in-process (migrations + API + queue + ML)
+  → generates/references secrets under the app-data dir
+  → compiles the versioned supervisor/server.template.toml
+  → atomically writes config/server.toml (0600)
+  → reloads it through server/config.LoadAppConfig(...)
+  → runs server/app.Run(ctx, cfg, controls) in-process
   → the Go API server also serves the React SPA at localhost:6680 (server.web_root)
 ```
 
@@ -45,7 +46,7 @@ make desktop-test
 ```
 
 The private cluster requires `scram-sha-256` auth everywhere (never trust); the
-password is generated into `secrets/db_password` and set at initdb time via
+bootstrap password is generated into `secrets/db_bootstrap_password` and set at initdb time via
 `--pwfile`. Data directories initialized before the scram switch have no
 password set and will fail auth on launch — delete `postgres/` under the
 app-data root to re-init (pre-production installs only).
@@ -55,10 +56,12 @@ App data (always local, never on the user's relocatable media drive):
 `config/`, `backups/`, `lumen/` (optional local AI: the supervised Lumen Hub
 build, generated config, and model cache — installed from the tray, see
 `desktop/lumen`), `lumilio.lock`. Override the root with `LUMILIO_APP_DATA`.
-`config/server.local.toml` is a generated debug copy of the typed runtime config;
-desktop does not boot by reloading it.
+`config/server.toml` is regenerated on launch and is the authoritative immutable
+input actually consumed by the in-process server. Stable policy comes from the
+tracked template; persisted user choices remain in `desktop-settings.json`.
 
-Useful env overrides (development):
+Desktop host/build-harness inputs (development; they are compiled into the
+generated manifest before the server starts):
 
 | Env | Purpose |
 |---|---|

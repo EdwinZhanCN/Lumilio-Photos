@@ -46,9 +46,10 @@ type agentService struct {
 	refStore       ref.Store
 	search         RetrieverSearch
 	conversations  *ConversationStore
+	auditLogPath   string
 }
 
-func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider, refStore ref.Store, search RetrieverSearch, conversations *ConversationStore) AgentService {
+func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider, refStore ref.Store, search RetrieverSearch, conversations *ConversationStore, auditLogPath string) AgentService {
 	return &agentService{
 		queries:        queries,
 		registry:       GetRegistry(),
@@ -57,6 +58,7 @@ func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider, re
 		refStore:       refStore,
 		search:         search,
 		conversations:  conversations,
+		auditLogPath:   strings.TrimSpace(auditLogPath),
 	}
 }
 
@@ -74,7 +76,7 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 		return nil, fmt.Errorf("load llm settings: %w", err)
 	}
 
-	return llm.NewChatModel(ctx, cfg)
+	return llm.NewChatModel(ctx, cfg, s.auditLogPath)
 }
 
 // buildAgent 构建 Agent 实例。mode 为空时返回全量工具集（自由模式）；非空时

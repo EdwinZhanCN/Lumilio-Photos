@@ -11,18 +11,11 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// AuditLogEnv names the env var that, when set to a writable file path,
-// wraps every chat model so the exact messages sent to the LLM are appended
-// as JSON lines. This is the INV-1 verification tool: audit the log to
-// confirm no asset content (pixels, EXIF, asset rows, UUID lists) ever
-// reaches the model. Dev tooling only — keep it unset in normal use.
-const AuditLogEnv = "LUMILIO_AGENT_AUDIT_LOG"
-
 var auditMu sync.Mutex
 
-// maybeWrapAudit returns the model unchanged unless the audit env is set.
-func maybeWrapAudit(inner model.ToolCallingChatModel) model.ToolCallingChatModel {
-	path := os.Getenv(AuditLogEnv)
+// maybeWrapAudit returns the model unchanged unless the host supplied an audit
+// path as an explicit single-run operator control.
+func maybeWrapAudit(inner model.ToolCallingChatModel, path string) model.ToolCallingChatModel {
 	if path == "" {
 		return inner
 	}

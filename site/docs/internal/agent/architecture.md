@@ -5,15 +5,16 @@ This is the compact system map for agents. Keep details here stable and useful; 
 ## Runtime Shape
 
 - `docker-compose.yml` runs PostgreSQL, the Go server, and the Caddy-served web app.
-- `server/config/server.example.toml` is the tracked template for runtime configuration.
-- `server/config/server.local.toml` is ignored local runtime configuration; `make setup` creates it from the example if missing.
-- `SERVER_ENV` selects normal server runtime mode; env variables are for bootstrap, secrets, deployment wiring, and machine-specific overrides. Desktop builds construct a typed config through `server/config` instead of booting from `SERVER_CONFIG_FILE`.
+- Runtime state has three non-overlapping owners: frontend preferences in browser localStorage; runtime-mutable settings in PostgreSQL through Settings/Setup APIs; and runtime-immutable process configuration in a complete schema-versioned TOML manifest.
+- First-run bootstrap (`fresh → db_rotated → admin_created → ready`) is an orthogonal state machine. It observes setup gates; it is not a fourth configuration source.
+- `server/config/server.example.toml` is the complete local template; `server/config/server.container.toml` is the image manifest; `desktop/supervisor/server.template.toml` is the versioned desktop compiler input.
+- Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
 
 ## Backend
 
-- `server/cmd/main.go`: thin entrypoint (signal handling + normal TOML/env config load) that calls `server/app`.
-- `server/app`: the only server runtime — logging, migrations, queue workers, router, repository bootstrap, SPA serving, and graceful shutdown via `Run(ctx, cfg)`. Imported by the CLI and, in-process, by the desktop supervisor.
-- `server/config`: single config schema/defaults boundary, including normal TOML/env loading, external tool paths, and `NewDesktopConfig` for the desktop host. Desktop may write a generated TOML debug copy, but runtime uses typed config.
+- `server/cmd/main.go`: thin entrypoint (flags, signals, break-glass env whitelist, strict manifest load) that calls `server/app`.
+- `server/app`: the only server runtime — logging, migrations, queue workers, router, repository bootstrap, SPA serving, and graceful shutdown via `Run(ctx, cfg, controls)`. It rejects configuration not produced by the strict loader.
+- `server/config`: leaf package exposing the sole production constructor `LoadAppConfig(path)`. It strictly decodes schema v1, resolves manifest-relative paths and secret files, validates the complete graph, and fingerprints the source bytes.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS.
 - `server/internal/api/handler`: HTTP request/response layer.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
@@ -35,7 +36,9 @@ This is the compact system map for agents. Keep details here stable and useful; 
 ## Desktop
 
 - `desktop/`: Wails v3 tray host; private PostgreSQL; runs `server/app` in-process
-  and serves the React SPA at `localhost:6680`. See `desktop/README.md`.
+  and serves the React SPA at `localhost:6680`. Its supervisor compiles the
+  versioned template to app-data `config/server.toml`, atomically writes it with
+  mode `0600`, and reloads it through `LoadAppConfig`. See `desktop/README.md`.
 - App updates (GitHub Releases → platform installer URL, CN download mirror,
   desktop-only download region): [desktop-updates.md](./desktop-updates.md).
 

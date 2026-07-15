@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -13,10 +14,6 @@ import (
 )
 
 const (
-	defaultLogLevel        = "info"
-	defaultLogDir          = "server/logs"
-	defaultConsoleFormat   = "console"
-	defaultFileFormat      = "json"
 	defaultMaxSizeMB       = 50
 	defaultMaxBackups      = 5
 	defaultMaxAgeDays      = 14
@@ -39,17 +36,8 @@ type Runtime struct {
 }
 
 func NewLogger(cfg Config) (*Runtime, error) {
-	if strings.TrimSpace(cfg.Level) == "" {
-		cfg.Level = defaultLogLevel
-	}
-	if strings.TrimSpace(cfg.LogDir) == "" {
-		cfg.LogDir = defaultLogDir
-	}
-	if strings.TrimSpace(cfg.ConsoleFormat) == "" {
-		cfg.ConsoleFormat = defaultConsoleFormat
-	}
-	if strings.TrimSpace(cfg.FileFormat) == "" {
-		cfg.FileFormat = defaultFileFormat
+	if strings.TrimSpace(cfg.Level) == "" || strings.TrimSpace(cfg.LogDir) == "" || strings.TrimSpace(cfg.ConsoleFormat) == "" || strings.TrimSpace(cfg.FileFormat) == "" {
+		return nil, fmt.Errorf("logging config must be complete")
 	}
 
 	if err := os.MkdirAll(cfg.LogDir, 0755); err != nil {
@@ -58,9 +46,7 @@ func NewLogger(cfg Config) (*Runtime, error) {
 
 	atomicLevel := zap.NewAtomicLevel()
 	if err := atomicLevel.UnmarshalText([]byte(cfg.Level)); err != nil {
-		if err := atomicLevel.UnmarshalText([]byte(defaultLogLevel)); err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	consoleEncoder := newEncoder(cfg.ConsoleFormat, cfg.Development, false)

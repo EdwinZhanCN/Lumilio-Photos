@@ -104,7 +104,7 @@ type shareLinkService struct {
 }
 
 // NewShareLinkService constructs the share link service. secretKeyPath is the
-// configured LUMILIO_SECRET_KEY file path (config.AuthConfig.SecretKeyPath);
+// configured auth.secret_key_file path;
 // the token-hashing key is derived from the same root secret used for
 // JWT/media-token signing (see auth_service.go's NewAuthService), under its
 // own scope so a leaked share-hashing key can't be used to forge auth tokens

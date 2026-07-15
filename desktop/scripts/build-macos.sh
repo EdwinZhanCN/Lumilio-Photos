@@ -128,7 +128,12 @@ stage() { # src dest
   mkdir -p "$(dirname "$2")"
   cp -R "$1" "$2"
 }
-stage "$PG_SRC"                                "$RES_DIR/postgres/18/$PLATFORM"
+PG_BUNDLE_DIR="$RES_DIR/postgres/18/$PLATFORM"
+stage "$PG_SRC"                                "$PG_BUNDLE_DIR"
+# Artifacts produced before the relocation gate may still contain the GitHub
+# runner's absolute pg-dist prefix. Rewrite the staged copy so local packaging
+# remains safe without mutating the downloaded resource cache.
+"$SCRIPT_DIR/relocate-postgres.sh" "$PG_BUNDLE_DIR"
 stage "$RESOURCES_SRC/ffmpeg/ffmpeg"          "$RES_DIR/ffmpeg/ffmpeg"
 stage "$RESOURCES_SRC/ffmpeg/ffprobe"         "$RES_DIR/ffmpeg/ffprobe"
 stage "$RESOURCES_SRC/exiftool"               "$RES_DIR/exiftool"

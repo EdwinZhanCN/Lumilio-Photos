@@ -1,12 +1,13 @@
 # Linux-only overlay: run the server on the host network so Lumen mDNS
 # discovery works (multicast cannot cross the default bridge network).
 #
-#   LUMILIO_STORAGE=/srv/photos docker compose \
+#   LUMILIO_HOST_MDNS_CONFIG=/path/to/complete-host-manifest.toml docker compose \
 #       -f docker-compose.release.yml -f docker-compose.host-mdns.yml up -d
 #
 # Requires Docker Compose v2.24+ (uses `!reset`). Docker Desktop on
-# macOS/Windows does not support host networking — use the gateway or
-# static-node discovery modes there instead.
+# macOS/Windows does not support host networking. The supplied manifest must be
+# a complete schema v1 file with database.host=127.0.0.1,
+# database.port=5433, and lumen.discovery_mdns_enabled=true.
 
 services:
     db:
@@ -21,10 +22,8 @@ services:
         # networks; the API listens on host port 6680 directly.
         ports: !reset []
         extra_hosts: !reset []
-        environment:
-            DB_HOST: 127.0.0.1
-            DB_PORT: 5433
-            LUMEN_DISCOVERY_MDNS_ENABLED: "true"
+        volumes:
+            - ${LUMILIO_HOST_MDNS_CONFIG:?set LUMILIO_HOST_MDNS_CONFIG to a complete schema v1 manifest}:/app/config/server.toml:ro
 
     web:
         environment:

@@ -95,14 +95,13 @@ func (b *Box) Decrypt(ciphertext []byte) (string, error) {
 // it on first boot. The env/config value must be a path, never raw secret text.
 func LoadOrCreateLumilioSecretKey(configuredPath string) (string, error) {
 	keyFile := strings.TrimSpace(configuredPath)
-	if keyFile != "" {
-		if !isExplicitFilePath(keyFile) {
-			return "", errors.New("LUMILIO_SECRET_KEY must be a key file path (absolute path, ./relative, or ../relative)")
-		}
-		keyFile = filepath.Clean(keyFile)
-	} else {
-		keyFile = DefaultLumilioSecretKeyPath()
+	if keyFile == "" {
+		return "", errors.New("secret key file path is required")
 	}
+	if !filepath.IsAbs(keyFile) {
+		return "", errors.New("secret key file path must be absolute")
+	}
+	keyFile = filepath.Clean(keyFile)
 
 	content, err := os.ReadFile(keyFile)
 	switch {
@@ -140,17 +139,4 @@ func DeriveScopedSecret(rootSecret string, scope string) []byte {
 	derived := make([]byte, len(sum))
 	copy(derived, sum[:])
 	return derived
-}
-
-func isExplicitFilePath(path string) bool {
-	if filepath.IsAbs(path) {
-		return true
-	}
-	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
-}
-
-// DefaultLumilioSecretKeyPath is a fallback for direct package use. Runtime
-// services should receive a configured path from server/config.
-func DefaultLumilioSecretKeyPath() string {
-	return filepath.Join("data", "storage", ".secrets", "lumilio_secret_key")
 }

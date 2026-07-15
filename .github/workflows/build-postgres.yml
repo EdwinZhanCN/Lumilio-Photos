@@ -40,6 +40,9 @@ jobs:
             platform: darwin-amd64
     runs-on: ${{ matrix.runner }}
     steps:
+      - name: Check out relocation tooling
+        uses: actions/checkout@v6
+
       - name: Build PostgreSQL ${{ inputs.pg_version }}
         run: |
           set -euo pipefail
@@ -98,6 +101,18 @@ jobs:
               exit 1
             }
           done
+
+          "$GITHUB_WORKSPACE/desktop/scripts/relocate-postgres.sh" "$OUT"
+
+          # The artifact must be runnable after leaving this runner. Catch any
+          # absolute build-prefix reference before upload instead of shipping a
+          # bundle that aborts in dyld on the user's machine.
+          if { find "$OUT/bin" -maxdepth 1 -type f -print0; find "$OUT/lib" -type f -name '*.dylib' -print0; } |
+            xargs -0 otool -L 2>/dev/null | grep -E '/Users/runner/|/pg-dist/'; then
+            echo "PostgreSQL artifact still contains runner-local dylib references"
+            exit 1
+          fi
+          "$OUT/bin/initdb" --version
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7

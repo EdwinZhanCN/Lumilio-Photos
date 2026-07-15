@@ -11,8 +11,8 @@ import (
 )
 
 // DesktopSettings are user choices that must persist across launches. It is the
-// source of truth for those choices because server.local.toml is only a
-// regenerated debug copy and therefore cannot hold persisted state.
+// source of truth for those choices. The generated server.toml is rebuilt from
+// these choices and is the authoritative immutable input for one launch.
 type DesktopSettings struct {
 	// StoragePath is the user-chosen media library location. Empty means "use
 	// the default" (<appdata>/storage), resolved at startup.

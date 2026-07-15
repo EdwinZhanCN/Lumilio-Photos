@@ -30,6 +30,7 @@ ARG VERSION=dev
 
 # Build API binary
 RUN go build -ldflags "-X server/internal/version.Version=${VERSION}" -o /out/server ./cmd
+RUN go build -o /out/secretinit ./tools/secretinit
 
 ############################################
 # Runtime
@@ -89,31 +90,7 @@ RUN set -eux; \
     test -s /tmp/avif-probe.avif; \
     rm -f /tmp/avif-probe.v /tmp/avif-probe.avif
 
-ENV SERVER_CONFIG_FILE=/app/config/server.local.toml \
-    SERVER_PORT=6680 \
-    SERVER_ENV=production \
-    SERVER_LOG_LEVEL=info \
-    LOG_LEVEL=info \
-    LOG_DIR=/app/logs \
-    LOG_FORMAT_CONSOLE=json \
-    LOG_FORMAT_FILE=json \
-    DB_HOST=db \
-    DB_PORT=5432 \
-    DB_USER=postgres \
-    DB_PASSWORD=postgres \
-    DB_NAME=lumiliophotos \
-    DB_SSL=disable \
-    LUMILIO_DB_PASSWORD_FILE=/data/storage/.secrets/db_password \
-    STORAGE_PATH=/data/storage \
-    REPOSITORY_SCAN_ENABLED=true \
-    ML_CLIP_ENABLED=true \
-    ML_BIOCLIP_ENABLED=true \
-    ML_OCR_ENABLED=true \
-    ML_FACE_ENABLED=true \
-    LUMILIO_SECRET_KEY=/data/storage/.secrets/lumilio_secret_key \
-    LUMEN_DISCOVERY_MDNS_ENABLED=false \
-    LUMEN_DISCOVERY_HUB_URL=http://host.docker.internal:5866 \
-    PATH="/usr/local/bin:${PATH}"
+ENV PATH="/usr/local/bin:${PATH}"
 
 ARG APP_UID=10001
 ARG APP_GID=10001
@@ -126,9 +103,9 @@ RUN groupadd --gid ${APP_GID} app \
 
 # App artifacts
 COPY --from=builder /out/server /usr/local/bin/server
+COPY --from=builder /out/secretinit /usr/local/bin/secretinit
 COPY --from=builder /app/migrations ./migrations
-COPY server/config/server.example.toml ./config/server.example.toml
-COPY server/config/server.example.toml ./config/server.local.toml
+COPY server/config/server.container.toml ./config/server.toml
 
 # Prepare storage path
 RUN mkdir -p /data/storage/primary && chown -R app:app /data /app
@@ -138,6 +115,6 @@ USER app
 EXPOSE 6680
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=20s CMD \
-    curl -fsS "http://localhost:${SERVER_PORT}/api/v1/health" >/dev/null || exit 1
+    curl -fsS "http://localhost:6680/api/v1/health" >/dev/null || exit 1
 
-ENTRYPOINT ["server"]
+ENTRYPOINT ["server", "--config", "/app/config/server.toml"]

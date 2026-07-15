@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/client"
 	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
@@ -56,21 +55,13 @@ type lumenService struct {
 // ErrLumenDisabled, so the server boots and media management degrades
 // gracefully without external ML.
 //
-// The app-owned fields (enabled/mDNS/hub URL) always come from cfg, which the
-// app config loader has already resolved with its TOML+env precedence.
-// SDK-only tuning knobs (deployment ID, timeouts, chunking) remain
-// env-configurable through the SDK's LUMEN_* variables.
+// Every SDK field consumed by Photos comes from the strict runtime manifest.
 func NewLumenServiceFromAppConfig(cfg config.LumenConfig, logger *zap.Logger) (LumenService, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	if !cfg.Enabled() {
-		if cfg.DiscoveryEnabled {
-			logger.Warn("lumen discovery is enabled but no backend is configured; ML features are disabled",
-				zap.String("hint", "set [lumen] discovery_mdns_enabled = true or discovery_hub_url"))
-		} else {
-			logger.Info("lumen ML integration disabled by config; media management runs without external ML")
-		}
+		logger.Info("lumen ML integration disabled by config; media management runs without external ML")
 		return NewDisabledLumenService(), nil
 	}
 
@@ -81,27 +72,19 @@ func NewLumenServiceFromAppConfig(cfg config.LumenConfig, logger *zap.Logger) (L
 	return NewLumenService(sdkCfg, logger)
 }
 
-// buildLumenSDKConfig maps the app-level Lumen config onto the SDK config:
-// SDK defaults, then LUMEN_* env for the SDK-only knobs, then the app-owned
-// discovery fields on top.
+// buildLumenSDKConfig maps the complete Photos-owned Lumen manifest directly
+// onto the SDK config. It deliberately avoids SDK defaults, env loading, and
+// the SDK's unrelated broker-server/logging validation surface.
 func buildLumenSDKConfig(cfg config.LumenConfig) (*lumenconfig.Config, error) {
-	sdkCfg := lumenconfig.DefaultConfig()
-	if err := sdkCfg.LoadFromEnv(); err != nil {
-		return nil, fmt.Errorf("load lumen env overrides: %w", err)
-	}
-	sdkCfg.Discovery.Enabled = cfg.DiscoveryEnabled
-	sdkCfg.Discovery.MDNSEnabled = cfg.DiscoveryMDNSEnabled
-	sdkCfg.Discovery.BrokerURL = strings.TrimSpace(cfg.DiscoveryHubURL)
-	sdkCfg.Discovery.StaticNodes = cfg.StaticNodes()
-	// Cap the initial "wait for node capabilities" at startup. The SDK default is
-	// 10s, which — when no Lumen node is present (the common desktop case) — stalls
-	// the whole server boot in "starting server" for 10s on every launch even
-	// though ML is optional and off the critical path. 3s is enough for a node
-	// that is actually on the LAN to answer; discovery keeps running afterwards, so
-	// a node that appears later is still picked up when ML workers run.
-	sdkCfg.Discovery.ConnectTimeout = 3 * time.Second
-	if err := sdkCfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid lumen sdk config: %w", err)
+	sdkCfg := &lumenconfig.Config{
+		Discovery: lumenconfig.DiscoveryConfig{
+			Enabled: cfg.DiscoveryEnabled, ServiceType: cfg.DiscoveryServiceType, Domain: cfg.DiscoveryDomain,
+			DeploymentID: cfg.DeploymentID, ResolveTimeout: cfg.ResolveTimeout, ConnectTimeout: cfg.ConnectTimeout,
+			RediscoveryBackoffMin: cfg.RediscoveryBackoffMin, RediscoveryBackoffMax: cfg.RediscoveryBackoffMax,
+			ScanInterval: cfg.ScanInterval, MDNSEnabled: cfg.DiscoveryMDNSEnabled,
+			BrokerURL: strings.TrimSpace(cfg.DiscoveryHubURL), StaticNodes: cfg.StaticNodes(),
+		},
+		Chunk: lumenconfig.ChunkConfig{EnableAuto: cfg.ChunkAuto, Threshold: cfg.ChunkThresholdBytes, MaxChunkBytes: cfg.ChunkMaxBytes},
 	}
 	return sdkCfg, nil
 }
