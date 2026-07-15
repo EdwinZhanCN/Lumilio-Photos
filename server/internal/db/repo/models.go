@@ -612,17 +612,19 @@ type Thumbnail struct {
 }
 
 type User struct {
-	UserID             int32              `db:"user_id" json:"user_id"`
-	Username           string             `db:"username" json:"username"`
-	Password           string             `db:"password" json:"password"`
-	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	IsActive           *bool              `db:"is_active" json:"is_active"`
-	LastLogin          pgtype.Timestamptz `db:"last_login" json:"last_login"`
-	DisplayName        string             `db:"display_name" json:"display_name"`
-	AvatarAssetID      pgtype.UUID        `db:"avatar_asset_id" json:"avatar_asset_id"`
-	Role               string             `db:"role" json:"role"`
-	WebauthnUserHandle []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	UserID                 int32              `db:"user_id" json:"user_id"`
+	Username               string             `db:"username" json:"username"`
+	Password               string             `db:"password" json:"password"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	IsActive               *bool              `db:"is_active" json:"is_active"`
+	LastLogin              pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	DisplayName            string             `db:"display_name" json:"display_name"`
+	AvatarAssetID          pgtype.UUID        `db:"avatar_asset_id" json:"avatar_asset_id"`
+	Role                   string             `db:"role" json:"role"`
+	WebauthnUserHandle     []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	AuthVersion            int64              `db:"auth_version" json:"auth_version"`
+	PasswordChangeRequired bool               `db:"password_change_required" json:"password_change_required"`
 }
 
 type UserMfaRecoveryCode struct {

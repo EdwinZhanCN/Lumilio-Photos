@@ -65,6 +65,7 @@ type Querier interface {
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
 	CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
+	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
 	CountActivePrimaryRepositories(ctx context.Context) (int64, error)
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
@@ -315,6 +316,7 @@ type Querier interface {
 	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
 	GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]OcrTextItem, error)
 	GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOCRTextItemsByAssetWithLimitParams) ([]OcrTextItem, error)
+	GetOldestActiveAdmin(ctx context.Context) (User, error)
 	// Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
 	// a specific asset set, for the agent dedupe tool's in-memory similarity graph.
 	GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []pgtype.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error)
@@ -328,6 +330,7 @@ type Querier interface {
 	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
 	GetPrimaryRepository(ctx context.Context) (Repository, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
+	GetRefreshTokenRecordByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRegistrationSessionByID(ctx context.Context, sessionID pgtype.UUID) (RegistrationSession, error)
 	GetRepository(ctx context.Context, repoID pgtype.UUID) (Repository, error)
 	// Repository Asset Statistics (kept for repository management)
@@ -464,6 +467,7 @@ type Querier interface {
 	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
 	RepositoryExists(ctx context.Context, path string) (bool, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
+	ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error)
 	RestoreAsset(ctx context.Context, assetID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
 	RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams) (ShareLink, error)

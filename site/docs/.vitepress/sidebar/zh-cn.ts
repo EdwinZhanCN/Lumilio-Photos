@@ -12,6 +12,7 @@ export const zhcnSidebar: DefaultTheme.Sidebar = {
                 { text: 'AI 与 Lumen', link: '/zh-cn/user-manual/introduction/lumen' },
                 { text: '实验性功能与已知风险', link: '/zh-cn/user-manual/introduction/experimental' },
                 { text: '安装', link: '/zh-cn/user-manual/introduction/installation' },
+                { text: '恢复管理员访问权限', link: '/zh-cn/user-manual/introduction/break-glass' },
                 { text: '首次使用', link: '/zh-cn/user-manual/introduction/first-use' },
             ]
         },

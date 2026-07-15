@@ -26,6 +26,13 @@ export type MFAMethod = "totp" | "recovery_code";
 export type LoginResult =
   | { status: "authenticated" }
   | {
+      status: "password_change_required";
+      challenge: {
+        user: User | null;
+        passwordChangeToken: string;
+      };
+    }
+  | {
       status: "mfa_required";
       challenge: {
         user: User | null;

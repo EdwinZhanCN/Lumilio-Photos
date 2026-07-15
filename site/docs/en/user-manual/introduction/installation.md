@@ -1,5 +1,7 @@
 # Installation
 
+If every administrator is locked out after installation, follow [Recover administrator access](./break-glass.md) instead of editing the database.
+
 Lumilio Photos is local-first: your photos, videos, and database live on your
 own machine. Pick the install path that matches where you want it to run:
 

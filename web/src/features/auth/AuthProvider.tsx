@@ -164,7 +164,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       const responseData = response;
       if (responseData) {
-        const { requires_mfa, mfa_token, mfa_methods, user } = responseData;
+        const {
+          requires_mfa,
+          mfa_token,
+          mfa_methods,
+          requires_password_change,
+          password_change_token,
+          user,
+        } = responseData;
+        if (requires_password_change && password_change_token) {
+          dispatch({ type: "AUTH_IDLE" });
+          return {
+            status: "password_change_required",
+            challenge: {
+              user: user ?? null,
+              passwordChangeToken: password_change_token,
+            },
+          };
+        }
         if (requires_mfa && mfa_token) {
           dispatch({ type: "AUTH_IDLE" });
           return {

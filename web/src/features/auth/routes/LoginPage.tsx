@@ -14,6 +14,7 @@ import {
   USERNAME_PATTERN,
   normalizeUsernameInput,
 } from "../lib/credentialPolicy.ts";
+import { storeRequiredPasswordChangeChallenge } from "../passwordChangeChallenge.ts";
 import {
   AuthShell,
   Btn,
@@ -175,6 +176,17 @@ const LoginPage: React.FC = () => {
     setOptionsError(null);
     try {
       const result = await login(username, password);
+      if (result.status === "password_change_required") {
+        storeRequiredPasswordChangeChallenge({
+          passwordChangeToken: result.challenge.passwordChangeToken,
+          username: result.challenge.user?.username ?? username,
+          redirectTo,
+        });
+        void navigate("/password-change-required", {
+          replace: true,
+        });
+        return;
+      }
       if (result.status === "mfa_required") {
         setChallenge(result.challenge);
         setMfaMethod(

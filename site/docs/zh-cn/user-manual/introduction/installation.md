@@ -4,6 +4,8 @@ import DockerComposeConfigurator from '../../../.vitepress/components/DockerComp
 
 # 安装
 
+如果安装后所有管理员都无法登录，请按照[恢复管理员访问权限](./break-glass.md)操作，不要直接编辑数据库。
+
 ::: warning 注意
 流明集当前处于 Beta 阶段。请先使用测试媒体或已有可靠备份的资料库进行试用，不要将本应用作为重要媒体的唯一存储位置。
 :::

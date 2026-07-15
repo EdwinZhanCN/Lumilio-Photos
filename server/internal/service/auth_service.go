@@ -24,12 +24,14 @@ import (
 )
 
 var (
-	ErrInvalidToken      = errors.New("invalid token")
-	ErrExpiredToken      = errors.New("token has expired")
-	ErrTokenNotFound     = errors.New("token not found")
-	ErrUserNotFound      = errors.New("user not found")
-	ErrInvalidPassword   = errors.New("invalid password")
-	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrInvalidToken               = errors.New("invalid token")
+	ErrExpiredToken               = errors.New("token has expired")
+	ErrTokenNotFound              = errors.New("token not found")
+	ErrUserNotFound               = errors.New("user not found")
+	ErrInvalidPassword            = errors.New("invalid password")
+	ErrUserAlreadyExists          = errors.New("user already exists")
+	ErrPasswordChangeRequired     = errors.New("password change required")
+	ErrInvalidPasswordChangeToken = errors.New("invalid password change token")
 )
 
 // Request/Response types
@@ -84,47 +86,53 @@ type UserResponse struct {
 }
 
 type AuthResponse struct {
-	User           *UserResponse `json:"user,omitempty"`
-	AccessToken    string        `json:"token,omitempty"`
-	RefreshToken   string        `json:"refreshToken,omitempty"`
-	ExpiresAt      *time.Time    `json:"expiresAt,omitempty"`
-	RequiresMFA    bool          `json:"requires_mfa"`
-	MFAToken       string        `json:"mfa_token,omitempty"`
-	MFAMethods     []string      `json:"mfa_methods,omitempty"`
-	BootstrapAdmin bool          `json:"bootstrap_admin,omitempty"`
+	User                   *UserResponse `json:"user,omitempty"`
+	AccessToken            string        `json:"token,omitempty"`
+	RefreshToken           string        `json:"refreshToken,omitempty"`
+	ExpiresAt              *time.Time    `json:"expiresAt,omitempty"`
+	RequiresMFA            bool          `json:"requires_mfa"`
+	MFAToken               string        `json:"mfa_token,omitempty"`
+	MFAMethods             []string      `json:"mfa_methods,omitempty"`
+	BootstrapAdmin         bool          `json:"bootstrap_admin,omitempty"`
+	RequiresPasswordChange bool          `json:"requires_password_change"`
+	PasswordChangeToken    string        `json:"password_change_token,omitempty"`
 }
 
 // AuthService handles JWT authentication operations
 type AuthService struct {
-	queries                *repo.Queries
-	db                     *pgxpool.Pool
-	jwtSecret              []byte
-	mfaTokenSecret         []byte
-	passkeyTokenSecret     []byte
-	mediaTokenSecret       []byte
-	mfaEncryptKey          []byte
-	accessTokenTTL         time.Duration
-	refreshTokenTTL        time.Duration
-	mediaTokenTTL          time.Duration
-	webauthnRPDisplayName  string
-	webauthnRPID           string
-	webauthnAllowedOrigins []string
-	logger                 *zap.Logger
+	queries                   *repo.Queries
+	db                        *pgxpool.Pool
+	jwtSecret                 []byte
+	mfaTokenSecret            []byte
+	passkeyTokenSecret        []byte
+	mediaTokenSecret          []byte
+	passwordChangeTokenSecret []byte
+	mfaEncryptKey             []byte
+	accessTokenTTL            time.Duration
+	refreshTokenTTL           time.Duration
+	mediaTokenTTL             time.Duration
+	webauthnRPDisplayName     string
+	webauthnRPID              string
+	webauthnAllowedOrigins    []string
+	logger                    *zap.Logger
+	securityLogger            *zap.Logger
 }
 
 // JWTClaims represents the claims in the JWT token
 type JWTClaims struct {
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID      int    `json:"user_id"`
+	Username    string `json:"username"`
+	Role        string `json:"role"`
+	AuthVersion int64  `json:"auth_version"`
 	jwt.RegisteredClaims
 }
 
 type MediaTokenClaims struct {
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
-	Scope    string `json:"scope"`
+	UserID      int    `json:"user_id"`
+	Username    string `json:"username"`
+	Role        string `json:"role"`
+	Scope       string `json:"scope"`
+	AuthVersion int64  `json:"auth_version"`
 	jwt.RegisteredClaims
 }
 
@@ -135,8 +143,12 @@ const mediaTokenScope = "media"
 // logger is used so callers (and tests) without logging stay valid.
 func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConfig, loggers ...*zap.Logger) (*AuthService, error) {
 	logger := zap.NewNop()
+	securityLogger := zap.NewNop()
 	if len(loggers) > 0 && loggers[0] != nil {
 		logger = loggers[0]
+	}
+	if len(loggers) > 1 && loggers[1] != nil {
+		securityLogger = loggers[1]
 	}
 	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(cfg.SecretKeyFile))
 	if err != nil {
@@ -146,23 +158,26 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConf
 	mfaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "mfa.signing.v1")
 	passkeyTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "passkey.signing.v1")
 	mediaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "media.url.signing.v1")
+	passwordChangeTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "password.change.signing.v1")
 	mfaEncryptKey := secretbox.DeriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
 	return &AuthService{
-		queries:                queries,
-		db:                     db,
-		jwtSecret:              jwtSecret,
-		mfaTokenSecret:         mfaTokenSecret,
-		passkeyTokenSecret:     passkeyTokenSecret,
-		mediaTokenSecret:       mediaTokenSecret,
-		mfaEncryptKey:          mfaEncryptKey,
-		accessTokenTTL:         cfg.AccessTokenTTL,
-		refreshTokenTTL:        cfg.RefreshTokenTTL,
-		mediaTokenTTL:          cfg.MediaTokenTTL,
-		webauthnRPDisplayName:  cfg.WebAuthnRPName,
-		webauthnRPID:           strings.TrimSpace(cfg.WebAuthnRPID),
-		webauthnAllowedOrigins: normalizeConfiguredWebAuthnOrigins(cfg.WebAuthnRPOrigins),
-		logger:                 logger,
+		queries:                   queries,
+		db:                        db,
+		jwtSecret:                 jwtSecret,
+		mfaTokenSecret:            mfaTokenSecret,
+		passkeyTokenSecret:        passkeyTokenSecret,
+		mediaTokenSecret:          mediaTokenSecret,
+		passwordChangeTokenSecret: passwordChangeTokenSecret,
+		mfaEncryptKey:             mfaEncryptKey,
+		accessTokenTTL:            cfg.AccessTokenTTL,
+		refreshTokenTTL:           cfg.RefreshTokenTTL,
+		mediaTokenTTL:             cfg.MediaTokenTTL,
+		webauthnRPDisplayName:     cfg.WebAuthnRPName,
+		webauthnRPID:              strings.TrimSpace(cfg.WebAuthnRPID),
+		webauthnAllowedOrigins:    normalizeConfiguredWebAuthnOrigins(cfg.WebAuthnRPOrigins),
+		logger:                    logger,
+		securityLogger:            securityLogger,
 	}, nil
 }
 
@@ -228,6 +243,9 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, ErrInvalidPassword
 	}
+	if user.PasswordChangeRequired {
+		return s.issueRequiredPasswordChange(user)
+	}
 
 	status, err := s.queries.GetUserMFAStatus(context.Background(), user.UserID)
 	if err != nil {
@@ -258,7 +276,7 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 // RefreshToken generates a new access token using a refresh token
 func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, error) {
 	// Get refresh token from database
-	refreshToken, err := s.queries.GetRefreshTokenByToken(context.Background(), refreshTokenString)
+	refreshToken, err := s.queries.GetRefreshTokenRecordByToken(context.Background(), refreshTokenString)
 	if err != nil {
 		return nil, ErrTokenNotFound
 	}
@@ -273,9 +291,18 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 		if err := s.queries.RevokeUserRefreshTokens(context.Background(), refreshToken.UserID); err != nil {
 			s.logger.Error("failed to revoke refresh token family after reuse",
 				zap.Int32("user_id", refreshToken.UserID), zap.Error(err))
+			s.securityLogger.Error("refresh token reuse response failed",
+				zap.String("operation", "auth.refresh_token_reuse"),
+				zap.String("outcome", "revoke_failed"),
+				zap.Int32("user_id", refreshToken.UserID),
+				zap.Error(err),
+			)
 		} else {
-			s.logger.Warn("refresh token reuse detected; revoked all sessions",
-				zap.Int32("user_id", refreshToken.UserID))
+			s.securityLogger.Warn("refresh token reuse detected; revoked all sessions",
+				zap.String("operation", "auth.refresh_token_reuse"),
+				zap.String("outcome", "sessions_revoked"),
+				zap.Int32("user_id", refreshToken.UserID),
+			)
 		}
 		return nil, ErrInvalidToken
 	}
@@ -298,6 +325,10 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 		// Revoke token for inactive user
 		s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID)
 		return nil, ErrUserNotFound
+	}
+	if user.PasswordChangeRequired {
+		_ = s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID)
+		return nil, ErrPasswordChangeRequired
 	}
 
 	// Rotate fail-closed: revoke the presented refresh token *before* issuing a
@@ -336,15 +367,36 @@ func (s *AuthService) ValidateToken(tokenString string) (*JWTClaims, error) {
 	return nil, ErrInvalidToken
 }
 
-func (s *AuthService) GenerateMediaToken(userID int, username, role string) (string, time.Time, error) {
+func (s *AuthService) AuthenticateAccessToken(ctx context.Context, tokenString string) (*UserResponse, error) {
+	claims, err := s.ValidateToken(tokenString)
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.queries.GetUserByID(ctx, int32(claims.UserID))
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+	if user.IsActive == nil || !*user.IsActive || user.PasswordChangeRequired || user.AuthVersion != claims.AuthVersion {
+		return nil, ErrInvalidToken
+	}
+	response := ConvertUserToResponse(user)
+	return &response, nil
+}
+
+func (s *AuthService) GenerateMediaToken(ctx context.Context, userID int) (string, time.Time, error) {
+	user, err := s.queries.GetUserByID(ctx, int32(userID))
+	if err != nil || user.IsActive == nil || !*user.IsActive || user.PasswordChangeRequired {
+		return "", time.Time{}, ErrInvalidToken
+	}
 	now := time.Now()
 	expiresAt := now.Add(s.mediaTokenTTL)
 
 	claims := &MediaTokenClaims{
-		UserID:   userID,
-		Username: username,
-		Role:     string(normalizeUserRole(role)),
-		Scope:    mediaTokenScope,
+		UserID:      userID,
+		Username:    user.Username,
+		Role:        string(normalizeUserRole(user.Role)),
+		Scope:       mediaTokenScope,
+		AuthVersion: user.AuthVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -363,7 +415,7 @@ func (s *AuthService) GenerateMediaToken(userID int, username, role string) (str
 	return tokenString, expiresAt, nil
 }
 
-func (s *AuthService) ValidateMediaToken(tokenString string) (*MediaTokenClaims, error) {
+func (s *AuthService) ValidateMediaToken(ctx context.Context, tokenString string) (*MediaTokenClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &MediaTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -380,6 +432,10 @@ func (s *AuthService) ValidateMediaToken(tokenString string) (*MediaTokenClaims,
 	}
 
 	if claims.Scope != mediaTokenScope {
+		return nil, ErrInvalidToken
+	}
+	user, err := s.queries.GetUserByID(ctx, int32(claims.UserID))
+	if err != nil || user.IsActive == nil || !*user.IsActive || user.PasswordChangeRequired || user.AuthVersion != claims.AuthVersion {
 		return nil, ErrInvalidToken
 	}
 
@@ -440,9 +496,10 @@ func (s *AuthService) generateAccessToken(user repo.User) (string, time.Time, er
 	expiresAt := time.Now().Add(s.accessTokenTTL)
 
 	claims := &JWTClaims{
-		UserID:   int(user.UserID),
-		Username: user.Username,
-		Role:     string(normalizeUserRole(user.Role)),
+		UserID:      int(user.UserID),
+		Username:    user.Username,
+		Role:        string(normalizeUserRole(user.Role)),
+		AuthVersion: user.AuthVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

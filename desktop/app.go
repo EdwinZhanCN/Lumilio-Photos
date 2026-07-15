@@ -13,6 +13,7 @@ import (
 
 	"desktop/lumen"
 	"desktop/supervisor"
+	serverapp "server/app"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -66,14 +67,18 @@ type desktopApp struct {
 	lastStage atomic.Value // string: most recent startup stage, for failure dialogs
 }
 
-func newDesktopApp() *desktopApp {
+func newDesktopApp(controls ...serverapp.OperatorControls) *desktopApp {
 	ctx, cancel := context.WithCancel(context.Background())
 	d := &desktopApp{
 		ctx:       ctx,
 		cancel:    cancel,
 		onboardCh: make(chan struct{}),
 	}
-	d.sup = supervisor.New(supervisor.Options{OnStage: d.onStage})
+	operatorControls := serverapp.OperatorControls{}
+	if len(controls) > 0 {
+		operatorControls = controls[0]
+	}
+	d.sup = supervisor.New(supervisor.Options{OnStage: d.onStage, OperatorControls: operatorControls})
 	// Resolve the native-chrome language up front so tray/dialogs are localized
 	// from the first frame; onboarding may refine it.
 	d.lang = d.onboardingLang()

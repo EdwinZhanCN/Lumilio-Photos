@@ -11,14 +11,20 @@ import (
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type UserHandler struct {
 	userService service.UserService
+	securityLog *zap.Logger
 }
 
-func NewUserHandler(userService service.UserService) *UserHandler {
-	return &UserHandler{userService: userService}
+func NewUserHandler(userService service.UserService, loggers ...*zap.Logger) *UserHandler {
+	securityLog := zap.NewNop()
+	if len(loggers) > 0 && loggers[0] != nil {
+		securityLog = loggers[0]
+	}
+	return &UserHandler{userService: userService, securityLog: securityLog}
 }
 
 // UpdateMyProfile updates the authenticated user's profile.
@@ -235,7 +241,7 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 
 // ResetUserAccess resets password and clears MFA factors for a target user.
 // @Summary Reset user access
-// @Description Generate a temporary password and clear passkeys, TOTP, recovery codes, and refresh tokens for a user.
+// @Description Generate a temporary password, require a password change on next login, invalidate existing sessions, and clear passkeys, TOTP, and recovery codes for a user.
 // @Tags users
 // @Accept json
 // @Produce json
@@ -262,6 +268,13 @@ func (h *UserHandler) ResetUserAccess(c *gin.Context) {
 
 	result, err := h.userService.AdminResetAccess(c.Request.Context(), admin.UserID, userID)
 	if err != nil {
+		h.securityLog.Error("administrator access reset failed",
+			zap.String("operation", "auth.admin_reset_access"),
+			zap.String("outcome", "failed"),
+			zap.Int("actor_user_id", admin.UserID),
+			zap.Int("target_user_id", userID),
+			zap.Error(err),
+		)
 		switch {
 		case errors.Is(err, service.ErrUserNotFound):
 			api.GinNotFound(c, err, "User not found")
@@ -272,6 +285,14 @@ func (h *UserHandler) ResetUserAccess(c *gin.Context) {
 		}
 		return
 	}
+	h.securityLog.Warn("administrator reset user access",
+		zap.String("operation", "auth.admin_reset_access"),
+		zap.String("outcome", "succeeded"),
+		zap.Int("actor_user_id", admin.UserID),
+		zap.Int("target_user_id", userID),
+		zap.Bool("cleared_totp", result.ClearedTOTP),
+		zap.Bool("cleared_passkeys", result.ClearedPasskeys),
+	)
 
 	api.JSONOK(c, dto.ToResetAccessResponseDTO(result))
 }

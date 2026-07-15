@@ -60,8 +60,9 @@ var ErrPortInUse = errors.New("the app port is already in use")
 // Supervisor owns the desktop runtime lifecycle. Start it once on app launch and
 // Stop it on quit.
 type Supervisor struct {
-	logf    func(string, ...any)
-	onStage func(string)
+	logf             func(string, ...any)
+	onStage          func(string)
+	operatorControls app.OperatorControls
 
 	paths *Paths
 	pg    *Postgres
@@ -82,6 +83,10 @@ type Options struct {
 	// new phase, letting the host surface progress. It may be called from a
 	// non-UI goroutine, so the host must marshal to its UI thread itself.
 	OnStage func(stage string)
+
+	// OperatorControls are explicit controls for this single desktop launch.
+	// They are never persisted to desktop settings or the generated manifest.
+	OperatorControls app.OperatorControls
 }
 
 // New constructs a Supervisor.
@@ -90,7 +95,7 @@ func New(opts Options) *Supervisor {
 	if logf == nil {
 		logf = log.Printf
 	}
-	return &Supervisor{logf: logf, onStage: opts.OnStage}
+	return &Supervisor{logf: logf, onStage: opts.OnStage, operatorControls: opts.OperatorControls}
 }
 
 // reportStage logs and, if configured, notifies the host that Start has entered
@@ -371,7 +376,7 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	srvCtx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	s.serverErr = make(chan error, 1)
-	go func() { s.serverErr <- app.Run(srvCtx, appConfig, app.OperatorControls{}) }()
+	go func() { s.serverErr <- app.Run(srvCtx, appConfig, s.operatorControls) }()
 
 	if err := s.waitForServer(ctx); err != nil {
 		return err

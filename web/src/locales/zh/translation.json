@@ -578,6 +578,17 @@
       "usernamePlaceholder": "请输入用户名",
       "verifyAndEnable": "验证并启用"
     },
+    "requiredPasswordChange": {
+      "confirmPassword": "确认新密码",
+      "description": "临时密码验证成功。继续使用前，请设置一个永久密码。",
+      "error": "无法设置新密码。",
+      "mismatch": "两次输入的密码必须完全一致。",
+      "newPassword": "新密码",
+      "passwordHint": "长度为 10–72 个字符，且至少包含一个大写字母、一个小写字母和一个数字。",
+      "saving": "正在保存…",
+      "submit": "设置密码并继续",
+      "title": "设置新密码"
+    },
     "setup": {
       "error": "初始化失败。请检查服务器日志后重试。",
       "gate": {

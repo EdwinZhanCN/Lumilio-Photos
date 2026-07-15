@@ -1430,10 +1430,16 @@ const docTemplate = `{
                     "mfa_token": {
                         "type": "string"
                     },
+                    "password_change_token": {
+                        "type": "string"
+                    },
                     "refreshToken": {
                         "type": "string"
                     },
                     "requires_mfa": {
+                        "type": "boolean"
+                    },
+                    "requires_password_change": {
                         "type": "boolean"
                     },
                     "token": {
@@ -1899,6 +1905,21 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "type": "object"
+            },
+            "dto.CompleteRequiredPasswordChangeRequestDTO": {
+                "properties": {
+                    "new_password": {
+                        "type": "string"
+                    },
+                    "password_change_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "new_password",
+                    "password_change_token"
+                ],
                 "type": "object"
             },
             "dto.CreateAgentPinRequest": {
@@ -12108,6 +12129,77 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/auth/password-change/complete": {
+            "post": {
+                "description": "Replace a temporary reset password using the short-lived token returned by login.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CompleteRequiredPasswordChangeRequestDTO",
+                                        "summary": "request",
+                                        "description": "Password change payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Password change payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AuthResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Password changed and session issued"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid password"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired password change token"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Complete required password change",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
         "/api/v1/auth/refresh": {
             "post": {
                 "description": "Generate a new access token using a valid refresh token",
@@ -17408,7 +17500,7 @@ const docTemplate = `{
         },
         "/api/v1/users/{id}/reset-access": {
             "post": {
-                "description": "Generate a temporary password and clear passkeys, TOTP, recovery codes, and refresh tokens for a user.",
+                "description": "Generate a temporary password, require a password change on next login, invalidate existing sessions, and clear passkeys, TOTP, and recovery codes for a user.",
                 "parameters": [
                     {
                         "description": "User ID",

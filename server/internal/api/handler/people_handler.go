@@ -851,7 +851,7 @@ func (h *PeopleHandler) resolveMediaOwnerScope(c *gin.Context) (*int32, bool) {
 		return nil, false
 	}
 
-	claims, err := h.authService.ValidateMediaToken(mediaToken)
+	claims, err := h.authService.ValidateMediaToken(c.Request.Context(), mediaToken)
 	if err != nil {
 		api.GinUnauthorized(c, errors.New("invalid or expired media token"), "Authentication required to access this face crop")
 		return nil, false

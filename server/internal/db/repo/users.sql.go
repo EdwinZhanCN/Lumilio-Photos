@@ -20,7 +20,7 @@ SET username = $2,
     is_active = $6,
     updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
-RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle
+RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
 type AdminUpdateUserParams struct {
@@ -54,6 +54,47 @@ func (q *Queries) AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams
 		&i.AvatarAssetID,
 		&i.Role,
 		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
+	)
+	return i, err
+}
+
+const completeRequiredPasswordChange = `-- name: CompleteRequiredPasswordChange :one
+UPDATE users
+SET password = $3,
+    password_change_required = false,
+    auth_version = auth_version + 1,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+  AND auth_version = $2
+  AND password_change_required = true
+RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
+`
+
+type CompleteRequiredPasswordChangeParams struct {
+	UserID      int32  `db:"user_id" json:"user_id"`
+	AuthVersion int64  `db:"auth_version" json:"auth_version"`
+	Password    string `db:"password" json:"password"`
+}
+
+func (q *Queries) CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error) {
+	row := q.db.QueryRow(ctx, completeRequiredPasswordChange, arg.UserID, arg.AuthVersion, arg.Password)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsActive,
+		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarAssetID,
+		&i.Role,
+		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
 	)
 	return i, err
 }
@@ -112,7 +153,7 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, password, display_name, role, webauthn_user_handle)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle
+RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
 type CreateUserParams struct {
@@ -144,6 +185,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.AvatarAssetID,
 		&i.Role,
 		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
 	)
 	return i, err
 }
@@ -155,6 +198,36 @@ DELETE FROM users WHERE user_id = $1
 func (q *Queries) DeleteUser(ctx context.Context, userID int32) error {
 	_, err := q.db.Exec(ctx, deleteUser, userID)
 	return err
+}
+
+const getOldestActiveAdmin = `-- name: GetOldestActiveAdmin :one
+SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
+FROM users
+WHERE role = 'admin'
+  AND is_active = true
+ORDER BY created_at ASC, user_id ASC
+LIMIT 1
+`
+
+func (q *Queries) GetOldestActiveAdmin(ctx context.Context) (User, error) {
+	row := q.db.QueryRow(ctx, getOldestActiveAdmin)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsActive,
+		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarAssetID,
+		&i.Role,
+		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
+	)
+	return i, err
 }
 
 const getRefreshTokenByToken = `-- name: GetRefreshTokenByToken :one
@@ -176,8 +249,27 @@ func (q *Queries) GetRefreshTokenByToken(ctx context.Context, token string) (Ref
 	return i, err
 }
 
+const getRefreshTokenRecordByToken = `-- name: GetRefreshTokenRecordByToken :one
+SELECT token_id, user_id, token, expires_at, created_at, is_revoked FROM refresh_tokens
+WHERE token = $1
+`
+
+func (q *Queries) GetRefreshTokenRecordByToken(ctx context.Context, token string) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, getRefreshTokenRecordByToken, token)
+	var i RefreshToken
+	err := row.Scan(
+		&i.TokenID,
+		&i.UserID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.IsRevoked,
+	)
+	return i, err
+}
+
 const getUserByID = `-- name: GetUserByID :one
-SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle FROM users WHERE user_id = $1
+SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users WHERE user_id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, userID int32) (User, error) {
@@ -195,12 +287,14 @@ func (q *Queries) GetUserByID(ctx context.Context, userID int32) (User, error) {
 		&i.AvatarAssetID,
 		&i.Role,
 		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle FROM users WHERE username = $1
+SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -218,12 +312,14 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.AvatarAssetID,
 		&i.Role,
 		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle FROM users
+SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -254,6 +350,8 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.AvatarAssetID,
 			&i.Role,
 			&i.WebauthnUserHandle,
+			&i.AuthVersion,
+			&i.PasswordChangeRequired,
 		); err != nil {
 			return nil, err
 		}
@@ -267,7 +365,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 
 const listUsersWithStats = `-- name: ListUsersWithStats :many
 SELECT
-  u.user_id, u.username, u.password, u.created_at, u.updated_at, u.is_active, u.last_login, u.display_name, u.avatar_asset_id, u.role, u.webauthn_user_handle,
+  u.user_id, u.username, u.password, u.created_at, u.updated_at, u.is_active, u.last_login, u.display_name, u.avatar_asset_id, u.role, u.webauthn_user_handle, u.auth_version, u.password_change_required,
   COALESCE(asset_counts.asset_count, 0)::bigint AS asset_count,
   COALESCE(album_counts.album_count, 0)::bigint AS album_count
 FROM users u
@@ -293,19 +391,21 @@ type ListUsersWithStatsParams struct {
 }
 
 type ListUsersWithStatsRow struct {
-	UserID             int32              `db:"user_id" json:"user_id"`
-	Username           string             `db:"username" json:"username"`
-	Password           string             `db:"password" json:"password"`
-	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	IsActive           *bool              `db:"is_active" json:"is_active"`
-	LastLogin          pgtype.Timestamptz `db:"last_login" json:"last_login"`
-	DisplayName        string             `db:"display_name" json:"display_name"`
-	AvatarAssetID      pgtype.UUID        `db:"avatar_asset_id" json:"avatar_asset_id"`
-	Role               string             `db:"role" json:"role"`
-	WebauthnUserHandle []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
-	AssetCount         int64              `db:"asset_count" json:"asset_count"`
-	AlbumCount         int64              `db:"album_count" json:"album_count"`
+	UserID                 int32              `db:"user_id" json:"user_id"`
+	Username               string             `db:"username" json:"username"`
+	Password               string             `db:"password" json:"password"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	IsActive               *bool              `db:"is_active" json:"is_active"`
+	LastLogin              pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	DisplayName            string             `db:"display_name" json:"display_name"`
+	AvatarAssetID          pgtype.UUID        `db:"avatar_asset_id" json:"avatar_asset_id"`
+	Role                   string             `db:"role" json:"role"`
+	WebauthnUserHandle     []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	AuthVersion            int64              `db:"auth_version" json:"auth_version"`
+	PasswordChangeRequired bool               `db:"password_change_required" json:"password_change_required"`
+	AssetCount             int64              `db:"asset_count" json:"asset_count"`
+	AlbumCount             int64              `db:"album_count" json:"album_count"`
 }
 
 func (q *Queries) ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error) {
@@ -329,6 +429,8 @@ func (q *Queries) ListUsersWithStats(ctx context.Context, arg ListUsersWithStats
 			&i.AvatarAssetID,
 			&i.Role,
 			&i.WebauthnUserHandle,
+			&i.AuthVersion,
+			&i.PasswordChangeRequired,
 			&i.AssetCount,
 			&i.AlbumCount,
 		); err != nil {
@@ -340,6 +442,42 @@ func (q *Queries) ListUsersWithStats(ctx context.Context, arg ListUsersWithStats
 		return nil, err
 	}
 	return items, nil
+}
+
+const resetUserAccessPassword = `-- name: ResetUserAccessPassword :one
+UPDATE users
+SET password = $2,
+    password_change_required = true,
+    auth_version = auth_version + 1,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
+`
+
+type ResetUserAccessPasswordParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	Password string `db:"password" json:"password"`
+}
+
+func (q *Queries) ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error) {
+	row := q.db.QueryRow(ctx, resetUserAccessPassword, arg.UserID, arg.Password)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsActive,
+		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarAssetID,
+		&i.Role,
+		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
+	)
+	return i, err
 }
 
 const revokeRefreshToken = `-- name: RevokeRefreshToken :exec
@@ -367,7 +505,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET username = $2, updated_at = CURRENT_TIMESTAMP, last_login = $3
 WHERE user_id = $1
-RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle
+RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
 type UpdateUserParams struct {
@@ -391,6 +529,8 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.AvatarAssetID,
 		&i.Role,
 		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
 	)
 	return i, err
 }
@@ -414,6 +554,8 @@ func (q *Queries) UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLog
 const updateUserPassword = `-- name: UpdateUserPassword :exec
 UPDATE users
 SET password = $2,
+    password_change_required = false,
+    auth_version = auth_version + 1,
     updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
 `
@@ -434,7 +576,7 @@ SET display_name = $2,
     avatar_asset_id = $3,
     updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
-RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle
+RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
 type UpdateUserProfileParams struct {
@@ -458,6 +600,8 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.AvatarAssetID,
 		&i.Role,
 		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
 	)
 	return i, err
 }

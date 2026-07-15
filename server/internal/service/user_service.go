@@ -22,6 +22,7 @@ var (
 	ErrCannotDisableLastAdmin  = errors.New("cannot disable the last active admin")
 	ErrInvalidAvatarAsset      = errors.New("invalid avatar asset")
 	ErrAvatarAssetMustBePhoto  = errors.New("avatar asset must be a photo")
+	ErrBreakGlassTargetInvalid = errors.New("break-glass target must be an active admin")
 )
 
 type ManagedUser struct {
@@ -113,17 +114,19 @@ func (s *userService) ListUsers(ctx context.Context, limit, offset int) (UserLis
 	for _, row := range rows {
 		items = append(items, ManagedUser{
 			UserResponse: ConvertUserToResponse(repo.User{
-				UserID:             row.UserID,
-				Username:           row.Username,
-				Password:           row.Password,
-				CreatedAt:          row.CreatedAt,
-				UpdatedAt:          row.UpdatedAt,
-				IsActive:           row.IsActive,
-				LastLogin:          row.LastLogin,
-				DisplayName:        row.DisplayName,
-				AvatarAssetID:      row.AvatarAssetID,
-				Role:               row.Role,
-				WebauthnUserHandle: row.WebauthnUserHandle,
+				UserID:                 row.UserID,
+				Username:               row.Username,
+				Password:               row.Password,
+				CreatedAt:              row.CreatedAt,
+				UpdatedAt:              row.UpdatedAt,
+				IsActive:               row.IsActive,
+				LastLogin:              row.LastLogin,
+				DisplayName:            row.DisplayName,
+				AvatarAssetID:          row.AvatarAssetID,
+				Role:                   row.Role,
+				WebauthnUserHandle:     row.WebauthnUserHandle,
+				AuthVersion:            row.AuthVersion,
+				PasswordChangeRequired: row.PasswordChangeRequired,
 			}),
 			AssetCount: row.AssetCount,
 			AlbumCount: row.AlbumCount,
@@ -375,6 +378,9 @@ func (s *userService) BreakGlassReset(ctx context.Context, username string) (Res
 			}
 			return ResetAccessResult{}, repo.User{}, fmt.Errorf("get user: %w", err)
 		}
+		if !IsAdminRole(found.Role) || found.IsActive == nil || !*found.IsActive {
+			return ResetAccessResult{}, repo.User{}, ErrBreakGlassTargetInvalid
+		}
 		target = found
 	} else {
 		admin, err := s.oldestActiveAdmin(ctx)
@@ -401,11 +407,11 @@ func (s *userService) resetUserAccess(ctx context.Context, target repo.User) (Re
 	}
 
 	if err := s.withTx(ctx, func(q *repo.Queries) error {
-		if err := q.UpdateUserPassword(ctx, repo.UpdateUserPasswordParams{
+		if _, err := q.ResetUserAccessPassword(ctx, repo.ResetUserAccessPasswordParams{
 			UserID:   target.UserID,
 			Password: passwordHash,
 		}); err != nil {
-			return fmt.Errorf("update password: %w", err)
+			return fmt.Errorf("reset password and authentication version: %w", err)
 		}
 		if err := q.DeleteUserWebAuthnCredentials(ctx, target.UserID); err != nil {
 			return fmt.Errorf("delete passkeys: %w", err)
@@ -431,30 +437,17 @@ func (s *userService) resetUserAccess(ctx context.Context, target repo.User) (Re
 	}, nil
 }
 
-// oldestActiveAdmin returns the earliest-created active admin account.
+// oldestActiveAdmin returns the earliest-created active admin account. Selection
+// and tie-breaking belong in SQL so every eligible account is considered.
 func (s *userService) oldestActiveAdmin(ctx context.Context) (repo.User, error) {
-	users, err := s.queries.ListUsers(ctx, repo.ListUsersParams{Limit: 10000, Offset: 0})
+	admin, err := s.queries.GetOldestActiveAdmin(ctx)
 	if err != nil {
-		return repo.User{}, fmt.Errorf("list users: %w", err)
-	}
-
-	var oldest *repo.User
-	for i := range users {
-		u := users[i]
-		if !IsAdminRole(u.Role) {
-			continue
+		if errors.Is(err, pgx.ErrNoRows) {
+			return repo.User{}, ErrUserNotFound
 		}
-		if u.IsActive == nil || !*u.IsActive {
-			continue
-		}
-		if oldest == nil || u.CreatedAt.Time.Before(oldest.CreatedAt.Time) {
-			oldest = &users[i]
-		}
+		return repo.User{}, fmt.Errorf("get oldest active admin: %w", err)
 	}
-	if oldest == nil {
-		return repo.User{}, ErrUserNotFound
-	}
-	return *oldest, nil
+	return admin, nil
 }
 
 func normalizeOptionalString(value string) *string {
