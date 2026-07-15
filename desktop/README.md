@@ -115,8 +115,7 @@ platform installer (macOS `.dmg` / Windows `setup.exe`), and surfaces **Update
 available** in the menu. Click opens the download URL — install is still manual.
 **Download region** (`cn` | `other`) is chosen in onboarding / the control
 panel and is independent of in-browser map region; `cn` rewrites installer URLs
-through `https://gh-proxy.com/`. Details:
-`site/docs/internal/agent/desktop-updates.md`.
+through `https://gh-proxy.com/`.
 
 > Homebrew Cask was intentionally not used: Homebrew quarantines casks by default,
 > so a cask install of an ad-hoc app hits the same Gatekeeper prompt as the DMG —

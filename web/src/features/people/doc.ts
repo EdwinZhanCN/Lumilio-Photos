@@ -17,8 +17,7 @@
  * repository filter — as do the face list and every mutation below.
  * {@link PersonDetails} is the detail route: a {@link CollectionHero} with an
  * edit action that opens {@link PersonRenameModal}, and the person's asset
- * gallery rendered through {@link AssetsGalleryPage}. See
- * `site/docs/internal/agent/scoping.md` for the scoping model.
+ * gallery rendered through {@link AssetsGalleryPage}.
  *
  * ## Corrections
  *

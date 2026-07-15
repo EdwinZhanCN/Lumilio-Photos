@@ -16,8 +16,7 @@ people); [usePersonDetails](./hooks/usePeople.ts) loads one person plus its rena
 repository filter — as do the face list and every mutation below.
 [PersonDetails](./routes/PersonDetails.tsx) is the detail route: a [CollectionHero](@/components/collection) with an
 edit action that opens [PersonRenameModal](./components/PersonRenameModal.tsx), and the person's asset
-gallery rendered through [AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx). See
-`site/docs/internal/agent/scoping.md` for the scoping model.
+gallery rendered through [AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx).
 
 ## Corrections
 

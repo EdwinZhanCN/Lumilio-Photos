@@ -40,6 +40,5 @@
 // repository default behaviour, is being consolidated into this package so the
 // bootstrap "dirs_ready" gate has a single owner. Until that lands, root
 // directory creation and repository-creation policy are still partly performed
-// by the setup flow and the HTTP handlers. See
-// site/docs/internal/agent/adr/0001-strict-runtime-configuration-manifest.md.
+// by the setup flow and the HTTP handlers.
 package storage

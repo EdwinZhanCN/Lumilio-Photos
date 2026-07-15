@@ -1,9 +1,7 @@
 # Ownership And Repository Scope
 
-> **Completed 2026-07-02.** The model is documented permanently in
-> [`scoping.md`](../../scoping.md). End-to-end validation happens against a
-> reset dev database (migrations were edited in place, per the
-> pre-production policy).
+> **Completed 2026-07-02.** End-to-end validation happens against a reset dev
+> database (migrations were edited in place, per the pre-production policy).
 
 ## Goal
 
@@ -234,11 +232,8 @@ jobs live in Manage.
 
 ## Workstream C — Documentation
 
-1. Write the model down permanently in
-   `site/docs/internal/agent/scoping.md`: the two axes, the two ownership
-   rules, the four-sources table, and the "structurally single-repo" entity
-   table. Link it from `BACKEND.md` (authorization section) and
-   `FRONTEND.md` (state boundaries section).
+1. Record the two axes, the two ownership rules, the four-sources table, and
+   the "structurally single-repo" entity table in this completed plan.
 2. Update `web/src/features/collections/doc.ts` where pages change
    (Duplicates, People); regenerate `doc.md`.
 3. Move `folders-tags.md` to `exec-plans/completed/` once the baseline diff
