@@ -39,8 +39,6 @@ This is the compact system map for agents. Keep details here stable and useful; 
   and serves the React SPA at `localhost:6680`. Its supervisor compiles the
   versioned template to app-data `config/server.toml`, atomically writes it with
   mode `0600`, and reloads it through `LoadAppConfig`. See `desktop/README.md`.
-- App updates (GitHub Releases → platform installer URL, CN download mirror,
-  desktop-only download region): [desktop-updates.md](./desktop-updates.md).
 
 ## Contracts
 
