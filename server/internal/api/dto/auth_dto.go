@@ -37,6 +37,11 @@ type RefreshTokenRequestDTO struct {
 	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
+type CompleteRequiredPasswordChangeRequestDTO struct {
+	PasswordChangeToken string `json:"password_change_token" binding:"required"`
+	NewPassword         string `json:"new_password" binding:"required"`
+}
+
 // UserDTO represents user information
 type UserDTO struct {
 	UserID        int        `json:"user_id"`
@@ -53,14 +58,16 @@ type UserDTO struct {
 
 // AuthResponseDTO represents the response structure for authentication operations
 type AuthResponseDTO struct {
-	User           *UserDTO   `json:"user,omitempty"`
-	AccessToken    string     `json:"token,omitempty"`
-	RefreshToken   string     `json:"refreshToken,omitempty"`
-	ExpiresAt      *time.Time `json:"expiresAt,omitempty"`
-	RequiresMFA    bool       `json:"requires_mfa"`
-	MFAToken       string     `json:"mfa_token,omitempty"`
-	MFAMethods     []string   `json:"mfa_methods,omitempty"`
-	BootstrapAdmin bool       `json:"bootstrap_admin,omitempty"`
+	User                   *UserDTO   `json:"user,omitempty"`
+	AccessToken            string     `json:"token,omitempty"`
+	RefreshToken           string     `json:"refreshToken,omitempty"`
+	ExpiresAt              *time.Time `json:"expiresAt,omitempty"`
+	RequiresMFA            bool       `json:"requires_mfa"`
+	MFAToken               string     `json:"mfa_token,omitempty"`
+	MFAMethods             []string   `json:"mfa_methods,omitempty"`
+	BootstrapAdmin         bool       `json:"bootstrap_admin,omitempty"`
+	RequiresPasswordChange bool       `json:"requires_password_change"`
+	PasswordChangeToken    string     `json:"password_change_token,omitempty"`
 }
 
 type MediaTokenDTO struct {
@@ -80,13 +87,15 @@ func ToAuthResponseDTO(response *service.AuthResponse) *AuthResponseDTO {
 	}
 
 	return &AuthResponseDTO{
-		User:           user,
-		AccessToken:    response.AccessToken,
-		RefreshToken:   response.RefreshToken,
-		ExpiresAt:      response.ExpiresAt,
-		RequiresMFA:    response.RequiresMFA,
-		MFAToken:       response.MFAToken,
-		MFAMethods:     append([]string(nil), response.MFAMethods...),
-		BootstrapAdmin: response.BootstrapAdmin,
+		User:                   user,
+		AccessToken:            response.AccessToken,
+		RefreshToken:           response.RefreshToken,
+		ExpiresAt:              response.ExpiresAt,
+		RequiresMFA:            response.RequiresMFA,
+		MFAToken:               response.MFAToken,
+		MFAMethods:             append([]string(nil), response.MFAMethods...),
+		BootstrapAdmin:         response.BootstrapAdmin,
+		RequiresPasswordChange: response.RequiresPasswordChange,
+		PasswordChangeToken:    response.PasswordChangeToken,
 	}
 }

@@ -33,6 +33,14 @@ func TestDashboardLogEndpoint(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("arbitrary log source status = %d, want 400", rec.Code)
 	}
+
+	// security.log may contain a one-time BreakGlass password and must never be
+	// exposed through the desktop log panel.
+	rec = httptest.NewRecorder()
+	d.onboardingHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/__onb/log?source=security", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("security log source status = %d, want 400", rec.Code)
+	}
 }
 
 func newTestApp(t *testing.T) *desktopApp {

@@ -130,6 +130,40 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
 }
 
+// CompleteRequiredPasswordChange exchanges a single-purpose challenge for a
+// normal authenticated session after the user chooses a permanent password.
+// @Summary Complete required password change
+// @Description Replace a temporary reset password using the short-lived token returned by login.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body dto.CompleteRequiredPasswordChangeRequestDTO true "Password change payload"
+// @Success 200 {object} dto.AuthResponseDTO "Password changed and session issued"
+// @Failure 400 {object} api.ErrorResponse "Invalid password"
+// @Failure 401 {object} api.ErrorResponse "Invalid or expired password change token"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/auth/password-change/complete [post]
+func (h *AuthHandler) CompleteRequiredPasswordChange(c *gin.Context) {
+	var req dto.CompleteRequiredPasswordChangeRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	response, err := h.authService.CompleteRequiredPasswordChange(c.Request.Context(), req.PasswordChangeToken, req.NewPassword)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrWeakPassword):
+			api.GinBadRequest(c, err, err.Error())
+		case errors.Is(err, service.ErrInvalidPasswordChangeToken):
+			api.GinUnauthorized(c, err, "Invalid or expired password change token")
+		default:
+			api.GinInternalError(c, err, "Failed to change password")
+		}
+		return
+	}
+	api.JSONOK(c, dto.ToAuthResponseDTO(response))
+}
+
 // RefreshToken handles JWT token refresh
 // @Summary Refresh access token
 // @Description Generate a new access token using a valid refresh token
@@ -153,7 +187,8 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, service.ErrTokenNotFound) ||
 			errors.Is(err, service.ErrInvalidToken) ||
-			errors.Is(err, service.ErrExpiredToken) {
+			errors.Is(err, service.ErrExpiredToken) ||
+			errors.Is(err, service.ErrPasswordChangeRequired) {
 			api.GinUnauthorized(c, err, "Invalid or expired refresh token")
 			return
 		}
@@ -233,7 +268,7 @@ func (h *AuthHandler) GetMediaToken(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := h.authService.GenerateMediaToken(user.UserID, user.Username, user.Role)
+	token, expiresAt, err := h.authService.GenerateMediaToken(c.Request.Context(), user.UserID)
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to generate media token")
 		return
@@ -302,12 +337,7 @@ func (h *AuthHandler) authenticateRequest(c *gin.Context) (*service.UserResponse
 		return nil, errors.New("invalid authorization header format")
 	}
 
-	claims, err := h.authService.ValidateToken(tokenParts[1])
-	if err != nil {
-		return nil, err
-	}
-
-	return h.authService.GetCurrentUser(claims.UserID)
+	return h.authService.AuthenticateAccessToken(c.Request.Context(), tokenParts[1])
 }
 
 func (h *AuthHandler) setUserContext(c *gin.Context, user *service.UserResponse) {

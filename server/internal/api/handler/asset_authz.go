@@ -153,7 +153,7 @@ func (h *AssetHandler) ensureOwnerAccessForMedia(c *gin.Context, ownerID *int32,
 		return false
 	}
 
-	claims, err := h.authService.ValidateMediaToken(mediaToken)
+	claims, err := h.authService.ValidateMediaToken(c.Request.Context(), mediaToken)
 	if err != nil {
 		api.GinUnauthorized(c, errors.New("invalid or expired media token"), unauthorizedMessage)
 		return false

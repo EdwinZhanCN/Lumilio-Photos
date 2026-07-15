@@ -8,6 +8,7 @@ export const enSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "Overview", link: "/user-manual/introduction/" },
         { text: "Installation", link: "/user-manual/introduction/installation" },
+        { text: "Recover administrator access", link: "/user-manual/introduction/break-glass" },
       ],
     },
     {

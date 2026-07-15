@@ -92,6 +92,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	defer restoreStdLog()
 
 	appLogger := logRuntime.Named("app")
+	securityLogger := logRuntime.Security()
 	lumenLogger := logRuntime.Named("lumen")
 	repositoryLogger := logRuntime.Named("repository")
 	processorLogger := logRuntime.Named("processor")
@@ -136,13 +137,11 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 
 	// Run database migrations
 	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
-		appLogger.Warn("failed to run migrations automatically",
+		appLogger.Error("failed to run migrations automatically",
 			zap.String("operation", "database.migrate"),
 			zap.Error(err),
 		)
-		appLogger.Warn("please run migrations manually using migrate -path server/migrations -database \"$DATABASE_URL\" up",
-			zap.String("operation", "database.migrate"),
-		)
+		return fmt.Errorf("run database migrations: %w", err)
 	}
 
 	// Connect to the database
@@ -219,7 +218,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
 	duplicateService := service.NewDuplicateService(queries, pgxPool, appLogger.Named("duplicate"), assetService)
-	authService, err := service.NewAuthService(queries, pgxPool, appConfig.Auth, appLogger.Named("auth"))
+	authService, err := service.NewAuthService(queries, pgxPool, appConfig.Auth, appLogger.Named("auth"), securityLogger)
 	if err != nil {
 		return fmt.Errorf("initialize auth service: %w", err)
 	}
@@ -228,7 +227,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 
 	// Break-glass recovery is an explicit single-run host control, separate from
 	// immutable AppConfig.
-	runBreakGlassIfRequested(ctx, userService, controls.BreakGlass, controls.BreakGlassUsername, appLogger)
+	runBreakGlassIfRequested(ctx, userService, controls.BreakGlass, controls.BreakGlassUsername, securityLogger)
 
 	// Initialize Agent Service. The ref store is shared between the agent
 	// tool chain and the hydration API handler; its janitor bounds memory
@@ -378,7 +377,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	locationController := handler.NewLocationHandler(locationService, queueClient)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
-	userController := handler.NewUserHandler(userService)
+	userController := handler.NewUserHandler(userService, securityLogger)
 	queueController := handler.NewQueueHandler(pgxPool)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins, assetService)

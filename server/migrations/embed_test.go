@@ -74,3 +74,19 @@ func TestCollectionsBaselineUsesLogicalMediaItems(t *testing.T) {
 		t.Fatal("RAW/JPEG must be a media-item structure, not a presentation stack kind")
 	}
 }
+
+func TestBreakGlassSecurityMigrationAddsAuthenticationState(t *testing.T) {
+	up, err := FS.ReadFile("000008_breakglass_security.up.sql")
+	if err != nil {
+		t.Fatalf("read break-glass migration: %v", err)
+	}
+	migration := strings.ToLower(string(up))
+	for _, required := range []string{
+		"auth_version bigint not null default 0",
+		"password_change_required boolean not null default false",
+	} {
+		if !strings.Contains(migration, required) {
+			t.Fatalf("break-glass migration missing %q", required)
+		}
+	}
+}

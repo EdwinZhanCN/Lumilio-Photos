@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,6 +21,7 @@ const (
 	defaultCompressBackups = true
 	globalApplicationLog   = "app.log"
 	globalErrorLog         = "error.log"
+	globalSecurityLog      = "security.log"
 )
 
 type Config struct {
@@ -31,8 +33,9 @@ type Config struct {
 }
 
 type Runtime struct {
-	logger      *zap.Logger
-	riverLogger *slog.Logger
+	logger         *zap.Logger
+	securityLogger *zap.Logger
+	riverLogger    *slog.Logger
 }
 
 func NewLogger(cfg Config) (*Runtime, error) {
@@ -42,6 +45,10 @@ func NewLogger(cfg Config) (*Runtime, error) {
 
 	if err := os.MkdirAll(cfg.LogDir, 0755); err != nil {
 		return nil, err
+	}
+	securityPath := filepath.Join(cfg.LogDir, globalSecurityLog)
+	if err := prepareSecurityLog(securityPath); err != nil {
+		return nil, fmt.Errorf("prepare security log: %w", err)
 	}
 
 	atomicLevel := zap.NewAtomicLevel()
@@ -72,10 +79,20 @@ func NewLogger(cfg Config) (*Runtime, error) {
 		zap.AddCallerSkip(1),
 		zap.ErrorOutput(zapcore.AddSync(newRollingWriter(filepath.Join(cfg.LogDir, globalErrorLog)))),
 	)
+	security := zap.New(
+		zapcore.NewCore(
+			newEncoder("json", false, true),
+			zapcore.AddSync(newRollingWriter(securityPath)),
+			zap.LevelEnablerFunc(func(level zapcore.Level) bool { return level >= zapcore.InfoLevel }),
+		),
+		zap.AddCaller(),
+		zap.AddCallerSkip(1),
+	)
 
 	return &Runtime{
-		logger:      root,
-		riverLogger: slog.New(NewSlogZapHandler(root.With(zap.String("component", "river")))),
+		logger:         root,
+		securityLogger: security,
+		riverLogger:    slog.New(NewSlogZapHandler(root.With(zap.String("component", "river")))),
 	}, nil
 }
 
@@ -94,6 +111,16 @@ func (r *Runtime) Named(component string) *zap.Logger {
 	return r.Logger().Named(component).With(zap.String("component", component))
 }
 
+// Security returns a logger whose events are isolated to security.log. Callers
+// must never attach secrets other than the explicitly issued break-glass
+// temporary password.
+func (r *Runtime) Security() *zap.Logger {
+	if r == nil || r.securityLogger == nil {
+		return zap.NewNop()
+	}
+	return r.securityLogger.Named("security").With(zap.String("component", "security"))
+}
+
 func (r *Runtime) RiverLogger() *slog.Logger {
 	if r == nil || r.riverLogger == nil {
 		return slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -105,14 +132,16 @@ func (r *Runtime) Sync() error {
 	if r == nil || r.logger == nil {
 		return nil
 	}
-	err := r.logger.Sync()
-	if err == nil {
-		return nil
+	var syncErrors []error
+	for _, logger := range []*zap.Logger{r.logger, r.securityLogger} {
+		if logger == nil {
+			continue
+		}
+		if err := logger.Sync(); err != nil && !ignorableSyncError(err) {
+			syncErrors = append(syncErrors, err)
+		}
 	}
-	if ignorableSyncError(err) {
-		return nil
-	}
-	return err
+	return errors.Join(syncErrors...)
 }
 
 func newEncoder(format string, development bool, fileOutput bool) zapcore.Encoder {
@@ -144,6 +173,17 @@ func newRollingWriter(path string) io.Writer {
 		MaxAge:     defaultMaxAgeDays,
 		Compress:   defaultCompressBackups,
 	}
+}
+
+func prepareSecurityLog(path string) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0600)
 }
 
 func ignorableSyncError(err error) bool {

@@ -5913,6 +5913,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password-change/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete required password change
+         * @description Replace a temporary reset password using the short-lived token returned by login.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Password change payload */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.CompleteRequiredPasswordChangeRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Password changed and session issued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AuthResponseDTO"];
+                    };
+                };
+                /** @description Invalid password */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Invalid or expired password change token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -10836,7 +10907,7 @@ export interface paths {
         put?: never;
         /**
          * Reset user access
-         * @description Generate a temporary password and clear passkeys, TOTP, recovery codes, and refresh tokens for a user.
+         * @description Generate a temporary password, require a password change on next login, invalidate existing sessions, and clear passkeys, TOTP, and recovery codes for a user.
          */
         post: {
             parameters: {
@@ -11588,8 +11659,10 @@ export interface components {
             expiresAt?: string;
             mfa_methods?: string[];
             mfa_token?: string;
+            password_change_token?: string;
             refreshToken?: string;
             requires_mfa?: boolean;
+            requires_password_change?: boolean;
             token?: string;
             user?: components["schemas"]["dto.UserDTO"];
         };
@@ -11764,6 +11837,10 @@ export interface components {
             required?: boolean;
             /** @example email */
             type?: string;
+        };
+        "dto.CompleteRequiredPasswordChangeRequestDTO": {
+            new_password: string;
+            password_change_token: string;
         };
         "dto.CreateAgentPinRequest": {
             layout?: components["schemas"]["dto.AgentPinLayoutDTO"];

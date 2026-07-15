@@ -22,6 +22,7 @@ import SharedLinks from "@/features/share/routes/SharedLinks.tsx";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import MFAPage from "@/features/auth/routes/MFAPage.tsx";
 import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
+import RequiredPasswordChangePage from "@/features/auth/routes/RequiredPasswordChangePage.tsx";
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
 import BootstrapWizard from "@/features/auth/routes/BootstrapWizard.tsx";
 import { Navigate } from "react-router-dom";
@@ -44,6 +45,10 @@ export const publicRoutes = [
   {
     path: "/register",
     element: <RegisterPage />,
+  },
+  {
+    path: "/password-change-required",
+    element: <RequiredPasswordChangePage />,
   },
 ];
 

@@ -578,6 +578,17 @@
       "usernamePlaceholder": "admin",
       "verifyAndEnable": "Verify & enable"
     },
+    "requiredPasswordChange": {
+      "confirmPassword": "Confirm new password",
+      "description": "Your temporary password was accepted. Set a permanent password before continuing.",
+      "error": "Unable to set the new password.",
+      "mismatch": "Passwords must match exactly.",
+      "newPassword": "New password",
+      "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
+      "saving": "Saving…",
+      "submit": "Set password and continue",
+      "title": "Choose a new password"
+    },
     "setup": {
       "error": "Setup failed. Check the server logs and try again.",
       "gate": {

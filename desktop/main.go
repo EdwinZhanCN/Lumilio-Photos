@@ -5,13 +5,42 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
+
+	"server/app"
 )
 
 func main() {
-	if err := newDesktopApp().run(); err != nil {
+	controls, err := parseDesktopCLI(os.Args[1:], os.Stderr)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if err := newDesktopApp(controls).run(); err != nil {
 		log.Printf("application exited with error: %v", err)
 		os.Exit(1)
 	}
+}
+
+func parseDesktopCLI(args []string, stderr io.Writer) (app.OperatorControls, error) {
+	flags := flag.NewFlagSet("Lumilio Photos", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	breakGlass := flags.Bool("break-glass", false, "recover an active administrator for this launch")
+	username := flags.String("break-glass-username", "", "active administrator username to recover")
+	if err := flags.Parse(args); err != nil {
+		return app.OperatorControls{}, err
+	}
+	if flags.NArg() != 0 {
+		return app.OperatorControls{}, fmt.Errorf("unexpected positional arguments")
+	}
+	trimmedUsername := strings.TrimSpace(*username)
+	if trimmedUsername != "" && !*breakGlass {
+		return app.OperatorControls{}, fmt.Errorf("--break-glass-username requires --break-glass")
+	}
+	return app.OperatorControls{BreakGlass: *breakGlass, BreakGlassUsername: trimmedUsername}, nil
 }

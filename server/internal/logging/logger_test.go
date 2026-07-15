@@ -42,6 +42,47 @@ func TestNewLoggerRoutesApplicationAndErrorLogs(t *testing.T) {
 	assert.Contains(t, errorText, "warn message")
 	assert.NotContains(t, errorText, "info message")
 	assert.Contains(t, appText, "\"component\":\"app\"")
+	securityBytes, err := os.ReadFile(filepath.Join(logDir, globalSecurityLog))
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(string(securityBytes)))
+}
+
+func TestSecurityLoggerIsIsolatedAndAlwaysEnabled(t *testing.T) {
+	logDir := t.TempDir()
+	runtime, err := NewLogger(Config{
+		Level:         "error",
+		LogDir:        logDir,
+		ConsoleFormat: "console",
+		FileFormat:    "json",
+	})
+	require.NoError(t, err)
+	defer runtime.Sync()
+
+	runtime.Security().Warn("temporary access issued",
+		zap.String("operation", "auth.break_glass"),
+		zap.String("temporary_password", "OnlyInSecurity9"),
+	)
+	require.NoError(t, runtime.Sync())
+
+	securityPath := filepath.Join(logDir, globalSecurityLog)
+	securityBytes, err := os.ReadFile(securityPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(securityBytes), "OnlyInSecurity9")
+
+	appBytes, err := os.ReadFile(filepath.Join(logDir, globalApplicationLog))
+	if err != nil && !os.IsNotExist(err) {
+		require.NoError(t, err)
+	}
+	errorBytes, err := os.ReadFile(filepath.Join(logDir, globalErrorLog))
+	if err != nil && !os.IsNotExist(err) {
+		require.NoError(t, err)
+	}
+	assert.NotContains(t, string(appBytes), "OnlyInSecurity9")
+	assert.NotContains(t, string(errorBytes), "OnlyInSecurity9")
+
+	info, err := os.Stat(securityPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 }
 
 func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
