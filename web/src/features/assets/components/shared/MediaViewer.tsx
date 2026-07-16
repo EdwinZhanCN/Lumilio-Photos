@@ -13,7 +13,7 @@ import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/l
 import { useI18n } from "@/lib/i18n";
 import { useAssetMediaItem } from "@/features/assets/hooks/useAssetMediaItem";
 import { useLivePhotoPlayback } from "@/features/assets/hooks/useLivePhotoPlayback";
-import { LivePhotos } from "@/components/icons/LivePhotos";
+import { LivePhotos } from "./LivePhotos";
 
 interface MediaViewerProps {
   asset: Asset;

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import "@/styles/pyramid.css";
+import "./pyramid.css";
 
 interface LumilioAvatarProps {
   /** When true, the pyramid will spin. */
