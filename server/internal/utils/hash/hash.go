@@ -16,6 +16,8 @@ const (
 
 	// Threshold for using quick hash vs full hash (100 MB)
 	QuickHashThreshold = 100 * 1024 * 1024
+
+	QuickFingerprintVersion = "blake3-size-first-last-1m-v1"
 )
 
 // HashAlgorithm defines the hashing algorithm to use
@@ -32,6 +34,36 @@ type HashResult struct {
 	Hash      string        `json:"hash"`
 	IsQuick   bool          `json:"is_quick"` // true if quick hash was used
 	FileSize  int64         `json:"file_size"`
+}
+
+// LayeredHashResult separates authoritative full-file identity from the
+// optional large-file precheck fingerprint.
+type LayeredHashResult struct {
+	ContentHash             string
+	QuickFingerprint        *string
+	QuickFingerprintVersion *string
+	FileSize                int64
+}
+
+// CalculateLayeredBLAKE3 always calculates a full BLAKE3 content hash. Large
+// files additionally receive a versioned quick fingerprint.
+func CalculateLayeredBLAKE3(filePath string) (*LayeredHashResult, error) {
+	full, err := CalculateFileHash(filePath, AlgorithmBLAKE3, false)
+	if err != nil {
+		return nil, err
+	}
+	result := &LayeredHashResult{ContentHash: full.Hash, FileSize: full.FileSize}
+	if full.FileSize <= QuickHashThreshold {
+		return result, nil
+	}
+	quick, err := CalculateFileHash(filePath, AlgorithmBLAKE3, true)
+	if err != nil {
+		return nil, err
+	}
+	result.QuickFingerprint = &quick.Hash
+	version := QuickFingerprintVersion
+	result.QuickFingerprintVersion = &version
+	return result, nil
 }
 
 // CalculateFileHash calculates the hash of a file using the specified algorithm
@@ -211,46 +243,13 @@ func isHexString(s string) bool {
 	return true
 }
 
-// GetHashForAssetType returns the appropriate hash strategy for an asset type
-// Photos: Full BLAKE3 (preferred from client) or SHA256
-// Videos: Quick hash for large files, full for small
-// Audio: Quick hash for large files, full for small
+// GetHashForAssetType is retained for internal callers that need a HashResult.
+// Asset identity is always derived from the full server-side file contents;
+// clientHash is intentionally ignored.
 func GetHashForAssetType(filePath string, assetType string, clientHash string) (*HashResult, error) {
-	// If client provided a valid hash, use it
-	if clientHash != "" && (ValidateHash(clientHash, AlgorithmBLAKE3) || ValidateHash(clientHash, AlgorithmSHA256)) {
-		stat, err := os.Stat(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to stat file: %w", err)
-		}
-
-		// Determine algorithm from hash length and format
-		algorithm := AlgorithmBLAKE3 // Assume BLAKE3 from client
-		if !ValidateHash(clientHash, AlgorithmBLAKE3) {
-			algorithm = AlgorithmSHA256
-		}
-
-		return &HashResult{
-			Algorithm: algorithm,
-			Hash:      clientHash,
-			IsQuick:   false,
-			FileSize:  stat.Size(),
-		}, nil
-	}
-
-	// Fallback: calculate hash based on asset type
-	switch assetType {
-	case "PHOTO":
-		// Photos: full BLAKE3 hash (preferred) or SHA256
-		return CalculateFileHash(filePath, AlgorithmBLAKE3, false)
-
-	case "VIDEO", "AUDIO":
-		// Videos/Audio: use quick hash for large files
-		return CalculateFileHash(filePath, AlgorithmBLAKE3, true)
-
-	default:
-		// Default: full BLAKE3 hash
-		return CalculateFileHash(filePath, AlgorithmBLAKE3, false)
-	}
+	_ = assetType
+	_ = clientHash
+	return CalculateFileHash(filePath, AlgorithmBLAKE3, false)
 }
 
 // CompareHashes compares two hashes, handling different algorithms

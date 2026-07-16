@@ -13,10 +13,12 @@ stores selected `UploadState.files`, placeholder preview slots, and
 drag-over state. Consumers use [useUploadContext](./hooks/useUpload.tsx); calling that hook
 outside the provider is an error.
 
-Upload processing state comes from [useUploadProcess](./hooks/useUploadProcess.tsx). It owns the
-aggregate progress number, per-file [FileUploadProgress](./hooks/useUploadProcess.tsx), hashing
-progress, and the two active flags used by the provider:
-`isGeneratingHashCodes` and `isUploading`.
+Upload processing state comes from [useUploadProcess](./hooks/useUploadProcess.tsx). Its React state
+bridge is isolated in [useUploadProgressState](./hooks/uploadProcessProgress.ts); the hash/upload pipeline
+is coordinated by [runUploadProcess](./hooks/uploadProcessRunner.ts), and transport-specific behavior is
+owned by [createUploadTransport](./hooks/uploadProcessTransport.ts). The hook exposes the aggregate progress
+number, per-file [FileUploadProgress](./hooks/useUploadProcess.tsx), hashing progress, and the two active
+flags used by the provider: `isGeneratingHashCodes` and `isUploading`.
 
 [UnifiedUploadSection](./components/UnifiedUploadSection.tsx) is the primary queue editor. It validates
 selected files, adds them to the provider queue, lets the user clear the

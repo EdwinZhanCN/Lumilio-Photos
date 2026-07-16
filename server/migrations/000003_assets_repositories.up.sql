@@ -54,7 +54,9 @@ CREATE TABLE public.assets (
     storage_path character varying(512),
     mime_type character varying(50) NOT NULL,
     file_size bigint NOT NULL,
-    hash character varying(64),
+    content_hash character varying(64) NOT NULL,
+    quick_fingerprint character varying(64),
+    quick_fingerprint_version character varying(32),
     width integer,
     height integer,
     duration double precision,
@@ -258,10 +260,12 @@ CREATE INDEX idx_assets_gps_lat_lng ON public.assets USING btree (gps_latitude, 
 
 
 --
--- Name: idx_assets_hash; Type: INDEX; Schema: public; Owner: -
+-- Name: layered asset hash indexes; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_assets_hash ON public.assets USING btree (hash);
+CREATE INDEX idx_assets_content_hash ON public.assets USING btree (content_hash);
+CREATE INDEX idx_assets_quick_fingerprint ON public.assets USING btree (quick_fingerprint, file_size)
+WHERE quick_fingerprint IS NOT NULL AND is_deleted = false;
 
 
 --

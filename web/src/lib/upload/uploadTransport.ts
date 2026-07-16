@@ -8,6 +8,7 @@ import type {
   ChunkedUploadOptions,
   UploadPrecheckFile,
   UploadPrecheckResponse,
+  UploadSessionState,
 } from "@/lib/upload/types";
 
 const baseURL = import.meta.env.VITE_API_URL ?? "";
@@ -80,7 +81,7 @@ export const uploadFile = async (
   formData.append("file", file);
 
   const headers: Record<string, string> = {
-    "X-Content-Hash": hash,
+    "X-Upload-Fingerprint": hash,
   };
 
   attachAuthHeader(headers);
@@ -164,7 +165,7 @@ export const batchUploadFiles = async (
   const headers: Record<string, string> = {};
 
   if (options?.contentHash) {
-    headers["X-Content-Hash"] = options.contentHash;
+    headers["X-Upload-Fingerprint"] = options.contentHash;
   }
 
   attachAuthHeader(headers);
@@ -235,46 +236,62 @@ export const uploadFileInChunks = async (
   const maxConcurrent = options?.maxConcurrent ?? 6;
   let lastResponse: BatchUploadResponse | null = null;
 
+  const session = await createUploadSession({
+    session_id: sessionId,
+    filename: file.name,
+    total_size: file.size,
+    total_chunks: totalChunks,
+    content_type: file.type,
+    repository_id: repositoryId,
+    client_fingerprint: hash,
+  });
+  if (session.status === "completed" && session.task_id) {
+    return { results: [{ success: true, file_name: file.name, content_hash: "", task_id: session.task_id, status: "processing" }] };
+  }
+  const completed = new Set(session.received_chunks ?? []);
+
   const uploadChunk = async (chunkIndex: number) => {
     const start = chunkIndex * effectiveChunkSize;
     const end = Math.min(start + effectiveChunkSize, file.size);
     const chunk = file.slice(start, end);
 
-    return batchUploadFiles(
-      [
-        {
-          file: chunk,
-          fileName: file.name,
-          sessionId,
-          isChunk: true,
-          chunkIndex,
-          totalChunks,
-        },
-      ],
-      repositoryId,
-      {
-        contentHash: hash,
-      },
-    );
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        return await batchUploadFiles(
+          [{ file: chunk, fileName: file.name, sessionId, isChunk: true, chunkIndex, totalChunks }],
+          repositoryId,
+          { contentHash: hash },
+        );
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) await new Promise((resolve) => globalThis.setTimeout(resolve, 300 * 2 ** attempt));
+      }
+    }
+    throw lastError;
   };
 
   let activeUploads = 0;
-  let nextChunkIndex = 0;
-  let completedChunks = 0;
+  const pendingChunks = Array.from({ length: totalChunks }, (_, index) => index).filter((index) => !completed.has(index));
+  // If every chunk reached the server but the completion response was lost,
+  // replay the final chunk as an idempotent finalize ping.
+  if (pendingChunks.length === 0 && totalChunks > 0) pendingChunks.push(totalChunks - 1);
+  let nextPendingIndex = 0;
+  let completedChunks = completed.size;
   let stopped = false;
 
   return new Promise((resolve, reject) => {
     const processNext = () => {
       if (stopped) return;
-      if (nextChunkIndex >= totalChunks) {
+      if (nextPendingIndex >= pendingChunks.length) {
         if (activeUploads === 0 && lastResponse) {
           resolve(lastResponse);
         }
         return;
       }
 
-      while (activeUploads < maxConcurrent && nextChunkIndex < totalChunks) {
-        const currentIndex = nextChunkIndex++;
+      while (activeUploads < maxConcurrent && nextPendingIndex < pendingChunks.length) {
+		const currentIndex = pendingChunks[nextPendingIndex++];
         activeUploads++;
 
         uploadChunk(currentIndex)
@@ -301,8 +318,40 @@ export const uploadFileInChunks = async (
   });
 };
 
+export const createUploadSession = async (request: {
+  session_id?: string; filename: string; total_size: number; total_chunks: number;
+  content_type?: string; repository_id?: string; client_fingerprint?: string;
+}): Promise<UploadSessionState> => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  attachAuthHeader(headers);
+  const response = await fetch(`${baseURL}/api/v1/assets/batch/sessions`, {
+    method: "POST", headers, body: JSON.stringify(request),
+  });
+  return parseSuccessfulJSON<UploadSessionState>(response, "Upload session");
+};
+
 export const generateSessionId = (): string => {
   return crypto.randomUUID();
+};
+
+export const getResumableSessionId = (file: File, repositoryId?: string): string => {
+  const key = resumableSessionKey(file, repositoryId);
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const created = generateSessionId();
+    localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return generateSessionId();
+  }
+};
+
+const resumableSessionKey = (file: File, repositoryId?: string): string =>
+  `lumilio.upload.session.v1:${repositoryId ?? "primary"}:${file.name}:${file.size}:${file.lastModified}`;
+
+export const clearResumableSessionId = (file: File, repositoryId?: string): void => {
+  try { localStorage.removeItem(resumableSessionKey(file, repositoryId)); } catch { /* storage is optional */ }
 };
 
 export const shouldUseChunks = (file: File, threshold: number = 10 * 1024 * 1024): boolean => {

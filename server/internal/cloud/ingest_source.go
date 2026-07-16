@@ -135,7 +135,7 @@ func (s *CloudImportSource) Discover(ctx context.Context) (<-chan sourcing.Inges
 					SourcePath:       stagingPath,
 					OriginalFilename: ra.Filename,
 					Size:             ra.Size,
-					Hash:             nil, // materializer computes BLAKE3
+					ContentHash:      nil, // materializer computes BLAKE3
 					Timestamp:        ra.ModifiedAt,
 					ContentType:      ra.MIME,
 					Metadata: map[string]any{

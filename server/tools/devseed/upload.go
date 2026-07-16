@@ -163,7 +163,7 @@ func (api *apiClient) sendUpload(ctx context.Context, token, filePath, contentHa
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
-	request.Header.Set("X-Content-Hash", contentHash)
+	request.Header.Set("X-Upload-Fingerprint", contentHash)
 	response, err := api.http.Do(request)
 	if err != nil {
 		return uploadResponse{}, 0, err

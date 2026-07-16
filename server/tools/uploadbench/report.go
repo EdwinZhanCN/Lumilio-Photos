@@ -299,7 +299,7 @@ func writeReport(rc *runContext, s *summary) error {
 	if s.DBExact {
 		timingNote = "completion times are exact (river_job.finalized_at)"
 	}
-	f("> Client-hash mode = %v; %s. HTTP acceptance is asynchronous and is NOT photo-ready. ", s.ClientHash, timingNote)
+	f("> Client-fingerprint hint = %v; the server still verifies full BLAKE3; %s. HTTP acceptance is asynchronous and is NOT photo-ready. ", s.ClientHash, timingNote)
 	f("This is a single run; publish the median of >=5 runs with hardware/dataset disclosure.\n")
 
 	path := filepath.Join(rc.cfg.outDir, "report.md")

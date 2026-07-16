@@ -438,10 +438,10 @@ func (s *Scanner) reconcileMovedEntries(
 	candidates := make(map[assetFingerprint][]string)
 	candidateSizes := make(map[int64]struct{})
 	for storagePath, asset := range missingAssets {
-		if isSoftDeleted(asset) || asset.Hash == nil || strings.TrimSpace(*asset.Hash) == "" {
+		if isSoftDeleted(asset) || strings.TrimSpace(asset.ContentHash) == "" {
 			continue
 		}
-		key := assetFingerprint{hash: *asset.Hash, size: asset.FileSize}
+		key := assetFingerprint{hash: asset.ContentHash, size: asset.FileSize}
 		candidates[key] = append(candidates[key], storagePath)
 		candidateSizes[asset.FileSize] = struct{}{}
 	}
@@ -459,7 +459,7 @@ func (s *Scanner) reconcileMovedEntries(
 		}
 
 		fullPath := filepath.Join(repository.Path, filepath.FromSlash(entry.StoragePath))
-		hashResult, err := hash.CalculateFileHash(fullPath, hash.AlgorithmBLAKE3, true)
+		hashResult, err := hash.CalculateFileHash(fullPath, hash.AlgorithmBLAKE3, false)
 		if err != nil {
 			s.logger.Warn("failed to hash potential moved asset",
 				zap.String("repository_id", repository.RepoID.String()),

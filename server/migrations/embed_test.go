@@ -90,3 +90,20 @@ func TestBreakGlassSecurityMigrationAddsAuthenticationState(t *testing.T) {
 		}
 	}
 }
+
+func TestAssetBaselineUsesLayeredHashes(t *testing.T) {
+	sql, err := FS.ReadFile("000003_assets_repositories.up.sql")
+	if err != nil {
+		t.Fatalf("read asset baseline migration: %v", err)
+	}
+	migration := strings.ToLower(string(sql))
+	for _, required := range []string{
+		"content_hash character varying(64) not null",
+		"quick_fingerprint character varying(64)",
+		"quick_fingerprint_version character varying(32)",
+	} {
+		if !strings.Contains(migration, required) {
+			t.Fatalf("asset baseline migration missing layered hash contract %q", required)
+		}
+	}
+}

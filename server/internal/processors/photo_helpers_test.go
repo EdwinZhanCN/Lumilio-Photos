@@ -81,8 +81,8 @@ func TestGenerateThumbnailsStoresInlinePHashAndKeepsLarge(t *testing.T) {
 	imaging.StartVips()
 
 	asset := &repo.Asset{
-		AssetID: pgtype.UUID{Valid: true},
-		Hash:    stringPtr("asset-hash"),
+		AssetID:     pgtype.UUID{Valid: true},
+		ContentHash: "asset-hash",
 	}
 	assetSvc := &thumbnailAssetServiceStub{}
 	embedding := &pHashEmbeddingStub{}
@@ -113,8 +113,8 @@ func TestGenerateThumbnailsFallsBackWhenInlinePHashSaveFails(t *testing.T) {
 	imaging.StartVips()
 
 	asset := &repo.Asset{
-		AssetID: pgtype.UUID{Valid: true},
-		Hash:    stringPtr("asset-hash"),
+		AssetID:     pgtype.UUID{Valid: true},
+		ContentHash: "asset-hash",
 	}
 	ap := &AssetProcessor{
 		assetService:     &thumbnailAssetServiceStub{},

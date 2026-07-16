@@ -259,13 +259,14 @@ func (args ProcessPHashArgs) InsertOpts() river.InsertOpts {
 
 // IngestAssetArgs handles initial staging ingestion and asset creation.
 type IngestAssetArgs struct {
-	ClientHash   string    `json:"clientHash" river:"unique"`
-	StagedPath   string    `json:"stagedPath"`
-	UserID       string    `json:"userId" river:"unique"`
-	Timestamp    time.Time `json:"timestamp"`
-	ContentType  string    `json:"contentType,omitempty"`
-	FileName     string    `json:"fileName,omitempty"`
-	RepositoryID string    `json:"repositoryId,omitempty"`
+	ContentHash      string    `json:"contentHash" river:"unique"`
+	QuickFingerprint string    `json:"quickFingerprint,omitempty"`
+	StagedPath       string    `json:"stagedPath"`
+	UserID           string    `json:"userId" river:"unique"`
+	Timestamp        time.Time `json:"timestamp"`
+	ContentType      string    `json:"contentType,omitempty"`
+	FileName         string    `json:"fileName,omitempty"`
+	RepositoryID     string    `json:"repositoryId,omitempty"`
 }
 
 func (IngestAssetArgs) Kind() string { return "ingest_asset" }

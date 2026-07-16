@@ -55,7 +55,7 @@ func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
 			StoragePath:          row.StoragePath,
 			MimeType:             row.MimeType,
 			FileSize:             row.FileSize,
-			Hash:                 row.Hash,
+			ContentHash:          row.ContentHash,
 			Width:                row.Width,
 			Height:               row.Height,
 			Duration:             row.Duration,

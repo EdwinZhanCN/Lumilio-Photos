@@ -1,6 +1,11 @@
 package upload
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -9,20 +14,23 @@ import (
 
 // UploadSession represents a file upload session
 type UploadSession struct {
-	SessionID      string    `json:"session_id"`
-	Filename       string    `json:"filename"`
-	TotalSize      int64     `json:"total_size"`
-	TotalChunks    int       `json:"total_chunks"`
-	ReceivedChunks []int     `json:"received_chunks"`
-	ContentType    string    `json:"content_type"`
-	ContentHash    string    `json:"content_hash"` // Client-provided hash
-	RepositoryID   string    `json:"repository_id"`
-	UserID         string    `json:"user_id"`
-	Status         string    `json:"status"` // "pending", "uploading", "merging", "completed", "failed"
-	CreatedAt      time.Time `json:"created_at"`
-	LastActivity   time.Time `json:"last_activity"`
-	BytesReceived  int64     `json:"bytes_received"`
-	Error          string    `json:"error,omitempty"`
+	SessionID         string         `json:"session_id"`
+	Filename          string         `json:"filename"`
+	TotalSize         int64          `json:"total_size"`
+	TotalChunks       int            `json:"total_chunks"`
+	ReceivedChunks    []int          `json:"received_chunks"`
+	ContentType       string         `json:"content_type"`
+	ClientFingerprint string         `json:"client_fingerprint"`
+	RepositoryID      string         `json:"repository_id"`
+	UserID            string         `json:"user_id"`
+	Status            string         `json:"status"` // "pending", "uploading", "merging", "completed", "failed"
+	CreatedAt         time.Time      `json:"created_at"`
+	LastActivity      time.Time      `json:"last_activity"`
+	BytesReceived     int64          `json:"bytes_received"`
+	Error             string         `json:"error,omitempty"`
+	TaskID            *int64         `json:"task_id,omitempty"`
+	ChunkFiles        map[int]string `json:"chunk_files,omitempty"`
+	ChunkSizes        map[int]int64  `json:"chunk_sizes,omitempty"`
 }
 
 // SessionManager manages upload sessions with thread-safe operations
@@ -48,6 +56,13 @@ func (sm *SessionManager) CreateSession(sessionID, filename string, totalSize in
 	if sessionID == "" {
 		sessionID = uuid.New().String()
 	}
+	if restored, err := loadSession(repositoryID, sessionID); err == nil && restored != nil &&
+		restored.Filename == filename && restored.TotalSize == totalSize &&
+		restored.TotalChunks == totalChunks && restored.UserID == userID {
+		restored.RepositoryID = repositoryID
+		sm.sessions[sessionID] = restored
+		return cloneSession(restored)
+	}
 	now := time.Now()
 
 	session := &UploadSession{
@@ -63,10 +78,13 @@ func (sm *SessionManager) CreateSession(sessionID, filename string, totalSize in
 		CreatedAt:      now,
 		LastActivity:   now,
 		BytesReceived:  0,
+		ChunkFiles:     make(map[int]string),
+		ChunkSizes:     make(map[int]int64),
 	}
 
 	sm.sessions[sessionID] = session
-	return session
+	_ = persistSession(session)
+	return cloneSession(session)
 }
 
 // GetSession retrieves a session by ID
@@ -75,11 +93,11 @@ func (sm *SessionManager) GetSession(sessionID string) (*UploadSession, bool) {
 	defer sm.mu.RUnlock()
 
 	session, exists := sm.sessions[sessionID]
-	return session, exists
+	return cloneSession(session), exists
 }
 
 // UpdateSessionChunk updates session with a new chunk
-func (sm *SessionManager) UpdateSessionChunk(sessionID string, chunkIndex int, chunkSize int64) bool {
+func (sm *SessionManager) UpdateSessionChunk(sessionID string, chunkIndex int, chunkSize int64, filePath string) bool {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -91,20 +109,23 @@ func (sm *SessionManager) UpdateSessionChunk(sessionID string, chunkIndex int, c
 	// Check if chunk already received
 	for _, received := range session.ReceivedChunks {
 		if received == chunkIndex {
-			return true // Chunk already processed
+			return true
 		}
 	}
 
 	// Add chunk to received list
 	session.ReceivedChunks = append(session.ReceivedChunks, chunkIndex)
 	session.BytesReceived += chunkSize
+	session.ChunkFiles[chunkIndex] = filePath
+	session.ChunkSizes[chunkIndex] = chunkSize
+	sort.Ints(session.ReceivedChunks)
 	session.LastActivity = time.Now()
 
 	if session.Status == "pending" {
 		session.Status = "uploading"
 	}
 
-	return true
+	return persistSession(session) == nil
 }
 
 // UpdateSessionStatus updates the status of a session
@@ -119,11 +140,11 @@ func (sm *SessionManager) UpdateSessionStatus(sessionID string, status string) b
 
 	session.Status = status
 	session.LastActivity = time.Now()
-	return true
+	return persistSession(session) == nil
 }
 
-// SetSessionHash sets the client-provided hash for a session
-func (sm *SessionManager) SetSessionHash(sessionID string, hash string) bool {
+// SetSessionFingerprint records a non-authoritative client precheck hint.
+func (sm *SessionManager) SetSessionFingerprint(sessionID string, fingerprint string) bool {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -132,8 +153,8 @@ func (sm *SessionManager) SetSessionHash(sessionID string, hash string) bool {
 		return false
 	}
 
-	session.ContentHash = hash
-	return true
+	session.ClientFingerprint = fingerprint
+	return persistSession(session) == nil
 }
 
 // SetSessionError sets an error message for a session
@@ -149,7 +170,19 @@ func (sm *SessionManager) SetSessionError(sessionID string, errorMsg string) boo
 	session.Error = errorMsg
 	session.Status = "failed"
 	session.LastActivity = time.Now()
-	return true
+	return persistSession(session) == nil
+}
+
+func (sm *SessionManager) SetSessionTaskID(sessionID string, taskID int64) bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	session, exists := sm.sessions[sessionID]
+	if !exists {
+		return false
+	}
+	session.TaskID = &taskID
+	session.LastActivity = time.Now()
+	return persistSession(session) == nil
 }
 
 // DeleteSession removes a session
@@ -159,6 +192,7 @@ func (sm *SessionManager) DeleteSession(sessionID string) bool {
 
 	_, exists := sm.sessions[sessionID]
 	if exists {
+		_ = os.Remove(sessionManifestPath(sm.sessions[sessionID].RepositoryID, sessionID))
 		delete(sm.sessions, sessionID)
 		return true
 	}
@@ -172,7 +206,7 @@ func (sm *SessionManager) GetAllSessions() []*UploadSession {
 
 	sessions := make([]*UploadSession, 0, len(sm.sessions))
 	for _, session := range sm.sessions {
-		sessions = append(sessions, session)
+		sessions = append(sessions, cloneSession(session))
 	}
 	return sessions
 }
@@ -185,10 +219,87 @@ func (sm *SessionManager) GetSessionsByUser(userID string) []*UploadSession {
 	var userSessions []*UploadSession
 	for _, session := range sm.sessions {
 		if session.UserID == userID {
-			userSessions = append(userSessions, session)
+			userSessions = append(userSessions, cloneSession(session))
 		}
 	}
 	return userSessions
+}
+
+func cloneSession(session *UploadSession) *UploadSession {
+	if session == nil {
+		return nil
+	}
+	clone := *session
+	clone.ReceivedChunks = append([]int(nil), session.ReceivedChunks...)
+	clone.ChunkFiles = make(map[int]string, len(session.ChunkFiles))
+	clone.ChunkSizes = make(map[int]int64, len(session.ChunkSizes))
+	for k, v := range session.ChunkFiles {
+		clone.ChunkFiles[k] = v
+	}
+	for k, v := range session.ChunkSizes {
+		clone.ChunkSizes[k] = v
+	}
+	return &clone
+}
+
+func sessionManifestPath(repoPath, sessionID string) string {
+	return filepath.Join(repoPath, ".lumilio", "staging", "incoming", "upload_sessions", sessionID+".json")
+}
+
+func persistSession(session *UploadSession) error {
+	if _, err := uuid.Parse(session.SessionID); err != nil {
+		return fmt.Errorf("invalid session id: %w", err)
+	}
+	path := sessionManifestPath(session.RepositoryID, session.SessionID)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := json.Marshal(session)
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func loadSession(repoPath, sessionID string) (*UploadSession, error) {
+	if _, err := uuid.Parse(sessionID); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(sessionManifestPath(repoPath, sessionID))
+	if err != nil {
+		return nil, err
+	}
+	var session UploadSession
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, err
+	}
+	if session.ChunkFiles == nil {
+		session.ChunkFiles = make(map[int]string)
+	}
+	if session.ChunkSizes == nil {
+		session.ChunkSizes = make(map[int]int64)
+	}
+	valid := session.ReceivedChunks[:0]
+	var bytes int64
+	incomingRoot := filepath.Join(repoPath, ".lumilio", "staging", "incoming")
+	for _, index := range session.ReceivedChunks {
+		path := session.ChunkFiles[index]
+		rel, relErr := filepath.Rel(incomingRoot, path)
+		if relErr != nil || rel == ".." || filepath.IsAbs(rel) || len(rel) >= 3 && rel[:3] == ".."+string(filepath.Separator) {
+			continue
+		}
+		info, err := os.Stat(path)
+		if err == nil && info.Size() == session.ChunkSizes[index] {
+			valid = append(valid, index)
+			bytes += info.Size()
+		}
+	}
+	session.ReceivedChunks, session.BytesReceived = valid, bytes
+	return &session, nil
 }
 
 // CleanupExpiredSessions removes sessions that have timed out

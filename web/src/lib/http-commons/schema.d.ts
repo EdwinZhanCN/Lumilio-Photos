@@ -1695,10 +1695,7 @@ export interface paths {
         post: {
             parameters: {
                 query?: never;
-                header?: {
-                    /** @description Client-calculated BLAKE3 hash of the file */
-                    "X-Content-Hash"?: string;
-                };
+                header?: never;
                 path?: never;
                 cookie?: never;
             };
@@ -3580,6 +3577,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/batch/jobs/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream upload materialization status */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Comma-separated upload task IDs */
+                    task_ids: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description SSE stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/batch/progress": {
         parameters: {
             query?: never;
@@ -3620,6 +3656,47 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/batch/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create or resume an upload session */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Upload metadata */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.CreateUploadSessionRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.UploadSessionResponseDTO"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -4355,8 +4432,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Precheck uploads against existing content hashes
-         * @description Given client-computed BLAKE3 fingerprints, reports which files already exist in the repository so the client can skip transporting them.
+         * Precheck uploads against existing content fingerprints
+         * @description Given client-computed BLAKE3 fingerprints, reports advisory candidates. Candidates must still be uploaded for server-side full-file verification.
          */
         post: {
             parameters: {
@@ -11943,6 +12020,15 @@ export interface components {
             updated_at?: string;
             view_count?: number;
         };
+        "dto.CreateUploadSessionRequestDTO": {
+            client_fingerprint?: string;
+            content_type?: string;
+            filename: string;
+            repository_id?: string;
+            session_id?: string;
+            total_chunks: number;
+            total_size: number;
+        };
         "dto.DateRangeDTO": {
             from?: string;
             to?: string;
@@ -12852,6 +12938,7 @@ export interface components {
         "dto.SessionProgressDTO": {
             bytes_done?: number;
             bytes_total?: number;
+            completed_chunks?: number[];
             filename?: string;
             last_activity?: string;
             progress?: number;
@@ -13174,8 +13261,12 @@ export interface components {
             jobs?: components["schemas"]["dto.UploadJobStatusDTO"][];
         };
         "dto.UploadPrecheckFileDTO": {
+            /** @example blake3-size-first-last-1m-v1 */
+            fingerprint_version?: string;
             /** @example abcd1234567890 */
             hash: string;
+            /** @example true */
+            is_quick?: boolean;
             /** @example 1048576 */
             size: number;
         };
@@ -13196,6 +13287,8 @@ export interface components {
         "dto.UploadPrecheckResultDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             asset_id?: string;
+            /** @example true */
+            candidate?: boolean;
             /** @example true */
             duplicate?: boolean;
             /** @example photo.jpg */
@@ -13220,6 +13313,14 @@ export interface components {
             status?: string;
             /** @example 12345 */
             task_id?: number;
+        };
+        "dto.UploadSessionResponseDTO": {
+            bytes_received?: number;
+            received_chunks?: number[];
+            session_id?: string;
+            status?: string;
+            task_id?: number;
+            total_chunks?: number;
         };
         "dto.UserDTO": {
             avatar_asset_id?: string;

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
 const host = "127.0.0.1";
-const port = 4173;
+const port = Number(process.env.PRODUCTION_SMOKE_PORT ?? 4173);
 const origin = `http://${host}:${port}`;
 const preview = spawn(
   "./node_modules/.bin/vp",
@@ -82,6 +82,9 @@ try {
 
   let uploadPoll = 0;
   await page.route("**/api/v1/assets/batch/jobs**", (route) => {
+	if (new URL(route.request().url()).pathname.endsWith("/stream")) {
+	  return route.fulfill({ status: 404, contentType: "application/json", body: '{}' });
+	}
     uploadPoll += 1;
     const complete = uploadPoll > 1;
     return route.fulfill({

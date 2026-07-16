@@ -29,14 +29,16 @@ type IngestSource struct {
 	// SkipCommit skips staging→inbox commit. When true, SourcePath is treated
 	// as the final repo-relative storage path (files already in-place, like
 	// cloud provider downloads landing directly in cloud/).
-	SkipCommit       bool
-	SourcePath       string // staging path (upload/cloud) or repo-relative path (scan)
-	OriginalFilename string
-	Size             int64   // optional hint; the materializer always stats the file for the authoritative size
-	Hash             *string // pre-computed hash; computed by the materializer when empty
-	Timestamp        time.Time
-	ContentType      string
-	Metadata         map[string]any // source-specific metadata (e.g. cloud object key, upload session ID)
+	SkipCommit              bool
+	SourcePath              string // staging path (upload/cloud) or repo-relative path (scan)
+	OriginalFilename        string
+	Size                    int64   // optional hint; the materializer always stats the file for the authoritative size
+	ContentHash             *string // authoritative full hash for trusted in-place sources
+	QuickFingerprint        *string // non-authoritative large-file precheck hint
+	QuickFingerprintVersion *string
+	Timestamp               time.Time
+	ContentType             string
+	Metadata                map[string]any // source-specific metadata (e.g. cloud object key, upload session ID)
 }
 
 // AssetSource produces IngestSource candidates from a specific origin.

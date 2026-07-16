@@ -17,13 +17,14 @@ import (
 
 // AssetPayload matches the ingest-stage payload fields (kept for compatibility with task workers).
 type AssetPayload struct {
-	ClientHash   string    `json:"clientHash" river:"unique"`
-	StagedPath   string    `json:"stagedPath"`
-	UserID       string    `json:"userId" river:"unique"`
-	Timestamp    time.Time `json:"timestamp"`
-	ContentType  string    `json:"contentType,omitempty"`
-	FileName     string    `json:"fileName,omitempty"`
-	RepositoryID string    `json:"repositoryId,omitempty"` // Repository UUID
+	ContentHash      string    `json:"contentHash" river:"unique"`
+	QuickFingerprint string    `json:"quickFingerprint,omitempty"`
+	StagedPath       string    `json:"stagedPath"`
+	UserID           string    `json:"userId" river:"unique"`
+	Timestamp        time.Time `json:"timestamp"`
+	ContentType      string    `json:"contentType,omitempty"`
+	FileName         string    `json:"fileName,omitempty"`
+	RepositoryID     string    `json:"repositoryId,omitempty"` // Repository UUID
 }
 
 // AssetProcessor holds shared dependencies for per-task processors.

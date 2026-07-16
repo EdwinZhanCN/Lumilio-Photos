@@ -351,30 +351,28 @@ func (q *Queries) GetDuplicateSummary(ctx context.Context, arg GetDuplicateSumma
 }
 
 const getExactDuplicateCandidates = `-- name: GetExactDuplicateCandidates :many
-SELECT a.asset_id, a.owner_id, a.hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
+SELECT a.asset_id, a.owner_id, a.content_hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.hash IS NOT NULL
   AND a.repository_id = $1
   AND EXISTS (
     SELECT 1 FROM assets b
     WHERE b.is_deleted = false
       AND b.type = 'PHOTO'
-      AND b.hash IS NOT NULL
       AND b.repository_id = a.repository_id
       AND b.owner_id IS NOT DISTINCT FROM a.owner_id
-      AND b.hash = a.hash
+      AND b.content_hash = a.content_hash
       AND b.file_size = a.file_size
       AND b.asset_id <> a.asset_id
   )
-ORDER BY a.owner_id, a.hash, a.file_size, a.asset_id
+ORDER BY a.owner_id, a.content_hash, a.file_size, a.asset_id
 `
 
 type GetExactDuplicateCandidatesRow struct {
 	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
 	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	Hash             *string            `db:"hash" json:"hash"`
+	ContentHash      string             `db:"content_hash" json:"content_hash"`
 	FileSize         int64              `db:"file_size" json:"file_size"`
 	OriginalFilename string             `db:"original_filename" json:"original_filename"`
 	TakenTime        pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
@@ -382,7 +380,7 @@ type GetExactDuplicateCandidatesRow struct {
 	Rating           *int32             `db:"rating" json:"rating"`
 }
 
-// Returns assets in a repository that share the exact same (hash, file_size)
+// Returns assets in a repository that share the exact same (content_hash, file_size)
 // with at least one other asset of the same owner. Only photos are considered,
 // and only non-deleted assets. Results are ordered so members of the same
 // duplicate set (owner included in the grouping key) are adjacent.
@@ -398,7 +396,7 @@ func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID 
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
-			&i.Hash,
+			&i.ContentHash,
 			&i.FileSize,
 			&i.OriginalFilename,
 			&i.TakenTime,

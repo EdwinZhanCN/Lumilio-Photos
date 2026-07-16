@@ -88,7 +88,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.runID, "run-id", "", "run identifier (default: timestamp)")
 	flag.StringVar(&cfg.outDir, "out", "", "output directory (default: ./benchruns/<run-id>)")
 	flag.BoolVar(&cfg.disableML, "disable-ml", true, "disable ML settings via the settings API before the run")
-	flag.BoolVar(&cfg.clientHash, "client-hash", true, "send client-computed BLAKE3 as X-Content-Hash (excludes server hashing from acceptance)")
+	flag.BoolVar(&cfg.clientHash, "client-hash", true, "send a client-computed precheck fingerprint hint (server still verifies full BLAKE3)")
 	flag.BoolVar(&cfg.instantPass, "instant-pass", false, "after drain, re-upload the dataset to measure the instant-upload (duplicate-skip) path")
 	flag.StringVar(&pollRaw, "poll-interval", "1s", "completion poll interval")
 	flag.StringVar(&toRaw, "timeout", "60m", "overall completion timeout")

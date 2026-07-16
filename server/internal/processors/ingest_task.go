@@ -10,6 +10,7 @@ import (
 
 	"server/internal/db/repo"
 	"server/internal/sourcing"
+	"server/internal/utils/hash"
 )
 
 // IngestAsset converts an upload payload into an IngestSource and delegates to the
@@ -45,19 +46,28 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		repoUUID = parsed
 	}
 
-	var hashPtr *string
-	if task.ClientHash != "" {
-		hashPtr = &task.ClientHash
+	var contentHash *string
+	if task.ContentHash != "" {
+		contentHash = &task.ContentHash
+	}
+	var quickFingerprint *string
+	var quickFingerprintVersion *string
+	if task.QuickFingerprint != "" {
+		quickFingerprint = &task.QuickFingerprint
+		version := hash.QuickFingerprintVersion
+		quickFingerprintVersion = &version
 	}
 
 	return ap.materializer.Materialize(ctx, sourcing.IngestSource{
-		RepositoryID:     repoUUID,
-		OwnerID:          ownerIDPtr,
-		Kind:             sourcing.IngestSourceUpload,
-		SourcePath:       task.StagedPath,
-		OriginalFilename: task.FileName,
-		Hash:             hashPtr,
-		Timestamp:        task.Timestamp,
-		ContentType:      task.ContentType,
+		RepositoryID:            repoUUID,
+		OwnerID:                 ownerIDPtr,
+		Kind:                    sourcing.IngestSourceUpload,
+		SourcePath:              task.StagedPath,
+		OriginalFilename:        task.FileName,
+		ContentHash:             contentHash,
+		QuickFingerprint:        quickFingerprint,
+		QuickFingerprintVersion: quickFingerprintVersion,
+		Timestamp:               task.Timestamp,
+		ContentType:             task.ContentType,
 	})
 }
