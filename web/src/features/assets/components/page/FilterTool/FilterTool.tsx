@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { useI18n } from "@/lib/i18n";
-import MapComponent from "@/components/MapComponent";
+import { MapComponent } from "../../../map";
 import TagPickerMenu, {
   type TagPickerItem,
 } from "@/features/assets/components/shared/TagPickerMenu";

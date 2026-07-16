@@ -4,12 +4,16 @@ import { ErrorBoundary } from "react-error-boundary";
 import { MapIcon } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import {
+  MapComponent,
+  type MapViewport,
+  type PhotoLocation,
+  useLocationClusters,
+  useMapPhotoAssets,
+} from "@/features/assets/map";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
-import MapComponent, { type MapViewport, type PhotoLocation } from "@/components/MapComponent";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMapPhotoAssets } from "@/features/home/hooks/useMapPhotoAssets";
-import { useLocationClusters } from "@/features/home/hooks/useLocationClusters";
 import { assetUrls } from "@/lib/assets/assetUrls";
 
 function MapViewContent() {

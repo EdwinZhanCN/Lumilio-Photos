@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { useMapPhotoAssets } from "@/features/home/hooks/useMapPhotoAssets";
-import { useLocationClusters } from "@/features/home/hooks/useLocationClusters";
+import { useLocationClusters, useMapPhotoAssets } from "@/features/assets/map";
 import { encodeGeohash } from "@/lib/geo/geohash";
 export type CityTripGroup = {
   id: string;

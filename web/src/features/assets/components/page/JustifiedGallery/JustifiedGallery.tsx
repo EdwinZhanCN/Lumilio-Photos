@@ -3,7 +3,7 @@ import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
 import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
 import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { useJustifiedLayoutService } from "@/hooks/util-hooks/useJustifiedLayoutService";
+import { useJustifiedLayoutService } from "./useJustifiedLayoutService";
 import type { LayoutResult } from "@/lib/layout/justifiedLayout";
 import { assetsToLayoutBoxes, createResponsiveConfig } from "@/lib/layout/justifiedLayout";
 import { Asset } from "@/lib/assets/types";

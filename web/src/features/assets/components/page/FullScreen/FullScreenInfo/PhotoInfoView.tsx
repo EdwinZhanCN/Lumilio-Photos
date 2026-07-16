@@ -6,8 +6,8 @@ import { useAssetLocationCluster } from "@/features/assets/hooks/useAssetLocatio
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import TagList from "./TagList";
-import MapComponent from "@/components/MapComponent";
-import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
+import { MapComponent } from "../../../../map";
+import { assetToPhotoLocation } from "../../../../map/assetLocation";
 import { formatCaptureTime } from "@/lib/format/dateTime";
 import type { Asset, PhotoSpecificMetadata } from "@/lib/http-commons";
 import { isPhotoMetadata } from "@/lib/http-commons";

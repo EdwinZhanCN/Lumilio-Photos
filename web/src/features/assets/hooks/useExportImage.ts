@@ -1,8 +1,8 @@
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
-import { Asset } from "@/lib/assets/types";
+import type { Asset } from "@/lib/assets/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { isExportSupported } from "@/features/assets/utils/mediaTypes";
+import { isExportSupported } from "../utils/mediaTypes";
 
 export interface ExportOptions {
   format: "jpeg" | "png" | "webp" | "avif" | "original";

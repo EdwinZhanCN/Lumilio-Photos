@@ -1,7 +1,7 @@
-import type { PhotoLocation } from "@/components/MapComponent";
-import { autoConvertCoordinates, type Coordinate } from "@/lib/geo/coordinateConversion";
+import { autoConvertCoordinates } from "@/lib/geo/coordinateConversion";
 import type { Asset } from "@/lib/http-commons";
 import { isPhotoMetadata } from "@/lib/http-commons";
+import type { PhotoLocation } from "./types";
 
 /**
  * Convert an Asset with GPS coordinates to PhotoLocation format
@@ -35,15 +35,4 @@ export const assetToPhotoLocation = (
     description: metadata.description,
     asset: asset,
   };
-};
-
-/**
- * Convert GPS coordinates to appropriate map coordinates based on region
- */
-export const convertCoordinatesForMap = (
-  longitude: number,
-  latitude: number,
-  useGaodeMap: boolean,
-): Coordinate => {
-  return autoConvertCoordinates(longitude, latitude, useGaodeMap);
 };

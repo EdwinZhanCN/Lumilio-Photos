@@ -14,6 +14,7 @@ export type UseLocationClustersOptions = {
   autoFetchAll?: boolean;
 };
 
+/** Reads paginated location clusters for map and place surfaces. */
 export function useLocationClusters(options: UseLocationClustersOptions = {}) {
   const { repositoryId, autoFetchAll = false } = options;
 

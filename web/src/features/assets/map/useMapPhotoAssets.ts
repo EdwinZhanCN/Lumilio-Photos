@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { MapViewport } from "@/components/MapComponent";
+import type { MapViewport } from "./types";
 
 type Schemas = components["schemas"];
 type AssetMapPointDTO = Schemas["dto.AssetMapPointDTO"];
