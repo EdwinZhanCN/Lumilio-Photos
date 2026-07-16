@@ -93,10 +93,6 @@ export const appRoutes = [
     path: "/",
     element: <Home />,
   },
-  // {
-  //   path: "/updates",
-  //   element: <Updates />,
-  // },
   {
     path: "/settings",
     element: <Settings />,
@@ -229,8 +225,4 @@ export const appRoutes = [
     path: "/lumilio",
     element: <LumilioChatPage />,
   },
-  // {
-  //   path: "/portfolio",
-  //   element: <Portfolio />,
-  // },
 ];

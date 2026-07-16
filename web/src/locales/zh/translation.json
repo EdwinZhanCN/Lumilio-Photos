@@ -1470,9 +1470,7 @@
   "routes": {
     "collections": "合集",
     "home": "首页",
-    "portfolio": "作品集",
-    "settings": "设置",
-    "updates": "更新"
+    "settings": "设置"
   },
   "search": {
     "error": "搜索暂时不可用，请稍后重试。",
