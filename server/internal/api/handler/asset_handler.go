@@ -149,7 +149,6 @@ func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 // @Produce json
 // @Param file formData file true "Asset file to upload"
 // @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
 // @Success 200 {object} dto.UploadResponseDTO "Upload successful"
 // @Failure 400 {object} api.ErrorResponse "Bad request - no file provided or parse error"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
@@ -193,29 +192,6 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		return
 	}
 
-	clientHash := c.GetHeader("X-Content-Hash")
-
-	// Instant upload: a client-provided fingerprint that already exists in this
-	// repository means the bytes are already here, so skip staging entirely.
-	if clientHash != "" {
-		duplicate, err := h.findDuplicateByHash(ctx, clientHash, header.Size, repository.RepoID)
-		if err != nil {
-			api.GinInternalError(c, err, "Failed to check for duplicate content")
-			return
-		}
-		if duplicate != nil {
-			log.Printf("Duplicate upload skipped: %s matches asset %s (hash %s)", header.Filename, duplicate.assetID, clientHash)
-			api.JSONOK(c, dto.UploadResponseDTO{
-				Status:      uploadStatusDuplicate,
-				FileName:    header.Filename,
-				Size:        header.Size,
-				ContentHash: clientHash,
-				Message:     "File already exists in repository",
-			})
-			return
-		}
-	}
-
 	// Create staging file in repository
 	stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
 	if err != nil {
@@ -241,24 +217,23 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		return
 	}
 
-	// Calculate hash if not provided by client
-	if clientHash == "" {
-		log.Println("No content hash provided by client, calculating hash...")
-		hashResult, err := hash.CalculateFileHash(stagingFile.Path, hash.AlgorithmBLAKE3, true)
-		if err != nil {
-			log.Printf("Failed to calculate hash: %v", err)
-			h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "calculate upload hash")
-			api.GinInternalError(c, err, "Failed to calculate file hash")
-			return
-		}
-		clientHash = hashResult.Hash
-		if hashResult.IsQuick {
-			log.Printf("Calculated quick hash for large file %s: %s", header.Filename, clientHash)
-		} else {
-			log.Printf("Calculated hash for %s: %s", header.Filename, clientHash)
-		}
-	} else {
-		log.Printf("Trusting client-provided hash for %s: %s", header.Filename, clientHash)
+	hashResult, err := hash.CalculateLayeredBLAKE3(stagingFile.Path)
+	if err != nil {
+		log.Printf("Failed to calculate authoritative hash: %v", err)
+		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "calculate upload hash")
+		api.GinInternalError(c, err, "Failed to calculate file hash")
+		return
+	}
+	duplicate, err := h.findDuplicateByHash(ctx, hashResult.ContentHash, hashResult.FileSize, repository.RepoID)
+	if err != nil {
+		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "check duplicate content")
+		api.GinInternalError(c, err, "Failed to check for duplicate content")
+		return
+	}
+	if duplicate != nil {
+		h.removeUploadTempFile(stagingFile.Path)
+		api.JSONOK(c, dto.UploadResponseDTO{Status: uploadStatusDuplicate, FileName: header.Filename, Size: header.Size, ContentHash: hashResult.ContentHash, Message: "File already exists in repository"})
+		return
 	}
 
 	// Get user ID from JWT claims
@@ -271,23 +246,25 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	}
 
 	payload := processors.AssetPayload{
-		ClientHash:   clientHash,
-		StagedPath:   stagingFile.Path,
-		UserID:       userID,
-		Timestamp:    time.Now(),
-		ContentType:  validationResult.MimeType,
-		FileName:     header.Filename,
-		RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
+		ContentHash:      hashResult.ContentHash,
+		QuickFingerprint: valueOrEmpty(hashResult.QuickFingerprint),
+		StagedPath:       stagingFile.Path,
+		UserID:           userID,
+		Timestamp:        time.Now(),
+		ContentType:      validationResult.MimeType,
+		FileName:         header.Filename,
+		RepositoryID:     uuid.UUID(repository.RepoID.Bytes).String(),
 	}
 
 	jobInsetResult, err := h.queueClient.Insert(ctx, jobs.IngestAssetArgs{
-		ClientHash:   payload.ClientHash,
-		StagedPath:   payload.StagedPath,
-		UserID:       payload.UserID,
-		Timestamp:    payload.Timestamp,
-		ContentType:  payload.ContentType,
-		FileName:     payload.FileName,
-		RepositoryID: payload.RepositoryID,
+		ContentHash:      payload.ContentHash,
+		QuickFingerprint: payload.QuickFingerprint,
+		StagedPath:       payload.StagedPath,
+		UserID:           payload.UserID,
+		Timestamp:        payload.Timestamp,
+		ContentType:      payload.ContentType,
+		FileName:         payload.FileName,
+		RepositoryID:     payload.RepositoryID,
 	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
@@ -310,7 +287,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		Status:      "processing",
 		FileName:    header.Filename,
 		Size:        header.Size,
-		ContentHash: clientHash,
+		ContentHash: hashResult.ContentHash,
 		Message:     fmt.Sprintf("File received and queued for processing in repository '%s'", repository.Name),
 	}
 
@@ -370,7 +347,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		return
 	}
 
-	clientHash := c.GetHeader("X-Content-Hash")
+	clientFingerprint := c.GetHeader("X-Upload-Fingerprint")
 
 	// Get user ID from JWT claims
 	var userID string
@@ -438,12 +415,35 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}
 
 		if _, exists := h.sessionManager.GetSession(fileInfo.SessionID); !exists {
+			if fileInfo.Type == "chunk" {
+				part.Close()
+				api.GinBadRequest(c, errors.New("upload session must be created first"), "Unknown upload session")
+				return
+			}
 			h.sessionManager.CreateSession(fileInfo.SessionID, filename, 0, fileInfo.TotalChunks, contentType, repository.Path, userID)
+		}
+		session, _ := h.sessionManager.GetSession(fileInfo.SessionID)
+		if session.UserID != userID || session.RepositoryID != repository.Path || session.TotalChunks != fileInfo.TotalChunks || session.Filename != filepath.Base(filename) {
+			part.Close()
+			api.GinBadRequest(c, errors.New("upload session metadata mismatch"), "Invalid upload session")
+			return
+		}
+		alreadyReceived := false
+		for _, index := range session.ReceivedChunks {
+			if index == fileInfo.ChunkIndex {
+				alreadyReceived = true
+				break
+			}
+		}
+		if alreadyReceived {
+			_, _ = io.Copy(io.Discard, part)
+			part.Close()
+			continue
 		}
 
 		// Update session hash if provided
-		if clientHash != "" {
-			h.sessionManager.SetSessionHash(fileInfo.SessionID, clientHash)
+		if clientFingerprint != "" {
+			h.sessionManager.SetSessionFingerprint(fileInfo.SessionID, clientFingerprint)
 		}
 
 		h.sessionManager.UpdateSessionStatus(fileInfo.SessionID, "uploading")
@@ -477,7 +477,10 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			return
 		}
 
-		h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written)
+		if !h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written, stagingFile.Path) {
+			api.GinInternalError(c, errors.New("failed to persist upload session"), "Failed to save upload progress")
+			return
+		}
 
 		state.chunkInfos = append(state.chunkInfos, upload.ChunkInfo{
 			SessionID:  fileInfo.SessionID,
@@ -576,6 +579,9 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}
 
 		h.sessionManager.UpdateSessionStatus(sessionID, "completed")
+		if result.TaskID != nil {
+			h.sessionManager.SetSessionTaskID(sessionID, *result.TaskID)
+		}
 		results = append(results, *result)
 	}
 
@@ -599,9 +605,9 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	api.JSONOK(c, dto.BatchUploadResponseDTO{Results: results})
 }
 
-// PrecheckUpload reports which of the candidate files already exist in the repository.
-// @Summary Precheck uploads against existing content hashes
-// @Description Given client-computed BLAKE3 fingerprints, reports which files already exist in the repository so the client can skip transporting them.
+// PrecheckUpload reports possible matches for client-provided fingerprints.
+// @Summary Precheck uploads against existing content fingerprints
+// @Description Given client-computed BLAKE3 fingerprints, reports advisory candidates. Candidates must still be uploaded for server-side full-file verification.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -626,14 +632,22 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 		return
 	}
 
-	hashes := make([]string, 0, len(req.Files))
+	contentHashes := make([]string, 0, len(req.Files))
+	quickFingerprints := make([]string, 0, len(req.Files))
 	for _, file := range req.Files {
-		hashes = append(hashes, file.Hash)
+		if file.IsQuick {
+			if file.FingerprintVersion == nil || *file.FingerprintVersion != hash.QuickFingerprintVersion {
+				continue
+			}
+			quickFingerprints = append(quickFingerprints, file.Hash)
+		} else {
+			contentHashes = append(contentHashes, file.Hash)
+		}
 	}
 
-	rows, err := h.queries.GetAssetsByHashesAndRepository(ctx, repo.GetAssetsByHashesAndRepositoryParams{
-		Hashes:       hashes,
-		RepositoryID: repository.RepoID,
+	contentRows, err := h.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
+		ContentHashes: contentHashes,
+		RepositoryID:  repository.RepoID,
 	})
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to precheck uploads")
@@ -650,12 +664,9 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 		assetID  string
 		filename string
 	}
-	existing := make(map[fingerprint]existingAsset, len(rows))
-	for _, row := range rows {
-		if row.Hash == nil {
-			continue
-		}
-		key := fingerprint{hash: *row.Hash, size: row.FileSize}
+	existing := make(map[fingerprint]existingAsset, len(contentRows))
+	for _, row := range contentRows {
+		key := fingerprint{hash: row.ContentHash, size: row.FileSize}
 		if _, seen := existing[key]; seen {
 			continue
 		}
@@ -664,16 +675,42 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 			filename: row.OriginalFilename,
 		}
 	}
+	quickRows, err := h.queries.GetAssetsByQuickFingerprintsAndRepository(ctx, repo.GetAssetsByQuickFingerprintsAndRepositoryParams{
+		QuickFingerprints: quickFingerprints,
+		RepositoryID:      repository.RepoID,
+	})
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to precheck upload fingerprints")
+		return
+	}
+	quickCandidates := make(map[fingerprint]existingAsset, len(quickRows))
+	for _, row := range quickRows {
+		if row.QuickFingerprint == nil {
+			continue
+		}
+		key := fingerprint{hash: *row.QuickFingerprint, size: row.FileSize}
+		quickCandidates[key] = existingAsset{assetID: row.AssetID.String(), filename: row.OriginalFilename}
+	}
 
 	results := make([]dto.UploadPrecheckResultDTO, 0, len(req.Files))
 	duplicateCount := 0
 	for _, file := range req.Files {
 		result := dto.UploadPrecheckResultDTO{Hash: file.Hash}
-		if match, ok := existing[fingerprint{hash: file.Hash, size: file.Size}]; ok {
-			result.Duplicate = true
+		key := fingerprint{hash: file.Hash, size: file.Size}
+		if file.IsQuick {
+			if file.FingerprintVersion == nil || *file.FingerprintVersion != hash.QuickFingerprintVersion {
+				results = append(results, result)
+				continue
+			}
+			if match, ok := quickCandidates[key]; ok {
+				result.Candidate = true
+				result.AssetID = &match.assetID
+				result.FileName = &match.filename
+			}
+		} else if match, ok := existing[key]; ok {
+			result.Candidate = true
 			result.AssetID = &match.assetID
 			result.FileName = &match.filename
-			duplicateCount++
 		}
 		results = append(results, result)
 	}
@@ -717,6 +754,41 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 	api.JSONOK(c, response)
 }
 
+// CreateUploadSession creates or resumes a durable chunk upload session.
+// @Summary Create or resume an upload session
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body dto.CreateUploadSessionRequestDTO true "Upload metadata"
+// @Success 200 {object} dto.UploadSessionResponseDTO
+// @Router /api/v1/assets/batch/sessions [post]
+func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
+	var req dto.CreateUploadSessionRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid upload session")
+		return
+	}
+	repository, err := h.resolveUploadRepository(c.Request.Context(), req.RepositoryID)
+	if err != nil {
+		h.respondRepositoryError(c, err)
+		return
+	}
+	userID := "anonymous"
+	if id, ok := c.Get("user_id"); ok {
+		userID = fmt.Sprintf("%d", id)
+	}
+	session := h.sessionManager.CreateSession(req.SessionID, filepath.Base(req.Filename), req.TotalSize, req.TotalChunks, req.ContentType, repository.Path, userID)
+	if req.ClientFingerprint != "" {
+		h.sessionManager.SetSessionFingerprint(session.SessionID, req.ClientFingerprint)
+	}
+	chunks := make([]upload.ChunkInfo, 0, len(session.ReceivedChunks))
+	for _, index := range session.ReceivedChunks {
+		chunks = append(chunks, upload.ChunkInfo{SessionID: session.SessionID, ChunkIndex: index, FilePath: session.ChunkFiles[index], Size: session.ChunkSizes[index]})
+	}
+	h.chunkMerger.AddChunks(session.SessionID, chunks)
+	api.JSONOK(c, dto.UploadSessionResponseDTO{SessionID: session.SessionID, Status: session.Status, TotalChunks: session.TotalChunks, ReceivedChunks: session.ReceivedChunks, BytesReceived: session.BytesReceived, TaskID: session.TaskID})
+}
+
 // GetUploadProgress returns upload progress for sessions
 // @Summary Get upload progress
 // @Description Get detailed progress information for upload sessions
@@ -729,22 +801,22 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 	sessionIDsParam := c.Query("session_ids")
 	var targetSessions []*upload.UploadSession
+	callerID := "anonymous"
+	if id, exists := c.Get("user_id"); exists {
+		callerID = fmt.Sprintf("%d", id)
+	}
 
 	if sessionIDsParam != "" {
 		// Get specific sessions
 		sessionIDs := strings.Split(sessionIDsParam, ",")
 		for _, sessionID := range sessionIDs {
-			if session, exists := h.sessionManager.GetSession(sessionID); exists {
+			if session, exists := h.sessionManager.GetSession(sessionID); exists && session.UserID == callerID {
 				targetSessions = append(targetSessions, session)
 			}
 		}
 	} else {
 		// Get all sessions for current user
-		userID := c.GetString("user_id")
-		if userID == "" {
-			userID = "anonymous"
-		}
-		targetSessions = h.sessionManager.GetSessionsByUser(userID)
+		targetSessions = h.sessionManager.GetSessionsByUser(callerID)
 	}
 
 	var totalBytesDone, totalBytesTotal int64
@@ -755,15 +827,16 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 		progress, _ := h.sessionManager.GetSessionProgress(session.SessionID)
 
 		sessionsProgress[i] = dto.SessionProgressDTO{
-			SessionID:    session.SessionID,
-			Filename:     session.Filename,
-			Status:       session.Status,
-			Progress:     progress,
-			Received:     len(session.ReceivedChunks),
-			Total:        session.TotalChunks,
-			BytesDone:    session.BytesReceived,
-			BytesTotal:   session.TotalSize,
-			LastActivity: session.LastActivity,
+			SessionID:       session.SessionID,
+			Filename:        session.Filename,
+			Status:          session.Status,
+			Progress:        progress,
+			Received:        len(session.ReceivedChunks),
+			Total:           session.TotalChunks,
+			BytesDone:       session.BytesReceived,
+			BytesTotal:      session.TotalSize,
+			LastActivity:    session.LastActivity,
+			CompletedChunks: append([]int(nil), session.ReceivedChunks...),
 		}
 
 		totalBytesDone += session.BytesReceived
@@ -805,26 +878,98 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Failure 400 {object} api.ErrorResponse "Invalid task IDs"
 // @Router /api/v1/assets/batch/jobs [get]
 func (h *AssetHandler) GetUploadJobStatus(c *gin.Context) {
-	rawIDs := strings.Split(strings.TrimSpace(c.Query("task_ids")), ",")
-	if len(rawIDs) == 0 || len(rawIDs) > 100 || (len(rawIDs) == 1 && strings.TrimSpace(rawIDs[0]) == "") {
-		api.GinBadRequest(c, errors.New("task_ids must contain between 1 and 100 IDs"), "Invalid upload task IDs")
+	statuses, err := h.loadUploadJobStatuses(c, c.Query("task_ids"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid upload task IDs")
 		return
 	}
+	api.JSONOK(c, dto.UploadJobStatusResponseDTO{Jobs: statuses})
+}
 
+// StreamUploadJobStatus streams ingest lifecycle updates until every job is terminal.
+// @Summary Stream upload materialization status
+// @Tags assets
+// @Produce text/event-stream
+// @Param task_ids query string true "Comma-separated upload task IDs"
+// @Success 200 {string} string "SSE stream"
+// @Router /api/v1/assets/batch/jobs/stream [get]
+func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
+	if _, err := parseUploadTaskIDs(c.Query("task_ids")); err != nil {
+		api.GinBadRequest(c, err, "Invalid upload task IDs")
+		return
+	}
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		api.GinInternalError(c, errors.New("streaming unsupported"), "Streaming unsupported")
+		return
+	}
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	ticker := time.NewTicker(500 * time.Millisecond)
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	defer heartbeat.Stop()
+	send := func(event string, value any) bool {
+		data, err := json.Marshal(value)
+		if err != nil {
+			return false
+		}
+		_, err = fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", event, data)
+		if err == nil {
+			flusher.Flush()
+		}
+		return err == nil
+	}
+	for {
+		statuses, err := h.loadUploadJobStatuses(c, c.Query("task_ids"))
+		if err != nil {
+			send("error", map[string]string{"error": err.Error()})
+			return
+		}
+		if !send("jobs", dto.UploadJobStatusResponseDTO{Jobs: statuses}) {
+			return
+		}
+		if len(statuses) > 0 && allUploadJobsTerminal(statuses) {
+			send("done", dto.UploadJobStatusResponseDTO{Jobs: statuses})
+			return
+		}
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case <-ticker.C:
+		case <-heartbeat.C:
+			if !send("heartbeat", map[string]int64{"timestamp": time.Now().Unix()}) {
+				return
+			}
+		}
+	}
+}
+
+func parseUploadTaskIDs(raw string) ([]int64, error) {
+	rawIDs := strings.Split(strings.TrimSpace(raw), ",")
+	if len(rawIDs) == 0 || len(rawIDs) > 100 || (len(rawIDs) == 1 && strings.TrimSpace(rawIDs[0]) == "") {
+		return nil, errors.New("task_ids must contain between 1 and 100 IDs")
+	}
 	ids := make([]int64, 0, len(rawIDs))
 	for _, rawID := range rawIDs {
 		id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
 		if err != nil || id <= 0 {
-			api.GinBadRequest(c, errors.New("task_ids must be positive integers"), "Invalid upload task IDs")
-			return
+			return nil, errors.New("task_ids must be positive integers")
 		}
 		ids = append(ids, id)
 	}
+	return ids, nil
+}
 
+func (h *AssetHandler) loadUploadJobStatuses(c *gin.Context, raw string) ([]dto.UploadJobStatusDTO, error) {
+	ids, err := parseUploadTaskIDs(raw)
+	if err != nil {
+		return nil, err
+	}
 	jobRows, err := h.queueClient.JobList(c.Request.Context(), river.NewJobListParams().IDs(ids...).Kinds(jobs.IngestAssetArgs{}.Kind()).First(len(ids)))
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load upload status")
-		return
+		return nil, err
 	}
 
 	callerID := "anonymous"
@@ -838,7 +983,16 @@ func (h *AssetHandler) GetUploadJobStatus(c *gin.Context) {
 		}
 	}
 
-	api.JSONOK(c, dto.UploadJobStatusResponseDTO{Jobs: statuses})
+	return statuses, nil
+}
+
+func allUploadJobsTerminal(statuses []dto.UploadJobStatusDTO) bool {
+	for _, status := range statuses {
+		if !status.Terminal {
+			return false
+		}
+	}
+	return true
 }
 
 func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.UploadJobStatusDTO, bool) {
@@ -1492,8 +1646,8 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	var fullPath string
 	webVersionExists := false
 
-	if asset.Hash != nil && *asset.Hash != "" {
-		webVideoFilename := fmt.Sprintf("%s_web.mp4", *asset.Hash)
+	if asset.ContentHash != "" {
+		webVideoFilename := fmt.Sprintf("%s_web.mp4", asset.ContentHash)
 		webVideoPath := filepath.Join(storage.DefaultStructure.VideosDir, "web", webVideoFilename)
 		fullPath = filepath.Join(repoPath, webVideoPath)
 
@@ -1572,8 +1726,8 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	var fullPath string
 	webVersionExists := false
 
-	if asset.Hash != nil && *asset.Hash != "" {
-		webAudioFilename := fmt.Sprintf("%s_web.mp3", *asset.Hash)
+	if asset.ContentHash != "" {
+		webAudioFilename := fmt.Sprintf("%s_web.mp3", asset.ContentHash)
 		webAudioPath := filepath.Join(storage.DefaultStructure.AudiosDir, "web", webAudioFilename)
 		fullPath = filepath.Join(repoPath, webAudioPath)
 
@@ -3473,7 +3627,7 @@ func (h *AssetHandler) sidecarSourceForAsset(asset *repo.Asset) dto.LumilioSidec
 	source.OriginalFilename = asset.OriginalFilename
 	source.MimeType = asset.MimeType
 	source.FileSize = asset.FileSize
-	source.Hash = asset.Hash
+	source.Hash = stringPtr(asset.ContentHash)
 	source.Width = asset.Width
 	source.Height = asset.Height
 	if asset.StoragePath != nil {
@@ -3546,6 +3700,13 @@ func (h *AssetHandler) isStagingIncomingPath(repoPath string, filePath string) b
 // stringPtr returns a pointer to a string
 func stringPtr(s string) *string {
 	return &s
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // groupFilesBySession groups uploaded files by their session ID
@@ -3679,20 +3840,6 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 		log.Printf("processChunkedFileSession: using existing session %s", sessionID)
 	}
 
-	// Update session with received chunks
-	log.Printf("processChunkedFileSession: updating session with %d files", len(files))
-	for fieldName, header := range files {
-		log.Printf("processChunkedFileSession: processing field %s, size=%d", fieldName, header.Size)
-		fileInfo, err := upload.ParseFileField(fieldName)
-		if err != nil {
-			log.Printf("processChunkedFileSession: failed to parse field %s: %v", fieldName, err)
-			continue
-		}
-		log.Printf("processChunkedFileSession: updating chunk %d for session %s", fileInfo.ChunkIndex, sessionID)
-		success := h.sessionManager.UpdateSessionChunk(sessionID, fileInfo.ChunkIndex, header.Size)
-		log.Printf("processChunkedFileSession: chunk update result=%v", success)
-	}
-
 	// Save all chunks to staging directory and add to chunk merger
 	log.Printf("processChunkedFileSession: saving %d chunks to staging", len(files))
 	chunkInfos := make([]upload.ChunkInfo, 0, len(files))
@@ -3735,6 +3882,7 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 			FilePath:   tempFile.Path,
 			Size:       header.Size,
 		})
+		h.sessionManager.UpdateSessionChunk(sessionID, fileInfo.ChunkIndex, bytesCopied, tempFile.Path)
 	}
 
 	// Add chunks to chunk merger for tracking across requests
@@ -3843,30 +3991,15 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		}
 	}
 
-	// Calculate hash (prioritize client-provided hash from session)
-	var finalHash string
-	var hashMethod string
-
-	if session != nil && session.ContentHash != "" {
-		finalHash = session.ContentHash
-		hashMethod = "client-provided"
-		log.Printf("Trusting client-provided hash for %s: %s", header.Filename, finalHash)
-	} else {
-		log.Printf("Calculating hash for file: %s", stagingFilePath)
-		hashResult, err := hash.CalculateFileHash(stagingFilePath, hash.AlgorithmBLAKE3, true)
-		if err != nil {
-			log.Printf("Failed to calculate hash for %s: %v", stagingFilePath, err)
-			h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "calculate completed upload hash")
-			return nil, fmt.Errorf("failed to calculate file hash: %w", err)
-		}
-
-		finalHash = hashResult.Hash
-		hashMethod = "quick"
-		if !hashResult.IsQuick {
-			hashMethod = "full"
-		}
-		log.Printf("Calculated %s hash for %s: %s", hashMethod, header.Filename, finalHash)
+	log.Printf("Calculating authoritative hash for file: %s", stagingFilePath)
+	hashResult, err := hash.CalculateLayeredBLAKE3(stagingFilePath)
+	if err != nil {
+		log.Printf("Failed to calculate hash for %s: %v", stagingFilePath, err)
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "calculate completed upload hash")
+		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
 	}
+	finalHash := hashResult.ContentHash
+	log.Printf("Calculated full content hash for %s: %s", header.Filename, finalHash)
 
 	validationResult := filevalidator.ValidateFile(header.Filename, session.ContentType)
 	if !validationResult.Valid {
@@ -3903,13 +4036,14 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	// Enqueue for processing
 	log.Printf("Enqueuing processing job for file: %s (hash: %s)", stagingFilePath, finalHash)
 	jobResult, err := h.queueClient.Insert(ctx, jobs.IngestAssetArgs{
-		ClientHash:   finalHash,
-		StagedPath:   stagingFilePath,
-		UserID:       session.UserID,
-		Timestamp:    time.Now(),
-		ContentType:  finalContentType,
-		FileName:     session.Filename,
-		RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
+		ContentHash:      finalHash,
+		QuickFingerprint: valueOrEmpty(hashResult.QuickFingerprint),
+		StagedPath:       stagingFilePath,
+		UserID:           session.UserID,
+		Timestamp:        time.Now(),
+		ContentType:      finalContentType,
+		FileName:         session.Filename,
+		RepositoryID:     uuid.UUID(repository.RepoID.Bytes).String(),
 	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
@@ -3926,7 +4060,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	taskID := jobResult.Job.ID
 	status := "processing"
 	size := header.Size
-	message := fmt.Sprintf("File uploaded with %s hash and queued for processing in repository '%s'", hashMethod, repository.Name)
+	message := fmt.Sprintf("File uploaded with verified content hash and queued for processing in repository '%s'", repository.Name)
 
 	log.Printf("Task %d enqueued for processing file %s in repository %s (staged path: %s)", taskID, header.Filename, repository.Name, stagingFilePath)
 
@@ -3947,19 +4081,16 @@ type duplicateAsset struct {
 	filename string
 }
 
-// findDuplicateByHash reports the existing asset in the repository carrying the
-// same content fingerprint, or nil when the content is new. Hash equality is the
-// system's identity notion for asset content; size is compared alongside it
-// because files over hash.QuickHashThreshold carry a quick hash that only covers
-// their first and last chunk.
+// findDuplicateByHash reports an existing asset with the same authoritative
+// full content hash and file size.
 func (h *AssetHandler) findDuplicateByHash(ctx context.Context, contentHash string, size int64, repositoryID pgtype.UUID) (*duplicateAsset, error) {
 	if contentHash == "" {
 		return nil, nil
 	}
 
-	rows, err := h.queries.GetAssetsByHashesAndRepository(ctx, repo.GetAssetsByHashesAndRepositoryParams{
-		Hashes:       []string{contentHash},
-		RepositoryID: repositoryID,
+	rows, err := h.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
+		ContentHashes: []string{contentHash},
+		RepositoryID:  repositoryID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up existing content hash: %w", err)

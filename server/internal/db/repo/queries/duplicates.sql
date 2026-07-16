@@ -14,28 +14,26 @@ WHERE a.repository_id = sqlc.arg('repository_id')
   AND a.is_deleted = false;
 
 -- name: GetExactDuplicateCandidates :many
--- Returns assets in a repository that share the exact same (hash, file_size)
+-- Returns assets in a repository that share the exact same (content_hash, file_size)
 -- with at least one other asset of the same owner. Only photos are considered,
 -- and only non-deleted assets. Results are ordered so members of the same
 -- duplicate set (owner included in the grouping key) are adjacent.
-SELECT a.asset_id, a.owner_id, a.hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
+SELECT a.asset_id, a.owner_id, a.content_hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.hash IS NOT NULL
   AND a.repository_id = sqlc.arg('repository_id')
   AND EXISTS (
     SELECT 1 FROM assets b
     WHERE b.is_deleted = false
       AND b.type = 'PHOTO'
-      AND b.hash IS NOT NULL
       AND b.repository_id = a.repository_id
       AND b.owner_id IS NOT DISTINCT FROM a.owner_id
-      AND b.hash = a.hash
+      AND b.content_hash = a.content_hash
       AND b.file_size = a.file_size
       AND b.asset_id <> a.asset_id
   )
-ORDER BY a.owner_id, a.hash, a.file_size, a.asset_id;
+ORDER BY a.owner_id, a.content_hash, a.file_size, a.asset_id;
 
 -- name: ListPHashEmbeddingsForRepository :many
 -- Loads pHash embeddings for every non-deleted photo in a repository so the

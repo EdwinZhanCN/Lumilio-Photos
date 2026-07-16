@@ -40,3 +40,12 @@ export interface ChunkedUploadOptions {
   maxConcurrent?: number;
   chunkSize?: number;
 }
+
+export interface UploadSessionState {
+  session_id: string;
+  status: string;
+  total_chunks: number;
+  received_chunks: number[];
+  bytes_received: number;
+  task_id?: number;
+}

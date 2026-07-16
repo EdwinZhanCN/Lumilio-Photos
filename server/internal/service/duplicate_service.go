@@ -476,7 +476,7 @@ func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow, stackOf map[uui
 	var have bool
 	var prev key
 	for _, r := range rows {
-		k := key{owner: detectionOwnerKey(r.OwnerID), hash: derefString(r.Hash), size: r.FileSize}
+		k := key{owner: detectionOwnerKey(r.OwnerID), hash: r.ContentHash, size: r.FileSize}
 		id := pgToUUID(r.AssetID)
 		if !have || k != prev {
 			anchor = id

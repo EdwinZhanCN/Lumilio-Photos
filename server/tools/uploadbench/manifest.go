@@ -53,8 +53,7 @@ type manifest struct {
 }
 
 // buildManifest walks the dataset directory, keeps files whose extension is in
-// exts, and (when clientHash) computes the BLAKE3 hash exactly as the server
-// would, so client-provided X-Content-Hash matches the stored asset hash.
+// exts, and (when clientHash) computes the client precheck fingerprint.
 func buildManifest(cfg config) (*manifest, error) {
 	allow := make(map[string]bool, len(cfg.exts))
 	for _, e := range cfg.exts {

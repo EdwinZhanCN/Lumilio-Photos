@@ -224,7 +224,7 @@ WITH page_ids AS MATERIALIZED (
     ORDER BY MAX(sp.score) DESC, a.upload_time DESC, a.asset_id DESC
     LIMIT $3 OFFSET $2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.best_score DESC, p.upload_time DESC, p.asset_id DESC
@@ -253,7 +253,9 @@ func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsByS
 			&i.StoragePath,
 			&i.MimeType,
 			&i.FileSize,
-			&i.Hash,
+			&i.ContentHash,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,

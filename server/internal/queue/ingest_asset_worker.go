@@ -21,13 +21,14 @@ type IngestAssetWorker struct {
 
 func (w *IngestAssetWorker) Work(ctx context.Context, job *river.Job[IngestAssetArgs]) error {
 	_, err := w.Processor.IngestAsset(ctx, processors.AssetPayload{
-		ClientHash:   job.Args.ClientHash,
-		StagedPath:   job.Args.StagedPath,
-		UserID:       job.Args.UserID,
-		Timestamp:    job.Args.Timestamp,
-		ContentType:  job.Args.ContentType,
-		FileName:     job.Args.FileName,
-		RepositoryID: job.Args.RepositoryID,
+		ContentHash:      job.Args.ContentHash,
+		QuickFingerprint: job.Args.QuickFingerprint,
+		StagedPath:       job.Args.StagedPath,
+		UserID:           job.Args.UserID,
+		Timestamp:        job.Args.Timestamp,
+		ContentType:      job.Args.ContentType,
+		FileName:         job.Args.FileName,
+		RepositoryID:     job.Args.RepositoryID,
 	})
 	return err
 }

@@ -1,8 +1,9 @@
 -- name: CreateAsset :one
 INSERT INTO assets (
     owner_id, type, original_filename, storage_path, mime_type,
-    file_size, hash, width, height, duration, taken_time, specific_metadata, rating, liked, repository_id, status
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    file_size, content_hash, quick_fingerprint, quick_fingerprint_version,
+    width, height, duration, taken_time, specific_metadata, rating, liked, repository_id, status
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 RETURNING *;
 
 -- name: GetAssetByID :one
@@ -197,17 +198,23 @@ SET status = $2
 WHERE asset_id = ANY($1::uuid[])
   AND is_deleted = false;
 
--- name: GetAssetsByHash :many
+-- name: GetAssetsByContentHash :many
 SELECT * FROM assets
-WHERE hash = $1 AND is_deleted = false;
+WHERE content_hash = $1 AND is_deleted = false;
 
--- name: GetAssetByHashAndRepository :one
+-- name: GetAssetByContentHashAndRepository :one
 SELECT * FROM assets
-WHERE hash = $1 AND repository_id = $2 AND is_deleted = false;
+WHERE content_hash = $1 AND repository_id = $2 AND is_deleted = false;
 
--- name: GetAssetsByHashesAndRepository :many
-SELECT asset_id, hash, file_size, original_filename FROM assets
-WHERE hash = ANY(sqlc.arg('hashes')::text[])
+-- name: GetAssetsByContentHashesAndRepository :many
+SELECT asset_id, content_hash, file_size, original_filename FROM assets
+WHERE content_hash = ANY(sqlc.arg('content_hashes')::text[])
+  AND repository_id = sqlc.arg('repository_id')
+  AND is_deleted = false;
+
+-- name: GetAssetsByQuickFingerprintsAndRepository :many
+SELECT asset_id, quick_fingerprint, quick_fingerprint_version, file_size, original_filename FROM assets
+WHERE quick_fingerprint = ANY(sqlc.arg('quick_fingerprints')::text[])
   AND repository_id = sqlc.arg('repository_id')
   AND is_deleted = false;
 
@@ -234,9 +241,11 @@ UPDATE assets
 SET original_filename = $2,
     mime_type = $3,
     file_size = $4,
-    hash = $5,
-    taken_time = $6,
-    status = $7,
+    content_hash = $5,
+    quick_fingerprint = $6,
+    quick_fingerprint_version = $7,
+    taken_time = $8,
+    status = $9,
     is_deleted = false,
     deleted_at = NULL
 WHERE asset_id = $1

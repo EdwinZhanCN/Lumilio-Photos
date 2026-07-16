@@ -2201,6 +2201,39 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.CreateUploadSessionRequestDTO": {
+                "properties": {
+                    "client_fingerprint": {
+                        "type": "string"
+                    },
+                    "content_type": {
+                        "type": "string"
+                    },
+                    "filename": {
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "type": "string"
+                    },
+                    "session_id": {
+                        "type": "string"
+                    },
+                    "total_chunks": {
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "total_size": {
+                        "minimum": 1,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "filename",
+                    "total_chunks",
+                    "total_size"
+                ],
+                "type": "object"
+            },
             "dto.DateRangeDTO": {
                 "properties": {
                     "from": {
@@ -4481,6 +4514,13 @@ const docTemplate = `{
                     "bytes_total": {
                         "type": "integer"
                     },
+                    "completed_chunks": {
+                        "items": {
+                            "type": "integer"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "filename": {
                         "type": "string"
                     },
@@ -5295,9 +5335,17 @@ const docTemplate = `{
             },
             "dto.UploadPrecheckFileDTO": {
                 "properties": {
+                    "fingerprint_version": {
+                        "example": "blake3-size-first-last-1m-v1",
+                        "type": "string"
+                    },
                     "hash": {
                         "example": "abcd1234567890",
                         "type": "string"
+                    },
+                    "is_quick": {
+                        "example": true,
+                        "type": "boolean"
                     },
                     "size": {
                         "example": 1048576,
@@ -5353,6 +5401,10 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
+                    "candidate": {
+                        "example": true,
+                        "type": "boolean"
+                    },
                     "duplicate": {
                         "example": true,
                         "type": "boolean"
@@ -5407,6 +5459,33 @@ const docTemplate = `{
                     },
                     "task_id": {
                         "example": 12345,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UploadSessionResponseDTO": {
+                "properties": {
+                    "bytes_received": {
+                        "type": "integer"
+                    },
+                    "received_chunks": {
+                        "items": {
+                            "type": "integer"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "session_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "task_id": {
+                        "type": "integer"
+                    },
+                    "total_chunks": {
                         "type": "integer"
                     }
                 },
@@ -7757,16 +7836,6 @@ const docTemplate = `{
         "/api/v1/assets": {
             "post": {
                 "description": "Upload a single photo, video, audio file, or document to the system. The file is staged in a repository and queued for processing.",
-                "parameters": [
-                    {
-                        "description": "Client-calculated BLAKE3 hash of the file",
-                        "in": "header",
-                        "name": "X-Content-Hash",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
                 "requestBody": {
                     "content": {
                         "application/x-www-form-urlencoded": {
@@ -7972,6 +8041,37 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/batch/jobs/stream": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Comma-separated upload task IDs",
+                        "in": "query",
+                        "name": "task_ids",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "SSE stream"
+                    }
+                },
+                "summary": "Stream upload materialization status",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/batch/progress": {
             "get": {
                 "description": "Get detailed progress information for upload sessions",
@@ -8007,6 +8107,46 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Get upload progress",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/batch/sessions": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CreateUploadSessionRequestDTO",
+                                        "summary": "request",
+                                        "description": "Upload metadata"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Upload metadata",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.UploadSessionResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Create or resume an upload session",
                 "tags": [
                     "assets"
                 ]
@@ -8739,7 +8879,7 @@ const docTemplate = `{
         },
         "/api/v1/assets/precheck": {
             "post": {
-                "description": "Given client-computed BLAKE3 fingerprints, reports which files already exist in the repository so the client can skip transporting them.",
+                "description": "Given client-computed BLAKE3 fingerprints, reports advisory candidates. Candidates must still be uploaded for server-side full-file verification.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -8802,7 +8942,7 @@ const docTemplate = `{
                         "description": "Internal Server Error"
                     }
                 },
-                "summary": "Precheck uploads against existing content hashes",
+                "summary": "Precheck uploads against existing content fingerprints",
                 "tags": [
                     "assets"
                 ]

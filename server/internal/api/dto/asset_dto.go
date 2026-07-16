@@ -120,8 +120,10 @@ type BatchUploadResultDTO struct {
 // Size is matched alongside the hash so a quick-hash fingerprint cannot alias a
 // file of a different length.
 type UploadPrecheckFileDTO struct {
-	Hash string `json:"hash" binding:"required" example:"abcd1234567890"`
-	Size int64  `json:"size" binding:"required" example:"1048576"`
+	Hash               string  `json:"hash" binding:"required" example:"abcd1234567890"`
+	Size               int64   `json:"size" binding:"required" example:"1048576"`
+	IsQuick            bool    `json:"is_quick" example:"true"`
+	FingerprintVersion *string `json:"fingerprint_version,omitempty" example:"blake3-size-first-last-1m-v1"`
 }
 
 // UploadPrecheckRequestDTO is the body for POST /assets/precheck.
@@ -132,12 +134,13 @@ type UploadPrecheckRequestDTO struct {
 	Files        []UploadPrecheckFileDTO `json:"files" binding:"required,min=1,dive"`
 }
 
-// UploadPrecheckResultDTO reports whether one candidate file already exists in
-// the target repository. When Duplicate is true the client can skip transport
-// entirely and mark the file as a duplicate.
+// UploadPrecheckResultDTO reports possible existing content. Candidate is only
+// a preflight hint; Duplicate remains false until server-side full-file
+// verification and must never cause the client to skip transport.
 type UploadPrecheckResultDTO struct {
 	Hash      string  `json:"hash" example:"abcd1234567890"`
 	Duplicate bool    `json:"duplicate" example:"true"`
+	Candidate bool    `json:"candidate" example:"true"`
 	AssetID   *string `json:"asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 	FileName  *string `json:"file_name,omitempty" example:"photo.jpg"`
 }
@@ -157,17 +160,41 @@ type UploadConfigResponseDTO struct {
 	MaxInFlightRequests int   `json:"max_in_flight_requests"`
 }
 
+type CreateUploadSessionRequestDTO struct {
+	SessionID         string `json:"session_id,omitempty" binding:"omitempty,uuid"`
+	Filename          string `json:"filename" binding:"required"`
+	TotalSize         int64  `json:"total_size" binding:"required,gte=1"`
+	TotalChunks       int    `json:"total_chunks" binding:"required,gte=1"`
+	ContentType       string `json:"content_type,omitempty"`
+	RepositoryID      string `json:"repository_id,omitempty" binding:"omitempty,uuid"`
+	ClientFingerprint string `json:"client_fingerprint,omitempty"`
+}
+
+type UploadSessionResponseDTO struct {
+	SessionID      string `json:"session_id"`
+	Status         string `json:"status"`
+	TotalChunks    int    `json:"total_chunks"`
+	ReceivedChunks []int  `json:"received_chunks"`
+	BytesReceived  int64  `json:"bytes_received"`
+	TaskID         *int64 `json:"task_id,omitempty"`
+}
+
+func stringPtr(value string) *string {
+	return &value
+}
+
 // SessionProgressDTO represents progress information for an upload session
 type SessionProgressDTO struct {
-	SessionID    string    `json:"session_id"`
-	Filename     string    `json:"filename"`
-	Status       string    `json:"status"`
-	Progress     float64   `json:"progress"`
-	Received     int       `json:"received_chunks"`
-	Total        int       `json:"total_chunks"`
-	BytesDone    int64     `json:"bytes_done"`
-	BytesTotal   int64     `json:"bytes_total"`
-	LastActivity time.Time `json:"last_activity"`
+	SessionID       string    `json:"session_id"`
+	Filename        string    `json:"filename"`
+	Status          string    `json:"status"`
+	Progress        float64   `json:"progress"`
+	Received        int       `json:"received_chunks"`
+	Total           int       `json:"total_chunks"`
+	BytesDone       int64     `json:"bytes_done"`
+	BytesTotal      int64     `json:"bytes_total"`
+	LastActivity    time.Time `json:"last_activity"`
+	CompletedChunks []int     `json:"completed_chunks"`
 }
 
 // ProgressSummaryDTO represents summary information for all upload sessions
@@ -327,7 +354,7 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		StoragePath:          storagePath,
 		MimeType:             a.MimeType,
 		FileSize:             a.FileSize,
-		Hash:                 a.Hash,
+		Hash:                 stringPtr(a.ContentHash),
 		Width:                a.Width,
 		Height:               a.Height,
 		Duration:             a.Duration,
@@ -550,7 +577,7 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		StoragePath:          storagePath,
 		MimeType:             r.MimeType,
 		FileSize:             r.FileSize,
-		Hash:                 r.Hash,
+		Hash:                 stringPtr(r.ContentHash),
 		Width:                r.Width,
 		Height:               r.Height,
 		Duration:             r.Duration,

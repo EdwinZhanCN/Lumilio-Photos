@@ -14,10 +14,12 @@
  * drag-over state. Consumers use {@link useUploadContext}; calling that hook
  * outside the provider is an error.
  *
- * Upload processing state comes from {@link useUploadProcess}. It owns the
- * aggregate progress number, per-file {@link FileUploadProgress}, hashing
- * progress, and the two active flags used by the provider:
- * `isGeneratingHashCodes` and `isUploading`.
+ * Upload processing state comes from {@link useUploadProcess}. Its React state
+ * bridge is isolated in {@link useUploadProgressState}; the hash/upload pipeline
+ * is coordinated by {@link runUploadProcess}, and transport-specific behavior is
+ * owned by {@link createUploadTransport}. The hook exposes the aggregate progress
+ * number, per-file {@link FileUploadProgress}, hashing progress, and the two active
+ * flags used by the provider: `isGeneratingHashCodes` and `isUploading`.
  *
  * {@link UnifiedUploadSection} is the primary queue editor. It validates
  * selected files, adds them to the provider queue, lets the user clear the
@@ -117,6 +119,9 @@ import type ProgressIndicator from "./components/ProgressIndicator.tsx";
 import type UnifiedUploadSection from "./components/UnifiedUploadSection.tsx";
 import type { useUploadContext } from "./hooks/useUpload.tsx";
 import type { FileUploadProgress, useUploadProcess } from "./hooks/useUploadProcess.tsx";
+import type { useUploadProgressState } from "./hooks/uploadProcessProgress.ts";
+import type { runUploadProcess } from "./hooks/uploadProcessRunner.ts";
+import type { createUploadTransport } from "./hooks/uploadProcessTransport.ts";
 import type {
   useBatchUploadMutation,
   useChunkedUploadMutation,

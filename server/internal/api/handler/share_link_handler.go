@@ -505,8 +505,8 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, w
 	}
 
 	fullPath := ""
-	if asset.Hash != nil && *asset.Hash != "" {
-		webFilename := *asset.Hash + webSuffix
+	if asset.ContentHash != "" {
+		webFilename := asset.ContentHash + webSuffix
 		candidate := filepath.Join(repository.Path, webVersionDir, "web", webFilename)
 		if _, statErr := os.Stat(candidate); statErr == nil {
 			fullPath = candidate

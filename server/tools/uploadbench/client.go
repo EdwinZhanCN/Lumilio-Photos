@@ -276,7 +276,7 @@ type uploadResponse struct {
 // uploadFile streams one file to POST /api/v1/assets. When repositoryID is set
 // it is sent as a form field (which also triggers detect_stacks server-side, so
 // the core profile leaves it empty). When clientHash is non-empty it is sent as
-// X-Content-Hash so the server trusts it instead of hashing on the request path.
+// X-Upload-Fingerprint as a non-authoritative precheck hint.
 func (c *client) uploadFile(ctx context.Context, path, clientHash, contentType, repositoryID string) (uploadResponse, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -312,7 +312,7 @@ func (c *client) uploadFile(ctx context.Context, path, clientHash, contentType, 
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	if clientHash != "" {
-		req.Header.Set("X-Content-Hash", clientHash)
+		req.Header.Set("X-Upload-Fingerprint", clientHash)
 	}
 
 	resp, err := c.http.Do(req)

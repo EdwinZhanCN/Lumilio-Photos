@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,6 +46,7 @@ type SourceMaterializer struct {
 	assetService   service.AssetService
 	logger         *zap.Logger
 	auditProvider  logging.RepositoryAuditProvider
+	contentLocks   [256]sync.Mutex
 }
 
 // NewSourceMaterializer creates a SourceMaterializer with the required dependencies.
@@ -123,10 +126,25 @@ func (m *SourceMaterializer) materializeFromStaging(
 	}
 	fileSize := info.Size()
 
-	// Compute or normalize hash
-	normalizedHash, err := m.resolveHash(source.SourcePath, source.Hash)
+	// Upload handlers pass a server-verified full hash; non-HTTP staging sources
+	// are hashed here. Client fingerprints never populate ContentHash.
+	hashes, err := m.resolveLayeredHash(source)
+	if err != nil {
+		return nil, fmt.Errorf("calculate layered hash: %w", err)
+	}
+	lockIndex, _ := strconv.ParseUint(hashes.ContentHash[:2], 16, 8)
+	m.contentLocks[lockIndex].Lock()
+	defer m.contentLocks[lockIndex].Unlock()
+
+	existing, err := m.findExistingContent(ctx, repository.RepoID, hashes.ContentHash, fileSize)
 	if err != nil {
 		return nil, err
+	}
+	if existing != nil {
+		if removeErr := os.Remove(source.SourcePath); removeErr != nil && !os.IsNotExist(removeErr) {
+			return nil, fmt.Errorf("remove duplicate staging file: %w", removeErr)
+		}
+		return existing, nil
 	}
 
 	// Build staging file handle
@@ -152,24 +170,26 @@ func (m *SourceMaterializer) materializeFromStaging(
 
 	// Create asset record (storage path not yet known)
 	asset, err := m.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
-		OwnerID:          ownerID,
-		Type:             string(validation.AssetType),
-		OriginalFilename: source.OriginalFilename,
-		StoragePath:      nil,
-		MimeType:         validation.MimeType,
-		FileSize:         fileSize,
-		Hash:             &normalizedHash,
-		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		Rating:           int32Ptr(0),
-		RepositoryID:     repository.RepoID,
-		Status:           statusJSON,
+		OwnerID:                 ownerID,
+		Type:                    string(validation.AssetType),
+		OriginalFilename:        source.OriginalFilename,
+		StoragePath:             nil,
+		MimeType:                validation.MimeType,
+		FileSize:                fileSize,
+		ContentHash:             hashes.ContentHash,
+		QuickFingerprint:        hashes.QuickFingerprint,
+		QuickFingerprintVersion: hashes.QuickFingerprintVersion,
+		TakenTime:               pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		Rating:                  int32Ptr(0),
+		RepositoryID:            repository.RepoID,
+		Status:                  statusJSON,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create asset: %w", err)
 	}
 
 	// Commit staging → inbox; the storage path is determined by the repo's storage strategy
-	storageRelPath, err := m.stagingManager.CommitStagingFileToInbox(stagingFile, normalizedHash)
+	storageRelPath, err := m.stagingManager.CommitStagingFileToInbox(stagingFile, hashes.ContentHash)
 	if err != nil {
 		m.handleStagingFailure(ctx, stagingFile, repository.Path, asset.AssetID, err)
 		return asset, nil // asset record exists but is in failed state
@@ -232,7 +252,7 @@ func (m *SourceMaterializer) materializeInPlace(
 	}
 
 	// Compute hash
-	hashResult, err := hash.CalculateFileHash(fullPath, hash.AlgorithmBLAKE3, true)
+	hashResult, err := hash.CalculateLayeredBLAKE3(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("calculate hash: %w", err)
 	}
@@ -256,21 +276,22 @@ func (m *SourceMaterializer) materializeInPlace(
 	// Existing asset — skip if unchanged, otherwise update
 	if existingErr == nil {
 		if !isSoftDeleted(existing) &&
-			existing.Hash != nil && *existing.Hash == hashResult.Hash &&
+			existing.ContentHash == hashResult.ContentHash &&
 			existing.FileSize == info.Size() &&
 			strings.EqualFold(existing.MimeType, validation.MimeType) {
 			return nil, nil // unchanged
 		}
 
-		hashPtr := hashResult.Hash
 		updated, updateErr := m.queries.UpdateDiscoveredAssetByID(ctx, repo.UpdateDiscoveredAssetByIDParams{
-			AssetID:          existing.AssetID,
-			OriginalFilename: source.OriginalFilename,
-			MimeType:         validation.MimeType,
-			FileSize:         info.Size(),
-			Hash:             &hashPtr,
-			TakenTime:        pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
-			Status:           statusJSON,
+			AssetID:                 existing.AssetID,
+			OriginalFilename:        source.OriginalFilename,
+			MimeType:                validation.MimeType,
+			FileSize:                info.Size(),
+			ContentHash:             hashResult.ContentHash,
+			QuickFingerprint:        hashResult.QuickFingerprint,
+			QuickFingerprintVersion: hashResult.QuickFingerprintVersion,
+			TakenTime:               pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
+			Status:                  statusJSON,
 		})
 		if updateErr != nil {
 			return nil, fmt.Errorf("update discovered asset: %w", updateErr)
@@ -290,20 +311,21 @@ func (m *SourceMaterializer) materializeInPlace(
 	}
 
 	// New asset — create
-	hashPtr := hashResult.Hash
 	storagePathPtr := storagePath
 	created, createErr := m.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
-		OwnerID:          ownerOrRepoDefault(source.OwnerID, repository.DefaultOwnerID),
-		Type:             string(assetType),
-		OriginalFilename: source.OriginalFilename,
-		StoragePath:      &storagePathPtr,
-		MimeType:         validation.MimeType,
-		FileSize:         info.Size(),
-		Hash:             &hashPtr,
-		TakenTime:        pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
-		Rating:           int32Ptr(0),
-		RepositoryID:     repoID,
-		Status:           statusJSON,
+		OwnerID:                 ownerOrRepoDefault(source.OwnerID, repository.DefaultOwnerID),
+		Type:                    string(assetType),
+		OriginalFilename:        source.OriginalFilename,
+		StoragePath:             &storagePathPtr,
+		MimeType:                validation.MimeType,
+		FileSize:                info.Size(),
+		ContentHash:             hashResult.ContentHash,
+		QuickFingerprint:        hashResult.QuickFingerprint,
+		QuickFingerprintVersion: hashResult.QuickFingerprintVersion,
+		TakenTime:               pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
+		Rating:                  int32Ptr(0),
+		RepositoryID:            repoID,
+		Status:                  statusJSON,
 	})
 	if createErr != nil {
 		// Race: another worker may have created the same asset between our lookup and insert
@@ -348,21 +370,48 @@ func (m *SourceMaterializer) materializeInPlace(
 // Helpers
 // ---------------------------------------------------------------------------
 
-// resolveHash returns a normalized BLAKE3 hash, computing it if not provided.
-func (m *SourceMaterializer) resolveHash(filePath string, providedHash *string) (string, error) {
-	if providedHash != nil && strings.TrimSpace(*providedHash) != "" {
-		return strings.ToLower(strings.TrimSpace(*providedHash)), nil
-	}
-
-	hashResult, err := hash.CalculateFileHash(filePath, hash.AlgorithmBLAKE3, true)
+func (m *SourceMaterializer) findExistingContent(ctx context.Context, repositoryID pgtype.UUID, contentHash string, fileSize int64) (*repo.Asset, error) {
+	rows, err := m.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
+		ContentHashes: []string{contentHash},
+		RepositoryID:  repositoryID,
+	})
 	if err != nil {
-		return "", fmt.Errorf("calculate hash: %w", err)
+		return nil, fmt.Errorf("find existing staged content: %w", err)
 	}
-	normalized := strings.ToLower(strings.TrimSpace(hashResult.Hash))
-	if normalized == "" {
-		return "", fmt.Errorf("asset hash is empty")
+	for _, row := range rows {
+		if row.FileSize != fileSize {
+			continue
+		}
+		asset, err := m.queries.GetAssetByID(ctx, row.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("load existing staged content: %w", err)
+		}
+		return &asset, nil
 	}
-	return normalized, nil
+	return nil, nil
+}
+
+func (m *SourceMaterializer) resolveLayeredHash(source IngestSource) (*hash.LayeredHashResult, error) {
+	info, err := os.Stat(source.SourcePath)
+	if err != nil {
+		return nil, fmt.Errorf("stat source for hashing: %w", err)
+	}
+	if source.ContentHash == nil || !hash.ValidateHash(strings.TrimSpace(*source.ContentHash), hash.AlgorithmBLAKE3) {
+		return hash.CalculateLayeredBLAKE3(source.SourcePath)
+	}
+	result := &hash.LayeredHashResult{
+		ContentHash: strings.ToLower(strings.TrimSpace(*source.ContentHash)),
+		FileSize:    info.Size(),
+	}
+	if info.Size() > hash.QuickHashThreshold && source.QuickFingerprint != nil && source.QuickFingerprintVersion != nil &&
+		*source.QuickFingerprintVersion == hash.QuickFingerprintVersion &&
+		hash.ValidateHash(strings.TrimSpace(*source.QuickFingerprint), hash.AlgorithmBLAKE3) {
+		quick := strings.ToLower(strings.TrimSpace(*source.QuickFingerprint))
+		version := hash.QuickFingerprintVersion
+		result.QuickFingerprint = &quick
+		result.QuickFingerprintVersion = &version
+	}
+	return result, nil
 }
 
 // handleStagingFailure attempts to move a failed staging file to the failed

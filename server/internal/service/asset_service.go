@@ -448,7 +448,7 @@ func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int
 
 // DetectDuplicates finds assets with the same hash
 func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error) {
-	return s.queries.GetAssetsByHash(ctx, &hash)
+	return s.queries.GetAssetsByContentHash(ctx, hash)
 }
 
 // UpdateAssetMetadata updates the specific metadata of an asset and extracts taken_time
@@ -703,7 +703,7 @@ func (s *assetService) SearchTags(ctx context.Context, query string, limit int) 
 
 // SaveAssetIndex implements the INDEX step: verify asset exists by hash and complete indexing
 func (s *assetService) SaveAssetIndex(ctx context.Context, taskID string, hash string) error {
-	assets, err := s.queries.GetAssetsByHash(ctx, &hash)
+	assets, err := s.queries.GetAssetsByContentHash(ctx, hash)
 	if err != nil {
 		return fmt.Errorf("failed to query asset by hash: %w", err)
 	}
@@ -820,7 +820,7 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 	if size == "" {
 		return fmt.Errorf("size cannot be empty")
 	}
-	if asset.Hash == nil || *asset.Hash == "" {
+	if asset.ContentHash == "" {
 		return fmt.Errorf("asset hash is required")
 	}
 	if repoPath == "" {
@@ -828,7 +828,7 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 	}
 
 	// Generate thumbnail filename using hash and size
-	filename := fmt.Sprintf("%s_%s.webp", *asset.Hash, size)
+	filename := fmt.Sprintf("%s_%s.webp", asset.ContentHash, size)
 
 	// Construct full path: .lumilio/assets/thumbnails/{size}/{hash}_{size}.webp
 	thumbnailDir := filepath.Join(repoPath, ".lumilio/assets/thumbnails", size)
@@ -1082,7 +1082,7 @@ func (s *assetService) SaveVideoVersion(ctx context.Context, repoPath string, vi
 	if version == "" {
 		return fmt.Errorf("version cannot be empty")
 	}
-	if asset.Hash == nil || *asset.Hash == "" {
+	if asset.ContentHash == "" {
 		return fmt.Errorf("asset hash is required")
 	}
 	if repoPath == "" {
@@ -1090,7 +1090,7 @@ func (s *assetService) SaveVideoVersion(ctx context.Context, repoPath string, vi
 	}
 
 	// Generate filename using hash and version
-	filename := fmt.Sprintf("%s_%s.mp4", *asset.Hash, version)
+	filename := fmt.Sprintf("%s_%s.mp4", asset.ContentHash, version)
 
 	// Construct full path: .lumilio/assets/videos/web/{hash}_{version}.mp4
 	videoDir := filepath.Join(repoPath, ".lumilio/assets/videos", version)
@@ -1143,7 +1143,7 @@ func (s *assetService) SaveAudioVersion(ctx context.Context, repoPath string, au
 	if version == "" {
 		return fmt.Errorf("version cannot be empty")
 	}
-	if asset.Hash == nil || *asset.Hash == "" {
+	if asset.ContentHash == "" {
 		return fmt.Errorf("asset hash is required")
 	}
 	if repoPath == "" {
@@ -1151,7 +1151,7 @@ func (s *assetService) SaveAudioVersion(ctx context.Context, repoPath string, au
 	}
 
 	// Generate filename using hash and version
-	filename := fmt.Sprintf("%s_%s.mp3", *asset.Hash, version)
+	filename := fmt.Sprintf("%s_%s.mp3", asset.ContentHash, version)
 
 	// Construct full path: .lumilio/assets/audios/web/{hash}_{version}.mp3
 	audioDir := filepath.Join(repoPath, ".lumilio/assets/audios", version)

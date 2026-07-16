@@ -168,8 +168,6 @@ func (cm *ChunkMerger) MergeChunks(sessionID string, totalChunks int, repoPath s
 		return nil, fmt.Errorf("file size verification failed: %w", err)
 	}
 
-	cm.ClearSession(sessionID)
-
 	return &MergeResult{
 		MergedFilePath: tempFile.Path,
 		TotalSize:      totalSize,
