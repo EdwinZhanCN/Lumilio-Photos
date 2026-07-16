@@ -23,7 +23,7 @@ import {
   RecoveryCodesPanel,
   TextInput,
   TotpSetupPanel,
-} from "./ui.tsx";
+} from "./ui";
 
 type RegistrationFormProps = {
   credentialTitle: string;

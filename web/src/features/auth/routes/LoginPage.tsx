@@ -24,7 +24,7 @@ import {
   OtpInput,
   PasswordField,
   TextInput,
-} from "../components/ui.tsx";
+} from "../components/ui";
 
 type AuthRedirectState = {
   from?: {
