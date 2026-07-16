@@ -18,8 +18,7 @@ import { $api } from "@/lib/http-commons/queryClient";
  * }
  * ```
  */
-export const useUploadConfig = () =>
-  $api.useQuery("get", "/api/v1/assets/batch/config", {});
+export const useUploadConfig = () => $api.useQuery("get", "/api/v1/assets/batch/config", {});
 
 /**
  * React Query hook for fetching upload progress for multiple sessions.

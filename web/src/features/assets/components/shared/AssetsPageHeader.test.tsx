@@ -171,7 +171,13 @@ describe("AssetsPageHeader bulk actions", () => {
         onSortByChange={vi.fn()}
         title="Assets"
         browseItems={browseItems}
-        hiddenBulkActions={["set-rating", "set-liked", "stack-selected", "download", "delete-assets"]}
+        hiddenBulkActions={[
+          "set-rating",
+          "set-liked",
+          "stack-selected",
+          "download",
+          "delete-assets",
+        ]}
       />,
     );
 

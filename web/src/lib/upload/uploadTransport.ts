@@ -19,12 +19,15 @@ const responseError = async (response: Response, operation: string): Promise<Err
     const payload: unknown = await response.json();
     if (payload && typeof payload === "object") {
       if ("error" in payload && typeof payload.error === "string") detail = payload.error;
-      else if ("message" in payload && typeof payload.message === "string") detail = payload.message;
+      else if ("message" in payload && typeof payload.message === "string")
+        detail = payload.message;
     }
   } catch {
     // The status code remains actionable when the response has no JSON body.
   }
-  return new Error(`${operation} failed with status ${response.status}${detail ? `: ${detail}` : ""}`);
+  return new Error(
+    `${operation} failed with status ${response.status}${detail ? `: ${detail}` : ""}`,
+  );
 };
 
 const parseSuccessfulJSON = async <T>(response: Response, operation: string): Promise<T> => {
@@ -246,7 +249,17 @@ export const uploadFileInChunks = async (
     client_fingerprint: hash,
   });
   if (session.status === "completed" && session.task_id) {
-    return { results: [{ success: true, file_name: file.name, content_hash: "", task_id: session.task_id, status: "processing" }] };
+    return {
+      results: [
+        {
+          success: true,
+          file_name: file.name,
+          content_hash: "",
+          task_id: session.task_id,
+          status: "processing",
+        },
+      ],
+    };
   }
   const completed = new Set(session.received_chunks ?? []);
 
@@ -265,14 +278,17 @@ export const uploadFileInChunks = async (
         );
       } catch (error) {
         lastError = error;
-        if (attempt < 3) await new Promise((resolve) => globalThis.setTimeout(resolve, 300 * 2 ** attempt));
+        if (attempt < 3)
+          await new Promise((resolve) => globalThis.setTimeout(resolve, 300 * 2 ** attempt));
       }
     }
     throw lastError;
   };
 
   let activeUploads = 0;
-  const pendingChunks = Array.from({ length: totalChunks }, (_, index) => index).filter((index) => !completed.has(index));
+  const pendingChunks = Array.from({ length: totalChunks }, (_, index) => index).filter(
+    (index) => !completed.has(index),
+  );
   // If every chunk reached the server but the completion response was lost,
   // replay the final chunk as an idempotent finalize ping.
   if (pendingChunks.length === 0 && totalChunks > 0) pendingChunks.push(totalChunks - 1);
@@ -291,7 +307,7 @@ export const uploadFileInChunks = async (
       }
 
       while (activeUploads < maxConcurrent && nextPendingIndex < pendingChunks.length) {
-		const currentIndex = pendingChunks[nextPendingIndex++];
+        const currentIndex = pendingChunks[nextPendingIndex++];
         activeUploads++;
 
         uploadChunk(currentIndex)
@@ -319,13 +335,20 @@ export const uploadFileInChunks = async (
 };
 
 export const createUploadSession = async (request: {
-  session_id?: string; filename: string; total_size: number; total_chunks: number;
-  content_type?: string; repository_id?: string; client_fingerprint?: string;
+  session_id?: string;
+  filename: string;
+  total_size: number;
+  total_chunks: number;
+  content_type?: string;
+  repository_id?: string;
+  client_fingerprint?: string;
 }): Promise<UploadSessionState> => {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   attachAuthHeader(headers);
   const response = await fetch(`${baseURL}/api/v1/assets/batch/sessions`, {
-    method: "POST", headers, body: JSON.stringify(request),
+    method: "POST",
+    headers,
+    body: JSON.stringify(request),
   });
   return parseSuccessfulJSON<UploadSessionState>(response, "Upload session");
 };
@@ -351,7 +374,11 @@ const resumableSessionKey = (file: File, repositoryId?: string): string =>
   `lumilio.upload.session.v1:${repositoryId ?? "primary"}:${file.name}:${file.size}:${file.lastModified}`;
 
 export const clearResumableSessionId = (file: File, repositoryId?: string): void => {
-  try { localStorage.removeItem(resumableSessionKey(file, repositoryId)); } catch { /* storage is optional */ }
+  try {
+    localStorage.removeItem(resumableSessionKey(file, repositoryId));
+  } catch {
+    /* storage is optional */
+  }
 };
 
 export const shouldUseChunks = (file: File, threshold: number = 10 * 1024 * 1024): boolean => {

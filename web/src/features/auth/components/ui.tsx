@@ -842,12 +842,7 @@ export const TotpSetupPanel: React.FC<{
           <div className="w-full pt-0.5">
             <p className="font-medium text-base-content">{copy.enter}</p>
             <div className="mt-3">
-              <OtpInput
-                value={code}
-                onChange={onCodeChange}
-                invalid={invalid}
-                autoFocus={false}
-              />
+              <OtpInput value={code} onChange={onCodeChange} invalid={invalid} autoFocus={false} />
               {invalid && errorMessage && (
                 <p className="mt-2 flex items-center gap-1 text-xs font-medium text-error">
                   <CircleAlert size={13} /> {errorMessage}

@@ -490,8 +490,7 @@ const AssetsPageHeader = ({
     const raw: TagSuggestion[] = tagSuggestionsQuery.data?.tags ?? [];
     return raw
       .filter(
-        (tag) =>
-          Boolean(tag.tag_name) && !pendingTagNames.has((tag.tag_name ?? "").toLowerCase()),
+        (tag) => Boolean(tag.tag_name) && !pendingTagNames.has((tag.tag_name ?? "").toLowerCase()),
       )
       .map((tag) => ({
         id: tag.tag_id ?? tag.tag_name!,
@@ -503,9 +502,7 @@ const AssetsPageHeader = ({
   const tagExactExists =
     trimmedTagQuery.length > 0 &&
     (pendingTagNames.has(trimmedTagQuery.toLowerCase()) ||
-      tagSuggestionItems.some(
-        (tag) => tag.name.toLowerCase() === trimmedTagQuery.toLowerCase(),
-      ));
+      tagSuggestionItems.some((tag) => tag.name.toLowerCase() === trimmedTagQuery.toLowerCase()));
   const showCreateTag = trimmedTagQuery.length > 0 && !tagExactExists;
 
   const addPendingTag = (item: TagPickerItem) => {

@@ -41,7 +41,10 @@ export default function BackupSection() {
   const restoreBackup = useRestoreBackup();
 
   // Name of the entry whose destructive action awaits its second click.
-  const [confirming, setConfirming] = useState<{ name: string; action: "delete" | "restore" } | null>(null);
+  const [confirming, setConfirming] = useState<{
+    name: string;
+    action: "delete" | "restore";
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
   const downloadBusy = useRef(false);
@@ -49,17 +52,18 @@ export default function BackupSection() {
   const backup = settingsQuery.data?.backup;
   const backups = backupsQuery.data?.backups ?? [];
 
-  const patchBackup = (patch: { enabled?: boolean; interval_hours?: number; keep_last?: number }) => {
+  const patchBackup = (patch: {
+    enabled?: boolean;
+    interval_hours?: number;
+    keep_last?: number;
+  }) => {
     setError(null);
     updateSettings.mutate({ body: { backup: patch } });
   };
 
   const onCreate = () => {
     setError(null);
-    createBackup.mutate(
-      {},
-      { onSuccess: () => setPollUntil(Date.now() + 30_000) },
-    );
+    createBackup.mutate({}, { onSuccess: () => setPollUntil(Date.now() + 30_000) });
   };
 
   const onDownload = async (name: string) => {
@@ -69,7 +73,9 @@ export default function BackupSection() {
     try {
       await downloadBackup(name);
     } catch {
-      setError(t("settings.serverSettings.backup.downloadFailed", { defaultValue: "Download failed." }));
+      setError(
+        t("settings.serverSettings.backup.downloadFailed", { defaultValue: "Download failed." }),
+      );
     } finally {
       downloadBusy.current = false;
     }
@@ -83,7 +89,9 @@ export default function BackupSection() {
         { params: { path: { name } } },
         {
           onError: () =>
-            setError(t("settings.serverSettings.backup.deleteFailed", { defaultValue: "Delete failed." })),
+            setError(
+              t("settings.serverSettings.backup.deleteFailed", { defaultValue: "Delete failed." }),
+            ),
         },
       );
       return;
@@ -121,7 +129,9 @@ export default function BackupSection() {
       <SettingsRow
         icon={<DatabaseBackupIcon className="size-4" />}
         iconColor="bg-info text-info-content"
-        label={t("settings.serverSettings.backup.enabledLabel", { defaultValue: "Automatic backups" })}
+        label={t("settings.serverSettings.backup.enabledLabel", {
+          defaultValue: "Automatic backups",
+        })}
         control={
           <input
             type="checkbox"
@@ -257,8 +267,13 @@ export default function BackupSection() {
                               defaultValue: "Delete this backup?",
                             })}
                       </span>
-                      <button className="btn btn-error btn-xs" onClick={() => onConfirmedAction(entry)}>
-                        {t("settings.serverSettings.backup.confirmYes", { defaultValue: "Confirm" })}
+                      <button
+                        className="btn btn-error btn-xs"
+                        onClick={() => onConfirmedAction(entry)}
+                      >
+                        {t("settings.serverSettings.backup.confirmYes", {
+                          defaultValue: "Confirm",
+                        })}
                       </button>
                       <button className="btn btn-ghost btn-xs" onClick={() => setConfirming(null)}>
                         {t("settings.serverSettings.backup.confirmNo", { defaultValue: "Cancel" })}

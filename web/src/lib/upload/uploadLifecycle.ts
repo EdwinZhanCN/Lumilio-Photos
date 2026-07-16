@@ -54,7 +54,10 @@ async function pollUploadJobs(
   throw new Error("Timed out waiting for uploaded files to finish processing");
 }
 
-async function streamUploadJobs(ids: number[], options: WaitForUploadJobsOptions): Promise<UploadJobStatus[]> {
+async function streamUploadJobs(
+  ids: number[],
+  options: WaitForUploadJobsOptions,
+): Promise<UploadJobStatus[]> {
   const latest = new Map<number, UploadJobStatus>();
   const baseUrl = import.meta.env.VITE_API_URL ?? "";
   const headers: Record<string, string> = {};
@@ -64,7 +67,10 @@ async function streamUploadJobs(ids: number[], options: WaitForUploadJobsOptions
     headers,
     signal: options.signal,
     openWhenHidden: true,
-    onopen: async (response) => { if (!response.ok) throw new Error(`Upload status stream failed with status ${response.status}`); },
+    onopen: async (response) => {
+      if (!response.ok)
+        throw new Error(`Upload status stream failed with status ${response.status}`);
+    },
     onmessage: (message) => {
       if (message.event !== "jobs" && message.event !== "done") return;
       const payload = JSON.parse(message.data) as { jobs?: UploadJobStatus[] };
@@ -74,19 +80,27 @@ async function streamUploadJobs(ids: number[], options: WaitForUploadJobsOptions
       }
       if (message.event === "done") throw new UploadStreamComplete();
     },
-    onerror: (error) => { throw error; },
+    onerror: (error) => {
+      throw error;
+    },
   }).catch((error: unknown) => {
     if (!(error instanceof UploadStreamComplete)) throw error;
   });
-  const jobs = ids.map((id) => latest.get(id)).filter((job): job is UploadJobStatus => Boolean(job));
-  if (jobs.length !== ids.length || !jobs.every((job) => job.terminal)) throw new Error("Upload status stream ended early");
+  const jobs = ids
+    .map((id) => latest.get(id))
+    .filter((job): job is UploadJobStatus => Boolean(job));
+  if (jobs.length !== ids.length || !jobs.every((job) => job.terminal))
+    throw new Error("Upload status stream ended early");
   return jobs;
 }
 
 class UploadStreamComplete extends Error {}
 
 /** Uses SSE first and falls back to /batch/jobs polling if streaming is unavailable. */
-export async function waitForUploadJobs(taskIds: number[], options: WaitForUploadJobsOptions = {}): Promise<UploadJobStatus[]> {
+export async function waitForUploadJobs(
+  taskIds: number[],
+  options: WaitForUploadJobsOptions = {},
+): Promise<UploadJobStatus[]> {
   const ids = Array.from(new Set(taskIds));
   if (ids.length === 0) return [];
   try {

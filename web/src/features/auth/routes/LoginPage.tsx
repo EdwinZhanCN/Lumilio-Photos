@@ -155,8 +155,7 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      const note =
-        options.passkey && !passkeySupport.supported ? passkeySupportReason : null;
+      const note = options.passkey && !passkeySupport.supported ? passkeySupportReason : null;
       goToPassword(note);
     } catch (identifyError) {
       setOptionsError(

@@ -9,18 +9,14 @@ export type FolderSummary = components["schemas"]["dto.FolderSummaryDTO"];
  * "" for root). Counts/covers are recursive over descendants.
  */
 export function useFolders(repositoryId: string | undefined, parentPath: string) {
-  return $api.useQuery(
-    "get",
-    "/api/v1/assets/folders",
-    {
-      params: {
-        query: {
-          repository_id: repositoryId,
-          path: parentPath,
-        },
+  return $api.useQuery("get", "/api/v1/assets/folders", {
+    params: {
+      query: {
+        repository_id: repositoryId,
+        path: parentPath,
       },
     },
-  );
+  });
 }
 
 /**

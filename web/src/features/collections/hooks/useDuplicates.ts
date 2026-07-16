@@ -25,15 +25,11 @@ function isAssetsQueryKey(queryKey: readonly unknown[]) {
  * Loads the Utilities Rail summary card data.
  */
 export function useDuplicateSummary(repositoryId?: string) {
-  return $api.useQuery(
-    "get",
-    "/api/v1/duplicates/summary",
-    {
-      params: {
-        query: repositoryId ? { repository_id: repositoryId } : {},
-      },
+  return $api.useQuery("get", "/api/v1/duplicates/summary", {
+    params: {
+      query: repositoryId ? { repository_id: repositoryId } : {},
     },
-  );
+  });
 }
 
 interface UseDuplicateGroupsOptions {
@@ -52,20 +48,16 @@ export function useDuplicateGroups({
   limit = 20,
   offset = 0,
 }: UseDuplicateGroupsOptions) {
-  return $api.useQuery(
-    "get",
-    "/api/v1/duplicates/groups",
-    {
-      params: {
-        query: {
-          repository_id: repositoryId,
-          status,
-          limit,
-          offset,
-        },
+  return $api.useQuery("get", "/api/v1/duplicates/groups", {
+    params: {
+      query: {
+        repository_id: repositoryId,
+        status,
+        limit,
+        offset,
       },
     },
-  );
+  });
 }
 
 interface DetectMutationVariables {
