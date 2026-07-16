@@ -18,7 +18,7 @@ import {
   getRetryTasksByCategoryForAssetType,
   isRetryTaskSupportedForAssetType,
 } from "@/config/retryTasks";
-import { isExportSupported } from "@/lib/utils/mediaTypes";
+import { isExportSupported } from "@/features/assets/utils/mediaTypes";
 import { useI18n } from "@/lib/i18n";
 
 type ExportFormat = "png" | "jpeg" | "webp" | "avif";

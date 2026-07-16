@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import type { Asset } from "@/lib/http-commons";
 import { isAudio, isPhoto, isRawPhoto, isVideo } from "./mediaTypes";
 
-describe("mediaTypes", () => {
+describe("asset media types", () => {
   it("prefers asset.type over MIME prefixes", () => {
     const asset = {
       type: "VIDEO",

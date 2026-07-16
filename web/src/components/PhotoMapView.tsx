@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { MapIcon, ListIcon } from "lucide-react";
 import MapComponent, { PhotoLocation } from "./MapComponent";
-import { formatGPSCoordinates } from "@/lib/utils/mapUtils";
+import { formatGPSCoordinates } from "@/lib/geo/formatCoordinates";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { assetUrls } from "@/lib/assets/assetUrls";

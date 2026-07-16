@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { convertCoordinatesForMap } from "@/lib/utils/mapUtils";
-import { convertFromGaodeCoordinates } from "@/lib/utils/coordinateConversion";
+import { convertFromGaodeCoordinates } from "@/lib/geo/coordinateConversion";
 import { Asset } from "@/lib/assets/types";
 
 // Fix Leaflet default icon issue

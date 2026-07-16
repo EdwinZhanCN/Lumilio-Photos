@@ -8,7 +8,7 @@ import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import TagList from "./TagList";
 import MapComponent from "@/components/MapComponent";
 import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
-import { formatCaptureTime } from "@/lib/utils/formatters";
+import { formatCaptureTime } from "@/lib/format/dateTime";
 import type { Asset, PhotoSpecificMetadata } from "@/lib/http-commons";
 import { isPhotoMetadata } from "@/lib/http-commons";
 
