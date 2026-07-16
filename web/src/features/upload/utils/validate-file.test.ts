@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { validateFile } from "./validate-file";
+import { validateFile } from "./validate-file.ts";
 
 describe("validateFile", () => {
   it("returns the canonical MIME type from the filename extension", () => {

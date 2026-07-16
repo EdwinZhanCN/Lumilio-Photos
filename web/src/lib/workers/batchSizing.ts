@@ -1,5 +1,5 @@
 /**
- * Smart Batch Sizing System
+ * Worker Batch Sizing System
  *
  * Provides dynamic batch sizing based on device capabilities and processing feedback
  * to optimize memory usage vs processing speed.

@@ -3,7 +3,7 @@ import {
   getResumableSessionId,
   shouldUseChunks,
 } from "@/lib/upload/uploadTransport";
-import { getOptimalBatchSize, ProcessingPriority } from "@/lib/utils/smartBatchSizing.ts";
+import { getOptimalBatchSize, ProcessingPriority } from "@/lib/workers/batchSizing.ts";
 import { createUploadTransport } from "./uploadProcessTransport.ts";
 import type {
   FileUploadSession,

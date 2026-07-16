@@ -1,5 +1,5 @@
 /**
- * Supported file extensions based on backend definitions
+ * Supported upload file extensions based on backend definitions
  * Reference: server/internal/utils/file/validator.go
  */
 
