@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { GitHubStyleHeatmap } from "@/components/Heatmap";
+import { GitHubStyleHeatmap } from "./GitHubStyleHeatmap";
 import { usePhotoStats } from "../hooks/usePhotoStats";
 import { useI18n } from "@/lib/i18n.tsx";
 import { CameraIcon, ClockIcon } from "lucide-react";

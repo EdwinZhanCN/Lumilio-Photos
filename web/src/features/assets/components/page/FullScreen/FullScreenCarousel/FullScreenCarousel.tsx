@@ -31,7 +31,7 @@ import ExportModal from "./ExportModal";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import "@/styles/custom-swiper.css";
+import "./custom-swiper.css";
 import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useCarouselContextContributor } from "@/features/lumilio/contributors/useCarouselContextContributor";
