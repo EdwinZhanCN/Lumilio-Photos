@@ -18,7 +18,7 @@ import {
   PasswordField,
   RecoveryCodesPanel,
   TotpSetupPanel,
-} from "../components/ui.tsx";
+} from "../components/ui";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */

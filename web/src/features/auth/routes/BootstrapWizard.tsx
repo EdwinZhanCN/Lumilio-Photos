@@ -44,7 +44,7 @@ import {
   TextInput,
   TotpSetupPanel,
   type StepperStep,
-} from "../components/ui.tsx";
+} from "../components/ui";
 
 const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
   { value: "en", label: "English" },
