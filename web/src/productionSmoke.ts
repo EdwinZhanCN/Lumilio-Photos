@@ -1,4 +1,4 @@
-import { waitForRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
+import { waitForRepositoryScan } from "@/features/repositories";
 import { uploadFile } from "@/lib/upload/uploadTransport";
 import { waitForUploadJobs } from "@/lib/upload/uploadLifecycle";
 import { AppWorkerClient } from "@/workers/workerClient";

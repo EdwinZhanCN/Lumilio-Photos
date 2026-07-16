@@ -68,9 +68,6 @@ vi.mock("@/features/repositories", () => ({
     setBrowseRepositoryId: vi.fn(),
     getRepositoryLabel: (repo: { name?: string }) => repo.name ?? "Repo",
   }),
-}));
-
-vi.mock("@/features/manage/hooks/useRepositoryScan", () => ({
   useRepositoryScan: () => ({
     scanRepositories: mocks.scanRepositories,
     isScanning: false,

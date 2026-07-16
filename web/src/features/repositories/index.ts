@@ -1,6 +1,10 @@
 export { default as BrowseScopeSelect } from "./components/BrowseScopeSelect";
+export { default as RepositoryGrid } from "./components/RepositoryGrid";
+export type { RepositoryGridProps } from "./components/RepositoryGrid";
 export { useBrowseScope } from "./hooks/useBrowseScope";
 export { useRepositoryOptions, normalizeRepositoryOptions } from "./hooks/useRepositoryOptions";
+export { useRepositoryScan } from "./hooks/useRepositoryScan";
 export { useWorkingRepository } from "./hooks/useWorkingRepository";
 export type { RepositoryOption } from "./repository.types";
 export { getRepositoryDisplayName } from "./utils/repositoryDisplayName";
+export { waitForRepositoryScan } from "./api/waitForRepositoryScan";

@@ -12,12 +12,14 @@
  *
  * {@link Manage} is intentionally thin. It renders the page header, exposes
  * the supported-format modal, and mounts {@link UnifiedUploadSection} before
- * {@link RepositoryGrid}. The header reads {@link useUploadContext} only to
- * summarize the current queue; upload queue mutation remains in the upload
- * feature.
+ * {@link RepositoryMaintenancePanel}. The panel passes maintenance state and
+ * callbacks to the repository-owned, presentational {@link RepositoryGrid}.
+ * The header reads {@link useUploadContext} only to summarize the current
+ * queue; upload queue mutation remains in the upload feature.
  *
- * Repository maintenance state is local to {@link RepositoryGrid}. Each action
- * tracks its own pending repository id or job state:
+ * Repository maintenance orchestration is local to
+ * {@link RepositoryMaintenancePanel}. Each action tracks its own pending
+ * repository id or job state:
  *
  * - {@link useRepositoryScan} tracks rescan and stack-detection ids.
  * - {@link useDetectDuplicates} runs duplicate detection for one repository.
@@ -50,7 +52,7 @@
  * - People rebuild is library-wide because face clusters can span
  *   repositories.
  * - Upload target selection belongs to {@link UnifiedUploadSection} through the
- *   settings feature's working-repository hook, not to Manage itself.
+ *   repositories feature's working-repository hook, not to Manage itself.
  *
  * ## Composition
  *
@@ -59,13 +61,14 @@
  *     ROUTE["/manage"] --> PAGE["Manage"]
  *     PAGE --> HEADER["ManageHeader"]
  *     PAGE --> UPLOAD["UnifiedUploadSection"]
- *     PAGE --> GRID["RepositoryGrid"]
+ *     PAGE --> PANEL["RepositoryMaintenancePanel"]
  *     HEADER --> UCTX["useUploadContext"]
- *     GRID --> REPOS["useRepositoryOptions"]
- *     GRID --> SCAN["useRepositoryScan"]
- *     GRID --> DUP["useDetectDuplicates"]
- *     GRID --> PEOPLE["useRebuildPeopleClusters"]
- *     GRID --> CLOUD["cloud sync hooks"]
+ *     PANEL --> GRID["RepositoryGrid"]
+ *     PANEL --> REPOS["useRepositoryOptions"]
+ *     PANEL --> SCAN["useRepositoryScan"]
+ *     PANEL --> DUP["useDetectDuplicates"]
+ *     PANEL --> PEOPLE["useRebuildPeopleClusters"]
+ *     PANEL --> CLOUD["cloud sync hooks"]
  *     GRID --> CARD["Repository cards"]
  *     CARD --> COUNT["repository asset count"]
  *     CARD --> STATUS["useRepositoryCloudStatus"]
@@ -93,13 +96,16 @@
  * @module
  */
 import type Manage from "./routes/Manage.tsx";
-import type RepositoryGrid from "./components/RepositoryGrid.tsx";
-import type { useRepositoryScan, waitForRepositoryScan } from "./hooks/useRepositoryScan.ts";
-import type UnifiedUploadSection from "@/features/upload/components/UnifiedUploadSection.tsx";
-import type { useUploadContext } from "@/features/upload";
-import type { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates.ts";
-import type { useRebuildPeopleClusters } from "@/features/people/hooks/usePeople.ts";
-import type { useRepositoryOptions } from "@/features/repositories";
+import type RepositoryMaintenancePanel from "./components/RepositoryMaintenancePanel.tsx";
+import type { useDetectDuplicates } from "@/features/collections";
+import type { useRebuildPeopleClusters } from "@/features/people";
+import type {
+  RepositoryGrid,
+  useRepositoryOptions,
+  useRepositoryScan,
+  waitForRepositoryScan,
+} from "@/features/repositories";
+import type { UnifiedUploadSection, useUploadContext } from "@/features/upload";
 import type {
   useCloudCredentials,
   useRepositoryCloudStatus,
