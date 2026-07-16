@@ -2,12 +2,14 @@ import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { docts } from "@edwinzhancn/docts/vite";
+import { playwright } from "vite-plus/test/browser/providers/playwright";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const productionSmokeEnabled = process.env.PRODUCTION_SMOKE === "true";
+const hashPerformanceEnabled = process.env.VITEST_HASH_PERF === "true";
 const testProjects = [
   {
     extends: true,
@@ -17,6 +19,29 @@ const testProjects = [
       setupFiles: ["./setup.happy-dom.ts"],
       include: ["src/**/*.{test,spec}.{ts,tsx}"],
       exclude: ["src/workers/*", "**/node_modules/**"],
+    },
+  },
+  {
+    extends: true,
+    test: {
+      name: hashPerformanceEnabled ? "hash-performance" : "hash-contract",
+      include: [
+        hashPerformanceEnabled ? "src/workers/hash.perf.test.ts" : "src/workers/hash.test.ts",
+      ],
+      exclude: ["**/node_modules/**"],
+      testTimeout: 300_000,
+      browser: {
+        api: {
+          host: "127.0.0.1",
+        },
+        provider: playwright({
+          launchOptions: {
+            channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
+          },
+        }),
+        instances: [{ browser: "chromium", headless: true }],
+        enabled: true,
+      },
     },
   },
 ];

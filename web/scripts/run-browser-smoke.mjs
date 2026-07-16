@@ -1,62 +1,60 @@
-import { spawn } from "node:child_process";
 import { chromium } from "playwright";
+import { preview as createPreview } from "vite";
 
 const host = "127.0.0.1";
-const port = Number(process.env.PRODUCTION_SMOKE_PORT ?? 4173);
-const origin = `http://${host}:${port}`;
-const preview = spawn(
-  "./node_modules/.bin/vp",
-  ["preview", "--host", host, "--port", String(port)],
-  {
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  },
-);
+const requestedPort = Number(process.env.PRODUCTION_SMOKE_PORT ?? 0);
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-const waitForPreview = async () => {
+assert(
+  Number.isInteger(requestedPort) && requestedPort >= 0 && requestedPort <= 65_535,
+  `Invalid PRODUCTION_SMOKE_PORT: ${process.env.PRODUCTION_SMOKE_PORT}`,
+);
+
+let previewServer;
+let origin;
+
+const startPreview = async () => {
+  previewServer = await createPreview({
+    preview: {
+      host,
+      port: requestedPort,
+      strictPort: requestedPort !== 0,
+    },
+  });
+
+  const previewUrl = previewServer.resolvedUrls?.local[0];
+  assert(previewUrl, "Production preview started without a local URL");
+  origin = new URL(previewUrl).origin;
+
   const deadline = Date.now() + 20_000;
+  let lastError;
   while (Date.now() < deadline) {
-    if (preview.exitCode !== null) {
-      throw new Error(`Production preview exited before becoming ready (code ${preview.exitCode})`);
-    }
     try {
       const response = await fetch(`${origin}/production-smoke.html`);
-      if (response.ok) return;
-    } catch {
+      const body = await response.text();
+      if (response.ok && body.includes("<title>Lumilio production smoke</title>")) return;
+      lastError = new Error(
+        response.ok
+          ? "production-smoke.html resolved to the SPA fallback"
+          : `HTTP ${response.status}`,
+      );
+    } catch (error) {
       // Preview is still starting.
+      lastError = error;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Timed out waiting for production preview");
-};
-
-const terminatePreview = async () => {
-  if (preview.exitCode !== null || !preview.pid) return;
-  try {
-    process.kill(-preview.pid, "SIGTERM");
-  } catch {
-    preview.kill("SIGTERM");
-  }
-  await Promise.race([
-    new Promise((resolve) => preview.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 2_000)),
-  ]);
-  if (preview.exitCode === null) {
-    try {
-      process.kill(-preview.pid, "SIGKILL");
-    } catch {
-      preview.kill("SIGKILL");
-    }
-  }
+  throw new Error(
+    `Timed out waiting for production preview at ${origin}: ${lastError?.message ?? "unknown error"}`,
+  );
 };
 
 let browser;
 try {
-  await waitForPreview();
+  await startPreview();
   browser = await chromium.launch({
     channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
     headless: true,
@@ -82,9 +80,9 @@ try {
 
   let uploadPoll = 0;
   await page.route("**/api/v1/assets/batch/jobs**", (route) => {
-	if (new URL(route.request().url()).pathname.endsWith("/stream")) {
-	  return route.fulfill({ status: 404, contentType: "application/json", body: '{}' });
-	}
+    if (new URL(route.request().url()).pathname.endsWith("/stream")) {
+      return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
+    }
     uploadPoll += 1;
     const complete = uploadPoll > 1;
     return route.fulfill({
@@ -129,5 +127,5 @@ try {
   );
 } finally {
   await browser?.close();
-  await terminatePreview();
+  await previewServer?.close();
 }

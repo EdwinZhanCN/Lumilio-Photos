@@ -15,6 +15,7 @@
     "preview": "vp preview",
     "test": "vp test",
     "test:coverage": "vp test run --coverage",
+    "test:hash-perf": "VITEST_HASH_PERF=true vp test run src/workers/hash.perf.test.ts",
     "test:watch": "vp test watch",
     "test:browser": "PRODUCTION_SMOKE=true vp build && node scripts/check-bundle-budget.mjs && node scripts/run-browser-smoke.mjs",
     "test:bundle": "vp build && node scripts/check-bundle-budget.mjs",

@@ -1,18 +1,16 @@
-# Vitest For Web Workers
+# Testing Web Workers
 
-In this project, we use `@vitest/webworker` to test webworker functionality
+`hash.test.ts` is a browser contract test. It runs in headless Chrome as part of
+the normal `vp test` / `make web-test` gate and covers both the small-file path
+and the backend-compatible quick-hash path for files over 100 MiB.
 
-## Example
+The 20 x 50 MiB throughput case lives separately in `hash.perf.test.ts`. It is
+never selected by the normal test gate; run it explicitly when changing hash
+worker performance:
 
-```ts
-import MyWorker from "../worker?worker";
-
-let worker = new MyWorker();
-// new Worker is also supported
-worker = new Worker(new URL("../src/worker.ts", import.meta.url));
-
-worker.postMessage("hello");
-worker.onmessage = (e) => {
-  // e.data equals to 'hello world'
-};
+```bash
+vp run test:hash-perf
 ```
+
+Set `PLAYWRIGHT_CHANNEL` to override the default `chrome` channel in either
+test mode.
