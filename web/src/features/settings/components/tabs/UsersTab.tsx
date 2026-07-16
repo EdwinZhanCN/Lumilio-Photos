@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangleIcon, KeyRoundIcon, MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import UserAvatar from "@/components/UserAvatar";
+import UserAvatar from "@/components/ui/UserAvatar";
 import PhotoPicker from "@/components/PhotoPicker";
 import { useAuth } from "@/features/auth";
 import {

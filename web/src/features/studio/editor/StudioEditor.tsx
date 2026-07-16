@@ -3,7 +3,7 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
 import client from "@/lib/http-commons/client";
 import { useI18n } from "@/lib/i18n";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { useWorker } from "@/contexts/WorkerProvider";
 import {
   DEFAULT_PARAMS as BORDER_DEFAULT_PARAMS,

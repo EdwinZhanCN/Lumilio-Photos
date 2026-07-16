@@ -41,7 +41,7 @@ vi.mock("@/features/repositories", () => ({
   }),
 }));
 
-vi.mock("@/hooks/util-hooks/useMessage", () => ({
+vi.mock("@/features/notifications", () => ({
   useMessage: () => mocks.showMessage,
 }));
 

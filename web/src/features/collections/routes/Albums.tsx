@@ -3,13 +3,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { Album, Plus, Trash2, X, SquareMousePointer, AlertTriangle } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { LoadMoreButton } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { CollectionsProvider, useCollections } from "../CollectionsProvider";
 import AlbumFormModal from "../components/AlbumFormModal";
@@ -201,7 +201,7 @@ export default function Albums() {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

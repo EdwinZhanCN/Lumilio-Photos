@@ -1,4 +1,4 @@
-import PageHeader from "@/components/PageHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import {
   SquareMousePointer,
   FunnelIcon,
@@ -29,7 +29,7 @@ import {
 import { useSelection, useBulkAssetOperations } from "@/features/assets/hooks/useSelection";
 import { BrowseItem, SortByType } from "@/features/assets/types/assets.type";
 import { useCallback, useMemo, useRef, useEffect, useState, ReactNode } from "react";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
 import { useFilterState, useFilterActions } from "@/features/assets/selectors";

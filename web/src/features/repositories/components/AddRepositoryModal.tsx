@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Cloud, FolderPlus, X } from "lucide-react";
 import { useCloudCredentials } from "@/features/cloud";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 

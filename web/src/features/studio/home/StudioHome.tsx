@@ -1,7 +1,7 @@
 import React from "react";
 import { Clock, Frame, Image as ImageIcon, ImageOff, SlidersHorizontal } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import PageHeader from "@/components/PageHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import { RecentEditItem } from "./RecentEditItem";
 import type { RecentEditRecord } from "./recentEditsStore";
 

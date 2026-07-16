@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/Sonner";
+import { Toaster } from "./Toaster";
 
 function Notifications() {
   return <Toaster position="bottom-left" visibleToasts={5} />;

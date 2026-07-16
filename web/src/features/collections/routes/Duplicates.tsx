@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { AlertTriangle, Check, Copy, Loader2, Trash2, X } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { formatBytes } from "@/lib/utils/formatters";
 import type { DuplicateGroup, DuplicateMethod, DuplicateStatus } from "@/lib/duplicates/types";
@@ -427,7 +427,7 @@ export default function Duplicates() {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

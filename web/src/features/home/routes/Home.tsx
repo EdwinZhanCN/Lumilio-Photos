@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import PageHeader from "@/components/PageHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";

@@ -6,7 +6,7 @@ import {
   extractRebuildResponseData,
 } from "../hooks/useAssetIndexing";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 
 interface MLMonitorProps {
   localRepoId?: string;

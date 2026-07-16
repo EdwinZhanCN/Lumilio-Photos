@@ -1,6 +1,6 @@
 import { Menu } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import MessageCenter from "@/components/MessageCenter";
+import { MessageCenter } from "@/features/notifications";
 import NavbarUploadQueue from "@/features/upload/components/NavbarUploadQueue";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 

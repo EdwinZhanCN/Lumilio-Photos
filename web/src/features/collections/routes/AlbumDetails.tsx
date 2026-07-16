@@ -10,7 +10,7 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import AlbumFormModal from "../components/AlbumFormModal";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,

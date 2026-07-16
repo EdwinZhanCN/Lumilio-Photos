@@ -12,7 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
-import UserAvatar from "@/components/UserAvatar";
+import UserAvatar from "@/components/ui/UserAvatar";
 import { useMFAStatus } from "@/features/auth/hooks/useMFA.ts";
 import {
   useBeginPasskeyEnrollment,

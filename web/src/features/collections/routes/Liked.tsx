@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { Heart, HeartOff } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
+import ErrorFallback from "@/components/ui/ErrorFallback";
 import { AssetsProvider, useAssetActions } from "@/features/assets";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import type {
@@ -11,7 +11,7 @@ import type {
 } from "@/features/assets/components/shared/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
 import type { AssetFilter } from "@/features/assets/types/assets.type";
 import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
@@ -127,7 +127,7 @@ const Liked = () => {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

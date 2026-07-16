@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { useWorkingRepository } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n";
 import { useGenerateHashcode } from "./useGenerateHashcode.ts";

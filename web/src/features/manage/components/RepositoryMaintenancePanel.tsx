@@ -9,7 +9,7 @@ import {
   useRepositoryOptions,
   useRepositoryScan,
 } from "@/features/repositories";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 

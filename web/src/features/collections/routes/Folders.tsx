@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { FolderTree } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -119,7 +119,7 @@ export default function Folders() {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}
