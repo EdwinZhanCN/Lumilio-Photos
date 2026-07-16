@@ -31,8 +31,8 @@
  *
  * ## Data
  *
- * Repository options come from {@link useIndexingRepositories}, the same
- * settings-owned source used by browse and working-repository pickers. Manage
+ * Repository options come from {@link useRepositoryOptions}, the same
+ * repository-owned source used by browse and working-repository pickers. Manage
  * reads from that source but does not persist repository selection
  * preferences.
  *
@@ -61,7 +61,7 @@
  *     PAGE --> UPLOAD["UnifiedUploadSection"]
  *     PAGE --> GRID["RepositoryGrid"]
  *     HEADER --> UCTX["useUploadContext"]
- *     GRID --> REPOS["useIndexingRepositories"]
+ *     GRID --> REPOS["useRepositoryOptions"]
  *     GRID --> SCAN["useRepositoryScan"]
  *     GRID --> DUP["useDetectDuplicates"]
  *     GRID --> PEOPLE["useRebuildPeopleClusters"]
@@ -99,11 +99,11 @@ import type UnifiedUploadSection from "@/features/upload/components/UnifiedUploa
 import type { useUploadContext } from "@/features/upload";
 import type { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates.ts";
 import type { useRebuildPeopleClusters } from "@/features/people/hooks/usePeople.ts";
-import type { useIndexingRepositories } from "@/features/settings/hooks/useAssetIndexing.ts";
+import type { useRepositoryOptions } from "@/features/repositories";
 import type {
   useCloudCredentials,
   useRepositoryCloudStatus,
   useStartRepositoryCloudImport,
-} from "@/features/settings/hooks/useCloudSync.ts";
+} from "@/features/cloud";
 
 export {};

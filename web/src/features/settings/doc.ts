@@ -3,10 +3,9 @@
  *
  * The settings feature owns the authenticated settings route, local
  * preferences, server-backed system settings drafts, runtime info display, AI
- * and cloud admin tabs, user-management surface, and the repository scope hooks
- * shared by other features. It is a boundary feature: pages such as Assets,
- * Collections, Home, Upload, Monitor, and Lumilio consume the hooks here but do
- * not own their persistence rules.
+ * and cloud admin tabs, and the user-management surface. Repository scope and
+ * cloud data access live in their own feature boundaries; Settings composes
+ * those capabilities without owning their persistence or query rules.
  *
  * ## State
  *
@@ -24,7 +23,7 @@
  * {@link useAISettingsDraft} is the current rich draft adapter for LLM/ML
  * settings, including API-key clearing semantics and server normalization.
  *
- * Repository preference state is deliberately split:
+ * Repository preference state is deliberately split by the Repositories feature:
  *
  * - {@link useBrowseScope} answers "what repository am I looking at?" for list
  *   pages. "All repositories" is a valid empty preference.
@@ -47,11 +46,11 @@
  * TOML/env-derived runtime configuration. It is display-only in the UI; users
  * change those values outside the SPA and restart the server.
  *
- * {@link useIndexingRepositories} is the shared repository option source used
+ * {@link useRepositoryOptions} is the shared repository option source used
  * by browse/working scope pickers and repository-aware status surfaces.
  * Cloud credentials and repository imports live behind {@link useCloudProviders},
  * {@link useCloudCredentials}, {@link useCreateCloudCredential}, and the
- * repository cloud hooks in `useCloudSync.ts`.
+ * repository cloud hooks exposed by the Cloud feature.
  *
  * ## Composition
  *
@@ -113,21 +112,23 @@ import type ServerTab from "./components/renew/tabs/ServerTab.tsx";
 import type UsersTab from "./components/renew/tabs/UsersTab.tsx";
 import type AboutTab from "./components/renew/tabs/AboutTab.tsx";
 import type { useAISettingsDraft } from "./hooks/useAISettingsDraft.ts";
-import type { useBrowseScope } from "./hooks/useBrowseScope.ts";
+import type {
+  useBrowseScope,
+  useRepositoryOptions,
+  useWorkingRepository,
+} from "@/features/repositories";
 import type {
   useCloudCredentials,
   useCloudProviders,
   useCreateCloudCredential,
-} from "./hooks/useCloudSync.ts";
+} from "@/features/cloud";
 import type { useDraftSettings } from "./hooks/useDraftSettings.ts";
-import type { useIndexingRepositories } from "./hooks/useAssetIndexing.ts";
 import type { useRuntimeInfo } from "./hooks/useRuntimeInfo.ts";
 import type {
   useSystemSettings,
   useUpdateSystemSettings,
   useValidateLLMSettings,
 } from "./hooks/useSystemSettings.ts";
-import type { useWorkingRepository } from "./hooks/useWorkingRepository.ts";
 import type {
   useDebouncedPreference,
   usePreference,

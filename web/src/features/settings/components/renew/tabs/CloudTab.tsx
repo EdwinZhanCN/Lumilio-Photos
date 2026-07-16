@@ -24,7 +24,7 @@ import {
   type CloudCredential,
   type CloudProvider,
   type CloudProviderField,
-} from "../../../hooks/useCloudSync";
+} from "@/features/cloud";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
 import { SettingsDropdown } from "../SettingsDropdown";
 

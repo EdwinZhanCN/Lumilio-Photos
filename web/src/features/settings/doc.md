@@ -2,10 +2,9 @@
 
 The settings feature owns the authenticated settings route, local
 preferences, server-backed system settings drafts, runtime info display, AI
-and cloud admin tabs, user-management surface, and the repository scope hooks
-shared by other features. It is a boundary feature: pages such as Assets,
-Collections, Home, Upload, Monitor, and Lumilio consume the hooks here but do
-not own their persistence rules.
+and cloud admin tabs, and the user-management surface. Repository scope and
+cloud data access live in their own feature boundaries; Settings composes
+those capabilities without owning their persistence or query rules.
 
 ## State
 
@@ -23,11 +22,11 @@ tabs edit a local draft, expose dirty/reset/save state through
 [useAISettingsDraft](./hooks/useAISettingsDraft.ts) is the current rich draft adapter for LLM/ML
 settings, including API-key clearing semantics and server normalization.
 
-Repository preference state is deliberately split:
+Repository preference state is deliberately split by the Repositories feature:
 
-- [useBrowseScope](./hooks/useBrowseScope.ts) answers "what repository am I looking at?" for list
+- [useBrowseScope](@/features/repositories) answers "what repository am I looking at?" for list
   pages. "All repositories" is a valid empty preference.
-- [useWorkingRepository](./hooks/useWorkingRepository.ts) answers "where should new content land?" for
+- [useWorkingRepository](@/features/repositories) answers "where should new content land?" for
   upload. It resolves to a concrete repository, falling back to primary/first
   repository once repository options load.
 
@@ -46,11 +45,11 @@ as an explicit action instead of on every keystroke.
 TOML/env-derived runtime configuration. It is display-only in the UI; users
 change those values outside the SPA and restart the server.
 
-[useIndexingRepositories](./hooks/useAssetIndexing.ts) is the shared repository option source used
+[useRepositoryOptions](@/features/repositories) is the shared repository option source used
 by browse/working scope pickers and repository-aware status surfaces.
-Cloud credentials and repository imports live behind [useCloudProviders](./hooks/useCloudSync.ts),
-[useCloudCredentials](./hooks/useCloudSync.ts), [useCreateCloudCredential](./hooks/useCloudSync.ts), and the
-repository cloud hooks in `useCloudSync.ts`.
+Cloud credentials and repository imports live behind [useCloudProviders](@/features/cloud),
+[useCloudCredentials](@/features/cloud), [useCreateCloudCredential](@/features/cloud), and the
+repository cloud hooks exposed by the Cloud feature.
 
 ## Composition
 

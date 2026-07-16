@@ -8,7 +8,7 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { CityTripGroup } from "../hooks/useCityTrips";
 import { useCityTrips } from "../hooks/useCityTrips";
-import { useBrowseScope } from "@/features/settings";
+import { useBrowseScope } from "@/features/repositories";
 
 const TripDetails = () => {
   const { t } = useI18n();

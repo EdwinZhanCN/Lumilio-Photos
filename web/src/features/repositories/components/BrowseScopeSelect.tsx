@@ -1,5 +1,5 @@
 import { useI18n } from "@/lib/i18n";
-import { useBrowseScope } from "@/features/settings";
+import { useBrowseScope } from "../hooks/useBrowseScope";
 
 export default function BrowseScopeSelect({ className = "" }: { className?: string }) {
   const { t } = useI18n();

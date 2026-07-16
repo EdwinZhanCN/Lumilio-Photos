@@ -10,8 +10,8 @@ user to the feature that owns the selected object.
 
 [Home](./routes/Home.tsx) stores only view state from the URL. The default `gallery` view
 omits the `tab` query parameter; the statistics view is addressed as
-`?tab=stats`. The page header includes [BrowseScopeSelect](@/components/BrowseScopeSelect), and the
-selected browse scope is read through [useBrowseScope](@/features/settings).
+`?tab=stats`. The page header includes [BrowseScopeSelect](@/features/repositories), and the
+selected browse scope is read through [useBrowseScope](@/features/repositories).
 
 Browse scope is the only repository preference Home observes. When the user
 chooses a repository, the scoped id is passed to featured-photo, statistics,
@@ -60,7 +60,7 @@ flowchart TD
 ```
 
 Home composes already-owned surfaces: gallery rendering comes from Assets,
-repository scope comes from Settings, heatmap rendering comes from shared
+repository scope comes from Repositories, heatmap rendering comes from shared
 components, and map presentation comes from the shared map component.
 
 ## Decisions

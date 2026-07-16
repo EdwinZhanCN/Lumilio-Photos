@@ -17,7 +17,7 @@ import { selectFilterAsAssetFilter, selectFiltersEnabled } from "../slices/filte
 import { client } from "@/lib/http-commons/client";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { Asset } from "@/lib/assets/types";
-import { useBrowseScope } from "@/features/settings";
+import { useBrowseScope } from "@/features/repositories";
 import { flattenAssetGroups, getViewerTimeZone } from "../utils/assetGroups";
 import {
   browseGroupsFromQueryLikePage,

@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
-import { useIndexingRepositories } from "@/features/settings/hooks/useAssetIndexing";
+import { useRepositoryOptions } from "@/features/repositories";
 import { CapabilitiesMonitor, MLMonitor, StatMonitor, QueueSummaryList } from "../components";
 
 export default function Monitor() {
@@ -15,7 +15,7 @@ export default function Monitor() {
   const view = requestedView === "capabilities" || requestedView === "ml" ? requestedView : "queue";
 
   const [localRepoId, setLocalRepoId] = useState<string | undefined>(undefined);
-  const { repositories } = useIndexingRepositories();
+  const { repositories } = useRepositoryOptions();
 
   const setView = (nextView: "queue" | "ml" | "capabilities") => {
     const params = new URLSearchParams(searchParams);

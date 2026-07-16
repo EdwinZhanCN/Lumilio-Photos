@@ -1,15 +1,16 @@
 import { useCallback, useMemo } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { usePreference } from "../preferences";
-import { type IndexingRepositoryOption, useIndexingRepositories } from "./useAssetIndexing";
-import { getRepositoryDisplayName } from "./useWorkingRepository";
+import { usePreference } from "@/lib/preferences/preferences";
+import type { RepositoryOption } from "../repository.types";
+import { getRepositoryDisplayName } from "../utils/repositoryDisplayName";
+import { useRepositoryOptions } from "./useRepositoryOptions";
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
 export function useBrowseScope() {
   const { t } = useI18n();
   const [browseRepositoryId, setBrowseRepositoryIdPreference] = usePreference("browseRepositoryId");
-  const repositoriesQuery = useIndexingRepositories();
+  const repositoriesQuery = useRepositoryOptions();
   const repositories = repositoriesQuery.repositories;
   const normalizedBrowseId = browseRepositoryId?.trim() ?? "";
 
@@ -42,8 +43,7 @@ export function useBrowseScope() {
     selectedRepository,
     scopeLabel,
     getRepositoryLabel: useCallback(
-      (repository: IndexingRepositoryOption) =>
-        getRepositoryDisplayName(repository, t as TranslateFn),
+      (repository: RepositoryOption) => getRepositoryDisplayName(repository, t as TranslateFn),
       [t],
     ),
     setBrowseRepositoryId,

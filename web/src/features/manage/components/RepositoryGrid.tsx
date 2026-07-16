@@ -20,10 +20,10 @@ import { useI18n } from "@/lib/i18n";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { $api } from "@/lib/http-commons/queryClient";
 import {
-  type IndexingRepositoryOption,
-  useIndexingRepositories,
-} from "@/features/settings/hooks/useAssetIndexing";
-import { getRepositoryDisplayName } from "@/features/settings/hooks/useWorkingRepository";
+  getRepositoryDisplayName,
+  type RepositoryOption,
+  useRepositoryOptions,
+} from "@/features/repositories";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates";
 import { useRebuildPeopleClusters } from "@/features/people/hooks/usePeople";
@@ -31,7 +31,7 @@ import {
   useCloudCredentials,
   useRepositoryCloudStatus,
   useStartRepositoryCloudImport,
-} from "@/features/settings/hooks/useCloudSync";
+} from "@/features/cloud";
 
 const getViewerTimeZone = () =>
   typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
@@ -84,17 +84,17 @@ function RepositoryCard({
   onLocationRebuild,
   onCloudImport,
 }: {
-  repository: IndexingRepositoryOption;
+  repository: RepositoryOption;
   isScanning: boolean;
   isDetecting: boolean;
   isDuplicateScanning: boolean;
   isRebuildingLocation: boolean;
   isCloudImporting: boolean;
-  onScan: (repository: IndexingRepositoryOption) => void;
-  onDetectStacks: (repository: IndexingRepositoryOption) => void;
-  onDuplicateScan: (repository: IndexingRepositoryOption) => void;
-  onLocationRebuild: (repository: IndexingRepositoryOption) => void;
-  onCloudImport: (repository: IndexingRepositoryOption) => void;
+  onScan: (repository: RepositoryOption) => void;
+  onDetectStacks: (repository: RepositoryOption) => void;
+  onDuplicateScan: (repository: RepositoryOption) => void;
+  onLocationRebuild: (repository: RepositoryOption) => void;
+  onCloudImport: (repository: RepositoryOption) => void;
 }) {
   const { t } = useI18n();
   const countQuery = useRepositoryAssetCount(repository.id);
@@ -513,7 +513,7 @@ function AddRepositoryModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
 export default function RepositoryGrid() {
   const { t } = useI18n();
   const showMessage = useMessage();
-  const repositoriesQuery = useIndexingRepositories();
+  const repositoriesQuery = useRepositoryOptions();
   const repositories = repositoriesQuery.repositories;
   const { scanRepository, scanRepositories, scanningIds, detectStacks, detectingIds, isScanning } =
     useRepositoryScan();
@@ -535,7 +535,7 @@ export default function RepositoryGrid() {
   );
 
   const handleScanRepository = useCallback(
-    async (repository: IndexingRepositoryOption) => {
+    async (repository: RepositoryOption) => {
       try {
         await scanRepository(repository.id);
         showMessage(
@@ -555,7 +555,7 @@ export default function RepositoryGrid() {
   );
 
   const handleDetectStacks = useCallback(
-    async (repository: IndexingRepositoryOption) => {
+    async (repository: RepositoryOption) => {
       try {
         const created = await detectStacks(repository.id);
         showMessage(
@@ -576,7 +576,7 @@ export default function RepositoryGrid() {
   );
 
   const handleDuplicateScan = useCallback(
-    async (repository: IndexingRepositoryOption) => {
+    async (repository: RepositoryOption) => {
       try {
         const result = await detectDuplicatesMutation.mutateAsync({
           repositoryId: repository.id,
@@ -613,7 +613,7 @@ export default function RepositoryGrid() {
       : null;
 
   const handleLocationRebuild = useCallback(
-    async (repository: IndexingRepositoryOption) => {
+    async (repository: RepositoryOption) => {
       try {
         await locationRebuildMutation.mutateAsync({
           body: { repository_id: repository.id },
@@ -632,7 +632,7 @@ export default function RepositoryGrid() {
       : undefined;
 
   const handleCloudImport = useCallback(
-    async (repository: IndexingRepositoryOption) => {
+    async (repository: RepositoryOption) => {
       try {
         await cloudImportMutation.mutateAsync({
           params: {

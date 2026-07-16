@@ -35,7 +35,7 @@ vi.mock("@tanstack/react-query", () => ({
   }),
 }));
 
-vi.mock("@/features/settings", () => ({
+vi.mock("@/features/repositories", () => ({
   useBrowseScope: () => ({
     scopedRepositoryId: undefined,
   }),
@@ -46,6 +46,7 @@ vi.mock("@/hooks/util-hooks/useMessage", () => ({
 }));
 
 vi.mock("@/lib/i18n.tsx", () => ({
+  getCurrentLanguage: () => "en",
   useI18n: () => ({
     i18n: { language: "en", resolvedLanguage: "en" },
     t: (key: string, options?: { defaultValue?: string; count?: number }) =>
