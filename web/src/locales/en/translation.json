@@ -1481,9 +1481,7 @@
   "routes": {
     "collections": "Collections",
     "home": "Home",
-    "portfolio": "Portfolio",
-    "settings": "Settings",
-    "updates": "Updates"
+    "settings": "Settings"
   },
   "search": {
     "error": "Search is temporarily unavailable. Try again in a moment.",
