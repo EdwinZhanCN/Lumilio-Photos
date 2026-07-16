@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Ban, Clock, Eye, Share2, Trash2 } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { useShareLinks, type ShareLinkDTO } from "../hooks/useShareLinks";
 
 type StatusFilter = "active" | "expired" | "revoked";
@@ -243,7 +243,7 @@ export default function SharedLinks() {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

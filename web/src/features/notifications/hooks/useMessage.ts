@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useGlobal } from "@/contexts/GlobalContext.tsx";
 import { toast } from "sonner";
+import { useGlobal } from "@/contexts/GlobalContext.tsx";
 
 export const useMessage = (timeout = 5000) => {
   const { addNotification, markNotificationRead } = useGlobal();

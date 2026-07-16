@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { Album, ArrowRight, FolderTree, LibraryBig, MapPin, Users, Wrench } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionErrorAlert } from "@/components/collection";
@@ -234,7 +234,7 @@ export default function Collections() {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ScanFace, UserRound, Users } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
-import Modal from "@/components/Modal";
+import { useMessage } from "@/features/notifications";
+import Modal from "@/components/ui/Modal";
 import PersonFacesPanel from "./PersonFacesPanel";
 import PersonPicker from "./PersonPicker";
 import { useMergePeople, useSetPersonHidden } from "../hooks/usePeople";

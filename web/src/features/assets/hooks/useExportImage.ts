@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
+import { useMessage } from "@/features/notifications";
 import type { Asset } from "@/lib/assets/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { isExportSupported } from "../utils/mediaTypes";

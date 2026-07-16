@@ -5,9 +5,9 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
 import { ALBUMS_QUERY_KEY } from "@/features/collections/hooks/useAlbums";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import PhotoPicker from "@/components/PhotoPicker";
-import Modal from "@/components/Modal";
+import Modal from "@/components/ui/Modal";
 import type { Album } from "@/lib/albums/types";
 
 interface AlbumFormModalProps {

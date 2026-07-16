@@ -4,7 +4,7 @@ import GlobalProvider from "@/contexts/GlobalContext";
 import "@/styles/App.css";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
-import Notifications from "@/components/Notifications";
+import { Notifications } from "@/features/notifications";
 import { PreferencesEffects } from "@/features/settings";
 import { AuthProvider } from "@/features/auth";
 import AppRouter from "@/app/router/AppRouter";

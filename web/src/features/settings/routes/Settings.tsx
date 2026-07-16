@@ -1,7 +1,7 @@
 import { ErrorBoundary } from "react-error-boundary";
 import { SettingsShell } from "../components";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import { SlidersHorizontalIcon } from "lucide-react";
 
@@ -12,7 +12,7 @@ export default function Settings() {
     <div className="flex h-full min-h-0 flex-col">
       <ErrorBoundary
         FallbackComponent={(props) => (
-          <ErrorFallBack code={500} title="Something went wrong" {...props} />
+          <ErrorFallback code={500} title="Something went wrong" {...props} />
         )}
       >
         <PageHeader

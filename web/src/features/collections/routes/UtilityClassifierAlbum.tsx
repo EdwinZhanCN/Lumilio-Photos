@@ -1,7 +1,7 @@
 import { Navigate, useParams } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { useCallback, useMemo, useState } from "react";
-import ErrorFallBack from "@/components/ErrorFallBack";
+import ErrorFallback from "@/components/ui/ErrorFallback";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AssetsProvider } from "@/features/assets";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
@@ -64,7 +64,7 @@ export default function UtilityClassifierAlbum() {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

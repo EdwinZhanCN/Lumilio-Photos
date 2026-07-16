@@ -7,7 +7,7 @@ import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { AssetGalleryProps } from "../gallery.types";
 import { DEFAULT_GROUP_KEYS, formatAssetGroupLabel } from "@/features/assets/utils/assetGroups";
-import EmptyState from "@/components/EmptyState";
+import EmptyState from "@/components/ui/EmptyState";
 import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
 import type { BrowseItem } from "@/features/assets/types/assets.type";
 import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { RotateCcw, Trash2 } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
+import ErrorFallback from "@/components/ui/ErrorFallback";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
 import type {
@@ -11,7 +11,7 @@ import type {
 } from "@/features/assets/components/shared/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 
@@ -121,7 +121,7 @@ const AssetsTrash = () => {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

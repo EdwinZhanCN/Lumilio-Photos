@@ -20,7 +20,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
 import { useAuth } from "@/features/auth";
 import { useResolvedThemeMode, useThemePreference } from "@/lib/theme";
-import UserAvatar from "@/components/UserAvatar";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 /** Unchecks the shell drawer checkbox so navigating on mobile auto-closes it. */
 function closeMobileDrawer() {

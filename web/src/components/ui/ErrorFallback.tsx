@@ -3,7 +3,7 @@ import { FallbackProps } from "react-error-boundary";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Home, RefreshCw, Bug, ExternalLink, Copy } from "lucide-react";
 
-type ErrorFallBackProps = {
+type ErrorFallbackProps = {
   code: string | number;
   title: string;
   message?: string;
@@ -11,13 +11,13 @@ type ErrorFallBackProps = {
   resetErrorBoundary?: (...args: any[]) => void;
 };
 
-export default function ErrorFallBack({
+export default function ErrorFallback({
   code,
   title,
   message,
   error,
   resetErrorBoundary,
-}: ErrorFallBackProps & FallbackProps): React.ReactElement {
+}: ErrorFallbackProps & FallbackProps): React.ReactElement {
   const [copied, setCopied] = React.useState(false);
 
   const details = React.useMemo(() => {

@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { AssetsProvider } from "../AssetsProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import ErrorFallBack from "@/components/ErrorFallBack";
+import ErrorFallback from "@/components/ui/ErrorFallback";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -72,7 +72,7 @@ const Assets = () => {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

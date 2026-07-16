@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Activity } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import PageHeader from "@/components/PageHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { useRepositoryOptions } from "@/features/repositories";

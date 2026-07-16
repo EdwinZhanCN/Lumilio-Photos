@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { FileTextIcon, Folders } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import { SupportedFormatsModal, UnifiedUploadSection, useUploadContext } from "@/features/upload";
 import { useI18n } from "@/lib/i18n";
 import RepositoryMaintenancePanel from "../components/RepositoryMaintenancePanel";
@@ -51,7 +51,7 @@ const Manage = () => {
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <ErrorBoundary
           FallbackComponent={(props) => (
-            <ErrorFallBack
+            <ErrorFallback
               code="500"
               title={t("manage.errorBoundaryTitle")}
               message={t("manage.errorBoundaryMessage")}

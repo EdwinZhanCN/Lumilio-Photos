@@ -1,6 +1,6 @@
 import ImgStackView from "../ImgStackView/ImgStackView";
 import { CheckCircle2, Circle } from "lucide-react";
-import EmptyState from "@/components/EmptyState";
+import EmptyState from "@/components/ui/EmptyState";
 import { useI18n } from "@/lib/i18n.tsx";
 
 export interface Album {

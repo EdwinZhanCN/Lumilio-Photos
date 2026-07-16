@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   listAlbums: vi.fn(),
 }));
 
-vi.mock("@/components/PageHeader", () => ({
+vi.mock("@/components/ui/PageHeader", () => ({
   default: ({ children, title }: { children: ReactNode; title: string }) => (
     <header>
       <h1>{title}</h1>
@@ -53,7 +53,7 @@ vi.mock("@/features/assets/selectors", () => ({
   }),
 }));
 
-vi.mock("@/hooks/util-hooks/useMessage", () => ({
+vi.mock("@/features/notifications", () => ({
   useMessage: () => mocks.showMessage,
 }));
 

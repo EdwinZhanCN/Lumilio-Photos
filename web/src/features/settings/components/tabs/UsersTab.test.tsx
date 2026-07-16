@@ -55,7 +55,7 @@ vi.mock("@/features/users/hooks/useUsers", () => ({
   }),
 }));
 
-vi.mock("@/components/UserAvatar", () => ({
+vi.mock("@/components/ui/UserAvatar", () => ({
   default: ({ name, assetId }: { name?: string; assetId?: string }) => (
     <div data-testid="user-avatar">
       {name}:{assetId ?? "initials"}

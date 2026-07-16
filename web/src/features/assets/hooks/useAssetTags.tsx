@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n.tsx";
 
 export type AssetTag = components["schemas"]["dto.AssetTagDTO"];

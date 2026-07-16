@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { MapIcon } from "lucide-react";
-import ErrorFallBack from "@/components/ErrorFallBack";
-import PageHeader from "@/components/PageHeader";
+import ErrorFallback from "@/components/ui/ErrorFallback";
+import PageHeader from "@/components/ui/PageHeader";
 import {
   MapComponent,
   type MapViewport,
@@ -154,7 +154,7 @@ export default function MapView() {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack
+        <ErrorFallback
           code={500}
           title={t("assets.errorFallback.something_went_wrong")}
           {...props}

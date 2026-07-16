@@ -5,7 +5,7 @@ import { useUploadContext } from "../hooks/useUpload";
 import { useUploadConfig } from "../hooks/useUploadQueries";
 import { validateFile, getValidationErrorMessage } from "../utils/validate-file.ts";
 import { getAcceptString } from "../utils/accept-file-extensions.ts";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { Upload, Info, FolderPlus, FolderUp, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 import { useWorkingRepository } from "@/features/repositories";

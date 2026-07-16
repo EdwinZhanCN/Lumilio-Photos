@@ -10,7 +10,7 @@ import {
   UserRoundX,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useMessage } from "@/features/notifications";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import {
   useMoveFace,
