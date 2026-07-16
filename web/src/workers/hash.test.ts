@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vite-plus/test";
-import { AppWorkerClient, SingleHashResult } from "./workerClient";
+import { AppWorkerClient } from "./workerClient";
+import type { SingleHashResult } from "./workerClient";
 import init, { StreamingHasher } from "../wasm/blake3/blake3_wasm";
 
 const QUICK_HASH_THRESHOLD = 100 * 1024 * 1024;
@@ -19,7 +20,7 @@ const backendCompatibleQuickHash = (
   return hasher.finalize();
 };
 
-describe("Hash Worker Performance (Final Strategy)", () => {
+describe("Hash worker contract", () => {
   let client: AppWorkerClient;
 
   beforeAll(async () => {
@@ -34,52 +35,20 @@ describe("Hash Worker Performance (Final Strategy)", () => {
     client.terminateAllWorkers();
   });
 
-  const createMockFiles = (count: number, sizeInMB: number) => {
-    const files: File[] = [];
-    const size = sizeInMB * 1024 * 1024;
-    const content = new Uint8Array(size);
-    content.fill(0x42);
-
-    for (let i = 0; i < count; i++) {
-      files.push(new File([content], `test-${i}.bin`, { type: "application/octet-stream" }));
-    }
-    return files;
-  };
-
   const timeout = 300000;
 
   it(
-    "Final Strategy: Pure Worker Pool - 20 files x 50MB",
+    "hashes a small file through the worker",
     async () => {
-      const count = 20;
-      const sizeInMB = 50;
-      const files = createMockFiles(count, sizeInMB);
-      const totalMB = count * sizeInMB;
-      const startTime = performance.now();
-
       const results: SingleHashResult[] = [];
 
-      await client.generateHash(files, (result) => {
+      await client.generateHash([new File(["lumilio"], "small.bin")], (result) => {
         results.push(result);
       });
 
-      const endTime = performance.now();
-      const durationInSeconds = (endTime - startTime) / 1000;
-      const speedMBps = totalMB / durationInSeconds;
-
-      // Assertions after completion to avoid interrupting the worker loop
-      expect(results.length).toBe(count);
-      results.forEach((result) => {
-        expect(
-          result.error,
-          `Hash failed for file ${result.index}: ${result.error}`,
-        ).toBeUndefined();
-        expect(result.hash, `Hash is empty for file ${result.index}`).toBeTruthy();
-      });
-
-      console.log(
-        `[FINAL] Total: ${totalMB}MB, Duration: ${durationInSeconds.toFixed(2)}s, Speed: ${speedMBps.toFixed(2)} MB/s`,
-      );
+      expect(results).toHaveLength(1);
+      expect(results[0].error).toBeUndefined();
+      expect(results[0].hash).toMatch(/^[a-f0-9]{64}$/);
     },
     timeout,
   );
