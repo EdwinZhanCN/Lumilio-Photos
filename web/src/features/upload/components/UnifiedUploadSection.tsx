@@ -8,7 +8,7 @@ import { getAcceptString } from "@/lib/utils/accept-file-extensions.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { Upload, Info, FolderPlus, FolderUp, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
-import { useWorkingRepository } from "@/features/settings";
+import { useWorkingRepository } from "@/features/repositories";
 
 function UnifiedUploadSection(): React.JSX.Element {
   const { t } = useI18n(); // Initialize useI18n

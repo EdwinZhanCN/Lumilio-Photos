@@ -57,7 +57,8 @@ vi.mock("@/hooks/util-hooks/useMessage", () => ({
   useMessage: () => mocks.showMessage,
 }));
 
-vi.mock("@/features/settings", () => ({
+vi.mock("@/features/repositories", () => ({
+  BrowseScopeSelect: () => null,
   useBrowseScope: () => ({
     repositories: [{ id: "repo-1", name: "Repo 1" }],
     browseRepositoryId: "",

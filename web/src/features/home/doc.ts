@@ -61,7 +61,7 @@
  * ```
  *
  * Home composes already-owned surfaces: gallery rendering comes from Assets,
- * repository scope comes from Settings, heatmap rendering comes from shared
+ * repository scope comes from Repositories, heatmap rendering comes from shared
  * components, and map presentation comes from the shared map component.
  *
  * ## Decisions
@@ -79,13 +79,12 @@
  *
  * @module
  */
-import type BrowseScopeSelect from "@/components/BrowseScopeSelect";
+import type { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import type PhotoMapView from "@/components/PhotoMapView";
 import type Home from "./routes/Home.tsx";
 import type GalleryGrid from "./components/GalleryGrid.tsx";
 import type SpacetimeMapCard from "./components/SpacetimeMapCard.tsx";
 import type StatsCards from "./components/StatsCards.tsx";
-import type { useBrowseScope } from "@/features/settings";
 import type { useFeaturedPhotos } from "./hooks/useFeaturedPhotos.ts";
 import type { useLocationClusters } from "./hooks/useLocationClusters.ts";
 import type { useMapPhotoAssets } from "./hooks/useMapPhotoAssets.ts";

@@ -4,7 +4,6 @@ import type { components } from "@/lib/http-commons/schema";
 
 type Schemas = components["schemas"];
 
-type IndexingRepositoryListResponseDTO = Schemas["dto.IndexingRepositoryListResponseDTO"];
 type AssetIndexingStatsResponseDTO = Schemas["dto.AssetIndexingStatsResponseDTO"];
 export type RebuildAssetIndexesPayload = Schemas["dto.RebuildAssetIndexesRequestDTO"];
 export type RebuildAssetIndexesResponse = Schemas["dto.RebuildAssetIndexesResponseDTO"];
@@ -28,26 +27,6 @@ export type AssetIndexingStats = {
     face: AssetIndexingTaskStats;
   };
 };
-
-export type IndexingRepositoryOption = {
-  id: string;
-  name: string;
-  path: string;
-  role: string;
-  isPrimary: boolean;
-};
-
-function normalizeIndexingRepositories(
-  data?: IndexingRepositoryListResponseDTO,
-): IndexingRepositoryOption[] {
-  return (data?.repositories ?? []).map((repository) => ({
-    id: repository.id ?? "",
-    name: repository.name ?? "",
-    path: repository.path ?? "",
-    role: repository.role ?? "regular",
-    isPrimary: repository.role === "primary" || Boolean(repository.is_primary),
-  }));
-}
 
 function normalizeTaskStats(
   task: AssetIndexingTaskStatsDTO | undefined,
@@ -83,28 +62,6 @@ function normalizeAssetIndexingStats(
       ocr: normalizeTaskStats(data.tasks?.ocr, photoTotal),
       face: normalizeTaskStats(data.tasks?.face, photoTotal),
     },
-  };
-}
-
-export function useIndexingRepositories(): UseQueryResult<
-  IndexingRepositoryListResponseDTO,
-  unknown
-> & {
-  repositories: IndexingRepositoryOption[];
-} {
-  const query = $api.useQuery(
-    "get",
-    "/api/v1/assets/indexing/repositories",
-    {},
-    {
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    },
-  ) as UseQueryResult<IndexingRepositoryListResponseDTO, unknown>;
-
-  return {
-    ...query,
-    repositories: normalizeIndexingRepositories(query.data),
   };
 }
 

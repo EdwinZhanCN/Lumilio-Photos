@@ -1,6 +1,6 @@
 import { useQueryClient, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import { useBrowseScope } from "@/features/settings";
+import { useBrowseScope } from "@/features/repositories";
 import type {
   FaceClusterRebuildResponse,
   ListPeopleResponse,

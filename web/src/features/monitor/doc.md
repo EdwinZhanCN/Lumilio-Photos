@@ -36,10 +36,10 @@ expandable diagnostics use
 the clipboard.
 
 [MLMonitor](./components/MLMonitor.tsx) reads repository-aware indexing coverage through
-[useAssetIndexingStats](@/features/settings/hooks/useAssetIndexing.ts). It can trigger [useRebuildAssetIndexes](@/features/settings/hooks/useAssetIndexing.ts)
+[useAssetIndexingStats](./hooks/useAssetIndexing.ts). It can trigger [useRebuildAssetIndexes](./hooks/useAssetIndexing.ts)
 for semantic, OCR, or face tasks, passing the selected repository id when
 the user narrows the ML view to one repository. The rebuild response is
-interpreted through [extractRebuildResponseData](@/features/settings/hooks/useAssetIndexing.ts) so disabled tasks can
+interpreted through [extractRebuildResponseData](./hooks/useAssetIndexing.ts) so disabled tasks can
 be reported without guessing from mutation shape.
 
 [CapabilitiesMonitor](./components/CapabilitiesMonitor.tsx) reads [useCapabilities](@/lib/capabilities/useCapabilities.ts) on a five-second
@@ -59,14 +59,14 @@ flowchart TD
     MON --> CAP["Capabilities view"]
     QUEUE --> STATS["StatMonitor"]
     QUEUE --> SUMMARY["QueueSummaryList"]
-    ML --> REPOS["useIndexingRepositories"]
+    ML --> REPOS["useRepositoryOptions"]
     ML --> INDEX["useAssetIndexingStats"]
     ML --> REBUILD["useRebuildAssetIndexes"]
     CAP --> CAPHOOK["useCapabilities"]
 ```
 
 Queue and capabilities views are pure monitor surfaces. The ML view borrows
-repository options from Settings only to scope coverage and rebuild actions;
+repository options from Repositories only to scope coverage and rebuild actions;
 it does not persist a browse or working repository preference.
 
 ## Decisions

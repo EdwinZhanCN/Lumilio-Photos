@@ -9,8 +9,6 @@ export {
   ThemePicker,
 } from "./components/renew";
 export type { ModeThemeName } from "./components/renew";
-export { useWorkingRepository } from "./hooks/useWorkingRepository";
-export { useBrowseScope } from "./hooks/useBrowseScope";
 export { usePreference, useDebouncedPreference, usePreferencesStore } from "./preferences";
 export type { Preferences, AssetPagePreferences } from "./preferences";
 export { useRuntimeInfo } from "./hooks/useRuntimeInfo";

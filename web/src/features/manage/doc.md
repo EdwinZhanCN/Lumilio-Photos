@@ -21,22 +21,22 @@ tracks its own pending repository id or job state:
 - [useRepositoryScan](./hooks/useRepositoryScan.ts) tracks rescan and stack-detection ids.
 - [useDetectDuplicates](@/features/collections/hooks/useDuplicates.ts) runs duplicate detection for one repository.
 - [useRebuildPeopleClusters](@/features/people/hooks/usePeople.ts) starts the library-wide people rebuild.
-- [useStartRepositoryCloudImport](@/features/settings/hooks/useCloudSync.ts) starts cloud import for a bound
+- [useStartRepositoryCloudImport](@/features/cloud) starts cloud import for a bound
   repository.
 
 Creating repositories is also local to the grid modal. Local repositories
 need only a display name; cloud repositories must pick a connected
-credential from [useCloudCredentials](@/features/settings/hooks/useCloudSync.ts).
+credential from [useCloudCredentials](@/features/cloud).
 
 ## Data
 
-Repository options come from [useIndexingRepositories](@/features/settings/hooks/useAssetIndexing.ts), the same
-settings-owned source used by browse and working-repository pickers. Manage
+Repository options come from [useRepositoryOptions](@/features/repositories), the same
+repository-owned source used by browse and working-repository pickers. Manage
 reads from that source but does not persist repository selection
 preferences.
 
 Repository cards show a scoped asset count through `/api/v1/assets/list` and
-cloud status through [useRepositoryCloudStatus](@/features/settings/hooks/useCloudSync.ts). A repository scan
+cloud status through [useRepositoryCloudStatus](@/features/cloud). A repository scan
 mutation only acknowledges a queued background job.
 [waitForRepositoryScan](./hooks/useRepositoryScan.ts) follows its scan run through running and
 terminal backend states; repository-aware queries are invalidated only after
@@ -60,7 +60,7 @@ flowchart TD
     PAGE --> UPLOAD["UnifiedUploadSection"]
     PAGE --> GRID["RepositoryGrid"]
     HEADER --> UCTX["useUploadContext"]
-    GRID --> REPOS["useIndexingRepositories"]
+    GRID --> REPOS["useRepositoryOptions"]
     GRID --> SCAN["useRepositoryScan"]
     GRID --> DUP["useDetectDuplicates"]
     GRID --> PEOPLE["useRebuildPeopleClusters"]

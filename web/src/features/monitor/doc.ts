@@ -60,14 +60,14 @@
  *     MON --> CAP["Capabilities view"]
  *     QUEUE --> STATS["StatMonitor"]
  *     QUEUE --> SUMMARY["QueueSummaryList"]
- *     ML --> REPOS["useIndexingRepositories"]
+ *     ML --> REPOS["useRepositoryOptions"]
  *     ML --> INDEX["useAssetIndexingStats"]
  *     ML --> REBUILD["useRebuildAssetIndexes"]
  *     CAP --> CAPHOOK["useCapabilities"]
  * ```
  *
  * Queue and capabilities views are pure monitor surfaces. The ML view borrows
- * repository options from Settings only to scope coverage and rebuild actions;
+ * repository options from Repositories only to scope coverage and rebuild actions;
  * it does not persist a browse or working repository preference.
  *
  * ## Decisions
@@ -102,6 +102,6 @@ import type {
   extractRebuildResponseData,
   useAssetIndexingStats,
   useRebuildAssetIndexes,
-} from "@/features/settings/hooks/useAssetIndexing.ts";
+} from "./hooks/useAssetIndexing.ts";
 
 export {};

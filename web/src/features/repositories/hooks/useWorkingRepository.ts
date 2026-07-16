@@ -1,34 +1,15 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { usePreference } from "../preferences";
-import { type IndexingRepositoryOption, useIndexingRepositories } from "./useAssetIndexing";
-
-type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
-
-export function getRepositoryDisplayName(
-  repository: IndexingRepositoryOption | undefined,
-  t: TranslateFn,
-): string {
-  if (!repository) {
-    return t("navbar.repository.all", {
-      defaultValue: "All repositories",
-    });
-  }
-
-  if (repository.isPrimary) {
-    return t("navbar.repository.primary", {
-      defaultValue: "Primary",
-    });
-  }
-
-  return repository.name || repository.path;
-}
+import { usePreference } from "@/lib/preferences/preferences";
+import type { RepositoryOption } from "../repository.types";
+import { getRepositoryDisplayName } from "../utils/repositoryDisplayName";
+import { useRepositoryOptions } from "./useRepositoryOptions";
 
 export function useWorkingRepository() {
   const { t } = useI18n();
   const [workingRepositoryId, setWorkingRepositoryIdPreference] =
     usePreference("workingRepositoryId");
-  const repositoriesQuery = useIndexingRepositories();
+  const repositoriesQuery = useRepositoryOptions();
   const repositories = repositoriesQuery.repositories;
   const normalizedWorkingRepositoryId = workingRepositoryId?.trim() ?? "";
 
@@ -100,7 +81,7 @@ export function useWorkingRepository() {
     scopeLabel,
     scopeDescription,
     getRepositoryLabel: useCallback(
-      (repository: IndexingRepositoryOption) => getRepositoryDisplayName(repository, t),
+      (repository: RepositoryOption) => getRepositoryDisplayName(repository, t),
       [t],
     ),
     setWorkingRepositoryId,

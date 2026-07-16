@@ -4,7 +4,7 @@ import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
   extractRebuildResponseData,
-} from "@/features/settings/hooks/useAssetIndexing";
+} from "../hooks/useAssetIndexing";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 
