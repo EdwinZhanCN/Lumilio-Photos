@@ -1,4 +1,4 @@
-import { useDebouncedPreference } from "@/features/settings";
+import { useDebouncedPreference } from "../../../preferences";
 import { useRuntimeInfo } from "@/features/settings/hooks/useRuntimeInfo";
 import { useI18n } from "@/lib/i18n.tsx";
 import { GaugeIcon } from "lucide-react";

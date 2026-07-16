@@ -7,7 +7,7 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./schema";
 import { getToken, getRefreshToken, saveToken, removeToken } from "./auth.ts";
-import { notifySessionExpired } from "@/features/auth/sessionEvents.ts";
+import { notifySessionExpired } from "./sessionEvents.ts";
 
 export const baseUrl = import.meta.env.VITE_API_URL ?? "";
 
@@ -16,9 +16,7 @@ let refreshGeneration = 0;
 let refreshAbortController: AbortController | null = null;
 const replayRequests = new Map<string, Request>();
 
-const isRefreshPayload = (
-  value: unknown,
-): value is { token: string; refreshToken: string } => {
+const isRefreshPayload = (value: unknown): value is { token: string; refreshToken: string } => {
   if (!value || typeof value !== "object") return false;
   return (
     "token" in value &&

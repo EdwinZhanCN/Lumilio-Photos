@@ -5,7 +5,7 @@
  * Used by the openapi-fetch client for authentication.
  */
 
-import { resetSessionExpiredNotification } from "@/features/auth/sessionEvents.ts";
+import { resetSessionExpiredNotification } from "./sessionEvents.ts";
 
 // JWT Token management
 const TOKEN_KEY = "auth_token";

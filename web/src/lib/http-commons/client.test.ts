@@ -85,4 +85,30 @@ describe("authenticated OpenAPI client", () => {
       JSON.stringify({ files: [{ hash: "abc", size: 123 }] }),
     ]);
   });
+
+  it("notifies the session owner only once when refresh cannot recover", async () => {
+    localStorage.setItem("auth_token", "expired-access");
+    localStorage.setItem("refresh_token", "expired-refresh");
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      return request.url.endsWith("/api/v1/auth/refresh")
+        ? json({ message: "invalid refresh token" }, 401)
+        : json({ message: "expired access token" }, 401);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { registerSessionExpiredHandler } = await import("./sessionEvents.ts");
+    const handleSessionExpired = vi.fn();
+    const unregister = registerSessionExpiredHandler(handleSessionExpired);
+    const { client } = await import("./client.ts");
+
+    await client.GET("/api/v1/auth/me");
+    await client.GET("/api/v1/auth/me");
+
+    expect(handleSessionExpired).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem("auth_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
+    unregister();
+  });
 });

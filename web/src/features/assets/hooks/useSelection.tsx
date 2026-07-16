@@ -7,7 +7,7 @@ import {
   createAssetsStore,
   useAssetsStoreApi,
 } from "../assets.store";
-import { SelectionResult } from "@/features/assets";
+import type { SelectionResult } from "../types/assets.type";
 import { useSelectionEnabled, useSelectedIds, useSelectionMode } from "../selectors";
 import { selectLastSelectedId } from "../slices/selection.slice";
 import { useAssetActions } from "./useAssetActions";

@@ -9,9 +9,11 @@ not own their persistence rules.
 
 ## State
 
-Client-only preferences live in [usePreferencesStore](./preferences.ts), persisted under
-[PREFERENCES_STORAGE_KEY](./settings.registry.ts). [usePreference](./preferences.ts) applies immediately,
-while [useDebouncedPreference](./preferences.ts) keeps high-frequency controls such as
+Client-only preferences live in the lower shared [usePreferencesStore](../../lib/preferences/preferences.ts)
+so theme effects do not depend on Settings UI. Settings keeps the public
+preference API and the model remains persisted under
+[PREFERENCES_STORAGE_KEY](./settings.registry.ts). [usePreference](../../lib/preferences/preferences.ts) applies immediately,
+while [useDebouncedPreference](../../lib/preferences/preferences.ts) keeps high-frequency controls such as
 health-check intervals and gallery columns responsive before writing to
 localStorage.
 

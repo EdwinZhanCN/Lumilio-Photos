@@ -10,7 +10,9 @@
  *
  * ## State
  *
- * Client-only preferences live in {@link usePreferencesStore}, persisted under
+ * Client-only preferences live in the lower shared {@link usePreferencesStore}
+ * so theme effects do not depend on Settings UI. Settings keeps the public
+ * preference API and the model remains persisted under
  * {@link PREFERENCES_STORAGE_KEY}. {@link usePreference} applies immediately,
  * while {@link useDebouncedPreference} keeps high-frequency controls such as
  * health-check intervals and gallery columns responsive before writing to
@@ -126,7 +128,11 @@ import type {
   useValidateLLMSettings,
 } from "./hooks/useSystemSettings.ts";
 import type { useWorkingRepository } from "./hooks/useWorkingRepository.ts";
-import type { useDebouncedPreference, usePreference, usePreferencesStore } from "./preferences.ts";
+import type {
+  useDebouncedPreference,
+  usePreference,
+  usePreferencesStore,
+} from "../../lib/preferences/preferences.ts";
 import type { PREFERENCES_STORAGE_KEY } from "./settings.registry.ts";
 
 export {};

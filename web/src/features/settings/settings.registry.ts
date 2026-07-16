@@ -1,3 +1,5 @@
-export const PREFERENCES_STORAGE_KEY = "lumilio.preferences";
-
-export { SETTINGS_REGISTRY, LOCAL_STORAGE_REGISTRY } from "@/lib/settings/registry";
+export {
+  PREFERENCES_STORAGE_KEY,
+  SETTINGS_REGISTRY,
+  LOCAL_STORAGE_REGISTRY,
+} from "@/lib/settings/registry";
