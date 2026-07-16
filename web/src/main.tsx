@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
+import App from "@/app/App";
 import { I18nProvider } from "@/lib/i18n.tsx";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 

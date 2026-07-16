@@ -101,7 +101,7 @@ Implementation pattern should mirror `UtilityClassifierAlbum` and `AssetsTrash`:
 - `basePath="/collections/liked"`
 - `syncUrl`
 
-Add routes in `web/src/routes/routes.tsx`:
+Add routes in `web/src/app/router/routes.tsx`:
 
 ```tsx
 {
@@ -208,7 +208,7 @@ Manual smoke:
 ## Critical Files for Implementation
 
 - `web/src/features/collections/routes/Liked.tsx`
-- `web/src/routes/routes.tsx`
+- `web/src/app/router/routes.tsx`
 - `web/src/features/collections/components/utilityShortcuts.ts`
 - `web/src/features/assets/components/shared/AssetsPageHeader.tsx`
 - `web/src/features/collections/doc.ts`

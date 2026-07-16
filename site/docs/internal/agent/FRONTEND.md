@@ -5,12 +5,14 @@ This document describes the current React frontend as implemented in `web/`.
 ## Runtime Entry
 
 - App entry: `web/src/main.tsx`.
-- App shell and providers: `web/src/App.tsx`.
-- Routes: `web/src/routes/routes.tsx`.
+- Root application composition and providers: `web/src/app/App.tsx`.
+- Router gates and route table: `web/src/app/router/AppRouter.tsx`, `web/src/app/router/routes.tsx`.
+- Authenticated navigation shell: `web/src/app/shell/AppShellLayout.tsx`.
+- Runtime health polling: `web/src/app/status/HealthPoller.tsx`.
 - Vite+ config: `web/vite.config.ts`.
 - Container runtime: `web/Dockerfile`, `web/Caddyfile`, `web/scripts/docker-entrypoint.sh`.
 
-The app mounts `I18nProvider`, then `SettingsProvider`, `GlobalProvider`, `QueryClientProvider`, `AuthProvider`, router/bootstrap gates, worker/upload providers, and the shell layout.
+The app mounts `I18nProvider`, then `PreferencesEffects`, `GlobalProvider`, `QueryClientProvider`, `AuthProvider`, router/bootstrap gates, worker/upload providers, and the shell layout.
 
 ## Toolchain
 
@@ -60,12 +62,12 @@ vp exec i18next-cli status     # step 3: verify zh coverage (must be 100%)
 
 ## Source Layout
 
+- `src/app`: root providers, router composition, application shell, and runtime status effects.
 - `src/features/*`: domain features and routes.
 - `src/components`: reusable app components and UI pieces.
 - `src/contexts`: cross-cutting providers.
 - `src/lib`: API client, i18n, utilities, feature support libraries.
 - `src/lib/http-commons`: generated OpenAPI schema, typed client, React Query integration.
-- `src/routes`: route registration.
 - `src/styles`: global styles.
 - `src/locales`: translation resources.
 - `src/wasm`: checked-in generated/bundled WASM support code.
@@ -155,7 +157,7 @@ parameters to person/album detail pages or mutations.
 
 Public routes include login and register. Bootstrap routes handle first-user setup. Protected standalone routes handle MFA and password changes.
 
-Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll container, and footer. Notable route groups include:
+Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll container, and the global ChatDock (except on `/lumilio`). Notable route groups include:
 
 Studio, Map, Lumilio, Monitor, and Settings are route-level lazy chunks. The
 global ChatDock also lazy-loads its message renderer and does not mount its

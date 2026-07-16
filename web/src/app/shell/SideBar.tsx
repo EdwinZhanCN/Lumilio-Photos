@@ -151,11 +151,7 @@ function SideBar() {
               to="/server-monitor"
               onClick={closeMobileDrawer}
               className={location.pathname.startsWith("/server-monitor") ? "active" : ""}
-              title={
-                isOnline
-                  ? t("sidebar.status.online")
-                  : t("sidebar.status.offline")
-              }
+              title={isOnline ? t("sidebar.status.online") : t("sidebar.status.offline")}
             >
               <Activity className={`size-5 ${isOnline ? "text-success" : "text-error"}`} />
               {t("sidebar.status.label", { defaultValue: "Status" })}
