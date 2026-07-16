@@ -1,5 +1,5 @@
 /**
- * File validation utilities
+ * Upload file validation utilities
  * Matches backend validation logic from server/internal/utils/file/validator.go
  */
 

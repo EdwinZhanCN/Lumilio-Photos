@@ -2,9 +2,9 @@ import React, { useRef, ChangeEvent, useMemo } from "react";
 import FileDropZone from "./FileDropZone";
 
 import { useUploadContext } from "../hooks/useUpload";
-import { useUploadConfig } from "@/features/upload/hooks/useUploadQueries";
-import { validateFile, getValidationErrorMessage } from "@/lib/utils/validate-file.ts";
-import { getAcceptString } from "@/lib/utils/accept-file-extensions.ts";
+import { useUploadConfig } from "../hooks/useUploadQueries";
+import { validateFile, getValidationErrorMessage } from "../utils/validate-file.ts";
+import { getAcceptString } from "../utils/accept-file-extensions.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { Upload, Info, FolderPlus, FolderUp, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n

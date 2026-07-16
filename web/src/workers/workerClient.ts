@@ -7,7 +7,7 @@
  * @since 1.1.0
  */
 
-import { detectDeviceCapabilities } from "@/lib/utils/smartBatchSizing.ts";
+import { detectDeviceCapabilities } from "@/lib/workers/batchSizing.ts";
 import type { LayoutBox, LayoutConfig, LayoutResult } from "@/lib/layout/justifiedLayout";
 
 export type WorkerType = "hash" | "justified" | "tool";

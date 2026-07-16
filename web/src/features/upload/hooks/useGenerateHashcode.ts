@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
-import { SingleHashResult } from "@/workers/workerClient";
+import type { SingleHashResult } from "@/workers/workerClient";
 
 export interface HashcodeProgress {
   numberProcessed: number;
