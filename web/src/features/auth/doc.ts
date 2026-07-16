@@ -22,7 +22,7 @@
  */
 import type { AuthProvider } from "./AuthProvider.tsx";
 import type { resetSession } from "./resetSession.ts";
-import type { registerSessionExpiredHandler } from "./sessionEvents.ts";
+import type { registerSessionExpiredHandler } from "../../lib/http-commons/sessionEvents.ts";
 import type { authMiddleware } from "@/lib/http-commons/client.ts";
 
 export {};

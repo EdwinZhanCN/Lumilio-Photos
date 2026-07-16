@@ -1,11 +1,4 @@
-import React, {
-  createContext,
-  useReducer,
-  useEffect,
-  ReactNode,
-  useRef,
-  useCallback,
-} from "react";
+import React, { createContext, useReducer, useEffect, ReactNode, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { authReducer, initialState } from "./auth.reducer";
 import { AuthAction, AuthResponse, AuthState, LoginResult, MFAMethod, User } from "./auth.type.ts";
@@ -14,7 +7,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { ensureMediaToken, getMediaTokenRefreshIntervalMs } from "@/lib/assets/mediaAccess.ts";
 import { useGlobal } from "@/contexts/GlobalContext.tsx";
 import { resetSession } from "./resetSession.ts";
-import { registerSessionExpiredHandler } from "./sessionEvents.ts";
+import { registerSessionExpiredHandler } from "@/lib/http-commons/sessionEvents.ts";
 
 interface AuthContextType extends AuthState {
   dispatch: React.Dispatch<AuthAction>;

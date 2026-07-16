@@ -13,6 +13,6 @@ persisted asset filters/search, and clears repository scope preferences.
 This boundary runs for explicit logout, failed bootstrap authentication, and
 refresh exhaustion so a later user cannot observe the prior user's state.
 
-[registerSessionExpiredHandler](./sessionEvents.ts) connects transport-level refresh
+[registerSessionExpiredHandler](../../lib/http-commons/sessionEvents.ts) connects transport-level refresh
 exhaustion back to the provider without making the HTTP client depend on
 React or browser navigation.

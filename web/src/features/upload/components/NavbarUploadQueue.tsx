@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CircleAlert, CopyCheck, Loader2, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useUploadContext } from "@/features/upload";
+import { useUploadContext } from "../hooks/useUpload";
 import type { FileUploadProgress } from "@/features/upload/hooks/useUploadProcess";
 import { shouldUseChunks } from "@/lib/upload/uploadTransport";
 

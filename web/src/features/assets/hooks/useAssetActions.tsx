@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { InfiniteData } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
-import { AssetActionsResult } from "@/features/assets";
+import type { AssetActionsResult } from "../types/assets.type";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";

@@ -1,4 +1,4 @@
-import { usePreferencesStore } from "@/features/settings/preferences";
+import { usePreferencesStore } from "@/lib/preferences/preferences";
 import { resolveActiveThemeMode, type ThemeMode } from "./daisyuiThemes";
 import { useSystemThemeMode } from "./useSystemThemeMode";
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { useUploadContext } from "@/features/upload";
+import { useUploadContext } from "../hooks/useUpload";
 
 /**
  * Props for the FileDropZone component.

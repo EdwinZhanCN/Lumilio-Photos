@@ -29,7 +29,7 @@ import {
 import { selectHasActiveFilters } from "@/features/assets/slices/filters.slice";
 import { useI18n } from "@/lib/i18n";
 import { usePreference } from "@/features/settings";
-import type { BrowseGroup } from "@/features/assets";
+import type { BrowseGroup } from "../../types/assets.type";
 import type { AssetGalleryProps } from "./gallery.types";
 import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import type { AssetFilter } from "@/features/assets/types/assets.type";

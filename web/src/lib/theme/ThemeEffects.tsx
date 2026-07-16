@@ -1,5 +1,5 @@
 import { useLayoutEffect, type ReactNode } from "react";
-import { usePreferencesStore } from "@/features/settings/preferences";
+import { usePreferencesStore } from "@/lib/preferences/preferences";
 import { applyThemePreferencesToDocument } from "./daisyuiThemes";
 import { useSystemThemeMode } from "./useSystemThemeMode";
 

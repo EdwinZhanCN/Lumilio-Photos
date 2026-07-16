@@ -1,7 +1,7 @@
 import React, { useRef, ChangeEvent, useMemo } from "react";
 import FileDropZone from "./FileDropZone";
 
-import { useUploadContext } from "@/features/upload";
+import { useUploadContext } from "../hooks/useUpload";
 import { useUploadConfig } from "@/features/upload/hooks/useUploadQueries";
 import { validateFile, getValidationErrorMessage } from "@/lib/utils/validate-file.ts";
 import { getAcceptString } from "@/lib/utils/accept-file-extensions.ts";
