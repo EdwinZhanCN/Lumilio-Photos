@@ -10,17 +10,19 @@ respective features and are invoked here through explicit hooks.
 ## State
 
 [Manage](./routes/Manage.tsx) is intentionally thin. It renders the page header, exposes
-the supported-format modal, and mounts [UnifiedUploadSection](@/features/upload/components/UnifiedUploadSection.tsx) before
-[RepositoryGrid](./components/RepositoryGrid.tsx). The header reads [useUploadContext](@/features/upload) only to
-summarize the current queue; upload queue mutation remains in the upload
-feature.
+the supported-format modal, and mounts [UnifiedUploadSection](@/features/upload) before
+[RepositoryMaintenancePanel](./components/RepositoryMaintenancePanel.tsx). The panel passes maintenance state and
+callbacks to the repository-owned, presentational [RepositoryGrid](@/features/repositories).
+The header reads [useUploadContext](@/features/upload) only to summarize the current
+queue; upload queue mutation remains in the upload feature.
 
-Repository maintenance state is local to [RepositoryGrid](./components/RepositoryGrid.tsx). Each action
-tracks its own pending repository id or job state:
+Repository maintenance orchestration is local to
+[RepositoryMaintenancePanel](./components/RepositoryMaintenancePanel.tsx). Each action tracks its own pending
+repository id or job state:
 
-- [useRepositoryScan](./hooks/useRepositoryScan.ts) tracks rescan and stack-detection ids.
-- [useDetectDuplicates](@/features/collections/hooks/useDuplicates.ts) runs duplicate detection for one repository.
-- [useRebuildPeopleClusters](@/features/people/hooks/usePeople.ts) starts the library-wide people rebuild.
+- [useRepositoryScan](@/features/repositories) tracks rescan and stack-detection ids.
+- [useDetectDuplicates](@/features/collections) runs duplicate detection for one repository.
+- [useRebuildPeopleClusters](@/features/people) starts the library-wide people rebuild.
 - [useStartRepositoryCloudImport](@/features/cloud) starts cloud import for a bound
   repository.
 
@@ -38,7 +40,7 @@ preferences.
 Repository cards show a scoped asset count through `/api/v1/assets/list` and
 cloud status through [useRepositoryCloudStatus](@/features/cloud). A repository scan
 mutation only acknowledges a queued background job.
-[waitForRepositoryScan](./hooks/useRepositoryScan.ts) follows its scan run through running and
+[waitForRepositoryScan](@/features/repositories) follows its scan run through running and
 terminal backend states; repository-aware queries are invalidated only after
 completion. Other maintenance mutations retain scoped invalidation behavior.
 
@@ -48,8 +50,8 @@ The action scope is deliberately mixed:
   import are repository-scoped.
 - People rebuild is library-wide because face clusters can span
   repositories.
-- Upload target selection belongs to [UnifiedUploadSection](@/features/upload/components/UnifiedUploadSection.tsx) through the
-  settings feature's working-repository hook, not to Manage itself.
+- Upload target selection belongs to [UnifiedUploadSection](@/features/upload) through the
+  repositories feature's working-repository hook, not to Manage itself.
 
 ## Composition
 
@@ -58,13 +60,14 @@ flowchart TD
     ROUTE["/manage"] --> PAGE["Manage"]
     PAGE --> HEADER["ManageHeader"]
     PAGE --> UPLOAD["UnifiedUploadSection"]
-    PAGE --> GRID["RepositoryGrid"]
+    PAGE --> PANEL["RepositoryMaintenancePanel"]
     HEADER --> UCTX["useUploadContext"]
-    GRID --> REPOS["useRepositoryOptions"]
-    GRID --> SCAN["useRepositoryScan"]
-    GRID --> DUP["useDetectDuplicates"]
-    GRID --> PEOPLE["useRebuildPeopleClusters"]
-    GRID --> CLOUD["cloud sync hooks"]
+    PANEL --> GRID["RepositoryGrid"]
+    PANEL --> REPOS["useRepositoryOptions"]
+    PANEL --> SCAN["useRepositoryScan"]
+    PANEL --> DUP["useDetectDuplicates"]
+    PANEL --> PEOPLE["useRebuildPeopleClusters"]
+    PANEL --> CLOUD["cloud sync hooks"]
     GRID --> CARD["Repository cards"]
     CARD --> COUNT["repository asset count"]
     CARD --> STATUS["useRepositoryCloudStatus"]

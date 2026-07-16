@@ -34,8 +34,7 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
 import { useFilterState, useFilterActions } from "@/features/assets/selectors";
 import { useAlbumOptions } from "@/features/collections/hooks/useAlbums";
-import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
-import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
+import { BrowseScopeSelect, useBrowseScope, useRepositoryScan } from "@/features/repositories";
 import { useStackActions } from "@/features/assets/hooks/useStackActions";
 import {
   getBrowseItemAsset,

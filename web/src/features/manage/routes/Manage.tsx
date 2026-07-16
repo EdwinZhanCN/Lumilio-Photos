@@ -3,11 +3,9 @@ import { FileTextIcon, Folders } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
+import { SupportedFormatsModal, UnifiedUploadSection, useUploadContext } from "@/features/upload";
 import { useI18n } from "@/lib/i18n";
-import { useUploadContext } from "@/features/upload";
-import UnifiedUploadSection from "@/features/upload/components/UnifiedUploadSection";
-import SupportedFormatsModal from "@/features/upload/components/SupportedFormatsModal";
-import RepositoryGrid from "@/features/manage/components/RepositoryGrid";
+import RepositoryMaintenancePanel from "../components/RepositoryMaintenancePanel";
 
 const ManageHeader: React.FC = () => {
   const { t } = useI18n();
@@ -62,7 +60,7 @@ const Manage = () => {
           )}
         >
           <UnifiedUploadSection />
-          <RepositoryGrid />
+          <RepositoryMaintenancePanel />
         </ErrorBoundary>
       </div>
     </div>
