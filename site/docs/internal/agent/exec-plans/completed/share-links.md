@@ -102,7 +102,7 @@ Add an authenticated `Shared Links` management page:
 
 Relevant existing pieces:
 
-- Authenticated public routes live in `web/src/routes/routes.tsx`, while the app
+- Authenticated public routes live in `web/src/app/router/routes.tsx`, while the app
   shell is applied only to protected `appRoutes`.
 - Asset galleries already converge on `AssetsGalleryPage`, `AssetsViewResult`,
   `BrowseGroup`, and `BrowseItem`.
@@ -485,5 +485,5 @@ Manual smoke:
 - `server/internal/api/router.go`
 - `server/app/app.go`
 - `server/internal/service/asset_browse_service.go`
-- `web/src/routes/routes.tsx`
+- `web/src/app/router/routes.tsx`
 - `web/src/features/assets/components/shared/AssetsPageHeader.tsx`

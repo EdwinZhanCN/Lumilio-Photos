@@ -13,7 +13,7 @@ import { filenameFromContentDisposition, triggerBlobDownload } from "../utils/do
 /**
  * Public, unauthenticated share viewer mounted at /s/:token (and
  * /s/:token/:assetId for the lightbox). Rendered outside the authenticated
- * app shell — see App.tsx's routing restructure — so it never shows the
+ * app shell — see app/router/AppRouter.tsx — so it never shows the
  * sidebar/navbar/chat dock and never makes authenticated API calls.
  */
 export function PublicShare(): ReactNode {

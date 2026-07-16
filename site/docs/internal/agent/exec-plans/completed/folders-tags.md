@@ -257,7 +257,7 @@ web/src/features/collections/routes/Tags.tsx
 web/src/features/collections/routes/TagDetails.tsx
 ```
 
-Register routes in `web/src/routes/routes.tsx`.
+Register routes in `web/src/app/router/routes.tsx`.
 
 ### 2. Add Hooks
 
@@ -385,5 +385,5 @@ Manual smoke:
 - `server/internal/api/dto/asset_dto.go`
 - `server/internal/db/repo/queries/assets.sql`
 - `server/internal/api/handler/asset_handler.go`
-- `web/src/routes/routes.tsx`
+- `web/src/app/router/routes.tsx`
 - `web/src/features/collections/doc.ts`

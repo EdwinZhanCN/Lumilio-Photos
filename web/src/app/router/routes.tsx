@@ -52,7 +52,7 @@ export const publicRoutes = [
   },
 ];
 
-// shareRoutes are rendered outside SetupGate/BootstrapGate (see App.tsx) so a
+// shareRoutes are rendered outside SetupGate/BootstrapGate (see AppRouter.tsx) so a
 // recipient hitting a public share link is never redirected through
 // first-run setup or forced to authenticate.
 export const shareRoutes = [

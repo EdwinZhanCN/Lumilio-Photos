@@ -13,8 +13,8 @@
  *   `/api/v1/share-links`.
  * - **Public**: {@link PublicShare} is mounted at `/s/:token` (and
  *   `/s/:token/:assetId` for the lightbox) as a sibling of the gated route
- *   tree in `App.tsx` — not inside it — so a recipient is never redirected
- *   through first-run setup or forced to authenticate. It uses
+ *   tree in `app/router/AppRouter.tsx` — not inside it — so a recipient is
+ *   never redirected through first-run setup or forced to authenticate. It uses
  *   {@link usePublicShareView} against `/api/v1/public/shares/{token}` and
  *   never calls an authenticated endpoint.
  *
