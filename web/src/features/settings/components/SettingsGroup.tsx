@@ -1,5 +1,5 @@
 /**
- * renew design language "B" — inset grouped lists (macOS System Settings).
+ * Settings inset grouped lists (macOS System Settings-inspired).
  *
  * A settings page is a stack of SettingsGroup containers. Each group is a
  * soft, borderless, rounded surface holding hairline-divided rows. Rows

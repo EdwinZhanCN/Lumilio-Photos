@@ -1,5 +1,5 @@
 import { ErrorBoundary } from "react-error-boundary";
-import { SettingsShell } from "../components/renew";
+import { SettingsShell } from "../components";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";

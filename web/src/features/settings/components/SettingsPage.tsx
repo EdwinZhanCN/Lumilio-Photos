@@ -1,5 +1,5 @@
 /**
- * renew/ — a clean, self-consistent settings UI kit.
+ * A clean, self-consistent settings UI kit.
  *
  * Three layers, each owning one job, with a strictly monotonic type scale:
  *

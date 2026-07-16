@@ -96,21 +96,17 @@
  * @module
  */
 import type Settings from "./routes/Settings.tsx";
-import type SettingsShell from "./components/renew/SettingsShell.tsx";
-import type { SettingsPage } from "./components/renew/SettingsPage.tsx";
-import type {
-  SettingsBlock,
-  SettingsGroup,
-  SettingsRow,
-} from "./components/renew/SettingsGroup.tsx";
-import type { SettingsSaveBar } from "./components/renew/SettingsSaveBar.tsx";
-import type AccountTab from "./components/renew/tabs/AccountTab.tsx";
-import type AppearanceTab from "./components/renew/tabs/AppearanceTab.tsx";
-import type AiTab from "./components/renew/tabs/AiTab.tsx";
-import type CloudTab from "./components/renew/tabs/CloudTab.tsx";
-import type ServerTab from "./components/renew/tabs/ServerTab.tsx";
-import type UsersTab from "./components/renew/tabs/UsersTab.tsx";
-import type AboutTab from "./components/renew/tabs/AboutTab.tsx";
+import type SettingsShell from "./components/SettingsShell.tsx";
+import type { SettingsPage } from "./components/SettingsPage.tsx";
+import type { SettingsBlock, SettingsGroup, SettingsRow } from "./components/SettingsGroup.tsx";
+import type { SettingsSaveBar } from "./components/SettingsSaveBar.tsx";
+import type AccountTab from "./components/tabs/AccountTab.tsx";
+import type AppearanceTab from "./components/tabs/AppearanceTab.tsx";
+import type AiTab from "./components/tabs/AiTab.tsx";
+import type CloudTab from "./components/tabs/CloudTab.tsx";
+import type ServerTab from "./components/tabs/ServerTab.tsx";
+import type UsersTab from "./components/tabs/UsersTab.tsx";
+import type AboutTab from "./components/tabs/AboutTab.tsx";
 import type { useAISettingsDraft } from "./hooks/useAISettingsDraft.ts";
 import type {
   useBrowseScope,

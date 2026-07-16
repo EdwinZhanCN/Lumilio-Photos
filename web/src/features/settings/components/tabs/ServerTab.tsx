@@ -1,5 +1,5 @@
-import { useDebouncedPreference } from "../../../preferences";
-import { useRuntimeInfo } from "@/features/settings/hooks/useRuntimeInfo";
+import { useDebouncedPreference } from "../../preferences";
+import { useRuntimeInfo } from "../../hooks/useRuntimeInfo";
 import { useI18n } from "@/lib/i18n.tsx";
 import { GaugeIcon } from "lucide-react";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";

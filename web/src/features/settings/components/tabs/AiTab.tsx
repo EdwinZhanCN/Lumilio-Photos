@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import {
-  useAISettingsDraft,
-  type AISettingsDraft,
-} from "@/features/settings/hooks/useAISettingsDraft";
-import { useValidateLLMSettings } from "@/features/settings/hooks/useSystemSettings";
+import { useAISettingsDraft, type AISettingsDraft } from "../../hooks/useAISettingsDraft";
+import { useValidateLLMSettings } from "../../hooks/useSystemSettings";
 import {
   BirdIcon,
   BotIcon,
