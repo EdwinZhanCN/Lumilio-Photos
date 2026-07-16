@@ -1,6 +1,6 @@
 import React from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { usePreference } from "../../../preferences";
+import { usePreference } from "../../preferences";
 import { useResolvedThemeMode, useThemePreference } from "@/lib/theme";
 import {
   DAISYUI_DARK_THEMES,

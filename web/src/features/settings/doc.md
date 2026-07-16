@@ -18,7 +18,7 @@ localStorage.
 
 Server-backed settings use the shared [useDraftSettings](./hooks/useDraftSettings.ts) contract:
 tabs edit a local draft, expose dirty/reset/save state through
-[SettingsSaveBar](./components/renew/SettingsSaveBar.tsx), and commit through [useUpdateSystemSettings](./hooks/useSystemSettings.ts).
+[SettingsSaveBar](./components/SettingsSaveBar.tsx), and commit through [useUpdateSystemSettings](./hooks/useSystemSettings.ts).
 [useAISettingsDraft](./hooks/useAISettingsDraft.ts) is the current rich draft adapter for LLM/ML
 settings, including API-key clearing semantics and server normalization.
 
@@ -72,11 +72,11 @@ flowchart TD
 ```
 
 [Settings](./routes/Settings.tsx) renders the route header and delegates the tabbed surface to
-[SettingsShell](./components/renew/SettingsShell.tsx). The shell always shows [AccountTab](./components/renew/tabs/AccountTab.tsx),
-[AppearanceTab](./components/renew/tabs/AppearanceTab.tsx), [ServerTab](./components/renew/tabs/ServerTab.tsx), and [AboutTab](./components/renew/tabs/AboutTab.tsx); admin users additionally see
-[AiTab](./components/renew/tabs/AiTab.tsx), [CloudTab](./components/renew/tabs/CloudTab.tsx), and [UsersTab](./components/renew/tabs/UsersTab.tsx). The visual hierarchy is
-centralized in [SettingsPage](./components/renew/SettingsPage.tsx), [SettingsGroup](./components/renew/SettingsGroup.tsx),
-[SettingsRow](./components/renew/SettingsGroup.tsx), and [SettingsBlock](./components/renew/SettingsGroup.tsx); tabs should compose those
+[SettingsShell](./components/SettingsShell.tsx). The shell always shows [AccountTab](./components/tabs/AccountTab.tsx),
+[AppearanceTab](./components/tabs/AppearanceTab.tsx), [ServerTab](./components/tabs/ServerTab.tsx), and [AboutTab](./components/tabs/AboutTab.tsx); admin users additionally see
+[AiTab](./components/tabs/AiTab.tsx), [CloudTab](./components/tabs/CloudTab.tsx), and [UsersTab](./components/tabs/UsersTab.tsx). The visual hierarchy is
+centralized in [SettingsPage](./components/SettingsPage.tsx), [SettingsGroup](./components/SettingsGroup.tsx),
+[SettingsRow](./components/SettingsGroup.tsx), and [SettingsBlock](./components/SettingsGroup.tsx); tabs should compose those
 primitives instead of inventing local section chrome.
 
 ## Decisions
