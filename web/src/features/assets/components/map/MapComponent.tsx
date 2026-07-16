@@ -1,14 +1,16 @@
 import { MapContainer, Marker, Popup, Rectangle, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L, { DivIcon, LatLngExpression, LatLngTuple } from "leaflet";
+import L, { DivIcon, LatLngTuple } from "leaflet";
 import Supercluster, { type BBox, type ClusterFeature, type PointFeature } from "supercluster";
-import { usePreference } from "@/features/settings";
+import type { MapComponentProps, MapViewport, PhotoLocation } from "../../map/types";
+import {
+  autoConvertCoordinates,
+  convertFromGaodeCoordinates,
+} from "@/lib/geo/coordinateConversion";
 import { useI18n } from "@/lib/i18n.tsx";
+import { usePreference } from "@/lib/preferences/preferences";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { convertCoordinatesForMap } from "@/lib/utils/mapUtils";
-import { convertFromGaodeCoordinates } from "@/lib/geo/coordinateConversion";
-import { Asset } from "@/lib/assets/types";
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -19,37 +21,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
-
-// Photo location data type
-export type PhotoLocation = {
-  id: string;
-  position: LatLngExpression;
-  title: string;
-  description?: string;
-  thumbnailUrl?: string;
-  asset?: Asset;
-};
-
-export type MapBoundsOverlay = {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-};
-
-// Map component props
-interface MapComponentProps {
-  photoLocations?: PhotoLocation[];
-  onPointClick?: (assetId: string) => void;
-  center?: LatLngTuple;
-  zoom?: number;
-  height?: string | number;
-  className?: string;
-  rounded?: boolean;
-  showSinglePhoto?: boolean; // For single photo display (basic info view)
-  boundsOverlay?: MapBoundsOverlay;
-  onViewportChange?: (viewport: MapViewport) => void;
-}
 
 type ClusterPointProperties = {
   locationId: string;
@@ -65,11 +36,6 @@ type ClusterProperties = {
 type ClusterPoint = PointFeature<ClusterPointProperties>;
 type MapCluster = ClusterFeature<Record<string, never>>;
 type ClusterResult = ClusterPoint | MapCluster;
-
-export type MapViewport = {
-  bbox: BBox;
-  zoom: number;
-};
 
 const isClusterResult = (feature: ClusterResult): feature is MapCluster => {
   const properties = feature.properties as Partial<ClusterProperties>;
@@ -263,7 +229,7 @@ function MapComponent({
     () =>
       photoLocations.map((location) => {
         const position = location.position as [number, number];
-        const converted = convertCoordinatesForMap(
+        const converted = autoConvertCoordinates(
           position[1], // longitude
           position[0], // latitude
           isChina,
@@ -279,7 +245,7 @@ function MapComponent({
   // Default center based on region with coordinate conversion
   const getDefaultCenter = useCallback((): LatLngTuple => {
     if (center) {
-      const converted = convertCoordinatesForMap(center[1], center[0], isChina);
+      const converted = autoConvertCoordinates(center[1], center[0], isChina);
       return [converted.latitude, converted.longitude];
     }
     return isChina ? [39.9042, 116.4074] : [51.505, -0.09]; // Beijing or London
@@ -298,7 +264,7 @@ function MapComponent({
     if (boundsOverlay) {
       const centerLat = (boundsOverlay.north + boundsOverlay.south) / 2;
       const centerLng = (boundsOverlay.east + boundsOverlay.west) / 2;
-      const converted = convertCoordinatesForMap(centerLng, centerLat, isChina);
+      const converted = autoConvertCoordinates(centerLng, centerLat, isChina);
       return [converted.latitude, converted.longitude];
     }
     return getDefaultCenter();
@@ -311,8 +277,8 @@ function MapComponent({
       return null;
     }
 
-    const southWest = convertCoordinatesForMap(boundsOverlay.west, boundsOverlay.south, isChina);
-    const northEast = convertCoordinatesForMap(boundsOverlay.east, boundsOverlay.north, isChina);
+    const southWest = autoConvertCoordinates(boundsOverlay.west, boundsOverlay.south, isChina);
+    const northEast = autoConvertCoordinates(boundsOverlay.east, boundsOverlay.north, isChina);
 
     return L.latLngBounds(
       [southWest.latitude, southWest.longitude],

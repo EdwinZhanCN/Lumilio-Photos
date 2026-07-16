@@ -1,4 +1,4 @@
-import { Info, Download } from "lucide-react";
+import { Download, Info } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 
 type ExifDataDisplayProps = {

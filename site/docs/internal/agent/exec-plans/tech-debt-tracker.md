@@ -69,7 +69,8 @@ Last aligned with the codebase: 2026-07-12.
   storage root because container paths cannot safely prove or repair host
   mounts.
 - **Asset reprocessing has no user-visible submission result.** Owner:
-  `web/src/components/ExportModal.tsx`. The retry flow closes and writes to the
+  `web/src/features/assets/components/page/FullScreen/FullScreenCarousel/ExportModal.tsx`.
+  The retry flow closes and writes to the
   console on success, and only writes to the console on failure. Replace the two
   TODOs with the existing app notification/message mechanism so users can tell
   whether the job was accepted.

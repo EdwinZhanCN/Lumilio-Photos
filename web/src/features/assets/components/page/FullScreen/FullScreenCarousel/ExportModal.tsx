@@ -10,7 +10,7 @@ import {
   Paintbrush,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useExportImage, type ExportOptions } from "@/hooks/util-hooks/useExportImage.tsx";
+import { useExportImage, type ExportOptions } from "../../../../hooks/useExportImage";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Asset } from "@/lib/assets/types";
@@ -18,7 +18,7 @@ import {
   getRetryTasksByCategoryForAssetType,
   isRetryTaskSupportedForAssetType,
 } from "@/config/retryTasks";
-import { isExportSupported } from "@/features/assets/utils/mediaTypes";
+import { isExportSupported } from "../../../../utils/mediaTypes";
 import { useI18n } from "@/lib/i18n";
 
 type ExportFormat = "png" | "jpeg" | "webp" | "avif";

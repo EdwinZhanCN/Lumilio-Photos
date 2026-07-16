@@ -27,7 +27,7 @@ import {
   Plus,
 } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
-import ExportModal from "@/components/ExportModal";
+import ExportModal from "./ExportModal";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";

@@ -1,5 +1,5 @@
 import React from "react";
-import PhotoMapView from "@/components/PhotoMapView";
+import PhotoMapView from "./PhotoMapView";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import { useI18n } from "@/lib/i18n.tsx";
 import { MapIcon } from "lucide-react";

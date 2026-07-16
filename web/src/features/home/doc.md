@@ -34,12 +34,12 @@ available-years, and daily-activity as independent TanStack Query entries.
 [StatsCards](./components/StatsCards.tsx) owns only the selected heatmap year and transforms cached
 responses into percentages and heatmap values.
 
-[useMapPhotoAssets](./hooks/useMapPhotoAssets.ts) reads paginated map points from
+[useMapPhotoAssets](@/features/assets/map/useMapPhotoAssets.ts) reads paginated map points from
 `/api/v1/assets/map-points`. Home enables its bounded preview only when the
 map card nears the viewport; the full Map route sends the visible bounding
-box and replaces its query as the viewport changes. [useLocationClusters](./hooks/useLocationClusters.ts) reads paginated
+box and replaces its query as the viewport changes. [useLocationClusters](@/features/assets/map/useLocationClusters.ts) reads paginated
 location clusters for the map badge. [SpacetimeMapCard](./components/SpacetimeMapCard.tsx) delegates map
-rendering to [PhotoMapView](@/components/PhotoMapView); clicking a point navigates to the owning
+rendering to [PhotoMapView](./components/PhotoMapView.tsx); clicking a point navigates to the owning
 asset route instead of opening an editor inside Home.
 
 ## Composition

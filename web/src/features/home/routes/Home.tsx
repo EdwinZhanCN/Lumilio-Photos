@@ -4,10 +4,9 @@ import PageHeader from "@/components/PageHeader";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";
+import { useLocationClusters, useMapPhotoAssets } from "@/features/assets/map";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
-import { useLocationClusters } from "../hooks/useLocationClusters";
-import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { AlertTriangleIcon, CameraIcon, HomeIcon, SparklesIcon } from "lucide-react";
 import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
 
