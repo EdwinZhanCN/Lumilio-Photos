@@ -14,10 +14,9 @@ export const waitForRepositoryScan = async (
 ) => {
   const deadline = Date.now() + (options.timeoutMs ?? 10 * 60 * 1000);
   while (Date.now() <= deadline) {
-    const { data, error, response } = await client.GET(
-      "/api/v1/repositories/{id}/scans/latest",
-      { params: { path: { id: repositoryId } } },
-    );
+    const { data, error, response } = await client.GET("/api/v1/repositories/{id}/scans/latest", {
+      params: { path: { id: repositoryId } },
+    });
     if (error && response.status !== 404) {
       throw new Error(error.error || error.message || "Failed to load repository scan status");
     }

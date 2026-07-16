@@ -23,19 +23,15 @@ export function useTagSummaries({
   limit = 60,
   offset = 0,
 }: UseTagSummariesOptions) {
-  return $api.useQuery(
-    "get",
-    "/api/v1/assets/tag-summaries",
-    {
-      params: {
-        query: {
-          repository_id: repositoryId,
-          source,
-          q: query,
-          limit,
-          offset,
-        },
+  return $api.useQuery("get", "/api/v1/assets/tag-summaries", {
+    params: {
+      query: {
+        repository_id: repositoryId,
+        source,
+        q: query,
+        limit,
+        offset,
       },
     },
-  );
+  });
 }

@@ -118,7 +118,9 @@ export default function RequiredPasswordChangePage(): React.ReactNode {
                   required
                 />
               </label>
-              <p className="label">{t("auth.requiredPasswordChange.passwordHint", PASSWORD_HINT)}</p>
+              <p className="label">
+                {t("auth.requiredPasswordChange.passwordHint", PASSWORD_HINT)}
+              </p>
             </fieldset>
 
             <fieldset className="fieldset">
@@ -143,7 +145,11 @@ export default function RequiredPasswordChangePage(): React.ReactNode {
               </label>
             </fieldset>
 
-            <button type="submit" className="btn btn-primary btn-block" disabled={mutation.isPending}>
+            <button
+              type="submit"
+              className="btn btn-primary btn-block"
+              disabled={mutation.isPending}
+            >
               {mutation.isPending
                 ? t("auth.requiredPasswordChange.saving", "Saving…")
                 : t("auth.requiredPasswordChange.submit", "Set password and continue")}

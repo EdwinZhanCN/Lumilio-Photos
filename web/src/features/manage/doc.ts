@@ -94,10 +94,7 @@
  */
 import type Manage from "./routes/Manage.tsx";
 import type RepositoryGrid from "./components/RepositoryGrid.tsx";
-import type {
-  useRepositoryScan,
-  waitForRepositoryScan,
-} from "./hooks/useRepositoryScan.ts";
+import type { useRepositoryScan, waitForRepositoryScan } from "./hooks/useRepositoryScan.ts";
 import type UnifiedUploadSection from "@/features/upload/components/UnifiedUploadSection.tsx";
 import type { useUploadContext } from "@/features/upload";
 import type { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates.ts";
