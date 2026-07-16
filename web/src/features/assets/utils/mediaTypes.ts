@@ -110,21 +110,3 @@ export const getAssetAriaLabel = (asset: Asset, includeDuration = true): string 
 
   return label;
 };
-
-/**
- * Gets human-readable file type description
- */
-export const getFileTypeDescription = (asset: Asset): string => {
-  const mediaType = getMediaType(asset);
-
-  if (asset.mime_type) {
-    // Convert MIME type to readable format
-    const [category, subtype] = asset.mime_type.split("/");
-    if (subtype) {
-      return `${subtype.toUpperCase()} ${category}`;
-    }
-    return asset.mime_type;
-  }
-
-  return asset.type || mediaType;
-};

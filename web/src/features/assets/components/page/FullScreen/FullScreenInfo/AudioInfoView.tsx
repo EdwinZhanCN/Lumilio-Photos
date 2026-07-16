@@ -5,7 +5,7 @@ import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import TagList from "./TagList";
-import { formatCaptureTime } from "@/lib/utils/formatters";
+import { formatCaptureTime } from "@/lib/format/dateTime";
 import type { Asset, AudioSpecificMetadata } from "@/lib/http-commons";
 import { isAudioMetadata } from "@/lib/http-commons";
 

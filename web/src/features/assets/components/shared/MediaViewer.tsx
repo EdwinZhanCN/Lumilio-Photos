@@ -2,7 +2,7 @@ import React, { useEffect, useId, useMemo, useState } from "react";
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
 
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { isVideo } from "@/lib/utils/mediaTypes";
+import { isVideo } from "@/features/assets/utils/mediaTypes";
 import { Asset } from "@/lib/assets/types";
 import "@vidstack/react/player/styles/base.css";
 import "@vidstack/react/player/styles/default/theme.css";

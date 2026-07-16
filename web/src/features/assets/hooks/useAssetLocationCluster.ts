@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
-import { encodeGeohash } from "@/lib/utils/geohash";
+import { encodeGeohash } from "@/lib/geo/geohash";
 
 type UseAssetLocationClusterOptions = {
   latitude?: number;
