@@ -1,7 +1,10 @@
 import React, { useCallback, useMemo } from "react";
-import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import { Asset } from "@/lib/assets/types";
-import { createBrowseGroupsFromAssets, flattenBrowseGroupsToAssets } from "@/features/assets";
+import {
+  SquareGallery,
+  createBrowseGroupsFromAssets,
+  flattenBrowseGroupsToAssets,
+} from "@/features/assets";
 
 export type GalleryGridProps = {
   assets?: Asset[];

@@ -7,7 +7,7 @@ import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionErrorAlert } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
-import { usePeople } from "@/features/people/hooks/usePeople";
+import { usePeople } from "@/features/people";
 import AlbumRail from "../components/AlbumRail";
 import FoldersRail from "../components/FoldersRail";
 import MapRail from "../components/MapRail";

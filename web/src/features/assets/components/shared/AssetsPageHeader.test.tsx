@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import AssetsPageHeader from "./AssetsPageHeader";
 import type { Asset } from "@/lib/assets/types";
-import type { BrowseItem } from "@/features/assets/types/assets.type";
+import type { BrowseItem } from "../../types/assets.type";
 
 const mocks = vi.hoisted(() => ({
   selectionClear: vi.fn(),
@@ -24,11 +24,11 @@ vi.mock("@/components/ui/PageHeader", () => ({
   ),
 }));
 
-vi.mock("@/features/assets/components/page/FilterTool/FilterTool", () => ({
+vi.mock("../page/FilterTool/FilterTool", () => ({
   default: () => <div data-testid="filter-tool" />,
 }));
 
-vi.mock("@/features/assets/hooks/useSelection", () => ({
+vi.mock("../../hooks/useSelection", () => ({
   useSelection: () => ({
     enabled: true,
     selectedIds: new Set(["asset:asset-1"]),
@@ -46,7 +46,7 @@ vi.mock("@/features/assets/hooks/useSelection", () => ({
   }),
 }));
 
-vi.mock("@/features/assets/selectors", () => ({
+vi.mock("../../selectors", () => ({
   useFilterState: () => ({ enabled: false }),
   useFilterActions: () => ({
     batchUpdateFilters: mocks.batchUpdateFilters,
@@ -74,7 +74,7 @@ vi.mock("@/features/repositories", () => ({
   }),
 }));
 
-vi.mock("@/features/assets/hooks/useStackActions", () => ({
+vi.mock("../../hooks/useStackActions", () => ({
   useStackActions: () => ({
     createStack: mocks.createStack,
     isCreatingStack: false,
@@ -117,6 +117,27 @@ const browseItems: BrowseItem[] = [
 ];
 
 describe("AssetsPageHeader bulk actions", () => {
+  it("scans every repository in the current all-libraries scope", async () => {
+    render(
+      <AssetsPageHeader
+        sortBy="date_captured"
+        onSortByChange={vi.fn()}
+        title="Assets"
+        browseItems={browseItems}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByText("assets.assetsPageHeader.scan.label")[0]!);
+
+    await waitFor(() => {
+      expect(mocks.scanRepositories).toHaveBeenCalledWith(["repo-1"]);
+      expect(mocks.showMessage).toHaveBeenCalledWith(
+        "success",
+        "assets.assetsPageHeader.scan.allQueued",
+      );
+    });
+  });
+
   it("renders custom actions while hiding requested default actions", async () => {
     const onRun = vi.fn();
 
@@ -149,7 +170,9 @@ describe("AssetsPageHeader bulk actions", () => {
     expect(screen.queryByText("Add to Album")).not.toBeInTheDocument();
     expect(screen.queryByText("Add tags")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByText("Custom action")[0]!);
+    const customActionButtons = screen.getAllByText("Custom action");
+    expect(customActionButtons).toHaveLength(2);
+    fireEvent.click(customActionButtons[0]!);
 
     await waitFor(() => {
       expect(onRun).toHaveBeenCalledWith(
@@ -180,7 +203,7 @@ describe("AssetsPageHeader bulk actions", () => {
     );
 
     const addTagsButtons = screen.getAllByText("Add tags");
-    expect(addTagsButtons.length).toBeGreaterThan(0);
+    expect(addTagsButtons).toHaveLength(2);
     fireEvent.click(addTagsButtons[0]!);
 
     expect(

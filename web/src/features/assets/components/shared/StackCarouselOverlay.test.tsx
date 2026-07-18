@@ -9,7 +9,7 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-vi.mock("@/features/assets/hooks/useStackCarouselAssets", () => ({
+vi.mock("../../hooks/useStackCarouselAssets", () => ({
   useStackCarouselAssets: () => ({
     assets: [
       {
@@ -26,18 +26,15 @@ vi.mock("@/features/assets/hooks/useStackCarouselAssets", () => ({
   }),
 }));
 
-vi.mock(
-  "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel",
-  () => ({
-    default: ({ initialSlide, slideIndex }: { initialSlide: number; slideIndex?: number }) => (
-      <div
-        data-testid="fullscreen-carousel"
-        data-initial-slide={initialSlide}
-        data-slide-index={slideIndex ?? ""}
-      />
-    ),
-  }),
-);
+vi.mock("../page/FullScreen/FullScreenCarousel/FullScreenCarousel", () => ({
+  default: ({ initialSlide, slideIndex }: { initialSlide: number; slideIndex?: number }) => (
+    <div
+      data-testid="fullscreen-carousel"
+      data-initial-slide={initialSlide}
+      data-slide-index={slideIndex ?? ""}
+    />
+  ),
+}));
 
 afterEach(() => {
   cleanup();

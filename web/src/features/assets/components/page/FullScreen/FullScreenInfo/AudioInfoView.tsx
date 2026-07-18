@@ -1,7 +1,7 @@
 import { useOptimistic, useTransition } from "react";
 import { SquarePen, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
+import { useAssetActions } from "../../../../hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import TagList from "./TagList";

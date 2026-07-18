@@ -11,22 +11,21 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useAuth } from "@/features/auth";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { useMFAStatus } from "@/features/auth/hooks/useMFA.ts";
-import {
-  useBeginPasskeyEnrollment,
-  useDeletePasskey,
-  usePasskeys,
-  useVerifyPasskeyEnrollment,
-} from "@/features/auth/hooks/usePasskeys.ts";
-import { createPasskeyCredential, getPasskeySupport } from "@/features/auth/lib/webauthn.ts";
 import {
   DISPLAY_NAME_HINT,
   DISPLAY_NAME_MAX_LENGTH,
-} from "@/features/auth/lib/credentialPolicy.ts";
-import { useUpdateMyProfile } from "@/features/users/hooks/useUsers";
-import PhotoPicker from "@/components/PhotoPicker";
+  createPasskeyCredential,
+  getPasskeySupport,
+  useAuth,
+  useBeginPasskeyEnrollment,
+  useDeletePasskey,
+  useMFAStatus,
+  usePasskeys,
+  useVerifyPasskeyEnrollment,
+} from "@/features/auth";
+import { useUpdateMyProfile } from "@/features/users";
+import PhotoPicker from "@/features/assets/picker";
 import type { components } from "@/lib/http-commons/schema";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
 import { SettingsSaveBar } from "../SettingsSaveBar";

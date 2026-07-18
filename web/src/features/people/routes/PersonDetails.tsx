@@ -1,8 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { EyeOff, Share2, Users, UserRound } from "lucide-react";
-import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import { AssetsGalleryPage, AssetsProvider } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -12,13 +11,13 @@ import { CollectionHero, MetaStat } from "@/components/collection";
 import PersonRenameModal from "../components/PersonRenameModal";
 import {
   CreateShareLinkModal,
+  createShareSelectedBulkAction,
   type ShareSourceKind,
-} from "@/features/share/components/CreateShareLinkModal";
-import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
+} from "@/features/share";
 import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
-} from "@/features/assets/components/shared/bulkActions";
+} from "@/lib/assets/bulkActions";
 
 const PersonAssetsContent = () => {
   const { t, i18n } = useI18n();

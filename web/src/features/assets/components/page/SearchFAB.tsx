@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { useSearchQuery, useUIActions } from "@/features/assets/selectors";
+import { useSearchQuery, useUIActions } from "../../selectors";
 
 interface SearchFABProps {
   className?: string;

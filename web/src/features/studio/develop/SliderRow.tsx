@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
-import { type AdjustmentControl, isControlModified } from "@/features/studio/editor/developConfig";
+import { type AdjustmentControl, isControlModified } from "../editor/developConfig";
 
 type SliderRowProps = {
   control: AdjustmentControl;

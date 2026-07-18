@@ -17,12 +17,17 @@ interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
 }
 
+interface AuthProviderProps {
+  children: ReactNode;
+  resetFeatureState: () => void;
+}
+
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const isMFAMethod = (value: string): value is MFAMethod =>
   value === "totp" || value === "recovery_code";
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatureState }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const queryClient = useQueryClient();
   const { resetSessionState } = useGlobal();
@@ -34,8 +39,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logoutMutation = $api.useMutation("post", "/api/v1/auth/logout");
 
   const resetClientSession = useCallback(
-    () => resetSession({ queryClient, resetGlobalState: resetSessionState }),
-    [queryClient, resetSessionState],
+    () =>
+      resetSession({
+        queryClient,
+        resetGlobalState: resetSessionState,
+        resetFeatureState,
+      }),
+    [queryClient, resetFeatureState, resetSessionState],
   );
 
   useEffect(

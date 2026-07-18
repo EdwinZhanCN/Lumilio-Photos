@@ -2,7 +2,7 @@ import { Focus, Palette, Sun, type LucideIcon } from "lucide-react";
 import {
   DEFAULT_STUDIO_ADJUSTMENTS,
   type StudioEditAdjustments,
-} from "@/features/studio/edit-mvp/types";
+} from "../edit-mvp/types";
 
 /**
  * Photometric adjustment keys — the numeric subset of {@link StudioEditAdjustments}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { Asset } from "@/lib/assets/types";
-import type { AssetGroup } from "@/features/assets/types/assets.type";
+import type { AssetGroup } from "../types/assets.type";
 import {
   browseGroupsFromQueryLikePage,
   browseGroupsFromSearchResultsPage,

@@ -1,16 +1,16 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Asset } from "@/lib/assets/types";
-import { createBrowseGroupsFromAssets } from "@/features/assets/utils/browseItems";
+import { createBrowseGroupsFromAssets } from "../../../utils/browseItems";
 import SquareGallery from "./SquareGallery";
 
-vi.mock("@/features/assets/components/shared/MediaThumbnail", () => ({
+vi.mock("../../shared/MediaThumbnail", () => ({
   default: ({ asset }: { asset: Asset }) => <div>{asset.asset_id}</div>,
 }));
-vi.mock("@/features/assets/components/shared/StackedThumbnail", () => ({
+vi.mock("../../shared/StackedThumbnail", () => ({
   default: ({ asset }: { asset: Asset }) => <div>{asset.asset_id}</div>,
 }));
-vi.mock("@/features/assets/hooks/useSelection", () => ({
+vi.mock("../../../hooks/useSelection", () => ({
   useOptionalKeyboardSelection: () => ({
     enabled: false,
     handleClick: vi.fn(),
@@ -18,9 +18,8 @@ vi.mock("@/features/assets/hooks/useSelection", () => ({
     isSelected: () => false,
   }),
 }));
-vi.mock("@/features/assets/hooks/useGalleryInfiniteScroll", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("@/features/assets/hooks/useGalleryInfiniteScroll")>();
+vi.mock("../../../hooks/useGalleryInfiniteScroll", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../hooks/useGalleryInfiniteScroll")>();
   return { ...original, useGalleryInfiniteScroll: () => ({ supportsIntersectionObserver: true }) };
 });
 vi.mock("@/lib/i18n", () => ({

@@ -4,8 +4,8 @@ import { Asset, StackPreview } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import MediaThumbnail from "./MediaThumbnail";
 import StackCarouselOverlay from "./StackCarouselOverlay";
-import { resolveStackFocusAssetId } from "@/features/assets/utils/browseItems";
-import type { BrowseStackItem } from "@/features/assets/types/assets.type";
+import { resolveStackFocusAssetId } from "../../utils/browseItems";
+import type { BrowseStackItem } from "../../types/assets.type";
 
 interface StackedThumbnailProps {
   asset: Asset;

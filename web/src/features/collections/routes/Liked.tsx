@@ -3,19 +3,21 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { Heart, HeartOff } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
-import { AssetsProvider, useAssetActions } from "@/features/assets";
-import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import {
+  AssetsGalleryPage,
+  AssetsProvider,
+  useAssetActions,
+  type AssetFilter,
+} from "@/features/assets";
 import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
-} from "@/features/assets/components/shared/bulkActions";
+} from "@/lib/assets/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
-import type { AssetFilter } from "@/features/assets/types/assets.type";
-import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
-import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
+import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/share";
 
 const HIDDEN_LIKED_BULK_ACTIONS = ["set-liked"] as const;
 // Module-level constant so the reference is stable across renders — an

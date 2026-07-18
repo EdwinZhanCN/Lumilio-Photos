@@ -11,7 +11,7 @@ import {
   AssetsViewResult,
   SortByType,
   ViewDefinitionOptions,
-} from "@/features/assets/types/assets.type";
+} from "../types/assets.type";
 import { generateViewKey } from "../utils/viewKey";
 import { selectFilterAsAssetFilter, selectFiltersEnabled } from "../slices/filters.slice";
 import { client } from "@/lib/http-commons/client";

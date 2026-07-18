@@ -1,7 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { useLumilioChatStore } from "@/features/lumilio/state/chatStore.ts";
-import { useContextStore } from "@/features/lumilio/state/contextStore.ts";
-import { usePreferencesStore } from "@/features/settings/preferences.ts";
+import { usePreferencesStore } from "@/lib/preferences/preferences";
 import { invalidateAuthRefresh } from "@/lib/http-commons/client.ts";
 import { removeToken } from "@/lib/http-commons/auth.ts";
 import {
@@ -13,18 +11,19 @@ import { removeStorageKeys } from "@/lib/settings/storage.ts";
 export interface SessionResetDependencies {
   queryClient: QueryClient;
   resetGlobalState: () => void;
+  resetFeatureState: () => void;
 }
 
 /** Clear every user-scoped client owner through one ordered session boundary. */
 export async function resetSession({
   queryClient,
   resetGlobalState,
+  resetFeatureState,
 }: SessionResetDependencies): Promise<void> {
   invalidateAuthRefresh();
   removeToken();
 
-  useLumilioChatStore.getState().resetSession();
-  useContextStore.getState().resetSession();
+  resetFeatureState();
   resetGlobalState();
 
   usePreferencesStore.setState({

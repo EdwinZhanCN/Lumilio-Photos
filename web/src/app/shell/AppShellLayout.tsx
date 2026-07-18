@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { BreadcrumbProvider } from "@/components/breadcrumbs";
-import { ChatDock } from "@/features/lumilio/components/Chat/ChatDock";
+import { ChatDock } from "@/features/lumilio";
 import { useI18n } from "@/lib/i18n.tsx";
 import NavBar from "@/app/shell/NavBar";
 import SideBar from "@/app/shell/SideBar";

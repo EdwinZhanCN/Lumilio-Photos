@@ -1,20 +1,20 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
-import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
-import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
+import MediaThumbnail from "../../shared/MediaThumbnail";
+import StackedThumbnail from "../../shared/StackedThumbnail";
+import { useOptionalKeyboardSelection } from "../../../hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { AssetGalleryProps } from "../gallery.types";
-import { DEFAULT_GROUP_KEYS, formatAssetGroupLabel } from "@/features/assets/utils/assetGroups";
+import { DEFAULT_GROUP_KEYS, formatAssetGroupLabel } from "../../../utils/assetGroups";
 import EmptyState from "@/components/ui/EmptyState";
-import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
-import type { BrowseItem } from "@/features/assets/types/assets.type";
-import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
+import { getBrowseItemAsset } from "../../../utils/browseItems";
+import type { BrowseItem } from "../../../types/assets.type";
+import { useGalleryInfiniteScroll } from "../../../hooks/useGalleryInfiniteScroll";
 import {
   intersectsGalleryWindow,
   useGalleryViewportWindow,
-} from "@/features/assets/hooks/useGalleryViewportWindow";
+} from "../../../hooks/useGalleryViewportWindow";
 
 interface SquareGalleryProps extends AssetGalleryProps {
   renderTileCaption?: (asset: Asset, index: number, groupKey: string) => React.ReactNode;

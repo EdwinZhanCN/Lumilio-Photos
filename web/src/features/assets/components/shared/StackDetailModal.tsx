@@ -3,7 +3,7 @@ import { Layers, X } from "lucide-react";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
-import { useAssetStackDetails } from "@/features/assets/hooks/useAssetStackDetails";
+import { useAssetStackDetails } from "../../hooks/useAssetStackDetails";
 
 interface StackDetailModalProps {
   asset: Asset;

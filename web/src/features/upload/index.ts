@@ -29,6 +29,7 @@
  */
 
 export { UploadProvider } from "./UploadProvider";
+export { default as NavbarUploadQueue } from "./components/NavbarUploadQueue";
 export { default as SupportedFormatsModal } from "./components/SupportedFormatsModal";
 export { default as UnifiedUploadSection } from "./components/UnifiedUploadSection";
 export { useUploadContext } from "./hooks/useUpload";

@@ -45,17 +45,15 @@ vi.mock("react-router-dom", () => ({
 }));
 
 vi.mock("@/features/auth", () => ({
+  DISPLAY_NAME_HINT: "Display names support multiple languages and stay under 64 characters.",
+  DISPLAY_NAME_MAX_LENGTH: 64,
+  createPasskeyCredential: vi.fn(),
+  getPasskeySupport: () => ({ supported: true }),
   useAuth: () => ({
     user: mocks.user,
     dispatch: mocks.dispatch,
   }),
-}));
-
-vi.mock("@/features/auth/hooks/useMFA.ts", () => ({
   useMFAStatus: () => mocks.mfaStatusQuery,
-}));
-
-vi.mock("@/features/auth/hooks/usePasskeys.ts", () => ({
   usePasskeys: () => mocks.passkeysQuery,
   useBeginPasskeyEnrollment: () => ({
     mutateAsync: mocks.beginPasskeyMutateAsync,
@@ -71,16 +69,11 @@ vi.mock("@/features/auth/hooks/usePasskeys.ts", () => ({
   }),
 }));
 
-vi.mock("@/features/users/hooks/useUsers", () => ({
+vi.mock("@/features/users", () => ({
   useUpdateMyProfile: () => ({
     mutateAsync: mocks.updateProfileMutateAsync,
     isPending: false,
   }),
-}));
-
-vi.mock("@/features/auth/lib/webauthn.ts", () => ({
-  createPasskeyCredential: vi.fn(),
-  getPasskeySupport: () => ({ supported: true }),
 }));
 
 vi.mock("@/components/ui/UserAvatar", () => ({
@@ -91,7 +84,7 @@ vi.mock("@/components/ui/UserAvatar", () => ({
   ),
 }));
 
-vi.mock("@/components/PhotoPicker", () => ({
+vi.mock("@/features/assets/picker", () => ({
   default: () => <div>photo-picker</div>,
 }));
 

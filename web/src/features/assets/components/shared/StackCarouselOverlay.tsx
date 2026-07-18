@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { Layers, X } from "lucide-react";
 import type { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
-import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import { useStackCarouselAssets } from "@/features/assets/hooks/useStackCarouselAssets";
+import FullScreenCarousel from "../page/FullScreen/FullScreenCarousel/FullScreenCarousel";
+import { useStackCarouselAssets } from "../../hooks/useStackCarouselAssets";
 
 interface StackCarouselOverlayProps {
   asset: Asset;

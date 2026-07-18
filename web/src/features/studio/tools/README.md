@@ -59,7 +59,7 @@ export function normalizeParams(raw: Record<string, unknown>): MyToolParams {
 `myToolRunner.ts` — export a single async function matching `ToolRunner`:
 
 ```ts
-import type { ToolRunner } from "@/features/studio/tools/types";
+import type { ToolRunner } from "../types";
 
 export const runMyTool: ToolRunner = async (ctx, params, helpers) => {
   const { inputFile, signal } = ctx;

@@ -9,6 +9,8 @@ export {
   useBulkAssetOperations,
 } from "./hooks/useSelection";
 export { useAssetsNavigation } from "./hooks/useAssetsNavigation";
+export { useAssetFilterOptions } from "./hooks/useAssetFilterOptions";
+export { useVisibleOnce } from "./hooks/useVisibleOnce";
 
 // Export selectors for fine-grained access
 export * from "./selectors";
@@ -25,6 +27,7 @@ export type {
   AssetActionsResult,
   SelectionResult,
   AssetMediaType,
+  AssetFilter,
   SortByType,
   AssetGroup,
   BrowseItem,
@@ -40,6 +43,7 @@ export type { AssetsContextValue } from "./types/assets.type";
 export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeader";
 export { default as JustifiedGallery } from "./components/page/JustifiedGallery/JustifiedGallery";
 export { default as SquareGallery } from "./components/page/SquareGallery/SquareGallery";
+export { AssetsGalleryPage } from "./components/page/AssetsGalleryPage";
 export type { AssetGalleryProps } from "./components/page/gallery.types";
 
 // Export utilities and selectors from slices

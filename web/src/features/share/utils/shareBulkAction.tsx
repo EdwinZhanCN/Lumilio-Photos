@@ -2,7 +2,7 @@ import { Share2 } from "lucide-react";
 import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
-} from "@/features/assets/components/shared/bulkActions";
+} from "@/lib/assets/bulkActions";
 
 /**
  * "Share selected" bulk action, reusable across every gallery that already

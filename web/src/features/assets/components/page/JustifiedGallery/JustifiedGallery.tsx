@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, memo, useMemo, useRef, useState } from "react";
-import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
-import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
-import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
+import MediaThumbnail from "../../shared/MediaThumbnail";
+import StackedThumbnail from "../../shared/StackedThumbnail";
+import { useOptionalKeyboardSelection } from "../../../hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useJustifiedLayoutService } from "./useJustifiedLayoutService";
 import type { LayoutResult } from "@/lib/layout/justifiedLayout";
@@ -9,16 +9,16 @@ import { assetsToLayoutBoxes, createResponsiveConfig } from "@/lib/layout/justif
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { AssetGalleryProps } from "../gallery.types";
-import { DEFAULT_GROUP_KEYS, formatAssetGroupLabel } from "@/features/assets/utils/assetGroups";
+import { DEFAULT_GROUP_KEYS, formatAssetGroupLabel } from "../../../utils/assetGroups";
 import EmptyState from "@/components/ui/EmptyState";
-import type { BrowseGroup, BrowseItem } from "@/features/assets/types/assets.type";
-import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
+import type { BrowseGroup, BrowseItem } from "../../../types/assets.type";
+import { getBrowseItemAsset } from "../../../utils/browseItems";
 
-import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
+import { useGalleryInfiniteScroll } from "../../../hooks/useGalleryInfiniteScroll";
 import {
   intersectsGalleryWindow,
   useGalleryViewportWindow,
-} from "@/features/assets/hooks/useGalleryViewportWindow";
+} from "../../../hooks/useGalleryViewportWindow";
 
 interface AbsoluteGalleryItemProps {
   top: number;

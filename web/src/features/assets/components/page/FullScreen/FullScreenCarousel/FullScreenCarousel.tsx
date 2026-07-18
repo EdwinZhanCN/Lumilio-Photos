@@ -34,13 +34,13 @@ import "swiper/css/pagination";
 import "./custom-swiper.css";
 import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useCarouselContextContributor } from "@/features/lumilio/contributors/useCarouselContextContributor";
-import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
-import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
+import { useCarouselContextContributor } from "../../../../hooks/useCarouselContextContributor";
+import { useAssetActions } from "../../../../hooks/useAssetActions";
+import { CreateShareLinkModal } from "@/features/share";
 import MediaViewer from "../../../shared/MediaViewer";
 import type { Asset } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
-import { useAlbumOptions } from "@/features/collections/hooks/useAlbums";
+import { useAlbumOptions } from "@/lib/albums/useAlbumOptions";
 import {
   type ParsedSpeciesPrediction,
   type TaxonomyRank,

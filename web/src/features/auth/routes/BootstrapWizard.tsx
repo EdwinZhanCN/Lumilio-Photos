@@ -20,7 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { SUPPORTED_LANGUAGES } from "@/lib/i18n.tsx";
 import { useI18n } from "@/lib/i18n.tsx";
-import { usePreference } from "@/features/settings/preferences.ts";
+import { usePreference } from "@/lib/preferences/preferences";
 import { useRegistrationFlow } from "../hooks/useRegistrationFlow.ts";
 import { setupStatusQueryKey, useSetupStatus } from "../hooks/useSetupStatus.ts";
 import {

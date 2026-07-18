@@ -1,6 +1,6 @@
 import { useEffect } from "react";
+import { useContextStore } from "@/lib/assistant";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useContextStore } from "../state/contextStore";
 
 const CONTRIBUTOR_ID = "carousel-viewing";
 

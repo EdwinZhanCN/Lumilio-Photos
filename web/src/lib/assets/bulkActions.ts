@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Asset } from "@/lib/assets/types";
+import type { Asset } from "./types";
 
 export type AssetsBulkActionId =
   | "set-rating"

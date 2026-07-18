@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Music, Video, Headphones, Check } from "lucide-react";
-import {
-  formatDuration,
-  getAssetAriaLabel,
-  isAudio,
-  isVideo,
-} from "@/features/assets/utils/mediaTypes";
+import { formatDuration, getAssetAriaLabel, isAudio, isVideo } from "../../utils/mediaTypes";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 

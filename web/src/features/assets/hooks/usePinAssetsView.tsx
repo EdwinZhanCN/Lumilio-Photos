@@ -8,19 +8,11 @@ import {
   normalizeTopResultsMeta,
   TOP_RESULTS_LIMIT,
   type SearchTopResultsMeta,
-} from "@/features/assets/hooks/useAssetsView";
-import { useFilterState } from "@/features/assets/selectors";
-import {
-  selectFilterAsAssetFilter,
-  selectFiltersEnabled,
-} from "@/features/assets/slices/filters.slice";
-import type {
-  AssetGroup,
-  AssetsViewResult,
-  BrowseGroup,
-  SortByType,
-} from "@/features/assets/types/assets.type";
-import { getViewerTimeZone } from "@/features/assets/utils/assetGroups";
+} from "./useAssetsView";
+import { useFilterState } from "../selectors";
+import { selectFilterAsAssetFilter, selectFiltersEnabled } from "../slices/filters.slice";
+import type { AssetGroup, AssetsViewResult, BrowseGroup, SortByType } from "../types/assets.type";
+import { getViewerTimeZone } from "../utils/assetGroups";
 import {
   browseGroupsFromQueryLikePage,
   browseGroupsFromSearchResultsPage,
@@ -31,12 +23,12 @@ import {
   flattenBrowseGroupsToAssets,
   getBrowseItemAsset,
   mergeAdjacentBrowseGroups,
-} from "@/features/assets/utils/browseItems";
+} from "../utils/browseItems";
 import { $api } from "@/lib/http-commons/queryClient";
 import { client } from "@/lib/http-commons/client";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import type { Asset } from "@/lib/assets/types";
-import { withBodyPaginationOffset } from "@/features/assets/utils/bodyPagination";
+import { withBodyPaginationOffset } from "../utils/bodyPagination";
 
 type AgentPinDTO = components["schemas"]["dto.AgentPinDTO"];
 type AssetFilterDTO = components["schemas"]["dto.AssetFilterDTO"];

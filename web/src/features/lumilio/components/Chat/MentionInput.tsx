@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
-import { useAlbumOptions } from "@/features/collections/hooks/useAlbums";
-import { useAssetFilterOptions } from "@/features/assets/hooks/useAssetFilterOptions";
+import { useAlbumOptions } from "@/lib/albums/useAlbumOptions";
+import { useAssetFilterOptions } from "@/features/assets";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import {
   createMentionSources,

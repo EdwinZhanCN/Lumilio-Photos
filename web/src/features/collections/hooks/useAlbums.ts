@@ -71,13 +71,3 @@ export function useAlbums(t: (key: string, options?: any) => string, repositoryI
   );
   return { ...query, data };
 }
-
-/** Shared small album list for pickers and mention sources. */
-export function useAlbumOptions(enabled = true) {
-  return $api.useQuery(
-    "get",
-    "/api/v1/albums",
-    { params: { query: { limit: 100, offset: 0 } } },
-    { enabled, staleTime: 60_000, gcTime: 5 * 60_000 },
-  );
-}
