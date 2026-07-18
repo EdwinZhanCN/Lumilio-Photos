@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ImageOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
-import { usePublicShareView } from "../hooks/usePublicShareView";
+import { usePublicShareView } from "../api/usePublicShareView";
 import { PublicShareHeader } from "../components/PublicShareHeader";
 import { PublicShareGrid } from "../components/PublicShareGrid";
 import { PublicShareLightbox } from "../components/PublicShareLightbox";

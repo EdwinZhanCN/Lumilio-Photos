@@ -22,11 +22,11 @@ vi.mock("@/contexts/WorkerProvider", () => ({
   WorkerProvider: ({ children }: { children: ReactNode }) => children,
 }));
 
-vi.mock("../AssetsProvider", () => ({
+vi.mock("../state/AssetsProvider", () => ({
   AssetsProvider: mocks.AssetsProvider,
 }));
 
-vi.mock("../selectors", () => ({
+vi.mock("../state/selectors", () => ({
   useSortBy: () => "date_captured",
   useUIActions: () => ({
     setSortBy: vi.fn(),
@@ -42,7 +42,7 @@ vi.mock("../selectors", () => ({
   }),
 }));
 
-vi.mock("../hooks/useAssetsView", () => ({
+vi.mock("../api/useAssetsView", () => ({
   useCurrentAssetsView: mocks.useCurrentAssetsView,
 }));
 
@@ -50,11 +50,11 @@ vi.mock("../hooks/useSelection", () => ({
   useSelection: mocks.useSelection,
 }));
 
-vi.mock("../components/page/SquareGallery/SquareGallery", () => ({
+vi.mock("../components/browse/SquareGallery/SquareGallery", () => ({
   default: () => <div>square-gallery</div>,
 }));
 
-vi.mock("../components/shared/AssetsPageHeader", () => ({
+vi.mock("../components/browse/AssetsPageHeader", () => ({
   default: mocks.AssetsPageHeader,
 }));
 

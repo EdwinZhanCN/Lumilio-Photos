@@ -3,12 +3,9 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { RotateCcw, Trash2 } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
-import { AssetsProvider } from "../AssetsProvider";
-import { AssetsGalleryPage } from "../components/page/AssetsGalleryPage";
-import type {
-  AssetsBulkActionContext,
-  AssetsBulkActionItem,
-} from "@/lib/assets/bulkActions";
+import { AssetsProvider } from "../state/AssetsProvider";
+import { AssetsGalleryPage } from "../components/browse/AssetsGalleryPage";
+import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMessage } from "@/features/notifications";

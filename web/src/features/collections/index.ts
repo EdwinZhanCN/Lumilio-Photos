@@ -1,3 +1,3 @@
-export * from "./CollectionsProvider";
-export * from "./collections.type.ts";
-export { useDetectDuplicates } from "./hooks/useDuplicates";
+export * from "./state/CollectionsProvider";
+export * from "./types.ts";
+export { useDetectDuplicates } from "./api/useDuplicates";

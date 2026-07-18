@@ -96,12 +96,12 @@ import type {
   QueueErrorSampleDTO,
   QueueSummaryDTO,
   QueueSummaryResponse,
-} from "./monitor.type.ts";
+} from "./types.ts";
 import type { useCapabilities } from "@/lib/capabilities/useCapabilities.ts";
 import type {
   extractRebuildResponseData,
   useAssetIndexingStats,
   useRebuildAssetIndexes,
-} from "./hooks/useAssetIndexing.ts";
+} from "./api/useAssetIndexing.ts";
 
 export {};

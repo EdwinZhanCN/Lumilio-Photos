@@ -26,20 +26,20 @@ Monitor-local state is intentionally small:
 ## Data
 
 [StatMonitor](./components/StatMonitor.tsx) polls `/api/v1/admin/river/stats` every five seconds and
-summarizes active, completed, and issue jobs from [JobStatsResponse](./monitor.type.ts).
+summarizes active, completed, and issue jobs from [JobStatsResponse](./types.ts).
 
 [QueueSummaryList](./components/QueueSummaryList.tsx) polls `/api/v1/admin/river/queue-summary` every five
 seconds with a small error sample limit. The response shape is
-[QueueSummaryResponse](./monitor.type.ts); queue rows use [QueueSummaryDTO](./monitor.type.ts);
+[QueueSummaryResponse](./types.ts); queue rows use [QueueSummaryDTO](./types.ts);
 expandable diagnostics use
-[QueueErrorSampleDTO](./monitor.type.ts) and copy a plain-text troubleshooting block to
+[QueueErrorSampleDTO](./types.ts) and copy a plain-text troubleshooting block to
 the clipboard.
 
 [MLMonitor](./components/MLMonitor.tsx) reads repository-aware indexing coverage through
-[useAssetIndexingStats](./hooks/useAssetIndexing.ts). It can trigger [useRebuildAssetIndexes](./hooks/useAssetIndexing.ts)
+[useAssetIndexingStats](./api/useAssetIndexing.ts). It can trigger [useRebuildAssetIndexes](./api/useAssetIndexing.ts)
 for semantic, OCR, or face tasks, passing the selected repository id when
 the user narrows the ML view to one repository. The rebuild response is
-interpreted through [extractRebuildResponseData](./hooks/useAssetIndexing.ts) so disabled tasks can
+interpreted through [extractRebuildResponseData](./api/useAssetIndexing.ts) so disabled tasks can
 be reported without guessing from mutation shape.
 
 [CapabilitiesMonitor](./components/CapabilitiesMonitor.tsx) reads [useCapabilities](@/lib/capabilities/useCapabilities.ts) on a five-second

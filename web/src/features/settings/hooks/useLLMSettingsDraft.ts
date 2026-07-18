@@ -1,4 +1,4 @@
-import { useSystemSettings, useUpdateSystemSettings } from "./useSystemSettings";
+import { useSystemSettings, useUpdateSystemSettings } from "../api/useSystemSettings";
 import { useDraftSettings, type DraftSettings } from "./useDraftSettings";
 
 export interface LLMDraft {

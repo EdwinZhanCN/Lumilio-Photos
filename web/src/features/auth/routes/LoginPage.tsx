@@ -4,8 +4,8 @@ import { ArrowLeft, Fingerprint, KeyRound, Smartphone, User } from "lucide-react
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
-import type { MFAMethod, User as UserType } from "../auth.type.ts";
-import { getPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
+import type { MFAMethod, User as UserType } from "../types.ts";
+import { getPasskeyCredential, getPasskeySupport } from "../utils/webauthn.ts";
 import {
   PASSWORD_HINT,
   USERNAME_HINT,
@@ -13,8 +13,8 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
   normalizeUsernameInput,
-} from "../lib/credentialPolicy.ts";
-import { storeRequiredPasswordChangeChallenge } from "../passwordChangeChallenge.ts";
+} from "../utils/credentialPolicy.ts";
+import { storeRequiredPasswordChangeChallenge } from "../state/passwordChangeChallenge.ts";
 import {
   AuthShell,
   Btn,

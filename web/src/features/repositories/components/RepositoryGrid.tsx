@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, RefreshCcwDot, ScanFace } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import type { RepositoryOption } from "../repository.types";
+import type { RepositoryOption } from "../types";
 import AddRepositoryModal from "./AddRepositoryModal";
 import RepositoryCard from "./RepositoryCard";
 

@@ -3,14 +3,14 @@ import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import PhotoPicker from "@/features/assets/picker";
 import { useI18n } from "@/lib/i18n";
-import { StudioHome } from "../home/StudioHome";
-import { StudioEditor, type StudioEditorActivity } from "../editor/StudioEditor";
+import { StudioHome } from "../modules/home/StudioHome";
+import { StudioEditor, type StudioEditorActivity } from "../modules/editor/StudioEditor";
 import {
   clearRecentEdits,
   readRecentEdits,
   recordRecentEdit,
   type RecentEditRecord,
-} from "../home/recentEditsStore";
+} from "../state/recentEdits";
 
 type StudioView = "home" | "picker" | "editor";
 

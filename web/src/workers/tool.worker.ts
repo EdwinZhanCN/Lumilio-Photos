@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
-import { runBorderTransform } from "@/features/studio/tools/border/borderRunner";
-import type { ToolRunner } from "@/features/studio/tools/types";
+import { runBorderTransform } from "@/features/studio/modules/tools/border/borderRunner";
+import type { ToolRunner } from "@/features/studio/modules/tools/types";
 
 interface LoadToolMessage {
   type: "LOAD_TOOL";

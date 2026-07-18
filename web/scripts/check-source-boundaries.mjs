@@ -23,6 +23,19 @@ const lowerLayerRoots = new Set([
 // feature through `@/features/<feature>`.
 const allowedFeatureEntries = new Set(["assets/map", "assets/picker"]);
 
+const standardFeatureDirectories = new Set([
+  "api",
+  "components",
+  "docs",
+  "hooks",
+  "modules",
+  "routes",
+  "state",
+  "utils",
+]);
+const standardFeatureRootFiles = new Set(["doc.md", "doc.ts", "index.ts", "types.ts"]);
+const featureDirectoryExceptions = new Map([["assets", new Set(["map", "picker"])]]);
+
 // Only the application entry point may enter app composition from the source
 // root. The production smoke entry composes public feature APIs directly.
 const appImportEntrypoints = new Set(["main.tsx"]);
@@ -32,7 +45,10 @@ const appImportEntrypoints = new Set(["main.tsx"]);
 const allowedLowerLayerFeatureImports = new Map([
   [
     "workers/tool.worker.ts",
-    new Set(["@/features/studio/tools/border/borderRunner", "@/features/studio/tools/types"]),
+    new Set([
+      "@/features/studio/modules/tools/border/borderRunner",
+      "@/features/studio/modules/tools/types",
+    ]),
   ],
 ]);
 
@@ -73,6 +89,39 @@ async function collectSourceFiles(directory) {
   }
 
   return files;
+}
+
+async function checkFeatureRootShape(violations) {
+  const featuresRoot = path.join(srcRoot, "features");
+  const features = await readdir(featuresRoot, { withFileTypes: true });
+
+  for (const feature of features) {
+    if (!feature.isDirectory()) continue;
+
+    const entries = await readdir(path.join(featuresRoot, feature.name), {
+      withFileTypes: true,
+    });
+    const entryNames = new Set(entries.map((entry) => entry.name));
+    const allowedDirectories = featureDirectoryExceptions.get(feature.name) ?? new Set();
+
+    for (const entry of entries) {
+      if (
+        entry.isDirectory() &&
+        !standardFeatureDirectories.has(entry.name) &&
+        !allowedDirectories.has(entry.name)
+      ) {
+        violations.push(`features/${feature.name}: non-standard root directory '${entry.name}'`);
+      }
+
+      if (entry.isFile() && !standardFeatureRootFiles.has(entry.name)) {
+        violations.push(`features/${feature.name}: non-standard root file '${entry.name}'`);
+      }
+    }
+
+    if (entryNames.has("doc.ts") !== entryNames.has("doc.md")) {
+      violations.push(`features/${feature.name}: doc.ts and generated doc.md must exist together`);
+    }
+  }
 }
 
 function featureOf(filename) {
@@ -249,6 +298,8 @@ const featureGraph = new Map([...featureNames].map((feature) => [feature, new Se
 const violations = [];
 let internalRuntimeEdges = 0;
 
+await checkFeatureRootShape(violations);
+
 for (const filename of files) {
   const sourceText = ts.sys.readFile(filename) ?? "";
   const importer = path.resolve(filename);
@@ -256,6 +307,40 @@ for (const filename of files) {
   const importerFeature = featureOf(importer);
   const importerRoot = rootLayerOf(importer);
   const importerIsTest = isTestFile(importer);
+  const importerParts = importerRelative.split("/");
+  const featureSection = importerFeature ? importerParts[2] : null;
+  const basename = path.basename(importerRelative);
+
+  if (
+    importerFeature &&
+    featureSection !== "state" &&
+    /(?:Provider|Store|store|Reducer|reducer|Context|context)\.[cm]?[jt]sx?$/.test(basename)
+  ) {
+    violations.push(
+      `${importerRelative}: shared feature state modules belong in the feature state directory`,
+    );
+  }
+
+  if (
+    importerFeature &&
+    !importerIsTest &&
+    featureSection !== "state" &&
+    /\b(?:localStorage|sessionStorage)\b/.test(sourceText)
+  ) {
+    violations.push(
+      `${importerRelative}: persisted feature state belongs in the feature state directory`,
+    );
+  }
+
+  if (
+    importerFeature &&
+    featureSection === "hooks" &&
+    /\$api\.use(?:Infinite)?Query\s*\(/.test(sourceText)
+  ) {
+    violations.push(
+      `${importerRelative}: server-state query definitions belong in the feature api directory`,
+    );
+  }
 
   for (const imported of readImports(filename, sourceText)) {
     const { specifier, typeOnly } = imported;

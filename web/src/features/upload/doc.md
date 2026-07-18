@@ -8,16 +8,16 @@ browser selection into the repository.
 
 ## State
 
-[UploadProvider](./UploadProvider.tsx) wraps the app with [UploadContext](./upload.type.ts). The reducer
+[UploadProvider](./state/UploadProvider.tsx) wraps the app with [UploadContext](./state/context.ts). The reducer
 stores selected `UploadState.files`, placeholder preview slots, and
 drag-over state. Consumers use [useUploadContext](./hooks/useUpload.tsx); calling that hook
 outside the provider is an error.
 
-Upload processing state comes from [useUploadProcess](./hooks/useUploadProcess.tsx). Its React state
-bridge is isolated in [useUploadProgressState](./hooks/uploadProcessProgress.ts); the hash/upload pipeline
-is coordinated by [runUploadProcess](./hooks/uploadProcessRunner.ts), and transport-specific behavior is
-owned by [createUploadTransport](./hooks/uploadProcessTransport.ts). The hook exposes the aggregate progress
-number, per-file [FileUploadProgress](./hooks/useUploadProcess.tsx), hashing progress, and the two active
+Upload processing state comes from [useUploadProcess](./modules/process/useUploadProcess.tsx). Its React state
+bridge is isolated in [useUploadProgressState](./modules/process/progress.ts); the hash/upload pipeline
+is coordinated by [runUploadProcess](./modules/process/runner.ts), and transport-specific behavior is
+owned by [createUploadTransport](./modules/process/transport.ts). The hook exposes the aggregate progress
+number, per-file [FileUploadProgress](./modules/process/useUploadProcess.tsx), hashing progress, and the two active
 flags used by the provider: `isGeneratingHashCodes` and `isUploading`.
 
 [UnifiedUploadSection](./components/UnifiedUploadSection.tsx) is the primary queue editor. It validates
@@ -34,11 +34,11 @@ repository id; unlike browse scope, "all repositories" is not a valid target.
 If the user has not selected a working repository, the settings hook resolves
 primary/first repository fallback before upload transport receives the id.
 
-[useUploadConfig](./hooks/useUploadQueries.ts) reads `/api/v1/assets/batch/config`. The server is
-authoritative for chunk size and concurrency; [useUploadProcess](./hooks/useUploadProcess.tsx) uses
+[useUploadConfig](./api/useUploadQueries.ts) reads `/api/v1/assets/batch/config`. The server is
+authoritative for chunk size and concurrency; [useUploadProcess](./modules/process/useUploadProcess.tsx) uses
 fixed fallbacks only while that config is unavailable. Small files are sent
-through [useBatchUploadMutation](./hooks/useUploadMutations.ts); large files are sent through
-[useChunkedUploadMutation](./hooks/useUploadMutations.ts). Both pass the resolved repository id to the
+through [useBatchUploadMutation](./api/useUploadMutations.ts); large files are sent through
+[useChunkedUploadMutation](./api/useUploadMutations.ts). Both pass the resolved repository id to the
 upload transport layer.
 
 Files are hashed before transport through `useGenerateHashcode`. Hashing is
@@ -51,7 +51,7 @@ editor queue, while failed `File` objects remain available for retry.
 
 A successful HTTP response means transport was accepted, not that an asset
 exists yet. [waitForUploadJobs](@/lib/upload/uploadLifecycle.ts) follows the returned ingest task ids
-through `/api/v1/assets/batch/jobs`; [FileUploadProgress](./hooks/useUploadProcess.tsx) remains in
+through `/api/v1/assets/batch/jobs`; [FileUploadProgress](./modules/process/useUploadProcess.tsx) remains in
 `processing` until every task reaches a backend terminal state. Asset
 list/search queries are invalidated only after successful materialization.
 
@@ -59,10 +59,10 @@ list/search queries are invalidated only after successful materialization.
 
 Because the worker fingerprint is byte-identical to the backend's, hashed
 files can be checked against the repository before any bytes move.
-[useUploadProcess](./hooks/useUploadProcess.tsx) passes each hash and size to `precheckUploads`
+[useUploadProcess](./modules/process/useUploadProcess.tsx) passes each hash and size to `precheckUploads`
 (`/api/v1/assets/precheck`) just before transport — batched with the small-file
 buffer, and as a single call ahead of each chunked upload. Files the server
-already holds are marked `duplicate` in [FileUploadProgress](./hooks/useUploadProcess.tsx) and never
+already holds are marked `duplicate` in [FileUploadProgress](./modules/process/useUploadProcess.tsx) and never
 transported.
 
 A duplicate is a success, not a failure: [NavbarUploadQueue](./components/NavbarUploadQueue.tsx) renders it in

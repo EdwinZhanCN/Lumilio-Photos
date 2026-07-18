@@ -6,11 +6,11 @@ import {
   AssetsStoreContext,
   createAssetsStore,
   useAssetsStoreApi,
-} from "../assets.store";
-import type { SelectionResult } from "../types/assets.type";
-import { useSelectionEnabled, useSelectedIds, useSelectionMode } from "../selectors";
-import { selectLastSelectedId } from "../slices/selection.slice";
-import { useAssetActions } from "./useAssetActions";
+} from "../state/store";
+import type { SelectionResult } from "../types";
+import { useSelectionEnabled, useSelectedIds, useSelectionMode } from "../state/selectors";
+import { selectLastSelectedId } from "../state/slices/selection.slice";
+import { useAssetActions } from "../api/useAssetActions";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { getToken } from "@/lib/http-commons/auth";
 import { $api } from "@/lib/http-commons/queryClient";

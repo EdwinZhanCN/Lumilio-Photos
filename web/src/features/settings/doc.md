@@ -11,14 +11,14 @@ those capabilities without owning their persistence or query rules.
 Client-only preferences live in the lower shared [usePreferencesStore](../../lib/preferences/preferences.ts)
 so theme effects do not depend on Settings UI. Settings keeps the public
 preference API and the model remains persisted under
-[PREFERENCES_STORAGE_KEY](./settings.registry.ts). [usePreference](../../lib/preferences/preferences.ts) applies immediately,
+[PREFERENCES_STORAGE_KEY](./state/registry.ts). [usePreference](../../lib/preferences/preferences.ts) applies immediately,
 while [useDebouncedPreference](../../lib/preferences/preferences.ts) keeps high-frequency controls such as
 health-check intervals and gallery columns responsive before writing to
 localStorage.
 
 Server-backed settings use the shared [useDraftSettings](./hooks/useDraftSettings.ts) contract:
 tabs edit a local draft, expose dirty/reset/save state through
-[SettingsSaveBar](./components/SettingsSaveBar.tsx), and commit through [useUpdateSystemSettings](./hooks/useSystemSettings.ts).
+[SettingsSaveBar](./components/SettingsSaveBar.tsx), and commit through [useUpdateSystemSettings](./api/useSystemSettings.ts).
 [useAISettingsDraft](./hooks/useAISettingsDraft.ts) is the current rich draft adapter for LLM/ML
 settings, including API-key clearing semantics and server normalization.
 
@@ -35,13 +35,13 @@ clears them while retaining device-level language, theme, and layout choices.
 
 ## Data
 
-[useSystemSettings](./hooks/useSystemSettings.ts) reads `/api/v1/settings/system`; mutations go
-through [useUpdateSystemSettings](./hooks/useSystemSettings.ts), which invalidates setup status and
+[useSystemSettings](./api/useSystemSettings.ts) reads `/api/v1/settings/system`; mutations go
+through [useUpdateSystemSettings](./api/useSystemSettings.ts), which invalidates setup status and
 capabilities because system settings affect bootstrap gates and AI runtime
-availability. [useValidateLLMSettings](./hooks/useSystemSettings.ts) validates the saved LLM config
+availability. [useValidateLLMSettings](./api/useSystemSettings.ts) validates the saved LLM config
 as an explicit action instead of on every keystroke.
 
-[useRuntimeInfo](./hooks/useRuntimeInfo.ts) reads `/api/v1/settings/runtime-info` for effective
+[useRuntimeInfo](./api/useRuntimeInfo.ts) reads `/api/v1/settings/runtime-info` for effective
 TOML/env-derived runtime configuration. It is display-only in the UI; users
 change those values outside the SPA and restart the server.
 

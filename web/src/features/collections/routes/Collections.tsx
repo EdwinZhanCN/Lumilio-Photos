@@ -13,9 +13,9 @@ import FoldersRail from "../components/FoldersRail";
 import MapRail from "../components/MapRail";
 import PeopleRail from "../components/PeopleRail";
 import UtilitiesRail from "../components/UtilitiesRail";
-import { useAlbums } from "../hooks/useAlbums";
+import { useAlbums } from "../api/useAlbums";
 import { useCityTrips } from "../hooks/useCityTrips";
-import { useFolders } from "../hooks/useFolders";
+import { useFolders } from "../api/useFolders";
 import { encodeFolderKey } from "../utils/folderKey";
 
 function CollectionsContent() {

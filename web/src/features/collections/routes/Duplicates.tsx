@@ -15,7 +15,7 @@ import {
   useDuplicateGroupList,
   useDuplicateSummary,
   useMergeDuplicateGroup,
-} from "../hooks/useDuplicates";
+} from "../api/useDuplicates";
 
 const STATUS_OPTIONS: DuplicateStatus[] = ["pending", "merged", "dismissed"];
 

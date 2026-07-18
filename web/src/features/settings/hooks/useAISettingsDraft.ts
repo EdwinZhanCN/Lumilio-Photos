@@ -1,5 +1,5 @@
-import type { UpdateSystemSettings } from "./useSystemSettings";
-import { useSystemSettings, useUpdateSystemSettings } from "./useSystemSettings";
+import type { UpdateSystemSettings } from "../api/useSystemSettings";
+import { useSystemSettings, useUpdateSystemSettings } from "../api/useSystemSettings";
 import { useDraftSettings, type DraftSettings } from "./useDraftSettings";
 
 type AgentProvider = "" | "ark" | "openai" | "deepseek" | "ollama";

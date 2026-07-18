@@ -8,13 +8,13 @@ without an account and without ever touching the authenticated app.
 
 - **Owner-facing**: [CreateShareLinkModal](./components/CreateShareLinkModal.tsx) (create) and
   [SharedLinks](./routes/SharedLinks.tsx) (manage: revoke/extend/delete) run inside the
-  authenticated app shell and use [useShareLinks](./hooks/useShareLinks.ts) against
+  authenticated app shell and use [useShareLinks](./api/useShareLinks.ts) against
   `/api/v1/share-links`.
 - **Public**: [PublicShare](./routes/PublicShare.tsx) is mounted at `/s/:token` (and
   `/s/:token/:assetId` for the lightbox) as a sibling of the gated route
   tree in `app/router/AppRouter.tsx` — not inside it — so a recipient is
   never redirected through first-run setup or forced to authenticate. It uses
-  [usePublicShareView](./hooks/usePublicShareView.ts) against `/api/v1/public/shares/{token}` and
+  [usePublicShareView](./api/usePublicShareView.ts) against `/api/v1/public/shares/{token}` and
   never calls an authenticated endpoint.
 
 ## Why the public viewer doesn't reuse the normal gallery

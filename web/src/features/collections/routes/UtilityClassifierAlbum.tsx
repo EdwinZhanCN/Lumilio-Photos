@@ -7,10 +7,7 @@ import { AssetsGalleryPage, AssetsProvider, type AssetFilter } from "@/features/
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { findUtilityClassifier, getUtilityClassifierTitle } from "../utils/utilityClassifiers";
-import type {
-  AssetsBulkActionContext,
-  AssetsBulkActionItem,
-} from "@/lib/assets/bulkActions";
+import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/share";
 
 export default function UtilityClassifierAlbum() {

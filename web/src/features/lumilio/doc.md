@@ -36,15 +36,15 @@ confirmation card and resumes through the same store.
 
 The stream side channel passes handles, not full asset payloads:
 [RefPayload](./types.ts) carries a ref id, count, widget hint, and params. Inline
-widgets hydrate that handle through [InlineWidgetCard](./widgets/chrome/InlineWidgetCard.tsx); durable pins
-copy the snapshot server-side through [PinButton](./widgets/PinButton.tsx) and are later read by
-[AgentBoard](./components/Board/AgentBoard.tsx). [useWidgetData](./widgets/useWidgetData.ts) normalizes ref/pin metadata into
-[WidgetData](./widgets/types.ts), while thumbnail-heavy views fetch assets separately.
+widgets hydrate that handle through [InlineWidgetCard](./modules/widgets/chrome/InlineWidgetCard.tsx); durable pins
+copy the snapshot server-side through [PinButton](./modules/widgets/PinButton.tsx) and are later read by
+[AgentBoard](./components/Board/AgentBoard.tsx). [useWidgetData](./modules/widgets/useWidgetData.ts) normalizes ref/pin metadata into
+[WidgetData](./modules/widgets/types.ts), while thumbnail-heavy views fetch assets separately.
 
 Mentions are explicit, typed constraints. [MentionInput](./components/Chat/MentionInput.tsx) uses
-[createMentionSources](./mentions/mentionSources.ts) to build searchable person, album, pin, camera,
-and lens sources; picked entities are sent as [MentionPayload](./mentions/mentionSources.ts). Slash
-modes come from [useSlashMacros](./slash/slashMacros.ts) and constrain the tool subset without
+[createMentionSources](./modules/mentions/mentionSources.ts) to build searchable person, album, pin, camera,
+and lens sources; picked entities are sent as [MentionPayload](./modules/mentions/mentionSources.ts). Slash
+modes come from [useSlashMacros](./modules/slash/slashMacros.ts) and constrain the tool subset without
 inserting a canned prompt.
 
 ## Composition
@@ -76,7 +76,7 @@ and an embedded [ChatDock](./components/Chat/ChatDock.tsx). The dock composes [M
 mount it in `fab` mode. Asset-owned contributors publish context through the
 shared assistant bus via
 [useGalleryContextContributor](@/features/assets/hooks/useGalleryContextContributor.ts) / [useCarouselContextContributor](@/features/assets/hooks/useCarouselContextContributor.ts).
-Board pins render through [BoardTile](./widgets/chrome/BoardTile.tsx), so the agent UI is a feature
+Board pins render through [BoardTile](./modules/widgets/chrome/BoardTile.tsx), so the agent UI is a feature
 overlay rather than another gallery implementation.
 
 ## Decisions
@@ -84,7 +84,7 @@ overlay rather than another gallery implementation.
 Context is opt-out at send time. Contributions stay visible as chips, and
 exclusions are cleared after sending so the next message starts from the
 current page context rather than a hidden stale exclusion.
-[resetLumilioSession](./resetSession.ts) is the feature reset exposed to application
+[resetLumilioSession](./state/resetSession.ts) is the feature reset exposed to application
 composition. It clears the chat store and shared context bus so conversation,
 contributions, and exclusions never cross a user boundary.
 
@@ -92,6 +92,6 @@ Pins are the durability boundary. Chat widgets are session refs; pinning
 copies the result to `/api/v1/agent/pins`, after which layout, title, view,
 size, and removal are board concerns.
 
-Widget views are registry entries. [registerWidget](./widgets/registry.ts) wires a widget type
+Widget views are registry entries. [registerWidget](./modules/widgets/registry.ts) wires a widget type
 to its view and icon; all views share the same S/M/L footprints from
-[DIMS](./widgets/registry.ts), so switching view never resizes the board cell.
+[DIMS](./modules/widgets/registry.ts), so switching view never resizes the board cell.

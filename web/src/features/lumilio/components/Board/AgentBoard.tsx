@@ -12,9 +12,9 @@ import { LayoutDashboard, Sparkles } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
-import { BoardTile } from "../../widgets/chrome/BoardTile";
-import { DIMS, getWidget } from "../../widgets/registry";
-import type { AgentPinDTO, WidgetSizeKey } from "../../widgets/types";
+import { BoardTile } from "../../modules/widgets/chrome/BoardTile";
+import { DIMS, getWidget } from "../../modules/widgets/registry";
+import type { AgentPinDTO, WidgetSizeKey } from "../../modules/widgets/types";
 
 const BOARD_COLS = 12;
 const ROW_HEIGHT = 72;

@@ -24,12 +24,12 @@ default can be recalculated from the scoped available-years response.
 
 ## Data
 
-[useFeaturedPhotos](./hooks/useFeaturedPhotos.ts) reads `/api/v1/assets/featured` with a small count
+[useFeaturedPhotos](./api/useFeaturedPhotos.ts) reads `/api/v1/assets/featured` with a small count
 and a larger candidate window. [GalleryGrid](./components/GalleryGrid.tsx) renders those assets
 through the shared square gallery grouping helpers and uses skeleton cards
 when no featured assets have loaded.
 
-[usePhotoStats](./hooks/usePhotoStats.ts) coordinates focal-length, camera/lens, time-of-day,
+[usePhotoStats](./api/usePhotoStats.ts) coordinates focal-length, camera/lens, time-of-day,
 available-years, and daily-activity as independent TanStack Query entries.
 [StatsCards](./components/StatsCards.tsx) owns only the selected heatmap year and transforms cached
 responses into percentages and heatmap values.

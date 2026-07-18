@@ -4,5 +4,5 @@ export {
   useResetUserAccess,
   useUpdateMyProfile,
   useUsers,
-} from "./hooks/useUsers";
-export type { ManagedUserDTO } from "./hooks/useUsers";
+} from "./api/useUsers";
+export type { ManagedUserDTO } from "./api/useUsers";

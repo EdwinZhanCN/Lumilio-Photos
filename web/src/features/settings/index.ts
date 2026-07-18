@@ -1,4 +1,4 @@
-export { PreferencesEffects } from "./preferencesEffects";
+export { PreferencesEffects } from "./state/PreferencesEffects";
 export {
   SettingsBlock,
   SettingsGroup,
@@ -9,18 +9,18 @@ export {
   ThemePicker,
 } from "./components";
 export type { ModeThemeName } from "./components";
-export { usePreference, useDebouncedPreference, usePreferencesStore } from "./preferences";
-export type { Preferences, AssetPagePreferences } from "./preferences";
-export { useRuntimeInfo } from "./hooks/useRuntimeInfo";
+export { usePreference, useDebouncedPreference, usePreferencesStore } from "./state/preferences";
+export type { Preferences, AssetPagePreferences } from "./state/preferences";
+export { useRuntimeInfo } from "./api/useRuntimeInfo";
 export { useAISettingsDraft } from "./hooks/useAISettingsDraft";
 export type { AISettingsDraft } from "./hooks/useAISettingsDraft";
 export {
   useSystemSettings,
   useUpdateSystemSettings,
   useValidateLLMSettings,
-} from "./hooks/useSystemSettings";
+} from "./api/useSystemSettings";
 export {
   PREFERENCES_STORAGE_KEY,
   SETTINGS_REGISTRY,
   LOCAL_STORAGE_REGISTRY,
-} from "./settings.registry";
+} from "./state/registry";

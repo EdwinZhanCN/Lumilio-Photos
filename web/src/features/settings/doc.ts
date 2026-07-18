@@ -119,17 +119,17 @@ import type {
   useCreateCloudCredential,
 } from "@/features/cloud";
 import type { useDraftSettings } from "./hooks/useDraftSettings.ts";
-import type { useRuntimeInfo } from "./hooks/useRuntimeInfo.ts";
+import type { useRuntimeInfo } from "./api/useRuntimeInfo.ts";
 import type {
   useSystemSettings,
   useUpdateSystemSettings,
   useValidateLLMSettings,
-} from "./hooks/useSystemSettings.ts";
+} from "./api/useSystemSettings.ts";
 import type {
   useDebouncedPreference,
   usePreference,
   usePreferencesStore,
 } from "../../lib/preferences/preferences.ts";
-import type { PREFERENCES_STORAGE_KEY } from "./settings.registry.ts";
+import type { PREFERENCES_STORAGE_KEY } from "./state/registry.ts";
 
 export {};

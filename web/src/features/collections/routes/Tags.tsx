@@ -9,7 +9,7 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import RailCard from "../components/RailCard";
-import { useTagSummaries } from "../hooks/useTagSummaries";
+import { useTagSummaries } from "../api/useTagSummaries";
 import { encodeTagKey } from "../utils/tagKey";
 
 type SourceFilter = "all" | "user" | "zeroshot";

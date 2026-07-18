@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { formatBytes } from "@/lib/utils/formatters";
-import { useSystemSettings, useUpdateSystemSettings } from "../../hooks/useSystemSettings";
+import { useSystemSettings, useUpdateSystemSettings } from "../../api/useSystemSettings";
 import {
   downloadBackup,
   useBackups,
@@ -16,7 +16,7 @@ import {
   useDeleteBackup,
   useRestoreBackup,
   type BackupEntry,
-} from "../../hooks/useBackups";
+} from "../../api/useBackups";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
 
 const intervalPresets = [6, 12, 24, 48, 168];

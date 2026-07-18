@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Bird, FolderPen, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
-import { ALBUMS_QUERY_KEY } from "../hooks/useAlbums";
+import { ALBUMS_QUERY_KEY } from "../api/useAlbums";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useMessage } from "@/features/notifications";
 import PhotoPicker from "@/features/assets/picker";

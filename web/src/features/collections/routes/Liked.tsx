@@ -9,10 +9,7 @@ import {
   useAssetActions,
   type AssetFilter,
 } from "@/features/assets";
-import type {
-  AssetsBulkActionContext,
-  AssetsBulkActionItem,
-} from "@/lib/assets/bulkActions";
+import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMessage } from "@/features/notifications";

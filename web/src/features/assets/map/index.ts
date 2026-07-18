@@ -1,4 +1,4 @@
-export { default as MapComponent } from "../components/map/MapComponent";
+export { default as MapComponent } from "./MapComponent";
 export { useLocationClusters } from "./useLocationClusters";
 export { useMapPhotoAssets } from "./useMapPhotoAssets";
 

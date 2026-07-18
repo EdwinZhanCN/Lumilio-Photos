@@ -1,7 +1,7 @@
-export { AssetsProvider } from "./AssetsProvider";
-export { useAssetsView, useCurrentAssetsView } from "./hooks/useAssetsView";
+export { AssetsProvider } from "./state/AssetsProvider";
+export { useAssetsView, useCurrentAssetsView } from "./api/useAssetsView";
 // Export removed: useAsset and related hooks are deleted
-export { useAssetActions } from "./hooks/useAssetActions";
+export { useAssetActions } from "./api/useAssetActions";
 export {
   useSelection,
   useKeyboardSelection,
@@ -9,15 +9,15 @@ export {
   useBulkAssetOperations,
 } from "./hooks/useSelection";
 export { useAssetsNavigation } from "./hooks/useAssetsNavigation";
-export { useAssetFilterOptions } from "./hooks/useAssetFilterOptions";
+export { useAssetFilterOptions } from "./api/useAssetFilterOptions";
 export { useVisibleOnce } from "./hooks/useVisibleOnce";
 
 // Export selectors for fine-grained access
-export * from "./selectors";
+export * from "./state/selectors";
 
 // Export scoped Zustand store helpers
-export { createAssetsStore, useAssetsStore, useAssetsStoreApi } from "./assets.store";
-export type { AssetsStore, AssetsStoreApi, AssetsStoreInitialState } from "./assets.store";
+export { createAssetsStore, useAssetsStore, useAssetsStoreApi } from "./state/store";
+export type { AssetsStore, AssetsStoreApi, AssetsStoreInitialState } from "./state/store";
 
 // Export types
 export type {
@@ -34,17 +34,17 @@ export type {
   BrowseGroup,
   BrowseItemId,
   ViewDefinitionOptions,
-} from "./types/assets.type";
+} from "./types";
 
 // Re-export AssetsContextValue from types (for backwards compat)
-export type { AssetsContextValue } from "./types/assets.type";
+export type { AssetsContextValue } from "./types";
 
 // Export shared components
-export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeader";
-export { default as JustifiedGallery } from "./components/page/JustifiedGallery/JustifiedGallery";
-export { default as SquareGallery } from "./components/page/SquareGallery/SquareGallery";
-export { AssetsGalleryPage } from "./components/page/AssetsGalleryPage";
-export type { AssetGalleryProps } from "./components/page/gallery.types";
+export { default as AssetsPageHeader } from "./components/browse/AssetsPageHeader";
+export { default as JustifiedGallery } from "./components/browse/JustifiedGallery/JustifiedGallery";
+export { default as SquareGallery } from "./components/browse/SquareGallery/SquareGallery";
+export { AssetsGalleryPage } from "./components/browse/AssetsGalleryPage";
+export type { AssetGalleryProps } from "./components/browse/gallery.types";
 
 // Export utilities and selectors from slices
 export { generateViewKey } from "./utils/viewKey";
@@ -65,4 +65,4 @@ export {
   selectActiveFilterCount,
   selectHasActiveFilters,
   selectFilterAsAssetFilter,
-} from "./slices/filters.slice";
+} from "./state/slices/filters.slice";

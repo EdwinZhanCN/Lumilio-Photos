@@ -1,12 +1,12 @@
 # Authentication
 
-[AuthProvider](./AuthProvider.tsx) owns the verified user session and exposes login, MFA,
+[AuthProvider](./state/AuthProvider.tsx) owns the verified user session and exposes login, MFA,
 completion, and logout commands. HTTP authentication is centralized in
 [authMiddleware](@/lib/http-commons/client.ts): it attaches the access token, permits only one
 refresh-token rotation at a time, and replays a failed request from a clone
 captured before its body was consumed.
 
-Every session exit converges on [resetSession](./resetSession.ts). The reset invalidates
+Every session exit converges on [resetSession](./state/resetSession.ts). The reset invalidates
 late refresh responses, removes tokens, aborts Lumilio streams, cancels and
 clears TanStack Query work, clears notifications and agent context, removes
 persisted asset filters/search, and clears repository scope preferences.

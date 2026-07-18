@@ -9,7 +9,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   PASSWORD_PATTERN,
-} from "../lib/credentialPolicy.ts";
+} from "../utils/credentialPolicy.ts";
 
 type ReturnState = {
   from?: {

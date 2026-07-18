@@ -112,22 +112,19 @@
  *
  * @module
  */
-import type { UploadProvider } from "./UploadProvider.tsx";
+import type { UploadProvider } from "./state/UploadProvider.tsx";
 import type FileDropZone from "./components/FileDropZone.tsx";
 import type NavbarUploadQueue from "./components/NavbarUploadQueue.tsx";
 import type ProgressIndicator from "./components/ProgressIndicator.tsx";
 import type UnifiedUploadSection from "./components/UnifiedUploadSection.tsx";
 import type { useUploadContext } from "./hooks/useUpload.tsx";
-import type { FileUploadProgress, useUploadProcess } from "./hooks/useUploadProcess.tsx";
-import type { useUploadProgressState } from "./hooks/uploadProcessProgress.ts";
-import type { runUploadProcess } from "./hooks/uploadProcessRunner.ts";
-import type { createUploadTransport } from "./hooks/uploadProcessTransport.ts";
-import type {
-  useBatchUploadMutation,
-  useChunkedUploadMutation,
-} from "./hooks/useUploadMutations.ts";
-import type { useUploadConfig } from "./hooks/useUploadQueries.ts";
-import type { UploadContext } from "./upload.type.ts";
+import type { FileUploadProgress, useUploadProcess } from "./modules/process/useUploadProcess.tsx";
+import type { useUploadProgressState } from "./modules/process/progress.ts";
+import type { runUploadProcess } from "./modules/process/runner.ts";
+import type { createUploadTransport } from "./modules/process/transport.ts";
+import type { useBatchUploadMutation, useChunkedUploadMutation } from "./api/useUploadMutations.ts";
+import type { useUploadConfig } from "./api/useUploadQueries.ts";
+import type { UploadContext } from "./state/context.ts";
 import type { waitForUploadJobs } from "@/lib/upload/uploadLifecycle.ts";
 
 export {};

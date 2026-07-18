@@ -3,7 +3,7 @@ import { FolderPlus, HardDrive } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
-import { setupStatusQueryKey, useSetupStatus } from "../hooks/useSetupStatus.ts";
+import { setupStatusQueryKey, useSetupStatus } from "../api/useSetupStatus.ts";
 
 const isStorageStrategy = (value?: string): value is "cas" | "date" | "flat" =>
   value === "cas" || value === "date" || value === "flat";

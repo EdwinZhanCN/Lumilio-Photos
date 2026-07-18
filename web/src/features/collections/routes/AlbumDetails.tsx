@@ -10,10 +10,7 @@ import { CollectionHero, MetaStat } from "@/components/collection";
 import AlbumFormModal from "../components/AlbumFormModal";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
-import type {
-  AssetsBulkActionContext,
-  AssetsBulkActionItem,
-} from "@/lib/assets/bulkActions";
+import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import {
   CreateShareLinkModal,
   createShareSelectedBulkAction,

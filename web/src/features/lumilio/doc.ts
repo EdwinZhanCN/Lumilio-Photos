@@ -105,17 +105,17 @@ import type { ChatDock } from "./components/Chat/ChatDock.tsx";
 import type { ChatMessages } from "./components/Chat/ChatMessages.tsx";
 import type { ContextChips } from "./components/Chat/ContextChips.tsx";
 import type { MentionInput } from "./components/Chat/MentionInput.tsx";
-import type { InlineWidgetCard } from "./widgets/chrome/InlineWidgetCard.tsx";
-import type { BoardTile } from "./widgets/chrome/BoardTile.tsx";
-import type { PinButton } from "./widgets/PinButton.tsx";
+import type { InlineWidgetCard } from "./modules/widgets/chrome/InlineWidgetCard.tsx";
+import type { BoardTile } from "./modules/widgets/chrome/BoardTile.tsx";
+import type { PinButton } from "./modules/widgets/PinButton.tsx";
 import type { streamAgent } from "./api/agentStream.ts";
-import type { createMentionSources, MentionPayload } from "./mentions/mentionSources.ts";
-import type { useSlashMacros } from "./slash/slashMacros.ts";
+import type { createMentionSources, MentionPayload } from "./modules/mentions/mentionSources.ts";
+import type { useSlashMacros } from "./modules/slash/slashMacros.ts";
 import type { useLumilioChatStore } from "./state/chatStore.ts";
 import type { useContextStore, useDockStore } from "@/lib/assistant/index.ts";
 import type { useGalleryContextContributor } from "@/features/assets/hooks/useGalleryContextContributor.ts";
 import type { useCarouselContextContributor } from "@/features/assets/hooks/useCarouselContextContributor.ts";
-import type { resetLumilioSession } from "./resetSession.ts";
+import type { resetLumilioSession } from "./state/resetSession.ts";
 import type {
   ConfirmBlock,
   ReasoningBlock,
@@ -125,8 +125,8 @@ import type {
   ToolBlock,
   WidgetBlock,
 } from "./types.ts";
-import type { DIMS, registerWidget } from "./widgets/registry.ts";
-import type { useWidgetData } from "./widgets/useWidgetData.ts";
-import type { WidgetData } from "./widgets/types.ts";
+import type { DIMS, registerWidget } from "./modules/widgets/registry.ts";
+import type { useWidgetData } from "./modules/widgets/useWidgetData.ts";
+import type { WidgetData } from "./modules/widgets/types.ts";
 
 export {};
