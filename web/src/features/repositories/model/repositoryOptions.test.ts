@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { normalizeRepositoryOptions } from "./useRepositoryOptions";
+import { normalizeRepositoryOptions } from "./repositoryOptions";
 
 describe("normalizeRepositoryOptions", () => {
   it("normalizes missing fields and both primary indicators", () => {

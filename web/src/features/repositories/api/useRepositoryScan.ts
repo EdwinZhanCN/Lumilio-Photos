@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import { waitForRepositoryScan } from "../api/waitForRepositoryScan";
+import { waitForRepositoryScan } from "./waitForRepositoryScan";
 
 const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await Promise.all([
