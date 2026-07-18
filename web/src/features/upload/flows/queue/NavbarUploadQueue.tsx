@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { CircleAlert, CopyCheck, Loader2, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useUploadContext } from "../hooks/useUpload";
-import type { FileUploadProgress } from "../modules/process/useUploadProcess";
+import { useUploadContext } from "../../state/useUploadContext";
+import type { FileUploadProgress } from "../../modules/process/useUploadProcess";
 import { shouldUseChunks } from "@/lib/upload/uploadTransport";
 
 const RECENTLY_FINISHED_VISIBILITY_MS = 90_000;
