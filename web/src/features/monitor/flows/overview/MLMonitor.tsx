@@ -4,7 +4,7 @@ import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
   extractRebuildResponseData,
-} from "../api/useAssetIndexing";
+} from "../../api/useAssetIndexing";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
 

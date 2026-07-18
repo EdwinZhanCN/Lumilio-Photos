@@ -18,9 +18,9 @@ import {
   RowsIcon,
   SunIcon,
 } from "lucide-react";
-import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
-import { SettingsDropdown } from "../SettingsDropdown";
-import { ThemePicker, type ModeThemeName } from "../ThemePicker";
+import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
+import { SettingsDropdown } from "../../components/SettingsDropdown";
+import { ThemePicker, type ModeThemeName } from "../../components/ThemePicker";
 
 export default function AppearanceTab() {
   const { t } = useI18n();

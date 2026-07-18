@@ -25,10 +25,13 @@ import {
   type CloudProvider,
   type CloudProviderField,
 } from "@/features/cloud";
-import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
-import { SettingsDropdown } from "../SettingsDropdown";
-
-type FormValues = Record<string, string>;
+import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
+import { SettingsDropdown } from "../../components/SettingsDropdown";
+import {
+  areRequiredCloudFieldsFilled,
+  createCloudCredentialFormValues,
+  type CloudCredentialFormValues,
+} from "../../model/cloudCredentialForm";
 
 const credentialStatusClass = (status?: string) => {
   switch (status) {
@@ -43,17 +46,6 @@ const credentialStatusClass = (status?: string) => {
   }
 };
 
-const fieldInitialValues = (fields: CloudProviderField[] = []): FormValues =>
-  fields.reduce<FormValues>((acc, field) => {
-    if (field.name) {
-      acc[field.name] = field.type === "select" ? (field.options?.[0]?.value ?? "") : "";
-    }
-    return acc;
-  }, {});
-
-const requiredFieldsFilled = (fields: CloudProviderField[] = [], values: FormValues) =>
-  fields.every((field) => !field.required || !field.name || values[field.name]?.trim());
-
 export default function CloudTab() {
   const { t } = useI18n();
   const providersQuery = useCloudProviders();
@@ -67,10 +59,10 @@ export default function CloudTab() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [providerChoice, setProviderChoice] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
-  const [formValues, setFormValues] = useState<FormValues>({});
+  const [formValues, setFormValues] = useState<CloudCredentialFormValues>({});
   const [pendingCredential, setPendingCredential] = useState<CloudCredential | null>(null);
   const [pendingChallenge, setPendingChallenge] = useState<CloudAuthChallenge | null>(null);
-  const [challengeValues, setChallengeValues] = useState<FormValues>({});
+  const [challengeValues, setChallengeValues] = useState<CloudCredentialFormValues>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -106,7 +98,7 @@ export default function CloudTab() {
   const chooseProvider = (provider: CloudProvider) => {
     if (!provider.id) return;
     setProviderChoice(provider.id);
-    setFormValues(fieldInitialValues(provider.form_fields));
+    setFormValues(createCloudCredentialFormValues(provider.form_fields));
   };
 
   const statusLabel = (status?: string) => {
@@ -144,7 +136,7 @@ export default function CloudTab() {
       if (result.auth_status === "challenge_required" && result.challenge) {
         setPendingCredential(credential);
         setPendingChallenge(result.challenge);
-        setChallengeValues(fieldInitialValues(result.challenge.fields));
+        setChallengeValues(createCloudCredentialFormValues(result.challenge.fields));
         setSuccessMsg(t("settings.cloud.messages.challengeRequired"));
       } else {
         resetForm();
@@ -207,7 +199,7 @@ export default function CloudTab() {
       ) {
         setPendingCredential(result.credential);
         setPendingChallenge(result.challenge);
-        setChallengeValues(fieldInitialValues(result.challenge.fields));
+        setChallengeValues(createCloudCredentialFormValues(result.challenge.fields));
         setSuccessMsg(t("settings.cloud.messages.challengeRequired"));
         setIsAddOpen(true);
       }
@@ -232,8 +224,10 @@ export default function CloudTab() {
 
   const renderField = (
     field: CloudProviderField,
-    values: FormValues,
-    setValues: (updater: (current: FormValues) => FormValues) => void,
+    values: CloudCredentialFormValues,
+    setValues: (
+      updater: (current: CloudCredentialFormValues) => CloudCredentialFormValues,
+    ) => void,
     disabled: boolean,
   ) => {
     if (!field.name) return null;
@@ -468,7 +462,7 @@ export default function CloudTab() {
                     type="submit"
                     className="btn btn-primary gap-2"
                     disabled={
-                      !requiredFieldsFilled(selectedProvider.form_fields, formValues) ||
+                      !areRequiredCloudFieldsFilled(selectedProvider.form_fields, formValues) ||
                       createCredential.isPending
                     }
                   >
@@ -506,7 +500,7 @@ export default function CloudTab() {
                     type="submit"
                     className="btn btn-primary"
                     disabled={
-                      !requiredFieldsFilled(pendingChallenge.fields, challengeValues) ||
+                      !areRequiredCloudFieldsFilled(pendingChallenge.fields, challengeValues) ||
                       verifyChallenge.isPending
                     }
                   >

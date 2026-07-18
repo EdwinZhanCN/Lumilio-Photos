@@ -17,26 +17,17 @@ import {
   useAdminUpdateUser,
   useResetUserAccess,
   useUsers,
-  type ManagedUserDTO,
 } from "@/features/users";
-import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
-import { SettingsDropdown } from "../SettingsDropdown";
-import { SettingsSaveBar } from "../SettingsSaveBar";
-
-type UserEditorState = {
-  username: string;
-  displayName: string;
-  avatarAssetId: string;
-  role: "admin" | "user";
-  isActive: boolean;
-};
+import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
+import { SettingsDropdown } from "../../components/SettingsDropdown";
+import { SettingsSaveBar } from "../../components/SettingsSaveBar";
+import {
+  createUserEditorState,
+  type ResetAccessState,
+  type UserEditorState,
+} from "../../model/userEditor";
 
 type FeedbackState = { tone: "success" | "error"; message: string } | null;
-type ResetAccessState = {
-  temporaryPassword: string;
-  clearedPasskeys: boolean;
-  clearedTotp: boolean;
-} | null;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -46,16 +37,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
     if (maybeApiError.error) return maybeApiError.error;
   }
   return fallback;
-}
-
-function createEditorState(user: ManagedUserDTO): UserEditorState {
-  return {
-    username: user.username ?? "",
-    displayName: user.display_name ?? "",
-    avatarAssetId: user.avatar_asset_id ?? "",
-    role: user.role === "admin" ? "admin" : "user",
-    isActive: user.is_active ?? true,
-  };
 }
 
 async function copyToClipboard(value: string) {
@@ -87,7 +68,7 @@ export default function UsersTab() {
     : "User";
   const isDirty = useMemo(() => {
     if (!selectedUser || !form) return false;
-    const original = createEditorState(selectedUser);
+    const original = createUserEditorState(selectedUser);
     return (
       form.username !== original.username ||
       form.displayName !== original.displayName ||
@@ -108,7 +89,7 @@ export default function UsersTab() {
       setForm(null);
       return;
     }
-    setForm(createEditorState(selectedUser));
+    setForm(createUserEditorState(selectedUser));
     setFeedback(null);
     setResetAccessState(null);
     setCopiedTemporaryPassword(false);
@@ -527,7 +508,7 @@ export default function UsersTab() {
             error={updateUserMutation.error}
             canSave={isDirty && !updateUserMutation.isPending}
             onSave={() => void handleSave()}
-            onReset={() => setForm(createEditorState(selectedUser))}
+            onReset={() => setForm(createUserEditorState(selectedUser))}
             saveLabel={t("settings.users.save", { defaultValue: "Save user" })}
           />
         </>

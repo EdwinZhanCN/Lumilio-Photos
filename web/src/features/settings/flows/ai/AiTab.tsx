@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useAISettingsDraft, type AISettingsDraft } from "../../hooks/useAISettingsDraft";
+import { useAISettingsDraft, type AISettingsDraft } from "./useAISettingsDraft";
 import { useValidateLLMSettings } from "../../api/useSystemSettings";
 import {
   BirdIcon,
@@ -13,9 +13,9 @@ import {
   SparklesIcon,
   TextSearchIcon,
 } from "lucide-react";
-import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
-import { SettingsDropdown } from "../SettingsDropdown";
-import { SettingsSaveBar } from "../SettingsSaveBar";
+import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
+import { SettingsDropdown } from "../../components/SettingsDropdown";
+import { SettingsSaveBar } from "../../components/SettingsSaveBar";
 
 type AgentProvider = AISettingsDraft["llm"]["provider"];
 
