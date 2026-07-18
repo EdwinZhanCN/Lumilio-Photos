@@ -99,8 +99,8 @@
  */
 import type PhotoPicker from "@/features/assets/picker/index.ts";
 import type { useWorker } from "@/contexts/WorkerProvider.tsx";
-import type { StudioEditMvp } from "./routes/StudioEditMvp.tsx";
-import type { StudioHome } from "./modules/home/StudioHome.tsx";
+import type { StudioEditMvp } from "./flows/workspace/StudioWorkspaceFlow.tsx";
+import type { StudioHome } from "./flows/home/StudioHome.tsx";
 import type {
   RecentEditRecord,
   STUDIO_RECENT_EDITS_KEY,
@@ -108,17 +108,17 @@ import type {
   readRecentEdits,
   recordRecentEdit,
 } from "./state/recentEdits.ts";
-import type { StudioEditor, StudioEditorActivity } from "./modules/editor/StudioEditor.tsx";
-import type { TopBar } from "./modules/editor/TopBar.tsx";
-import type { AssetPanel } from "./modules/editor/AssetPanel.tsx";
-import type { Viewport } from "./modules/editor/Viewport.tsx";
-import type { DEVELOP_GROUPS } from "./modules/editor/developConfig.ts";
-import type { DevelopPanel } from "./modules/develop/DevelopPanel.tsx";
+import type { StudioEditor, StudioEditorActivity } from "./flows/editor/StudioEditor.tsx";
+import type { TopBar } from "./flows/editor/TopBar.tsx";
+import type { AssetPanel } from "./flows/editor/AssetPanel.tsx";
+import type { Viewport } from "./flows/editor/Viewport.tsx";
+import type { DEVELOP_GROUPS } from "./model/developConfig.ts";
+import type { DevelopPanel } from "./flows/editor/develop/DevelopPanel.tsx";
 import type {
   DEFAULT_STUDIO_ADJUSTMENTS,
   LumilioSidecarV1,
   StudioEditAdjustments,
-} from "./modules/editor/runtime/types.ts";
+} from "./model/editTypes.ts";
 import type { BorderPanel } from "./modules/tools/border/BorderPanel.tsx";
 import type {
   extractBorderExif,

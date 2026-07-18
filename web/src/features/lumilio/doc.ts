@@ -99,12 +99,12 @@
  *
  * @module
  */
-import type LumilioChatPage from "./routes/LumilioChat.tsx";
-import type { AgentBoard } from "./components/Board/AgentBoard.tsx";
-import type { ChatDock } from "./components/Chat/ChatDock.tsx";
-import type { ChatMessages } from "./components/Chat/ChatMessages.tsx";
-import type { ContextChips } from "./components/Chat/ContextChips.tsx";
-import type { MentionInput } from "./components/Chat/MentionInput.tsx";
+import type LumilioChatPage from "./flows/workspace/LumilioWorkspaceFlow.tsx";
+import type { AgentBoard } from "./flows/board/AgentBoard.tsx";
+import type { ChatDock } from "./flows/chat/ChatDock.tsx";
+import type { ChatMessages } from "./flows/chat/ChatMessages.tsx";
+import type { ContextChips } from "./flows/chat/ContextChips.tsx";
+import type { MentionInput } from "./flows/chat/MentionInput.tsx";
 import type { InlineWidgetCard } from "./modules/widgets/chrome/InlineWidgetCard.tsx";
 import type { BoardTile } from "./modules/widgets/chrome/BoardTile.tsx";
 import type { PinButton } from "./modules/widgets/PinButton.tsx";
@@ -124,7 +124,7 @@ import type {
   TextBlock,
   ToolBlock,
   WidgetBlock,
-} from "./types.ts";
+} from "./model/chatTypes.ts";
 import type { DIMS, registerWidget } from "./modules/widgets/registry.ts";
 import type { useWidgetData } from "./modules/widgets/useWidgetData.ts";
 import type { WidgetData } from "./modules/widgets/types.ts";

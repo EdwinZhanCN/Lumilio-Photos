@@ -6,7 +6,7 @@ import type {
   AgentResumeRequest,
   InterruptInfo,
   SideChannelEvent,
-} from "../types";
+} from "../model/chatTypes";
 
 const baseUrl = import.meta.env.VITE_API_URL ?? "";
 
