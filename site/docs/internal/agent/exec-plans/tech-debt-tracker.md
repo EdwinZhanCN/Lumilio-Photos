@@ -4,7 +4,7 @@ Keep this list short. Each item must describe current behavior, name a concrete
 owner path, and explain the user or release impact. Completed history belongs in
 the relevant exec plan, not in this file.
 
-Last aligned with the codebase: 2026-07-12.
+Last aligned with the codebase: 2026-07-18.
 
 ## Release and operations
 
@@ -68,14 +68,8 @@ Last aligned with the codebase: 2026-07-12.
   API. Docker should remain limited to its configured, explicitly mounted
   storage root because container paths cannot safely prove or repair host
   mounts.
-- **Asset reprocessing has no user-visible submission result.** Owner:
-  `web/src/features/assets/components/page/FullScreen/FullScreenCarousel/ExportModal.tsx`.
-  The retry flow closes and writes to the
-  console on success, and only writes to the console on failure. Replace the two
-  TODOs with the existing app notification/message mechanism so users can tell
-  whether the job was accepted.
 - **AgentBoard has no mobile column reflow.** Owner:
-  `web/src/features/lumilio/components/Board/AgentBoard.tsx`. It renders one
+  `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one
   persisted 12-column layout at every width, so phone columns compress into
   narrow slivers. Add a client-only narrow-screen remap or a separately
   persisted breakpoint layout, then verify it against a live backend without

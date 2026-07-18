@@ -5,7 +5,7 @@ This file is the short entry point for humans and coding agents working in Lumil
 ## Overview
 
 - `server/`: Go API service. Entrypoint is `server/cmd/main.go` (thin); the bootstrap lives in `server/app` (`app.Run(ctx)`); application config is `server/config`; business logic lives in `server/internal/*`; migrations live in `server/migrations`.
-- `web/`: React 19 + TypeScript frontend on Vite+. Feature code lives under `web/src/features/*`; shared pieces live in `web/src/lib`, `web/src/components`, and `web/src/contexts`.
+- `web/`: React 19 + TypeScript frontend on Vite+. Feature code lives under `web/src/features/*`; shared pieces live in `web/src/lib`, `web/src/components`, and `web/src/contexts`. `web/ARCHITECTURE.md` is authoritative; `web/src/features/README.md` is the short placement checklist.
 - `desktop/`: Wails v3 macOS app (separate Go module, `replace server => ../server`). Bundles a private PostgreSQL and runs `server/app` in-process; the React UI is served over HTTP at `localhost:6680`. See `desktop/README.md`.
 - `wasm/`: Rust WebAssembly crates for browser-side hashing/export/studio/thumbnail flows; checked-in JS/WASM bundles live under `web/src/wasm`.
 - `site/docs/`: VitePress docs site. Public product/user docs under `en/` and `zh-cn/`; internal engineering/harness docs live under `site/docs/internal/` (`internal/agent/` = harness notes, `internal/frontend/` = frontend architecture) — built but excluded from nav/sidebar/search.
@@ -49,7 +49,8 @@ The system is local-first: preserve original media, keep repository/storage sema
 - Go code must be formatted with `gofmt`. TypeScript should follow Vite+ lint/fmt rules and prefer `@/...` imports.
 - `vp fmt` writes files by default. Generated/vendored frontend artifacts must stay excluded through `web/vite.config.ts` `fmt.ignorePatterns` (notably `src/wasm/**`, `src/features/*/doc.md`, and generated OpenAPI/client code).
 - i18n keys are **extract-then-fill, never hand-written**: write `t("key", "default")` in code → run `vp exec i18next-cli extract` → fill zh values in the generated JSON. Do NOT manually add/restructure/delete keys in `translation.json`. See [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) for details.
-- Frontend server state belongs in TanStack Query; feature-local interactive UI state can use Zustand; Context is for cross-cutting app state.
+- Choose frontend state by source and lifecycle: TanStack Query for server facts, Context for cross-cutting runtime capabilities, flow-local Zustand/`useReducer` for shared interaction, URL state for shareable/restorable pages, and persisted storage only for explicitly refresh-safe preferences. See `web/ARCHITECTURE.md`.
+- Frontend feature routes stay thin, workflow orchestration belongs in `flows/<workflow>/`, and cross-feature runtime imports must use the target feature's narrow public entry.
 - Keep generated files generated. If a generated artifact changes, include the command that produced it in your notes.
 - Document a feature with a `doc.ts` at its root (`@module` comment, markdown prose, `{@link}` to real symbols). Every `{@link X}` MUST be `import type`-d in the same file — tsc plus the `docts/link-needs-import` rule enforce it. The sibling `doc.md` is generated; never hand-edit it. See [docts.md](site/docs/internal/agent/docts.md).
 - Commit messages convention, use this pattern: feat: …, fix: …., chore: …, refactor: …. and docs: … etc.If something domain specific and worth noting, then use pattern like: feat(assets): …

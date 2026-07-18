@@ -26,9 +26,11 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 ## Frontend
 
-- `web/src/features/*`: domain features.
+- `web/ARCHITECTURE.md`: authoritative and boundary-enforced frontend ownership, feature vocabulary, dependency direction, and state-placement rules.
+- `web/src/features/*`: domain features. User journeys live in named `flows/`; reusable server access in `api/`; React-free rules and codecs in `model/`; cross-flow state or persistence in `state/`; isolated technical capabilities in `modules/`.
+- Feature route files are thin entries. Runtime imports between features go through the target feature's narrow `index.ts`, except the reviewed `assets/map` and `assets/picker` entries.
 - `web/src/lib/http-commons`: generated OpenAPI types and typed API client.
-- `web/src/contexts`: cross-cutting app state.
+- `web/src/contexts`: cross-cutting runtime capabilities and provider boundaries.
 - `web/src/components`: reusable UI components.
 - `web/src/wasm` and `web/src/workers`: checked-in `blake3`/`studio` browser bundles and worker entry points for compute-heavy paths.
 - `wasm/*`: Rust source crates for `blake3-wasm`, `studio-wasm`, `thumbnail-wasm`, and `export-wasm`.

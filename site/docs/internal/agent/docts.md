@@ -21,13 +21,13 @@ A feature documents itself with a `doc.ts` at its root. Canonical example:
 /**
  * # Collections
  *
- * {@link CollectionsProvider} (read via {@link useCollections}) holds the
- * feature's transient UI state, reduced by {@link collectionsReducer}.
+ * {@link AlbumsProvider} (read via {@link useAlbumsState}) holds the albums
+ * flow's transient UI state, reduced by {@link albumsReducer}.
  *
  * @module
  */
-import type { CollectionsProvider, useCollections } from "./CollectionsProvider.tsx";
-import type { collectionsReducer } from "./collections.reducer.ts";
+import type { AlbumsProvider, useAlbumsState } from "./flows/albums/state/AlbumsProvider.tsx";
+import type { albumsReducer } from "./flows/albums/state/reducer.ts";
 
 export {};
 ```
@@ -49,8 +49,9 @@ Together, the prose can never name a symbol that doesn't exist or silently rot.
 - When you add or materially change a feature, update its `doc.ts`.
 - Every `{@link X}` needs a matching `import type { X }` (or default import) in
   the same file. No exceptions — that is the contract.
-- Keep the import specifier pointing at the symbol's real source file, with the
-  extension, so the rendered link resolves on GitHub.
+- Keep a relative import specifier pointing at the symbol's real source file,
+  with the extension, so the rendered link resolves on GitHub. Public alias or
+  directory-entry references may point at the reviewed entry instead.
 - `doc.md` is **generated** — never hand-edit it. Change `doc.ts`, then
   re-render (below).
 - Do not add other exports or runtime code to `doc.ts`; the imports exist only
@@ -90,7 +91,7 @@ and every `{@link Symbol}` turned into a link to the symbol's source file. After
 editing a `doc.ts`, regenerate from `web/`:
 
 ```bash
-node --input-type=module -e '
+vp node --input-type=module -e '
   import { parseDocFile, renderMarkdown } from "@edwinzhancn/docts";
   import { writeFileSync } from "node:fs";
   const f = process.argv[1];
