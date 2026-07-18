@@ -5,6 +5,9 @@ import { $api } from "@/lib/http-commons/queryClient";
 type CreateRepositoryInput = {
   name: string;
   cloudCredentialId?: string;
+  role?: "primary" | "regular";
+  storageStrategy?: "cas" | "date" | "flat";
+  duplicateHandling?: "overwrite" | "rename" | "uuid";
 };
 
 export function useCreateRepository() {
@@ -12,11 +15,20 @@ export function useCreateRepository() {
   const mutation = $api.useMutation("post", "/api/v1/repositories");
 
   const createRepository = useCallback(
-    async ({ name, cloudCredentialId }: CreateRepositoryInput) => {
+    async ({
+      name,
+      cloudCredentialId,
+      role,
+      storageStrategy,
+      duplicateHandling,
+    }: CreateRepositoryInput) => {
       const response = await mutation.mutateAsync({
         body: {
           name,
           cloud_credential_id: cloudCredentialId,
+          role,
+          storage_strategy: storageStrategy,
+          duplicate_handling: duplicateHandling,
         },
       });
 
@@ -40,5 +52,6 @@ export function useCreateRepository() {
   return {
     createRepository,
     isPending: mutation.isPending,
+    error: mutation.error,
   };
 }

@@ -2,8 +2,10 @@ export { default as BrowseScopeSelect } from "./flows/browse-scope/BrowseScopeSe
 export { useBrowseScope } from "./flows/browse-scope/useBrowseScope";
 export { default as RepositoryGrid } from "./flows/manage/RepositoryGrid";
 export { useWorkingRepository } from "./flows/working-repository/useWorkingRepository";
+export { useCreateRepository } from "./api/useCreateRepository";
 export { useRepositoryOptions } from "./api/useRepositoryOptions";
 export { useRepositoryScan } from "./api/useRepositoryScan";
 export type { RepositoryOption } from "./types";
 export { getRepositoryDisplayName } from "./model/repositoryDisplayName";
+export { isDuplicateHandling, isStorageStrategy } from "./model/repositorySetup";
 export { waitForRepositoryScan } from "./api/waitForRepositoryScan";

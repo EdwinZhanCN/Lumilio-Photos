@@ -1,14 +1,13 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { FolderPlus, HardDrive } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { $api } from "@/lib/http-commons/queryClient";
+import {
+  isDuplicateHandling,
+  isStorageStrategy,
+  useCreateRepository,
+} from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
-import { setupStatusQueryKey, useSetupStatus } from "../api/useSetupStatus.ts";
-
-const isStorageStrategy = (value?: string): value is "cas" | "date" | "flat" =>
-  value === "cas" || value === "date" || value === "flat";
-const isDuplicateHandling = (value?: string): value is "overwrite" | "rename" | "uuid" =>
-  value === "overwrite" || value === "rename" || value === "uuid";
+import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
 
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -23,7 +22,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const setupQuery = useSetupStatus();
-  const createMutation = $api.useMutation("post", "/api/v1/repositories");
+  const createMutation = useCreateRepository();
   const defaults = setupQuery.data?.repository_defaults;
   const primaryReady = setupQuery.data?.primary_repository_initialized ?? false;
   const [name, setName] = useState("Primary Storage");
@@ -69,13 +68,11 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmit) return;
-    await createMutation.mutateAsync({
-      body: {
-        name: name.trim(),
-        role: "primary",
-        storage_strategy: strategy,
-        duplicate_handling: duplicateHandling,
-      },
+    await createMutation.createRepository({
+      name: name.trim(),
+      role: "primary",
+      storageStrategy: strategy,
+      duplicateHandling,
     });
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: setupStatusQueryKey }),

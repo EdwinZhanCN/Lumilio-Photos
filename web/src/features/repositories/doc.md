@@ -27,8 +27,10 @@ their empty-state semantics differ.
 
 [RepositoryGrid](./flows/manage/RepositoryGrid.tsx) owns the repository-management surface. Its create
 modal delegates server mutation and invalidation to
-[useCreateRepository](./api/useCreateRepository.ts); the grid receives maintenance commands from the
-higher Manage composition route rather than importing those domains.
+[useCreateRepository](./api/useCreateRepository.ts); Auth setup uses the same public mutation for
+primary-repository creation. [isStorageStrategy](./model/repositorySetup.ts) keeps storage-policy
+parsing in the repository model. The grid receives maintenance commands from
+the higher Manage composition route rather than importing those domains.
 
 ## State
 

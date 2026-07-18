@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Fingerprint, Info, KeyRound, Smartphone, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useRegistrationFlow } from "../hooks/useRegistrationFlow.ts";
+import { useRegistrationFlow } from "./useRegistrationFlow.ts";
 import {
   PASSWORD_HINT,
   USERNAME_HINT,
@@ -10,7 +10,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
   normalizeUsernameInput,
-} from "../utils/credentialPolicy.ts";
+} from "../../model/credentialPolicy.ts";
 import {
   AuthShell,
   Btn,
@@ -23,7 +23,7 @@ import {
   RecoveryCodesPanel,
   TextInput,
   TotpSetupPanel,
-} from "./ui";
+} from "../../components/ui";
 
 type RegistrationFormProps = {
   credentialTitle: string;
