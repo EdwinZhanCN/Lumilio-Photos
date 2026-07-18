@@ -10,7 +10,7 @@ browser selection into the repository.
 
 [UploadProvider](./state/UploadProvider.tsx) wraps the app with [UploadContext](./state/context.ts). The reducer
 stores selected `UploadState.files`, placeholder preview slots, and
-drag-over state. Consumers use [useUploadContext](./hooks/useUpload.tsx); calling that hook
+drag-over state. Consumers use [useUploadContext](./state/useUploadContext.ts); calling that hook
 outside the provider is an error.
 
 Upload processing state comes from [useUploadProcess](./modules/process/useUploadProcess.tsx). Its React state
@@ -20,10 +20,10 @@ owned by [createUploadTransport](./modules/process/transport.ts). The hook expos
 number, per-file [FileUploadProgress](./modules/process/useUploadProcess.tsx), hashing progress, and the two active
 flags used by the provider: `isGeneratingHashCodes` and `isUploading`.
 
-[UnifiedUploadSection](./components/UnifiedUploadSection.tsx) is the primary queue editor. It validates
+[UnifiedUploadSection](./flows/intake/UnifiedUploadSection.tsx) is the primary queue editor. It validates
 selected files, adds them to the provider queue, lets the user clear the
 queue while idle, starts upload, and exposes the working repository picker.
-[NavbarUploadQueue](./components/NavbarUploadQueue.tsx) is only a compact global status surface; it reuses
+[NavbarUploadQueue](./flows/queue/NavbarUploadQueue.tsx) is only a compact global status surface; it reuses
 provider state and links back to `/manage` for detailed control.
 
 ## Data
@@ -65,7 +65,7 @@ buffer, and as a single call ahead of each chunked upload. Files the server
 already holds are marked `duplicate` in [FileUploadProgress](./modules/process/useUploadProcess.tsx) and never
 transported.
 
-A duplicate is a success, not a failure: [NavbarUploadQueue](./components/NavbarUploadQueue.tsx) renders it in
+A duplicate is a success, not a failure: [NavbarUploadQueue](./flows/queue/NavbarUploadQueue.tsx) renders it in
 the warning color with its own count, separate from the error count, and the
 upload summary reports how many files were skipped. Precheck is an optimization
 only. If the request fails the files upload normally, and the server repeats the
@@ -90,10 +90,9 @@ flowchart TD
     CHUNK --> TRANSPORT
 ```
 
-[FileDropZone](./components/FileDropZone.tsx) contributes drag/drop interaction, but validation and
-queue mutation stay in [UnifiedUploadSection](./components/UnifiedUploadSection.tsx). [ProgressIndicator](./components/ProgressIndicator.tsx)
-can render aggregate progress, while [NavbarUploadQueue](./components/NavbarUploadQueue.tsx) renders the
-durable per-file queue that remains visible across routes.
+[FileDropZone](./flows/intake/FileDropZone.tsx) contributes drag/drop interaction, but validation and
+queue mutation stay in [UnifiedUploadSection](./flows/intake/UnifiedUploadSection.tsx). [NavbarUploadQueue](./flows/queue/NavbarUploadQueue.tsx)
+renders the durable per-file queue that remains visible across routes.
 
 ## Decisions
 

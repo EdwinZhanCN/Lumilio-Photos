@@ -92,9 +92,8 @@
  * ```
  *
  * {@link FileDropZone} contributes drag/drop interaction, but validation and
- * queue mutation stay in {@link UnifiedUploadSection}. {@link ProgressIndicator}
- * can render aggregate progress, while {@link NavbarUploadQueue} renders the
- * durable per-file queue that remains visible across routes.
+ * queue mutation stay in {@link UnifiedUploadSection}. {@link NavbarUploadQueue}
+ * renders the durable per-file queue that remains visible across routes.
  *
  * ## Decisions
  *
@@ -113,11 +112,10 @@
  * @module
  */
 import type { UploadProvider } from "./state/UploadProvider.tsx";
-import type FileDropZone from "./components/FileDropZone.tsx";
-import type NavbarUploadQueue from "./components/NavbarUploadQueue.tsx";
-import type ProgressIndicator from "./components/ProgressIndicator.tsx";
-import type UnifiedUploadSection from "./components/UnifiedUploadSection.tsx";
-import type { useUploadContext } from "./hooks/useUpload.tsx";
+import type FileDropZone from "./flows/intake/FileDropZone.tsx";
+import type NavbarUploadQueue from "./flows/queue/NavbarUploadQueue.tsx";
+import type UnifiedUploadSection from "./flows/intake/UnifiedUploadSection.tsx";
+import type { useUploadContext } from "./state/useUploadContext.ts";
 import type { FileUploadProgress, useUploadProcess } from "./modules/process/useUploadProcess.tsx";
 import type { useUploadProgressState } from "./modules/process/progress.ts";
 import type { runUploadProcess } from "./modules/process/runner.ts";

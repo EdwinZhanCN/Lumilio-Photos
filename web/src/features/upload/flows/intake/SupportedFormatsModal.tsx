@@ -1,5 +1,5 @@
 import React from "react";
-import { getFormatGroups, type FormatGroup } from "../utils/accept-file-extensions.ts";
+import { getFormatGroups, type FormatGroup } from "../../model/accept-file-extensions.ts";
 import { Image, Video, Music, Camera } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 
