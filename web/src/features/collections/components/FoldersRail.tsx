@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import Rail from "./Rail";
 import RailCard from "./RailCard";
-import type { FolderSummary } from "../hooks/useFolders";
+import type { FolderSummary } from "../api/useFolders";
 
 type FoldersRailProps = {
   folders: FolderSummary[];

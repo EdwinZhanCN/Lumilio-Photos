@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import { useRepositoryCloudStatus } from "@/features/cloud";
 import { useI18n } from "@/lib/i18n";
-import type { RepositoryOption } from "../repository.types";
-import { useRepositoryAssetCount } from "../hooks/useRepositoryAssetCount";
+import type { RepositoryOption } from "../types";
+import { useRepositoryAssetCount } from "../api/useRepositoryAssetCount";
 import { getRepositoryDisplayName } from "../utils/repositoryDisplayName";
 
 export interface RepositoryCardProps {

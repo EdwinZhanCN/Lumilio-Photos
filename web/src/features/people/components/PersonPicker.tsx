@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Check, Search, UserRound } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { usePeople } from "../hooks/usePeople";
-import type { PersonSummaryList } from "../people.types";
+import { usePeople } from "../api/usePeople";
+import type { PersonSummaryList } from "../types";
 
 type PersonPickerProps = {
   /** Person IDs to exclude from the list (e.g. the target/self). */

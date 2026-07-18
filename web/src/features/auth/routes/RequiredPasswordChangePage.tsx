@@ -4,13 +4,13 @@ import { AlertCircle, KeyRound, ShieldCheck } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
-import { takeRequiredPasswordChangeChallenge } from "../passwordChangeChallenge.ts";
+import { takeRequiredPasswordChangeChallenge } from "../state/passwordChangeChallenge.ts";
 import {
   PASSWORD_HINT,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   PASSWORD_PATTERN,
-} from "../lib/credentialPolicy.ts";
+} from "../utils/credentialPolicy.ts";
 
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;

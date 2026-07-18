@@ -4,9 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "./useAuth.ts";
-import { setupStatusQueryKey } from "./useSetupStatus.ts";
-import type { TOTPSetupResponse } from "../auth.type.ts";
-import { createPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
+import { setupStatusQueryKey } from "../api/useSetupStatus.ts";
+import type { TOTPSetupResponse } from "../types.ts";
+import { createPasskeyCredential, getPasskeySupport } from "../utils/webauthn.ts";
 
 type AuthRedirectState = {
   from?: {

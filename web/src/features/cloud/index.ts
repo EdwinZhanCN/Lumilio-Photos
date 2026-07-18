@@ -5,7 +5,7 @@ export type {
   CloudProvider,
   CloudProviderField,
   RepositoryCloudStatus,
-} from "./cloud.types";
+} from "./types";
 export {
   useCloudCredentials,
   useCloudProviders,
@@ -14,8 +14,5 @@ export {
   useReconnectCloudCredential,
   useRemoveCloudCredential,
   useVerifyCloudCredentialChallenge,
-} from "./hooks/useCloudCredentials";
-export {
-  useRepositoryCloudStatus,
-  useStartRepositoryCloudImport,
-} from "./hooks/useRepositoryCloud";
+} from "./api/useCloudCredentials";
+export { useRepositoryCloudStatus, useStartRepositoryCloudImport } from "./api/useRepositoryCloud";

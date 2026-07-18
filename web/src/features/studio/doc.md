@@ -10,30 +10,30 @@ Collections, and Assets.
 ## State
 
 [StudioEditMvp](./routes/StudioEditMvp.tsx) is the route shell. It switches between three local
-views: [StudioHome](./home/StudioHome.tsx), a shared [PhotoPicker](@/features/assets/picker/index.ts), and
-[StudioEditor](./editor/StudioEditor.tsx). If the URL includes an `assetId` query parameter, the
+views: [StudioHome](./modules/home/StudioHome.tsx), a shared [PhotoPicker](@/features/assets/picker/index.ts), and
+[StudioEditor](./modules/editor/StudioEditor.tsx). If the URL includes an `assetId` query parameter, the
 shell opens the editor directly. Otherwise the user starts from Studio Home,
 chooses a photo, and can resume recent edits.
 
 Recent edits are client-local history stored under
-[STUDIO_RECENT_EDITS_KEY](./home/recentEditsStore.ts). [RecentEditRecord](./home/recentEditsStore.ts),
-[readRecentEdits](./home/recentEditsStore.ts), [recordRecentEdit](./home/recentEditsStore.ts), and
-[clearRecentEdits](./home/recentEditsStore.ts) persist only asset id, name, dimensions, and
+[STUDIO_RECENT_EDITS_KEY](./state/recentEdits.ts). [RecentEditRecord](./state/recentEdits.ts),
+[readRecentEdits](./state/recentEdits.ts), [recordRecentEdit](./state/recentEdits.ts), and
+[clearRecentEdits](./state/recentEdits.ts) persist only asset id, name, dimensions, and
 timestamp; durable edit instructions live in the asset sidecar, not in
 localStorage.
 
-[StudioEditor](./editor/StudioEditor.tsx) owns the editor session state: loaded asset metadata,
-normalized [StudioEditAdjustments](./edit-mvp/types.ts), undo history, preview URLs, before
+[StudioEditor](./modules/editor/StudioEditor.tsx) owns the editor session state: loaded asset metadata,
+normalized [StudioEditAdjustments](./modules/editor/runtime/types.ts), undo history, preview URLs, before
 preview, save/export flags, render errors, and border-result state. It emits
-[StudioEditorActivity](./editor/StudioEditor.tsx) back to the shell so Studio Home can update
-recent edits. The default edit state is [DEFAULT_STUDIO_ADJUSTMENTS](./edit-mvp/types.ts);
+[StudioEditorActivity](./modules/editor/StudioEditor.tsx) back to the shell so Studio Home can update
+recent edits. The default edit state is [DEFAULT_STUDIO_ADJUSTMENTS](./modules/editor/runtime/types.ts);
 defaults are intentionally identity operations so an unchanged editor
 represents the original image.
 
 ## Data
 
 The editor reads the asset record, sidecar, exported source image, and EXIF
-record for the selected asset id. Sidecars use [LumilioSidecarV1](./edit-mvp/types.ts):
+record for the selected asset id. Sidecars use [LumilioSidecarV1](./modules/editor/runtime/types.ts):
 saving writes the adjustment instructions back to `/api/v1/assets/{id}/sidecar`
 without overwriting the preserved original media.
 
@@ -44,17 +44,17 @@ chooses an engine such as WebGPU, WebGL2, WASM CPU, or Canvas 2D and returns
 blobs for the preview/export path. The worker is an implementation boundary,
 not a public feature API.
 
-Develop controls are defined by [DEVELOP_GROUPS](./editor/developConfig.ts) and rendered by
-[DevelopPanel](./develop/DevelopPanel.tsx). Geometry changes are tracked separately from numeric
+Develop controls are defined by [DEVELOP_GROUPS](./modules/editor/developConfig.ts) and rendered by
+[DevelopPanel](./modules/develop/DevelopPanel.tsx). Geometry changes are tracked separately from numeric
 photometric controls because preview rendering ignores rotation/flip while
-[Viewport](./editor/Viewport.tsx) applies them visually.
+[Viewport](./modules/editor/Viewport.tsx) applies them visually.
 
-The border tool is additive. [BorderPanel](./tools/border/BorderPanel.tsx) edits border params; applying
+The border tool is additive. [BorderPanel](./modules/tools/border/BorderPanel.tsx) edits border params; applying
 a border first exports the current develop result, then runs
-[runBorderTransform](./tools/border) through the shared worker client from
-[useWorker](@/contexts/WorkerProvider.tsx). EXIF-driven border modes use [extractBorderExif](./tools/border),
-[hasSufficientExif](./tools/border), [matchBrandKey](./tools/border), and
-[rasterizeBrandLogo](./tools/border); users cannot manually edit EXIF or force a
+[runBorderTransform](./modules/tools/border) through the shared worker client from
+[useWorker](@/contexts/WorkerProvider.tsx). EXIF-driven border modes use [extractBorderExif](./modules/tools/border),
+[hasSufficientExif](./modules/tools/border), [matchBrandKey](./modules/tools/border), and
+[rasterizeBrandLogo](./modules/tools/border); users cannot manually edit EXIF or force a
 camera logo.
 
 ## Composition
@@ -76,10 +76,10 @@ flowchart TD
     BORDER --> TOOL["runBorderTransform via useWorker"]
 ```
 
-[TopBar](./editor/TopBar.tsx) owns session commands such as back, undo, reset, before,
-save, and export. [AssetPanel](./editor/AssetPanel.tsx) shows source metadata and EXIF rows.
-[Viewport](./editor/Viewport.tsx) owns fit/zoom, before preview, rotation/flip presentation,
-and render errors. [DevelopPanel](./develop/DevelopPanel.tsx) owns the grouped controls and mobile
+[TopBar](./modules/editor/TopBar.tsx) owns session commands such as back, undo, reset, before,
+save, and export. [AssetPanel](./modules/editor/AssetPanel.tsx) shows source metadata and EXIF rows.
+[Viewport](./modules/editor/Viewport.tsx) owns fit/zoom, before preview, rotation/flip presentation,
+and render errors. [DevelopPanel](./modules/develop/DevelopPanel.tsx) owns the grouped controls and mobile
 bottom-sheet behavior.
 
 ## Decisions

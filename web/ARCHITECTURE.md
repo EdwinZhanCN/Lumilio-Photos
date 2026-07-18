@@ -16,6 +16,34 @@ This document defines where frontend code belongs and which imports are allowed.
 | `src/types/`              | Ambient and third-party declaration files. Domain types stay with their feature; reusable value types stay beside their implementation in `lib`.                                                                                          |
 | `src/styles/`             | Global stylesheet entry points and genuinely global rules. Component- or feature-specific CSS is colocated with its owner.                                                                                                                |
 
+## Standard feature shape
+
+Every feature uses the same root vocabulary. Directories are optional—do not create empty placeholders—but a different root directory name is not allowed:
+
+```text
+src/features/<feature>/
+├── api/          # TanStack Query definitions, mutations, DTO adapters, server workflows
+├── components/   # feature-owned UI
+├── docs/         # feature-local supporting notes; doc.ts/doc.md remain at the root
+├── hooks/        # React workflows and UI orchestration; composes api/state
+├── modules/      # cohesive capability slices inside a large feature
+├── routes/       # router entry components
+├── state/        # Context, Zustand, reducers, selectors, persistence and reset
+├── utils/        # pure feature-domain functions
+├── types.ts      # feature-wide types
+├── index.ts      # narrow cross-feature public API, only when needed
+├── doc.ts        # architecture source, when documented
+└── doc.md        # generated from doc.ts
+```
+
+- Root files other than `index.ts`, `types.ts`, `doc.ts`, and generated `doc.md` are not allowed.
+- `api/` owns reusable server-state access. A hook in `hooks/` may orchestrate mutations as part of a workflow, but reusable query definitions belong in `api/`.
+- `state/` owns feature-wide client state and lifecycle: providers, stores, reducers, selectors, persistence, hydration, and reset behavior.
+- `modules/<capability>/` is the only extension point for a large feature. Name it after product vocabulary (`editor`, `widgets`, `process`), never `common`, `misc`, or `shared`.
+- Tests and feature-specific styles stay beside the implementation they characterize.
+- A small feature omits unused directories. Uniformity means identical directory semantics, not identical directory counts.
+- The Assets feature keeps `map/` and `picker/` as reviewed public sub-entry exceptions. Their entry files remain narrow.
+
 ## Dependency rules
 
 The normal direction is:
@@ -50,6 +78,30 @@ import PhotoPicker from "@/features/assets/picker";
 
 ## State, data, and utility ownership
 
+Choose state by source and lifecycle:
+
+```mermaid
+flowchart TD
+    A["One piece of data"] --> B{"Source and lifecycle"}
+    B -->|"Server fact"| C["TanStack Query"]
+    B -->|"Cross-cutting runtime capability"| D["React Context"]
+    B -->|"Shared by components in one feature"| E["Zustand / useReducer"]
+    B -->|"Single-component interaction"| F["useState / useReducer"]
+    B -->|"Shareable or restorable page state"| G["URL / React Router"]
+    B -->|"Temporary reference without rendering"| H["useRef"]
+    B -->|"Allowed to survive refresh"| I["localStorage / persisted store"]
+```
+
+| Source of truth                      | Owner                               | Placement and rule                                                                                                          |
+| ------------------------------------ | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Server fact                          | TanStack Query                      | Put reusable query/mutation definitions in the feature `api/`. Never copy fetched collections into Context or Zustand.      |
+| Cross-cutting runtime capability     | React Context                       | App-wide capabilities live in `src/contexts`; feature-scoped providers and contexts live in that feature's `state/`.        |
+| Shared feature interaction           | Zustand or `useReducer`             | Put the store/reducer, provider, selectors, hydration, and reset behavior in `state/`.                                      |
+| Single component interaction         | `useState` or local `useReducer`    | Keep it beside the rendering component; do not promote it without multiple consumers.                                       |
+| Shareable/restorable page state      | URL / React Router                  | The URL remains authoritative for search, tab, filter, entity, or view state that should survive navigation or be linkable. |
+| Non-rendering temporary value        | `useRef`                            | Use for DOM handles, latest callbacks, request identity, and mutable bookkeeping that must not render.                      |
+| Refresh-persistent client preference | Versioned storage / persisted store | Persistence code, migration, hydration, and reset live in `state/`; keys and versions use the shared settings registry.     |
+
 - Keep ephemeral state in the component that renders it. Lift it only when multiple siblings need the same interaction state.
 - Use TanStack Query for server data, pagination, loading/error state, cache invalidation, and mutations. Do not mirror fetched collections into Context or Zustand.
 - Use a feature-local Zustand store for interactive state shared across that feature, such as selection, filters, panels, or URL-synchronized controls.
@@ -73,7 +125,7 @@ make web-test
 
 If no direct test covers the change, run the nearest characterization tests plus typecheck, lint, and `pnpm run check:boundaries`; add coverage when behavior is being changed or moved without it. The full gate remains required.
 
-`make web-test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `pnpm run check:boundaries` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded; `doc.ts` links are checked by the documentation lint rule instead.
+`make web-test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `pnpm run check:boundaries` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, non-standard feature roots, misplaced shared-state or persistence modules, reusable server queries under `hooks/`, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded from the runtime graph; `doc.ts` links are checked by the documentation lint rule instead.
 
 Also run `make web-browser-test` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths. It builds the production app, enforces the bundle budget, and runs the browser smoke suite.
 

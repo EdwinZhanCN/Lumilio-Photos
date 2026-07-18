@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { HardDrive, KeyRound, ShieldCheck } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
-import { setupStatusQueryKey, useSetupStatus } from "../hooks/useSetupStatus.ts";
+import { setupStatusQueryKey, useSetupStatus } from "../api/useSetupStatus.ts";
 
 function getApiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;

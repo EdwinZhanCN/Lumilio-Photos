@@ -5,8 +5,8 @@ import { useMessage } from "@/features/notifications";
 import Modal from "@/components/ui/Modal";
 import PersonFacesPanel from "./PersonFacesPanel";
 import PersonPicker from "./PersonPicker";
-import { useMergePeople, useSetPersonHidden } from "../hooks/usePeople";
-import type { PersonDetail } from "../people.types";
+import { useMergePeople, useSetPersonHidden } from "../api/usePeople";
+import type { PersonDetail } from "../types";
 
 interface PersonRenameModalProps {
   open: boolean;

@@ -2,9 +2,9 @@ export {
   extractRebuildResponseData,
   useAssetIndexingStats,
   useRebuildAssetIndexes,
-} from "./hooks/useAssetIndexing";
+} from "./api/useAssetIndexing";
 export type {
   AssetIndexingStats,
   RebuildAssetIndexesPayload,
   RebuildAssetIndexesResponse,
-} from "./hooks/useAssetIndexing";
+} from "./api/useAssetIndexing";

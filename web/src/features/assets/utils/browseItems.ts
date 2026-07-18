@@ -7,7 +7,7 @@ import type {
   BrowseStackItem,
   BrowseItemId,
   SortByType,
-} from "../types/assets.type";
+} from "../types";
 import { groupAssetsBySort } from "./assetGroups";
 
 export type BrowseItemDTO = components["schemas"]["dto.BrowseItemDTO"];

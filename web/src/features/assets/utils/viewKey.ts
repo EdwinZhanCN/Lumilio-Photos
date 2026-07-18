@@ -1,4 +1,4 @@
-import type { AssetViewDefinition } from "../types/assets.type";
+import type { AssetViewDefinition } from "../types";
 
 export const generateViewKey = (definition: AssetViewDefinition): string => {
   if (definition.key) {

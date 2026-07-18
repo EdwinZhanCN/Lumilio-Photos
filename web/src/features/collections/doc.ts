@@ -102,23 +102,23 @@
  *
  * @module
  */
-import type { CollectionsProvider, useCollections } from "./CollectionsProvider.tsx";
-import type { collectionsReducer } from "./collections.reducer.ts";
-import type { CollectionsState, CollectionsAction } from "./collections.type.ts";
-import type { useAlbums, mapAlbumToUI } from "./hooks/useAlbums.ts";
+import type { CollectionsProvider, useCollections } from "./state/CollectionsProvider.tsx";
+import type { collectionsReducer } from "./state/reducer.ts";
+import type { CollectionsState, CollectionsAction } from "./types.ts";
+import type { useAlbums, mapAlbumToUI } from "./api/useAlbums.ts";
 import type { useCityTrips } from "./hooks/useCityTrips.ts";
 import type {
   useDuplicateSummary,
   useDuplicateGroupList,
   useDetectDuplicates,
-} from "./hooks/useDuplicates.ts";
+} from "./api/useDuplicates.ts";
 import type { UTILITY_CLASSIFIERS } from "./utils/utilityClassifiers.ts";
-import type { useFolders, useFolderSummary } from "./hooks/useFolders.ts";
-import type { useTagSummaries } from "./hooks/useTagSummaries.ts";
+import type { useFolders, useFolderSummary } from "./api/useFolders.ts";
+import type { useTagSummaries } from "./api/useTagSummaries.ts";
 import type { encodeFolderKey, decodeFolderKey } from "./utils/folderKey.ts";
 import type { encodeTagKey, decodeTagKey } from "./utils/tagKey.ts";
 import type { useUtilityShortcuts } from "./components/utilityShortcuts.ts";
-import type { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage.tsx";
+import type { AssetsGalleryPage } from "@/features/assets/components/browse/AssetsGalleryPage.tsx";
 import type { CollectionHero } from "@/components/collection";
 import type Collections from "./routes/Collections.tsx";
 import type AlbumDetails from "./routes/AlbumDetails.tsx";

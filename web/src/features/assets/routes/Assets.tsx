@@ -1,17 +1,14 @@
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useCallback, useState } from "react";
-import { AssetsProvider } from "../AssetsProvider";
+import { AssetsProvider } from "../state/AssetsProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { $api } from "@/lib/http-commons/queryClient";
-import { AssetsGalleryPage } from "../components/page/AssetsGalleryPage";
-import type {
-  AssetsBulkActionContext,
-  AssetsBulkActionItem,
-} from "@/lib/assets/bulkActions";
+import { AssetsGalleryPage } from "../components/browse/AssetsGalleryPage";
+import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/share";
 
 interface AssetsOrigin {

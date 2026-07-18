@@ -5,7 +5,7 @@ import RequiredPasswordChangePage from "./RequiredPasswordChangePage";
 import {
   clearRequiredPasswordChangeChallenge,
   storeRequiredPasswordChangeChallenge,
-} from "../passwordChangeChallenge.ts";
+} from "../state/passwordChangeChallenge.ts";
 
 const mocks = vi.hoisted(() => ({
   completeAuth: vi.fn(),

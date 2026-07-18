@@ -11,10 +11,10 @@ import { LoadMoreButton } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
-import { CollectionsProvider, useCollections } from "../CollectionsProvider";
+import { CollectionsProvider, useCollections } from "../state/CollectionsProvider";
 import AlbumFormModal from "../components/AlbumFormModal";
 import { ImgStackGrid } from "../components/ImgStackGrid";
-import { ALBUMS_QUERY_KEY, useAlbums } from "../hooks/useAlbums";
+import { ALBUMS_QUERY_KEY, useAlbums } from "../api/useAlbums";
 
 function AlbumsContent() {
   const { t } = useI18n();

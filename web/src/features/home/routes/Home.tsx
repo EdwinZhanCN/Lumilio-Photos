@@ -6,7 +6,7 @@ import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";
 import { useLocationClusters, useMapPhotoAssets } from "@/features/assets/map";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
+import { useFeaturedPhotos } from "../api/useFeaturedPhotos";
 import { AlertTriangleIcon, CameraIcon, HomeIcon, SparklesIcon } from "lucide-react";
 import { useVisibleOnce } from "@/features/assets";
 

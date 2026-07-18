@@ -9,7 +9,7 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import RailCard from "../components/RailCard";
-import { useFolders, type FolderSummary } from "../hooks/useFolders";
+import { useFolders, type FolderSummary } from "../api/useFolders";
 import { encodeFolderKey } from "../utils/folderKey";
 import { formatDateRange } from "../utils/formatDateRange";
 

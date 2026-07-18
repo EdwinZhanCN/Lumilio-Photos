@@ -5,7 +5,7 @@ import { AssetsGalleryPage, AssetsProvider } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
-import { usePersonDetails } from "../hooks/usePeople";
+import { usePersonDetails } from "../api/usePeople";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import PersonRenameModal from "../components/PersonRenameModal";
@@ -14,10 +14,7 @@ import {
   createShareSelectedBulkAction,
   type ShareSourceKind,
 } from "@/features/share";
-import type {
-  AssetsBulkActionContext,
-  AssetsBulkActionItem,
-} from "@/lib/assets/bulkActions";
+import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 
 const PersonAssetsContent = () => {
   const { t, i18n } = useI18n();

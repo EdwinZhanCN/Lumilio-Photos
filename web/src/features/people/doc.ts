@@ -55,7 +55,7 @@
  * @module
  */
 import type { CollectionHero } from "@/components/collection";
-import type { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage.tsx";
+import type { AssetsGalleryPage } from "@/features/assets/components/browse/AssetsGalleryPage.tsx";
 import type {
   usePeople,
   usePersonDetails,
@@ -65,7 +65,7 @@ import type {
   useRemoveFaceFromPerson,
   useSetPersonCover,
   useSetPersonHidden,
-} from "./hooks/usePeople.ts";
+} from "./api/usePeople.ts";
 import type PersonDetails from "./routes/PersonDetails.tsx";
 import type PersonRenameModal from "./components/PersonRenameModal.tsx";
 import type PersonFacesPanel from "./components/PersonFacesPanel.tsx";

@@ -18,8 +18,8 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { LumilioAvatar } from "../LumilioAvatar/LumilioAvatar";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useContextStore, useDockStore } from "@/lib/assistant";
-import { useSlashMacros } from "../../slash/slashMacros";
-import type { MentionPayload } from "../../mentions/mentionSources";
+import { useSlashMacros } from "../../modules/slash/slashMacros";
+import type { MentionPayload } from "../../modules/mentions/mentionSources";
 import { MentionInput } from "./MentionInput";
 import { ContextChips } from "./ContextChips";
 

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useContextStore } from "@/lib/assistant";
 import { useI18n } from "@/lib/i18n.tsx";
-import type { BrowseItem } from "../types/assets.type";
+import type { BrowseItem } from "../types";
 import { resolveBrowseSelectedAssetIds } from "../utils/browseItems";
 import { useSelection } from "./useSelection";
 

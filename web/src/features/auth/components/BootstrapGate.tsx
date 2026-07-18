@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useSetupStatus } from "../hooks/useSetupStatus.ts";
+import { useSetupStatus } from "../api/useSetupStatus.ts";
 import { useAuth } from "../hooks/useAuth.ts";
 
 const BOOTSTRAP_PATH = "/bootstrap";

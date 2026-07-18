@@ -3,7 +3,7 @@ import { Markdown } from "../LumilioMarkdown/Markdown";
 import { ReasoningBlock } from "../blocks/ReasoningBlock";
 import { ToolCallBlock } from "../blocks/ToolCallBlock";
 import { ConfirmBlock } from "../blocks/ConfirmBlock";
-import { InlineWidgetCard } from "../../widgets/chrome/InlineWidgetCard";
+import { InlineWidgetCard } from "../../modules/widgets/chrome/InlineWidgetCard";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { Block, ChatMessage, WidgetBlock } from "../../types";

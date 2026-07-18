@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { AssetsNavigationContext } from "../AssetsProvider";
+import { AssetsNavigationContext } from "../state/AssetsProvider";
 
 export const useAssetsNavigation = () => {
   const context = useContext(AssetsNavigationContext);

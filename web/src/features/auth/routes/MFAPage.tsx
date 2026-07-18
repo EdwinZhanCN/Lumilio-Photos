@@ -9,7 +9,7 @@ import {
   useMFAStatus,
   useRegenerateRecoveryCodes,
   type TOTPSetupResponse,
-} from "../hooks/useMFA.ts";
+} from "../api/useMFA.ts";
 import {
   AuthShell,
   Btn,

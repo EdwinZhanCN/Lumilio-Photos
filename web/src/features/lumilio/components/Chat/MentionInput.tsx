@@ -29,8 +29,8 @@ import {
   type MentionEntity,
   type MentionPayload,
   type MentionType,
-} from "../../mentions/mentionSources";
-import { useSlashMacros, type SlashMacro } from "../../slash/slashMacros";
+} from "../../modules/mentions/mentionSources";
+import { useSlashMacros, type SlashMacro } from "../../modules/slash/slashMacros";
 
 const MAX_TEXTAREA_HEIGHT = 140;
 

@@ -1,4 +1,4 @@
-import { SortByType } from "../types/assets.type";
+import { SortByType } from "../types";
 
 export const isSortByType = (value: string | null): value is SortByType => {
   return value === "date_captured" || value === "recently_added";

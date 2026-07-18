@@ -102,45 +102,40 @@
  *
  * @module
  */
-import type { AssetsProvider } from "./AssetsProvider.tsx";
-import type { createAssetsStore } from "./assets.store.ts";
-import type { createUISlice } from "./slices/ui.slice.ts";
-import type { createFiltersSlice } from "./slices/filters.slice.ts";
-import type { createSelectionSlice } from "./slices/selection.slice.ts";
-import type {
-  AssetViewDefinition,
-  AssetsViewResult,
-  BrowseGroup,
-  BrowseItem,
-} from "./types/assets.type.ts";
+import type { AssetsProvider } from "./state/AssetsProvider.tsx";
+import type { createAssetsStore } from "./state/store.ts";
+import type { createUISlice } from "./state/slices/ui.slice.ts";
+import type { createFiltersSlice } from "./state/slices/filters.slice.ts";
+import type { createSelectionSlice } from "./state/slices/selection.slice.ts";
+import type { AssetViewDefinition, AssetsViewResult, BrowseGroup, BrowseItem } from "./types.ts";
 import type {
   browseGroupsFromQueryLikePage,
   createBrowseGroupsFromBrowseItemDTOs,
   flattenBrowseGroups,
   resolveBrowseSelectedAssetIds,
 } from "./utils/browseItems.ts";
-import type { useAssetActions } from "./hooks/useAssetActions.tsx";
+import type { useAssetActions } from "./api/useAssetActions.tsx";
 import type { useBulkAssetOperations } from "./hooks/useSelection.tsx";
 import type { useAssetsNavigation } from "./hooks/useAssetsNavigation.ts";
 import type {
   useAssetsView,
   useCurrentAssetsSearchView,
   useCurrentAssetsView,
-} from "./hooks/useAssetsView.tsx";
-import type { PinAssetsViewResult, usePinAssetsView } from "./hooks/usePinAssetsView.tsx";
-import type { AssetsGalleryPage } from "./components/page/AssetsGalleryPage.tsx";
+} from "./api/useAssetsView.tsx";
+import type { PinAssetsViewResult, usePinAssetsView } from "./api/usePinAssetsView.tsx";
+import type { AssetsGalleryPage } from "./components/browse/AssetsGalleryPage.tsx";
 import type Assets from "./routes/Assets.tsx";
 import type AssetsTrash from "./routes/AssetsTrash.tsx";
-import type AssetsPageHeader from "./components/shared/AssetsPageHeader.tsx";
-import type JustifiedGallery from "./components/page/JustifiedGallery/JustifiedGallery.tsx";
-import type SquareGallery from "./components/page/SquareGallery/SquareGallery.tsx";
-import type FullScreenCarousel from "./components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx";
-import type { SearchFAB } from "./components/page/SearchFAB.tsx";
+import type AssetsPageHeader from "./components/browse/AssetsPageHeader.tsx";
+import type JustifiedGallery from "./components/browse/JustifiedGallery/JustifiedGallery.tsx";
+import type SquareGallery from "./components/browse/SquareGallery/SquareGallery.tsx";
+import type FullScreenCarousel from "./components/browse/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx";
+import type { SearchFAB } from "./components/browse/SearchFAB.tsx";
 import type { useGalleryContextContributor } from "./hooks/useGalleryContextContributor.ts";
 import type { useGalleryViewportWindow } from "./hooks/useGalleryViewportWindow.ts";
-import type { useAssetMediaItem } from "./hooks/useAssetMediaItem.ts";
-import type { useStackCarouselAssets } from "./hooks/useStackCarouselAssets.ts";
-import type MediaViewer from "./components/shared/MediaViewer.tsx";
+import type { useAssetMediaItem } from "./api/useAssetMediaItem.ts";
+import type { useStackCarouselAssets } from "./api/useStackCarouselAssets.ts";
+import type MediaViewer from "./components/media/MediaViewer.tsx";
 import type PhotoPicker from "./picker/PhotoPicker.tsx";
 
 export {};

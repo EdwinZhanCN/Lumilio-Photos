@@ -12,20 +12,20 @@ browse-only utility-style view, not its own hub rail.
 
 ## State
 
-[CollectionsProvider](./CollectionsProvider.tsx) (read via [useCollections](./CollectionsProvider.tsx)) holds only the
+[CollectionsProvider](./state/CollectionsProvider.tsx) (read via [useCollections](./state/CollectionsProvider.tsx)) holds only the
 feature's transient UI state — album multi-select and which edit/create modal
-is open — reduced by [collectionsReducer](./collections.reducer.ts) as [CollectionsAction](./collections.type.ts)
-over [CollectionsState](./collections.type.ts). Everything durable is server state in TanStack
+is open — reduced by [collectionsReducer](./state/reducer.ts) as [CollectionsAction](./types.ts)
+over [CollectionsState](./types.ts). Everything durable is server state in TanStack
 Query; nothing fetched is mirrored here.
 
 ## Data
 
 Each rail has a distinct backend story, and the differences are the point:
 
-- **Albums** — a real backend entity. [useAlbums](./hooks/useAlbums.ts) paginates
-  `/api/v1/albums`; [mapAlbumToUI](./hooks/useAlbums.ts) shapes each DTO for the grid.
-- **Duplicates** — a backend-computed graph. [useDuplicateSummary](./hooks/useDuplicates.ts),
-  [useDuplicateGroupList](./hooks/useDuplicates.ts) and [useDetectDuplicates](./hooks/useDuplicates.ts) wrap
+- **Albums** — a real backend entity. [useAlbums](./api/useAlbums.ts) paginates
+  `/api/v1/albums`; [mapAlbumToUI](./api/useAlbums.ts) shapes each DTO for the grid.
+- **Duplicates** — a backend-computed graph. [useDuplicateSummary](./api/useDuplicates.ts),
+  [useDuplicateGroupList](./api/useDuplicates.ts) and [useDetectDuplicates](./api/useDuplicates.ts) wrap
   `/api/v1/duplicates/*`.
 - **Utility classifier albums** — not entities at all: [UTILITY_CLASSIFIERS](./utils/utilityClassifiers.ts)
   is a static client table of saved tag-source queries (documents, receipts,
@@ -39,8 +39,8 @@ Each rail has a distinct backend story, and the differences are the point:
   result; there is **no backend
   trip entity**, so a trip is identity-less and editing it is meaningless.
 - **Folders** — derived from `assets.storage_path` prefixes; there is no
-  folders table. [useFolders](./hooks/useFolders.ts) lists immediate child folders (recursive
-  counts/covers) and [useFolderSummary](./hooks/useFolders.ts) aggregates one folder path, both
+  folders table. [useFolders](./api/useFolders.ts) lists immediate child folders (recursive
+  counts/covers) and [useFolderSummary](./api/useFolders.ts) aggregates one folder path, both
   backed by new `/api/v1/assets/folders*` endpoints. Route identity is a
   `{ repositoryId, folderPath }` pair packed by [encodeFolderKey](./utils/folderKey.ts) /
   [decodeFolderKey](./utils/folderKey.ts) into an opaque `:folderKey` segment, since a raw
@@ -49,7 +49,7 @@ Each rail has a distinct backend story, and the differences are the point:
   human placed or scanned into the repository.
 - **Tags** — a real vocabulary, but grouped by `(tag_id, source)` because the
   same tag name can carry both manual and AI/system assignments across
-  different assets. [useTagSummaries](./hooks/useTagSummaries.ts) wraps the new
+  different assets. [useTagSummaries](./api/useTagSummaries.ts) wraps the new
   `/api/v1/assets/tag-summaries` endpoint (counts/covers), distinct from the
   autocomplete-only `/api/v1/assets/tags` used by `@`-mentions. Route
   identity uses [encodeTagKey](./utils/tagKey.ts) / [decodeTagKey](./utils/tagKey.ts) over
@@ -57,7 +57,7 @@ Each rail has a distinct backend story, and the differences are the point:
   `AssetFilterDTO` already supports.
 - **Liked** — the utility rail ([useUtilityShortcuts](./components/utilityShortcuts.ts)) also includes
   Liked alongside Duplicates and Trash. [Liked](./routes/Liked.tsx) scopes
-  [AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx) to `{ liked: true }` and hides the default
+  [AssetsGalleryPage](@/features/assets/components/browse/AssetsGalleryPage.tsx) to `{ liked: true }` and hides the default
   `set-liked` bulk menu in favor of a single scoped "remove from Liked"
   action, since setting liked=true is meaningless on a page already
   filtered to liked assets.
@@ -81,7 +81,7 @@ flowchart TD
 
 [AlbumDetails](./routes/AlbumDetails.tsx), [TripDetails](./routes/TripDetails.tsx), [UtilityClassifierAlbum](./routes/UtilityClassifierAlbum.tsx),
 [FolderDetails](./routes/FolderDetails.tsx) and [TagDetails](./routes/TagDetails.tsx) all render through the shared
-[AssetsGalleryPage](@/features/assets/components/page/AssetsGalleryPage.tsx) orchestrator, differing only by injection points:
+[AssetsGalleryPage](@/features/assets/components/browse/AssetsGalleryPage.tsx) orchestrator, differing only by injection points:
 album scopes by `{ album_id }`, trip by `{ location(bbox), date }`, classifier
 and tag detail by `{ tag_name, tag_source }`, folder detail by
 `{ repository_id, folder_path, folder_recursive }`. Album detail carries an

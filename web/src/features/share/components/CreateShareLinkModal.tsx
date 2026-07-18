@@ -3,7 +3,7 @@ import { Check, Copy, Link2, Share2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
-import { useShareLinks, type CreateShareLinkResponseDTO } from "../hooks/useShareLinks";
+import { useShareLinks, type CreateShareLinkResponseDTO } from "../api/useShareLinks";
 import { shareUrls } from "../utils/shareUrls";
 
 export type ShareSourceKind = "asset_snapshot" | "album" | "person" | "utility_query" | "pin";

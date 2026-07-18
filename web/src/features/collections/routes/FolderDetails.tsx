@@ -9,7 +9,7 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import { useI18n } from "@/lib/i18n";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { useFolders, useFolderSummary } from "../hooks/useFolders";
+import { useFolders, useFolderSummary } from "../api/useFolders";
 import { decodeFolderKey, encodeFolderKey } from "../utils/folderKey";
 import { formatDateRange } from "../utils/formatDateRange";
 

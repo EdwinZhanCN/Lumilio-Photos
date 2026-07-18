@@ -1,9 +1,9 @@
 import { useCallback, useMemo } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
-import type { RepositoryOption } from "../repository.types";
+import type { RepositoryOption } from "../types";
 import { getRepositoryDisplayName } from "../utils/repositoryDisplayName";
-import { useRepositoryOptions } from "./useRepositoryOptions";
+import { useRepositoryOptions } from "../api/useRepositoryOptions";
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 

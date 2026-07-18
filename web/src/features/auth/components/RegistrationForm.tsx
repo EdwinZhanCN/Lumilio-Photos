@@ -10,7 +10,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
   normalizeUsernameInput,
-} from "../lib/credentialPolicy.ts";
+} from "../utils/credentialPolicy.ts";
 import {
   AuthShell,
   Btn,

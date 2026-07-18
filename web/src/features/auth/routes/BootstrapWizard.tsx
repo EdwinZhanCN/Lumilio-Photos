@@ -22,7 +22,7 @@ import { SUPPORTED_LANGUAGES } from "@/lib/i18n.tsx";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import { useRegistrationFlow } from "../hooks/useRegistrationFlow.ts";
-import { setupStatusQueryKey, useSetupStatus } from "../hooks/useSetupStatus.ts";
+import { setupStatusQueryKey, useSetupStatus } from "../api/useSetupStatus.ts";
 import {
   PASSWORD_HINT,
   USERNAME_HINT,
@@ -30,7 +30,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
   normalizeUsernameInput,
-} from "../lib/credentialPolicy.ts";
+} from "../utils/credentialPolicy.ts";
 import {
   Brand,
   Btn,

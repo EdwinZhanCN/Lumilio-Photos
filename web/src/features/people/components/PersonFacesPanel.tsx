@@ -17,7 +17,7 @@ import {
   usePersonFaces,
   useRemoveFaceFromPerson,
   useSetPersonCover,
-} from "../hooks/usePeople";
+} from "../api/usePeople";
 import PersonPicker from "./PersonPicker";
 
 interface PersonFacesPanelProps {

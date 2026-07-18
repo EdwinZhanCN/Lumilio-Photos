@@ -6,7 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
-import { useShareLinks, type ShareLinkDTO } from "../hooks/useShareLinks";
+import { useShareLinks, type ShareLinkDTO } from "../api/useShareLinks";
 
 type StatusFilter = "active" | "expired" | "revoked";
 
