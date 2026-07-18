@@ -3,7 +3,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useCallback, useMemo, useState } from "react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AssetsGalleryPage, AssetsProvider, type AssetFilter } from "@/features/assets";
+import { AssetBrowser, AssetBrowserScope, type AssetBrowseConstraint } from "@/features/assets";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { findUtilityClassifier, getUtilityClassifierTitle } from "../utils/utilityClassifiers";
@@ -15,7 +15,7 @@ export default function UtilityClassifierAlbum() {
   const { t } = useI18n();
   const classifier = findUtilityClassifier(classifierSlug);
 
-  const baseFilter: AssetFilter = useMemo(
+  const constraint: AssetBrowseConstraint = useMemo(
     () => ({
       tag_name: classifier?.tagName,
       tag_source: "zeroshot",
@@ -65,21 +65,17 @@ export default function UtilityClassifierAlbum() {
         />
       )}
     >
-      <AssetsProvider
-        scopeId={`collections:utilities:${classifier.slug}`}
-        syncUrl
-        basePath={basePath}
-      >
+      <AssetBrowserScope scopeId={`collections:utilities:${classifier.slug}`} basePath={basePath}>
         <WorkerProvider>
-          <AssetsGalleryPage
+          <AssetBrowser
             title={getUtilityClassifierTitle(t, classifier.slug)}
             icon={<Icon className="w-6 h-6 text-primary" />}
-            baseFilter={baseFilter}
+            constraint={constraint}
             viewKey={`utility:${classifier.slug}`}
             bulkActions={bulkActions}
           />
         </WorkerProvider>
-      </AssetsProvider>
+      </AssetBrowserScope>
       <CreateShareLinkModal
         open={shareAssetIds !== null}
         onClose={() => setShareAssetIds(null)}

@@ -57,7 +57,7 @@ Each rail has a distinct backend story, and the differences are the point:
   `AssetFilterDTO` already supports.
 - **Liked** — the utility rail ([useUtilityShortcuts](./components/utilityShortcuts.ts)) also includes
   Liked alongside Duplicates and Trash. [Liked](./routes/Liked.tsx) scopes
-  [AssetsGalleryPage](@/features/assets/components/browse/AssetsGalleryPage.tsx) to `{ liked: true }` and hides the default
+  [AssetBrowser](@/features/assets) to `{ liked: true }` and hides the default
   `set-liked` bulk menu in favor of a single scoped "remove from Liked"
   action, since setting liked=true is meaningless on a page already
   filtered to liked assets.
@@ -81,7 +81,7 @@ flowchart TD
 
 [AlbumDetails](./routes/AlbumDetails.tsx), [TripDetails](./routes/TripDetails.tsx), [UtilityClassifierAlbum](./routes/UtilityClassifierAlbum.tsx),
 [FolderDetails](./routes/FolderDetails.tsx) and [TagDetails](./routes/TagDetails.tsx) all render through the shared
-[AssetsGalleryPage](@/features/assets/components/browse/AssetsGalleryPage.tsx) orchestrator, differing only by injection points:
+[AssetBrowser](@/features/assets) orchestrator, differing only by injection points:
 album scopes by `{ album_id }`, trip by `{ location(bbox), date }`, classifier
 and tag detail by `{ tag_name, tag_source }`, folder detail by
 `{ repository_id, folder_path, folder_recursive }`. Album detail carries an

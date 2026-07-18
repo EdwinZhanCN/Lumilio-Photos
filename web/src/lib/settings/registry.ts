@@ -77,7 +77,7 @@ export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
   },
 ] as const;
 
-export type LocalSettingsOwner = "preferences_store" | "assets_provider";
+export type LocalSettingsOwner = "preferences_store" | "assets_legacy_migration";
 
 export interface LocalStorageRegistryEntry {
   key: string;
@@ -98,8 +98,8 @@ export const LOCAL_STORAGE_REGISTRY: readonly LocalStorageRegistryEntry[] = [
   {
     key: ASSETS_STATE_STORAGE_KEY,
     version: ASSETS_STATE_STORAGE_VERSION,
-    owner: "assets_provider",
+    owner: "assets_legacy_migration",
     legacyKeys: [LEGACY_ASSETS_STATE_STORAGE_KEY],
-    description: "Persisted assets feature filters and selection state",
+    description: "Retired Assets store read once to migrate browse state into the URL",
   },
 ] as const;

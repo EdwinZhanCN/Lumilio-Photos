@@ -59,8 +59,8 @@ flowchart TD
     DOCK --> MESSAGES["ChatMessages"]
     INPUT --> STORE["useLumilioChatStore"]
     CHIPS --> CTX["useContextStore"]
-    GALLERY["useGalleryContextContributor"] --> CTX
-    CAROUSEL["useCarouselContextContributor"] --> CTX
+    GALLERY["useBrowseSelectionContext"] --> CTX
+    CAROUSEL["useViewerContextContributor"] --> CTX
     STORE --> SSE["streamAgent"]
     MESSAGES --> INLINE["InlineWidgetCard"]
     INLINE --> PIN["PinButton"]
@@ -75,7 +75,7 @@ and an embedded [ChatDock](./components/Chat/ChatDock.tsx). The dock composes [M
 [ContextChips](./components/Chat/ContextChips.tsx), and [ChatMessages](./components/Chat/ChatMessages.tsx); asset and carousel surfaces
 mount it in `fab` mode. Asset-owned contributors publish context through the
 shared assistant bus via
-[useGalleryContextContributor](@/features/assets/hooks/useGalleryContextContributor.ts) / [useCarouselContextContributor](@/features/assets/hooks/useCarouselContextContributor.ts).
+[useBrowseSelectionContext](@/features/assets/flows/browse/useBrowseSelectionContext.ts) / [useViewerContextContributor](@/features/assets/flows/viewer/useViewerContextContributor.ts).
 Board pins render through [BoardTile](./modules/widgets/chrome/BoardTile.tsx), so the agent UI is a feature
 overlay rather than another gallery implementation.
 

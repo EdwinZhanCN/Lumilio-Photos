@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { FolderTree, Folder as FolderIcon } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AssetsGalleryPage, AssetsProvider, type AssetFilter } from "@/features/assets";
+import { AssetBrowser, AssetBrowserScope, type AssetBrowseConstraint } from "@/features/assets";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import { useI18n } from "@/lib/i18n";
@@ -24,7 +24,7 @@ export default function FolderDetails() {
   const summary = summaryQuery.data;
   const children = childrenQuery.data?.folders ?? [];
 
-  const baseFilter: AssetFilter = useMemo(
+  const constraint: AssetBrowseConstraint = useMemo(
     () => ({
       repository_id: identity?.repositoryId,
       folder_path: identity?.folderPath ?? "",
@@ -138,17 +138,17 @@ export default function FolderDetails() {
         />
       )}
     >
-      <AssetsProvider scopeId={`collections:folders:${folderKey}`} syncUrl basePath={basePath}>
+      <AssetBrowserScope scopeId={`collections:folders:${folderKey}`} basePath={basePath}>
         <WorkerProvider>
-          <AssetsGalleryPage
+          <AssetBrowser
             title={title}
             icon={<FolderTree className="w-6 h-6 text-primary" />}
-            baseFilter={baseFilter}
+            constraint={constraint}
             viewKey={`folder:${identity.repositoryId}:${identity.folderPath}`}
             hero={hero}
           />
         </WorkerProvider>
-      </AssetsProvider>
+      </AssetBrowserScope>
     </ErrorBoundary>
   );
 }

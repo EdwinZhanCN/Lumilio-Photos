@@ -157,6 +157,7 @@
       "title": "基本信息",
       "viewExif": "查看 EXIF"
     },
+    "clearSearchAriaLabel": "清除搜索",
     "errorFallback": {
       "something_went_wrong": "出了些问题"
     },
@@ -280,6 +281,8 @@
       "componentRaw": "RAW",
       "componentTabs": "媒体组件",
       "media_not_available": "媒体不可用",
+      "toggleInfo": "显示或隐藏资源信息",
+      "toggleLike": "切换喜欢状态",
       "unknown_file": "未知文件",
       "unknown_type": "未知类型",
       "video_title": "视频"
@@ -329,6 +332,7 @@
       "modeLive": "实时"
     },
     "pinTrailLabel": "所选内容",
+    "searchAriaLabel": "搜索资源",
     "searchPlaceholder": "搜索资源...",
     "stackCarousel": {
       "error": "堆叠资源暂时不可用。",
@@ -336,20 +340,9 @@
       "loading": "正在加载堆叠资源..."
     },
     "stackDetail": {
-      "assetFallback": "当前资源",
       "close": "关闭堆叠详情",
-      "coverBadge": "封面",
-      "currentBadge": "当前",
-      "empty": "此堆叠未返回相关资源。",
-      "error": "此资源的堆叠详情暂时不可用。",
-      "frameLabel": "第 {{position}} 帧",
-      "loading": "正在加载堆叠详情...",
-      "memberCount_one": "堆叠中 {{count}} 个资源",
-      "memberCount_other": "堆叠中 {{count}} 个资源",
       "openButton_one": "查看堆叠详情",
-      "openButton_other": "查看 {{count}} 个相关资源",
-      "thumbnailAlt": "堆叠成员预览",
-      "title": "堆叠详情"
+      "openButton_other": "查看 {{count}} 个相关资源"
     },
     "tags": {
       "add": "添加标签",
@@ -879,6 +872,8 @@
     "noRetryTasks": "此资源类型没有可重试的任务。",
     "optional": "可选",
     "retryProcessing": "重试处理",
+    "retrySubmitFailed": "提交重新处理任务失败。",
+    "retrySubmitted": "已提交重新处理任务。",
     "retryTitle": "重试处理任务",
     "selectedCount_one": "已选 {{count}} 项",
     "selectedCount_other": "已选 {{count}} 项",

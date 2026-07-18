@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Tag as TagIcon } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AssetsGalleryPage, AssetsProvider, type AssetFilter } from "@/features/assets";
+import { AssetBrowser, AssetBrowserScope, type AssetBrowseConstraint } from "@/features/assets";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { decodeTagKey } from "../utils/tagKey";
@@ -14,7 +14,7 @@ export default function TagDetails() {
   const { t } = useI18n();
   const identity = useMemo(() => decodeTagKey(tagKey), [tagKey]);
 
-  const baseFilter: AssetFilter = useMemo(
+  const constraint: AssetBrowseConstraint = useMemo(
     () => ({
       tag_name: identity?.tagName,
       tag_source: identity?.source || undefined,
@@ -49,16 +49,16 @@ export default function TagDetails() {
         />
       )}
     >
-      <AssetsProvider scopeId={`collections:tags:${tagKey}`} syncUrl basePath={basePath}>
+      <AssetBrowserScope scopeId={`collections:tags:${tagKey}`} basePath={basePath}>
         <WorkerProvider>
-          <AssetsGalleryPage
+          <AssetBrowser
             title={identity.tagName}
             icon={<TagIcon className="w-6 h-6 text-primary" />}
-            baseFilter={baseFilter}
+            constraint={constraint}
             viewKey={`tag:${identity.tagName}:${identity.source}`}
           />
         </WorkerProvider>
-      </AssetsProvider>
+      </AssetBrowserScope>
     </ErrorBoundary>
   );
 }

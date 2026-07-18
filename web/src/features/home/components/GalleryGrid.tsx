@@ -1,10 +1,6 @@
-import React, { useCallback, useMemo } from "react";
+import React from "react";
 import { Asset } from "@/lib/assets/types";
-import {
-  SquareGallery,
-  createBrowseGroupsFromAssets,
-  flattenBrowseGroupsToAssets,
-} from "@/features/assets";
+import { AssetPreviewGrid } from "@/features/assets";
 
 export type GalleryGridProps = {
   assets?: Asset[];
@@ -37,33 +33,16 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
   className = "",
   onItemClick,
 }) => {
-  const browseGroups = useMemo(() => createBrowseGroupsFromAssets(assets), [assets]);
-  const visibleAssets = useMemo(() => flattenBrowseGroupsToAssets(browseGroups), [browseGroups]);
-
-  const openCarousel = useCallback(
-    (assetId: string) => {
-      const index = visibleAssets.findIndex((asset) => asset.asset_id === assetId);
-      if (index === -1) return;
-      const asset = visibleAssets[index];
-      if (!asset) return;
-      onItemClick?.(asset, index);
-    },
-    [visibleAssets, onItemClick],
-  );
-
   if (assets.length === 0) {
     return <PlaceholderGrid count={placeholderCount} className={className} />;
   }
 
   return (
-    <SquareGallery
-      browseGroups={browseGroups}
-      openCarousel={openCarousel}
-      onLoadMore={() => {}}
-      hasMore={false}
-      isLoadingMore={false}
+    <AssetPreviewGrid
+      assets={assets}
+      scopeId="home:gallery-preview"
       className={className}
-      render3DCard={true}
+      onItemClick={onItemClick}
     />
   );
 };

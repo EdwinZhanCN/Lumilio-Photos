@@ -2,31 +2,41 @@
  * # Assets
  *
  * The asset feature owns the main library timeline, trash timeline, reusable
- * gallery shell, carousel inspection, selection, and bulk asset actions.
+ * browser surface, viewer inspection, selection, and export/bulk asset actions.
  * {@link Assets} is the ordinary `/assets` route; {@link AssetsTrash} scopes the
  * same gallery to deleted assets; collection/person/agent routes reuse
- * {@link AssetsGalleryPage} with source-specific filters or a pin source.
+ * {@link AssetBrowser} with source-specific constraints or a pin source.
  *
  * ## State
  *
- * {@link AssetsProvider} creates one scoped Zustand store with {@link createAssetsStore}.
- * The store is intentionally UI-only: {@link createUISlice} holds sort, search
- * text and carousel route state; {@link createFiltersSlice} holds local filter
- * controls; {@link createSelectionSlice} holds selected {@link BrowseItem} ids.
- * Fine-grained readers live in `selectors.ts`, while navigation helpers are
- * exposed through {@link useAssetsNavigation}.
+ * {@link useAssetBrowseRouteState} makes search, sort and applied filters URL-owned.
+ * Page constraints are merged through {@link mergeAssetFilters} and cannot be
+ * overridden by user parameters. {@link AssetBrowserScope} creates one scoped
+ * Zustand store with {@link createAssetSelectionStore}; that store only holds
+ * selected {@link BrowseItem} ids. Navigation helpers are exposed through
+ * {@link useAssetBrowserNavigation}.
  *
  * Server state stays in TanStack Query hooks. Durable asset mutations are in
  * {@link useAssetActions}, and bulk commands resolve selection through
- * {@link useBulkAssetOperations}; no fetched asset collection is mirrored into
+ * {@link useBulkAssetActions}; no fetched asset collection is mirrored into
  * the Zustand store.
+ *
+ * ## Structure
+ *
+ * `api/` contains server-state access and DTO adaptation; `model/` contains
+ * React-free filtering, grouping, sorting, and browse-item rules. User journeys
+ * are colocated under `flows/browse`, `flows/viewer`, and `flows/export`, so
+ * workflow-specific components, hooks, state, tests, and styles have one owner.
+ * Root `components/` is reserved for UI reused by multiple flows. Root `state/`
+ * only holds the one-time persisted-state migration; it does not become a
+ * second home for route state or server data.
  *
  * ## Data
  *
- * {@link useCurrentAssetsView} adapts the scoped store state plus optional
- * route-level filters into an {@link AssetViewDefinition}, then reads
- * `/api/v1/assets/list` through {@link useAssetsView}. When search text is
- * present, {@link useCurrentAssetsSearchView} switches to `/api/v1/assets/search`
+ * {@link useAssetBrowser} adapts explicit route state plus a page
+ * constraint into an {@link AssetViewDefinition}, then reads
+ * `/api/v1/assets/list` through {@link useAssetsList}. When search text is
+ * present, it switches to `/api/v1/assets/search`
  * and returns the same {@link AssetsViewResult} shape.
  *
  * The rendering contract is {@link BrowseGroup} and {@link BrowseItem}, not raw
@@ -40,7 +50,7 @@
  * contain those logical items. {@link useAssetMediaItem} resolves components
  * for {@link MediaViewer}; {@link useStackCarouselAssets} resolves one primary
  * asset per logical stack member, so file counts never inflate burst counts.
- * In {@link FullScreenCarousel}, the logical primary remains the Swiper item,
+ * In {@link AssetViewer}, the logical primary remains the Swiper item,
  * while RAW/JPEG selection is lifted into an active physical component that
  * drives metadata and asset-level actions without duplicating carousel slides.
  *
@@ -56,15 +66,17 @@
  *
  * ```mermaid
  * flowchart TD
- *     ROUTE["Assets / AssetsTrash routes"] --> PROVIDER["AssetsProvider"]
- *     PROVIDER --> PAGE["AssetsGalleryPage"]
+ *     ROUTE["Assets / AssetsTrash routes"] --> PROVIDER["AssetBrowserScope"]
+ *     PROVIDER --> PAGE["AssetBrowser"]
  *     PAGE --> HEADER["AssetsPageHeader"]
  *     PAGE --> JG["JustifiedGallery"]
  *     PAGE --> SG["SquareGallery"]
- *     PAGE --> FS["FullScreenCarousel"]
+ *     PAGE --> FS["AssetViewer"]
+ *     FS --> ACTIONS["AssetViewerActions"]
+ *     ACTIONS --> EXPORT["AssetExportDialog"]
  *     PAGE --> SEARCH["SearchFAB"]
  *     PAGE -. pin .-> PIN["usePinAssetsView"]
- *     PAGE -. library .-> VIEW["useCurrentAssetsView"]
+ *     PAGE -. library .-> VIEW["useAssetBrowser"]
  *     VIEW --> BROWSE["BrowseGroup / BrowseItem"]
  *     PIN --> BROWSE
  *     BROWSE --> JG
@@ -72,14 +84,17 @@
  *     BROWSE --> FS
  * ```
  *
- * {@link AssetsGalleryPage} is the route orchestrator: it picks the source hook,
+ * {@link AssetBrowser} is the route orchestrator: it picks the source hook,
  * contributes visible selection to Lumilio context via
- * {@link useGalleryContextContributor}, renders the chosen gallery layout, and
+ * {@link useBrowseSelectionContext}, renders the chosen gallery layout, and
  * keeps URL-backed carousel navigation in sync.
  * {@link AssetsPageHeader} owns route-level controls; {@link JustifiedGallery}
- * and {@link SquareGallery} render the browse model; {@link FullScreenCarousel}
- * inspects the current flattened asset set; {@link SearchFAB} writes to the
- * shared search state and the selected source hook decides how to execute it.
+ * and {@link SquareGallery} render the browse model; {@link AssetViewer}
+ * inspects the current flattened asset set; {@link SearchFAB} writes debounced
+ * search text to the URL and the selected source hook decides how to execute it.
+ * {@link AssetViewer} owns carousel/media inspection and delegates mutation
+ * dialogs and action state to {@link AssetViewerActions}; export and reprocess
+ * behavior live in the separate export flow through {@link AssetExportDialog}.
  * {@link PhotoPicker} is the narrow cross-feature picker entry: it creates an
  * isolated single-selection asset scope while keeping gallery and filter
  * implementation details inside Assets.
@@ -87,6 +102,9 @@
  * remains stable, while only an overscanned vertical slice mounts thumbnail
  * components. Leaving that slice removes media nodes instead of retaining every
  * tile ever visited. Inactive list/search queries have a short bounded GC time.
+ * {@link AssetPreviewGrid} is the finite dashboard-preview entry used outside
+ * Assets; it hides browse-group conversion, gallery implementation, and its
+ * isolated selection scope behind one public component.
  *
  * ## Decisions
  *
@@ -102,40 +120,41 @@
  *
  * @module
  */
-import type { AssetsProvider } from "./state/AssetsProvider.tsx";
-import type { createAssetsStore } from "./state/store.ts";
-import type { createUISlice } from "./state/slices/ui.slice.ts";
-import type { createFiltersSlice } from "./state/slices/filters.slice.ts";
-import type { createSelectionSlice } from "./state/slices/selection.slice.ts";
+import type {
+  AssetBrowserScope,
+  useAssetBrowserNavigation,
+} from "./flows/browse/selection/AssetBrowserScope.tsx";
+import type { createAssetSelectionStore } from "./flows/browse/selection/selection.store.ts";
+import type { mergeAssetFilters } from "./model/filter.ts";
+import type { useAssetBrowseRouteState } from "./flows/browse/useAssetBrowseRouteState.ts";
 import type { AssetViewDefinition, AssetsViewResult, BrowseGroup, BrowseItem } from "./types.ts";
 import type {
   browseGroupsFromQueryLikePage,
   createBrowseGroupsFromBrowseItemDTOs,
   flattenBrowseGroups,
   resolveBrowseSelectedAssetIds,
-} from "./utils/browseItems.ts";
-import type { useAssetActions } from "./api/useAssetActions.tsx";
-import type { useBulkAssetOperations } from "./hooks/useSelection.tsx";
-import type { useAssetsNavigation } from "./hooks/useAssetsNavigation.ts";
-import type {
-  useAssetsView,
-  useCurrentAssetsSearchView,
-  useCurrentAssetsView,
-} from "./api/useAssetsView.tsx";
-import type { PinAssetsViewResult, usePinAssetsView } from "./api/usePinAssetsView.tsx";
-import type { AssetsGalleryPage } from "./components/browse/AssetsGalleryPage.tsx";
+} from "./model/browseItems.ts";
+import type { useAssetActions } from "./api/useAssetActions.ts";
+import type { useBulkAssetActions } from "./flows/browse/bulk-actions/useBulkAssetActions.ts";
+import type { useAssetsList } from "./api/useAssetsList.ts";
+import type { useAssetBrowser } from "./flows/browse/useAssetBrowser.ts";
+import type { PinAssetsViewResult, usePinAssetsView } from "./api/usePinAssetsView.ts";
+import type { AssetBrowser } from "./flows/browse/AssetBrowser.tsx";
+import type { AssetPreviewGrid } from "./flows/browse/AssetPreviewGrid.tsx";
 import type Assets from "./routes/Assets.tsx";
 import type AssetsTrash from "./routes/AssetsTrash.tsx";
-import type AssetsPageHeader from "./components/browse/AssetsPageHeader.tsx";
-import type JustifiedGallery from "./components/browse/JustifiedGallery/JustifiedGallery.tsx";
-import type SquareGallery from "./components/browse/SquareGallery/SquareGallery.tsx";
-import type FullScreenCarousel from "./components/browse/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx";
-import type { SearchFAB } from "./components/browse/SearchFAB.tsx";
-import type { useGalleryContextContributor } from "./hooks/useGalleryContextContributor.ts";
-import type { useGalleryViewportWindow } from "./hooks/useGalleryViewportWindow.ts";
+import type AssetsPageHeader from "./flows/browse/header/AssetsPageHeader.tsx";
+import type JustifiedGallery from "./flows/browse/gallery/JustifiedGallery/JustifiedGallery.tsx";
+import type SquareGallery from "./flows/browse/gallery/SquareGallery/SquareGallery.tsx";
+import type AssetViewer from "./flows/viewer/AssetViewer.tsx";
+import type { AssetViewerActions } from "./flows/viewer/AssetViewerActions.tsx";
+import type { AssetExportDialog } from "./flows/export/AssetExportDialog.tsx";
+import type { SearchFAB } from "./flows/browse/SearchFAB.tsx";
+import type { useBrowseSelectionContext } from "./flows/browse/useBrowseSelectionContext.ts";
+import type { useGalleryViewportWindow } from "./flows/browse/gallery/useGalleryViewportWindow.ts";
 import type { useAssetMediaItem } from "./api/useAssetMediaItem.ts";
 import type { useStackCarouselAssets } from "./api/useStackCarouselAssets.ts";
-import type MediaViewer from "./components/media/MediaViewer.tsx";
+import type MediaViewer from "./flows/viewer/media/MediaViewer.tsx";
 import type PhotoPicker from "./picker/PhotoPicker.tsx";
 
 export {};

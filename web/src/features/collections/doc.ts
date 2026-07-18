@@ -58,7 +58,7 @@
  *   `AssetFilterDTO` already supports.
  * - **Liked** — the utility rail ({@link useUtilityShortcuts}) also includes
  *   Liked alongside Duplicates and Trash. {@link Liked} scopes
- *   {@link AssetsGalleryPage} to `{ liked: true }` and hides the default
+ *   {@link AssetBrowser} to `{ liked: true }` and hides the default
  *   `set-liked` bulk menu in favor of a single scoped "remove from Liked"
  *   action, since setting liked=true is meaningless on a page already
  *   filtered to liked assets.
@@ -82,7 +82,7 @@
  *
  * {@link AlbumDetails}, {@link TripDetails}, {@link UtilityClassifierAlbum},
  * {@link FolderDetails} and {@link TagDetails} all render through the shared
- * {@link AssetsGalleryPage} orchestrator, differing only by injection points:
+ * {@link AssetBrowser} orchestrator, differing only by injection points:
  * album scopes by `{ album_id }`, trip by `{ location(bbox), date }`, classifier
  * and tag detail by `{ tag_name, tag_source }`, folder detail by
  * `{ repository_id, folder_path, folder_recursive }`. Album detail carries an
@@ -118,7 +118,7 @@ import type { useTagSummaries } from "./api/useTagSummaries.ts";
 import type { encodeFolderKey, decodeFolderKey } from "./utils/folderKey.ts";
 import type { encodeTagKey, decodeTagKey } from "./utils/tagKey.ts";
 import type { useUtilityShortcuts } from "./components/utilityShortcuts.ts";
-import type { AssetsGalleryPage } from "@/features/assets/components/browse/AssetsGalleryPage.tsx";
+import type { AssetBrowser } from "@/features/assets";
 import type { CollectionHero } from "@/components/collection";
 import type Collections from "./routes/Collections.tsx";
 import type AlbumDetails from "./routes/AlbumDetails.tsx";

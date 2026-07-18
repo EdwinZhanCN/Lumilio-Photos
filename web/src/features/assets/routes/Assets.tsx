@@ -1,13 +1,13 @@
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useCallback, useState } from "react";
-import { AssetsProvider } from "../state/AssetsProvider";
+import { AssetBrowserScope } from "../flows/browse/selection/AssetBrowserScope";
 import { ErrorBoundary } from "react-error-boundary";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { $api } from "@/lib/http-commons/queryClient";
-import { AssetsGalleryPage } from "../components/browse/AssetsGalleryPage";
+import { AssetBrowser } from "../flows/browse/AssetBrowser";
 import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/share";
 
@@ -49,9 +49,8 @@ const Assets = () => {
       : [],
   );
 
-  // Pin deep-links use an isolated, non-persistent scope so they never pollute
-  // the main gallery's persisted filters/sort. syncUrl keeps the `pin` param
-  // alive across carousel open/close navigation.
+  // Pin deep-links use an isolated selection scope. Browse state is URL-owned,
+  // so the `pin` parameter survives carousel navigation without store syncing.
   const scopeId = isPinMode ? `assets:pin:${pin}` : "assets:main";
 
   const [shareAssetIds, setShareAssetIds] = useState<string[] | null>(null);
@@ -75,11 +74,15 @@ const Assets = () => {
         />
       )}
     >
-      <AssetsProvider key={scopeId} scopeId={scopeId} persist={!isPinMode} syncUrl={isPinMode}>
+      <AssetBrowserScope key={scopeId} scopeId={scopeId}>
         <WorkerProvider>
-          <AssetsGalleryPage pinId={pin ?? undefined} bulkActions={bulkActions} />
+          <AssetBrowser
+            pinId={pin ?? undefined}
+            bulkActions={bulkActions}
+            migrateLegacyState={!isPinMode}
+          />
         </WorkerProvider>
-      </AssetsProvider>
+      </AssetBrowserScope>
       <CreateShareLinkModal
         open={shareAssetIds !== null}
         onClose={() => setShareAssetIds(null)}
