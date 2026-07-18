@@ -45,7 +45,9 @@ own persisted chat/editor state and worker-backed capabilities.
    process module.
 5. Refactor `collections` with `people`, `share`, and `home`.
 6. Refactor `manage` after all of the capabilities it composes are stable.
-7. Audit public exports, old paths, feature cycles, generated architecture
+7. Refactor `lumilio` and `studio`, preserving persisted state and worker
+   boundaries.
+8. Audit public exports, old paths, feature cycles, generated architecture
    docs, and the final working tree.
 
 Each feature or tightly coupled small-feature slice should remain a separate,
@@ -69,3 +71,20 @@ Completion requires all in-scope feature roots to use the standard vocabulary,
 all workflow-specific code to have one clear owner, no obsolete paths or
 compatibility shims, an acyclic cross-feature graph, current generated feature
 docs, and passing full Web and browser gates.
+
+## Result
+
+Completed on 2026-07-18. All 16 frontend features now use the shared structural
+vocabulary. Workflow UI and orchestration live under named `flows/`; public
+route entries are thin; server state remains in `api/`; deterministic rules and
+wire/view models live in `model/`; cross-flow state and technical modules retain
+their explicit boundaries. Obsolete and empty feature directories were removed.
+
+Final evidence:
+
+- Type checking and linting passed for 532 source files.
+- Source boundaries passed for 459 runtime modules and 1,156 runtime edges with
+  zero cycles.
+- All 48 test files and 152 tests passed.
+- Production build, entry bundle budget, BLAKE3/upload lifecycle browser smoke,
+  and Studio worker/WASM packaging passed.
