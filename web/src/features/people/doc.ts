@@ -66,8 +66,8 @@ import type {
   useSetPersonCover,
   useSetPersonHidden,
 } from "./api/usePeople.ts";
-import type PersonDetails from "./routes/PersonDetails.tsx";
-import type PersonRenameModal from "./components/PersonRenameModal.tsx";
-import type PersonFacesPanel from "./components/PersonFacesPanel.tsx";
-import type PersonPicker from "./components/PersonPicker.tsx";
+import type PersonDetails from "./flows/detail/PersonDetailsFlow.tsx";
+import type PersonRenameModal from "./flows/detail/PersonRenameModal.tsx";
+import type PersonFacesPanel from "./flows/detail/PersonFacesPanel.tsx";
+import type PersonPicker from "./flows/detail/PersonPicker.tsx";
 export {};

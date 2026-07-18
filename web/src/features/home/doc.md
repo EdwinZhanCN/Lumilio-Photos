@@ -8,7 +8,7 @@ user to the feature that owns the selected object.
 
 ## State
 
-[Home](./routes/Home.tsx) stores only view state from the URL. The default `gallery` view
+[Home](./flows/overview/HomeFlow.tsx) stores only view state from the URL. The default `gallery` view
 omits the `tab` query parameter; the statistics view is addressed as
 `?tab=stats`. The page header includes [BrowseScopeSelect](@/features/repositories), and the
 selected browse scope is read through [useBrowseScope](@/features/repositories).
@@ -18,28 +18,28 @@ chooses a repository, the scoped id is passed to featured-photo, statistics,
 map-point, and location-cluster hooks. Home does not use the working
 repository because it never creates new assets.
 
-[StatsCards](./components/StatsCards.tsx) owns only local presentation state for its selected
+[StatsCards](./flows/overview/StatsCards.tsx) owns only local presentation state for its selected
 heatmap year. Changing repository scope resets the selected year so the
 default can be recalculated from the scoped available-years response.
 
 ## Data
 
 [useFeaturedPhotos](./api/useFeaturedPhotos.ts) reads `/api/v1/assets/featured` with a small count
-and a larger candidate window. [GalleryGrid](./components/GalleryGrid.tsx) renders those assets
+and a larger candidate window. [GalleryGrid](./flows/overview/GalleryGrid.tsx) renders those assets
 through the shared square gallery grouping helpers and uses skeleton cards
 when no featured assets have loaded.
 
 [usePhotoStats](./api/usePhotoStats.ts) coordinates focal-length, camera/lens, time-of-day,
 available-years, and daily-activity as independent TanStack Query entries.
-[StatsCards](./components/StatsCards.tsx) owns only the selected heatmap year and transforms cached
+[StatsCards](./flows/overview/StatsCards.tsx) owns only the selected heatmap year and transforms cached
 responses into percentages and heatmap values.
 
 [useMapPhotoAssets](@/features/assets/map/useMapPhotoAssets.ts) reads paginated map points from
 `/api/v1/assets/map-points`. Home enables its bounded preview only when the
 map card nears the viewport; the full Map route sends the visible bounding
 box and replaces its query as the viewport changes. [useLocationClusters](@/features/assets/map/useLocationClusters.ts) reads paginated
-location clusters for the map badge. [SpacetimeMapCard](./components/SpacetimeMapCard.tsx) delegates map
-rendering to [PhotoMapView](./components/PhotoMapView.tsx); clicking a point navigates to the owning
+location clusters for the map badge. [SpacetimeMapCard](./flows/overview/SpacetimeMapCard.tsx) delegates map
+rendering to [PhotoMapView](./flows/overview/PhotoMapView.tsx); clicking a point navigates to the owning
 asset route instead of opening an editor inside Home.
 
 ## Composition
