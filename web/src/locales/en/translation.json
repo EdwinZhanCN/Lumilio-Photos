@@ -157,6 +157,7 @@
       "title": "Basic Info",
       "viewExif": "View EXIF"
     },
+    "clearSearchAriaLabel": "Clear search",
     "errorFallback": {
       "something_went_wrong": "Something went wrong"
     },
@@ -280,6 +281,8 @@
       "componentRaw": "RAW",
       "componentTabs": "Media components",
       "media_not_available": "Media not available",
+      "toggleInfo": "Toggle asset information",
+      "toggleLike": "Toggle liked status",
       "unknown_file": "Unknown file",
       "unknown_type": "Unknown type",
       "video_title": "Video"
@@ -329,6 +332,7 @@
       "modeLive": "Live"
     },
     "pinTrailLabel": "Selection",
+    "searchAriaLabel": "Search assets",
     "searchPlaceholder": "Search assets...",
     "stackCarousel": {
       "error": "Stack assets are temporarily unavailable.",
@@ -336,20 +340,9 @@
       "loading": "Loading stack assets..."
     },
     "stackDetail": {
-      "assetFallback": "Current asset",
       "close": "Close stack details",
-      "coverBadge": "Cover",
-      "currentBadge": "Current",
-      "empty": "No related assets were returned for this stack.",
-      "error": "Stack details are temporarily unavailable for this asset.",
-      "frameLabel": "Frame {{position}}",
-      "loading": "Loading stack details...",
-      "memberCount_one": "{{count}} asset in stack",
-      "memberCount_other": "{{count}} assets in stack",
       "openButton_one": "View stack details",
-      "openButton_other": "View {{count}} related assets",
-      "thumbnailAlt": "Stack member preview",
-      "title": "Stack details"
+      "openButton_other": "View {{count}} related assets"
     },
     "tags": {
       "add": "Add tag",
@@ -883,6 +876,8 @@
     "noRetryTasks": "No retry tasks are available for this asset type.",
     "optional": "Optional",
     "retryProcessing": "Retry Processing",
+    "retrySubmitFailed": "Failed to submit the processing retry.",
+    "retrySubmitted": "Processing retry submitted.",
     "retryTitle": "Retry Processing Tasks",
     "selectedCount_one": "{{count}} selected",
     "selectedCount_other": "{{count}} selected",

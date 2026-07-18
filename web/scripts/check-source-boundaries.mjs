@@ -27,7 +27,9 @@ const standardFeatureDirectories = new Set([
   "api",
   "components",
   "docs",
+  "flows",
   "hooks",
+  "model",
   "modules",
   "routes",
   "state",
@@ -309,15 +311,17 @@ for (const filename of files) {
   const importerIsTest = isTestFile(importer);
   const importerParts = importerRelative.split("/");
   const featureSection = importerFeature ? importerParts[2] : null;
+  const isFlowLocalState = featureSection === "flows" && importerParts.length >= 5;
   const basename = path.basename(importerRelative);
 
   if (
     importerFeature &&
     featureSection !== "state" &&
+    !isFlowLocalState &&
     /(?:Provider|Store|store|Reducer|reducer|Context|context)\.[cm]?[jt]sx?$/.test(basename)
   ) {
     violations.push(
-      `${importerRelative}: shared feature state modules belong in the feature state directory`,
+      `${importerRelative}: shared feature state belongs in state/; flow-local state must stay under flows/<flow>/`,
     );
   }
 
@@ -342,6 +346,15 @@ for (const filename of files) {
     );
   }
 
+  if (
+    importerFeature === "assets" &&
+    featureSection === "model" &&
+    !importerIsTest &&
+    /from\s+["'](?:react|@tanstack\/react-query)(?:\/[^"']*)?["']/.test(sourceText)
+  ) {
+    violations.push(`${importerRelative}: the Assets model layer must remain React-free`);
+  }
+
   for (const imported of readImports(filename, sourceText)) {
     const { specifier, typeOnly } = imported;
     if (!specifier.startsWith("@/") && !specifier.startsWith(".")) continue;
@@ -356,6 +369,33 @@ for (const filename of files) {
     const resolvedAbsolute = path.resolve(resolved);
     const importedFeature = featureOf(resolvedAbsolute);
     const importedRoot = rootLayerOf(resolvedAbsolute);
+    const importedRelative = relativeToSrc(resolvedAbsolute);
+    const importedFeatureSection = importedRelative.split("/")[2] ?? null;
+
+    if (importerFeature === "assets" && importedFeature === "assets") {
+      const importsRootTypes = importedRelative === "features/assets/types.ts" && typeOnly;
+      if (featureSection === "model" && importedFeatureSection !== "model" && !importsRootTypes) {
+        violations.push(
+          `${importerRelative}: Assets model may only depend on model/ and type-only root contracts`,
+        );
+      }
+      if (
+        featureSection === "api" &&
+        ["components", "flows", "routes", "state"].includes(importedFeatureSection)
+      ) {
+        violations.push(
+          `${importerRelative}: Assets api cannot depend on UI or client-state layers`,
+        );
+      }
+      if (
+        featureSection === "state" &&
+        ["api", "components", "flows", "routes"].includes(importedFeatureSection)
+      ) {
+        violations.push(
+          `${importerRelative}: Assets feature-wide state cannot depend on API or UI flows`,
+        );
+      }
+    }
 
     if (
       importedRoot === "app" &&

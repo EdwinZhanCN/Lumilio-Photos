@@ -18,7 +18,7 @@ export interface PublicShareLightboxProps {
 
 /**
  * Minimal full-screen previous/next viewer for the public share page. Not a
- * reuse of FullScreenCarousel — that component is built around the full
+ * reuse of AssetViewer — that component is built around the full
  * authenticated Asset type and bakes in like/delete/album/export actions that
  * make no sense (and would leak internal APIs) on a public, tokenless page.
  */

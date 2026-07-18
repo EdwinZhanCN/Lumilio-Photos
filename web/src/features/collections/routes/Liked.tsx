@@ -4,10 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Heart, HeartOff } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import {
-  AssetsGalleryPage,
-  AssetsProvider,
+  AssetBrowser,
+  AssetBrowserScope,
   useAssetActions,
-  type AssetFilter,
+  type AssetBrowseConstraint,
 } from "@/features/assets";
 import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
@@ -18,10 +18,8 @@ import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/
 
 const HIDDEN_LIKED_BULK_ACTIONS = ["set-liked"] as const;
 // Module-level constant so the reference is stable across renders — an
-// inline `{ liked: true }` literal would give AssetsGalleryPage's internal
-// `useMemo([baseFilter, ...])` a new identity every render, which
-// retriggers the view definition and can loop with the syncUrl search sync.
-const LIKED_BASE_FILTER: AssetFilter = { liked: true };
+// Keep the page constraint stable so the browse query definition is stable.
+const LIKED_CONSTRAINT: AssetBrowseConstraint = { liked: true };
 
 const LikedContent = () => {
   const { t } = useI18n();
@@ -97,19 +95,18 @@ const LikedContent = () => {
 
   return (
     <>
-      <AssetsProvider scopeId="collections:liked" syncUrl basePath="/collections/liked">
+      <AssetBrowserScope scopeId="collections:liked" basePath="/collections/liked">
         <WorkerProvider>
-          <AssetsGalleryPage
+          <AssetBrowser
             title={t("collections.utilities.liked.title")}
             icon={<Heart className="h-6 w-6 text-primary" strokeWidth={1.5} />}
-            baseFilter={LIKED_BASE_FILTER}
+            constraint={LIKED_CONSTRAINT}
             viewKey="collections:liked"
             bulkActions={bulkActions}
             hiddenBulkActions={HIDDEN_LIKED_BULK_ACTIONS}
-            lockedFilterFields={["liked"]}
           />
         </WorkerProvider>
-      </AssetsProvider>
+      </AssetBrowserScope>
       <CreateShareLinkModal
         open={shareAssetIds !== null}
         onClose={() => setShareAssetIds(null)}

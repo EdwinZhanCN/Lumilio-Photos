@@ -5,8 +5,8 @@ import AlbumDetails from "./AlbumDetails";
 import type { AssetsBulkActionContext } from "@/lib/assets/bulkActions";
 
 const mocks = vi.hoisted(() => ({
-  AssetsProvider: vi.fn((props: { children: ReactNode }) => props.children),
-  AssetsGalleryPage: vi.fn((_props: unknown) => "assets-gallery-page"),
+  AssetBrowserScope: vi.fn((props: { children: ReactNode }) => props.children),
+  AssetBrowser: vi.fn((_props: unknown) => "asset-browser"),
   invalidateQueries: vi.fn(),
   removeAssetFromAlbum: vi.fn(),
   rebuildBioClip: vi.fn(),
@@ -22,8 +22,8 @@ vi.mock("@/contexts/WorkerProvider", () => ({
 }));
 
 vi.mock("@/features/assets", () => ({
-  AssetsProvider: mocks.AssetsProvider,
-  AssetsGalleryPage: mocks.AssetsGalleryPage,
+  AssetBrowserScope: mocks.AssetBrowserScope,
+  AssetBrowser: mocks.AssetBrowser,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -87,7 +87,7 @@ describe("AlbumDetails bulk actions", () => {
 
     render(<AlbumDetails />);
 
-    const props = mocks.AssetsGalleryPage.mock.calls[0][0] as {
+    const props = mocks.AssetBrowser.mock.calls[0][0] as {
       hiddenBulkActions: string[];
       bulkActions: (context: AssetsBulkActionContext) => unknown[];
     };

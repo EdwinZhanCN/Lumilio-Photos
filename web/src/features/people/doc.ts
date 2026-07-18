@@ -17,7 +17,7 @@
  * repository filter — as do the face list and every mutation below.
  * {@link PersonDetails} is the detail route: a {@link CollectionHero} with an
  * edit action that opens {@link PersonRenameModal}, and the person's asset
- * gallery rendered through {@link AssetsGalleryPage}.
+ * gallery rendered through {@link AssetBrowser}.
  *
  * ## Corrections
  *
@@ -55,7 +55,7 @@
  * @module
  */
 import type { CollectionHero } from "@/components/collection";
-import type { AssetsGalleryPage } from "@/features/assets/components/browse/AssetsGalleryPage.tsx";
+import type { AssetBrowser } from "@/features/assets";
 import type {
   usePeople,
   usePersonDetails,

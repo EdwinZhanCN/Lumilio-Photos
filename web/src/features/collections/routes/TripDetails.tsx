@@ -1,7 +1,7 @@
 import { useParams, useLocation } from "react-router-dom";
 import { useMemo } from "react";
 import { MapPin } from "lucide-react";
-import { AssetsGalleryPage, AssetsProvider } from "@/features/assets";
+import { AssetBrowser, AssetBrowserScope } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -50,16 +50,15 @@ const TripDetails = () => {
 
   return (
     <WorkerProvider>
-      <AssetsProvider
+      <AssetBrowserScope
         key={`trip:${trip.id}`}
         scopeId={`trip:${trip.id}`}
-        persist={false}
         basePath={`/collections/places/${trip.id}`}
       >
-        <AssetsGalleryPage
+        <AssetBrowser
           title={trip.displayTitle}
           icon={<MapPin className="w-6 h-6 text-primary" />}
-          baseFilter={{
+          constraint={{
             location: {
               north: trip.bbox.north,
               south: trip.bbox.south,
@@ -73,7 +72,7 @@ const TripDetails = () => {
           }}
           viewKey={`trip:${trip.id}`}
         />
-      </AssetsProvider>
+      </AssetBrowserScope>
     </WorkerProvider>
   );
 };

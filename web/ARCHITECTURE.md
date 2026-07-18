@@ -7,7 +7,7 @@ This document defines where frontend code belongs and which imports are allowed.
 | Path                      | Responsibility                                                                                                                                                                                                                            |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/app/`                | Application composition only: root providers, routing, shell, fatal-error handling, and process-wide effects. Domain behavior does not belong here.                                                                                       |
-| `src/features/<feature>/` | One product/domain capability. A feature owns its routes, components, hooks, API adapters, state, types, utilities, tests, and feature-specific styles.                                                                                   |
+| `src/features/<feature>/` | One product/domain capability. A feature owns its routes, flows, model rules, API adapters, state lifecycles, tests, and feature-specific styles.                                                                                         |
 | `src/components/`         | Reusable presentational UI with no feature/API/store dependency. Components accept plain data and callbacks; semantic families such as `collection` are allowed when multiple domains use them. Do not create a generic `shared/` bucket. |
 | `src/hooks/`              | Generic React mechanisms used across domains. Workflow-specific hooks belong in their feature; a small stable query/type contract shared by several features may live under a named `lib/<concept>` namespace.                            |
 | `src/lib/`                | Non-visual lower-layer code: HTTP/runtime adapters, algorithms, formatting, preferences, and stable contracts shared across features (for example `albums`, `assets`, or `upload`). It must not import or orchestrate a feature.          |
@@ -22,14 +22,16 @@ Every feature uses the same root vocabulary. Directories are optional—do not c
 
 ```text
 src/features/<feature>/
-├── api/          # TanStack Query definitions, mutations, DTO adapters, server workflows
-├── components/   # feature-owned UI
+├── api/          # TanStack Query definitions, mutations and DTO adapters
+├── model/        # pure domain types, rules, codecs and transformations
+├── flows/        # user workflows; each flow colocates its UI, hooks and local state
+├── components/   # UI genuinely reused by multiple flows in this feature
 ├── docs/         # feature-local supporting notes; doc.ts/doc.md remain at the root
-├── hooks/        # React workflows and UI orchestration; composes api/state
-├── modules/      # cohesive capability slices inside a large feature
+├── hooks/        # rare feature-wide React mechanisms shared across flows
+├── modules/      # technically isolated capabilities that are not user workflows
 ├── routes/       # router entry components
-├── state/        # Context, Zustand, reducers, selectors, persistence and reset
-├── utils/        # pure feature-domain functions
+├── state/        # feature-wide state, persistence, migration and reset only
+├── utils/        # legacy/general pure helpers with no domain vocabulary
 ├── types.ts      # feature-wide types
 ├── index.ts      # narrow cross-feature public API, only when needed
 ├── doc.ts        # architecture source, when documented
@@ -37,12 +39,15 @@ src/features/<feature>/
 ```
 
 - Root files other than `index.ts`, `types.ts`, `doc.ts`, and generated `doc.md` are not allowed.
-- `api/` owns reusable server-state access. A hook in `hooks/` may orchestrate mutations as part of a workflow, but reusable query definitions belong in `api/`.
-- `state/` owns feature-wide client state and lifecycle: providers, stores, reducers, selectors, persistence, hydration, and reset behavior.
-- `modules/<capability>/` is the only extension point for a large feature. Name it after product vocabulary (`editor`, `widgets`, `process`), never `common`, `misc`, or `shared`.
+- `api/` owns reusable server-state access and must not contain page composition or modal state.
+- `model/` is React-free. Put domain names, normalization, validation, URL codecs, grouping, sorting, and other deterministic rules here rather than growing a catch-all `utils/` directory.
+- `flows/<workflow>/` is the default home for workflow UI and orchestration. Colocate its components, hooks, reducers, scoped Zustand stores, tests, and styles; nested names such as `gallery/`, `selection/`, or `header/` describe parts of that workflow.
+- `components/` is not a second UI dumping ground. A component used by only one flow stays in that flow; root components must have real consumers in multiple flows.
+- `state/` owns only state whose lifecycle spans multiple flows or refreshes: persistence, migration, hydration, reset, or a genuinely feature-wide provider. A reducer or scoped store used by one flow stays with that flow.
+- `modules/<capability>/` is for an isolated technical/product capability that is not itself a user journey. Name it after product vocabulary (`editor`, `widgets`, `process`), never `common`, `misc`, or `shared`.
 - Tests and feature-specific styles stay beside the implementation they characterize.
 - A small feature omits unused directories. Uniformity means identical directory semantics, not identical directory counts.
-- The Assets feature keeps `map/` and `picker/` as reviewed public sub-entry exceptions. Their entry files remain narrow.
+- The Assets feature expresses its main journeys as `flows/browse`, `flows/viewer`, and `flows/export`; pure filtering and browse-item rules live in `model`. It keeps `map/` and `picker/` as reviewed public sub-entry exceptions whose entry files remain narrow.
 
 ## Dependency rules
 
@@ -66,8 +71,8 @@ productionSmoke.ts -> feature public APIs / lib / workers (browser gate only)
 Examples:
 
 ```ts
-// Inside features/assets: relative to the owning feature.
-import { useSelection } from "../hooks/useSelection";
+// Inside features/assets: relative to the owning flow.
+import { useAssetSelection } from "./selection/useAssetSelection";
 
 // Across features: use a public entry.
 import { useMessage } from "@/features/notifications";
@@ -96,7 +101,7 @@ flowchart TD
 | ------------------------------------ | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Server fact                          | TanStack Query                      | Put reusable query/mutation definitions in the feature `api/`. Never copy fetched collections into Context or Zustand.      |
 | Cross-cutting runtime capability     | React Context                       | App-wide capabilities live in `src/contexts`; feature-scoped providers and contexts live in that feature's `state/`.        |
-| Shared feature interaction           | Zustand or `useReducer`             | Put the store/reducer, provider, selectors, hydration, and reset behavior in `state/`.                                      |
+| Shared workflow interaction          | Zustand or `useReducer`             | Colocate it under `flows/<flow>/`; use root `state/` only when the lifecycle genuinely spans flows or refreshes.            |
 | Single component interaction         | `useState` or local `useReducer`    | Keep it beside the rendering component; do not promote it without multiple consumers.                                       |
 | Shareable/restorable page state      | URL / React Router                  | The URL remains authoritative for search, tab, filter, entity, or view state that should survive navigation or be linkable. |
 | Non-rendering temporary value        | `useRef`                            | Use for DOM handles, latest callbacks, request identity, and mutable bookkeeping that must not render.                      |
@@ -104,7 +109,8 @@ flowchart TD
 
 - Keep ephemeral state in the component that renders it. Lift it only when multiple siblings need the same interaction state.
 - Use TanStack Query for server data, pagination, loading/error state, cache invalidation, and mutations. Do not mirror fetched collections into Context or Zustand.
-- Use a feature-local Zustand store for interactive state shared across that feature, such as selection, filters, panels, or URL-synchronized controls.
+- Use a scoped Zustand store for transient interaction shared by several components in one flow, such as browse selection. Do not store applied filters, search, sorting, or the current route entity there when those values belong in the URL.
+- Keep an unapplied form/filter draft in a local reducer; committing it writes to its authoritative owner (for example the URL or a mutation).
 - Use Context for dependency/provider boundaries and truly cross-cutting runtime state. A domain-specific provider belongs under its feature, not `src/contexts`.
 - Put workflow orchestration and feature-specific hooks in the owning feature. A small stable query/type contract used by several features may live under a named `lib/<concept>` namespace to avoid coupling those features. Use generated OpenAPI types through `lib/http-commons`; never hand-edit `src/lib/http-commons/schema.d.ts`.
 - Keep workflow-specific types, formatters, validators, and adapters in the feature. Move code to `lib` only when it is a stable lower contract and does not depend on feature UI, state, or orchestration.

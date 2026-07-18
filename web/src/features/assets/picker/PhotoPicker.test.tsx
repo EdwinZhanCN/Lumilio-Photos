@@ -5,15 +5,10 @@ import type { Asset } from "@/lib/assets/types";
 import PhotoPicker from "./PhotoPicker";
 
 const mocks = vi.hoisted(() => ({
-  useCurrentAssetsView: vi.fn(),
-  useSelection: vi.fn(),
-  AssetsProvider: vi.fn((props: { children: ReactNode }) => props.children),
-  AssetsPageHeader: vi.fn(
-    (_props: { lockedFilterFields?: readonly string[] }) => "assets-page-header",
-  ),
-  resetFilters: vi.fn(),
-  batchUpdateFilters: vi.fn(),
-  setSearchQuery: vi.fn(),
+  useAssetBrowser: vi.fn(),
+  useAssetSelection: vi.fn(),
+  AssetBrowserScope: vi.fn((props: { children: ReactNode }) => props.children),
+  AssetsPageHeader: vi.fn((_props: Record<string, unknown>) => "assets-page-header"),
   setSelectionEnabled: vi.fn(),
   clearSelection: vi.fn(),
 }));
@@ -22,39 +17,27 @@ vi.mock("@/contexts/WorkerProvider", () => ({
   WorkerProvider: ({ children }: { children: ReactNode }) => children,
 }));
 
-vi.mock("../state/AssetsProvider", () => ({
-  AssetsProvider: mocks.AssetsProvider,
+vi.mock("../flows/browse/selection/AssetBrowserScope", () => ({
+  AssetBrowserScope: mocks.AssetBrowserScope,
 }));
 
-vi.mock("../state/selectors", () => ({
-  useSortBy: () => "date_captured",
-  useUIActions: () => ({
-    setSortBy: vi.fn(),
-    setSearchQuery: mocks.setSearchQuery,
-  }),
-  useFilterActions: () => ({
-    resetFilters: mocks.resetFilters,
-    batchUpdateFilters: mocks.batchUpdateFilters,
-  }),
-  useSelectionActions: () => ({
+vi.mock("../flows/browse/selection/useAssetSelection", () => ({
+  useAssetSelectionActions: () => ({
     clear: mocks.clearSelection,
     setEnabled: mocks.setSelectionEnabled,
   }),
+  useAssetSelection: mocks.useAssetSelection,
 }));
 
-vi.mock("../api/useAssetsView", () => ({
-  useCurrentAssetsView: mocks.useCurrentAssetsView,
+vi.mock("../flows/browse/useAssetBrowser", () => ({
+  useAssetBrowser: mocks.useAssetBrowser,
 }));
 
-vi.mock("../hooks/useSelection", () => ({
-  useSelection: mocks.useSelection,
-}));
-
-vi.mock("../components/browse/SquareGallery/SquareGallery", () => ({
+vi.mock("../flows/browse/gallery/SquareGallery/SquareGallery", () => ({
   default: () => <div>square-gallery</div>,
 }));
 
-vi.mock("../components/browse/AssetsPageHeader", () => ({
+vi.mock("../flows/browse/header/AssetsPageHeader", () => ({
   default: mocks.AssetsPageHeader,
 }));
 
@@ -78,7 +61,7 @@ const createAsset = (assetId: string, overrides: Partial<Asset> = {}): Asset =>
 
 describe("PhotoPicker", () => {
   it("locks the media type filter by default", async () => {
-    mocks.useCurrentAssetsView.mockReturnValue({
+    mocks.useAssetBrowser.mockReturnValue({
       assets: [],
       browseGroups: [],
       browseItems: [],
@@ -89,7 +72,7 @@ describe("PhotoPicker", () => {
       hasMore: false,
       viewKey: "picker-view",
     });
-    mocks.useSelection.mockReturnValue({
+    mocks.useAssetSelection.mockReturnValue({
       enabled: true,
       selectedIds: new Set(),
       selectedCount: 0,
@@ -97,16 +80,16 @@ describe("PhotoPicker", () => {
 
     render(<PhotoPicker scopeId="test-scope" onSelect={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(mocks.batchUpdateFilters).toHaveBeenCalledWith({
-        enabled: true,
-        type: "PHOTO",
-        raw: undefined,
-      });
-    });
+    expect(mocks.useAssetBrowser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        constraint: { type: "PHOTO" },
+        userFilter: {},
+      }),
+    );
     expect(mocks.AssetsPageHeader.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        lockedFilterFields: ["type"],
+        constraint: { type: "PHOTO" },
+        filter: {},
         hiddenBulkActions: [
           "set-rating",
           "set-liked",
@@ -121,7 +104,7 @@ describe("PhotoPicker", () => {
   });
 
   it("passes additional locked filters and initial raw constraint", async () => {
-    mocks.useCurrentAssetsView.mockReturnValue({
+    mocks.useAssetBrowser.mockReturnValue({
       assets: [],
       browseGroups: [],
       browseItems: [],
@@ -132,7 +115,7 @@ describe("PhotoPicker", () => {
       hasMore: false,
       viewKey: "picker-view",
     });
-    mocks.useSelection.mockReturnValue({
+    mocks.useAssetSelection.mockReturnValue({
       enabled: true,
       selectedIds: new Set(),
       selectedCount: 0,
@@ -147,27 +130,21 @@ describe("PhotoPicker", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(mocks.batchUpdateFilters).toHaveBeenCalledWith({
-        enabled: true,
-        type: "PHOTO",
-        raw: false,
-      });
-    });
-    expect(mocks.AssetsProvider.mock.calls[0][0]).toEqual(
+    expect(mocks.useAssetBrowser).toHaveBeenCalledWith(
       expect.objectContaining({
-        initialState: {
-          filters: {
-            enabled: true,
-            type: "PHOTO",
-            raw: false,
-          },
-        },
+        constraint: { type: "PHOTO", raw: false },
+        userFilter: {},
+      }),
+    );
+    expect(mocks.AssetBrowserScope.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        initialSelection: { selectionMode: "single" },
       }),
     );
     expect(mocks.AssetsPageHeader.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        lockedFilterFields: ["type", "raw"],
+        constraint: { type: "PHOTO", raw: false },
+        filter: {},
         hiddenBulkActions: [
           "set-rating",
           "set-liked",
@@ -184,7 +161,7 @@ describe("PhotoPicker", () => {
   it("resolves stack selections to the representative asset id", async () => {
     const onSelect = vi.fn();
 
-    mocks.useCurrentAssetsView.mockReturnValue({
+    mocks.useAssetBrowser.mockReturnValue({
       assets: [],
       browseGroups: [
         {
@@ -266,7 +243,7 @@ describe("PhotoPicker", () => {
       hasMore: false,
       viewKey: "picker-view",
     });
-    mocks.useSelection.mockReturnValue({
+    mocks.useAssetSelection.mockReturnValue({
       enabled: true,
       selectedIds: new Set(["stack:stack-1"]),
       selectedCount: 1,

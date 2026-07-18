@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { EyeOff, Share2, Users, UserRound } from "lucide-react";
-import { AssetsGalleryPage, AssetsProvider } from "@/features/assets";
+import { AssetBrowser, AssetBrowserScope } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -146,11 +146,11 @@ const PersonAssetsContent = () => {
 
   return (
     <>
-      <AssetsGalleryPage
+      <AssetBrowser
         title={displayName}
         icon={<Users className="w-6 h-6 text-primary" />}
         viewKey={`person:${personId}`}
-        baseFilter={{ person_id: personIdNumber }}
+        constraint={{ person_id: personIdNumber }}
         hero={hero}
         bulkActions={bulkActions}
       />
@@ -171,14 +171,13 @@ const PersonDetails = () => {
 
   return (
     <WorkerProvider>
-      <AssetsProvider
+      <AssetBrowserScope
         key={`person:${personId}`}
         scopeId={`person:${personId}`}
-        persist={false}
         basePath={`/people/${personId}`}
       >
         <PersonAssetsContent />
-      </AssetsProvider>
+      </AssetBrowserScope>
     </WorkerProvider>
   );
 };

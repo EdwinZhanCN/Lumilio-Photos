@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AssetsGalleryPage, AssetsProvider } from "@/features/assets";
+import { AssetBrowser, AssetBrowserScope } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AlbumIcon, Bird, FolderMinus, RefreshCcw, Share2 } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -256,10 +256,10 @@ const AlbumAssetsContent = () => {
 
   return (
     <>
-      <AssetsGalleryPage
+      <AssetBrowser
         title={album?.album_name || t("collections.albumDetails.fallbackName")}
         icon={<AlbumIcon className="h-6 w-6 text-primary" />}
-        baseFilter={{ album_id: albumIdNumber }}
+        constraint={{ album_id: albumIdNumber }}
         viewKey={`album:${albumId}`}
         hero={hero}
         bulkActions={bulkActions}
@@ -282,14 +282,13 @@ const AlbumDetails = () => {
 
   return (
     <WorkerProvider>
-      <AssetsProvider
+      <AssetBrowserScope
         key={`album:${albumId}`}
         scopeId={`album:${albumId}`}
-        persist={false}
         basePath={`/collections/${albumId}`}
       >
         <AlbumAssetsContent />
-      </AssetsProvider>
+      </AssetBrowserScope>
     </WorkerProvider>
   );
 };

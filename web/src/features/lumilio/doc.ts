@@ -60,8 +60,8 @@
  *     DOCK --> MESSAGES["ChatMessages"]
  *     INPUT --> STORE["useLumilioChatStore"]
  *     CHIPS --> CTX["useContextStore"]
- *     GALLERY["useGalleryContextContributor"] --> CTX
- *     CAROUSEL["useCarouselContextContributor"] --> CTX
+ *     GALLERY["useBrowseSelectionContext"] --> CTX
+ *     CAROUSEL["useViewerContextContributor"] --> CTX
  *     STORE --> SSE["streamAgent"]
  *     MESSAGES --> INLINE["InlineWidgetCard"]
  *     INLINE --> PIN["PinButton"]
@@ -76,7 +76,7 @@
  * {@link ContextChips}, and {@link ChatMessages}; asset and carousel surfaces
  * mount it in `fab` mode. Asset-owned contributors publish context through the
  * shared assistant bus via
- * {@link useGalleryContextContributor} / {@link useCarouselContextContributor}.
+ * {@link useBrowseSelectionContext} / {@link useViewerContextContributor}.
  * Board pins render through {@link BoardTile}, so the agent UI is a feature
  * overlay rather than another gallery implementation.
  *
@@ -113,8 +113,8 @@ import type { createMentionSources, MentionPayload } from "./modules/mentions/me
 import type { useSlashMacros } from "./modules/slash/slashMacros.ts";
 import type { useLumilioChatStore } from "./state/chatStore.ts";
 import type { useContextStore, useDockStore } from "@/lib/assistant/index.ts";
-import type { useGalleryContextContributor } from "@/features/assets/hooks/useGalleryContextContributor.ts";
-import type { useCarouselContextContributor } from "@/features/assets/hooks/useCarouselContextContributor.ts";
+import type { useBrowseSelectionContext } from "@/features/assets/flows/browse/useBrowseSelectionContext.ts";
+import type { useViewerContextContributor } from "@/features/assets/flows/viewer/useViewerContextContributor.ts";
 import type { resetLumilioSession } from "./state/resetSession.ts";
 import type {
   ConfirmBlock,

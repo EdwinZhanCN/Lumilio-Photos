@@ -3,8 +3,8 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
 import { RotateCcw, Trash2 } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
-import { AssetsProvider } from "../state/AssetsProvider";
-import { AssetsGalleryPage } from "../components/browse/AssetsGalleryPage";
+import { AssetBrowserScope } from "../flows/browse/selection/AssetBrowserScope";
+import { AssetBrowser } from "../flows/browse/AssetBrowser";
 import type { AssetsBulkActionContext, AssetsBulkActionItem } from "@/lib/assets/bulkActions";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
@@ -93,22 +93,22 @@ const AssetsTrashContent = () => {
   );
 
   return (
-    <AssetsProvider
+    <AssetBrowserScope
       scopeId="assets:trash"
       basePath="/collections/trash"
       defaultSelectionMode="multiple"
     >
       <WorkerProvider>
-        <AssetsGalleryPage
+        <AssetBrowser
           title={t("assets.trash.title")}
           icon={<Trash2 className="h-6 w-6 text-primary" strokeWidth={1.5} />}
-          baseFilter={{ is_deleted: true }}
+          constraint={{ is_deleted: true }}
           viewKey="assets:trash"
           bulkActions={bulkActions}
           hiddenBulkActions={HIDDEN_TRASH_BULK_ACTIONS}
         />
       </WorkerProvider>
-    </AssetsProvider>
+    </AssetBrowserScope>
   );
 };
 
