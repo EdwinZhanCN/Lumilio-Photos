@@ -14,8 +14,8 @@ repositories, so only the list read follows the browse scope.
 `includeHidden` toggle that switches the grid from visible-only to all
 people); [usePersonDetails](./api/usePeople.ts) loads one person plus its rename, with no
 repository filter — as do the face list and every mutation below.
-[PersonDetails](./routes/PersonDetails.tsx) is the detail route: a [CollectionHero](@/components/collection) with an
-edit action that opens [PersonRenameModal](./components/PersonRenameModal.tsx), and the person's asset
+[PersonDetails](./flows/detail/PersonDetailsFlow.tsx) is the detail route: a [CollectionHero](@/components/collection) with an
+edit action that opens [PersonRenameModal](./flows/detail/PersonRenameModal.tsx), and the person's asset
 gallery rendered through [AssetBrowser](@/features/assets).
 
 ## Corrections
@@ -24,16 +24,16 @@ Two distinct surfaces sit on the same person:
 
 - **Asset gallery** — the person's *photos*, scoped by `{ person_id }`. This
   is the browsing surface and does not render face crops as gallery content.
-- **Edit modal** — [PersonRenameModal](./components/PersonRenameModal.tsx) owns tabbed identity management:
-  info/name/hidden state, face corrections through [PersonFacesPanel](./components/PersonFacesPanel.tsx)
-  over [usePersonFaces](./api/usePeople.ts), and merge via [PersonPicker](./components/PersonPicker.tsx).
+- **Edit modal** — [PersonRenameModal](./flows/detail/PersonRenameModal.tsx) owns tabbed identity management:
+  info/name/hidden state, face corrections through [PersonFacesPanel](./flows/detail/PersonFacesPanel.tsx)
+  over [usePersonFaces](./api/usePeople.ts), and merge via [PersonPicker](./flows/detail/PersonPicker.tsx).
 
 The face-level operations:
 
 - [useSetPersonCover](./api/usePeople.ts) — promote one face to the representative cover
   from that face's non-selection-mode menu.
 - [useMoveFace](./api/usePeople.ts) — reassign selected faces to another person
-  ([PersonPicker](./components/PersonPicker.tsx) picks the target). Each reassignment becomes a manual
+  ([PersonPicker](./flows/detail/PersonPicker.tsx) picks the target). Each reassignment becomes a manual
   correction. Photos and other faces in the same asset are unchanged.
 - [useRemoveFaceFromPerson](./api/usePeople.ts) — detach selected faces, leaving them
   unclustered for a later rebuild. The original assets are never modified.

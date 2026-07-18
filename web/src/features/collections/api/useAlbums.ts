@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album as AlbumDTO } from "@/lib/albums/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
+import type { AlbumViewModel } from "../model/album";
 
 const PAGE_SIZE = 60;
 export const ALBUMS_QUERY_KEY = ["get", "/api/v1/albums"] as const;
@@ -13,7 +13,7 @@ export const ALBUMS_QUERY_KEY = ["get", "/api/v1/albums"] as const;
 export const mapAlbumToUI = (
   album: AlbumDTO,
   t: (key: string, options?: any) => string,
-): ImgStackAlbum => {
+): AlbumViewModel => {
   const coverAssetId = album.display_cover_asset_id ?? album.cover_asset_id;
 
   return {

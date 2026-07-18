@@ -10,7 +10,7 @@ import type {
   PersonFaceList,
   PersonSummaryList,
   UpdatePersonRequest,
-} from "../types";
+} from "../model/people";
 
 /**
  * Invalidate every query whose results can change after a people correction:

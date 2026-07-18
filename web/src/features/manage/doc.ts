@@ -95,8 +95,8 @@
  *
  * @module
  */
-import type Manage from "./routes/Manage.tsx";
-import type RepositoryMaintenancePanel from "./components/RepositoryMaintenancePanel.tsx";
+import type Manage from "./flows/overview/ManageFlow.tsx";
+import type RepositoryMaintenancePanel from "./flows/overview/RepositoryMaintenancePanel.tsx";
 import type { useDetectDuplicates } from "@/features/collections";
 import type { useRebuildPeopleClusters } from "@/features/people";
 import type {

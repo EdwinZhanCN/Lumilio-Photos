@@ -82,11 +82,11 @@
 import type { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import type { useLocationClusters } from "@/features/assets/map/useLocationClusters.ts";
 import type { useMapPhotoAssets } from "@/features/assets/map/useMapPhotoAssets.ts";
-import type Home from "./routes/Home.tsx";
-import type GalleryGrid from "./components/GalleryGrid.tsx";
-import type PhotoMapView from "./components/PhotoMapView.tsx";
-import type SpacetimeMapCard from "./components/SpacetimeMapCard.tsx";
-import type StatsCards from "./components/StatsCards.tsx";
+import type Home from "./flows/overview/HomeFlow.tsx";
+import type GalleryGrid from "./flows/overview/GalleryGrid.tsx";
+import type PhotoMapView from "./flows/overview/PhotoMapView.tsx";
+import type SpacetimeMapCard from "./flows/overview/SpacetimeMapCard.tsx";
+import type StatsCards from "./flows/overview/StatsCards.tsx";
 import type { useFeaturedPhotos } from "./api/useFeaturedPhotos.ts";
 import type { usePhotoStats } from "./api/usePhotoStats.ts";
 

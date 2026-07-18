@@ -13,10 +13,10 @@
  *
  * ## State
  *
- * {@link CollectionsProvider} (read via {@link useCollections}) holds only the
+ * {@link AlbumsProvider} (read via {@link useAlbumsState}) holds only the
  * feature's transient UI state — album multi-select and which edit/create modal
- * is open — reduced by {@link collectionsReducer} as {@link CollectionsAction}
- * over {@link CollectionsState}. Everything durable is server state in TanStack
+ * is open — reduced by {@link albumsReducer} as {@link AlbumsAction}
+ * over {@link AlbumsState}. Everything durable is server state in TanStack
  * Query; nothing fetched is mirrored here.
  *
  * ## Data
@@ -102,33 +102,33 @@
  *
  * @module
  */
-import type { CollectionsProvider, useCollections } from "./state/CollectionsProvider.tsx";
-import type { collectionsReducer } from "./state/reducer.ts";
-import type { CollectionsState, CollectionsAction } from "./types.ts";
+import type { AlbumsProvider, useAlbumsState } from "./flows/albums/state/AlbumsProvider.tsx";
+import type { albumsReducer } from "./flows/albums/state/reducer.ts";
+import type { AlbumsState, AlbumsAction } from "./flows/albums/state/types.ts";
 import type { useAlbums, mapAlbumToUI } from "./api/useAlbums.ts";
-import type { useCityTrips } from "./hooks/useCityTrips.ts";
+import type { useCityTrips } from "./flows/places/useCityTrips.ts";
 import type {
   useDuplicateSummary,
   useDuplicateGroupList,
   useDetectDuplicates,
 } from "./api/useDuplicates.ts";
-import type { UTILITY_CLASSIFIERS } from "./utils/utilityClassifiers.ts";
+import type { UTILITY_CLASSIFIERS } from "./model/utilityClassifiers.ts";
 import type { useFolders, useFolderSummary } from "./api/useFolders.ts";
 import type { useTagSummaries } from "./api/useTagSummaries.ts";
-import type { encodeFolderKey, decodeFolderKey } from "./utils/folderKey.ts";
-import type { encodeTagKey, decodeTagKey } from "./utils/tagKey.ts";
-import type { useUtilityShortcuts } from "./components/utilityShortcuts.ts";
+import type { encodeFolderKey, decodeFolderKey } from "./model/folderKey.ts";
+import type { encodeTagKey, decodeTagKey } from "./model/tagKey.ts";
+import type { useUtilityShortcuts } from "./flows/utilities/useUtilityShortcuts.ts";
 import type { AssetBrowser } from "@/features/assets";
 import type { CollectionHero } from "@/components/collection";
-import type Collections from "./routes/Collections.tsx";
-import type AlbumDetails from "./routes/AlbumDetails.tsx";
-import type TripDetails from "./routes/TripDetails.tsx";
-import type UtilityClassifierAlbum from "./routes/UtilityClassifierAlbum.tsx";
-import type Duplicates from "./routes/Duplicates.tsx";
-import type Liked from "./routes/Liked.tsx";
-import type Folders from "./routes/Folders.tsx";
-import type FolderDetails from "./routes/FolderDetails.tsx";
-import type Tags from "./routes/Tags.tsx";
-import type TagDetails from "./routes/TagDetails.tsx";
-import type { AlbumFormModal } from "./components/AlbumFormModal.tsx";
+import type Collections from "./flows/hub/CollectionsFlow.tsx";
+import type AlbumDetails from "./flows/albums/AlbumDetailsFlow.tsx";
+import type TripDetails from "./flows/places/TripDetailsFlow.tsx";
+import type UtilityClassifierAlbum from "./flows/utilities/UtilityClassifierFlow.tsx";
+import type Duplicates from "./flows/utilities/DuplicatesFlow.tsx";
+import type Liked from "./flows/utilities/LikedFlow.tsx";
+import type Folders from "./flows/folders/FoldersFlow.tsx";
+import type FolderDetails from "./flows/folders/FolderDetailsFlow.tsx";
+import type Tags from "./flows/tags/TagsFlow.tsx";
+import type TagDetails from "./flows/tags/TagDetailsFlow.tsx";
+import type { AlbumFormModal } from "./flows/albums/components/AlbumFormModal.tsx";
 export {};

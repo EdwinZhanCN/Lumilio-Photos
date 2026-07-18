@@ -1,2 +1,2 @@
 export { usePeople, useRebuildPeopleClusters } from "./api/usePeople";
-export type { PersonSummaryList } from "./types";
+export type { PersonSummaryList } from "./model/people";

@@ -9,15 +9,15 @@ respective features and are invoked here through explicit hooks.
 
 ## State
 
-[Manage](./routes/Manage.tsx) is intentionally thin. It renders the page header, exposes
+[Manage](./flows/overview/ManageFlow.tsx) is intentionally thin. It renders the page header, exposes
 the supported-format modal, and mounts [UnifiedUploadSection](@/features/upload) before
-[RepositoryMaintenancePanel](./components/RepositoryMaintenancePanel.tsx). The panel passes maintenance state and
+[RepositoryMaintenancePanel](./flows/overview/RepositoryMaintenancePanel.tsx). The panel passes maintenance state and
 callbacks to the repository-owned, presentational [RepositoryGrid](@/features/repositories).
 The header reads [useUploadContext](@/features/upload) only to summarize the current
 queue; upload queue mutation remains in the upload feature.
 
 Repository maintenance orchestration is local to
-[RepositoryMaintenancePanel](./components/RepositoryMaintenancePanel.tsx). Each action tracks its own pending
+[RepositoryMaintenancePanel](./flows/overview/RepositoryMaintenancePanel.tsx). Each action tracks its own pending
 repository id or job state:
 
 - [useRepositoryScan](@/features/repositories) tracks rescan and stack-detection ids.
@@ -73,7 +73,7 @@ flowchart TD
     CARD --> STATUS["useRepositoryCloudStatus"]
 ```
 
-[Manage](./routes/Manage.tsx) is therefore a composition route, not a data owner. It brings
+[Manage](./flows/overview/ManageFlow.tsx) is therefore a composition route, not a data owner. It brings
 together upload and repository maintenance but leaves each subsystem's
 durable state in the feature that already owns it.
 

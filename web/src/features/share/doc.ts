@@ -54,13 +54,13 @@
  *
  * @module
  */
-import type CreateShareLinkModal from "./components/CreateShareLinkModal.tsx";
-import type PublicShareGrid from "./components/PublicShareGrid.tsx";
-import type PublicShareLightbox from "./components/PublicShareLightbox.tsx";
-import type PublicShare from "./routes/PublicShare.tsx";
-import type SharedLinks from "./routes/SharedLinks.tsx";
+import type CreateShareLinkModal from "./flows/create/CreateShareLinkModal.tsx";
+import type PublicShareGrid from "./flows/public/PublicShareGrid.tsx";
+import type PublicShareLightbox from "./flows/public/PublicShareLightbox.tsx";
+import type PublicShare from "./flows/public/PublicShareFlow.tsx";
+import type SharedLinks from "./flows/manage/SharedLinksFlow.tsx";
 import type { useShareLinks } from "./api/useShareLinks.ts";
 import type { usePublicShareView } from "./api/usePublicShareView.ts";
-import type { shareUrls } from "./utils/shareUrls.ts";
-import type { createShareSelectedBulkAction } from "./utils/shareBulkAction.tsx";
+import type { shareUrls } from "./model/shareUrls.ts";
+import type { createShareSelectedBulkAction } from "./flows/create/shareBulkAction.tsx";
 export {};
