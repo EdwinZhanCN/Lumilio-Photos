@@ -1,7 +1,7 @@
 import { useI18n } from "@/lib/i18n.tsx";
 import { BookOpenIcon, ExternalLinkIcon, FileBadgeIcon, ScaleIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { SettingsGroup, SettingsRow } from "../SettingsGroup";
+import { SettingsGroup, SettingsRow } from "../../components/SettingsGroup";
 
 const REPOSITORY = "https://github.com/EdwinZhanCN/Lumilio-Photos";
 

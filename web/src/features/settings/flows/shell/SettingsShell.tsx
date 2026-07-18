@@ -11,14 +11,14 @@ import {
   UserCircle2Icon,
   Users2Icon,
 } from "lucide-react";
-import { SettingsPage } from "./SettingsPage";
-import AppearanceTab from "./tabs/AppearanceTab";
-import ServerTab from "./tabs/ServerTab";
-import AiTab from "./tabs/AiTab";
-import AccountTab from "./tabs/AccountTab";
-import CloudTab from "./tabs/CloudTab";
-import UsersTab from "./tabs/UsersTab";
-import AboutTab from "./tabs/AboutTab";
+import { SettingsPage } from "../../components/SettingsPage";
+import AccountTab from "../account/AccountTab";
+import AiTab from "../ai/AiTab";
+import AppearanceTab from "../appearance/AppearanceTab";
+import AboutTab from "../about/AboutTab";
+import CloudTab from "../cloud/CloudTab";
+import ServerTab from "../server/ServerTab";
+import UsersTab from "../users/UsersTab";
 
 type SettingsTabKey = "account" | "appearance" | "ai" | "cloud" | "server" | "users" | "about";
 

@@ -96,18 +96,18 @@
  * @module
  */
 import type Settings from "./routes/Settings.tsx";
-import type SettingsShell from "./components/SettingsShell.tsx";
+import type SettingsShell from "./flows/shell/SettingsShell.tsx";
 import type { SettingsPage } from "./components/SettingsPage.tsx";
 import type { SettingsBlock, SettingsGroup, SettingsRow } from "./components/SettingsGroup.tsx";
 import type { SettingsSaveBar } from "./components/SettingsSaveBar.tsx";
-import type AccountTab from "./components/tabs/AccountTab.tsx";
-import type AppearanceTab from "./components/tabs/AppearanceTab.tsx";
-import type AiTab from "./components/tabs/AiTab.tsx";
-import type CloudTab from "./components/tabs/CloudTab.tsx";
-import type ServerTab from "./components/tabs/ServerTab.tsx";
-import type UsersTab from "./components/tabs/UsersTab.tsx";
-import type AboutTab from "./components/tabs/AboutTab.tsx";
-import type { useAISettingsDraft } from "./hooks/useAISettingsDraft.ts";
+import type AccountTab from "./flows/account/AccountTab.tsx";
+import type AppearanceTab from "./flows/appearance/AppearanceTab.tsx";
+import type AiTab from "./flows/ai/AiTab.tsx";
+import type CloudTab from "./flows/cloud/CloudTab.tsx";
+import type ServerTab from "./flows/server/ServerTab.tsx";
+import type UsersTab from "./flows/users/UsersTab.tsx";
+import type AboutTab from "./flows/about/AboutTab.tsx";
+import type { useAISettingsDraft } from "./flows/ai/useAISettingsDraft.ts";
 import type {
   useBrowseScope,
   useRepositoryOptions,

@@ -17,7 +17,7 @@ import {
   useRestoreBackup,
   type BackupEntry,
 } from "../../api/useBackups";
-import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
+import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 
 const intervalPresets = [6, 12, 24, 48, 168];
 

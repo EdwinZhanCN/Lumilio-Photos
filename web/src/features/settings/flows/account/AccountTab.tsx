@@ -27,8 +27,8 @@ import {
 import { useUpdateMyProfile } from "@/features/users";
 import PhotoPicker from "@/features/assets/picker";
 import type { components } from "@/lib/http-commons/schema";
-import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
-import { SettingsSaveBar } from "../SettingsSaveBar";
+import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
+import { SettingsSaveBar } from "../../components/SettingsSaveBar";
 
 type Schemas = components["schemas"];
 type FeedbackState = { tone: "success" | "error"; message: string } | null;

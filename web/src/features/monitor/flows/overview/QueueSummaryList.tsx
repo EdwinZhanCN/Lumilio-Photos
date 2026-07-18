@@ -23,7 +23,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
-import type { QueueErrorSampleDTO, QueueSummaryDTO } from "../types";
+import type { QueueErrorSampleDTO, QueueSummaryDTO } from "../../types";
 
 type QueuePresentation = {
   icon: LucideIcon;

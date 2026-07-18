@@ -19,7 +19,7 @@ localStorage.
 Server-backed settings use the shared [useDraftSettings](./hooks/useDraftSettings.ts) contract:
 tabs edit a local draft, expose dirty/reset/save state through
 [SettingsSaveBar](./components/SettingsSaveBar.tsx), and commit through [useUpdateSystemSettings](./api/useSystemSettings.ts).
-[useAISettingsDraft](./hooks/useAISettingsDraft.ts) is the current rich draft adapter for LLM/ML
+[useAISettingsDraft](./flows/ai/useAISettingsDraft.ts) is the current rich draft adapter for LLM/ML
 settings, including API-key clearing semantics and server normalization.
 
 Repository preference state is deliberately split by the Repositories feature:
@@ -72,9 +72,9 @@ flowchart TD
 ```
 
 [Settings](./routes/Settings.tsx) renders the route header and delegates the tabbed surface to
-[SettingsShell](./components/SettingsShell.tsx). The shell always shows [AccountTab](./components/tabs/AccountTab.tsx),
-[AppearanceTab](./components/tabs/AppearanceTab.tsx), [ServerTab](./components/tabs/ServerTab.tsx), and [AboutTab](./components/tabs/AboutTab.tsx); admin users additionally see
-[AiTab](./components/tabs/AiTab.tsx), [CloudTab](./components/tabs/CloudTab.tsx), and [UsersTab](./components/tabs/UsersTab.tsx). The visual hierarchy is
+[SettingsShell](./flows/shell/SettingsShell.tsx). The shell always shows [AccountTab](./flows/account/AccountTab.tsx),
+[AppearanceTab](./flows/appearance/AppearanceTab.tsx), [ServerTab](./flows/server/ServerTab.tsx), and [AboutTab](./flows/about/AboutTab.tsx); admin users additionally see
+[AiTab](./flows/ai/AiTab.tsx), [CloudTab](./flows/cloud/CloudTab.tsx), and [UsersTab](./flows/users/UsersTab.tsx). The visual hierarchy is
 centralized in [SettingsPage](./components/SettingsPage.tsx), [SettingsGroup](./components/SettingsGroup.tsx),
 [SettingsRow](./components/SettingsGroup.tsx), and [SettingsBlock](./components/SettingsGroup.tsx); tabs should compose those
 primitives instead of inventing local section chrome.
