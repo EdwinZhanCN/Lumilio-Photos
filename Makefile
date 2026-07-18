@@ -81,7 +81,11 @@ server-test:
 	cd $(SERVER_DIR) && $(GO) test ./...
 
 web-test:
-	cd $(WEB_DIR) && $(VP) check --no-fmt --no-lint && $(VP) lint && $(VP) test
+	cd $(WEB_DIR) && \
+		$(VP) check --no-fmt --no-lint && \
+		$(VP) lint && \
+		$(VP) node scripts/check-source-boundaries.mjs && \
+		$(VP) test
 
 web-browser-test:
 	cd $(WEB_DIR) && PRODUCTION_SMOKE=true $(VP) build && $(VP) node scripts/check-bundle-budget.mjs && $(VP) node scripts/run-browser-smoke.mjs
