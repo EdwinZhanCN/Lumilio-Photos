@@ -71,7 +71,7 @@ flowchart TD
     CLOUD --> CLOUDAPI["cloud hooks"]
 ```
 
-[Settings](./routes/Settings.tsx) renders the route header and delegates the tabbed surface to
+[Settings](./flows/shell/SettingsPageFlow.tsx) renders the route header and delegates the tabbed surface to
 [SettingsShell](./flows/shell/SettingsShell.tsx). The shell always shows [AccountTab](./flows/account/AccountTab.tsx),
 [AppearanceTab](./flows/appearance/AppearanceTab.tsx), [ServerTab](./flows/server/ServerTab.tsx), and [AboutTab](./flows/about/AboutTab.tsx); admin users additionally see
 [AiTab](./flows/ai/AiTab.tsx), [CloudTab](./flows/cloud/CloudTab.tsx), and [UsersTab](./flows/users/UsersTab.tsx). The visual hierarchy is

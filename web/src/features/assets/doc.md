@@ -2,7 +2,7 @@
 
 The asset feature owns the main library timeline, trash timeline, reusable
 browser surface, viewer inspection, selection, and export/bulk asset actions.
-[Assets](./routes/Assets.tsx) is the ordinary `/assets` route; [AssetsTrash](./routes/AssetsTrash.tsx) scopes the
+[Assets](./flows/library/AssetsFlow.tsx) is the ordinary `/assets` route; [AssetsTrash](./flows/trash/AssetsTrashFlow.tsx) scopes the
 same gallery to deleted assets; collection/person/agent routes reuse
 [AssetBrowser](./flows/browse/AssetBrowser.tsx) with source-specific constraints or a pin source.
 

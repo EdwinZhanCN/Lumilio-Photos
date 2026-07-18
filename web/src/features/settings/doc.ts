@@ -95,7 +95,7 @@
  *
  * @module
  */
-import type Settings from "./routes/Settings.tsx";
+import type Settings from "./flows/shell/SettingsPageFlow.tsx";
 import type SettingsShell from "./flows/shell/SettingsShell.tsx";
 import type { SettingsPage } from "./components/SettingsPage.tsx";
 import type { SettingsBlock, SettingsGroup, SettingsRow } from "./components/SettingsGroup.tsx";
