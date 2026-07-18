@@ -1,11 +1,10 @@
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { Cloud, FolderPlus, X } from "lucide-react";
 import { useCloudCredentials } from "@/features/cloud";
 import { useMessage } from "@/features/notifications";
-import { $api } from "@/lib/http-commons/queryClient";
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n.tsx";
+import { useCreateRepository } from "../../api/useCreateRepository";
 
 export default function AddRepositoryModal({
   isOpen,
@@ -16,8 +15,7 @@ export default function AddRepositoryModal({
 }) {
   const { t } = useI18n();
   const showMessage = useMessage();
-  const queryClient = useQueryClient();
-  const createMutation = $api.useMutation("post", "/api/v1/repositories");
+  const createRepositoryMutation = useCreateRepository();
   const credentialsQuery = useCloudCredentials();
   const [name, setName] = useState("");
   const [source, setSource] = useState<"local" | "cloud">("local");
@@ -29,38 +27,25 @@ export default function AddRepositoryModal({
   );
 
   const handleClose = useCallback(() => {
-    if (createMutation.isPending) return;
+    if (createRepositoryMutation.isPending) return;
     setName("");
     setSource("local");
     setCredentialId("");
     onClose();
-  }, [createMutation.isPending, onClose]);
+  }, [createRepositoryMutation.isPending, onClose]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const trimmedName = name.trim();
-      if (!trimmedName || createMutation.isPending) return;
+      if (!trimmedName || createRepositoryMutation.isPending) return;
       if (source === "cloud" && !credentialId) return;
 
       try {
-        const response = await createMutation.mutateAsync({
-          body: {
-            name: trimmedName,
-            cloud_credential_id: source === "cloud" ? credentialId : undefined,
-          },
+        const response = await createRepositoryMutation.createRepository({
+          name: trimmedName,
+          cloudCredentialId: source === "cloud" ? credentialId : undefined,
         });
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: ["get", "/api/v1/assets/indexing/repositories"],
-          }),
-          queryClient.invalidateQueries({
-            queryKey: ["post", "/api/v1/assets/list"],
-          }),
-          queryClient.invalidateQueries({
-            queryKey: ["post", "/api/v1/assets/search"],
-          }),
-        ]);
         showMessage(
           response.cloud_import_error ? "info" : "success",
           response.cloud_import_error
@@ -84,7 +69,7 @@ export default function AddRepositoryModal({
         );
       }
     },
-    [createMutation, credentialId, name, onClose, queryClient, showMessage, source, t],
+    [createRepositoryMutation, credentialId, name, onClose, showMessage, source, t],
   );
 
   if (!isOpen) return null;
@@ -105,7 +90,7 @@ export default function AddRepositoryModal({
             type="button"
             className="btn btn-ghost btn-sm btn-circle"
             onClick={handleClose}
-            disabled={createMutation.isPending}
+            disabled={createRepositoryMutation.isPending}
             aria-label={t("common.close", { defaultValue: "Close" })}
           >
             <X size={18} />
@@ -125,7 +110,7 @@ export default function AddRepositoryModal({
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("manage.repositories.createNamePlaceholder")}
-              disabled={createMutation.isPending}
+              disabled={createRepositoryMutation.isPending}
               autoFocus
               required
             />
@@ -138,7 +123,7 @@ export default function AddRepositoryModal({
                 type="button"
                 className={`btn btn-sm ${source === "local" ? "btn-primary" : "btn-outline"}`}
                 onClick={() => setSource("local")}
-                disabled={createMutation.isPending}
+                disabled={createRepositoryMutation.isPending}
               >
                 {t("manage.repositories.sourceLocal")}
               </button>
@@ -146,7 +131,7 @@ export default function AddRepositoryModal({
                 type="button"
                 className={`btn btn-sm gap-2 ${source === "cloud" ? "btn-primary" : "btn-outline"}`}
                 onClick={() => setSource("cloud")}
-                disabled={createMutation.isPending}
+                disabled={createRepositoryMutation.isPending}
               >
                 <Cloud size={15} />
                 {t("manage.repositories.sourceCloud")}
@@ -166,7 +151,7 @@ export default function AddRepositoryModal({
                 className="select select-bordered w-full"
                 value={credentialId}
                 onChange={(event) => setCredentialId(event.target.value)}
-                disabled={createMutation.isPending || credentialsQuery.isLoading}
+                disabled={createRepositoryMutation.isPending || credentialsQuery.isLoading}
                 required
               >
                 <option value="">
@@ -200,7 +185,7 @@ export default function AddRepositoryModal({
               type="button"
               className="btn btn-ghost"
               onClick={handleClose}
-              disabled={createMutation.isPending}
+              disabled={createRepositoryMutation.isPending}
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -208,10 +193,12 @@ export default function AddRepositoryModal({
               type="submit"
               className="btn btn-primary gap-2"
               disabled={
-                !name.trim() || createMutation.isPending || (source === "cloud" && !credentialId)
+                !name.trim() ||
+                createRepositoryMutation.isPending ||
+                (source === "cloud" && !credentialId)
               }
             >
-              {createMutation.isPending ? (
+              {createRepositoryMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <FolderPlus size={16} />

@@ -1,4 +1,4 @@
-import type { RepositoryOption } from "../types";
+import type { RepositoryOption } from "../types.ts";
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
