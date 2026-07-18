@@ -1,2 +1,2 @@
-export { ChatDock } from "./components/Chat/ChatDock";
+export { ChatDock } from "./flows/chat/ChatDock";
 export { resetLumilioSession } from "./state/resetSession";

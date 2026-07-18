@@ -8,7 +8,7 @@ import {
   resolveConfirm,
   userMessage,
 } from "./blocks";
-import type { ChatMessage, SideChannelEvent } from "../types";
+import type { ChatMessage, SideChannelEvent } from "../model/chatTypes";
 
 const conversation = (): ChatMessage[] => [userMessage("hello"), assistantMessage()];
 

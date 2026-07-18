@@ -1,5 +1,5 @@
 import type { Asset } from "@/lib/assets/types";
-import type { AgentRefAssetsDTO, AgentRefDTO } from "../../types";
+import type { AgentRefAssetsDTO, AgentRefDTO } from "../../model/chatTypes";
 import type { WidgetSource } from "./types";
 
 type MockWidgetDataset = {

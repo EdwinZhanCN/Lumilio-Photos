@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { streamAgent } from "../api/agentStream";
-import type { ChatMessage, TokenUsageInfo } from "../types";
+import type { ChatMessage, TokenUsageInfo } from "../model/chatTypes";
 import type { MentionPayload } from "../modules/mentions/mentionSources";
 import type { ContextContribution } from "@/lib/assistant";
 import {

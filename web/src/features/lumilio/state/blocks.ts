@@ -1,4 +1,10 @@
-import type { Block, ChatMessage, InterruptInfo, ReasoningBlock, SideChannelEvent } from "../types";
+import type {
+  Block,
+  ChatMessage,
+  InterruptInfo,
+  ReasoningBlock,
+  SideChannelEvent,
+} from "../model/chatTypes";
 
 /** Pure reduction rules from SSE events onto the typed-block conversation.
  * The store applies these against the last assistant message; rendering never

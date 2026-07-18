@@ -1,5 +1,5 @@
 import { $api } from "@/lib/http-commons/queryClient";
-import type { AgentRefDTO } from "../../types";
+import type { AgentRefDTO } from "../../model/chatTypes";
 import { getMockWidgetDataset, isMockWidgetSource } from "./mockWidgetData";
 import type { AgentPinDTO, WidgetSource } from "./types";
 

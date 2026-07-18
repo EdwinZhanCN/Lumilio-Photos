@@ -17,7 +17,7 @@ small Zustand stores with explicit ownership:
   SSE request before clearing the conversation.
 - The lower-level [useContextStore](@/lib/assistant/index.ts) is the cross-surface context bus. Contributors
   register current asset selections or carousel viewing context, and
-  [ContextChips](./components/Chat/ContextChips.tsx) lets the user exclude a contribution before send.
+  [ContextChips](./flows/chat/ContextChips.tsx) lets the user exclude a contribution before send.
 - The lower-level [useDockStore](@/lib/assistant/index.ts) owns only the user's chat collapse override; route
   defaults still decide whether an untouched dock starts expanded or collapsed.
 
@@ -29,19 +29,19 @@ component/hook edges instead of being mirrored into those stores.
 
 [streamAgent](./api/agentStream.ts) opens authenticated SSE streams to `/api/v1/agent/chat`
 and `/api/v1/agent/chat/resume`. The stream emits typed chat blocks:
-[TextBlock](./types.ts), [ReasoningBlock](./types.ts), [ToolBlock](./types.ts),
-[WidgetBlock](./types.ts), and [ConfirmBlock](./types.ts). Tool status, widgets, and
-token usage arrive through [SideChannelEvent](./types.ts); an interrupt becomes a
+[TextBlock](./model/chatTypes.ts), [ReasoningBlock](./model/chatTypes.ts), [ToolBlock](./model/chatTypes.ts),
+[WidgetBlock](./model/chatTypes.ts), and [ConfirmBlock](./model/chatTypes.ts). Tool status, widgets, and
+token usage arrive through [SideChannelEvent](./model/chatTypes.ts); an interrupt becomes a
 confirmation card and resumes through the same store.
 
 The stream side channel passes handles, not full asset payloads:
-[RefPayload](./types.ts) carries a ref id, count, widget hint, and params. Inline
+[RefPayload](./model/chatTypes.ts) carries a ref id, count, widget hint, and params. Inline
 widgets hydrate that handle through [InlineWidgetCard](./modules/widgets/chrome/InlineWidgetCard.tsx); durable pins
 copy the snapshot server-side through [PinButton](./modules/widgets/PinButton.tsx) and are later read by
-[AgentBoard](./components/Board/AgentBoard.tsx). [useWidgetData](./modules/widgets/useWidgetData.ts) normalizes ref/pin metadata into
+[AgentBoard](./flows/board/AgentBoard.tsx). [useWidgetData](./modules/widgets/useWidgetData.ts) normalizes ref/pin metadata into
 [WidgetData](./modules/widgets/types.ts), while thumbnail-heavy views fetch assets separately.
 
-Mentions are explicit, typed constraints. [MentionInput](./components/Chat/MentionInput.tsx) uses
+Mentions are explicit, typed constraints. [MentionInput](./flows/chat/MentionInput.tsx) uses
 [createMentionSources](./modules/mentions/mentionSources.ts) to build searchable person, album, pin, camera,
 and lens sources; picked entities are sent as [MentionPayload](./modules/mentions/mentionSources.ts). Slash
 modes come from [useSlashMacros](./modules/slash/slashMacros.ts) and constrain the tool subset without
@@ -70,9 +70,9 @@ flowchart TD
     TILE --> REG["widget registry"]
 ```
 
-[LumilioChatPage](./routes/LumilioChat.tsx) is intentionally thin: it renders [AgentBoard](./components/Board/AgentBoard.tsx)
-and an embedded [ChatDock](./components/Chat/ChatDock.tsx). The dock composes [MentionInput](./components/Chat/MentionInput.tsx),
-[ContextChips](./components/Chat/ContextChips.tsx), and [ChatMessages](./components/Chat/ChatMessages.tsx); asset and carousel surfaces
+[LumilioChatPage](./flows/workspace/LumilioWorkspaceFlow.tsx) is intentionally thin: it renders [AgentBoard](./flows/board/AgentBoard.tsx)
+and an embedded [ChatDock](./flows/chat/ChatDock.tsx). The dock composes [MentionInput](./flows/chat/MentionInput.tsx),
+[ContextChips](./flows/chat/ContextChips.tsx), and [ChatMessages](./flows/chat/ChatMessages.tsx); asset and carousel surfaces
 mount it in `fab` mode. Asset-owned contributors publish context through the
 shared assistant bus via
 [useBrowseSelectionContext](@/features/assets/flows/browse/useBrowseSelectionContext.ts) / [useViewerContextContributor](@/features/assets/flows/viewer/useViewerContextContributor.ts).
