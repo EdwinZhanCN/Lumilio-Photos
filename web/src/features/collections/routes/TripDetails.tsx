@@ -1,8 +1,7 @@
 import { useParams, useLocation } from "react-router-dom";
 import { useMemo } from "react";
 import { MapPin } from "lucide-react";
-import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import { AssetsGalleryPage, AssetsProvider } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";

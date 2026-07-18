@@ -10,7 +10,7 @@ Collections, and Assets.
 ## State
 
 [StudioEditMvp](./routes/StudioEditMvp.tsx) is the route shell. It switches between three local
-views: [StudioHome](./home/StudioHome.tsx), a shared [PhotoPicker](@/components/PhotoPicker), and
+views: [StudioHome](./home/StudioHome.tsx), a shared [PhotoPicker](@/features/assets/picker/index.ts), and
 [StudioEditor](./editor/StudioEditor.tsx). If the URL includes an `assetId` query parameter, the
 shell opens the editor directly. Otherwise the user starts from Studio Home,
 chooses a photo, and can resume recent edits.

@@ -8,7 +8,7 @@ import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { CollectionErrorAlert, LoadMoreButton } from "@/components/collection";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
-import { usePeople } from "@/features/people/hooks/usePeople";
+import { usePeople } from "@/features/people";
 import PeopleCollectionGrid from "../components/PeopleCollectionGrid";
 
 const PAGE_SIZE = 24;

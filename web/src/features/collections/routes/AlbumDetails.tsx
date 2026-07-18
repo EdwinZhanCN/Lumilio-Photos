@@ -1,8 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import { AssetsGalleryPage, AssetsProvider } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { AlbumIcon, Bird, FolderMinus, RefreshCcw, Share2 } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -14,12 +13,12 @@ import { useMessage } from "@/features/notifications";
 import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
-} from "@/features/assets/components/shared/bulkActions";
+} from "@/lib/assets/bulkActions";
 import {
   CreateShareLinkModal,
+  createShareSelectedBulkAction,
   type ShareSourceKind,
-} from "@/features/share/components/CreateShareLinkModal";
-import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
+} from "@/features/share";
 
 const AlbumAssetsContent = () => {
   const { t, i18n } = useI18n();

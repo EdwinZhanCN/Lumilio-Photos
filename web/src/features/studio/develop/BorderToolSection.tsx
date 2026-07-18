@@ -1,8 +1,8 @@
 import React from "react";
 import { Frame, Loader2, Wand2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { BorderPanel, isExifBorderMode, normalizeParams } from "@/features/studio/tools/border";
-import type { BorderExifSummary } from "@/features/studio/tools/border/BorderPanel";
+import { BorderPanel, isExifBorderMode, normalizeParams } from "../tools/border";
+import type { BorderExifSummary } from "../tools/border/BorderPanel";
 import { SectionHeader } from "./SectionHeader";
 
 type BorderToolSectionProps = {

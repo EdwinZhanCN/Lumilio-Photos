@@ -17,20 +17,20 @@ import {
   rasterizeBrandLogo,
   type BorderExif,
   type BrandKey,
-} from "@/features/studio/tools/border";
-import type { BorderExifSummary } from "@/features/studio/tools/border/BorderPanel";
+} from "../tools/border";
+import type { BorderExifSummary } from "../tools/border/BorderPanel";
 import {
   DEFAULT_STUDIO_ADJUSTMENTS,
   normalizeStudioAdjustments,
   type AssetSidecarResponse,
   type LumilioSidecarV1,
   type StudioEditAdjustments,
-} from "@/features/studio/edit-mvp/types";
+} from "../edit-mvp/types";
 import type { AdjustmentKey } from "./developConfig";
 import { TopBar } from "./TopBar";
 import { AssetPanel, type AssetExifRow } from "./AssetPanel";
 import { Viewport } from "./Viewport";
-import { DevelopPanel } from "@/features/studio/develop/DevelopPanel";
+import { DevelopPanel } from "../develop/DevelopPanel";
 
 type WorkerResult = {
   blob: Blob;

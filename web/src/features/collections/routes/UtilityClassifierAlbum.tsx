@@ -3,18 +3,15 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useCallback, useMemo, useState } from "react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AssetsProvider } from "@/features/assets";
-import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import { AssetsGalleryPage, AssetsProvider, type AssetFilter } from "@/features/assets";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { findUtilityClassifier, getUtilityClassifierTitle } from "../utils/utilityClassifiers";
-import type { AssetFilter } from "@/features/assets/types/assets.type";
 import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
-} from "@/features/assets/components/shared/bulkActions";
-import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
-import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
+} from "@/lib/assets/bulkActions";
+import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/share";
 
 export default function UtilityClassifierAlbum() {
   const { classifierSlug } = useParams<{ classifierSlug: string }>();

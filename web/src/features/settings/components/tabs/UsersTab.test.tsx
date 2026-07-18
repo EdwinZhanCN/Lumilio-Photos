@@ -33,13 +33,21 @@ vi.mock("@/lib/i18n.tsx", () => ({
 }));
 
 vi.mock("@/features/auth", () => ({
+  DISPLAY_NAME_HINT: "Display names support multiple languages and stay under 64 characters.",
+  DISPLAY_NAME_MAX_LENGTH: 64,
+  USERNAME_HINT:
+    "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
+  USERNAME_MAX_LENGTH: 32,
+  USERNAME_MIN_LENGTH: 3,
+  USERNAME_PATTERN: "[a-z](?:[a-z0-9]|[._-](?=[a-z0-9])){2,31}",
+  normalizeUsernameInput: (value: string) => value.toLowerCase(),
   useAuth: () => ({
     user: mocks.admin,
     dispatch: mocks.dispatch,
   }),
 }));
 
-vi.mock("@/features/users/hooks/useUsers", () => ({
+vi.mock("@/features/users", () => ({
   useUsers: () => ({
     users: mocks.users,
     isLoading: false,
@@ -63,7 +71,7 @@ vi.mock("@/components/ui/UserAvatar", () => ({
   ),
 }));
 
-vi.mock("@/components/PhotoPicker", () => ({
+vi.mock("@/features/assets/picker", () => ({
   default: () => <div>photo-picker</div>,
 }));
 

@@ -73,12 +73,15 @@ flowchart TD
 
 [AssetsGalleryPage](./components/page/AssetsGalleryPage.tsx) is the route orchestrator: it picks the source hook,
 contributes visible selection to Lumilio context via
-[useGalleryContextContributor](@/features/lumilio/contributors/useGalleryContextContributor.ts), renders the chosen gallery layout, and
+[useGalleryContextContributor](./hooks/useGalleryContextContributor.ts), renders the chosen gallery layout, and
 keeps URL-backed carousel navigation in sync.
 [AssetsPageHeader](./components/shared/AssetsPageHeader.tsx) owns route-level controls; [JustifiedGallery](./components/page/JustifiedGallery/JustifiedGallery.tsx)
 and [SquareGallery](./components/page/SquareGallery/SquareGallery.tsx) render the browse model; [FullScreenCarousel](./components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx)
 inspects the current flattened asset set; [SearchFAB](./components/page/SearchFAB.tsx) writes to the
 shared search state and the selected source hook decides how to execute it.
+[PhotoPicker](./picker/PhotoPicker.tsx) is the narrow cross-feature picker entry: it creates an
+isolated single-selection asset scope while keeping gallery and filter
+implementation details inside Assets.
 Both galleries use [useGalleryViewportWindow](./hooks/useGalleryViewportWindow.ts): the full layout height
 remains stable, while only an overscanned vertical slice mounts thumbnail
 components. Leaving that slice removes media nodes instead of retaining every

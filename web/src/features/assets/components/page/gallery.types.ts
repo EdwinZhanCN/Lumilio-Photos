@@ -1,4 +1,4 @@
-import type { BrowseGroup } from "@/features/assets/types/assets.type";
+import type { BrowseGroup } from "../../types/assets.type";
 
 export interface AssetGalleryProps {
   browseGroups: BrowseGroup[];

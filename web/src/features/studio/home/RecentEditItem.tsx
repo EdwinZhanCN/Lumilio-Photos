@@ -1,7 +1,7 @@
 import React from "react";
 import { Clock, Pencil } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { PhotoThumb } from "@/features/studio/shared/PhotoThumb";
+import { PhotoThumb } from "../shared/PhotoThumb";
 import { formatRelativeTime, type RecentEditRecord } from "./recentEditsStore";
 
 type RecentEditItemProps = {

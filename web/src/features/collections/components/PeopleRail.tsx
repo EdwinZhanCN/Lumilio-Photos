@@ -3,7 +3,7 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n.tsx";
 import Rail from "./Rail";
 import RailCard from "./RailCard";
-import type { PersonSummaryList } from "@/features/people/people.types";
+import type { PersonSummaryList } from "@/features/people";
 
 type PeopleRailProps = {
   people: PersonSummaryList;

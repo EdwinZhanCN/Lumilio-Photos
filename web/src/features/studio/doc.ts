@@ -97,7 +97,7 @@
  *
  * @module
  */
-import type PhotoPicker from "@/components/PhotoPicker";
+import type PhotoPicker from "@/features/assets/picker/index.ts";
 import type { useWorker } from "@/contexts/WorkerProvider.tsx";
 import type { StudioEditMvp } from "./routes/StudioEditMvp.tsx";
 import type { StudioHome } from "./home/StudioHome.tsx";

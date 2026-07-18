@@ -2,7 +2,7 @@ import React, { useEffect, useId, useMemo, useState } from "react";
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
 
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { isVideo } from "@/features/assets/utils/mediaTypes";
+import { isVideo } from "../../utils/mediaTypes";
 import { Asset } from "@/lib/assets/types";
 import "@vidstack/react/player/styles/base.css";
 import "@vidstack/react/player/styles/default/theme.css";
@@ -11,8 +11,8 @@ import "@vidstack/react/player/styles/default/layouts/audio.css";
 
 import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
 import { useI18n } from "@/lib/i18n";
-import { useAssetMediaItem } from "@/features/assets/hooks/useAssetMediaItem";
-import { useLivePhotoPlayback } from "@/features/assets/hooks/useLivePhotoPlayback";
+import { useAssetMediaItem } from "../../hooks/useAssetMediaItem";
+import { useLivePhotoPlayback } from "../../hooks/useLivePhotoPlayback";
 import { LivePhotos } from "./LivePhotos";
 
 interface MediaViewerProps {

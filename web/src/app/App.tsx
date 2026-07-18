@@ -7,6 +7,7 @@ import "streamdown/styles.css";
 import { Notifications } from "@/features/notifications";
 import { PreferencesEffects } from "@/features/settings";
 import { AuthProvider } from "@/features/auth";
+import { resetLumilioSession } from "@/features/lumilio";
 import AppRouter from "@/app/router/AppRouter";
 import HealthPoller from "@/app/status/HealthPoller";
 
@@ -17,7 +18,7 @@ function App(): ReactNode {
     <PreferencesEffects>
       <GlobalProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
+          <AuthProvider resetFeatureState={resetLumilioSession}>
             <AppRouter />
           </AuthProvider>
           <HealthPoller />

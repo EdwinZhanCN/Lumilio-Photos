@@ -1,23 +1,15 @@
-import { useEffect, useMemo } from "react";
 import { Image as ImageIcon } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import {
-  useSortBy,
-  useUIActions,
-  useFilterActions,
-  useSelectionActions,
-} from "@/features/assets/selectors";
-import { useCurrentAssetsView } from "@/features/assets/hooks/useAssetsView";
-import { useSelection } from "@/features/assets/hooks/useSelection";
-import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
-import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import type {
-  FilterDTO,
-  FilterFieldKey,
-} from "@/features/assets/components/page/FilterTool/FilterTool";
-import { resolveBrowseSelectedAssetIds } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n";
+import { AssetsProvider } from "../AssetsProvider";
+import SquareGallery from "../components/page/SquareGallery/SquareGallery";
+import type { FilterDTO, FilterFieldKey } from "../components/page/FilterTool/FilterTool";
+import AssetsPageHeader from "../components/shared/AssetsPageHeader";
+import { useCurrentAssetsView } from "../hooks/useAssetsView";
+import { useSelection } from "../hooks/useSelection";
+import { useFilterActions, useSelectionActions, useSortBy, useUIActions } from "../selectors";
+import { resolveBrowseSelectedAssetIds } from "../utils/browseItems";
 
 const DEFAULT_LOCKED_FIELDS: readonly FilterFieldKey[] = ["type"];
 

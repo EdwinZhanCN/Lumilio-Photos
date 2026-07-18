@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import PhotoPicker from "@/components/PhotoPicker";
+import PhotoPicker from "@/features/assets/picker";
 import { useI18n } from "@/lib/i18n";
-import { StudioHome } from "@/features/studio/home/StudioHome";
-import { StudioEditor, type StudioEditorActivity } from "@/features/studio/editor/StudioEditor";
+import { StudioHome } from "../home/StudioHome";
+import { StudioEditor, type StudioEditorActivity } from "../editor/StudioEditor";
 import {
   clearRecentEdits,
   readRecentEdits,
   recordRecentEdit,
   type RecentEditRecord,
-} from "@/features/studio/home/recentEditsStore";
+} from "../home/recentEditsStore";
 
 type StudioView = "home" | "picker" | "editor";
 

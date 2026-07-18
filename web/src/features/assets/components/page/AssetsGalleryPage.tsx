@@ -1,39 +1,36 @@
 import { useCallback, useState, useEffect, useMemo, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, Pin } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import type {
-  AssetsBulkActionId,
-  AssetsBulkActionInput,
-} from "@/features/assets/components/shared/bulkActions";
-import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
-import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
-import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
-import { SearchFAB } from "@/features/assets/components/page/SearchFAB";
-import { useDockStore } from "@/features/lumilio/state/dockStore";
-import { useGalleryContextContributor } from "@/features/lumilio/contributors/useGalleryContextContributor";
-import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
+import { useDockStore } from "@/lib/assistant";
+import { usePreference } from "@/lib/preferences/preferences";
+import AssetsPageHeader from "../shared/AssetsPageHeader";
+import type { AssetsBulkActionId, AssetsBulkActionInput } from "@/lib/assets/bulkActions";
+import FullScreenCarousel from "./FullScreen/FullScreenCarousel/FullScreenCarousel";
+import JustifiedGallery from "./JustifiedGallery/JustifiedGallery";
+import SquareGallery from "./SquareGallery/SquareGallery";
+import PhotosLoadingSkeleton from "./LoadingSkeleton";
+import { SearchFAB } from "./SearchFAB";
+import { useAssetsNavigation } from "../../hooks/useAssetsNavigation";
 import {
   useCurrentAssetsView,
   useCurrentAssetsSearchView,
-} from "@/features/assets/hooks/useAssetsView";
-import { usePinAssetsView } from "@/features/assets/hooks/usePinAssetsView";
+} from "../../hooks/useAssetsView";
+import { useGalleryContextContributor } from "../../hooks/useGalleryContextContributor";
+import { usePinAssetsView } from "../../hooks/usePinAssetsView";
 import {
   useSortBy,
   useIsCarouselOpen,
   useSearchQuery,
   useUIActions,
   useFilterState,
-} from "@/features/assets/selectors";
-import { selectHasActiveFilters } from "@/features/assets/slices/filters.slice";
+} from "../../selectors";
+import { selectHasActiveFilters } from "../../slices/filters.slice";
 import { useI18n } from "@/lib/i18n";
-import { usePreference } from "@/features/settings";
 import type { BrowseGroup } from "../../types/assets.type";
 import type { AssetGalleryProps } from "./gallery.types";
-import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
-import type { AssetFilter } from "@/features/assets/types/assets.type";
-import type { FilterFieldKey } from "@/features/assets/components/page/FilterTool/FilterTool";
+import { findBrowseItemIndexByAssetId } from "../../utils/browseItems";
+import type { AssetFilter } from "../../types/assets.type";
+import type { FilterFieldKey } from "./FilterTool/FilterTool";
 
 type PinNavigationOrigin = {
   from?: string;

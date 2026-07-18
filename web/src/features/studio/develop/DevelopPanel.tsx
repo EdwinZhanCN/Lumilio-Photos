@@ -14,14 +14,14 @@ import { useI18n } from "@/lib/i18n";
 import {
   DEFAULT_STUDIO_ADJUSTMENTS,
   type StudioEditAdjustments,
-} from "@/features/studio/edit-mvp/types";
+} from "../edit-mvp/types";
 import {
   DEVELOP_GROUPS,
   isGeometryModified,
   isGroupModified,
   type AdjustmentKey,
-} from "@/features/studio/editor/developConfig";
-import type { BorderExifSummary } from "@/features/studio/tools/border/BorderPanel";
+} from "../editor/developConfig";
+import type { BorderExifSummary } from "../tools/border/BorderPanel";
 import { SectionHeader } from "./SectionHeader";
 import { SliderRow } from "./SliderRow";
 import { BorderToolSection } from "./BorderToolSection";

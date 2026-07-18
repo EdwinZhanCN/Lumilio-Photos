@@ -7,13 +7,12 @@ import ErrorFallback from "@/components/ui/ErrorFallback";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
 import { $api } from "@/lib/http-commons/queryClient";
-import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import { AssetsGalleryPage } from "../components/page/AssetsGalleryPage";
 import type {
   AssetsBulkActionContext,
   AssetsBulkActionItem,
-} from "@/features/assets/components/shared/bulkActions";
-import { CreateShareLinkModal } from "@/features/share/components/CreateShareLinkModal";
-import { createShareSelectedBulkAction } from "@/features/share/utils/shareBulkAction";
+} from "@/lib/assets/bulkActions";
+import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/share";
 
 interface AssetsOrigin {
   from?: string;

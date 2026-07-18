@@ -1,7 +1,7 @@
 import React from "react";
 import { Aperture, Camera, Clock, Focus, Sun, Timer, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { PhotoThumb } from "@/features/studio/shared/PhotoThumb";
+import { PhotoThumb } from "../shared/PhotoThumb";
 
 export type AssetExifRow = { label: string; value: string };
 

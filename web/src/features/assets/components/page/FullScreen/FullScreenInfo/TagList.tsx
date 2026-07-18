@@ -11,10 +11,8 @@ import { Plus, Tags as TagsIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
-import TagPickerMenu, {
-  type TagPickerItem,
-} from "@/features/assets/components/shared/TagPickerMenu";
-import { useAssetTags, isManualTag, type AssetTag } from "@/features/assets/hooks/useAssetTags";
+import TagPickerMenu, { type TagPickerItem } from "../../../shared/TagPickerMenu";
+import { useAssetTags, isManualTag, type AssetTag } from "../../../../hooks/useAssetTags";
 
 type TagSuggestion = components["schemas"]["dto.TagDTO"];
 

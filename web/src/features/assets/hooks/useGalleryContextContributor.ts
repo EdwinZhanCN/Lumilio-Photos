@@ -1,9 +1,9 @@
 import { useEffect } from "react";
+import { useContextStore } from "@/lib/assistant";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useSelection } from "@/features/assets/hooks/useSelection";
-import { resolveBrowseSelectedAssetIds } from "@/features/assets/utils/browseItems";
-import type { BrowseItem } from "@/features/assets/types/assets.type";
-import { useContextStore } from "../state/contextStore";
+import type { BrowseItem } from "../types/assets.type";
+import { resolveBrowseSelectedAssetIds } from "../utils/browseItems";
+import { useSelection } from "./useSelection";
 
 const CONTRIBUTOR_ID = "gallery-selection";
 

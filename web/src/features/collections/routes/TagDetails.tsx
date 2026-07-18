@@ -4,11 +4,9 @@ import { useMemo } from "react";
 import { Tag as TagIcon } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { AssetsProvider } from "@/features/assets";
-import { AssetsGalleryPage } from "@/features/assets/components/page/AssetsGalleryPage";
+import { AssetsGalleryPage, AssetsProvider, type AssetFilter } from "@/features/assets";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n";
-import type { AssetFilter } from "@/features/assets/types/assets.type";
 import { decodeTagKey } from "../utils/tagKey";
 
 export default function TagDetails() {

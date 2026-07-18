@@ -8,16 +8,17 @@ own features and Lumilio consumes them through explicit context or mentions.
 
 ## State
 
-Feature-local interactive state lives in three Zustand stores:
+Feature-local interactive state and the shared assistant surface use three
+small Zustand stores with explicit ownership:
 
 - [useLumilioChatStore](./state/chatStore.ts) owns the thread id, streamed message blocks,
   generation/error state, confirmation interrupts, token usage, and the
   send/resume/new-conversation commands. Its session reset aborts the active
   SSE request before clearing the conversation.
-- [useContextStore](./state/contextStore.ts) is the cross-surface context bus. Contributors
+- The lower-level [useContextStore](@/lib/assistant/index.ts) is the cross-surface context bus. Contributors
   register current asset selections or carousel viewing context, and
   [ContextChips](./components/Chat/ContextChips.tsx) lets the user exclude a contribution before send.
-- [useDockStore](./state/dockStore.ts) owns only the user's chat collapse override; route
+- The lower-level [useDockStore](@/lib/assistant/index.ts) owns only the user's chat collapse override; route
   defaults still decide whether an untouched dock starts expanded or collapsed.
 
 Server state stays in TanStack Query: pins, ref hydration, widget metadata,
@@ -72,8 +73,9 @@ flowchart TD
 [LumilioChatPage](./routes/LumilioChat.tsx) is intentionally thin: it renders [AgentBoard](./components/Board/AgentBoard.tsx)
 and an embedded [ChatDock](./components/Chat/ChatDock.tsx). The dock composes [MentionInput](./components/Chat/MentionInput.tsx),
 [ContextChips](./components/Chat/ContextChips.tsx), and [ChatMessages](./components/Chat/ChatMessages.tsx); asset and carousel surfaces
-mount it in `fab` mode and contribute context through
-[useGalleryContextContributor](./contributors/useGalleryContextContributor.ts) / [useCarouselContextContributor](./contributors/useCarouselContextContributor.ts).
+mount it in `fab` mode. Asset-owned contributors publish context through the
+shared assistant bus via
+[useGalleryContextContributor](@/features/assets/hooks/useGalleryContextContributor.ts) / [useCarouselContextContributor](@/features/assets/hooks/useCarouselContextContributor.ts).
 Board pins render through [BoardTile](./widgets/chrome/BoardTile.tsx), so the agent UI is a feature
 overlay rather than another gallery implementation.
 
@@ -82,8 +84,9 @@ overlay rather than another gallery implementation.
 Context is opt-out at send time. Contributions stay visible as chips, and
 exclusions are cleared after sending so the next message starts from the
 current page context rather than a hidden stale exclusion.
-Both Lumilio stores also expose a full session reset used by authentication;
-conversation, contributions, and exclusions never cross a user boundary.
+[resetLumilioSession](./resetSession.ts) is the feature reset exposed to application
+composition. It clears the chat store and shared context bus so conversation,
+contributions, and exclusions never cross a user boundary.
 
 Pins are the durability boundary. Chat widgets are session refs; pinning
 copies the result to `/api/v1/agent/pins`, after which layout, title, view,

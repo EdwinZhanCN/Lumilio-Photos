@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useContextStore, type ContextContribution } from "../../state/contextStore";
+import { useContextStore, type ContextContribution } from "@/lib/assistant";
 
 interface ContextChipsProps {
   contributions: ContextContribution[];

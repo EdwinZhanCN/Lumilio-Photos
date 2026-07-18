@@ -1,15 +1,11 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLumilioChatStore } from "@/features/lumilio/state/chatStore.ts";
-import { useContextStore } from "@/features/lumilio/state/contextStore.ts";
-import { usePreferencesStore } from "@/features/settings/preferences.ts";
+import { usePreferencesStore } from "@/lib/preferences/preferences";
 import { resetSession } from "./resetSession.ts";
 
 describe("resetSession", () => {
   beforeEach(() => {
     localStorage.clear();
-    useLumilioChatStore.getState().resetSession();
-    useContextStore.getState().resetSession();
   });
 
   it("isolates user A state before user B can authenticate", async () => {
@@ -36,22 +32,14 @@ describe("resetSession", () => {
       workingRepositoryId: "repository-a",
       browseRepositoryId: "repository-a",
     });
-    useLumilioChatStore.setState({
-      threadId: "thread-a",
-      messages: [{ id: "message-a", role: "user", blocks: [] }],
-    });
-    useContextStore.setState({
-      contributions: new Map([
-        [
-          "selection-a",
-          { id: "selection-a", type: "selection", assetIds: ["private-a"], label: "A" },
-        ],
-      ]),
-      excluded: new Set(["selection-a"]),
-    });
     const resetGlobalState = vi.fn();
+    const resetFeatureState = vi.fn();
 
-    await resetSession({ queryClient, resetGlobalState });
+    await resetSession({
+      queryClient,
+      resetGlobalState,
+      resetFeatureState,
+    });
     await inFlightQuery;
 
     expect(queryAborted).toBe(true);
@@ -63,10 +51,7 @@ describe("resetSession", () => {
     expect(localStorage.getItem("assets_state_v1")).toBeNull();
     expect(usePreferencesStore.getState().workingRepositoryId).toBeUndefined();
     expect(usePreferencesStore.getState().browseRepositoryId).toBeUndefined();
-    expect(useLumilioChatStore.getState().threadId).toBeNull();
-    expect(useLumilioChatStore.getState().messages).toEqual([]);
-    expect(useContextStore.getState().contributions.size).toBe(0);
-    expect(useContextStore.getState().excluded.size).toBe(0);
+    expect(resetFeatureState).toHaveBeenCalledOnce();
     expect(resetGlobalState).toHaveBeenCalledOnce();
   });
 });

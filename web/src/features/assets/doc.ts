@@ -80,6 +80,9 @@
  * and {@link SquareGallery} render the browse model; {@link FullScreenCarousel}
  * inspects the current flattened asset set; {@link SearchFAB} writes to the
  * shared search state and the selected source hook decides how to execute it.
+ * {@link PhotoPicker} is the narrow cross-feature picker entry: it creates an
+ * isolated single-selection asset scope while keeping gallery and filter
+ * implementation details inside Assets.
  * Both galleries use {@link useGalleryViewportWindow}: the full layout height
  * remains stable, while only an overscanned vertical slice mounts thumbnail
  * components. Leaving that slice removes media nodes instead of retaining every
@@ -133,10 +136,11 @@ import type JustifiedGallery from "./components/page/JustifiedGallery/JustifiedG
 import type SquareGallery from "./components/page/SquareGallery/SquareGallery.tsx";
 import type FullScreenCarousel from "./components/page/FullScreen/FullScreenCarousel/FullScreenCarousel.tsx";
 import type { SearchFAB } from "./components/page/SearchFAB.tsx";
-import type { useGalleryContextContributor } from "@/features/lumilio/contributors/useGalleryContextContributor.ts";
+import type { useGalleryContextContributor } from "./hooks/useGalleryContextContributor.ts";
 import type { useGalleryViewportWindow } from "./hooks/useGalleryViewportWindow.ts";
 import type { useAssetMediaItem } from "./hooks/useAssetMediaItem.ts";
 import type { useStackCarouselAssets } from "./hooks/useStackCarouselAssets.ts";
 import type MediaViewer from "./components/shared/MediaViewer.tsx";
+import type PhotoPicker from "./picker/PhotoPicker.tsx";
 
 export {};

@@ -8,7 +8,7 @@ import { useLocationClusters, useMapPhotoAssets } from "@/features/assets/map";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { AlertTriangleIcon, CameraIcon, HomeIcon, SparklesIcon } from "lucide-react";
-import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
+import { useVisibleOnce } from "@/features/assets";
 
 const SpacetimeMapCard = lazy(() => import("../components/SpacetimeMapCard"));
 

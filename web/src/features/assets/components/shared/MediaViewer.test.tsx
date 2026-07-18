@@ -16,7 +16,7 @@ vi.mock("@/lib/assets/assetUrls", () => ({
   },
 }));
 
-vi.mock("@/features/assets/hooks/useAssetMediaItem", () => ({
+vi.mock("../../hooks/useAssetMediaItem", () => ({
   useAssetMediaItem: () => ({
     data: {
       media_item: {
@@ -31,7 +31,7 @@ vi.mock("@/features/assets/hooks/useAssetMediaItem", () => ({
   }),
 }));
 
-vi.mock("@/features/assets/hooks/useLivePhotoPlayback", () => ({
+vi.mock("../../hooks/useLivePhotoPlayback", () => ({
   useLivePhotoPlayback: () => ({
     videoRef: { current: null },
     isPlaying: false,

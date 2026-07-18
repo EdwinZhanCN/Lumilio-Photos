@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { streamAgent } from "../api/agentStream";
 import type { ChatMessage, TokenUsageInfo } from "../types";
 import type { MentionPayload } from "../mentions/mentionSources";
-import type { ContextContribution } from "./contextStore";
+import type { ContextContribution } from "@/lib/assistant";
 import {
   applyChunk,
   applyInterrupt,

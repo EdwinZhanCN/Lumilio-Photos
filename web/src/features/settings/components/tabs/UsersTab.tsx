@@ -2,14 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangleIcon, KeyRoundIcon, MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import UserAvatar from "@/components/ui/UserAvatar";
-import PhotoPicker from "@/components/PhotoPicker";
-import { useAuth } from "@/features/auth";
-import {
-  useAdminUpdateUser,
-  useResetUserAccess,
-  useUsers,
-  type ManagedUserDTO,
-} from "@/features/users/hooks/useUsers";
+import PhotoPicker from "@/features/assets/picker";
 import {
   DISPLAY_NAME_HINT,
   DISPLAY_NAME_MAX_LENGTH,
@@ -18,7 +11,14 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
   normalizeUsernameInput,
-} from "@/features/auth/lib/credentialPolicy.ts";
+  useAuth,
+} from "@/features/auth";
+import {
+  useAdminUpdateUser,
+  useResetUserAccess,
+  useUsers,
+  type ManagedUserDTO,
+} from "@/features/users";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../SettingsGroup";
 import { SettingsDropdown } from "../SettingsDropdown";
 import { SettingsSaveBar } from "../SettingsSaveBar";

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, Info, KeyRound, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
-import { useChangeMyPassword } from "@/features/users/hooks/useUsers";
+import { useChangeMyPassword } from "@/features/users";
 import {
   PASSWORD_HINT,
   PASSWORD_MAX_LENGTH,

@@ -2,7 +2,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import AlbumDetails from "./AlbumDetails";
-import type { AssetsBulkActionContext } from "@/features/assets/components/shared/bulkActions";
+import type { AssetsBulkActionContext } from "@/lib/assets/bulkActions";
 
 const mocks = vi.hoisted(() => ({
   AssetsProvider: vi.fn((props: { children: ReactNode }) => props.children),
@@ -21,11 +21,8 @@ vi.mock("@/contexts/WorkerProvider", () => ({
   WorkerProvider: ({ children }: { children: ReactNode }) => children,
 }));
 
-vi.mock("@/features/assets/AssetsProvider", () => ({
+vi.mock("@/features/assets", () => ({
   AssetsProvider: mocks.AssetsProvider,
-}));
-
-vi.mock("@/features/assets/components/page/AssetsGalleryPage", () => ({
   AssetsGalleryPage: mocks.AssetsGalleryPage,
 }));
 

@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Asset } from "@/lib/assets/types";
-import type { AssetGroup, SortByType } from "@/features/assets/types/assets.type";
+import type { AssetGroup, SortByType } from "../types/assets.type";
 
 export const DEFAULT_GROUP_KEYS = new Set<string>();
 
