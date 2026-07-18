@@ -4,13 +4,8 @@ import type { components } from "@/lib/http-commons/schema";
 
 type Schemas = components["schemas"];
 
-type UserDTO = Schemas["dto.UserDTO"];
 type ManagedUserDTO = Schemas["dto.ManagedUserDTO"];
 type ListUsersResponseDTO = Schemas["dto.ListUsersResponseDTO"];
-
-export type UpdateOwnProfilePayload = Schemas["dto.UpdateOwnProfileRequestDTO"];
-export type AdminUpdateUserPayload = Schemas["dto.AdminUpdateUserRequestDTO"];
-export type ChangePasswordPayload = Schemas["dto.ChangePasswordRequestDTO"];
 
 export function useUsers(
   limit = 50,
@@ -82,4 +77,4 @@ export function useResetUserAccess() {
   });
 }
 
-export type { UserDTO, ManagedUserDTO };
+export type { ManagedUserDTO };

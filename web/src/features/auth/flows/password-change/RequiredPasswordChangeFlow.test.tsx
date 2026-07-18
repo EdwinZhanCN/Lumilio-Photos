@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import RequiredPasswordChangePage from "./RequiredPasswordChangePage";
+import RequiredPasswordChangeFlow from "./RequiredPasswordChangeFlow";
 import {
   clearRequiredPasswordChangeChallenge,
   storeRequiredPasswordChangeChallenge,
-} from "../state/passwordChangeChallenge.ts";
+} from "../../state/passwordChangeChallenge.ts";
 
 const mocks = vi.hoisted(() => ({
   completeAuth: vi.fn(),
@@ -24,11 +24,11 @@ vi.mock("@/lib/http-commons/queryClient", () => ({
   },
 }));
 
-vi.mock("../hooks/useAuth.ts", () => ({
+vi.mock("../../state/useAuth.ts", () => ({
   useAuth: () => ({ completeAuth: mocks.completeAuth }),
 }));
 
-describe("RequiredPasswordChangePage", () => {
+describe("RequiredPasswordChangeFlow", () => {
   beforeEach(() => {
     mocks.completeAuth.mockReset();
     mocks.mutateAsync.mockReset();
@@ -41,7 +41,7 @@ describe("RequiredPasswordChangePage", () => {
     render(
       <MemoryRouter initialEntries={["/password-change-required"]}>
         <Routes>
-          <Route path="/password-change-required" element={<RequiredPasswordChangePage />} />
+          <Route path="/password-change-required" element={<RequiredPasswordChangeFlow />} />
           <Route path="/login" element={<div>Login again</div>} />
         </Routes>
       </MemoryRouter>,
@@ -68,7 +68,7 @@ describe("RequiredPasswordChangePage", () => {
     render(
       <MemoryRouter initialEntries={["/password-change-required"]}>
         <Routes>
-          <Route path="/password-change-required" element={<RequiredPasswordChangePage />} />
+          <Route path="/password-change-required" element={<RequiredPasswordChangeFlow />} />
           <Route path="/done" element={<div>Authenticated</div>} />
         </Routes>
       </MemoryRouter>,

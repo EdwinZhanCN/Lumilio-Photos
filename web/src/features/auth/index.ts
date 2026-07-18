@@ -1,10 +1,9 @@
-export * from "./state/AuthProvider";
-export * from "./hooks/useAuth";
-export * from "./types.ts";
-export { default as ProtectedRoute } from "./components/ProtectedRoute";
-export { default as BootstrapGate } from "./components/BootstrapGate";
-export { default as PrimaryRepositoryGate } from "./components/PrimaryRepositoryGate";
-export { default as SetupGate } from "./components/SetupGate";
+export { AuthProvider } from "./state/AuthProvider";
+export { useAuth } from "./state/useAuth";
+export { default as ProtectedRoute } from "./modules/access/ProtectedRoute";
+export { default as BootstrapGate } from "./modules/access/BootstrapGate";
+export { default as PrimaryRepositoryGate } from "./modules/access/PrimaryRepositoryGate";
+export { default as SetupGate } from "./modules/access/SetupGate";
 export { useMFAStatus } from "./api/useMFA";
 export {
   useBeginPasskeyEnrollment,
@@ -20,5 +19,5 @@ export {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
   normalizeUsernameInput,
-} from "./utils/credentialPolicy";
-export { createPasskeyCredential, getPasskeySupport } from "./utils/webauthn";
+} from "./model/credentialPolicy";
+export { createPasskeyCredential, getPasskeySupport } from "./modules/webauthn/webauthn";

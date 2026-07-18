@@ -3,10 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useAuth } from "./useAuth.ts";
-import { setupStatusQueryKey } from "../api/useSetupStatus.ts";
-import type { TOTPSetupResponse } from "../types.ts";
-import { createPasskeyCredential, getPasskeySupport } from "../utils/webauthn.ts";
+import { useAuth } from "../../state/useAuth.ts";
+import { setupStatusQueryKey } from "../../api/useSetupStatus.ts";
+import type { TOTPSetupResponse } from "../../types.ts";
+import { createPasskeyCredential, getPasskeySupport } from "../../modules/webauthn/webauthn.ts";
+import { usePasswordConfirmation } from "../../hooks/usePasswordConfirmation.ts";
 
 type AuthRedirectState = {
   from?: {
@@ -66,7 +67,6 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   const passkeyVerifyMutation = $api.useMutation("post", "/api/v1/auth/mfa/passkeys/verify");
   const location = useLocation();
   const navigate = useNavigate();
-  const confirmPasswordRef = useRef<HTMLInputElement | null>(null);
   // Set once the account is created so the redirect effect doesn't bounce the
   // freshly-registered (now authenticated) user out of the optional MFA steps.
   const startedRef = useRef(false);
@@ -90,6 +90,11 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   const confirmPasswordMessage = t("auth.register.confirmPasswordHint", {
     defaultValue: "Passwords must match exactly.",
   });
+  const confirmPasswordRef = usePasswordConfirmation(
+    password,
+    confirmPassword,
+    confirmPasswordMessage,
+  );
   const displayError = flowError;
   const isBusy =
     registerMutation.isPending ||
@@ -97,18 +102,6 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
     totpEnableMutation.isPending ||
     passkeyOptionsMutation.isPending ||
     passkeyVerifyMutation.isPending;
-
-  useEffect(() => {
-    const input = confirmPasswordRef.current;
-    if (!input) return;
-
-    if (confirmPassword && confirmPassword !== password) {
-      input.setCustomValidity(confirmPasswordMessage);
-      return;
-    }
-
-    input.setCustomValidity("");
-  }, [confirmPassword, confirmPasswordMessage, password]);
 
   useEffect(() => {
     // Bounce already-authenticated visitors away — but not the user who just

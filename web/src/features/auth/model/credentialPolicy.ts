@@ -13,6 +13,6 @@ export const DISPLAY_NAME_HINT =
 export const PASSWORD_HINT =
   "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.";
 
-export function normalizeUsernameInput(value: string) {
+export function normalizeUsernameInput(value: string): string {
   return value.toLowerCase();
 }

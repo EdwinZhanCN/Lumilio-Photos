@@ -1,6 +1,6 @@
 import React from "react";
 import { useI18n } from "@/lib/i18n.tsx";
-import RegistrationForm from "../components/RegistrationForm.tsx";
+import RegistrationForm from "../flows/registration/RegistrationForm.tsx";
 
 const RegisterPage: React.FC = () => {
   const { t } = useI18n();

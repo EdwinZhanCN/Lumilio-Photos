@@ -1,11 +1,11 @@
-export type PasskeySupport = {
+export interface PasskeySupport {
   supported: boolean;
   reasonKey?:
     | "auth.passkeySupport.browserOnly"
     | "auth.passkeySupport.notSupported"
     | "auth.passkeySupport.secureContextRequired"
     | "auth.passkeySupport.httpsRequired";
-};
+}
 
 function isLocalHostname(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1";

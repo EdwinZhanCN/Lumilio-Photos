@@ -28,8 +28,10 @@
  *
  * {@link RepositoryGrid} owns the repository-management surface. Its create
  * modal delegates server mutation and invalidation to
- * {@link useCreateRepository}; the grid receives maintenance commands from the
- * higher Manage composition route rather than importing those domains.
+ * {@link useCreateRepository}; Auth setup uses the same public mutation for
+ * primary-repository creation. {@link isStorageStrategy} keeps storage-policy
+ * parsing in the repository model. The grid receives maintenance commands from
+ * the higher Manage composition route rather than importing those domains.
  *
  * ## State
  *
@@ -50,6 +52,7 @@ import type { useBrowseScope } from "./flows/browse-scope/useBrowseScope.ts";
 import type RepositoryGrid from "./flows/manage/RepositoryGrid.tsx";
 import type { useWorkingRepository } from "./flows/working-repository/useWorkingRepository.ts";
 import type { normalizeRepositoryOptions } from "./model/repositoryOptions.ts";
+import type { isStorageStrategy } from "./model/repositorySetup.ts";
 import type { RepositoryOption } from "./types.ts";
 
 export {};
