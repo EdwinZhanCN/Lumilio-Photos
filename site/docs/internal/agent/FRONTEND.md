@@ -63,7 +63,7 @@ vp exec i18next-cli status     # step 3: verify zh coverage (must be 100%)
 ## Source Layout
 
 - `src/app`: root providers, router composition, application shell, and runtime status effects.
-- `src/features/*`: domain features and routes.
+- `src/features/*`: domain features. The enforced shape and dependency rules live in `web/ARCHITECTURE.md`; the quick placement guide is `web/src/features/README.md`.
 - `src/components`: reusable app components and UI pieces.
 - `src/contexts`: cross-cutting providers.
 - `src/lib`: API client, i18n, utilities, feature support libraries.
@@ -73,7 +73,27 @@ vp exec i18next-cli status     # step 3: verify zh coverage (must be 100%)
 - `src/wasm`: checked-in generated/bundled WASM support code.
 - `src/workers`: browser worker entry points and worker tests.
 
-Current feature areas include assets, auth, collections, home, Lumilio chat, manage, monitor, people, portfolio, settings, studio, upload, updates, and users.
+Current feature areas are assets, auth, cloud, collections, home, Lumilio, manage, monitor, notifications, people, repositories, settings, share, studio, upload, and users.
+
+### Feature Ownership
+
+Feature roots use one optional vocabulary:
+
+- `api/`: reusable TanStack Query reads/mutations and DTO adapters.
+- `model/`: React-free domain rules, value types, codecs, validation, and transformations.
+- `flows/<workflow>/`: the default owner of user-journey UI, orchestration, flow-local hooks/state, tests, and styles.
+- `components/`: UI with real consumers in multiple flows of the same feature.
+- `hooks/`: rare React mechanisms reused across multiple flows.
+- `state/`: only cross-flow or refresh-spanning state, persistence, migration, hydration, and reset.
+- `modules/`: isolated technical capabilities that are not themselves a user journey.
+- `routes/`: thin router entries that delegate to a flow.
+- `utils/`: legacy/general pure helpers without domain vocabulary; prefer `model/` or a named lower-layer `lib/` owner for new code.
+- `docs/`: feature-local supporting notes; `doc.ts` and generated `doc.md` stay at the feature root.
+
+Directories are optional. Do not create placeholders or alternate roots, and do
+not leave compatibility re-exports at old internal paths. Inside a feature use
+relative imports; between features use the target feature's public `index.ts`
+except for reviewed narrow entries documented in `web/ARCHITECTURE.md`.
 
 ## API Contract
 
@@ -127,26 +147,25 @@ Use TanStack Query for server state:
 - loading/error state
 - pagination and refetch behavior
 
-Use Context for cross-cutting app state:
+Use Context for cross-cutting runtime capabilities:
 
-- settings
 - auth session
-- global online/notification behavior
-- worker runtime dependencies
+- global runtime/notification coordination
+- worker dependencies
 
-Session teardown is centralized in `features/auth/resetSession.ts`. Logout and
+Use flow-local Zustand or `useReducer` for interaction shared by several
+components in one workflow. Use component-local state for one component, URL
+state for linkable/restorable page state, `useRef` for non-rendering temporary
+values, and versioned storage only for explicitly refresh-safe preferences.
+
+Session teardown is centralized in `features/auth/state/resetSession.ts`. Logout and
 refresh exhaustion must use that boundary so in-flight Query/Lumilio work and
 all user-scoped caches, notifications, repository choices, searches, and
 filters are cleared before another user authenticates.
 
-Use Zustand for feature-local interactive UI state:
-
-- selections
-- tabs and panels
-- local feature preferences
-- URL-synced controls
-
-Do not mirror the same data across Query, Context, and Zustand without a clear ownership reason.
+Do not mirror the same data across Query, Context, Zustand, URL, or storage.
+Root feature `state/` is reserved for lifecycles that genuinely span flows or
+refreshes; otherwise colocate state with the owning flow.
 
 Repository scoping uses `useBrowseScope` for list pages,
 `useWorkingRepository` for upload only, the entity's own `repository_id` for
@@ -157,32 +176,17 @@ parameters to person/album detail pages or mutations.
 
 Public routes include login and register. Bootstrap routes handle first-user setup. Protected standalone routes handle MFA and password changes.
 
-Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll container, and the global ChatDock (except on `/lumilio`). Notable route groups include:
+Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll container, and the global ChatDock (except on `/lumilio`). The route table in `web/src/app/router/routes.tsx` is authoritative. Its stable route families are:
+
+- Home and library: `/`, `/assets/*`.
+- Collections: `/collections`, albums, places/map, people, folders, tags, liked, trash, shared links, and utility/classifier views.
+- Entity detail: album, trip, folder, tag, person, and asset routes with optional asset-viewer segments.
+- Operations: `/manage`, `/settings`, `/studio`, `/server-monitor`, and `/lumilio`.
+- Public/auth/setup: `/s/:token/*`, login, registration, password/MFA, and bootstrap routes outside or around the authenticated shell as appropriate.
 
 Studio, Map, Lumilio, Monitor, and Settings are route-level lazy chunks. The
 global ChatDock also lazy-loads its message renderer and does not mount its
 expanded body/input queries while collapsed.
-
-- `/`
-- `/assets`
-- `/assets/:assetId`
-- `/collections`
-- `/collections/albums`
-- `/collections/map`
-- `/collections/places/:tripId`
-- `/collections/places/:tripId/:assetId`
-- `/collections/people`
-- `/collections/utilities/duplicates`
-- `/collections/utilities/:classifierSlug`
-- `/collections/utilities/:classifierSlug/:assetId`
-- `/collections/:albumId`
-- `/collections/:albumId/:assetId`
-- `/people/:personId`
-- `/people/:personId/:assetId`
-- `/manage`
-- `/studio`
-- `/server-monitor`
-- `/lumilio`
 
 Legacy compatibility routes also redirect `/upload-photos` to `/manage`.
 

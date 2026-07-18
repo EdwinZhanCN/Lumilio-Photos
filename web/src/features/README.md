@@ -1,51 +1,73 @@
-# Features and State Management
+# Feature Placement Guide
 
-This directory contains the core business logic and UI modules of the application. Each feature is self-contained and follows a consistent structure for state management and UI design.
+`web/ARCHITECTURE.md` is the authoritative, boundary-enforced frontend
+architecture. This file is the short checklist for work inside
+`src/features/`.
 
-## State Management Structure
+## Standard shape
 
-We follow a **feature-based state management** approach. While global state exists, we encourage using React Context on a per-feature basis to keep the logic modular and maintainable.
+Feature directories use this optional vocabulary only:
 
-### Feature Store Pattern
-
-Each feature should manage its own state. Feel free to use Redux, but ensure it is scoped to the feature: **one store per feature**.
-
-Example structure for a `settings` feature:
-
-```txt
-src/
-└── features/
-    └── settings/
-        ├── index.ts              // Entry point: export { SettingsProvider, useSettings } from '...'
-        ├── SettingsProvider.tsx  // Provider component (wraps Context)
-        ├── hooks/
-        │   └── useSettings.ts    // Custom Hook for accessing feature state
-        ├── reducers/
-        │   ├── lumen.reducer.ts  // Sub-reducer
-        │   └── ui.reducer.ts     // Sub-reducer
-        ├── settings.reducer.ts   // Root Reducer for this feature
-        └── settings.type.ts              // Feature-specific type definitions
+```text
+src/features/<feature>/
+├── api/          # TanStack Query reads, mutations, DTO adapters
+├── model/        # React-free domain types, rules, codecs, transformations
+├── flows/        # named user journeys with their UI, hooks, local state, tests
+├── components/   # UI reused by multiple flows in this feature
+├── hooks/        # rare React mechanisms reused across multiple flows
+├── modules/      # isolated technical capabilities, not user journeys
+├── routes/       # thin router entries delegating to flows
+├── state/        # cross-flow/persisted state, migration, hydration, reset
+├── utils/        # legacy/general pure helpers; prefer model/ for domain rules
+├── docs/         # feature-local supporting notes
+├── index.ts      # narrow cross-feature public API, only when needed
+├── types.ts      # genuinely feature-wide types, when needed
+├── doc.ts        # architecture-document source
+└── doc.md        # generated from doc.ts; never edit directly
 ```
 
-## Design Protocol
+Omit unused directories. Uniformity means identical semantics, not identical
+directory counts.
 
-### Dependencies
+## Choose state by source and lifecycle
 
-- TailwindCSS
-- DaisyUI
+| Data | Owner |
+| --- | --- |
+| Server fact, loading, pagination, mutation | TanStack Query in `api/` |
+| Cross-cutting runtime capability | React Context |
+| Interaction shared inside one flow | Flow-local Zustand or `useReducer` |
+| One component's interaction | Local `useState` / `useReducer` |
+| Shareable or restorable page state | URL / React Router |
+| Temporary value that must not render | `useRef` |
+| Explicitly refresh-safe preference | Versioned persisted store in `state/` |
 
-### Header
+Never mirror a fetched collection into Context or Zustand. Do not store URL
+state in a feature store. Root `state/` is not the default location for local
+reducers.
 
-- The header should be consistent across all pages.
-- It should include the icon on the left and navigation title on the right.
+## Ownership rules
 
-Using Lucide-react components for the icon is recommended. Standard className should be `w-6 h-6 text-primary` or `size-6 text-primary`.
+- Put workflow UI and orchestration in `flows/<workflow>/` by default.
+- Keep a component inside its flow until another flow actually consumes it.
+- Put deterministic domain logic in `model/`, not a catch-all `utils/` folder.
+- Keep route files thin and move route behavior into an owning flow.
+- Use relative imports inside one feature.
+- Import another feature through `@/features/<feature>`; only reviewed narrow
+  entries such as `@/features/assets/map` and `@/features/assets/picker` may be
+  imported directly.
+- Keep public `index.ts` files narrow and backed by real external consumers.
+- Remove old paths after moves; do not leave compatibility shims.
+- Keep tests and feature-specific styles beside the implementation they cover.
 
-```jsx
-<PageHeader title="Studio" icon={<PaintBrushIcon className="w-6 h-6 text-primary" />} />
+## Validation
+
+From the repository root:
+
+```bash
+make web-test
+make web-browser-test  # workers, WASM, upload lifecycle, bundling/runtime work
 ```
 
-### Buttons
-
-- We prefer the **soft button style** from DaisyUI.
-- For frequently used buttons, use: `className="btn btn-sm btn-soft btn-info"`.
+`make web-test` performs type checking, linting, the source-boundary audit, and
+the frontend test suite. When `doc.ts` changes, regenerate its sibling `doc.md`
+as described in `site/docs/internal/agent/docts.md`.

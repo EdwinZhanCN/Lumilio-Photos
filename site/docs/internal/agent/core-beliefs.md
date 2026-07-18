@@ -7,4 +7,5 @@
 - Tracked complete manifests should boot cleanly in Docker and local development.
 - Configuration should be boring: one strict TOML manifest for runtime-immutable behavior, secret values in referenced files, and no ordinary environment overrides.
 - Frontend flows should be dense enough for real work and calm enough for repeated use.
+- Frontend state should have one owner selected by source and lifecycle; server facts, URL state, runtime context, transient interaction, and persisted preferences are not interchangeable.
 - Generated artifacts should be reproducible from commands, not manually curated.

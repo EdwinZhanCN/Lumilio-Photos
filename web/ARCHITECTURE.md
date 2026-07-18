@@ -124,14 +124,14 @@ Run focused tests while editing, then the repository gates from the project root
 ```bash
 cd web
 vp test run path/to/changed.test.ts
-pnpm run check:boundaries
+vp node scripts/check-source-boundaries.mjs
 cd ..
 make web-test
 ```
 
-If no direct test covers the change, run the nearest characterization tests plus typecheck, lint, and `pnpm run check:boundaries`; add coverage when behavior is being changed or moved without it. The full gate remains required.
+If no direct test covers the change, run the nearest characterization tests plus typecheck, lint, and `vp node scripts/check-source-boundaries.mjs`; add coverage when behavior is being changed or moved without it. The full gate remains required.
 
-`make web-test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `pnpm run check:boundaries` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, non-standard feature roots, misplaced shared-state or persistence modules, reusable server queries under `hooks/`, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded from the runtime graph; `doc.ts` links are checked by the documentation lint rule instead.
+`make web-test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `vp node scripts/check-source-boundaries.mjs` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, non-standard feature roots, misplaced shared-state or persistence modules, reusable server queries under `hooks/`, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded from the runtime graph; `doc.ts` links are checked by the documentation lint rule instead.
 
 Also run `make web-browser-test` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths. It builds the production app, enforces the bundle budget, and runs the browser smoke suite.
 
