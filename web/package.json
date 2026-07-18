@@ -10,6 +10,7 @@
     "lint:fix": "vp lint --fix",
     "type-check": "vp check --no-fmt --no-lint",
     "check": "vp check",
+    "check:boundaries": "node scripts/check-source-boundaries.mjs",
     "fmt": "vp fmt",
     "fmt:fix": "vp fmt . --write",
     "preview": "vp preview",

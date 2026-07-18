@@ -19,6 +19,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 - `site/docs/internal/agent/architecture.md`: system map, backend/frontend boundaries, config/runtime notes.
 - `site/docs/internal/agent/BACKEND.md`: backend runtime, package map, config, queues, storage, API contracts.
 - `site/docs/internal/agent/FRONTEND.md`: frontend runtime, toolchain, routes, state boundaries, API usage.
+- `web/ARCHITECTURE.md`: enforceable frontend directory ownership, public-entry rules, dependency direction, and boundary gates.
 - `site/docs/internal/agent/DESIGN.md`: product and interface guidance for app work.
 - `site/docs/internal/agent/core-beliefs.md`: decision principles for product and engineering tradeoffs.
 - `site/docs/internal/agent/exec-plans/tech-debt-tracker.md`: small known debt that should not be forgotten.
