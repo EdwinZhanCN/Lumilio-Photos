@@ -64,10 +64,21 @@ jobs:
                   cd web && vp install && vp build
                   cd .. && node desktop/scripts/generate-third-party-notices.mjs
 
+            # The Go binary embeds this via //go:embed all:panel/dist.
+            - name: Build desktop control panel
+              run: cd desktop/panel && vp install && vp run build
+
             - uses: actions/upload-artifact@v7
               with:
                   name: web-dist
                   path: web/dist
+                  if-no-files-found: error
+                  retention-days: 1
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: panel-dist
+                  path: desktop/panel/dist
                   if-no-files-found: error
                   retention-days: 1
 
@@ -120,6 +131,12 @@ jobs:
                   name: web-dist
                   path: web/dist
 
+            - name: Stage control panel bundle
+              uses: actions/download-artifact@v8
+              with:
+                  name: panel-dist
+                  path: desktop/panel/dist
+
             - name: Stage third-party notices
               uses: actions/download-artifact@v8
               with:
@@ -144,6 +161,7 @@ jobs:
             - name: Build .app and DMG
               run: |
                   LUMILIO_VERSION="${SAFE_REF#v}" LUMILIO_WEB_DIST_PREBUILT=1 \
+                      LUMILIO_PANEL_DIST_PREBUILT=1 \
                       desktop/scripts/build-macos.sh ${{ matrix.arch }} --dmg
 
             - name: Rename DMG for release
@@ -183,6 +201,12 @@ jobs:
               with:
                   name: web-dist
                   path: web/dist
+
+            - name: Stage control panel bundle
+              uses: actions/download-artifact@v8
+              with:
+                  name: panel-dist
+                  path: desktop/panel/dist
 
             - name: Stage third-party notices
               uses: actions/download-artifact@v8

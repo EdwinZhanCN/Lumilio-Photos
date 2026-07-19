@@ -59,6 +59,20 @@ echo "==> Cleaning previous bundle"
 rm -rf "$APP"
 mkdir -p "$MACOS_DIR" "$RES_DIR" "$FRAMEWORKS_DIR"
 
+echo "==> Ensuring control panel bundle (desktop/panel/dist, embedded via go:embed)"
+PANEL_DIST="$DESKTOP_DIR/panel/dist"
+# CI stages a prebuilt panel-dist artifact and sets LUMILIO_PANEL_DIST_PREBUILT=1;
+# local builds always rebuild so a stale dist is never embedded.
+if [ "${LUMILIO_PANEL_DIST_PREBUILT:-}" = "1" ] && [ -f "$PANEL_DIST/index.html" ]; then
+  echo "    using prebuilt $PANEL_DIST"
+else
+  if ! command -v vp >/dev/null 2>&1; then
+    echo "    ERROR: vp not found; install Vite+ tooling (the Go binary embeds panel/dist)." >&2
+    exit 1
+  fi
+  ( cd "$DESKTOP_DIR/panel" && vp install && vp run build )
+fi
+
 echo "==> Building Go binary ($PLATFORM)"
 # Add an LC_RPATH pointing at the bundled Frameworks dir so the libvips tree
 # (whose install names dylibbundler rewrites to @rpath) resolves at runtime. On

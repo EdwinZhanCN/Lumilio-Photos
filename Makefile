@@ -43,7 +43,7 @@ COMPOSE = $(if $(COMPOSE_BIN),$(COMPOSE_BIN) -f $(COMPOSE_FILE) -p $(COMPOSE_PRO
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
 .PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test dto db db-reset dev-reset clean \
-	desktop-dev desktop-build desktop-test \
+	desktop-dev desktop-build desktop-test desktop-panel \
 	.server-config .server-secret .web-env
 
 setup: .server-config .server-secret
@@ -90,7 +90,11 @@ web-test:
 web-browser-test:
 	cd $(WEB_DIR) && PRODUCTION_SMOKE=true $(VP) build && $(VP) node scripts/check-bundle-budget.mjs && $(VP) node scripts/run-browser-smoke.mjs
 
-desktop-dev:
+desktop-panel:
+	@echo "==> Building desktop control panel (Svelte, embedded into the Go binary)"
+	cd $(DESKTOP_DIR)/panel && $(VP) install && $(VP) run build
+
+desktop-dev: desktop-panel
 	@echo "==> Running desktop app (dev). PG_BIN_DIR=$(PG_BIN_DIR)"
 	@echo "    Serving the SPA from $(CURDIR)/$(WEB_DIR)/dist (run 'cd web && vp build' first)."
 	cd $(DESKTOP_DIR) && \
@@ -98,11 +102,11 @@ desktop-dev:
 		LUMILIO_WEB_ROOT=$(CURDIR)/$(WEB_DIR)/dist \
 		$(GO) run .
 
-desktop-test:
+desktop-test: desktop-panel
 	@echo "==> Testing desktop module (PostgreSQL lifecycle test skips if no PG)"
 	cd $(DESKTOP_DIR) && $(GO) test ./...
 
-desktop-build:
+desktop-build: desktop-panel
 	@echo "==> Building macOS desktop app bundle"
 	$(DESKTOP_DIR)/scripts/build-macos.sh
 
