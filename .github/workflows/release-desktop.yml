@@ -59,14 +59,15 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+            # Before the web SPA: the notices generator runs `go list` over the
+            # desktop module, whose //go:embed all:panel/dist needs dist to exist.
+            - name: Build desktop control panel
+              run: cd desktop/panel && vp install && vp run build
+
             - name: Build web SPA
               run: |
                   cd web && vp install && vp build
                   cd .. && node desktop/scripts/generate-third-party-notices.mjs
-
-            # The Go binary embeds this via //go:embed all:panel/dist.
-            - name: Build desktop control panel
-              run: cd desktop/panel && vp install && vp run build
 
             - uses: actions/upload-artifact@v7
               with:
