@@ -117,6 +117,12 @@ cp "$APP_ICON" "$RES_DIR/$APP_ICON_NAME.icns"
 
 echo "==> Staging bundled runtime resources"
 PG_SRC="$RESOURCES_SRC/postgres/18/$PLATFORM"
+# GitHub artifact upload/download drops the executable bit (documented
+# limitation), so a CI-staged bundle arrives with plain-file binaries.
+# Restore it before the tool check; no-op for locally staged bundles.
+if [ -d "$PG_SRC/bin" ]; then
+  chmod +x "$PG_SRC"/bin/*
+fi
 for tool in postgres initdb pg_ctl pg_isready createdb pg_dump pg_restore psql; do
   if [ ! -x "$PG_SRC/bin/$tool" ]; then
     echo "    ERROR: missing required PostgreSQL tool: $PG_SRC/bin/$tool" >&2
