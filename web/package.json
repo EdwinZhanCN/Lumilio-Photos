@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "assets:sync": "node scripts/assets-sync.mjs",
+    "assets:sync:test": "node --test scripts/assets-sync.test.mjs",
     "dev": "vp dev",
     "build": "vp build",
     "lint": "vp lint",

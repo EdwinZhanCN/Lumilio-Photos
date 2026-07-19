@@ -42,6 +42,7 @@ MANIFEST
 # Testing
 /coverage/
 *.test
+/.cache/lumilio-assets/
 
 # Production
 *.env

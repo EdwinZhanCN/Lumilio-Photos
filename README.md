@@ -109,6 +109,13 @@ make db-reset         # Delete development database state (destructive)
 make dev-reset        # Recreate config, bootstrap secret, and DB state (destructive)
 ```
 
+Versioned demo and E2E media comes from the separately released
+[`Lumilio-Assets`](https://github.com/EdwinZhanCN/Lumilio-Assets) repository.
+From `web/`, run `vp run assets:sync` for the profile pinned in
+`assets.lock.json`, or `vp run assets:sync -- --profile=e2e` for another profile
+at the same locked revision. Files are hash-verified and stored only in the
+ignored `.cache/lumilio-assets/` directory.
+
 The repository also includes a Dev Container configuration under `.devcontainer/`. Open the project in the container, run `make setup`, and then use the same `make dev` workflow.
 
 ## Optional AI with Lumen
