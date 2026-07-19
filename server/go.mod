@@ -9,7 +9,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidbyttow/govips/v2 v2.18.0
-	github.com/edwinzhancn/lumen-sdk v1.3.1
+	github.com/edwinzhancn/lumen-sdk v1.3.2
 )
 
 require (
@@ -38,7 +38,7 @@ require (
 	github.com/chyroc/persistent-cookiejar v0.1.0 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/hashicorp/mdns v1.0.6 // indirect
+	github.com/hashicorp/mdns v1.0.7 // indirect
 )
 
 require (
@@ -70,7 +70,7 @@ require (
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/meguminnnnnnnnn/go-openai v0.1.1 // indirect
-	github.com/miekg/dns v1.1.55 // indirect
+	github.com/miekg/dns v1.1.72 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nikolalohinski/gonja v1.5.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
