@@ -12,5 +12,9 @@ worker performance:
 vp run test:hash-perf
 ```
 
-Set `PLAYWRIGHT_CHANNEL` to override the default `chrome` channel in either
-test mode.
+Install the lockfile-matched Chromium before the Vitest browser project or the
+Playwright E2E gate:
+
+```bash
+vp exec playwright install chromium
+```

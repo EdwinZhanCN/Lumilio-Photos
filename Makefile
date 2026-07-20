@@ -88,7 +88,7 @@ web-test:
 		$(VP) test
 
 web-browser-test:
-	cd $(WEB_DIR) && PRODUCTION_SMOKE=true $(VP) build && $(VP) node scripts/check-bundle-budget.mjs && $(VP) node scripts/run-browser-smoke.mjs
+	cd $(WEB_DIR) && $(VP) run e2e:seed && $(VP) run test:browser
 
 desktop-panel:
 	@echo "==> Building desktop control panel (Svelte, embedded into the Go binary)"

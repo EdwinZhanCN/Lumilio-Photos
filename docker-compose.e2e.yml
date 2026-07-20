@@ -1,0 +1,63 @@
+name: lumilio-photos-e2e
+
+services:
+    db:
+        build:
+            context: .
+            dockerfile: server/db.Dockerfile
+        environment:
+            POSTGRES_DB: lumiliophotos
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD_FILE: /run/secrets/db_bootstrap_password
+        secrets:
+            - db_bootstrap_password
+        volumes:
+            - db_data:/var/lib/postgresql
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
+            interval: 2s
+            timeout: 5s
+            retries: 30
+
+    server:
+        build:
+            context: .
+            dockerfile: server/Dockerfile
+        depends_on:
+            db:
+                condition: service_healthy
+        secrets:
+            - db_bootstrap_password
+        volumes:
+            - ./.cache/e2e/storage:/data/storage
+            - ./web/e2e/support/server.e2e.toml:/app/config/server.container.toml:ro
+        healthcheck:
+            test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
+            interval: 2s
+            timeout: 5s
+            retries: 60
+            start_period: 10s
+
+    web:
+        build:
+            context: .
+            dockerfile: web/Dockerfile
+            secrets:
+                - npmrc
+        depends_on:
+            server:
+                condition: service_healthy
+        environment:
+            LUMILIO_SITE_ADDRESS: :80
+            LUMILIO_API_UPSTREAM: http://server:6680
+        ports:
+            - "${LUMILIO_E2E_PORT:-16657}:80"
+
+volumes:
+    db_data:
+
+secrets:
+    db_bootstrap_password:
+        file: ./.cache/e2e/db_bootstrap_password
+    npmrc:
+        file: ./.cache/e2e/npmrc

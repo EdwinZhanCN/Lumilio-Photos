@@ -79,19 +79,10 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - name: Enable pnpm via corepack
-              run: corepack enable
-
-            - uses: actions/setup-node@v6
+            - uses: voidzero-dev/setup-vp@v1
               with:
-                  node-version: 24
-                  cache: pnpm
-                  cache-dependency-path: web/pnpm-lock.yaml
-
-            - name: Install Vite+
-              run: |
-                  curl -fsSL https://vite.plus | bash
-                  echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+                  node-version: '24'
+                  cache: true
 
             # @edwinzhancn/docts lives on GitHub Packages, which requires a
             # token even for public packages (web/.npmrc maps the scope).
@@ -101,9 +92,40 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install dependencies
-              run: cd web && vp install
+              run: cd web && vp install --frozen-lockfile
+
+            - name: Install Playwright Chromium
+              run: cd web && vp exec playwright install --with-deps chromium
 
             - run: make web-test
+
+            - name: Start isolated E2E environment
+              run: cd web && vp run e2e:up
+
+            - name: Run Chromium smoke
+              run: make web-browser-test
+
+            - name: Capture E2E service logs
+              if: failure()
+              run: |
+                  mkdir -p web/test-results
+                  cd web
+                  vp run e2e:logs > test-results/services.log
+
+            - name: Upload Playwright diagnostics
+              if: failure()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: playwright-smoke-${{ github.run_id }}
+                  path: |
+                      web/playwright-report/
+                      web/test-results/
+                  if-no-files-found: ignore
+                  retention-days: 7
+
+            - name: Stop isolated E2E environment
+              if: always()
+              run: cd web && vp run e2e:down
 
     desktop:
         name: desktop (make desktop-test)

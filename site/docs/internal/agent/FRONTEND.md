@@ -238,9 +238,61 @@ Direct equivalent when intentionally scoped to `web/`:
 
 ```bash
 cd web && vp check --no-fmt --no-lint && vp lint && vp test
+cd web && vp run e2e:up
+cd web && vp run e2e:seed
+cd web && vp run e2e:test --grep @smoke
+cd web && vp run e2e:down
 ```
 
-`web-browser-test` is the real-browser worker/release smoke job for cross-origin
-isolation, BLAKE3, upload recovery, and background lifecycle transitions. Use
-`vp build` when changing bundling, Caddy/runtime behavior, WASM loading,
-workers, or production-only code paths.
+`web-browser-test` runs the `@smoke` subset of the Playwright E2E suite against
+the isolated Compose environment. The first-party API, PostgreSQL, storage, and
+queues are real; only external services may be replaced. Run `e2e:up` first and
+`e2e:down` afterwards. Install the project-pinned browser revision with
+`vp exec playwright install chromium` locally, or
+`vp exec playwright install --with-deps chromium` on Linux CI.
+
+Rebuild the `web` service (`docker compose -f docker-compose.e2e.yml -p
+lumilio-photos-e2e up -d --build web`) after changing frontend source; the
+container serves a built image, so edits are otherwise invisible to the suite.
+
+### E2E Locators
+
+Specs run under `locale: "en-US"` (set in `playwright.config.ts`), which is what
+i18next detects from `navigator`. Pick locators in this order:
+
+1. `getByRole(role, { name })` with the name resolved through `e2e/support/i18n.ts`,
+   which reads the same `en` bundle the app renders. Roles are semantic and are
+   never translated; rewording a string keeps specs green, renaming a key fails
+   them — which is the structural change that should fail.
+2. Data anchors from `.cache/e2e/seed.json` via the `seed` export in
+   `e2e/fixtures/test.ts`. Filenames and ids are data, not copy.
+3. API and URL facts. `waitForResponse` on a real response beats waiting for UI
+   wording, and it is the only reliable signal for work that continues after the
+   request is accepted.
+4. `getByTestId`, only for elements with no stable accessible semantics. Scope
+   dynamic rows through a container test id plus a data attribute instead of
+   interpolating a runtime id into the test id.
+
+Two things are not allowed:
+
+- **UI copy literals in specs.** They couple tests to translations, so every
+  wording change drags a spec change behind it.
+- **`aria-label` as a test hook.** It is user-facing text that screen readers
+  announce. Translated, it couples to copy exactly like visible text and buys
+  nothing; frozen in English to stabilise tests, it breaks non-English assistive
+  technology. On an element that already has visible text it also overrides the
+  accessible name, violating WCAG 2.5.3 (Label in Name) and breaking voice
+  control. Reserve `aria-label` for elements with no visible text, such as
+  icon-only buttons.
+
+Form fields get their accessible name from `<label htmlFor>` paired with
+`<input id>`. `Field` in `features/auth/components/ui/Fields.tsx` generates the
+id with `useId` and passes it down through context, so `TextInput` and
+`PasswordField` pair automatically and no call site can forget. Follow that
+shape when adding field components rather than re-exposing an optional
+`htmlFor`, which is how the pairing was missed before.
+
+Assert on data and API facts, not on wording; copy correctness belongs to i18n,
+not to E2E. Note that `getByLabel` matches substrings — pass `{ exact: true }`
+where a shorter label would otherwise also match a longer one, as "Password"
+does against the "Show password" toggle.
