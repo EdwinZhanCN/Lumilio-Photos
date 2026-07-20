@@ -142,6 +142,15 @@ jobs:
                       desktop/go.sum
                       server/go.sum
 
+            # `make desktop-test` builds the Svelte control panel first, which
+            # needs `vp`. The panel's dependencies are all public, so it needs
+            # no GitHub Packages token, and `desktop-panel` runs `vp install`
+            # itself.
+            - uses: voidzero-dev/setup-vp@v1
+              with:
+                  node-version: '24'
+                  cache: true
+
             # CGO deps: the desktop module compiles the server module
             # (govips/libraw) in-process. The PostgreSQL lifecycle test
             # auto-skips because no PG is staged on the runner.

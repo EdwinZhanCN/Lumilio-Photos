@@ -24,8 +24,13 @@ if (command === "up") {
   run([...compose, "down", "--volumes", "--remove-orphans"]);
   await rm(cache, { recursive: true, force: true });
   await mkdir(path.join(cache, "storage"), { recursive: true });
+  // World-readable on purpose: the server container runs as a non-root user and
+  // plain Compose bind-mounts secret files as-is, with no uid/gid/mode option to
+  // fix ownership. On Linux CI, host and container UIDs map directly, so 0600
+  // leaves the container unable to read its own bootstrap password. The value is
+  // random per run and lives in an ignored cache directory.
   await writeFile(path.join(cache, "db_bootstrap_password"), randomBytes(32).toString("hex"), {
-    mode: 0o600,
+    mode: 0o644,
   });
   const npmrc = process.env.LUMILIO_E2E_NPMRC ?? path.join(process.env.HOME ?? "", ".npmrc");
   await copyFile(npmrc, path.join(cache, "npmrc"));
