@@ -62,6 +62,7 @@ type desktopApp struct {
 	lumenStopRequested atomic.Bool
 	lumenMu            sync.Mutex
 	lumenError         string
+	lumenStatus        lumen.Status // latest control-plane snapshot (guarded by lumenMu)
 	lumenLatestVersion string
 
 	lastStage atomic.Value // string: most recent startup stage, for failure dialogs

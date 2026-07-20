@@ -45,6 +45,23 @@ make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin
 make desktop-test
 ```
 
+### Control panel UI (`desktop/panel`)
+
+The first-run wizard + supervisor dashboard is a Svelte 5 + Tailwind v4 +
+Bits UI app in `desktop/panel`, served by the Wails asset handler and embedded
+into the Go binary via `//go:embed all:panel/dist` (`onboarding.go`). The
+`desktop-dev` / `desktop-test` / `desktop-build` Make targets build it first
+(`make desktop-panel`); a plain `go build` fails until `panel/dist` exists.
+
+Theme tokens are the web frontend's `lumilio` / `lumilio-dark` daisyUI themes
+(mirrored from `web/src/styles/App.css`, light/dark follows the OS). To iterate
+on the UI without the desktop app:
+
+```sh
+cd desktop/panel && vp dev          # serves against a built-in /__onb mock API
+LUMILIO_PANEL_API=http://host:port vp dev   # proxy /__onb to a live app instead
+```
+
 The private cluster requires `scram-sha-256` auth everywhere (never trust); the
 bootstrap password is generated into `secrets/db_bootstrap_password` and set at initdb time via
 `--pwfile`. Data directories initialized before the scram switch have no

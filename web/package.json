@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "assets:sync": "node scripts/assets-sync.mjs",
+    "assets:sync:test": "node --test scripts/assets-sync.test.mjs",
+    "e2e:up": "node e2e/support/environment.mjs up",
+    "e2e:down": "node e2e/support/environment.mjs down",
+    "e2e:logs": "node e2e/support/environment.mjs logs",
+    "e2e:seed": "vp run assets:sync && node e2e/support/seed.mjs",
+    "e2e:test": "playwright test",
+    "demo:seed": "node scripts/demo-seed.mjs",
     "dev": "vp dev",
     "build": "vp build",
     "lint": "vp lint",
@@ -18,7 +26,7 @@
     "test:coverage": "vp test run --coverage",
     "test:hash-perf": "VITEST_HASH_PERF=true vp test run src/workers/hash.perf.test.ts",
     "test:watch": "vp test watch",
-    "test:browser": "PRODUCTION_SMOKE=true vp build && node scripts/check-bundle-budget.mjs && node scripts/run-browser-smoke.mjs",
+    "test:browser": "vp run e2e:test --grep @smoke",
     "test:bundle": "vp build && node scripts/check-bundle-budget.mjs",
     "test:ui": "vp test --ui"
   },

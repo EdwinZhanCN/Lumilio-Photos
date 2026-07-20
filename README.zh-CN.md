@@ -108,6 +108,13 @@ make db-reset         # 删除开发数据库状态（破坏性操作）
 make dev-reset        # 重建配置、bootstrap secret 与数据库状态（破坏性操作）
 ```
 
+版本化的 demo 与 E2E 媒体来自独立发布的
+[`Lumilio-Assets`](https://github.com/EdwinZhanCN/Lumilio-Assets) 仓库。在
+`web/` 中运行 `vp run assets:sync` 可同步 `assets.lock.json` 锁定的默认
+profile；运行 `vp run assets:sync -- --profile=e2e` 可同步同一锁定 revision
+下的其他 profile。文件会经过散列校验，并且只写入被忽略的
+`.cache/lumilio-assets/` 目录。
+
 仓库还在 `.devcontainer/` 中提供了 Dev Container 配置。在容器中打开项目后，运行 `make setup`，再使用同样的 `make dev` 流程即可。
 
 ## 可选的 Lumen AI

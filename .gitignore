@@ -41,7 +41,11 @@ MANIFEST
 
 # Testing
 /coverage/
+/web/playwright-report/
+/web/test-results/
 *.test
+/.cache/lumilio-assets/
+/.cache/e2e/
 
 # Production
 *.env

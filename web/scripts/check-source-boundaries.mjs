@@ -39,7 +39,8 @@ const standardFeatureRootFiles = new Set(["doc.md", "doc.ts", "index.ts", "types
 const featureDirectoryExceptions = new Map([["assets", new Set(["map", "picker"])]]);
 
 // Only the application entry point may enter app composition from the source
-// root. The production smoke entry composes public feature APIs directly.
+// root. The browser smoke fixture lives outside src and composes public feature
+// APIs directly.
 const appImportEntrypoints = new Set(["main.tsx"]);
 
 // Worker entry points are lower-layer files but may register specific

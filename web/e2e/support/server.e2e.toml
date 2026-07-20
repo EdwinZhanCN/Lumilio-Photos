@@ -1,0 +1,75 @@
+schema_version = 1
+environment = "test"
+
+[database]
+host = "db"
+port = "5432"
+user = "postgres"
+name = "lumiliophotos"
+ssl = "disable"
+bootstrap_password_file = "/run/secrets/db_bootstrap_password"
+rotated_password_file = "/data/storage/.secrets/db_password"
+tools_bin_dir = ""
+
+[server]
+port = "6680"
+cors_allowed_origins = []
+web_root = ""
+
+[logging]
+level = "info"
+dir = "/tmp/lumilio-e2e-logs"
+console_format = "console"
+file_format = "json"
+repository_audit_verbose = false
+
+[storage]
+path = "/data/storage"
+
+[repository_scan]
+enabled = true
+interval_seconds = 3600
+settle_seconds = 1
+max_concurrent_repos = 1
+batch_size = 50
+
+[geocoding]
+provider = "disabled"
+nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
+language = "en"
+user_agent = "Lumilio-Photos-E2E/1.0"
+
+[auth]
+secret_key_file = "/data/storage/.secrets/lumilio_secret_key"
+access_token_ttl = "15m"
+refresh_token_ttl = "1h"
+media_token_ttl = "10m"
+webauthn_rp_name = "Lumilio Photos E2E"
+webauthn_rp_mode = "origin-derived"
+webauthn_rp_id = ""
+webauthn_rp_origins = []
+
+[transcode]
+hardware_accel = "none"
+
+[lumen]
+discovery_enabled = false
+discovery_mdns_enabled = false
+discovery_hub_url = ""
+discovery_static_nodes = []
+discovery_service_type = "_lumen._tcp"
+discovery_domain = "local"
+deployment_id = "e2e"
+resolve_timeout = "1s"
+connect_timeout = "1s"
+rediscovery_backoff_min = "1s"
+rediscovery_backoff_max = "5s"
+scan_interval = "30s"
+chunk_auto = true
+chunk_threshold_bytes = 1048576
+chunk_max_bytes = 262144
+
+[tools]
+exiftool_path = "exiftool"
+ffmpeg_path = "ffmpeg"
+ffprobe_path = "ffprobe"
