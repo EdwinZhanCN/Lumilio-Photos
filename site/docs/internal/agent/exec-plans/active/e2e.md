@@ -156,9 +156,27 @@ otherwise empty, so the asset happened to render on the first page — an implic
 dependency on ambient state. Note the scope select is rendered twice for the
 responsive layouts, so the locator filters to the visible one.
 
+## CI caching
+
+The web job caches the Playwright browser and the E2E image layers in the free
+per-repo GitHub Actions cache — no registry or account tier. Playwright browsers
+restore from `~/.cache/ms-playwright` keyed on the lockfile, with `install-deps`
+still run for the apt libraries. Image layers use the `type=gha` buildkit
+backend, enabled by a docker-container buildx builder plus the ACTIONS_* runtime
+env, and wired per service with distinct scopes through the CI-only
+`docker-compose.e2e.ci.yml` (layered on via `LUMILIO_E2E_COMPOSE_EXTRA`; local
+runs build without a cache backend).
+
+Measured on the web job: "Start isolated E2E environment", which includes
+`compose up --build`, dropped from 428s cold to 100s warm, and the Playwright
+browser download (249 MB) became a 4s cache restore. The first run on a branch
+is still cold — it populates the cache — so the speedup shows from the second
+run on.
+
+Asset caching was intentionally skipped: the smoke profile is three files, so
+its LFS pull is already seconds. Revisit if a heavier profile enters CI.
+
 ## Remaining work
 
-- CI caching for assets, the Playwright browser, and Docker layers. The run
-  above downloads and builds all three from scratch.
 - Retire `server/tools/devseed` once nobody depends on it.
 
