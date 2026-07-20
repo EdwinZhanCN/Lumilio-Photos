@@ -62,13 +62,46 @@ Verified against a real Docker daemon on 2026-07-20:
 - Repeated clean cycles, and back-to-back `e2e:up` without an intervening
   `e2e:down`.
 
-## Remaining verification
+Verified on CI in PR #155, run 29767782431: `make web-test` plus a serial
+Chromium `@smoke` run, 4 passed, on a cold cache with no asset, browser, or
+Docker layer caching. Teardown succeeds.
 
-CI artifact inspection for an intentionally observed failure, followed by a
-clean passing run. This needs a CI run and cannot be produced locally.
+Artifact readability was proved by three real failures rather than a staged one.
+Each was diagnosed by downloading `test-results/services.log` from the failed
+run, which named the exact cause, and the fourth run was clean.
+
+## Linux-only failures this surfaced
+
+None of these reproduce on macOS, where Docker's file sharing maps ownership
+loosely. All three were host/container uid conflicts on the same bind mount.
+
+1. The bootstrap password was written 0600 by the host, so the server, running
+   as uid 10001, could not read its own secret. Plain Compose bind-mounts secret
+   files as-is and has no uid/gid/mode option, so the file is now 0644. It is
+   random per run and lives in an ignored cache directory.
+2. The server could not create its storage layout under a host-owned directory.
+3. Teardown could not remove `/data/storage/.secrets`, which the server creates
+   with restrictive permissions.
+
+Opening directory modes only relocated the conflict, since the container kept
+creating paths the host had not anticipated. Storage is now a named volume, so
+the two sides share no directory at all: Docker seeds a fresh volume from the
+image, so the chowned `/data/storage/primary` is already present, and
+`down --volumes` disposes of the tree without the host touching container-owned
+files. The seed places the scan fixture with `docker compose cp`.
 
 A `db` volume mounted at the pre-18 `/var/lib/postgresql/data` makes the
 PostgreSQL 18 image exit(1) even on a fresh volume. All four compose files were
 moved to `/var/lib/postgresql`; developers with volumes created before that
 change must recreate them.
+
+## Remaining work
+
+- Per-worker isolation. ADR-005 gives each Playwright worker its own user and
+  repository, but the seed creates one admin and one repository shared by every
+  worker. CI masks this with `workers: 1`; locally four workers already run
+  `scan` and `upload` against the same repository.
+- `vp run demo:seed`.
+- CI caching for assets, the Playwright browser, and Docker layers. The run
+  above downloads and builds all three from scratch.
 
