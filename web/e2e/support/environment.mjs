@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
@@ -23,7 +23,17 @@ if (command === "up") {
   // — which is also the empty database each E2E job is supposed to get.
   run([...compose, "down", "--volumes", "--remove-orphans"]);
   await rm(cache, { recursive: true, force: true });
-  await mkdir(path.join(cache, "storage"), { recursive: true });
+  // Storage is bind-mounted, so the image's `chown app:app /data` is shadowed by
+  // whatever the host directory looks like. The server runs as uid 10001 and the
+  // seed writes the scan fixture from the host, so both need to write here and
+  // their uids do not match on Linux. Create the directories up front and open
+  // them, rather than letting whoever gets there first own them. mkdir's mode is
+  // masked by umask, hence the explicit chmod.
+  for (const dir of ["storage", "storage/primary"]) {
+    const target = path.join(cache, dir);
+    await mkdir(target, { recursive: true });
+    await chmod(target, 0o777);
+  }
   // World-readable on purpose: the server container runs as a non-root user and
   // plain Compose bind-mounts secret files as-is, with no uid/gid/mode option to
   // fix ownership. On Linux CI, host and container UIDs map directly, so 0600
