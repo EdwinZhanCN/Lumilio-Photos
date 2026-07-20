@@ -11,6 +11,7 @@
     "e2e:logs": "node e2e/support/environment.mjs logs",
     "e2e:seed": "vp run assets:sync && node e2e/support/seed.mjs",
     "e2e:test": "playwright test",
+    "demo:seed": "node scripts/demo-seed.mjs",
     "dev": "vp dev",
     "build": "vp build",
     "lint": "vp lint",

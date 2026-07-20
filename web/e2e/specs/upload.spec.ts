@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "../fixtures/test";
+import { GalleryPage } from "../pages/gallery.page";
 import { LoginPage } from "../pages/login.page";
 import { t } from "../support/i18n";
 
@@ -35,8 +36,9 @@ test("@smoke user uploads a real image and sees it in the library", async ({ pag
 
   // Ingestion continues after the accept response, and the gallery query does not
   // refetch on its own, so reload until the asset lands.
+  const gallery = new GalleryPage(page);
   await expect(async () => {
-    await page.goto("/assets");
+    await gallery.scopeTo(workspace.repositoryName);
     await expect(page.getByLabel(new RegExp(workspace.uploadFilename, "i"))).toBeVisible({
       timeout: 5_000,
     });

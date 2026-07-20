@@ -124,9 +124,41 @@ Note that `assets.json` catalogues the entire asset repository while
 assets through the profile, not the catalogue, or you will reference files that
 were never downloaded.
 
+## Demo seed
+
+`vp run demo:seed` materialises the pinned `demo` profile — the 225-photo pool —
+into a running instance through the real setup, repository and upload APIs. It
+shares profile resolution and verification with the E2E seed by calling
+`syncAssets` from `scripts/assets-sync.mjs`; only the profile differs. Point it
+with `LUMILIO_DEMO_BASE_URL` (default `http://localhost:6680`); credentials and
+the repository name are overridable through `LUMILIO_DEMO_*`.
+
+Media lands in its own `Lumilio Demo` repository so it never mixes with a real
+library, an existing repository is reused rather than recreated, and a second
+run is a no-op once the assets are present.
+
+This supersedes `server/tools/devseed`, which read the 225 photos from
+`demo/seed/library` — a directory that is gitignored and untracked, so the tool
+only worked on a machine that happened to have it.
+
+### What seeding demo data into an E2E instance exposed
+
+Running the suite against an instance that already held the demo library failed
+`upload` and `scan`, and the reason corrected an assumption: **the gallery is not
+partitioned by owner**. A worker user could see all 233 assets, including the
+225 uploaded by the bootstrap admin. Per-worker users therefore do not isolate
+what a spec observes; the isolation comes from per-worker repositories and
+filenames.
+
+Both specs now scope the gallery to their own repository through
+`GalleryPage.scopeTo`. Without it they passed only because the E2E database is
+otherwise empty, so the asset happened to render on the first page — an implicit
+dependency on ambient state. Note the scope select is rendered twice for the
+responsive layouts, so the locator filters to the visible one.
+
 ## Remaining work
 
-- `vp run demo:seed`.
 - CI caching for assets, the Playwright browser, and Docker layers. The run
   above downloads and builds all three from scratch.
+- Retire `server/tools/devseed` once nobody depends on it.
 
