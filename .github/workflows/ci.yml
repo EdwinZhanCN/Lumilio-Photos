@@ -94,13 +94,37 @@ jobs:
             - name: Install dependencies
               run: cd web && vp install --frozen-lockfile
 
+            # Keyed on the lockfile, which changes when the Playwright version
+            # does. A hit still needs `install-deps` for the apt libraries the
+            # browser links against.
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+
             - name: Install Playwright Chromium
-              run: cd web && vp exec playwright install --with-deps chromium
+              run: |
+                  cd web
+                  if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+                      vp exec playwright install-deps chromium
+                  else
+                      vp exec playwright install --with-deps chromium
+                  fi
 
             - run: make web-test
 
+            # A docker-container builder plus the ACTIONS_* runtime env let the
+            # E2E image builds read and write the GitHub Actions layer cache;
+            # docker-compose.e2e.ci.yml wires the cache in per service.
+            - uses: docker/setup-buildx-action@v3
+            - uses: crazy-max/ghaction-github-runtime@v3
+
             - name: Start isolated E2E environment
               run: cd web && vp run e2e:up
+              env:
+                  LUMILIO_E2E_COMPOSE_EXTRA: docker-compose.e2e.ci.yml
 
             - name: Run Chromium smoke
               run: make web-browser-test

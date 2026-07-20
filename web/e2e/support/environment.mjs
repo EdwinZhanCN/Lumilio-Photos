@@ -7,7 +7,17 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const cache = path.join(root, ".cache/e2e");
-const compose = ["compose", "-f", "docker-compose.e2e.yml", "-p", "lumilio-photos-e2e"];
+// CI layers a build-cache override on top through this env var; local runs leave
+// it unset and build without a cache backend.
+const extraFile = process.env.LUMILIO_E2E_COMPOSE_EXTRA;
+const compose = [
+  "compose",
+  "-f",
+  "docker-compose.e2e.yml",
+  ...(extraFile ? ["-f", extraFile] : []),
+  "-p",
+  "lumilio-photos-e2e",
+];
 
 function run(args) {
   const result = spawnSync("docker", args, { cwd: root, stdio: "inherit", env: process.env });
