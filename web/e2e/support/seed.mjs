@@ -1,10 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
-import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://127.0.0.1:16657";
 const username = process.env.LUMILIO_E2E_USERNAME ?? "e2e-admin";
 const password = process.env.LUMILIO_E2E_PASSWORD ?? "Lumilio-E2E-2026!";
@@ -56,41 +51,8 @@ if (!primary) {
   primary = created.repository;
 }
 
-const lock = JSON.parse(await readFile(path.join(root, "assets.lock.json"), "utf8"));
-const assetRoot = path.join(root, ".cache/lumilio-assets", lock.revision, "smoke");
-const catalog = JSON.parse(await readFile(path.join(assetRoot, "assets.json"), "utf8"));
-const scanAsset = catalog.assets.find((asset) => asset.id === "picsum-scan-000");
-if (!scanAsset) throw new Error("smoke profile is missing picsum-scan-000");
-// Storage is a named volume, so the fixture goes in through the container
-// rather than the host filesystem.
-const scanFilename = "e2e-scan-000.jpg";
-const scanTarget = `/data/storage/primary/${scanFilename}`;
-const copy = spawnSync(
-  "docker",
-  [
-    "compose",
-    "-f",
-    "docker-compose.e2e.yml",
-    "-p",
-    "lumilio-photos-e2e",
-    "cp",
-    path.join(assetRoot, scanAsset.path),
-    `server:${scanTarget}`,
-  ],
-  { cwd: root, stdio: "inherit" },
-);
-if (copy.error) throw copy.error;
-if (copy.status !== 0) throw new Error(`docker compose cp failed (${copy.status})`);
-
-// Specs read this instead of restating seeded names, so they assert against the
-// state that actually exists rather than a copy that can drift.
-const state = {
-  username,
-  repositoryId: primary.id,
-  repositoryName: primary.name,
-  scanFilename,
-  uploadAsset: "media/upload/upload-001.jpg",
-};
-await writeFile(path.join(root, ".cache/e2e/seed.json"), JSON.stringify(state, null, 2));
-
-console.log(JSON.stringify({ ...state, scanFile: scanTarget }));
+// Per-worker users, repositories and fixtures are provisioned by the
+// worker-scoped `workspace` fixture, not here: this layer only has to leave a
+// migrated database, a bootstrap admin, and the instance's single primary
+// repository behind.
+console.log(JSON.stringify({ username, primaryRepositoryId: primary.id }));

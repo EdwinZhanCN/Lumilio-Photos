@@ -1,14 +1,16 @@
-import { credentials, expect, seed, test } from "../fixtures/test";
+import { expect, test } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { t } from "../support/i18n";
 
-test("@smoke administrator scans a real repository file and sees it", async ({ page }) => {
-  await new LoginPage(page).signIn(credentials.username, credentials.password);
+test("@smoke administrator scans a real repository file and sees it", async ({
+  page,
+  workspace,
+}) => {
+  await new LoginPage(page).signIn(workspace.username, workspace.password);
   await page.goto("/manage");
-  // The UI labels the primary repository with a translated name, not its stored one.
   await page
     .getByRole("button", {
-      name: t("manage.repositories.actionsMenu", { name: t("navbar.repository.primary") }),
+      name: t("manage.repositories.actionsMenu", { name: workspace.repositoryName }),
     })
     .click();
   const completedScan = page.waitForResponse(async (response) => {
@@ -20,7 +22,7 @@ test("@smoke administrator scans a real repository file and sees it", async ({ p
   await page.getByRole("button", { name: t("manage.repositories.rescanRepository") }).click();
   await completedScan;
   await page.goto("/assets");
-  await expect(page.getByLabel(new RegExp(seed.scanFilename, "i"))).toBeVisible({
+  await expect(page.getByLabel(new RegExp(workspace.scanFilename, "i"))).toBeVisible({
     timeout: 60_000,
   });
 });

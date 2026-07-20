@@ -95,12 +95,37 @@ PostgreSQL 18 image exit(1) even on a fresh volume. All four compose files were
 moved to `/var/lib/postgresql`; developers with volumes created before that
 change must recreate them.
 
+## Worker isolation
+
+The three-layer model is complete. `e2e/support/seed.mjs` only leaves a migrated
+database, a bootstrap admin, and the instance's single primary repository. The
+worker-scoped `workspace` fixture then provisions each Playwright worker through
+the real API: register `e2e-w{index}`, promote it to admin, create the
+`E2E Worker {index}` repository, and place the scan fixture with
+`docker compose cp`. The fixture is lazy, so a spec that does not take
+`workspace` — `capabilities` — provisions nothing.
+
+Two details follow from the product's existing rules rather than working around
+them. Self-service registration only makes the first account an admin, and
+repository and scan endpoints require admin, so the bootstrap admin promotes
+each worker user through `PATCH /users/:id`; multi-admin is already supported,
+including a last-active-admin guard and a role selector in settings. Worker
+repositories are `regular` because `repositories_one_primary_idx` allows one
+primary per instance.
+
+Verified with four workers uploading concurrently: each upload enqueued its own
+task into its own repository, so duplicate detection is scoped per repository
+rather than globally by content hash. The smoke profile is deliberately minimal
+— three assets — so workers share source bytes and separate themselves by
+filename, repository, and owner instead.
+
+Note that `assets.json` catalogues the entire asset repository while
+`assets:sync` only materialises what `profiles/smoke.json` references. Resolve
+assets through the profile, not the catalogue, or you will reference files that
+were never downloaded.
+
 ## Remaining work
 
-- Per-worker isolation. ADR-005 gives each Playwright worker its own user and
-  repository, but the seed creates one admin and one repository shared by every
-  worker. CI masks this with `workers: 1`; locally four workers already run
-  `scan` and `upload` against the same repository.
 - `vp run demo:seed`.
 - CI caching for assets, the Playwright browser, and Docker layers. The run
   above downloads and builds all three from scratch.
