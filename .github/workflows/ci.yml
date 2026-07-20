@@ -204,22 +204,16 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - name: Enable pnpm via corepack
-              run: corepack enable
-
-            - uses: actions/setup-node@v6
+            # setup-vp provisions the runtime, the package manager pinned by
+            # site/package.json, and install caching, so pnpm needs no separate
+            # corepack or setup-node step.
+            - uses: voidzero-dev/setup-vp@v1
               with:
-                  node-version: 24
-                  cache: pnpm
-                  cache-dependency-path: site/pnpm-lock.yaml
-
-            - name: Install Vite+
-              run: |
-                  curl -fsSL https://vite.plus | bash
-                  echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+                  node-version: '24'
+                  cache: true
 
             - name: Install dependencies
               run: cd site && vp install
 
             - name: Build docs site
-              run: cd site && ./node_modules/.bin/vitepress build docs
+              run: cd site && vp run build
