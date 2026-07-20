@@ -11,13 +11,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const hashPerformanceEnabled = process.env.VITEST_HASH_PERF === "true";
 const testProjects = [
   {
+    // Pure logic in Node: no DOM, window, storage, Testing Library, Router or
+    // QueryClient. The missing browser globals are the point — they turn an
+    // accidental browser dependency into a failure instead of hiding it.
     extends: true,
     test: {
-      name: "happy-dom",
+      name: "unit",
+      environment: "node",
+      include: ["src/**/*.test.ts"],
+      exclude: ["src/**/*.browser.test.ts", "src/workers/**", "**/node_modules/**"],
+    },
+  },
+  {
+    // Components (*.test.tsx) and colocated flow integration (*.spec.tsx) share
+    // happy-dom, Testing Library and the same setup.
+    extends: true,
+    test: {
+      name: "integration",
       environment: "happy-dom",
-      setupFiles: ["./setup.happy-dom.ts"],
-      include: ["src/**/*.{test,spec}.{ts,tsx}"],
-      exclude: ["src/workers/*", "src/**/*.browser.test.ts", "**/node_modules/**"],
+      setupFiles: ["./test/setup.integration.ts"],
+      include: ["src/**/*.test.tsx", "src/**/*.spec.tsx"],
+      exclude: ["src/**/*.browser.test.ts", "**/node_modules/**"],
     },
   },
   {
@@ -26,7 +40,7 @@ const testProjects = [
       name: hashPerformanceEnabled ? "hash-performance" : "browser",
       include: hashPerformanceEnabled
         ? ["src/workers/hash.perf.test.ts"]
-        : ["src/workers/hash.test.ts", "src/**/*.browser.test.ts"],
+        : ["src/**/*.browser.test.ts"],
       exclude: ["**/node_modules/**"],
       testTimeout: 300_000,
       browser: {
