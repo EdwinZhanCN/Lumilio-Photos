@@ -186,6 +186,18 @@ jobs:
                       mingw-w64-x86_64-libvips
                       mingw-w64-x86_64-libraw
 
+            - uses: voidzero-dev/setup-vp@v1
+              with:
+                  node-version: '24'
+                  cache: true
+
+            # `onboarding.go` embeds `all:panel/dist`, so the compile below fails
+            # on the missing directory before it ever reaches the CGo linking this
+            # job exists to probe. Built in the default shell because vp is not on
+            # the msys2 PATH; only the directory on disk has to cross over.
+            - name: Build control panel
+              run: cd desktop/panel && vp install && vp run build
+
             - name: Compile desktop module (CGo via mingw64)
               shell: msys2 {0}
               run: |
