@@ -1,0 +1,88 @@
+// Mirror of Lumen-Hub/crates/lumen-hub/proto/control.proto (the source of
+// truth). Regenerate with desktop/lumen/controlv1/generate.sh after syncing.
+syntax = "proto3";
+
+package lumen.control.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "desktop/lumen/controlv1";
+
+// Control plane for a running Lumen Hub. Mounted on the same gRPC port as the
+// data plane (home_native.v1.Inference), which stays frozen. Everything here
+// is read-only observability: lifecycle, progress, errors, and logs. Anything
+// mutating (shutdown, reconfigure) is deliberately out of v1 — the hub may be
+// reachable from the LAN and mutations would need authn first.
+
+// ---- Lifecycle ----
+
+// Hub/service lifecycle. The hub binds its port in PHASE_STARTING, so every
+// later phase (downloads included) is observable over this API.
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_STARTING = 1; // config parsed, control plane up
+  PHASE_DOWNLOADING = 2; // fetching model artifacts
+  PHASE_LOADING = 3; // constructing models / moving weights to device
+  PHASE_WARMUP = 4; // startup warmup inference
+  PHASE_READY = 5; // data plane serving
+  PHASE_FAILED = 6; // terminal until restart; see StatusSnapshot.error
+  PHASE_STOPPING = 7;
+}
+
+message DownloadProgress {
+  string model = 1; // e.g. "bioclip-v2"
+  string file = 2; // artifact currently transferring
+  uint64 bytes_done = 3;
+  uint64 bytes_total = 4; // 0 when the remote did not report a length
+  uint32 files_done = 5;
+  uint32 files_total = 6;
+}
+
+message ServiceState {
+  string service = 1; // "siglip","ppocr","insightface","bioclip"
+  Phase phase = 2; // per-service lifecycle
+  string error = 3; // set when phase == PHASE_FAILED
+}
+
+message StatusSnapshot {
+  Phase phase = 1;
+  string version = 2; // hub build version
+  string profile = 3; // e.g. "darwin-arm64-metal"
+  int64 started_at_unix_ms = 4;
+  DownloadProgress download = 5; // set while PHASE_DOWNLOADING
+  repeated ServiceState services = 6;
+  string error = 7; // last fatal error when PHASE_FAILED
+  uint64 seq = 8; // monotonic; lets clients discard stale snapshots
+}
+
+// ---- Logs ----
+
+message TailLogsRequest {
+  uint32 backlog_lines = 1; // ring-buffer lines replayed before live tail; 0 = live only
+  string min_level = 2; // "TRACE".."ERROR"; empty = "INFO"
+  bool follow = 3; // true: keep streaming live entries; false: close after the backlog
+}
+
+message LogEntry {
+  int64 time_unix_ms = 1;
+  string level = 2; // "INFO","WARN","ERROR",...
+  string target = 3; // tracing target, e.g. "lumen_hub::model_download"
+  string message = 4;
+  map<string, string> fields = 5; // structured tracing fields
+}
+
+// ---- Service contract ----
+
+service Control {
+  // Snapshot of the current status; cheap, poll-safe.
+  rpc GetStatus(google.protobuf.Empty) returns (StatusSnapshot);
+
+  // Pushes a fresh snapshot on every state change (download progress is
+  // throttled server-side, ~2/s). The first message is the current snapshot,
+  // so subscribers never start blind.
+  rpc WatchStatus(google.protobuf.Empty) returns (stream StatusSnapshot);
+
+  // Structured log tail: optional ring-buffer backlog, then live entries.
+  // The on-disk log file remains the post-mortem source of truth.
+  rpc TailLogs(TailLogsRequest) returns (stream LogEntry);
+}

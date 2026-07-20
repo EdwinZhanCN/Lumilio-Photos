@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const productionSmokeEnabled = process.env.PRODUCTION_SMOKE === "true";
 const hashPerformanceEnabled = process.env.VITEST_HASH_PERF === "true";
 const testProjects = [
   {
@@ -18,27 +17,23 @@ const testProjects = [
       environment: "happy-dom",
       setupFiles: ["./setup.happy-dom.ts"],
       include: ["src/**/*.{test,spec}.{ts,tsx}"],
-      exclude: ["src/workers/*", "**/node_modules/**"],
+      exclude: ["src/workers/*", "src/**/*.browser.test.ts", "**/node_modules/**"],
     },
   },
   {
     extends: true,
     test: {
-      name: hashPerformanceEnabled ? "hash-performance" : "hash-contract",
-      include: [
-        hashPerformanceEnabled ? "src/workers/hash.perf.test.ts" : "src/workers/hash.test.ts",
-      ],
+      name: hashPerformanceEnabled ? "hash-performance" : "browser",
+      include: hashPerformanceEnabled
+        ? ["src/workers/hash.perf.test.ts"]
+        : ["src/workers/hash.test.ts", "src/**/*.browser.test.ts"],
       exclude: ["**/node_modules/**"],
       testTimeout: 300_000,
       browser: {
         api: {
           host: "127.0.0.1",
         },
-        provider: playwright({
-          launchOptions: {
-            channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
-          },
-        }),
+        provider: playwright(),
         instances: [{ browser: "chromium", headless: true }],
         enabled: true,
       },
@@ -73,14 +68,6 @@ export default defineConfig({
 
   build: {
     target: "esnext",
-    rollupOptions: productionSmokeEnabled
-      ? {
-          input: {
-            app: path.resolve(__dirname, "index.html"),
-            "production-smoke": path.resolve(__dirname, "production-smoke.html"),
-          },
-        }
-      : undefined,
   },
 
   worker: {

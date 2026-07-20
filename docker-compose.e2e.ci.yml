@@ -1,0 +1,25 @@
+# CI-only overlay: caches each image's build layers in the GitHub Actions cache
+# backend so a warm run skips rebuilding server, web and db from scratch. Applied
+# through LUMILIO_E2E_COMPOSE_EXTRA; local runs never load it. Requires a
+# docker-container buildx builder (docker/setup-buildx-action) and the ACTIONS_*
+# runtime env (crazy-max/ghaction-github-runtime). Distinct scopes keep the three
+# images from evicting each other.
+services:
+    db:
+        build:
+            cache_from:
+                - type=gha,scope=e2e-db
+            cache_to:
+                - type=gha,scope=e2e-db,mode=max
+    server:
+        build:
+            cache_from:
+                - type=gha,scope=e2e-server
+            cache_to:
+                - type=gha,scope=e2e-server,mode=max
+    web:
+        build:
+            cache_from:
+                - type=gha,scope=e2e-web
+            cache_to:
+                - type=gha,scope=e2e-web,mode=max

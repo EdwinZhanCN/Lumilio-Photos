@@ -1,0 +1,35 @@
+{
+  "name": "lumilio-panel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "svelte-check --tsconfig ./tsconfig.json && vp build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "preview": "vp preview",
+    "prepare": "vp config"
+  },
+  "dependencies": {
+    "bits-ui": "^2.9.6"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.1.0",
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/node": "^26.1.1",
+    "daisyui": "^5.0.46",
+    "svelte": "^5.36.0",
+    "svelte-check": "^4.2.2",
+    "tailwindcss": "^4.1.11",
+    "typescript": "~6.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.13.1",
+      "onFail": "download"
+    }
+  }
+}

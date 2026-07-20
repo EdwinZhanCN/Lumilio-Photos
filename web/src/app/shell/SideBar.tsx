@@ -68,7 +68,7 @@ function SideBar() {
   }, [accountOpen]);
 
   return (
-    <div className="flex h-full w-full min-w-0 select-none flex-col">
+    <nav className="flex h-full w-full min-w-0 select-none flex-col">
       <div className="shrink-0 p-2 pb-1">
         <Link
           to="/"
@@ -279,7 +279,7 @@ function SideBar() {
           </button>
         </div>
       )}
-    </div>
+    </nav>
   );
 }
 

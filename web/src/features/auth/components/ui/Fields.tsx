@@ -1,21 +1,35 @@
-import React, { useId, useMemo, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { CircleAlert, Eye, EyeOff, Info, Lock, type LucideIcon } from "lucide-react";
 import { cx } from "./classNames.ts";
 import { passwordStrength } from "./passwordStrength.ts";
+
+/** Carries the generated id from {@link Field} down to {@link FieldInput}. */
+const FieldIdContext = createContext<string | undefined>(undefined);
+
+/**
+ * Input that adopts the enclosing {@link Field}'s id, so the label/input pairing
+ * that gives the control its accessible name cannot be forgotten at a call site.
+ */
+const FieldInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  function FieldInput({ id, ...props }, ref) {
+    const fieldId = useContext(FieldIdContext);
+    return <input ref={ref} id={id ?? fieldId} {...props} />;
+  },
+);
 
 export const Field: React.FC<{
   label?: ReactNode;
   hint?: string;
   error?: ReactNode;
-  htmlFor?: string;
   children: ReactNode;
-}> = ({ label, hint, error, htmlFor, children }) => {
+}> = ({ label, hint, error, children }) => {
+  const id = useId();
   return (
     <div className="form-control w-full min-w-0">
       {(label || hint) && (
         <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
           {label && (
-            <label className="min-w-0 text-sm font-medium text-base-content/80" htmlFor={htmlFor}>
+            <label className="min-w-0 text-sm font-medium text-base-content/80" htmlFor={id}>
               {label}
             </label>
           )}
@@ -32,7 +46,7 @@ export const Field: React.FC<{
           )}
         </div>
       )}
-      {children}
+      <FieldIdContext.Provider value={id}>{children}</FieldIdContext.Provider>
       {error && (
         <span className="mt-1.5 flex items-center gap-1 text-xs font-medium text-error">
           <CircleAlert size={13} /> {error}
@@ -61,7 +75,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
         )}
       >
         <Icon size={17} className="shrink-0 text-base-content/40" />
-        <input
+        <FieldInput
           ref={ref}
           className="min-w-0 grow bg-transparent outline-none placeholder:text-base-content/35"
           {...props}
@@ -70,7 +84,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
     );
   }
   return (
-    <input
+    <FieldInput
       ref={ref}
       className={cx(
         "input input-bordered w-full min-w-0 bg-base-100",
@@ -121,7 +135,7 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
         )}
       >
         <Lock size={17} className="shrink-0 text-base-content/40" />
-        <input
+        <FieldInput
           ref={inputRef}
           type={show ? "text" : "password"}
           className="min-w-0 grow bg-transparent outline-none placeholder:text-base-content/35"
@@ -159,9 +173,3 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
     </Field>
   );
 };
-
-/** Stable id helper for label/input pairing in forms. */
-export function useFieldId(prefix: string): string {
-  const id = useId();
-  return useMemo(() => `${prefix}-${id}`, [prefix, id]);
-}

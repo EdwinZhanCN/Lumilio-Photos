@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"path/filepath"
 	"time"
@@ -73,6 +74,9 @@ func (d *desktopApp) disableLumen() {
 func (d *desktopApp) stopLumen() {
 	d.lumenStopRequested.Store(true)
 	d.setLumenState(lumenOff)
+	d.lumenMu.Lock()
+	d.lumenStatus = lumen.Status{}
+	d.lumenMu.Unlock()
 	if hub := d.lumenHub; hub != nil {
 		hub.Stop(10 * time.Second)
 		d.lumenHub = nil
@@ -130,7 +134,7 @@ func (d *desktopApp) runLumen() {
 	}
 	d.lumenHub = hub
 
-	if err := hub.WaitReady(d.ctx, lumenReadyTimeout); err != nil {
+	if err := d.awaitLumenReady(hub); err != nil {
 		if d.ctx.Err() != nil || d.lumenStopRequested.Load() {
 			return // shutting down / deliberately disabled
 		}
@@ -156,6 +160,114 @@ func (d *desktopApp) runLumen() {
 	}
 	d.lumenHub = nil
 	d.failLumen(exitErr)
+}
+
+// awaitLumenReady blocks until the hub reports READY on its control plane,
+// fails, exits, or times out. The status watch keeps running after readiness
+// so the dashboard sees live phase/download/error updates; hubs predating the
+// control plane fall back to the TCP probe.
+func (d *desktopApp) awaitLumenReady(hub *lumen.Hub) error {
+	ready := make(chan error, 1)
+	report := func(err error) {
+		select {
+		case ready <- err:
+		default:
+		}
+	}
+
+	go d.watchLumenStatus(hub, report)
+
+	select {
+	case err := <-ready:
+		return err
+	case <-time.After(lumenReadyTimeout):
+		return errors.New("lumen hub not ready in time")
+	case exitErr, open := <-hub.Done():
+		if open && exitErr != nil {
+			return exitErr
+		}
+		return errors.New("lumen hub exited during startup")
+	case <-d.ctx.Done():
+		return d.ctx.Err()
+	}
+}
+
+// watchLumenStatus maintains a control-plane watch for the lifetime of one hub
+// process, mirroring snapshots into d.lumenStatus / d.lumenState. The first
+// READY or FAILED snapshot is also reported through report.
+func (d *desktopApp) watchLumenStatus(hub *lumen.Hub, report func(error)) {
+	for {
+		select {
+		case <-hub.Done():
+			return
+		case <-d.ctx.Done():
+			return
+		default:
+		}
+
+		err := lumen.WatchStatus(d.ctx, lumen.GRPCEndpoint, func(status lumen.Status) {
+			d.applyLumenStatus(status)
+			switch status.Phase {
+			case "ready":
+				report(nil)
+			case "failed":
+				message := status.Error
+				if message == "" {
+					message = "lumen hub failed to start"
+				}
+				report(errors.New(message))
+			}
+		})
+		if errors.Is(err, lumen.ErrControlUnsupported) {
+			// Old hub build: single TCP readiness probe, no live status.
+			log.Printf("lumen: control plane unsupported by this hub build; using TCP probe")
+			report(hub.WaitReady(d.ctx, lumenReadyTimeout))
+			return
+		}
+
+		// Stream ended (hub still binding, restarting, or transient error):
+		// retry until the process exits or we shut down.
+		select {
+		case <-hub.Done():
+			return
+		case <-d.ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+// applyLumenStatus records the latest control-plane snapshot and derives the
+// coarse tray state. The tray/menu only refreshes on state transitions, not on
+// every throttled download tick.
+func (d *desktopApp) applyLumenStatus(status lumen.Status) {
+	d.lumenMu.Lock()
+	d.lumenStatus = status
+	if status.Phase == "failed" && status.Error != "" {
+		d.lumenError = status.Error
+	}
+	d.lumenMu.Unlock()
+
+	var state string
+	switch status.Phase {
+	case "ready":
+		state = lumenRunning
+	case "failed":
+		state = lumenFailed
+	case "stopping":
+		return
+	default: // starting/downloading/loading/warmup
+		state = lumenStarting
+	}
+	if d.lumenState != state && d.lumenState != lumenOff {
+		d.setLumenState(state)
+	}
+}
+
+func (d *desktopApp) lumenStatusSnapshot() lumen.Status {
+	d.lumenMu.Lock()
+	defer d.lumenMu.Unlock()
+	return d.lumenStatus
 }
 
 func (d *desktopApp) lumenSelection(dir string, settings supervisor.DesktopSettings) (lumen.ConfigSelection, error) {

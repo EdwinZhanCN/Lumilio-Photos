@@ -1,9 +1,10 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,8 +19,21 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
-//go:embed onboarding/index.html
-var onboardingHTML []byte
+// The control-panel UI is a Svelte app in desktop/panel; its build output is
+// embedded here. Build it before compiling this module (the desktop-* Makefile
+// targets do this): cd panel && vp install && vp run build.
+//
+//go:embed all:panel/dist
+var panelDist embed.FS
+
+// panelFS is panelDist rooted at the dist directory.
+var panelFS = func() fs.FS {
+	sub, err := fs.Sub(panelDist, "panel/dist")
+	if err != nil {
+		panic(err)
+	}
+	return sub
+}()
 
 // tosVersion is the accepted-terms revision persisted on completion. Bump it to
 // re-prompt users when the bundled licenses or terms change materially
@@ -60,6 +74,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			}
 		}
 		choices, _ := lumen.BackendChoicesForHost()
+		hubStatus := d.lumenStatusSnapshot()
 		ramGB := totalMemoryGB()
 		recommended := lumen.RecommendPreset(ramGB, float64(cacheValidation.FreeBytes)/(1<<30))
 		writeJSON(w, map[string]any{
@@ -77,7 +92,8 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			"lumen": map[string]any{"enabled": settings.LumenEnabled, "state": d.lumenState, "error": d.lumenError,
 				"preset": settings.LumenPreset, "backend": settings.LumenBackend, "profile": settings.LumenProfile,
 				"cacheDir": cacheDir, "previousCacheDir": settings.LumenPreviousCacheDir,
-				"installedVersion": settings.LumenInstalledVersion, "latestVersion": d.lumenLatestVersion},
+				"installedVersion": settings.LumenInstalledVersion, "latestVersion": d.lumenLatestVersion,
+				"phase": hubStatus.Phase, "download": hubStatus.Download},
 			"backends": choices, "presets": lumen.Presets(), "recommendedPreset": recommended,
 			"memoryGB": ramGB, "cacheValidation": cacheValidation,
 		})
@@ -211,10 +227,25 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 	mux.HandleFunc("/__onb/legal/third-party", serveLegalText("licenses/THIRD_PARTY_NOTICES.txt"))
 	mux.HandleFunc("/__onb/legal/terms", handleTermsOfUse)
 
-	// Everything else (notably "/") serves the single-page setup UI.
+	// Everything else serves the embedded control-panel bundle, with a SPA
+	// fallback to index.html for any path that is not a built asset.
+	assets := http.FileServer(http.FS(panelFS))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/")
+		if name != "" && name != "index.html" {
+			if f, err := panelFS.Open(name); err == nil {
+				_ = f.Close()
+				assets.ServeHTTP(w, r)
+				return
+			}
+		}
+		index, err := fs.ReadFile(panelFS, "index.html")
+		if err != nil {
+			http.Error(w, "control panel bundle missing", http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(onboardingHTML)
+		_, _ = w.Write(index)
 	})
 
 	return mux

@@ -79,19 +79,10 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - name: Enable pnpm via corepack
-              run: corepack enable
-
-            - uses: actions/setup-node@v6
+            - uses: voidzero-dev/setup-vp@v1
               with:
-                  node-version: 24
-                  cache: pnpm
-                  cache-dependency-path: web/pnpm-lock.yaml
-
-            - name: Install Vite+
-              run: |
-                  curl -fsSL https://vite.plus | bash
-                  echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+                  node-version: '24'
+                  cache: true
 
             # @edwinzhancn/docts lives on GitHub Packages, which requires a
             # token even for public packages (web/.npmrc maps the scope).
@@ -101,9 +92,64 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install dependencies
-              run: cd web && vp install
+              run: cd web && vp install --frozen-lockfile
+
+            # Keyed on the lockfile, which changes when the Playwright version
+            # does. A hit still needs `install-deps` for the apt libraries the
+            # browser links against.
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+
+            - name: Install Playwright Chromium
+              run: |
+                  cd web
+                  if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+                      vp exec playwright install-deps chromium
+                  else
+                      vp exec playwright install --with-deps chromium
+                  fi
 
             - run: make web-test
+
+            # A docker-container builder plus the ACTIONS_* runtime env let the
+            # E2E image builds read and write the GitHub Actions layer cache;
+            # docker-compose.e2e.ci.yml wires the cache in per service.
+            - uses: docker/setup-buildx-action@v3
+            - uses: crazy-max/ghaction-github-runtime@v3
+
+            - name: Start isolated E2E environment
+              run: cd web && vp run e2e:up
+              env:
+                  LUMILIO_E2E_COMPOSE_EXTRA: docker-compose.e2e.ci.yml
+
+            - name: Run Chromium smoke
+              run: make web-browser-test
+
+            - name: Capture E2E service logs
+              if: failure()
+              run: |
+                  mkdir -p web/test-results
+                  cd web
+                  vp run e2e:logs > test-results/services.log
+
+            - name: Upload Playwright diagnostics
+              if: failure()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: playwright-smoke-${{ github.run_id }}
+                  path: |
+                      web/playwright-report/
+                      web/test-results/
+                  if-no-files-found: ignore
+                  retention-days: 7
+
+            - name: Stop isolated E2E environment
+              if: always()
+              run: cd web && vp run e2e:down
 
     desktop:
         name: desktop (make desktop-test)
@@ -119,6 +165,15 @@ jobs:
                   cache-dependency-path: |
                       desktop/go.sum
                       server/go.sum
+
+            # `make desktop-test` builds the Svelte control panel first, which
+            # needs `vp`. The panel's dependencies are all public, so it needs
+            # no GitHub Packages token, and `desktop-panel` runs `vp install`
+            # itself.
+            - uses: voidzero-dev/setup-vp@v1
+              with:
+                  node-version: '24'
+                  cache: true
 
             # CGO deps: the desktop module compiles the server module
             # (govips/libraw) in-process. The PostgreSQL lifecycle test
@@ -155,6 +210,18 @@ jobs:
                       mingw-w64-x86_64-libvips
                       mingw-w64-x86_64-libraw
 
+            - uses: voidzero-dev/setup-vp@v1
+              with:
+                  node-version: '24'
+                  cache: true
+
+            # `onboarding.go` embeds `all:panel/dist`, so the compile below fails
+            # on the missing directory before it ever reaches the CGo linking this
+            # job exists to probe. Built in the default shell because vp is not on
+            # the msys2 PATH; only the directory on disk has to cross over.
+            - name: Build control panel
+              run: cd desktop/panel && vp install && vp run build
+
             - name: Compile desktop module (CGo via mingw64)
               shell: msys2 {0}
               run: |
@@ -173,22 +240,16 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - name: Enable pnpm via corepack
-              run: corepack enable
-
-            - uses: actions/setup-node@v6
+            # setup-vp provisions the runtime, the package manager pinned by
+            # site/package.json, and install caching, so pnpm needs no separate
+            # corepack or setup-node step.
+            - uses: voidzero-dev/setup-vp@v1
               with:
-                  node-version: 24
-                  cache: pnpm
-                  cache-dependency-path: site/pnpm-lock.yaml
-
-            - name: Install Vite+
-              run: |
-                  curl -fsSL https://vite.plus | bash
-                  echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+                  node-version: '24'
+                  cache: true
 
             - name: Install dependencies
               run: cd site && vp install
 
             - name: Build docs site
-              run: cd site && ./node_modules/.bin/vitepress build docs
+              run: cd site && vp run build

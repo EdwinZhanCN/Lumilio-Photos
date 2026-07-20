@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"desktop/lumen"
 )
@@ -25,13 +27,26 @@ var dashboardLogFiles = map[string]string{
 
 // handleDashboardLog exposes a bounded, read-only tail of known local logs to
 // the private control-panel webview. The fixed key map deliberately prevents a
-// caller from using this endpoint as an arbitrary file reader.
+// caller from using this endpoint as an arbitrary file reader. The Lumen tab
+// prefers the hub's structured in-memory tail (control plane) while the hub is
+// up, falling back to the log file otherwise.
 func (d *desktopApp) handleDashboardLog(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Query().Get("source")
 	name, ok := dashboardLogFiles[key]
 	if !ok {
 		http.Error(w, "unknown log source", http.StatusBadRequest)
 		return
+	}
+	if key == "lumen" && d.lumenHub != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		content, err := lumen.LogTail(ctx, lumen.GRPCEndpoint, dashboardLogTailLines)
+		cancel()
+		if err == nil {
+			writeJSON(w, map[string]any{"source": key,
+				"path": lumen.GRPCEndpoint + " · lumen.control.v1/TailLogs", "content": content})
+			return
+		}
+		log.Printf("lumen: control-plane log tail unavailable, using file: %v", err)
 	}
 	content, err := tailFile(filepath.Join(d.sup.LogDir(), name), dashboardLogTailLines)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {

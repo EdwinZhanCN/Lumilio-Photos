@@ -12,7 +12,7 @@ export { passwordStrength } from "./passwordStrength";
 export type { PasswordStrength } from "./passwordStrength";
 export { Brand, AuthShell, CardHead } from "./Shell";
 export type { HeadTone } from "./Shell";
-export { Field, TextInput, PasswordField, useFieldId } from "./Fields";
+export { Field, TextInput, PasswordField } from "./Fields";
 export { Btn, CopyButton } from "./Buttons";
 export type { BtnVariant } from "./Buttons";
 export { OtpInput, AuthQR } from "./Verification";

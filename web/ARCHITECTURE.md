@@ -56,11 +56,11 @@ The normal direction is:
 ```text
 main.tsx -> app -> features -> components / contexts / hooks / lib / workers / types
                          \-> another feature's public API (acyclic only)
-productionSmoke.ts -> feature public APIs / lib / workers (browser gate only)
+e2e -> public browser UI -> real API / database / storage / queues
 ```
 
 - Lower layers (`components`, `config`, `contexts`, `hooks`, `lib`, `types`, and shared worker code) never import features.
-- Nothing imports `app` except `main.tsx` and modules already inside `app`. `app` is the composition root and may import route implementations directly; this does not make those paths public to other features. `productionSmoke.ts` is a separate browser-gate entry point and composes only feature public APIs and lower layers.
+- Nothing imports `app` except `main.tsx` and modules already inside `app`. `app` is the composition root and may import route implementations directly; this does not make those paths public to other features. Playwright E2E tests exercise public browser UI against isolated real services and do not import production feature internals.
 - Inside one feature, use relative imports. Do not import `@/features/<same-feature>/...` and do not route internal code through the feature's root public barrel. A cohesive submodule may use its own local `index.ts` through a relative path. Use the `@/...` alias when an import leaves the feature.
 - Between features, import `@/features/<feature>` unless an approved narrow entry applies. The target feature's `index.ts` is its explicit public contract.
 - Keep `index.ts` narrow. Export only symbols with real cross-feature consumers; do not expose internals merely to shorten a path.

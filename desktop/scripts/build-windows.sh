@@ -28,6 +28,13 @@ echo "==> Cleaning previous build"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR"
 
+# The Go binary embeds desktop/panel/dist (control panel). CI stages the
+# prebuilt panel-dist artifact; fail early with a clear message otherwise.
+if [ ! -f "$DESKTOP_DIR/panel/dist/index.html" ]; then
+  echo "ERROR: desktop/panel/dist missing — build it first (cd desktop/panel && vp install && vp run build)" >&2
+  exit 1
+fi
+
 echo "==> Building Go binary (windows/amd64, CGo via mingw64)"
 # -H windowsgui: no console window for the tray app.
 ( cd "$DESKTOP_DIR" && CGO_ENABLED=1 \
