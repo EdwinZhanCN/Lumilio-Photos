@@ -1,4 +1,5 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -60,10 +61,26 @@ const assetRoot = path.join(root, ".cache/lumilio-assets", lock.revision, "smoke
 const catalog = JSON.parse(await readFile(path.join(assetRoot, "assets.json"), "utf8"));
 const scanAsset = catalog.assets.find((asset) => asset.id === "picsum-scan-000");
 if (!scanAsset) throw new Error("smoke profile is missing picsum-scan-000");
+// Storage is a named volume, so the fixture goes in through the container
+// rather than the host filesystem.
 const scanFilename = "e2e-scan-000.jpg";
-const scanTarget = path.join(root, ".cache/e2e/storage/primary", scanFilename);
-await mkdir(path.dirname(scanTarget), { recursive: true });
-await copyFile(path.join(assetRoot, scanAsset.path), scanTarget);
+const scanTarget = `/data/storage/primary/${scanFilename}`;
+const copy = spawnSync(
+  "docker",
+  [
+    "compose",
+    "-f",
+    "docker-compose.e2e.yml",
+    "-p",
+    "lumilio-photos-e2e",
+    "cp",
+    path.join(assetRoot, scanAsset.path),
+    `server:${scanTarget}`,
+  ],
+  { cwd: root, stdio: "inherit" },
+);
+if (copy.error) throw copy.error;
+if (copy.status !== 0) throw new Error(`docker compose cp failed (${copy.status})`);
 
 // Specs read this instead of restating seeded names, so they assert against the
 // state that actually exists rather than a copy that can drift.

@@ -29,7 +29,11 @@ services:
         secrets:
             - db_bootstrap_password
         volumes:
-            - ./.cache/e2e/storage:/data/storage
+            # A named volume, not a bind mount: the server runs as uid 10001 and
+            # would otherwise create root-only directories the host cannot clean
+            # up. Docker seeds a fresh named volume from the image, so the
+            # chowned /data/storage/primary is already there.
+            - storage_data:/data/storage
             - ./web/e2e/support/server.e2e.toml:/app/config/server.container.toml:ro
         healthcheck:
             test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
@@ -55,6 +59,7 @@ services:
 
 volumes:
     db_data:
+    storage_data:
 
 secrets:
     db_bootstrap_password:
