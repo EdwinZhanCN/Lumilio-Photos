@@ -26,12 +26,10 @@ func TestEnsureRootLayout(t *testing.T) {
 		}
 	}
 
-	// Owner-only permissions on the secret/cloud working areas.
+	// Owner-only access on the secret/cloud working areas, expressed in whatever
+	// mechanism the platform actually enforces.
 	for _, dir := range []string{cfg.SecretsDir(), cfg.CloudDir()} {
-		info, _ := os.Stat(dir)
-		if perm := info.Mode().Perm(); perm != 0o700 {
-			t.Fatalf("%s perm = %o, want 0700", dir, perm)
-		}
+		requireDirectoryIsPrivate(t, dir)
 	}
 
 	// Idempotent: a second call is a no-op.

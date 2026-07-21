@@ -58,6 +58,11 @@ export default function AddRepositoryModal({
                 })
               : t("manage.repositories.createSuccess", { name: trimmedName }),
         );
+        // The repository was created; these describe risks of where it landed,
+        // such as a cloud-sync folder that may evict originals.
+        for (const warning of response.warnings ?? []) {
+          showMessage("info", warning);
+        }
         setName("");
         setSource("local");
         setCredentialId("");

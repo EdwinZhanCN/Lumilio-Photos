@@ -39,8 +39,24 @@ type RepositoryManager interface {
 
 	// AddRepository registers an already-initialized on-disk repository (one
 	// that has a valid .lumiliorepo). It fails if the path is not a valid
-	// repository or is already registered.
+	// repository or is already registered. If the repository's ID is registered
+	// at a different path it returns a *RepositoryConflictError, which the caller
+	// resolves with RelocateRepository or RegisterRepositoryCopy.
 	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error)
+
+	// RelocateRepository points an existing repository at a new on-disk
+	// location. Assets are untouched because assets.storage_path is
+	// repository-relative.
+	RelocateRepository(ctx context.Context, id string, newPath string) (*repo.Repository, error)
+
+	// RegisterRepositoryCopy registers a duplicated repository directory as an
+	// independent repository by minting a fresh UUID into its .lumiliorepo.
+	RegisterRepositoryCopy(ctx context.Context, path string, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error)
+
+	// ReconcileAll re-checks every repository's recorded path against the
+	// .lumiliorepo actually on disk, updating reachability status and refreshing
+	// the cached config from disk.
+	ReconcileAll(ctx context.Context) error
 
 	// GetRepository returns the repository with the given UUID, or an error if
 	// the id is malformed or no such repository exists.
@@ -73,7 +89,7 @@ type RepositoryManager interface {
 	// Provisioning: CreateRepository enforces the primary-first / single-primary
 	// policy and path resolution; EnsurePrimaryRepository is its idempotent
 	// bootstrap helper for the mandatory primary repository.
-	CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*repo.Repository, error)
+	CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*CreateRepositoryResult, error)
 	EnsurePrimaryRepository(ctx context.Context, root string, ownerID *int32) (*repo.Repository, error)
 
 	// GetStagingManager and GetDirectoryManager expose the sub-managers.
@@ -90,6 +106,15 @@ type DefaultRepositoryManager struct {
 	stagingManager StagingManager
 	logger         *zap.Logger
 	auditProvider  logging.RepositoryAuditProvider
+	policy         PathPolicy
+}
+
+// WithPathPolicy selects where new repositories may live. The zero value is
+// RootedPolicy; desktop builds pass FreePolicy.
+func WithPathPolicy(policy PathPolicy) func(*DefaultRepositoryManager) {
+	return func(rm *DefaultRepositoryManager) {
+		rm.policy = policy
+	}
 }
 
 // NewRepositoryManager creates a new repository manager instance
@@ -97,6 +122,7 @@ func NewRepositoryManager(
 	queries *repo.Queries,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
+	options ...func(*DefaultRepositoryManager),
 ) (*DefaultRepositoryManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -112,6 +138,9 @@ func NewRepositoryManager(
 		logger:         logger.With(zap.String("component", "repository")),
 		auditProvider:  auditProvider,
 	}
+	for _, option := range options {
+		option(rm)
+	}
 
 	return rm, nil
 }
@@ -122,7 +151,7 @@ var _ RepositoryManager = (*DefaultRepositoryManager)(nil)
 // AddRepository registers an existing repository with the system
 func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error) {
 	// Clean and validate path
-	cleanPath, err := filepath.Abs(filepath.Clean(path))
+	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
 		rm.logger.Warn("repository add failed: invalid path", zap.String("operation", "repository.add"), zap.String("path", path), zap.Error(err))
 		return nil, fmt.Errorf("invalid path: %w", err)
@@ -152,10 +181,15 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 		return nil, fmt.Errorf("failed to load repository configuration: %w", err)
 	}
 
-	// Check if repository ID already exists
-	_, err = rm.GetRepository(config.ID)
-	if err == nil {
-		return nil, fmt.Errorf("repository with ID %s is already registered", config.ID)
+	// The ID on disk is already registered somewhere else. Only the user can say
+	// whether this is the same library that moved or an independent copy, so
+	// surface both paths and let the caller offer the choice.
+	if registered, err := rm.GetRepository(config.ID); err == nil {
+		return nil, &RepositoryConflictError{
+			RepositoryID:   config.ID,
+			RegisteredPath: registered.Path,
+			RequestedPath:  cleanPath,
+		}
 	}
 
 	repoUUID, err := uuid.Parse(config.ID)
@@ -201,7 +235,7 @@ func (rm *DefaultRepositoryManager) validateRepository(path string) (*Validation
 		Warnings: []string{},
 	}
 
-	cleanPath, err := filepath.Abs(filepath.Clean(path))
+	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
 		result.Valid = false
 		result.Errors = append(result.Errors, fmt.Sprintf("Invalid path: %v", err))
@@ -304,7 +338,7 @@ func (rm *DefaultRepositoryManager) validateRepository(path string) (*Validation
 
 // isNestedRepository checks if a repository path is nested inside another repository
 func (rm *DefaultRepositoryManager) isNestedRepository(path string) (bool, string, error) {
-	cleanPath, err := filepath.Abs(filepath.Clean(path))
+	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
 		return false, "", err
 	}
@@ -331,9 +365,16 @@ func (rm *DefaultRepositoryManager) isNestedRepository(path string) (bool, strin
 
 // checkDirectoryPermissions checks if we have proper read/write permissions
 func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error {
-	// Test read permission
-	if _, err := os.Open(path); err != nil {
+	// Test read permission. The handle must be closed: on Windows an open handle
+	// to a directory blocks its deletion, which surfaced as repositories and
+	// test temp directories becoming undeletable ("The process cannot access the
+	// file because it is being used by another process").
+	dir, err := os.Open(path)
+	if err != nil {
 		return fmt.Errorf("cannot read directory: %w", err)
+	}
+	if err := dir.Close(); err != nil {
+		return fmt.Errorf("cannot close directory: %w", err)
 	}
 
 	// Test write permission by trying to create a temporary file
@@ -351,7 +392,7 @@ func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error
 // InitializeRepository creates a new repository with full directory structure
 func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error) {
 	// Clean and validate path
-	cleanPath, err := filepath.Abs(filepath.Clean(path))
+	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
 		rm.logger.Warn("repository init failed: invalid path", zap.String("operation", "repository.initialize"), zap.String("path", path), zap.Error(err))
 		return nil, fmt.Errorf("invalid path: %w", err)
@@ -445,7 +486,7 @@ func (rm *DefaultRepositoryManager) GetRepository(id string) (*repo.Repository, 
 }
 
 func (rm *DefaultRepositoryManager) GetRepositoryByPath(path string) (*repo.Repository, error) {
-	cleanPath, err := filepath.Abs(filepath.Clean(path))
+	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
@@ -520,13 +561,24 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
+	// The on-disk .lumiliorepo is authoritative and the DB config column is a
+	// cache of it. An offline repository cannot take the disk write, so accepting
+	// the DB half would leave the two forked until reconcile silently reverted
+	// the edit on remount. Refuse the whole edit instead.
+	existing, err := rm.GetRepository(id)
+	if err != nil {
+		return nil, err
+	}
+	if existing.Status == dbtypes.RepoStatusOffline {
+		return nil, fmt.Errorf("%w: %s", ErrRepositoryOffline, existing.Path)
+	}
+
 	// Update database record
 	now := time.Now()
 	dbRepo, err := rm.queries.UpdateRepository(context.Background(), repo.UpdateRepositoryParams{
 		RepoID:         pgtype.UUID{Bytes: repoUUID, Valid: true},
 		Name:           config.Name,
 		Config:         config,
-		Status:         dbtypes.RepoStatusActive,
 		DefaultOwnerID: defaultOwnerID,
 		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
 	})
@@ -551,7 +603,7 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 
 func (rm *DefaultRepositoryManager) repoAudit(repoPath string) logging.RepositoryAuditLogger {
 	if rm.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(rm.logger, false).ForPath(repoPath)
+		return logging.NoopRepositoryAuditLogger()
 	}
 	return rm.auditProvider.ForPath(repoPath)
 }
@@ -570,6 +622,12 @@ func (rm *DefaultRepositoryManager) GetRepositoryPath(repoID string) (string, er
 	repository, err := rm.GetRepository(repoID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get repository: %w", err)
+	}
+	// Same reason as the media read path: a caller handed an unreachable path
+	// can only produce a bare I/O error, which cannot be told apart from missing
+	// data.
+	if repository.Status == dbtypes.RepoStatusOffline {
+		return "", fmt.Errorf("%w: %s", ErrRepositoryOffline, repository.Name)
 	}
 	return repository.Path, nil
 }

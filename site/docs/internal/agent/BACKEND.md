@@ -37,6 +37,11 @@ root, compiles `desktop/supervisor/server.template.toml`, atomically writes
 app-data `config/server.toml` with mode `0600`, reloads it through the same
 strict loader, then calls `app.Run`. A write or reload error blocks startup.
 
+The standalone Server/Docker distribution is supported on Linux. macOS and
+Windows ship the Desktop App rather than a separately operated Server, but that
+does not narrow their backend test surface: the App embeds the complete runtime,
+so both Desktop platforms run all Server tests in their native CI environment.
+
 TOML contains all immutable database/server/logging/storage/scanner/geocoding/
 auth/transcode/Lumen/tool decisions. Database bootstrap, rotated database, and
 app root secrets are file references only. Bootstrap must be readable and

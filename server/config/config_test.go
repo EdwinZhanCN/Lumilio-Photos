@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +80,7 @@ ffprobe_path = "/opt/ffprobe"
 
 func writeManifestFixture(t *testing.T, contents string) string {
 	t.Helper()
+	contents = strings.ReplaceAll(contents, `"/opt/ffprobe"`, strconv.Quote(filepath.ToSlash(absoluteToolFixturePath())))
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".secrets"), 0o700); err != nil {
 		t.Fatal(err)
@@ -90,6 +93,13 @@ func writeManifestFixture(t *testing.T, contents string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func absoluteToolFixturePath() string {
+	if runtime.GOOS != "windows" {
+		return "/opt/ffprobe"
+	}
+	return filepath.Join(filepath.VolumeName(os.TempDir())+string(filepath.Separator), "opt", "ffprobe")
 }
 
 func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
@@ -112,7 +122,7 @@ func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
 	if cfg.StorageConfig.Path != filepath.Join(base, "data/storage") {
 		t.Fatalf("storage path = %q", cfg.StorageConfig.Path)
 	}
-	if cfg.Tools.FFmpegPath != filepath.Join(base, "bin/ffmpeg") || cfg.Tools.ExifToolPath != "exiftool" || cfg.Tools.FFprobePath != "/opt/ffprobe" {
+	if cfg.Tools.FFmpegPath != filepath.Join(base, "bin/ffmpeg") || cfg.Tools.ExifToolPath != "exiftool" || cfg.Tools.FFprobePath != absoluteToolFixturePath() {
 		t.Fatalf("tool path resolution = %+v", cfg.Tools)
 	}
 	if cfg.Auth.AccessTokenTTL != 15*time.Minute {

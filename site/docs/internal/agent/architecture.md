@@ -5,6 +5,10 @@ This is the compact system map for agents. Keep details here stable and useful; 
 ## Runtime Shape
 
 - `docker-compose.yml` runs PostgreSQL, the Go server, and the Caddy-served web app.
+- Linux is the standalone Server/Docker delivery target. macOS and Windows are
+  Desktop App delivery targets; the App hosts the same complete `server/app`
+  runtime in-process, so both Desktop CI jobs run the full Server and Desktop
+  test suites plus a native CGo build.
 - Runtime state has three non-overlapping owners: frontend preferences in browser localStorage; runtime-mutable settings in PostgreSQL through Settings/Setup APIs; and runtime-immutable process configuration in a complete schema-versioned TOML manifest.
 - First-run bootstrap (`fresh → db_rotated → admin_created → ready`) is an orthogonal state machine. It observes setup gates; it is not a fourth configuration source.
 - `server/config/server.example.toml` is the complete local template; `server/config/server.container.toml` is the image manifest; `desktop/supervisor/server.template.toml` is the versioned desktop compiler input.

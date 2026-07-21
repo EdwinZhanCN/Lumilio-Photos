@@ -11,7 +11,7 @@ func TestMLBaselineSeedsUtilityClassifiers(t *testing.T) {
 		t.Fatalf("read ML baseline migration: %v", err)
 	}
 
-	migration := string(sql)
+	migration := strings.ReplaceAll(string(sql), "\r\n", "\n")
 	if !strings.Contains(migration, "INSERT INTO public.classifier_definitions") {
 		t.Fatal("ML baseline migration does not seed classifier definitions")
 	}

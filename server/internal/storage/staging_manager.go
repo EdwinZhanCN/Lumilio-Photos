@@ -90,7 +90,7 @@ func (sm *DefaultStagingManager) CommitStagingFile(stagingFile *StagingFile, fin
 	if strings.TrimSpace(finalPath) == "" {
 		return fmt.Errorf("final path cannot be empty")
 	}
-	if filepath.IsAbs(finalPath) {
+	if IsRootedPath(finalPath) {
 		return fmt.Errorf("final path must be repository-relative")
 	}
 

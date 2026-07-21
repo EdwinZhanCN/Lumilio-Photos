@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"server/platform/fsprivacy"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -22,7 +24,7 @@ func TestNewLoggerRoutesApplicationAndErrorLogs(t *testing.T) {
 		Development:   true,
 	})
 	require.NoError(t, err)
-	defer runtime.Sync()
+	t.Cleanup(func() { require.NoError(t, runtime.Close()) })
 
 	logger := runtime.Named("app")
 	logger.Info("info message", zap.String("operation", "test.info"))
@@ -56,7 +58,7 @@ func TestSecurityLoggerIsIsolatedAndAlwaysEnabled(t *testing.T) {
 		FileFormat:    "json",
 	})
 	require.NoError(t, err)
-	defer runtime.Sync()
+	t.Cleanup(func() { require.NoError(t, runtime.Close()) })
 
 	runtime.Security().Warn("temporary access issued",
 		zap.String("operation", "auth.break_glass"),
@@ -80,9 +82,9 @@ func TestSecurityLoggerIsIsolatedAndAlwaysEnabled(t *testing.T) {
 	assert.NotContains(t, string(appBytes), "OnlyInSecurity9")
 	assert.NotContains(t, string(errorBytes), "OnlyInSecurity9")
 
-	info, err := os.Stat(securityPath)
+	private, err := fsprivacy.IsPrivate(securityPath)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+	assert.True(t, private)
 }
 
 func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
@@ -95,7 +97,7 @@ func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
 		Development:   true,
 	})
 	require.NoError(t, err)
-	defer runtime.Sync()
+	t.Cleanup(func() { require.NoError(t, runtime.Close()) })
 
 	riverLogger := runtime.RiverLogger()
 	riverLogger.Warn("river warning", slog.String("job_kind", "process_semantic"), slog.Int64("job_id", 42))
@@ -125,6 +127,7 @@ func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
 	t.Run("operations log quiet without REPO_AUDIT_VERBOSE", func(t *testing.T) {
 		p := NewRepositoryAuditProvider(zap.NewNop(), false)
 		quietRepo := t.TempDir()
+		t.Cleanup(func() { require.NoError(t, p.Close()) })
 		require.NoError(t, os.MkdirAll(filepath.Join(quietRepo, repositoryLogsDir), 0755))
 		p.ForPath(quietRepo).Operation("asset.ingest", zap.String("asset_id", "quiet"))
 		opsBytes, err := os.ReadFile(filepath.Join(quietRepo, repositoryLogsDir, repositoryOpsLogName))
@@ -133,6 +136,7 @@ func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
 	})
 
 	provider = NewRepositoryAuditProvider(zap.NewNop(), true).(*repositoryAuditProvider)
+	t.Cleanup(func() { require.NoError(t, provider.Close()) })
 
 	first := provider.ForPath(repoPath)
 	second := provider.ForPath(repoPath)

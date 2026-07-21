@@ -37,6 +37,11 @@ func EnsureRootLayout(cfg config.StorageConfig) error {
 		if err := os.MkdirAll(d.path, d.mode); err != nil {
 			return fmt.Errorf("create storage layout dir %s: %w", d.path, err)
 		}
+		// MkdirAll's mode is advisory on Windows and subject to umask on Unix, so
+		// the policy is applied explicitly rather than trusted from creation.
+		if err := applyDirectoryMode(d.path, d.mode); err != nil {
+			return fmt.Errorf("protect storage layout dir %s: %w", d.path, err)
+		}
 	}
 	return nil
 }

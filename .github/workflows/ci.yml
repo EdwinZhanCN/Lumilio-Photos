@@ -47,8 +47,11 @@ jobs:
                           - 'site/**'
                           - '.github/workflows/ci.yml'
 
-    server:
-        name: server (make server-test)
+    # Linux is the standalone Server deployment target. macOS and Windows run
+    # the same complete Server suite below as part of their Desktop App gates,
+    # because the App hosts server/app in-process rather than a smaller runtime.
+    server-linux:
+        name: server linux (make server-test)
         needs: changes
         if: needs.changes.outputs.server == 'true'
         runs-on: ubuntu-latest
@@ -151,8 +154,12 @@ jobs:
               if: always()
               run: cd web && vp run e2e:down
 
-    desktop:
-        name: desktop (make desktop-test)
+    # macOS and Windows intentionally validate the same product surface:
+    # complete embedded Server tests, complete Desktop tests, and a native CGo
+    # build. Only dependency/toolchain setup and platform-specific test files
+    # differ between the two jobs.
+    desktop-macos:
+        name: desktop macos (tests + CGo build)
         needs: changes
         if: needs.changes.outputs.desktop == 'true'
         runs-on: macos-15
@@ -175,26 +182,42 @@ jobs:
                   node-version: '24'
                   cache: true
 
-            # CGO deps: the desktop module compiles the server module
-            # (govips/libraw) in-process. The PostgreSQL lifecycle test
-            # auto-skips because no PG is staged on the runner.
+            # CGO deps: both the complete Server suite and the Desktop module
+            # compile govips/libraw. PostgreSQL lifecycle tests auto-skip
+            # because no PostgreSQL distribution is staged on PR runners.
             - name: Install libvips and libraw
               run: brew install vips libraw
 
-            - name: Run desktop tests with fresh Go build cache
+            - name: Run complete embedded Server tests
+              run: make server-test
+
+            - name: Run complete Desktop tests
               run: |
                   go clean -cache
                   make desktop-test
 
-    # W4 signal gathering: can the desktop module (server CGo: libvips+libraw)
-    # compile on Windows with the MSYS2/mingw-w64 toolchain? Experimental —
-    # failures do not block the gate.
+            - name: Compile Desktop App
+              working-directory: desktop
+              run: go build ./...
+
+    # Windows uses the same test/build scope as macOS, but runs Go inside the
+    # MSYS2/mingw64 environment that supplies the release CGo toolchain. The
+    # control panel stays in the default shell because vp is not on the MSYS2
+    # PATH; the generated directory is shared on disk with the later steps.
+    #
+    # This job depends on an external toolchain (msys2 package availability), so
+    # if it starts failing for reasons unrelated to a change, fix or pin the
+    # toolchain — do not quietly restore continue-on-error.
     desktop-windows:
-        name: desktop windows (experimental CGo)
+        name: desktop windows (tests + CGo build)
         needs: changes
         if: needs.changes.outputs.desktop == 'true'
         runs-on: windows-2025
-        continue-on-error: true
+        env:
+            CGO_ENABLED: '1'
+            GOFLAGS: -buildvcs=false
+            CGO_LDFLAGS_ALLOW: -Xpreprocessor
+            CGO_CFLAGS_ALLOW: -Xpreprocessor
         steps:
             - uses: actions/checkout@v7
 
@@ -215,20 +238,27 @@ jobs:
                   node-version: '24'
                   cache: true
 
-            # `onboarding.go` embeds `all:panel/dist`, so the compile below fails
-            # on the missing directory before it ever reaches the CGo linking this
-            # job exists to probe. Built in the default shell because vp is not on
-            # the msys2 PATH; only the directory on disk has to cross over.
             - name: Build control panel
               run: cd desktop/panel && vp install && vp run build
 
-            - name: Compile desktop module (CGo via mingw64)
+            - name: Run complete embedded Server tests
               shell: msys2 {0}
               run: |
-                  export CGO_ENABLED=1
-                  export GOFLAGS=-buildvcs=false
+                  go clean -cache
                   go version
                   pkgconf --modversion vips libraw
+                  cd server
+                  go test ./...
+
+            - name: Run complete Desktop tests
+              shell: msys2 {0}
+              run: |
+                  cd desktop
+                  go test ./...
+
+            - name: Compile Desktop App
+              shell: msys2 {0}
+              run: |
                   cd desktop
                   go build ./...
 

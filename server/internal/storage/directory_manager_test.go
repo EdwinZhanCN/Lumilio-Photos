@@ -485,29 +485,19 @@ func TestDirectoryManager_EdgeCases(t *testing.T) {
 	dm := NewDirectoryManager()
 
 	t.Run("invalid repository paths", func(t *testing.T) {
-		invalidPaths := []string{
-			"/dev/null/invalid",
-		}
-
-		for _, path := range invalidPaths {
-			err := dm.CreateStructure(path)
-			assert.Error(t, err, "Expected error for path %s", path)
-		}
+		path := invalidStructurePath()
+		err := dm.CreateStructure(path)
+		assert.Error(t, err, "Expected error for path %s", path)
 	})
 
 	t.Run("permission denied scenarios", func(t *testing.T) {
-		if os.Getuid() == 0 {
-			t.Skip("Skipping permission tests when running as root")
+		readOnlyDir := unwritableDir(t)
+		if readOnlyDir == "" {
+			t.Skip("platform cannot deny directory creation via the mechanism under test")
 		}
 
-		// Try to create structure in read-only directory
-		readOnlyDir := t.TempDir()
-		err := os.Chmod(readOnlyDir, 0444) // Read-only
-		require.NoError(t, err)
-		defer os.Chmod(readOnlyDir, 0755) // Restore for cleanup
-
 		subDir := filepath.Join(readOnlyDir, "repo")
-		err = dm.CreateStructure(subDir)
+		err := dm.CreateStructure(subDir)
 		assert.Error(t, err)
 	})
 

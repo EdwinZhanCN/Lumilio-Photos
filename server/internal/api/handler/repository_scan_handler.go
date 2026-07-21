@@ -82,15 +82,17 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	}
 
 	ownerID := adminIDFromContext(c)
-	dbRepo, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
+	result, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
 		Name:              name,
 		Role:              role,
 		Root:              h.storageRoot,
+		Path:              strings.TrimSpace(req.Path),
 		OwnerID:           ownerID,
 		StorageStrategy:   req.StorageStrategy,
 		DuplicateHandling: req.DuplicateHandling,
 	})
 	if err != nil {
+		var conflict *storage.RepositoryConflictError
 		switch {
 		case errors.Is(err, storage.ErrPrimaryRepositoryExists):
 			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Primary repository already exists")
@@ -98,11 +100,18 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Primary repository must be created first")
 		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
 			api.GinBadRequest(c, err, "Repository already exists")
+		case errors.Is(err, storage.ErrPathNotAllowed):
+			api.GinBadRequest(c, err, "Repository path is not allowed")
+		case errors.As(err, &conflict):
+			// Only the user can say whether this is the same library that moved
+			// or an independent copy. Hand back both paths so the client can ask.
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, conflict.Error())
 		default:
 			api.GinBadRequest(c, err, "Failed to create repository")
 		}
 		return
 	}
+	dbRepo := result.Repository
 
 	var cloudImportRunID *string
 	var cloudImportError *string
@@ -135,9 +144,102 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 
 	api.JSONOK(c, dto.CreateRepositoryResponseDTO{
 		Repository:       toRepositoryDTO(dbRepo),
+		Warnings:         result.Warnings,
 		CloudImportRunID: cloudImportRunID,
 		CloudImportError: cloudImportError,
 	})
+}
+
+// RelocateRepository points an existing repository at a new on-disk location.
+// @Summary Relocate repository
+// @Description Update a repository's recorded location after its folder moved. The .lumiliorepo at the new path must carry the same repository ID. Assets are not moved: their storage paths are repository-relative.
+// @Tags repositories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Repository UUID"
+// @Param request body dto.RelocateRepositoryRequestDTO true "New repository path"
+// @Success 200 {object} dto.RepositoryDTO "Repository relocated successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 404 {object} api.ErrorResponse "Repository not found"
+// @Failure 409 {object} api.ErrorResponse "Another repository already occupies the path"
+// @Router /api/v1/repositories/{id}/relocate [post]
+func (h *RepositoryScanHandler) RelocateRepository(c *gin.Context) {
+	if h == nil || h.repoManager == nil {
+		api.GinInternalError(c, errors.New("repository manager unavailable"), "Repository manager unavailable")
+		return
+	}
+
+	id := strings.TrimSpace(c.Param("id"))
+	if _, err := uuid.Parse(id); err != nil {
+		api.GinBadRequest(c, err, "Invalid repository ID")
+		return
+	}
+
+	var req dto.RelocateRepositoryRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid relocate request")
+		return
+	}
+
+	updated, err := h.repoManager.RelocateRepository(c.Request.Context(), id, strings.TrimSpace(req.Path))
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Another repository is already registered at that path")
+		case errors.Is(err, storage.ErrRepositoryIDMismatch):
+			api.GinBadRequest(c, err, "That folder holds a different repository")
+		case errors.Is(err, pgx.ErrNoRows):
+			api.GinNotFound(c, err, "Repository not found")
+		default:
+			api.GinBadRequest(c, err, "Failed to relocate repository")
+		}
+		return
+	}
+
+	api.JSONOK(c, toRepositoryDTO(updated))
+}
+
+// RegisterRepositoryCopy registers a duplicated repository folder as a new,
+// independent repository.
+// @Summary Register repository copy
+// @Description Register a folder whose .lumiliorepo carries an already-registered repository ID as an independent repository. A fresh repository ID is written into the folder, the way cloning a git repository produces a distinct working copy.
+// @Tags repositories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.RelocateRepositoryRequestDTO true "Repository path"
+// @Success 200 {object} dto.RepositoryDTO "Repository registered successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Router /api/v1/repositories/copies [post]
+func (h *RepositoryScanHandler) RegisterRepositoryCopy(c *gin.Context) {
+	if h == nil || h.repoManager == nil {
+		api.GinInternalError(c, errors.New("repository manager unavailable"), "Repository manager unavailable")
+		return
+	}
+
+	var req dto.RelocateRepositoryRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request")
+		return
+	}
+
+	created, err := h.repoManager.RegisterRepositoryCopy(
+		c.Request.Context(),
+		strings.TrimSpace(req.Path),
+		adminIDFromContext(c),
+		dbtypes.RepoRoleRegular,
+	)
+	if err != nil {
+		api.GinBadRequest(c, err, "Failed to register repository copy")
+		return
+	}
+
+	api.JSONOK(c, toRepositoryDTO(created))
 }
 
 // QueueRepositoryScan queues a manual repository scan.

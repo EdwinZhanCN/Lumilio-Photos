@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 // DesktopSettings are user choices that must persist across launches. It is the
@@ -77,10 +78,20 @@ func SaveSettings(path string, s DesktopSettings) error {
 		return fmt.Errorf("marshal desktop settings: %w", err)
 	}
 	tmp := path + ".tmp"
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return fmt.Errorf("create desktop settings directory: %w", err)
+	}
+	if err := applyPrivateDirectoryMode(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("protect desktop settings directory: %w", err)
+	}
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return fmt.Errorf("write desktop settings: %w", err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := applyPrivateFileMode(tmp); err != nil {
+		return fmt.Errorf("protect desktop settings: %w", err)
+	}
+	defer os.Remove(tmp)
+	if err := replaceFile(tmp, path); err != nil {
 		return fmt.Errorf("replace desktop settings: %w", err)
 	}
 	return nil
@@ -91,7 +102,7 @@ func SaveSettings(path string, s DesktopSettings) error {
 // remain stable across launches.
 func ensureSecret(path string) error {
 	if info, err := os.Stat(path); err == nil && info.Size() > 0 {
-		return nil
+		return applyPrivateFileMode(path)
 	}
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
@@ -100,5 +111,5 @@ func ensureSecret(path string) error {
 	if err := os.WriteFile(path, []byte(hex.EncodeToString(buf)), 0o600); err != nil {
 		return fmt.Errorf("write secret %s: %w", path, err)
 	}
-	return nil
+	return applyPrivateFileMode(path)
 }

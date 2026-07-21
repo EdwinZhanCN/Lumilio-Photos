@@ -8,7 +8,7 @@ import (
 )
 
 func TestResolveRepositoryCreatePathUsesStorageRoot(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 
 	got, err := resolveRepositoryCreatePath(root, "Family Photos", dbtypes.RepoRoleRegular)
 	if err != nil {
@@ -22,7 +22,7 @@ func TestResolveRepositoryCreatePathUsesStorageRoot(t *testing.T) {
 }
 
 func TestResolveRepositoryCreatePathUsesPrimaryFolderForPrimaryRole(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 
 	got, err := resolveRepositoryCreatePath(root, "Library", dbtypes.RepoRolePrimary)
 	if err != nil {

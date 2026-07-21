@@ -314,9 +314,8 @@ UPDATE repositories
 SET
     name = $2,
     config = $3,
-    status = $4,
-    default_owner_id = $5,
-    updated_at = $6
+    default_owner_id = $4,
+    updated_at = $5
 WHERE repo_id = $1
 RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
 `
@@ -325,17 +324,18 @@ type UpdateRepositoryParams struct {
 	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
 	Name           string                   `db:"name" json:"name"`
 	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
-	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
 	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
 	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 }
 
+// Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
+// Letting a settings edit write status resurrects a repository that reconcile
+// has marked offline.
 func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error) {
 	row := q.db.QueryRow(ctx, updateRepository,
 		arg.RepoID,
 		arg.Name,
 		arg.Config,
-		arg.Status,
 		arg.DefaultOwnerID,
 		arg.UpdatedAt,
 	)
@@ -372,6 +372,46 @@ type UpdateRepositoryLastSyncParams struct {
 
 func (q *Queries) UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error) {
 	row := q.db.QueryRow(ctx, updateRepositoryLastSync, arg.RepoID, arg.LastSync, arg.UpdatedAt)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Status,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+	)
+	return i, err
+}
+
+const updateRepositoryPath = `-- name: UpdateRepositoryPath :one
+UPDATE repositories
+SET
+    path = $2,
+    status = $3,
+    updated_at = $4
+WHERE repo_id = $1
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
+`
+
+type UpdateRepositoryPathParams struct {
+	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
+	Path      string             `db:"path" json:"path"`
+	Status    dbtypes.RepoStatus `db:"status" json:"status"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error) {
+	row := q.db.QueryRow(ctx, updateRepositoryPath,
+		arg.RepoID,
+		arg.Path,
+		arg.Status,
+		arg.UpdatedAt,
+	)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,
