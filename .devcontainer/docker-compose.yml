@@ -4,13 +4,25 @@
 name: lumilio-photos-devcontainer
 
 services:
+    # Copies the repository's bootstrap secret into the volume postgres reads it
+    # from. It must *derive* rather than generate: the server reads
+    # server/config/.secrets/db_bootstrap_password (see database.bootstrap_password_file
+    # in server.local.toml), so a secret generated independently here would
+    # initialize postgres with a password the server does not know, and every
+    # connection would fail SASL auth. `make .server-secret` is the one generator.
+    #
+    # The volume exists because a bind mount does not work portably: the host
+    # file is 0600 and owned by the developer, while postgres runs as uid 999
+    # inside the container. It happens to be readable under OrbStack's virtiofs,
+    # but not on Linux.
     secretinit:
-        image: golang:1.25.0-trixie
-        working_dir: /workspace
+        image: alpine:3
         volumes:
             - ..:/workspace:ro
             - db-bootstrap-secret:/secrets
-        command: go run ./server/tools/secretinit /secrets/db_bootstrap_password
+        command: >-
+            sh -c 'install -m 600 /workspace/server/config/.secrets/db_bootstrap_password
+            /secrets/db_bootstrap_password'
 
     db:
         build:
@@ -52,7 +64,10 @@ services:
             - go-mod-cache:/root/go
             - pnpm-store:/root/.local/share/pnpm
             - cargo-cache:/usr/local/cargo/registry
-            - db-bootstrap-secret:/workspace/server/config/.secrets:ro
+        # No db-bootstrap-secret mount: the secret's home is the repository, at
+        # server/config/.secrets, which /workspace already provides read-write.
+        # Mounting the volume over that path would shadow the source with the
+        # derived copy and make `make .server-secret` fail on a read-only file.
         environment:
             CGO_ENABLED: "1"
             GOFLAGS: -buildvcs=false
