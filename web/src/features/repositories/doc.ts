@@ -22,9 +22,21 @@
  * for list, map, collection, and statistics pages.
  *
  * {@link useWorkingRepository} forms the upload-target flow. It must resolve a
- * concrete repository and falls back to the primary or first active option.
- * Browse scope and working repository remain separate preferences because
- * their empty-state semantics differ.
+ * concrete repository and falls back to the primary or first option that
+ * {@link isRepositoryOffline} reports as reachable — auto-selecting an
+ * unreachable repository would guarantee the next upload is refused. An
+ * explicit user choice is left alone even when it goes offline. Browse scope
+ * and working repository remain separate preferences because their empty-state
+ * semantics differ.
+ *
+ * ## Reachability
+ *
+ * {@link RepositoryStatus} carries a repository's reachability alongside its
+ * activity. An `offline` repository is one whose folder is not currently
+ * mounted — an unplugged external drive — and is distinct from one whose data
+ * is gone: it stays selectable as a browse filter while being refused as an
+ * upload target. An unrecognized status normalizes to `active`, because
+ * wrongly reading a repository as offline blocks writes to it.
  *
  * {@link RepositoryGrid} owns the repository-management surface. Its create
  * modal delegates server mutation and invalidation to
@@ -51,8 +63,11 @@ import type BrowseScopeSelect from "./flows/browse-scope/BrowseScopeSelect.tsx";
 import type { useBrowseScope } from "./flows/browse-scope/useBrowseScope.ts";
 import type RepositoryGrid from "./flows/manage/RepositoryGrid.tsx";
 import type { useWorkingRepository } from "./flows/working-repository/useWorkingRepository.ts";
-import type { normalizeRepositoryOptions } from "./model/repositoryOptions.ts";
+import type {
+  isRepositoryOffline,
+  normalizeRepositoryOptions,
+} from "./model/repositoryOptions.ts";
 import type { isStorageStrategy } from "./model/repositorySetup.ts";
-import type { RepositoryOption } from "./types.ts";
+import type { RepositoryOption, RepositoryStatus } from "./types.ts";
 
 export {};

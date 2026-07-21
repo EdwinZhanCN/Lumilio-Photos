@@ -40,14 +40,25 @@ SELECT COUNT(*) FROM repositories
 WHERE role = 'primary'
   AND status = 'active';
 
+-- Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
+-- Letting a settings edit write status resurrects a repository that reconcile
+-- has marked offline.
 -- name: UpdateRepository :one
 UPDATE repositories
 SET
     name = $2,
     config = $3,
-    status = $4,
-    default_owner_id = $5,
-    updated_at = $6
+    default_owner_id = $4,
+    updated_at = $5
+WHERE repo_id = $1
+RETURNING *;
+
+-- name: UpdateRepositoryPath :one
+UPDATE repositories
+SET
+    path = $2,
+    status = $3,
+    updated_at = $4
 WHERE repo_id = $1
 RETURNING *;
 

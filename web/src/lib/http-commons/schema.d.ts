@@ -9184,6 +9184,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories/{id}/relocate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Relocate repository
+         * @description Update a repository's recorded location after its folder moved. The .lumiliorepo at the new path must carry the same repository ID. Assets are not moved: their storage paths are repository-relative.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description New repository path */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.RelocateRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Repository relocated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Repository not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Another repository already occupies the path */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories/{id}/scan": {
         parameters: {
             query?: never;
@@ -9388,6 +9480,77 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["dto.AutoDetectStacksResponseDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/copies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register repository copy
+         * @description Register a folder whose .lumiliorepo carries an already-registered repository ID as an independent repository. A fresh repository ID is written into the folder, the way cloning a git repository produces a distinct working copy.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository path */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.RelocateRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Repository registered successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -11971,6 +12134,13 @@ export interface components {
             /** @example Family Photos */
             name: string;
             /**
+             * @description Path is an absolute on-disk location for the repository. It is only
+             *     accepted by deployments whose path policy allows free placement (desktop);
+             *     a server rejects it and places the repository under its storage root.
+             * @example /Volumes/Media/Photos
+             */
+            path?: string;
+            /**
              * @example regular
              * @enum {string}
              */
@@ -11985,6 +12155,11 @@ export interface components {
             cloud_import_error?: string;
             cloud_import_run_id?: string;
             repository?: components["schemas"]["dto.RepositoryDTO"];
+            /**
+             * @description Warnings are non-fatal notes about the chosen location, such as it being
+             *     inside a cloud-sync folder. The repository was created regardless.
+             */
+            warnings?: string[];
         };
         "dto.CreateShareLinkRequestDTO": {
             allow_download?: boolean;
@@ -12233,6 +12408,12 @@ export interface components {
             path?: string;
             /** @example regular */
             role?: string;
+            /**
+             * @description Status lets a selector keep an unreachable repository visible as a browse
+             *     filter while refusing it as an upload target.
+             * @example active
+             */
+            status?: string;
         };
         "dto.LLMCapabilitiesDTO": {
             agent_enabled?: boolean;
@@ -12716,6 +12897,10 @@ export interface components {
         "dto.RegistrationStartRequestDTO": {
             password: string;
             username: string;
+        };
+        "dto.RelocateRepositoryRequestDTO": {
+            /** @example /Volumes/NewDrive/Photos */
+            path: string;
         };
         "dto.RepositoryCloudStatusDTO": {
             credential?: components["schemas"]["dto.CloudCredentialDTO"];

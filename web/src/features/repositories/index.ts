@@ -5,7 +5,8 @@ export { useWorkingRepository } from "./flows/working-repository/useWorkingRepos
 export { useCreateRepository } from "./api/useCreateRepository";
 export { useRepositoryOptions } from "./api/useRepositoryOptions";
 export { useRepositoryScan } from "./api/useRepositoryScan";
-export type { RepositoryOption } from "./types";
+export type { RepositoryOption, RepositoryStatus } from "./types";
 export { getRepositoryDisplayName } from "./model/repositoryDisplayName";
+export { isRepositoryOffline } from "./model/repositoryOptions";
 export { isDuplicateHandling, isStorageStrategy } from "./model/repositorySetup";
 export { waitForRepositoryScan } from "./api/waitForRepositoryScan";

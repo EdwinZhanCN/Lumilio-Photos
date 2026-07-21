@@ -514,9 +514,13 @@ type Querier interface {
 	UpdateOCRFullText(ctx context.Context, arg UpdateOCRFullTextParams) error
 	UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
+	// Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
+	// Letting a settings edit write status resurrects a repository that reconcile
+	// has marked offline.
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg UpdateRepositoryCloudBindingLastRunParams) (RepositoryCloudBinding, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
+	UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
