@@ -365,9 +365,16 @@ func (rm *DefaultRepositoryManager) isNestedRepository(path string) (bool, strin
 
 // checkDirectoryPermissions checks if we have proper read/write permissions
 func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error {
-	// Test read permission
-	if _, err := os.Open(path); err != nil {
+	// Test read permission. The handle must be closed: on Windows an open handle
+	// to a directory blocks its deletion, which surfaced as repositories and
+	// test temp directories becoming undeletable ("The process cannot access the
+	// file because it is being used by another process").
+	dir, err := os.Open(path)
+	if err != nil {
 		return fmt.Errorf("cannot read directory: %w", err)
+	}
+	if err := dir.Close(); err != nil {
+		return fmt.Errorf("cannot close directory: %w", err)
 	}
 
 	// Test write permission by trying to create a temporary file

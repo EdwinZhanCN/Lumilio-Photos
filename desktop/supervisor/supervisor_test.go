@@ -40,16 +40,25 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "server.toml")
 	bootstrap := filepath.Join(dir, "bootstrap")
+	webRoot := filepath.Join(dir, "bundle", "web")
+	logDir := filepath.Join(dir, "appdata", "logs")
+	storagePath := filepath.Join(dir, "library")
+	dbHost := filepath.Join(dir, "postgres", "18", "run")
+	pgBinDir := filepath.Join(dir, "bundle", "postgres", "bin")
+	exifToolPath := filepath.Join(dir, "bundle", "exiftool")
+	ffmpegPath := filepath.Join(dir, "bundle", "ffmpeg")
+	ffprobePath := filepath.Join(dir, "bundle", "ffprobe")
+	secretKeyFile := filepath.Join(dir, "secrets", "lumilio_secret_key")
 	if err := os.WriteFile(bootstrap, []byte("bootstrap-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	cfg, err := compileAndLoadServerManifest(path, serverManifestBindings{
-		Port: "6680", BrowserOrigin: "http://localhost:6680", WebRoot: "/bundle/web",
-		LogDir: "/Users/me/Library/Application Support/Lumilio Photos/logs", StoragePath: "/Volumes/Photos/Lumilio Library",
-		DBHost: "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run", DBPort: "5487", DBUser: "lumilio", DBName: "lumiliophotos",
-		BootstrapPasswordFile: bootstrap, RotatedPasswordFile: filepath.Join(dir, "rotated"), SecretKeyFile: "/secrets/lumilio_secret_key",
-		PGBinDir: "/bundle/postgres/bin", ExifToolPath: "/bundle/exiftool", FFmpegPath: "/bundle/ffmpeg", FFprobePath: "/bundle/ffprobe",
+		Port: "6680", BrowserOrigin: "http://localhost:6680", WebRoot: webRoot,
+		LogDir: logDir, StoragePath: storagePath,
+		DBHost: dbHost, DBPort: "5487", DBUser: "lumilio", DBName: "lumiliophotos",
+		BootstrapPasswordFile: bootstrap, RotatedPasswordFile: filepath.Join(dir, "rotated"), SecretKeyFile: secretKeyFile,
+		PGBinDir: pgBinDir, ExifToolPath: exifToolPath, FFmpegPath: ffmpegPath, FFprobePath: ffprobePath,
 		LumenStaticNode: "127.0.0.1:50051",
 	})
 	if err != nil {
@@ -61,7 +70,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if got, want := strings.Join(cfg.Auth.WebAuthnRPOrigins, ","), "http://localhost:6680"; got != want {
 		t.Fatalf("webauthn origins = %q, want %q", got, want)
 	}
-	if cfg.DatabaseConfig.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run" {
+	if cfg.DatabaseConfig.Host != dbHost {
 		t.Fatalf("database host = %q", cfg.DatabaseConfig.Host)
 	}
 
@@ -69,11 +78,12 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	if !strings.Contains(string(data), "/bundle/web") || strings.Contains(string(data), "bootstrap-secret") {
-		t.Fatalf("generated manifest must contain bindings but no secret content:\n%s", data)
+	if strings.Contains(string(data), "bootstrap-secret") {
+		t.Fatalf("generated manifest must contain no secret content:\n%s", data)
 	}
-	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("manifest mode = %v, err=%v", info.Mode().Perm(), err)
+	private, err := isPrivatePath(path)
+	if err != nil || !private {
+		t.Fatalf("manifest private = %v, err = %v", private, err)
 	}
 	if !cfg.LoadedFromManifest() || cfg.ManifestPath != path || cfg.ServerConfig.Port != "6680" {
 		t.Fatalf("manifest was not strict-loaded: %+v", cfg)
@@ -81,7 +91,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if cfg.Auth.WebAuthnRPID != "localhost" || strings.Join(cfg.Auth.WebAuthnRPOrigins, ",") != "http://localhost:6680" {
 		t.Fatalf("unexpected auth config: %+v", cfg.Auth)
 	}
-	if cfg.DatabaseConfig.Host != "/Users/me/Library/Application Support/Lumilio Photos/postgres/18/run" || cfg.Tools.FFmpegPath != "/bundle/ffmpeg" {
+	if cfg.ServerConfig.WebRoot != webRoot || cfg.DatabaseConfig.Host != dbHost || cfg.Tools.FFmpegPath != ffmpegPath {
 		t.Fatalf("unexpected generated config: db=%+v tools=%+v", cfg.DatabaseConfig, cfg.Tools)
 	}
 }
@@ -129,6 +139,15 @@ func TestDesktopSettingsRoundTrip(t *testing.T) {
 	if got != want {
 		t.Errorf("round trip = %+v, want %+v", got, want)
 	}
+
+	updated := DesktopSettings{StoragePath: "/Volumes/Photos/Updated", Language: "zh"}
+	if err := SaveSettings(path, updated); err != nil {
+		t.Fatalf("SaveSettings(replace): %v", err)
+	}
+	got, err = LoadSettings(path)
+	if err != nil || got != updated {
+		t.Fatalf("replacement round trip = %+v/%v, want %+v/nil", got, err, updated)
+	}
 }
 
 func TestEnsureSecretIdempotent(t *testing.T) {
@@ -156,6 +175,27 @@ func TestEnsureSecretIdempotent(t *testing.T) {
 	}
 	if string(first) != string(second) {
 		t.Error("ensureSecret regenerated an existing secret; keys would change across launches")
+	}
+	private, err := isPrivatePath(path)
+	if err != nil || !private {
+		t.Fatalf("secret private = %v, err = %v", private, err)
+	}
+}
+
+func TestEnsureDirsArePrivate(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+	paths, err := NewPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := paths.EnsureDirs(); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{paths.AppData, paths.PGData, paths.PGRun, paths.PGLogs, paths.Logs, paths.Secrets, paths.Config, paths.Backups} {
+		private, err := isPrivatePath(path)
+		if err != nil || !private {
+			t.Errorf("%s private = %v, err = %v", path, private, err)
+		}
 	}
 }
 

@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"server/platform/fsprivacy"
 )
 
 func main() {
@@ -32,11 +34,14 @@ func ensureSecret(path string) error {
 		} else if info.Mode().Perm() == 0o600 {
 			return nil
 		}
-		return os.Chmod(path, 0o600)
+		return fsprivacy.ApplyFileMode(path, 0o600)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	if err := fsprivacy.ApplyDirectoryMode(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	random := make([]byte, 32)
@@ -54,5 +59,8 @@ func ensureSecret(path string) error {
 		f.Close()
 		return err
 	}
-	return f.Close()
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return fsprivacy.ApplyFileMode(path, 0o600)
 }

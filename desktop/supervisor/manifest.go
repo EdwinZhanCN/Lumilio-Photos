@@ -63,13 +63,16 @@ func writeAtomicPrivate(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
+	if err := applyPrivateDirectoryMode(filepath.Dir(path)); err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".server.toml-*")
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
-	if err := tmp.Chmod(0o600); err != nil {
+	if err := applyPrivateFileMode(tmpPath); err != nil {
 		tmp.Close()
 		return err
 	}

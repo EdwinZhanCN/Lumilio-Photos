@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -106,7 +107,8 @@ func TestLatestRoutine(t *testing.T) {
 
 func TestLocateToolsPrefersOverride(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "pg_dump"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+	tool := clientToolName("pg_dump", runtime.GOOS)
+	if err := os.WriteFile(filepath.Join(dir, tool), []byte("test fixture"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	got, err := LocateTools(dir, 17)

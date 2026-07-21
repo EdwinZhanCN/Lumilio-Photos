@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"server/platform/fsprivacy"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -36,6 +38,7 @@ type Runtime struct {
 	logger         *zap.Logger
 	securityLogger *zap.Logger
 	riverLogger    *slog.Logger
+	writers        []io.Closer
 }
 
 func NewLogger(cfg Config) (*Runtime, error) {
@@ -59,15 +62,19 @@ func NewLogger(cfg Config) (*Runtime, error) {
 	consoleEncoder := newEncoder(cfg.ConsoleFormat, cfg.Development, false)
 	fileEncoder := newEncoder(cfg.FileFormat, cfg.Development, true)
 
+	appWriter := newRollingWriter(filepath.Join(cfg.LogDir, globalApplicationLog))
+	errorWriter := newRollingWriter(filepath.Join(cfg.LogDir, globalErrorLog))
+	securityWriter := newRollingWriter(securityPath)
+
 	consoleCore := zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), atomicLevel)
 	appCore := zapcore.NewCore(
 		fileEncoder,
-		zapcore.AddSync(newRollingWriter(filepath.Join(cfg.LogDir, globalApplicationLog))),
+		zapcore.AddSync(appWriter),
 		atomicLevel,
 	)
 	errorCore := zapcore.NewCore(
 		fileEncoder,
-		zapcore.AddSync(newRollingWriter(filepath.Join(cfg.LogDir, globalErrorLog))),
+		zapcore.AddSync(errorWriter),
 		zap.LevelEnablerFunc(func(level zapcore.Level) bool {
 			return level >= zapcore.WarnLevel && level >= atomicLevel.Level()
 		}),
@@ -77,12 +84,12 @@ func NewLogger(cfg Config) (*Runtime, error) {
 		zapcore.NewTee(consoleCore, appCore, errorCore),
 		zap.AddCaller(),
 		zap.AddCallerSkip(1),
-		zap.ErrorOutput(zapcore.AddSync(newRollingWriter(filepath.Join(cfg.LogDir, globalErrorLog)))),
+		zap.ErrorOutput(zapcore.AddSync(errorWriter)),
 	)
 	security := zap.New(
 		zapcore.NewCore(
 			newEncoder("json", false, true),
-			zapcore.AddSync(newRollingWriter(securityPath)),
+			zapcore.AddSync(securityWriter),
 			zap.LevelEnablerFunc(func(level zapcore.Level) bool { return level >= zapcore.InfoLevel }),
 		),
 		zap.AddCaller(),
@@ -93,6 +100,7 @@ func NewLogger(cfg Config) (*Runtime, error) {
 		logger:         root,
 		securityLogger: security,
 		riverLogger:    slog.New(NewSlogZapHandler(root.With(zap.String("component", "river")))),
+		writers:        []io.Closer{appWriter, errorWriter, securityWriter},
 	}, nil
 }
 
@@ -144,6 +152,29 @@ func (r *Runtime) Sync() error {
 	return errors.Join(syncErrors...)
 }
 
+// Close flushes the loggers and releases every rolling file writer. Sync alone
+// does not close lumberjack's file handles; on Windows those handles prevent
+// the log directory from being moved or removed.
+func (r *Runtime) Close() error {
+	if r == nil {
+		return nil
+	}
+	var closeErrors []error
+	if err := r.Sync(); err != nil {
+		closeErrors = append(closeErrors, err)
+	}
+	for _, writer := range r.writers {
+		if writer == nil {
+			continue
+		}
+		if err := writer.Close(); err != nil {
+			closeErrors = append(closeErrors, err)
+		}
+	}
+	r.writers = nil
+	return errors.Join(closeErrors...)
+}
+
 func newEncoder(format string, development bool, fileOutput bool) zapcore.Encoder {
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "ts"
@@ -186,7 +217,7 @@ func prepareSecurityLog(path string) error {
 	if err := file.Close(); err != nil {
 		return err
 	}
-	return os.Chmod(path, 0600)
+	return fsprivacy.ApplyFileMode(path, 0600)
 }
 
 func ignorableSyncError(err error) bool {

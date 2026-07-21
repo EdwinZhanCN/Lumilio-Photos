@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"server/platform/fsprivacy"
 )
 
 func TestEnsureSecretIsIdempotentAndPrivate(t *testing.T) {
@@ -28,11 +30,8 @@ func TestEnsureSecretIsIdempotentAndPrivate(t *testing.T) {
 	if string(second) != string(first) {
 		t.Fatal("idempotent initialization replaced the secret")
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("secret permissions = %o", info.Mode().Perm())
+	private, err := fsprivacy.IsPrivate(path)
+	if err != nil || !private {
+		t.Fatalf("secret private = %v, err = %v", private, err)
 	}
 }
