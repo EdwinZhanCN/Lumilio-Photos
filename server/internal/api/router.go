@@ -209,11 +209,10 @@ type UserControllerInterface interface {
 
 type RepositoryScanControllerInterface interface {
 	CreateRepository(c *gin.Context)
-	RegisterRepositoryCopy(c *gin.Context)
+	ListRepositoryRoots(c *gin.Context)
 	ListRepositories(c *gin.Context)
 	GetRepository(c *gin.Context)
 	UpdateRepository(c *gin.Context)
-	RelocateRepository(c *gin.Context)
 	DeleteRepository(c *gin.Context)
 	QueueRepositoryScan(c *gin.Context)
 	GetLatestRepositoryScan(c *gin.Context)
@@ -388,10 +387,8 @@ func NewRouter(
 		{
 			repositories.GET("", appInitializedMiddleware, repositoryScanController.ListRepositories)
 			repositories.POST("", repositoryScanController.CreateRepository)
-			repositories.POST("/copies", appInitializedMiddleware, repositoryScanController.RegisterRepositoryCopy)
 			repositories.GET("/:id", appInitializedMiddleware, repositoryScanController.GetRepository)
 			repositories.PATCH("/:id", appInitializedMiddleware, repositoryScanController.UpdateRepository)
-			repositories.POST("/:id/relocate", appInitializedMiddleware, repositoryScanController.RelocateRepository)
 			repositories.DELETE("/:id", appInitializedMiddleware, repositoryScanController.DeleteRepository)
 			repositories.GET("/:id/cloud", appInitializedMiddleware, cloudController.GetRepositoryCloudStatus)
 			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
@@ -399,6 +396,12 @@ func NewRouter(
 			repositories.GET("/:id/scans/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
 			repositories.GET("/:id/scans", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
 			repositories.POST("/:id/stacks/detect", appInitializedMiddleware, assetController.AutoDetectStacks)
+		}
+
+		repositoryRoots := v1.Group("/repository-roots")
+		repositoryRoots.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
+		{
+			repositoryRoots.GET("", repositoryScanController.ListRepositoryRoots)
 		}
 
 		locations := v1.Group("/locations")

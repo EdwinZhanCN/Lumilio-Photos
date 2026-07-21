@@ -8,7 +8,7 @@ and the same React UI over HTTP. See the full design in
 ## Architecture
 
 ```
-Wails v3 system tray (menubar app, no webview)
+Wails v3 system tray + private native control-panel webview
   → "Open Lumilio Photos" opens the default browser at http://localhost:6680
 desktop/supervisor
   → manages a private PostgreSQL 18 (initdb / pg_ctl / pg_isready / createdb)
@@ -20,12 +20,12 @@ desktop/supervisor
   → the Go API server also serves the React SPA at localhost:6680 (server.web_root)
 ```
 
-There is **no embedded webview**: the UI runs in the user's real browser. This is
-deliberate — a real browser surfaces platform passkeys (Touch ID / iCloud
-Keychain) at the `localhost` RP, whereas an embedded WKWebView would require an
-Apple Associated-Domains entitlement (a paid Developer account) to do so. The
-React bundle is served by the Go server (`server.web_root`), not Wails' assets;
-the tray auto-opens the browser on launch and on demand.
+The React product UI runs in the user's real browser. This is deliberate — a
+real browser surfaces platform passkeys (Touch ID / iCloud Keychain) at the
+`localhost` RP. Wails embeds only the private first-run/supervisor Control Panel;
+it is also the trusted native surface for granting external Storage Locations
+and attaching existing repositories. The React bundle is served by the Go
+server (`server.web_root`); the tray opens the browser on launch and on demand.
 
 ## Module wiring
 
@@ -70,7 +70,8 @@ app-data root to re-init (pre-production installs only).
 
 App data (always local, never on the user's relocatable media drive):
 `~/Library/Application Support/Lumilio Photos/` — `postgres/`, `secrets/`,
-`config/`, `backups/`, `lumen/` (optional local AI: the supervised Lumen Hub
+`config/`, `cloud/`, `logs/`, `backups/`, `storage/` (the default media Storage
+Location), and `lumen/` (optional local AI: the supervised Lumen Hub
 build, generated config, and model cache — installed from the tray, see
 `desktop/lumen`), `lumilio.lock`. Override the root with `LUMILIO_APP_DATA`.
 `config/server.toml` is regenerated on launch and is the authoritative immutable
@@ -107,6 +108,12 @@ desktop/scripts/fetch-resources.sh             # ffmpeg/ffprobe/exiftool (pinned
 make desktop-build                             # → desktop/build/Lumilio Photos.app
 desktop/scripts/build-macos.sh arm64 --dmg     # also produce a DMG
 ```
+
+The macOS bundle declares purpose strings for user-selected Desktop,
+Documents, Downloads, removable-volume, network-volume, and File Provider
+Storage Locations. The native directory picker supplies the user grant; a
+stable Bundle ID and signing identity are still required for TCC decisions to
+survive rebuilds and upgrades reliably.
 
 The `--dmg` step builds the classic "drag the app onto Applications" window via
 `create-dmg` (Applications symlink + positioned icons; optional background art at
@@ -195,7 +202,7 @@ preserves data.
 ## Status / remaining work
 
 Implemented: supervisor (PG lifecycle, typed config/secrets generation,
-single-instance lock, storage-path persistence, quarantine cleanup), embedded
+single-instance lock, Storage Location migration, quarantine cleanup), embedded
 migrations, in-process server boot, the Go server serving the SPA, the Wails
 system-tray controller with auto-open browser, and dev/build tooling. Verified end to end
 against a real PostgreSQL (`TestDesktopRuntimeE2E`): PG → migrations → API → SPA

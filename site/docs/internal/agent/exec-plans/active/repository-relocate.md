@@ -1,11 +1,11 @@
 # Repository Relocate & Path Policy
 
-Status: active. Steps 1, 3, 4 and 5 are implemented; step 2 (macOS signing/TCC
-spike) is unstarted and needs a human on real hardware, and step 6 (desktop UI)
-is deliberately deferred behind it. Implements ADR-004 (repository identity
-separated from location; deployment-differentiated path policy). This plan
-records what the code already provides, the corrections the investigation forced
-on the ADR, and the ordered remaining work.
+Status: superseded by `storage-locations.md`. Repository identity/reconcile work
+from this plan remains implemented, but its Desktop `FreePolicy` direction was
+replaced: native grants now register bounded Storage Locations or attach an
+existing repository through the in-process Control Panel. The shared HTTP API
+never accepts arbitrary host paths. The signing/TCC investigation remains
+relevant to native picker durability.
 
 ## Current contract
 
@@ -64,9 +64,10 @@ expose them. Verified against the pinned toolchain, that framing is wrong:
   designated requirement, so its identity is effectively the cdhash. Every
   rebuild or in-place update produces a new cdhash, which is expected to
   invalidate previously granted access to protected locations.
-- `desktop/build/Lumilio Photos.app/Contents/Info.plist` declares no
-  `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription`,
-  `NSRemovableVolumesUsageDescription`, or `NSPhotoLibraryUsageDescription`.
+- The packaging script now declares Desktop, Documents, Downloads, removable
+  volume, network volume, and File Provider usage descriptions. It deliberately
+  omits `NSPhotoLibraryUsageDescription`: Lumilio does not call the Apple Photos
+  Library API and rejects `.photoslibrary` as a Storage Location.
 
 Consequence: the FreePolicy spike is no longer about Wails APIs. It is a
 signing-and-TCC question that **already applies to the shipped onboarding
@@ -174,8 +175,10 @@ here before starting step 5.
 registered" hard error now returns `*RepositoryConflictError` carrying both the
 registered and requested paths, which the handler renders as a 409 so the client
 can offer the choice. `RelocateRepository` and `RegisterRepositoryCopy` are the
-two resolutions, exposed as `POST /repositories/{id}/relocate` and
-`POST /repositories/copies`. `RegisterRepositoryCopy` restores the original
+two resolutions. They were initially exposed as shared HTTP routes; the
+Storage Locations follow-up removed those arbitrary-host-path endpoints and
+now exposes them only through Desktop's in-process Control Panel.
+`RegisterRepositoryCopy` restores the original
 `.lumiliorepo` identity if registration fails, so a failed attempt cannot leave
 a directory holding a UUID that belongs to no row. Assets are untouched by
 construction.
@@ -375,14 +378,11 @@ symlink tests self-skip), and 8.3 short paths in the runner's temp directory
 would pass through the casing walk unchanged (harmless, since every comparison
 is canonical-against-canonical).
 
-Two Windows behaviours remain unverified and need a real machine:
-
-- **Drive-letter reassignment is the Windows relocate case**, and it is far more
-  common than the macOS `/Volumes/Name 1` equivalent: a USB drive that was `D:`
-  can come back as `E:`. Expected flow is offline → user relocates. Untested.
-- Case-insensitive NTFS behaviour of the casing walk, and `EvalSymlinks` against
-  junctions/reparse points, are assumed to behave like the APFS path but have
-  never been run.
+The Storage Locations follow-up added native Windows 11 verification under
+Parallels. Drive-letter reassignment (`D:\\Lumilio` → `E:\\Lumilio`) and
+case-insensitive NTFS canonicalization now pass. `EvalSymlinks` behaviour for
+junctions/reparse points remains a packaged-App edge case rather than a reason
+to maintain a separate standalone Windows Server product.
 
 The remaining platform-behaviour checks belong on real machines or in packaged
 App smoke tests rather than in a separately supported Windows/macOS standalone
@@ -434,4 +434,5 @@ Still outstanding:
   unplug/remount test, not a unit test.
 - A manual TCC durability run per step 2 (`make desktop-test` now passes on
   macOS).
-- Step 6 desktop UI, and the free-path input it carries.
+- Packaged-App smoke coverage for native picker grants across macOS TCC changes
+  and Windows junction/reparse-point paths.

@@ -10,7 +10,7 @@ user = "postgres"
 name = "lumiliophotos"
 ssl = "disable"
 bootstrap_password_file = "/run/secrets/db_bootstrap_password"
-rotated_password_file = "/data/storage/.secrets/db_password"
+rotated_password_file = "/data/app-state/secrets/db_password"
 tools_bin_dir = ""
 
 [server]
@@ -26,7 +26,10 @@ file_format = "json"
 repository_audit_verbose = false
 
 [storage]
+# Media and machine-bound state are separate mounts in Docker Compose.
 path = "/data/storage"
+cloud_state_path = "/data/app-state/cloud"
+backups_path = "/data/app-state/backups"
 
 [repository_scan]
 enabled = true
@@ -42,7 +45,7 @@ language = "en"
 user_agent = "Lumilio-Photos/1.0"
 
 [auth]
-secret_key_file = "/data/storage/.secrets/lumilio_secret_key"
+secret_key_file = "/data/app-state/secrets/lumilio_secret_key"
 access_token_ttl = "15m"
 refresh_token_ttl = "168h"
 media_token_ttl = "10m"

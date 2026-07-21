@@ -27,6 +27,8 @@ repository_audit_verbose = false
 
 [storage]
 path = {{toml .StoragePath}}
+cloud_state_path = {{toml .CloudStatePath}}
+backups_path = {{toml .BackupsPath}}
 
 [repository_scan]
 enabled = true

@@ -60,14 +60,6 @@
     step === 1 ? agreed && (validation?.writable ?? false) : !submitting,
   );
 
-  async function pickStorage() {
-    const r = await api.pickStorage();
-    if (!r.cancelled && r.path) {
-      path = r.path;
-      validation = r.validation ?? null;
-    }
-  }
-
   async function pickCache() {
     const r = await api.pickCache();
     if (!r.cancelled && r.path) {
@@ -140,7 +132,7 @@
           <h1 class="m-0 text-xl font-semibold">{t("s1title")}</h1>
           <p class="m-0 text-[13px] leading-normal text-muted">{t("s1sub")}</p>
 
-          <PathPicker label={t("pathLabel")} {path} {validation} onpick={pickStorage} />
+          <PathPicker label={t("pathLabel")} {path} {validation} readonly />
 
           <div class="flex flex-col gap-2 rounded-[10px] border border-line bg-raised px-4 py-3.5">
             <div class="text-xs font-semibold tracking-wide text-muted uppercase">

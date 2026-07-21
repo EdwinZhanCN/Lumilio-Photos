@@ -16,11 +16,11 @@ import (
 )
 
 type iCloudCredentialProvider struct {
-	storageRoot string
+	cloudStateDir string
 }
 
-func NewICloudCredentialProvider(storageRoot string) CredentialProvider {
-	return &iCloudCredentialProvider{storageRoot: storageRoot}
+func NewICloudCredentialProvider(cloudStateDir string) CredentialProvider {
+	return &iCloudCredentialProvider{cloudStateDir: cloudStateDir}
 }
 
 func (p *iCloudCredentialProvider) Descriptor() ProviderDescriptor {
@@ -91,7 +91,7 @@ func (p *iCloudCredentialProvider) Identity(inputs map[string]string) (Credentia
 }
 
 func (p *iCloudCredentialProvider) DefaultArtifactDir(credentialID uuid.UUID) string {
-	return filepath.Join(providerArtifactRoot(p.storageRoot, ProviderICloud), credentialID.String())
+	return filepath.Join(providerArtifactRoot(p.cloudStateDir, ProviderICloud), credentialID.String())
 }
 
 func (p *iCloudCredentialProvider) Authenticate(ctx context.Context, input CredentialAuthInput) (CredentialAuthResult, error) {

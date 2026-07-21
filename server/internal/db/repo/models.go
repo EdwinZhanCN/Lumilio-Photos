@@ -491,6 +491,7 @@ type Repository struct {
 	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
 	Role           dbtypes.RepoRole         `db:"role" json:"role"`
+	RootID         pgtype.UUID              `db:"root_id" json:"root_id"`
 }
 
 type RepositoryCloudBinding struct {
@@ -508,6 +509,16 @@ type RepositoryDefault struct {
 	Strategy          string             `db:"strategy" json:"strategy"`
 	DuplicateHandling string             `db:"duplicate_handling" json:"duplicate_handling"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type RepositoryRoot struct {
+	RootID    pgtype.UUID                  `db:"root_id" json:"root_id"`
+	Name      string                       `db:"name" json:"name"`
+	Path      string                       `db:"path" json:"path"`
+	Kind      dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
+	Status    dbtypes.RepositoryRootStatus `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz           `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz           `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryScanRun struct {

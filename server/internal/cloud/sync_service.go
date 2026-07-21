@@ -134,7 +134,7 @@ func NewCloudSyncService(
 	queries *repo.Queries,
 	materializer *sourcing.SourceMaterializer,
 	secretKeyPath string,
-	storageRoot string,
+	cloudStateDir string,
 	logger *zap.Logger,
 ) CloudSyncService {
 	if logger == nil {
@@ -149,7 +149,7 @@ func NewCloudSyncService(
 		queries:       queries,
 		materializer:  materializer,
 		logger:        scopedLogger,
-		registry:      NewDefaultProviderRegistry(storageRoot),
+		registry:      NewDefaultProviderRegistry(cloudStateDir),
 		secretBox:     box,
 		pendingAuth:   make(map[uuid.UUID]pendingCredentialAuth),
 		activeImports: make(map[uuid.UUID]*activeImport),

@@ -85,9 +85,14 @@ func (rm *DefaultRepositoryManager) RelocateRepository(ctx context.Context, id s
 	}
 
 	now := time.Now()
+	rootID, err := rm.repositoryRootIDForPath(ctx, cleanPath)
+	if err != nil {
+		return nil, err
+	}
 	dbRepo, err := rm.queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
 		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
 		Path:      cleanPath,
+		RootID:    rootID,
 		Status:    dbtypes.RepoStatusActive,
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	})

@@ -88,6 +88,35 @@ export interface PickResult {
   validation?: Validation;
 }
 
+export interface StorageLocation {
+  id: string;
+  name: string;
+  path: string;
+  kind: "default" | "external";
+  status: "active" | "offline" | "error";
+}
+
+export interface RepositoryInfo {
+  id: string;
+  name: string;
+  path: string;
+  status: string;
+}
+
+export interface RepositoryIdentityConflict {
+  repositoryId: string;
+  registeredPath: string;
+  requestedPath: string;
+  actions: Array<"relocate" | "copy">;
+}
+
+export interface StorageLocationIdentityConflict {
+  rootId: string;
+  registeredPath: string;
+  requestedPath: string;
+  actions: Array<"relocate">;
+}
+
 export interface LogResult {
   content: string;
   path: string;

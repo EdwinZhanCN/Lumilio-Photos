@@ -4,12 +4,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 
 type CreateRepositoryInput = {
   name: string;
-  /**
-   * Absolute on-disk location. Only deployments whose path policy allows free
-   * placement (desktop) accept it; a server rejects it and places the repository
-   * under its own storage root.
-   */
-  path?: string;
+  rootId?: string;
   cloudCredentialId?: string;
   role?: "primary" | "regular";
   storageStrategy?: "cas" | "date" | "flat";
@@ -23,7 +18,7 @@ export function useCreateRepository() {
   const createRepository = useCallback(
     async ({
       name,
-      path,
+      rootId,
       cloudCredentialId,
       role,
       storageStrategy,
@@ -32,7 +27,7 @@ export function useCreateRepository() {
       const response = await mutation.mutateAsync({
         body: {
           name,
-          path,
+          root_id: rootId,
           cloud_credential_id: cloudCredentialId,
           role,
           storage_strategy: storageStrategy,
@@ -43,6 +38,9 @@ export function useCreateRepository() {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["get", "/api/v1/repository-roots"],
         }),
         queryClient.invalidateQueries({
           queryKey: ["post", "/api/v1/assets/list"],

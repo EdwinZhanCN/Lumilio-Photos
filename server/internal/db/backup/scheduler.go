@@ -17,8 +17,7 @@ type Scheduler struct {
 	Conn        Conn
 	Pool        RowQuerier
 	ToolsBinDir string // optional override (desktop bundle); empty = autodetect
-	StorageRoot string // media root; unreachable → skip the run with a warning
-	Dir         string // dump target, <storage>/backups
+	Dir         string // explicit private dump target
 	AppVersion  string
 	Settings    func(ctx context.Context) (settings.Backup, error)
 	Logf        Logf
@@ -31,8 +30,8 @@ type Scheduler struct {
 // (disabled, not yet due, storage unreachable) return nil — only actual
 // dump/prune failures are errors, so River retries real failures but never
 // "retries" a skip. A forced run (admin "back up now") bypasses the enabled
-// and due checks, and an unreachable storage root becomes an error the API
-// can surface instead of a silent skip.
+// and due checks, and an unreachable backup destination becomes an error the
+// API can surface instead of a silent skip.
 func (s *Scheduler) Run(ctx context.Context, force bool) error {
 	logf := s.Logf
 	if logf == nil {
@@ -60,14 +59,14 @@ func (s *Scheduler) Run(ctx context.Context, force bool) error {
 		}
 	}
 
-	// Resolved plan decision: when the media library (e.g. an unplugged
-	// external drive) is unreachable, skip with a warning rather than dump to
-	// a fallback location the user's media backup would not capture.
-	if _, err := os.Stat(s.StorageRoot); err != nil {
+	// The backup destination is explicit and independent from repository mounts.
+	// Never redirect it when unavailable: periodic work skips and a forced admin
+	// request gets a useful error.
+	if _, err := os.Stat(s.Dir); err != nil {
 		if force {
-			return fmt.Errorf("storage root %s unreachable: %w", s.StorageRoot, err)
+			return fmt.Errorf("backup destination %s unreachable: %w", s.Dir, err)
 		}
-		logf("backup: storage root %s unreachable, skipping this run: %v", s.StorageRoot, err)
+		logf("backup: destination %s unreachable, skipping this run: %v", s.Dir, err)
 		return nil
 	}
 

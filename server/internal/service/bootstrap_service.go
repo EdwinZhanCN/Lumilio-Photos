@@ -94,7 +94,7 @@ func (s *bootstrapService) compute(ctx context.Context) (string, error) {
 		return BootstrapPhaseDBRotated, nil
 	}
 
-	primaries, err := s.queries.CountActivePrimaryRepositories(ctx)
+	primaries, err := s.queries.CountPrimaryRepositories(ctx)
 	if err != nil {
 		return "", fmt.Errorf("count primary repositories: %w", err)
 	}

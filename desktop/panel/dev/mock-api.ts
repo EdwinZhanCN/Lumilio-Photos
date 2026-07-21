@@ -34,10 +34,27 @@ interface MockState {
 
 const HOME = "/Users/demo";
 
+let storageLocations = [
+  {
+    id: "default-root",
+    name: "Default storage",
+    path: `${HOME}/Library/Application Support/Lumilio Photos/storage`,
+    kind: "default",
+    status: "active",
+  },
+  {
+    id: "external-root",
+    name: "Photo Archive",
+    path: "/Volumes/Photo Archive",
+    kind: "external",
+    status: "offline",
+  },
+];
+
 const mock: MockState = {
   mode: "onboarding",
   region: "other",
-  path: `${HOME}/Pictures/Lumilio Library`,
+  path: `${HOME}/Library/Application Support/Lumilio Photos/storage`,
   ready: false,
   lumen: {
     enabled: false,
@@ -159,6 +176,51 @@ export function mockPanelApi(): Plugin {
             return json(res, { path: `${HOME}/Pictures/Lumilio Library`, validation });
           case "/__onb/pick-cache":
             return json(res, { path: `${HOME}/Library/Caches/lumen-models`, validation });
+          case "/__onb/storage-locations":
+            return json(res, { locations: storageLocations });
+          case "/__onb/pick-storage-location": {
+            const location = {
+              id: `external-${Date.now()}`,
+              name: "External Photos",
+              path: "/Volumes/External Photos",
+              kind: "external",
+              status: "active",
+            };
+            storageLocations = [...storageLocations, location];
+            return json(res, { location, warnings: [] });
+          }
+          case "/__onb/remove-storage-location": {
+            const body = await readBody(req);
+            storageLocations = storageLocations.filter((item) => item.id !== body.id);
+            return json(res, { ok: true });
+          }
+          case "/__onb/storage-location-conflict": {
+            const body = await readBody(req);
+            const current = storageLocations.find((item) => item.id === body.rootId);
+            if (current) {
+              current.path = body.path;
+              current.status = "active";
+            }
+            return json(res, { location: current });
+          }
+          case "/__onb/attach-repository":
+            return json(res, {
+              repository: {
+                id: `repository-${Date.now()}`,
+                name: "Attached Archive",
+                path: "/Volumes/Attached Archive",
+                status: "active",
+              },
+            });
+          case "/__onb/repository-conflict":
+            return json(res, {
+              repository: {
+                id: `repository-${Date.now()}`,
+                name: "Resolved Archive",
+                path: "/Volumes/Resolved Archive",
+                status: "active",
+              },
+            });
           case "/__onb/complete": {
             const body = await readBody(req);
             mock.mode = "dashboard";
