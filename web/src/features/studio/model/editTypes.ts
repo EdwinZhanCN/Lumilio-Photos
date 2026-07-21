@@ -1,3 +1,6 @@
+import { normalizeCanvasSpec, type CanvasSpec } from "./canvasSpec";
+import { normalizeLayers, type Layer } from "./layers";
+
 /** Serializable non-destructive adjustments shared by the editor and render worker. */
 export type StudioEditAdjustments = {
   exposure: number;
@@ -34,11 +37,25 @@ export type LumilioSidecarSource = {
   height?: number | null;
 };
 
+/**
+ * The durable record of a Studio edit.
+ *
+ * `adjustments` are photometric and geometric operations on the source pixels.
+ * `canvas` and `layers` are the composition placed around and on top of the
+ * developed result — they are rendered after adjustments, never baked into
+ * them.
+ *
+ * Both composition fields are additive and nullable, so a sidecar written
+ * before they existed still reads as a valid v1 document that simply has no
+ * composition.
+ */
 export type LumilioSidecarV1 = {
   version: 1;
   asset_id: string;
   source: LumilioSidecarSource;
   adjustments: StudioEditAdjustments;
+  canvas: CanvasSpec | null;
+  layers: Layer[];
   updated_at: string;
 };
 
@@ -77,5 +94,26 @@ export function normalizeStudioAdjustments(
     flipHorizontal: Boolean(input?.flipHorizontal),
     flipVertical: Boolean(input?.flipVertical),
     crop: input?.crop ?? null,
+  };
+}
+
+/** The composition half of a sidecar: what is drawn around and on the photo. */
+export type StudioComposition = {
+  canvas: CanvasSpec | null;
+  layers: Layer[];
+};
+
+export const EMPTY_COMPOSITION: StudioComposition = { canvas: null, layers: [] };
+
+/**
+ * Read composition out of a sidecar payload. A sidecar written before these
+ * fields existed yields an empty composition rather than an error.
+ */
+export function normalizeStudioComposition(
+  input: Pick<Partial<LumilioSidecarV1>, "canvas" | "layers"> | null | undefined,
+): StudioComposition {
+  return {
+    canvas: input?.canvas ? normalizeCanvasSpec(input.canvas) : null,
+    layers: normalizeLayers(input?.layers),
   };
 }
