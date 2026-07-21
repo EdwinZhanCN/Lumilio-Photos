@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"server/config"
+	"server/platform/fsprivacy"
 )
 
 type fakeRotator struct {
@@ -75,12 +76,9 @@ func TestSetupService_Initialize_RotatesPersistsAndMarksInitialized(t *testing.T
 	}
 
 	// Secret persisted with 0600 perms and matching the rotated password.
-	secretInfo, err := os.Stat(svc.secretPath)
-	if err != nil {
-		t.Fatalf("stat secret: %v", err)
-	}
-	if perm := secretInfo.Mode().Perm(); perm != 0o600 {
-		t.Fatalf("expected secret perms 0600, got %o", perm)
+	private, err := fsprivacy.IsPrivate(svc.secretPath)
+	if err != nil || !private {
+		t.Fatalf("secret private = %v, err = %v", private, err)
 	}
 	secretBytes, err := os.ReadFile(svc.secretPath)
 	if err != nil {

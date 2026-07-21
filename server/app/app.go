@@ -87,7 +87,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	if err != nil {
 		return fmt.Errorf("initialize logger: %w", err)
 	}
-	defer logRuntime.Sync()
+	defer logRuntime.Close()
 	restoreStdLog := logging.RedirectStandardLog(logRuntime.Named("stdlib"))
 	defer restoreStdLog()
 
@@ -99,6 +99,11 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	indexingLogger := logRuntime.Named("indexing")
 	scannerLogger := logRuntime.Named("repository_scanner")
 	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), appConfig.LoggingConfig.RepositoryAuditVerbose)
+	defer func() {
+		if err := repoAuditProvider.Close(); err != nil {
+			appLogger.Warn("failed to close repository audit logs", zap.Error(err))
+		}
+	}()
 
 	appLogger.Info("starting Lumilio Photos API",
 		zap.String("operation", "server.start"),
@@ -188,6 +193,14 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	}
 	stagingManager := storage.NewStagingManager()
 	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
+
+	// Drives get unplugged, remounted, and replaced while the server is down.
+	// Re-check every repository's recorded path before anything schedules work
+	// against it. Unreachable repositories become offline rather than failing
+	// mid-scan.
+	if err := repoManager.ReconcileAll(ctx); err != nil {
+		appLogger.Warn("failed to reconcile repositories", zap.Error(err))
+	}
 
 	workers := river.NewWorkers()
 	queueClient, err := queue.New(pgxPool, workers, logRuntime.RiverLogger())

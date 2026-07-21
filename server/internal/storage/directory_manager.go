@@ -335,7 +335,7 @@ func (dm *DefaultDirectoryManager) protectSystemDirectories(repoPath string) err
 	for _, d := range repoDirs {
 		dirPath := filepath.Join(cleanPath, d.path)
 		if _, err := os.Stat(dirPath); err == nil {
-			if err := os.Chmod(dirPath, d.mode); err != nil {
+			if err := applyDirectoryMode(dirPath, d.mode); err != nil {
 				return fmt.Errorf("failed to set permissions for %s: %w", d.path, err)
 			}
 		}
@@ -727,9 +727,16 @@ func resolveInRepo(repoRoot, p string) (string, error) {
 
 // checkDirectoryPermissions checks if we have proper read/write permissions
 func (dm *DefaultDirectoryManager) checkDirectoryPermissions(path string) error {
-	// Test read permission
-	if _, err := os.Open(path); err != nil {
+	// Test read permission. The handle must be closed: on Windows an open handle
+	// to a directory blocks its deletion, which surfaced as repositories and
+	// test temp directories becoming undeletable ("The process cannot access the
+	// file because it is being used by another process").
+	dir, err := os.Open(path)
+	if err != nil {
 		return fmt.Errorf("cannot read directory: %w", err)
+	}
+	if err := dir.Close(); err != nil {
+		return fmt.Errorf("cannot close directory: %w", err)
 	}
 
 	// Test write permission by trying to create a temporary file

@@ -12,6 +12,7 @@ import (
 
 	"server/config"
 	"server/internal/storage"
+	"server/platform/fsprivacy"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -231,10 +232,13 @@ func writeSecretFile(path, secret string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("create secret dir: %w", err)
 	}
+	if err := fsprivacy.ApplyDirectoryMode(filepath.Dir(path), 0o700); err != nil {
+		return fmt.Errorf("protect secret dir: %w", err)
+	}
 	if err := os.WriteFile(path, []byte(secret+"\n"), 0o600); err != nil {
 		return fmt.Errorf("write secret %s: %w", path, err)
 	}
-	if err := os.Chmod(path, 0o600); err != nil {
+	if err := fsprivacy.ApplyFileMode(path, 0o600); err != nil {
 		return fmt.Errorf("lock secret permissions %s: %w", path, err)
 	}
 	return nil

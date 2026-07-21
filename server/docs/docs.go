@@ -2051,6 +2051,11 @@ const docTemplate = `{
                         "example": "Family Photos",
                         "type": "string"
                     },
+                    "path": {
+                        "description": "Path is an absolute on-disk location for the repository. It is only\naccepted by deployments whose path policy allows free placement (desktop);\na server rejects it and places the repository under its storage root.",
+                        "example": "/Volumes/Media/Photos",
+                        "type": "string"
+                    },
                     "role": {
                         "enum": [
                             "primary",
@@ -2084,6 +2089,14 @@ const docTemplate = `{
                     },
                     "repository": {
                         "$ref": "#/components/schemas/dto.RepositoryDTO"
+                    },
+                    "warnings": {
+                        "description": "Warnings are non-fatal notes about the chosen location, such as it being\ninside a cloud-sync folder. The repository was created regardless.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -2708,6 +2721,11 @@ const docTemplate = `{
                     },
                     "role": {
                         "example": "regular",
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "Status lets a selector keep an unreachable repository visible as a browse\nfilter while refusing it as an upload target.",
+                        "example": "active",
                         "type": "string"
                     }
                 },
@@ -4023,6 +4041,18 @@ const docTemplate = `{
                 "required": [
                     "password",
                     "username"
+                ],
+                "type": "object"
+            },
+            "dto.RelocateRepositoryRequestDTO": {
+                "properties": {
+                    "path": {
+                        "example": "/Volumes/NewDrive/Photos",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "path"
                 ],
                 "type": "object"
             },
@@ -15691,6 +15721,82 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/repositories/copies": {
+            "post": {
+                "description": "Register a folder whose .lumiliorepo carries an already-registered repository ID as an independent repository. A fresh repository ID is written into the folder, the way cloning a git repository produces a distinct working copy.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RelocateRepositoryRequestDTO",
+                                        "summary": "request",
+                                        "description": "Repository path"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository path",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository registered successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Register repository copy",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
         "/api/v1/repositories/{id}": {
             "delete": {
                 "description": "Remove a repository from the registry. Does not delete files on disk.",
@@ -15989,6 +16095,113 @@ const docTemplate = `{
                 "summary": "Start repository cloud import",
                 "tags": [
                     "cloud"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/relocate": {
+            "post": {
+                "description": "Update a repository's recorded location after its folder moved. The .lumiliorepo at the new path must carry the same repository ID. Assets are not moved: their storage paths are repository-relative.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RelocateRepositoryRequestDTO",
+                                        "summary": "request",
+                                        "description": "New repository path"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "New repository path",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository relocated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Another repository already occupies the path"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Relocate repository",
+                "tags": [
+                    "repositories"
                 ]
             }
         },

@@ -59,8 +59,11 @@ type IndexingRepositoryOptionDTO struct {
 	Name string `json:"name" example:"Photos Library"`
 	// Path is only populated for admin callers; repository filesystem
 	// locations are never exposed to regular users.
-	Path      string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
-	Role      string `json:"role" example:"regular"`
+	Path string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
+	Role string `json:"role" example:"regular"`
+	// Status lets a selector keep an unreachable repository visible as a browse
+	// filter while refusing it as an upload target.
+	Status    string `json:"status" example:"active"`
 	IsPrimary bool   `json:"is_primary" example:"false"`
 }
 

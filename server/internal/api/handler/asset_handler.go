@@ -115,6 +115,9 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 		if err != nil {
 			return repo.Repository{}, errNoRepository
 		}
+		if err := rejectOfflineRepository(repository); err != nil {
+			return repo.Repository{}, err
+		}
 		return repository, nil
 	}
 
@@ -126,7 +129,20 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 	if err != nil {
 		return repo.Repository{}, errRepositoryNotFound
 	}
+	if err := rejectOfflineRepository(repository); err != nil {
+		return repo.Repository{}, err
+	}
 	return repository, nil
+}
+
+// rejectOfflineRepository refuses ingest into a repository whose location is not
+// currently reachable. Staging a file for a repository that cannot be written is
+// a guaranteed failure later, with a worse error attached.
+func rejectOfflineRepository(repository repo.Repository) error {
+	if repository.Status == dbtypes.RepoStatusOffline {
+		return fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
+	}
+	return nil
 }
 
 // respondRepositoryError maps a resolveUploadRepository failure onto its HTTP response.
@@ -136,6 +152,8 @@ func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 		api.GinBadRequest(c, err, "Invalid repository ID")
 	case errors.Is(err, errRepositoryNotFound):
 		api.GinNotFound(c, err, "Repository not found")
+	case errors.Is(err, storage.ErrRepositoryOffline):
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is offline")
 	default:
 		api.GinBadRequest(c, err, "Please specify a repository_id or create a repository first")
 	}
@@ -1281,7 +1299,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	repository, err := h.getRepositoryForAsset(c.Request.Context(), asset)
 	if err != nil {
 		log.Printf("Failed to resolve repository for thumbnail request: %v", err)
-		api.GinInternalError(c, err, "Failed to resolve repository")
+		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
 	fullPath := h.resolveRepositoryPath(repository.Path, thumbnail.StoragePath)
@@ -1356,7 +1374,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	repository, err := h.getRepositoryForAsset(ctx, asset)
 	if err != nil {
 		log.Printf("Failed to resolve repository for original file: %v", err)
-		api.GinInternalError(c, err, "Failed to access repository")
+		respondRepositoryResolveError(c, err, "Failed to access repository")
 		return
 	}
 	fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
@@ -1445,7 +1463,7 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	repository, err := h.getRepositoryForAsset(ctx, asset)
 	if err != nil {
 		log.Printf("Failed to resolve repository for export: %v", err)
-		api.GinInternalError(c, err, "Failed to access repository")
+		respondRepositoryResolveError(c, err, "Failed to access repository")
 		return
 	}
 	fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
@@ -1549,7 +1567,7 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 		repository, err := h.getRepositoryForAsset(ctx, asset)
 		if err != nil {
 			log.Printf("Failed to resolve repository for bulk download: %v", err)
-			api.GinInternalError(c, err, "Failed to access repository")
+			respondRepositoryResolveError(c, err, "Failed to access repository")
 			return
 		}
 
@@ -2066,6 +2084,7 @@ func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository, includ
 			ID:        uuid.UUID(repository.RepoID.Bytes).String(),
 			Name:      repository.Name,
 			Role:      string(repository.Role),
+			Status:    string(repository.Status),
 			IsPrimary: repository.Role == dbtypes.RepoRolePrimary,
 		}
 		if includePath {
@@ -3566,6 +3585,11 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 			log.Printf("❌ Failed to list repositories for orphaned chunk cleanup: %v", err)
 		} else {
 			for _, repo := range repositories {
+				// An offline repository has no reachable staging directory;
+				// walking it only produces I/O errors and false failure counts.
+				if repo.Status == dbtypes.RepoStatusOffline {
+					continue
+				}
 				// Use staging manager's cleanup function with short max age (1 hour)
 				err := stagingManager.CleanupStaging(repo.Path, time.Hour)
 				if err != nil {

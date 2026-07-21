@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"server/internal/secretbox"
+	"server/platform/fsprivacy"
 
 	"github.com/stretchr/testify/require"
 )
@@ -26,9 +27,9 @@ func TestLoadOrCreateLumilioSecretKey_AutoGenerateAndReuse(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, first, string(bytes.TrimSpace(content)))
 
-	stat, err := os.Stat(keyFile)
+	private, err := fsprivacy.IsPrivate(keyFile)
 	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0o600), stat.Mode().Perm())
+	require.True(t, private)
 }
 
 func TestLoadOrCreateLumilioSecretKey_RejectsRawText(t *testing.T) {

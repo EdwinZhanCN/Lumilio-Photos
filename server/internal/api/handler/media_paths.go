@@ -3,13 +3,20 @@ package handler
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"server/internal/api"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage"
+
+	"github.com/gin-gonic/gin"
 )
 
 // assetDownloadFile pairs a resolved asset with its on-disk original path,
@@ -36,7 +43,29 @@ func getRepositoryForAsset(ctx context.Context, queries *repo.Queries, asset *re
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository by id: %w", err)
 	}
+	// An unreachable repository must not degrade into a bare I/O error further
+	// down. The UI has to be able to tell "the drive is unplugged" from "the
+	// photo is gone", and only this layer still knows which one it is.
+	if repository.Status == dbtypes.RepoStatusOffline {
+		return nil, fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
+	}
 	return &repository, nil
+}
+
+// respondRepositoryResolveError maps a getRepositoryForAsset failure onto its
+// HTTP response.
+//
+// An offline repository must not surface as a 500. "The drive is unplugged" is
+// a recoverable condition the user can act on, while a 500 reads as a server
+// fault and tells the UI nothing it can show. 409 is the same status the ingest
+// path already returns for an offline repository, so a client has one code to
+// recognize regardless of which endpoint it hit.
+func respondRepositoryResolveError(c *gin.Context, err error, message string) {
+	if errors.Is(err, storage.ErrRepositoryOffline) {
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is offline")
+		return
+	}
+	api.GinInternalError(c, err, message)
 }
 
 // resolveRepositoryPath joins a repository root with an asset's stored path,

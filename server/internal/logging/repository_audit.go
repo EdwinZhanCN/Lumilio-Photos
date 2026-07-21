@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,13 @@ const (
 
 type RepositoryAuditProvider interface {
 	ForPath(repoPath string) RepositoryAuditLogger
+
+	// Close releases the per-repository log files this provider opened. The
+	// provider caches one logger per repository path and never evicts, so
+	// without this every repository ever touched holds two open file handles
+	// for the process's lifetime. On Windows those handles also make the
+	// repository directory undeletable.
+	Close() error
 }
 
 type RepositoryAuditLogger interface {
@@ -38,9 +46,17 @@ type repositoryAuditLogger struct {
 	repoPath    string
 	operations  *zap.Logger
 	errorLogger *zap.Logger
+	writers     []io.Closer
 }
 
 type noopRepositoryAuditLogger struct{}
+
+// NoopRepositoryAuditLogger is the audit sink for a value that has no provider
+// configured. Building a throwaway provider in that case would open per-repository
+// log files that nothing can ever close, once per call.
+func NoopRepositoryAuditLogger() RepositoryAuditLogger {
+	return noopRepositoryAuditLogger{}
+}
 
 func NewRepositoryAuditProvider(baseLogger *zap.Logger, verbose bool) RepositoryAuditProvider {
 	if baseLogger == nil {
@@ -93,16 +109,18 @@ func (p *repositoryAuditProvider) ForPath(repoPath string) RepositoryAuditLogger
 	if p.verbose {
 		minOperationLevel = zapcore.DebugLevel
 	}
+	opsWriter := newRollingWriter(opsPath)
+	errWriter := newRollingWriter(errPath)
 	opsLogger := zap.New(zapcore.NewCore(
 		zapcore.NewJSONEncoder(p.enc),
-		zapcore.AddSync(newRollingWriter(opsPath)),
+		zapcore.AddSync(opsWriter),
 		zap.LevelEnablerFunc(func(l zapcore.Level) bool {
 			return l >= minOperationLevel
 		}),
 	))
 	errLogger := zap.New(zapcore.NewCore(
 		zapcore.NewJSONEncoder(p.enc),
-		zapcore.AddSync(newRollingWriter(errPath)),
+		zapcore.AddSync(errWriter),
 		zapcore.WarnLevel,
 	))
 
@@ -110,9 +128,29 @@ func (p *repositoryAuditProvider) ForPath(repoPath string) RepositoryAuditLogger
 		repoPath:    cleanPath,
 		operations:  opsLogger,
 		errorLogger: errLogger,
+		writers:     []io.Closer{opsWriter, errWriter},
 	}
 	p.cache[cleanPath] = logger
 	return logger
+}
+
+// Close closes every cached repository logger's files and empties the cache, so
+// a provider that is closed and used again reopens rather than writing to a
+// closed file.
+func (p *repositoryAuditProvider) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var firstErr error
+	for path, logger := range p.cache {
+		for _, writer := range logger.writers {
+			if err := writer.Close(); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		delete(p.cache, path)
+	}
+	return firstErr
 }
 
 func (l *repositoryAuditLogger) Operation(operation string, fields ...zap.Field) {
