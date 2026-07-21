@@ -3,60 +3,77 @@
  *
  * The Studio feature owns the authenticated `/studio` editing surface for
  * photos that already exist in the library. It provides a small route state
- * machine, a local recent-edit dashboard, the develop editor, sidecar save,
- * export, and the border tool. It does not import new media, mutate album
- * membership, or replace the asset gallery; those remain in Upload,
- * Collections, and Assets.
+ * machine, a local recent-edit dashboard, the editor, sidecar save, and export.
+ * It does not import new media, mutate album membership, or replace the asset
+ * gallery; those remain in Upload, Collections, and Assets.
+ *
+ * ## The two halves of an edit
+ *
+ * An edit has two independent halves, and keeping them apart is the feature's
+ * central idea.
+ *
+ * **Adjustments** ({@link StudioEditAdjustments}) transform the source pixels:
+ * exposure, color, detail, crop, rotation, flip.
+ *
+ * **Composition** ({@link StudioComposition}) is drawn around and on top of the
+ * developed result — a {@link CanvasSpec} border and a stack of
+ * {@link Layer}s. It is never baked into the develop pipeline, so changing
+ * exposure does not disturb a caption, and moving a caption does not re-run the
+ * GPU pipeline.
+ *
+ * Both halves persist in one sidecar ({@link LumilioSidecarV1}). The
+ * composition fields are additive and nullable, so a sidecar written before
+ * they existed still reads as a valid v1 document.
  *
  * ## State
  *
  * {@link StudioEditMvp} is the route shell. It switches between three local
  * views: {@link StudioHome}, a shared {@link PhotoPicker}, and
  * {@link StudioEditor}. If the URL includes an `assetId` query parameter, the
- * shell opens the editor directly. Otherwise the user starts from Studio Home,
- * chooses a photo, and can resume recent edits.
+ * shell opens the editor directly.
  *
  * Recent edits are client-local history stored under
  * {@link STUDIO_RECENT_EDITS_KEY}. {@link RecentEditRecord},
  * {@link readRecentEdits}, {@link recordRecentEdit}, and
  * {@link clearRecentEdits} persist only asset id, name, dimensions, and
- * timestamp; durable edit instructions live in the asset sidecar, not in
- * localStorage.
+ * timestamp; durable edit instructions live in the asset sidecar.
  *
- * {@link StudioEditor} owns the editor session state: loaded asset metadata,
- * normalized {@link StudioEditAdjustments}, undo history, preview URLs, before
- * preview, save/export flags, render errors, and border-result state. It emits
- * {@link StudioEditorActivity} back to the shell so Studio Home can update
- * recent edits. The default edit state is {@link DEFAULT_STUDIO_ADJUSTMENTS};
- * defaults are intentionally identity operations so an unchanged editor
- * represents the original image.
+ * {@link StudioEditor} owns the session: asset metadata, normalized
+ * adjustments, undo history, preview URLs, and save/export flags. Composition
+ * state lives in {@link useComposition}, which also owns template previews and
+ * logo rasterization. The editor emits {@link StudioEditorActivity} so Studio
+ * Home can update recent edits.
  *
- * ## Data
+ * ## Rendering
  *
- * The editor reads the asset record, sidecar, exported source image, and EXIF
- * record for the selected asset id. Sidecars use {@link LumilioSidecarV1}:
- * saving writes the adjustment instructions back to `/api/v1/assets/{id}/sidecar`
- * without overwriting the preserved original media.
+ * All rendering runs in the feature worker. The main thread decodes the source
+ * into image data, then sends `LOAD_IMAGE_DATA`, `RENDER_PREVIEW`,
+ * `EXPORT_IMAGE`, and `SET_LOGOS`. The worker develops the photo on WebGPU,
+ * WebGL2, WASM CPU, or Canvas 2D, then composes:
+ * {@link composeStudioImage} applies {@link renderCanvasSpec} and
+ * {@link drawLayers}. The worker is an implementation boundary, not a public
+ * API.
  *
- * Preview and export rendering run through the feature worker file. The main
- * thread decodes the source into image data, then sends `LOAD_IMAGE_DATA`,
- * `RENDER_PREVIEW`, and `EXPORT_IMAGE` messages with request ids. The worker
- * chooses an engine such as WebGPU, WebGL2, WASM CPU, or Canvas 2D and returns
- * blobs for the preview/export path. The worker is an implementation boundary,
- * not a public feature API.
+ * Geometry renders in the worker rather than as CSS on {@link Viewport},
+ * because a frame drawn around the photo must rotate with it, not on top of it.
  *
- * Develop controls are defined by {@link DEVELOP_GROUPS} and rendered by
- * {@link DevelopPanel}. Geometry changes are tracked separately from numeric
- * photometric controls because preview rendering ignores rotation/flip while
- * {@link Viewport} applies them visually.
+ * Fonts load inside the worker through {@link ensureStudioFontsLoaded}, so text
+ * is measured with the same context that draws it. Measuring in one place and
+ * drawing in another is what makes alignment drift with line width.
  *
- * The border tool is additive. {@link BorderPanel} edits border params; applying
- * a border first exports the current develop result, then runs
- * {@link runBorderTransform} through the shared worker client from
- * {@link useWorker}. EXIF-driven border modes use {@link extractBorderExif},
- * {@link hasSufficientExif}, {@link matchBrandKey}, and
- * {@link rasterizeBrandLogo}; users cannot manually edit EXIF or force a
- * camera logo.
+ * Logos cannot be rasterized in the worker — decoding SVG needs the DOM — so
+ * {@link rasterizeLogos} runs on the main thread and transfers bitmaps across.
+ *
+ * ## Frames
+ *
+ * A {@link FrameTemplate} is declarative data: a canvas treatment plus anchored
+ * elements. {@link applyTemplate} expands one into a canvas spec and ordinary
+ * layers, after which nothing distinguishes template content from something the
+ * user typed. Templates hold no rendering logic.
+ *
+ * {@link expandTemplate} is the only place template units are converted, and
+ * resolves EXIF through {@link extractFrameExif} and brands through
+ * {@link matchBrand}.
  *
  * ## Composition
  *
@@ -70,27 +87,27 @@
  *     EDITOR --> TOP["TopBar"]
  *     EDITOR --> ASSET["AssetPanel"]
  *     EDITOR --> VIEW["Viewport"]
- *     EDITOR --> DEVELOP["DevelopPanel"]
- *     DEVELOP --> BORDER["BorderToolSection / BorderPanel"]
+ *     EDITOR --> PANEL["EditorPanel"]
+ *     PANEL --> DEV["DevelopSections"]
+ *     PANEL --> FRAME["FramePanel"]
+ *     PANEL --> TEXT["TextPanel"]
+ *     EDITOR --> COMP["useComposition"]
+ *     COMP --> TPL["applyTemplate"]
  *     EDITOR --> SIDE["LumilioSidecarV1"]
  *     EDITOR --> WORKER["studio edit worker"]
- *     BORDER --> TOOL["runBorderTransform via useWorker"]
  * ```
  *
- * {@link TopBar} owns session commands such as back, undo, reset, before,
- * save, and export. {@link AssetPanel} shows source metadata and EXIF rows.
- * {@link Viewport} owns fit/zoom, before preview, rotation/flip presentation,
- * and render errors. {@link DevelopPanel} owns the grouped controls and mobile
- * bottom-sheet behavior.
+ * {@link TopBar} owns session commands. {@link AssetPanel} shows source
+ * metadata and EXIF. {@link Viewport} owns fit/zoom, before preview, and render
+ * errors. {@link EditorPanel} hosts the three tabs and the mobile bottom sheet;
+ * {@link DevelopSections} renders the adjustment groups defined by
+ * {@link DEVELOP_GROUPS}, {@link FramePanel} the presets and border, and
+ * {@link TextPanel} the layer stack.
  *
  * ## Decisions
  *
  * Studio is non-destructive. The original asset stays preserved, saved edits
  * are sidecar instructions, and export downloads a new rendered file.
- *
- * Border output is a derived result layered on top of develop adjustments.
- * Changing any develop control clears the border result because the previous
- * border no longer represents the current edit state.
  *
  * Recent edits are convenience state only. Losing localStorage should remove
  * Studio Home shortcuts, not the saved sidecar or the original media.
@@ -98,7 +115,6 @@
  * @module
  */
 import type PhotoPicker from "@/features/assets/picker/index.ts";
-import type { useWorker } from "@/contexts/WorkerProvider.tsx";
 import type { StudioEditMvp } from "./flows/workspace/StudioWorkspaceFlow.tsx";
 import type { StudioHome } from "./flows/home/StudioHome.tsx";
 import type {
@@ -112,20 +128,28 @@ import type { StudioEditor, StudioEditorActivity } from "./flows/editor/StudioEd
 import type { TopBar } from "./flows/editor/TopBar.tsx";
 import type { AssetPanel } from "./flows/editor/AssetPanel.tsx";
 import type { Viewport } from "./flows/editor/Viewport.tsx";
+import type { EditorPanel } from "./flows/editor/EditorPanel.tsx";
+import type { useComposition } from "./flows/editor/useComposition.ts";
 import type { DEVELOP_GROUPS } from "./model/developConfig.ts";
-import type { DevelopPanel } from "./flows/editor/develop/DevelopPanel.tsx";
+import type { DevelopSections } from "./flows/editor/develop/DevelopSections.tsx";
+import type { FramePanel } from "./flows/editor/frame/FramePanel.tsx";
+import type { TextPanel } from "./flows/editor/text/TextPanel.tsx";
 import type {
-  DEFAULT_STUDIO_ADJUSTMENTS,
   LumilioSidecarV1,
+  StudioComposition,
   StudioEditAdjustments,
 } from "./model/editTypes.ts";
-import type { BorderPanel } from "./modules/tools/border/BorderPanel.tsx";
-import type {
-  extractBorderExif,
-  hasSufficientExif,
-  matchBrandKey,
-  rasterizeBrandLogo,
-  runBorderTransform,
-} from "./modules/tools/border";
+import type { CanvasSpec } from "./model/canvasSpec.ts";
+import type { Layer } from "./model/layers.ts";
+import type { composeStudioImage } from "./modules/rendering/composeStudioImage.ts";
+import type { renderCanvasSpec } from "./modules/rendering/renderCanvas.ts";
+import type { drawLayers } from "./modules/rendering/renderLayers.ts";
+import type { ensureStudioFontsLoaded } from "./modules/rendering/fonts/loadStudioFonts.ts";
+import type { applyTemplate } from "./modules/frame/applyTemplate.ts";
+import type { expandTemplate } from "./modules/frame/expandTemplate.ts";
+import type { FrameTemplate } from "./modules/frame/frameTemplate.ts";
+import type { extractFrameExif } from "./modules/frame/frameExif.ts";
+import type { matchBrand } from "./modules/frame/logoRegistry.ts";
+import type { rasterizeLogos } from "./modules/frame/logoRaster.ts";
 
 export {};

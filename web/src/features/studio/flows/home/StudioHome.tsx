@@ -9,7 +9,7 @@ type StudioHomeProps = {
   recent: RecentEditRecord[];
   onOpenEditor: () => void;
   onResume: (assetId: string) => void;
-  onOpenBorderTool: () => void;
+  onOpenFrameTool: () => void;
   onClearRecent: () => void;
 };
 
@@ -17,7 +17,7 @@ export function StudioHome({
   recent,
   onOpenEditor,
   onResume,
-  onOpenBorderTool,
+  onOpenFrameTool,
   onClearRecent,
 }: StudioHomeProps): React.JSX.Element {
   const { t } = useI18n();
@@ -92,19 +92,19 @@ export function StudioHome({
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <button
               type="button"
-              onClick={onOpenBorderTool}
+              onClick={onOpenFrameTool}
               className="group relative overflow-hidden rounded-xl border border-base-300 bg-base-100 p-6 text-left transition-all hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
             >
               <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-primary/10 text-primary">
                 <Frame size={22} />
               </div>
               <h3 className="text-base font-semibold text-base-content">
-                {t("studio.home.border.title", { defaultValue: "Add a Border" })}
+                {t("studio.home.frame.title", { defaultValue: "Add a Frame" })}
               </h3>
               <p className="mt-1.5 text-sm text-base-content/55">
-                {t("studio.home.border.body", {
+                {t("studio.home.frame.body", {
                   defaultValue:
-                    "Frame a photo with colored, frosted, or vignette borders — applied on top of your edits.",
+                    "Frame a photo with a camera-branded preset, or build your own border and captions.",
                 })}
               </p>
             </button>

@@ -2017,15 +2017,69 @@
       "properties": "Image Properties",
       "title": "EXIF Metadata"
     },
-    "home": {
-      "border": {
-        "body": "Frame a photo with colored, frosted, or vignette borders — applied on top of your edits.",
-        "title": "Add a Border"
+    "frame": {
+      "blur": "Blur",
+      "border": "Border",
+      "bottomExtra": "Extra at bottom",
+      "brightness": "Brightness",
+      "clear": "Remove frame",
+      "color": "Color",
+      "family": {
+        "bar": "Info bar",
+        "dual": "Dual mark",
+        "editorial": "Editorial",
+        "margin": "Margin",
+        "overlay": "On photo",
+        "vertical": "Vertical"
       },
+      "frosted": "Frosted",
+      "gradient": "Gradient",
+      "gradientAngle": "Angle",
+      "gradientFrom": "Gradient from",
+      "gradientStops": "From / to",
+      "gradientTo": "Gradient to",
+      "innerRadius": "Photo corners",
+      "noExif": "This photo has no camera EXIF, so presets that print camera details will come out sparse.",
+      "outerRadius": "Outer corners",
+      "padding": "Border width",
+      "resetBorder": "Reset border",
+      "solid": "Solid",
+      "template": {
+        "barDark": "Info Bar · Dark",
+        "barExif": "Info Bar · Settings",
+        "barFull": "Info Bar · Full",
+        "barId": "Info Bar · Model",
+        "borderStack": "White Border · Centered",
+        "cornerLogo": "Overlay · Corner Mark",
+        "cornerVertical": "Wide Margin · Vertical Settings",
+        "dualBar": "Dual Mark · Info Bar",
+        "dualStack": "Dual Mark · Centered",
+        "gallerySplit": "Gallery · Justified",
+        "magazineCover": "Magazine Cover",
+        "marginGold": "Margin · Gold",
+        "marginLogo": "Margin · Centered Mark",
+        "marginTopBottom": "Margin · Top & Bottom",
+        "overlayCorners": "Overlay · Corners",
+        "overlayExif": "Overlay · Centered",
+        "overlayMinimal": "Overlay · Settings Only",
+        "overlayStack": "Overlay · Bottom Left",
+        "overlayTop": "Overlay · Top Mark",
+        "textMargin": "Margin · Model Only",
+        "verticalLeft": "Vertical · Left Strip",
+        "verticalRight": "Vertical · Right Strip"
+      },
+      "templates": "Presets",
+      "vignette": "Vignette"
+    },
+    "home": {
       "clear": "Clear",
       "empty": {
         "body": "Open a photo from your library to start editing. Your latest work shows up here.",
         "title": "No recent edits yet"
+      },
+      "frame": {
+        "body": "Frame a photo with a camera-branded preset, or build your own border and captions.",
+        "title": "Add a Frame"
       },
       "openEditor": "Open editor",
       "recent": "Recent Edits",
@@ -2033,32 +2087,38 @@
       "tools": "Tools"
     },
     "pickPhoto": "Pick a photo to edit",
+    "tab": {
+      "develop": "Develop",
+      "frame": "Frame",
+      "text": "Text"
+    },
     "tagline": "Quick, non-destructive edits for photos already in your library.",
-    "title": "Studio",
-    "tools": {
-      "border": {
-        "apply": "Apply border",
-        "blur": "Blur",
-        "borderWidth": "Border Width",
-        "brandLogo": "{{brand}} (logo)",
-        "brandText": "{{brand}} (text)",
-        "brightness": "Brightness",
-        "clear": "Clear",
-        "color": "Color",
-        "cornerRadius": "Corner Radius",
-        "done": "Border applied",
-        "exifAuto": "Auto-filled from EXIF",
-        "exifMissing": "This style needs camera EXIF (model + at least one of focal length, aperture, shutter, ISO). It's unavailable for this photo.",
-        "hint": "Border bakes new pixels on top of your current edit. Apply to preview, then export.",
-        "modeColored": "Colored",
-        "modeFrosted": "Frosted",
-        "modeFrostedInfo": "Frosted Info",
-        "modeInfoStrip": "Info Strip",
-        "modeVignette": "Vignette",
-        "strength": "Strength"
-      },
-      "title": "Tools"
-    }
+    "text": {
+      "add": "Add text",
+      "caseLower": "aa",
+      "caseNone": "Aa",
+      "caseTitle": "Ab",
+      "caseUpper": "AA",
+      "color": "Color",
+      "content": "Text",
+      "duplicate": "Duplicate",
+      "empty": "No text yet. Add a layer, or apply a frame preset.",
+      "font": "Font",
+      "italic": "Italic",
+      "lineHeight": "Line height",
+      "newLayer": "Your text",
+      "opacity": "Opacity",
+      "outline": "Outline",
+      "positionX": "Horizontal",
+      "positionY": "Vertical",
+      "rotation": "Rotation",
+      "shadow": "Shadow",
+      "size": "Size",
+      "tracking": "Letter spacing",
+      "untitled": "Empty text",
+      "weight": "Weight"
+    },
+    "title": "Studio"
   },
   "upload": {
     "FileUploadProgress": {
@@ -2080,9 +2140,6 @@
       "failed_other": "{{count}} failed",
       "openPage": "Open upload page",
       "title": "Upload Queue"
-    },
-    "ProgressIndicator": {
-      "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
     },
     "SupportedFormatsModal": {
       "category_audio": "Audio",

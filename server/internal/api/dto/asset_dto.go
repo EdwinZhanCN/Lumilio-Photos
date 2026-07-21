@@ -297,11 +297,157 @@ type StudioEditAdjustmentsDTO struct {
 	Crop           *StudioEditCropDTO `json:"crop,omitempty"`
 }
 
+// StudioCanvasPadDTO is padding around the photo, each side a fraction of the
+// photo's SHORT edge so a landscape and a portrait frame carry equal weight.
+type StudioCanvasPadDTO struct {
+	Top    float64 `json:"top" example:"0"`
+	Right  float64 `json:"right" example:"0"`
+	Bottom float64 `json:"bottom" example:"0.18"`
+	Left   float64 `json:"left" example:"0"`
+}
+
+// StudioCanvasBackgroundDTO fills the padded area. Kind selects which fields
+// apply: "solid" uses color, "gradient" uses from/to/angle, and "frosted"
+// reproduces the photo itself blurred (blur/brightness/overscan).
+type StudioCanvasBackgroundDTO struct {
+	Kind  string `json:"kind" example:"solid"`
+	Color string `json:"color,omitempty" example:"#ffffff"`
+
+	From  string  `json:"from,omitempty" example:"#ffffff"`
+	To    string  `json:"to,omitempty" example:"#d4d4d4"`
+	Angle float64 `json:"angle,omitempty" example:"180"`
+
+	Blur       float64 `json:"blur,omitempty" example:"0.06"`
+	Brightness float64 `json:"brightness,omitempty" example:"-0.16"`
+	Overscan   float64 `json:"overscan,omitempty" example:"1.12"`
+}
+
+// StudioCanvasScrimDTO is a one-sided gradient wash over the photo that keeps
+// overlaid text readable.
+type StudioCanvasScrimDTO struct {
+	Edge   string  `json:"edge" example:"bottom"`
+	From   string  `json:"from" example:"rgba(0,0,0,0)"`
+	To     string  `json:"to" example:"rgba(0,0,0,0.5)"`
+	Height float64 `json:"height" example:"0.32"`
+}
+
+// StudioCanvasDTO is the border layer: how the photo is framed and what fills
+// the space around it.
+type StudioCanvasDTO struct {
+	Pad         StudioCanvasPadDTO        `json:"pad"`
+	Background  StudioCanvasBackgroundDTO `json:"background"`
+	OuterRadius float64                   `json:"outerRadius" example:"0"`
+	InnerRadius float64                   `json:"innerRadius" example:"0"`
+	Scrim       *StudioCanvasScrimDTO     `json:"scrim,omitempty"`
+	Vignette    float64                   `json:"vignette" example:"0"`
+}
+
+// StudioLayerShadowDTO offsets and blur are fractions of the composed output's
+// width, like every other layer measurement.
+type StudioLayerShadowDTO struct {
+	Color   string  `json:"color" example:"#000000"`
+	Opacity float64 `json:"opacity" example:"0.6"`
+	Blur    float64 `json:"blur" example:"0.006"`
+	OffsetX float64 `json:"offsetX" example:"0"`
+	OffsetY float64 `json:"offsetY" example:"0.003"`
+}
+
+// StudioLayerFillDTO is a solid or gradient paint. Kind selects which fields
+// apply.
+type StudioLayerFillDTO struct {
+	Kind    string  `json:"kind" example:"solid"`
+	Color   string  `json:"color,omitempty" example:"#ffffff"`
+	Opacity float64 `json:"opacity,omitempty" example:"1"`
+
+	From        string  `json:"from,omitempty" example:"#ffffff"`
+	To          string  `json:"to,omitempty" example:"#d2a05a"`
+	Angle       float64 `json:"angle,omitempty" example:"90"`
+	FromOpacity float64 `json:"fromOpacity,omitempty" example:"1"`
+	ToOpacity   float64 `json:"toOpacity,omitempty" example:"1"`
+}
+
+// StudioTextFontDTO sizes are fractions of the composed output's width;
+// tracking is an em fraction and lineHeight a multiplier.
+type StudioTextFontDTO struct {
+	Family     string  `json:"family" example:"Plus Jakarta Sans"`
+	Weight     int     `json:"weight" example:"400"`
+	Italic     bool    `json:"italic" example:"false"`
+	Size       float64 `json:"size" example:"0.06"`
+	Tracking   float64 `json:"tracking" example:"0"`
+	LineHeight float64 `json:"lineHeight" example:"1.2"`
+}
+
+// StudioTextStrokeDTO width is a fraction of the composed output's width.
+type StudioTextStrokeDTO struct {
+	Color string  `json:"color" example:"#000000"`
+	Width float64 `json:"width" example:"0.002"`
+}
+
+// StudioTextBackgroundPaddingDTO is padding around a text block, as fractions
+// of the font size.
+type StudioTextBackgroundPaddingDTO struct {
+	Top    float64 `json:"top" example:"0.15"`
+	Right  float64 `json:"right" example:"0.25"`
+	Bottom float64 `json:"bottom" example:"0.15"`
+	Left   float64 `json:"left" example:"0.25"`
+}
+
+// StudioTextBackgroundDTO is the block drawn behind a text layer.
+type StudioTextBackgroundDTO struct {
+	Fill    StudioLayerFillDTO             `json:"fill"`
+	Padding StudioTextBackgroundPaddingDTO `json:"padding"`
+}
+
+// StudioLayerDTO is one composition layer.
+//
+// Text and logo layers share geometry, opacity, and shadow; `type` selects
+// which of the remaining groups applies. They are modeled as one struct with
+// optional members because OpenAPI 2 has no discriminated union, and splitting
+// them into separate arrays would let a client reorder the two kinds
+// independently — but draw order is exactly what the array encodes.
+//
+// x/y locate the layer's visual CENTER as fractions of the composed output.
+type StudioLayerDTO struct {
+	ID           string                `json:"id" example:"text-lz4k2p-1"`
+	Type         string                `json:"type" example:"text"`
+	X            float64               `json:"x" example:"0.5"`
+	Y            float64               `json:"y" example:"0.9"`
+	Rotation     float64               `json:"rotation" example:"0"`
+	Opacity      float64               `json:"opacity" example:"1"`
+	Shadow       *StudioLayerShadowDTO `json:"shadow,omitempty"`
+	FromTemplate bool                  `json:"fromTemplate" example:"true"`
+
+	// Text layers.
+	Text          *string                  `json:"text,omitempty" example:"X-T5"`
+	Font          *StudioTextFontDTO       `json:"font,omitempty"`
+	TextCase      *string                  `json:"textCase,omitempty" example:"none"`
+	Align         *string                  `json:"align,omitempty" example:"center"`
+	Fill          *StudioLayerFillDTO      `json:"fill,omitempty"`
+	Stroke        *StudioTextStrokeDTO     `json:"stroke,omitempty"`
+	Background    *StudioTextBackgroundDTO `json:"background,omitempty"`
+	Underline     *bool                    `json:"underline,omitempty" example:"false"`
+	Strikethrough *bool                    `json:"strikethrough,omitempty" example:"false"`
+
+	// Logo layers.
+	Brand   *string  `json:"brand,omitempty" example:"fujifilm"`
+	Variant *string  `json:"variant,omitempty" example:"wordmark"`
+	Color   *string  `json:"color,omitempty" example:"#1a1a1a"`
+	Size    *float64 `json:"size,omitempty" example:"0.12"`
+}
+
+// LumilioSidecarV1DTO is the durable record of a Studio edit.
+//
+// Adjustments operate on the source pixels. Canvas and Layers are the
+// composition rendered around and on top of that result, never baked into it.
+// Both composition fields are additive and optional, so a sidecar written
+// before they existed is still a valid v1 document with no composition.
 type LumilioSidecarV1DTO struct {
 	Version     int                      `json:"version" example:"1"`
 	AssetID     string                   `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Source      LumilioSidecarSourceDTO  `json:"source"`
 	Adjustments StudioEditAdjustmentsDTO `json:"adjustments"`
+	Canvas      *StudioCanvasDTO         `json:"canvas,omitempty"`
+	Layers      []StudioLayerDTO         `json:"layers,omitempty"`
 	UpdatedAt   time.Time                `json:"updated_at" example:"2026-05-26T10:00:00Z"`
 }
 

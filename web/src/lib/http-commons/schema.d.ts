@@ -12379,6 +12379,8 @@ export interface components {
             adjustments?: components["schemas"]["dto.StudioEditAdjustmentsDTO"];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             asset_id?: string;
+            canvas?: components["schemas"]["dto.StudioCanvasDTO"];
+            layers?: components["schemas"]["dto.StudioLayerDTO"][];
             source?: components["schemas"]["dto.LumilioSidecarSourceDTO"];
             /** @example 2026-05-26T10:00:00Z */
             updated_at?: string;
@@ -13064,6 +13066,55 @@ export interface components {
         "dto.StartCloudImportResponse": {
             run?: components["schemas"]["dto.CloudImportRunDTO"];
         };
+        "dto.StudioCanvasBackgroundDTO": {
+            /** @example 180 */
+            angle?: number;
+            /** @example 0.06 */
+            blur?: number;
+            /** @example -0.16 */
+            brightness?: number;
+            /** @example #ffffff */
+            color?: string;
+            /** @example #ffffff */
+            from?: string;
+            /** @example solid */
+            kind?: string;
+            /** @example 1.12 */
+            overscan?: number;
+            /** @example #d4d4d4 */
+            to?: string;
+        };
+        "dto.StudioCanvasDTO": {
+            background?: components["schemas"]["dto.StudioCanvasBackgroundDTO"];
+            /** @example 0 */
+            innerRadius?: number;
+            /** @example 0 */
+            outerRadius?: number;
+            pad?: components["schemas"]["dto.StudioCanvasPadDTO"];
+            scrim?: components["schemas"]["dto.StudioCanvasScrimDTO"];
+            /** @example 0 */
+            vignette?: number;
+        };
+        "dto.StudioCanvasPadDTO": {
+            /** @example 0.18 */
+            bottom?: number;
+            /** @example 0 */
+            left?: number;
+            /** @example 0 */
+            right?: number;
+            /** @example 0 */
+            top?: number;
+        };
+        "dto.StudioCanvasScrimDTO": {
+            /** @example bottom */
+            edge?: string;
+            /** @example rgba(0,0,0,0) */
+            from?: string;
+            /** @example 0.32 */
+            height?: number;
+            /** @example rgba(0,0,0,0.5) */
+            to?: string;
+        };
         "dto.StudioEditAdjustmentsDTO": {
             /** @example 0 */
             blacks?: number;
@@ -13108,6 +13159,115 @@ export interface components {
             x?: number;
             /** @example 0 */
             y?: number;
+        };
+        "dto.StudioLayerDTO": {
+            /** @example center */
+            align?: string;
+            background?: components["schemas"]["dto.StudioTextBackgroundDTO"];
+            /**
+             * @description Logo layers.
+             * @example fujifilm
+             */
+            brand?: string;
+            /** @example #1a1a1a */
+            color?: string;
+            fill?: components["schemas"]["dto.StudioLayerFillDTO"];
+            font?: components["schemas"]["dto.StudioTextFontDTO"];
+            /** @example true */
+            fromTemplate?: boolean;
+            /** @example text-lz4k2p-1 */
+            id?: string;
+            /** @example 1 */
+            opacity?: number;
+            /** @example 0 */
+            rotation?: number;
+            shadow?: components["schemas"]["dto.StudioLayerShadowDTO"];
+            /** @example 0.12 */
+            size?: number;
+            /** @example false */
+            strikethrough?: boolean;
+            stroke?: components["schemas"]["dto.StudioTextStrokeDTO"];
+            /**
+             * @description Text layers.
+             * @example X-T5
+             */
+            text?: string;
+            /** @example none */
+            textCase?: string;
+            /** @example text */
+            type?: string;
+            /** @example false */
+            underline?: boolean;
+            /** @example wordmark */
+            variant?: string;
+            /** @example 0.5 */
+            x?: number;
+            /** @example 0.9 */
+            y?: number;
+        };
+        "dto.StudioLayerFillDTO": {
+            /** @example 90 */
+            angle?: number;
+            /** @example #ffffff */
+            color?: string;
+            /** @example #ffffff */
+            from?: string;
+            /** @example 1 */
+            fromOpacity?: number;
+            /** @example solid */
+            kind?: string;
+            /** @example 1 */
+            opacity?: number;
+            /** @example #d2a05a */
+            to?: string;
+            /** @example 1 */
+            toOpacity?: number;
+        };
+        "dto.StudioLayerShadowDTO": {
+            /** @example 0.006 */
+            blur?: number;
+            /** @example #000000 */
+            color?: string;
+            /** @example 0 */
+            offsetX?: number;
+            /** @example 0.003 */
+            offsetY?: number;
+            /** @example 0.6 */
+            opacity?: number;
+        };
+        "dto.StudioTextBackgroundDTO": {
+            fill?: components["schemas"]["dto.StudioLayerFillDTO"];
+            padding?: components["schemas"]["dto.StudioTextBackgroundPaddingDTO"];
+        };
+        "dto.StudioTextBackgroundPaddingDTO": {
+            /** @example 0.15 */
+            bottom?: number;
+            /** @example 0.25 */
+            left?: number;
+            /** @example 0.25 */
+            right?: number;
+            /** @example 0.15 */
+            top?: number;
+        };
+        "dto.StudioTextFontDTO": {
+            /** @example Plus Jakarta Sans */
+            family?: string;
+            /** @example false */
+            italic?: boolean;
+            /** @example 1.2 */
+            lineHeight?: number;
+            /** @example 0.06 */
+            size?: number;
+            /** @example 0 */
+            tracking?: number;
+            /** @example 400 */
+            weight?: number;
+        };
+        "dto.StudioTextStrokeDTO": {
+            /** @example #000000 */
+            color?: string;
+            /** @example 0.002 */
+            width?: number;
         };
         "dto.SystemSettingsDTO": {
             backup?: components["schemas"]["dto.BackupSettingsDTO"];
