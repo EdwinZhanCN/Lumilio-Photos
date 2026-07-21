@@ -24,7 +24,7 @@ export function StudioEditMvp(): React.JSX.Element {
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<StudioView>("home");
   const [assetId, setAssetId] = useState<string | null>(() => searchParams.get("assetId"));
-  const [focusBorder, setFocusBorder] = useState(false);
+  const [focusFrame, setFocusFrame] = useState(false);
   const [recent, setRecent] = useState<RecentEditRecord[]>(() => readRecentEdits());
 
   // If provided via search param, skip to editor
@@ -36,13 +36,13 @@ export function StudioEditMvp(): React.JSX.Element {
     }
   }, [searchParams]);
 
-  const openPicker = useCallback((withBorder: boolean) => {
-    setFocusBorder(withBorder);
+  const openPicker = useCallback((withFrame: boolean) => {
+    setFocusFrame(withFrame);
     setView("picker");
   }, []);
 
   const resume = useCallback((id: string) => {
-    setFocusBorder(false);
+    setFocusFrame(false);
     setAssetId(id);
     setView("editor");
   }, []);
@@ -74,7 +74,7 @@ export function StudioEditMvp(): React.JSX.Element {
         <StudioEditor
           key={assetId}
           assetId={assetId}
-          focusBorder={focusBorder}
+          focusFrame={focusFrame}
           onBack={() => setView("home")}
           onActivity={handleActivity}
         />
@@ -115,7 +115,7 @@ export function StudioEditMvp(): React.JSX.Element {
       <StudioHome
         recent={recent}
         onOpenEditor={() => openPicker(false)}
-        onOpenBorderTool={() => openPicker(true)}
+        onOpenFrameTool={() => openPicker(true)}
         onResume={resume}
         onClearRecent={handleClearRecent}
       />

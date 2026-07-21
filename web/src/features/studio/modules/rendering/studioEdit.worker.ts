@@ -3,8 +3,19 @@ import {
   normalizeStudioAdjustments,
   type StudioEditAdjustments,
 } from "../../model/editTypes";
+import { composeStudioImage, type Composition } from "./composeStudioImage";
+import { ensureStudioFontsLoaded } from "./fonts/loadStudioFonts";
 
 type RenderEngine = "webgpu" | "webgl2" | "wasm-cpu" | "canvas-2d";
+
+/**
+ * Rasterized brand marks, keyed as `renderLayers` looks them up.
+ *
+ * The worker cannot decode SVG (no `Image`), so the main thread rasterizes and
+ * transfers bitmaps here via SET_LOGOS. They persist across renders because a
+ * template's marks do not change while the user drags a slider.
+ */
+let logoImages = new Map<string, ImageBitmap>();
 
 type LoadImageMessage = {
   type: "LOAD_IMAGE";
@@ -33,6 +44,7 @@ type RenderPreviewMessage = {
   payload: {
     requestId: number;
     adjustments: Partial<StudioEditAdjustments>;
+    composition?: Composition;
     previewMaxSize?: number;
   };
 };
@@ -42,9 +54,19 @@ type ExportImageMessage = {
   payload: {
     requestId: number;
     adjustments: Partial<StudioEditAdjustments>;
+    composition?: Composition;
     format: "image/jpeg" | "image/png" | "image/webp";
     quality: number;
     maxSize?: number;
+  };
+};
+
+/** Hands over brand marks the main thread rasterized. Bitmaps are transferred. */
+type SetLogosMessage = {
+  type: "SET_LOGOS";
+  payload: {
+    requestId: number;
+    logos: Array<[string, ImageBitmap]>;
   };
 };
 
@@ -52,7 +74,8 @@ type WorkerMessage =
   | LoadImageMessage
   | LoadImageDataMessage
   | RenderPreviewMessage
-  | ExportImageMessage;
+  | ExportImageMessage
+  | SetLogosMessage;
 
 type ProcessedImage = {
   data: Uint8ClampedArray;
@@ -1000,17 +1023,13 @@ async function processWithBestBackend(
   return processWithWasmCpu(imageData, adjustments);
 }
 
-async function processedImageToBlob(
-  processed: ProcessedImage,
-  format: "image/jpeg" | "image/png" | "image/webp",
-  quality: number,
-): Promise<Blob> {
+function processedImageToCanvas(processed: ProcessedImage): OffscreenCanvas {
   const canvas = new OffscreenCanvas(processed.width, processed.height);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2D canvas is not available for Studio export");
   const imageDataBytes = new Uint8ClampedArray(processed.data) as Uint8ClampedArray<ArrayBuffer>;
   ctx.putImageData(new ImageData(imageDataBytes, processed.width, processed.height), 0, 0);
-  return canvas.convertToBlob({ type: format, quality });
+  return canvas;
 }
 
 async function canvasToBlob(
@@ -1021,12 +1040,11 @@ async function canvasToBlob(
   return canvas.convertToBlob({ type: format, quality });
 }
 
-async function renderImage(
+/** Apply adjustments and return the developed pixels, before composition. */
+async function renderDeveloped(
   adjustmentsInput: Partial<StudioEditAdjustments> | undefined,
   maxSize: number,
-  format: "image/jpeg" | "image/png" | "image/webp",
-  quality: number,
-): Promise<{ blob: Blob; width: number; height: number; engine: RenderEngine }> {
+): Promise<{ canvas: OffscreenCanvas; engine: RenderEngine }> {
   const source = sourceImageData ?? sourceBitmap;
   if (!source) {
     throw new Error("No source image loaded");
@@ -1035,23 +1053,40 @@ async function renderImage(
   const adjustments = normalizeStudioAdjustments(adjustmentsInput ?? DEFAULT_STUDIO_ADJUSTMENTS);
   if (!hasPhotometricAdjustments(adjustments)) {
     const rendered = drawSourceCanvas(source, adjustments, maxSize);
-    const blob = await canvasToBlob(rendered.canvas, format, quality);
-    return {
-      blob,
-      width: rendered.width,
-      height: rendered.height,
-      engine: "canvas-2d",
-    };
+    return { canvas: rendered.canvas, engine: "canvas-2d" };
   }
 
   const renderSourceImageData = drawSourceImageData(source, adjustments, maxSize);
   const processed = await processWithBestBackend(renderSourceImageData, adjustments);
-  const blob = await processedImageToBlob(processed, format, quality);
+  return { canvas: processedImageToCanvas(processed), engine: processed.engine };
+}
+
+async function renderImage(
+  adjustmentsInput: Partial<StudioEditAdjustments> | undefined,
+  composition: Composition | undefined,
+  maxSize: number,
+  format: "image/jpeg" | "image/png" | "image/webp",
+  quality: number,
+): Promise<{ blob: Blob; width: number; height: number; engine: RenderEngine }> {
+  const developed = await renderDeveloped(adjustmentsInput, maxSize);
+
+  // Fonts are only needed once something actually draws text, so the ~3.7 MB
+  // font chunk stays unfetched for a plain develop-only edit.
+  const hasText = composition?.layers.some((layer) => layer.type === "text") ?? false;
+  if (hasText) {
+    await ensureStudioFontsLoaded();
+  }
+
+  const composed = composition
+    ? composeStudioImage(developed.canvas, composition, logoImages)
+    : developed.canvas;
+
+  const blob = await canvasToBlob(composed, format, quality);
   return {
     blob,
-    width: processed.width,
-    height: processed.height,
-    engine: processed.engine,
+    width: composed.width,
+    height: composed.height,
+    engine: developed.engine,
   };
 }
 
@@ -1072,8 +1107,11 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       );
       sourceOriginalWidth = sourceBitmap.width;
       sourceOriginalHeight = sourceBitmap.height;
+      // Load renders the developed photo only; the editor follows up with
+      // RENDER_PREVIEW once it knows the composition.
       const result = await renderImage(
         message.payload.adjustments,
+        undefined,
         message.payload.previewMaxSize ?? 1800,
         "image/jpeg",
         0.9,
@@ -1101,8 +1139,11 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       sourceImageData = message.payload.imageData;
       sourceOriginalWidth = message.payload.originalWidth;
       sourceOriginalHeight = message.payload.originalHeight;
+      // Load renders the developed photo only; the editor follows up with
+      // RENDER_PREVIEW once it knows the composition.
       const result = await renderImage(
         message.payload.adjustments,
+        undefined,
         message.payload.previewMaxSize ?? 1800,
         "image/jpeg",
         0.9,
@@ -1122,9 +1163,17 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       return;
     }
 
+    if (message.type === "SET_LOGOS") {
+      for (const bitmap of logoImages.values()) bitmap.close();
+      logoImages = new Map(message.payload.logos);
+      self.postMessage({ type: "LOGOS_SET", payload: { requestId } });
+      return;
+    }
+
     if (message.type === "RENDER_PREVIEW") {
       const result = await renderImage(
         message.payload.adjustments,
+        message.payload.composition,
         message.payload.previewMaxSize ?? 1800,
         "image/jpeg",
         0.9,
@@ -1139,6 +1188,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
     if (message.type === "EXPORT_IMAGE") {
       const result = await renderImage(
         message.payload.adjustments,
+        message.payload.composition,
         message.payload.maxSize ?? 8192,
         message.payload.format,
         message.payload.quality,
