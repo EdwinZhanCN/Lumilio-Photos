@@ -68,6 +68,32 @@ jobs:
 
             - run: make server-test
 
+    # Repository path handling is the one part of the server whose behaviour is
+    # genuinely platform-specific: drive letters, case-insensitive NTFS, and
+    # backslash separators all change what a "same path" comparison means, and
+    # getting it wrong duplicates repositories.path rows. Windows desktop is a
+    # release target, so this must be a real gate rather than a probe.
+    #
+    # internal/storage is CGo-free, so this needs no msys2/libvips toolchain.
+    server-windows:
+        name: server storage (windows)
+        needs: changes
+        if: needs.changes.outputs.server == 'true'
+        runs-on: windows-2025
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: server/go.sum
+
+            - name: Test repository path handling
+              working-directory: server
+              env:
+                  CGO_ENABLED: '0'
+              run: go test ./internal/storage/...
+
     web:
         name: web (make web-test)
         needs: changes
@@ -186,15 +212,18 @@ jobs:
                   go clean -cache
                   make desktop-test
 
-    # W4 signal gathering: can the desktop module (server CGo: libvips+libraw)
-    # compile on Windows with the MSYS2/mingw-w64 toolchain? Experimental —
-    # failures do not block the gate.
+    # Can the desktop module (server CGo: libvips+libraw) compile on Windows with
+    # the MSYS2/mingw-w64 toolchain? Windows desktop is a release-v1 target, so a
+    # regression here has to block rather than be discovered at release time.
+    #
+    # This job depends on an external toolchain (msys2 package availability), so
+    # if it starts failing for reasons unrelated to a change, fix or pin the
+    # toolchain — do not quietly restore continue-on-error.
     desktop-windows:
-        name: desktop windows (experimental CGo)
+        name: desktop windows (CGo)
         needs: changes
         if: needs.changes.outputs.desktop == 'true'
         runs-on: windows-2025
-        continue-on-error: true
         steps:
             - uses: actions/checkout@v7
 

@@ -11,6 +11,7 @@ describe("normalizeRepositoryOptions", () => {
             name: "Primary",
             path: "/photos/primary",
             role: "primary",
+            status: "offline",
             is_primary: false,
           },
           {
@@ -25,6 +26,7 @@ describe("normalizeRepositoryOptions", () => {
         name: "Primary",
         path: "/photos/primary",
         role: "primary",
+        status: "offline",
         isPrimary: true,
       },
       {
@@ -32,9 +34,18 @@ describe("normalizeRepositoryOptions", () => {
         name: "",
         path: "",
         role: "regular",
+        status: "active",
         isPrimary: true,
       },
     ]);
+  });
+
+  it("falls back to active for a missing or unrecognized status, so uploads are not blocked", () => {
+    expect(
+      normalizeRepositoryOptions({
+        repositories: [{ id: "no-status" }, { id: "bogus", status: "wat" as never }],
+      }).map((repository) => repository.status),
+    ).toEqual(["active", "active"]);
   });
 
   it("returns an empty list when the response has no repositories", () => {

@@ -189,6 +189,14 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	stagingManager := storage.NewStagingManager()
 	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
 
+	// Drives get unplugged, remounted, and replaced while the server is down.
+	// Re-check every repository's recorded path before anything schedules work
+	// against it. Unreachable repositories become offline rather than failing
+	// mid-scan.
+	if err := repoManager.ReconcileAll(ctx); err != nil {
+		appLogger.Warn("failed to reconcile repositories", zap.Error(err))
+	}
+
 	workers := river.NewWorkers()
 	queueClient, err := queue.New(pgxPool, workers, logRuntime.RiverLogger())
 	if err != nil {

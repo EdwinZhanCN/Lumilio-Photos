@@ -66,7 +66,7 @@ func TestValidateRepository(t *testing.T) {
 
 func TestIsNestedRepository(t *testing.T) {
 	manager, _ := NewRepositoryManager(nil, zap.NewNop(), nil) // Using nil for tests since we're not testing DB operations
-	testDir := t.TempDir()
+	testDir := canonicalTempDir(t)
 
 	// Create parent repository
 	parentRepo := filepath.Join(testDir, "parent")
@@ -100,7 +100,7 @@ func TestIsNestedRepository(t *testing.T) {
 func TestRepositoryWorkflow_Integration(t *testing.T) {
 	manager, _ := NewRepositoryManager(nil, zap.NewNop(), nil) // Using nil for tests since we're not testing DB operations
 	dirManager := NewDirectoryManager()
-	testRoot := t.TempDir()
+	testRoot := canonicalTempDir(t)
 
 	// Create multiple test repositories
 	repos := []struct {

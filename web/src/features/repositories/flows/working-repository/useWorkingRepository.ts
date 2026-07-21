@@ -3,6 +3,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import type { RepositoryOption } from "../../types";
 import { getRepositoryDisplayName } from "../../model/repositoryDisplayName";
+import { isRepositoryOffline } from "../../model/repositoryOptions";
 import { useRepositoryOptions } from "../../api/useRepositoryOptions";
 
 export function useWorkingRepository() {
@@ -37,9 +38,13 @@ export function useWorkingRepository() {
       return;
     }
 
-    const primary = repositories.find((repository) => repository.isPrimary) ?? repositories[0];
-    if (primary && normalizedWorkingRepositoryId !== primary.id) {
-      setWorkingRepositoryId(primary.id);
+    // Auto-selecting an unreachable repository as the upload target guarantees
+    // the next upload is refused, so only fall back to a reachable one. An
+    // explicit user choice is left alone even when it goes offline.
+    const reachable = repositories.filter((repository) => !isRepositoryOffline(repository));
+    const fallback = reachable.find((repository) => repository.isPrimary) ?? reachable[0];
+    if (fallback && normalizedWorkingRepositoryId !== fallback.id) {
+      setWorkingRepositoryId(fallback.id);
     }
   }, [
     repositoriesQuery.isSuccess,

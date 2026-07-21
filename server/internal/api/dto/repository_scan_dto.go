@@ -3,7 +3,11 @@ package dto
 import "time"
 
 type CreateRepositoryRequestDTO struct {
-	Name              string `json:"name" binding:"required" example:"Family Photos"`
+	Name string `json:"name" binding:"required" example:"Family Photos"`
+	// Path is an absolute on-disk location for the repository. It is only
+	// accepted by deployments whose path policy allows free placement (desktop);
+	// a server rejects it and places the repository under its storage root.
+	Path              string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
 	Role              string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
 	StorageStrategy   string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
 	DuplicateHandling string `json:"duplicate_handling,omitempty" binding:"omitempty,oneof=rename uuid overwrite" example:"rename"`
@@ -37,9 +41,25 @@ type ListRepositoriesResponseDTO struct {
 }
 
 type CreateRepositoryResponseDTO struct {
-	Repository       RepositoryDTO `json:"repository"`
-	CloudImportRunID *string       `json:"cloud_import_run_id,omitempty"`
-	CloudImportError *string       `json:"cloud_import_error,omitempty"`
+	Repository RepositoryDTO `json:"repository"`
+	// Warnings are non-fatal notes about the chosen location, such as it being
+	// inside a cloud-sync folder. The repository was created regardless.
+	Warnings         []string `json:"warnings,omitempty"`
+	CloudImportRunID *string  `json:"cloud_import_run_id,omitempty"`
+	CloudImportError *string  `json:"cloud_import_error,omitempty"`
+}
+
+// RepositoryConflictDTO describes a repository whose identity is already
+// registered at a different path, and the two actions that resolve it.
+type RepositoryConflictDTO struct {
+	RepositoryID   string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RegisteredPath string `json:"registered_path" example:"/Volumes/OldDrive/Photos"`
+	RequestedPath  string `json:"requested_path" example:"/Volumes/NewDrive/Photos"`
+}
+
+// RelocateRepositoryRequestDTO points an existing repository at a new location.
+type RelocateRepositoryRequestDTO struct {
+	Path string `json:"path" binding:"required" example:"/Volumes/NewDrive/Photos"`
 }
 
 type RepositoryScanRequestDTO struct {

@@ -24,19 +24,30 @@ var (
 // DuplicateHandling are optional; empty values fall back to the storage-owned
 // repository defaults.
 type CreateRepositorySpec struct {
-	Name              string
-	Role              dbtypes.RepoRole
-	Root              string
+	Name string
+	Role dbtypes.RepoRole
+	Root string
+	// Path is the caller-requested absolute location. Only FreePolicy honours
+	// it; RootedPolicy rejects a non-empty Path rather than silently placing the
+	// repository somewhere else.
+	Path              string
 	OwnerID           *int32
 	StorageStrategy   string
 	DuplicateHandling string
+}
+
+// CreateRepositoryResult carries the created repository plus any non-fatal
+// warnings the path policy raised about its location.
+type CreateRepositoryResult struct {
+	Repository *repo.Repository
+	Warnings   []string
 }
 
 // CreateRepository is the single entry point for creating (or registering) a
 // repository: it enforces the primary-first / single-primary policy, resolves a
 // path inside Root, applies repository defaults, and either registers an
 // existing on-disk repository or initializes a new one.
-func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*CreateRepositoryResult, error) {
 	role := normalizeRepoRole(spec.Role)
 
 	primaryExists, err := rm.primaryRepositoryExists(ctx)
@@ -50,7 +61,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		return nil, ErrPrimaryRepositoryRequired
 	}
 
-	repoPath, err := resolveRepositoryCreatePath(spec.Root, spec.Name, role)
+	repoPath, warnings, err := pathPolicyForRole(rm.pathPolicy(), role, spec).ResolveCreatePath(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +70,11 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 	}
 
 	if repocfg.IsRepositoryRoot(repoPath) {
-		return rm.AddRepository(repoPath, spec.OwnerID, role)
+		dbRepo, err := rm.AddRepository(repoPath, spec.OwnerID, role)
+		if err != nil {
+			return nil, err
+		}
+		return &CreateRepositoryResult{Repository: dbRepo, Warnings: warnings}, nil
 	}
 
 	defaults, err := rm.GetRepositoryDefaults(ctx)
@@ -71,7 +86,21 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		repocfg.WithStorageStrategy(firstNonEmpty(spec.StorageStrategy, defaults.Strategy, "date")),
 		repocfg.WithLocalSettings(firstNonEmpty(spec.DuplicateHandling, defaults.DuplicateHandling, "rename")),
 	)
-	return rm.InitializeRepository(repoPath, *cfg, spec.OwnerID, role)
+	dbRepo, err := rm.InitializeRepository(repoPath, *cfg, spec.OwnerID, role)
+	if err != nil {
+		return nil, err
+	}
+	return &CreateRepositoryResult{Repository: dbRepo, Warnings: warnings}, nil
+}
+
+// pathPolicy returns the configured policy, defaulting to RootedPolicy so a
+// deployment that has not opted into free placement cannot accidentally accept
+// caller-supplied paths.
+func (rm *DefaultRepositoryManager) pathPolicy() PathPolicy {
+	if rm.policy == nil {
+		return RootedPolicy{}
+	}
+	return rm.policy
 }
 
 // EnsurePrimaryRepository idempotently ensures a primary repository exists at
@@ -80,12 +109,16 @@ func (rm *DefaultRepositoryManager) EnsurePrimaryRepository(ctx context.Context,
 	if existing, err := rm.queries.GetPrimaryRepository(ctx); err == nil {
 		return &existing, nil
 	}
-	return rm.CreateRepository(ctx, CreateRepositorySpec{
+	result, err := rm.CreateRepository(ctx, CreateRepositorySpec{
 		Name:    "Primary Storage",
 		Role:    dbtypes.RepoRolePrimary,
 		Root:    root,
 		OwnerID: ownerID,
 	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Repository, nil
 }
 
 func (rm *DefaultRepositoryManager) primaryRepositoryExists(ctx context.Context) (bool, error) {
@@ -104,7 +137,7 @@ func resolveRepositoryCreatePath(root, name string, role dbtypes.RepoRole) (stri
 	if trimmed == "" {
 		return "", errors.New("storage root is not configured")
 	}
-	cleanRoot, err := filepath.Abs(filepath.Clean(trimmed))
+	cleanRoot, err := CanonicalizeRepositoryPath(trimmed)
 	if err != nil {
 		return "", fmt.Errorf("invalid storage root: %w", err)
 	}
