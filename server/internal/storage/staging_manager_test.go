@@ -34,7 +34,7 @@ func TestStagingManager_BasicOperations(t *testing.T) {
 		// Verify file exists in staging
 		_, err = os.Stat(stagingFile.Path)
 		assert.NoError(t, err)
-		assert.Contains(t, stagingFile.Path, DefaultStructure.IncomingDir)
+		assert.Equal(t, filepath.Join(testDir, DefaultStructure.IncomingDir), filepath.Dir(stagingFile.Path))
 	})
 
 	t.Run("commit staging file to custom path", func(t *testing.T) {

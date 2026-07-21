@@ -87,7 +87,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	if err != nil {
 		return fmt.Errorf("initialize logger: %w", err)
 	}
-	defer logRuntime.Sync()
+	defer logRuntime.Close()
 	restoreStdLog := logging.RedirectStandardLog(logRuntime.Named("stdlib"))
 	defer restoreStdLog()
 

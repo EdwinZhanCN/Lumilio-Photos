@@ -92,6 +92,9 @@ func (p *Paths) EnsureDirs() error {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}
+		if err := applyPrivateDirectoryMode(dir); err != nil {
+			return fmt.Errorf("protect %s: %w", dir, err)
+		}
 	}
 	return nil
 }

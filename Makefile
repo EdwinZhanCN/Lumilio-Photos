@@ -42,7 +42,7 @@ COMPOSE = $(if $(COMPOSE_BIN),$(COMPOSE_BIN) -f $(COMPOSE_FILE) -p $(COMPOSE_PRO
 
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
-.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test dto db db-reset dev-reset clean \
+.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test dto db db-reset dev-reset \
 	desktop-dev desktop-build desktop-test desktop-panel \
 	.server-config .server-secret .web-env
 
@@ -127,14 +127,10 @@ db-reset:
 
 dev-reset: db-reset
 	@echo "==> Removing incompatible pre-manifest local state"
+	rm -f $(WEB_DIR)/.env.development
 	rm -f $(SERVER_CONFIG_LOCAL)
 	rm -rf $(SERVER_DIR)/config/.secrets $(SERVER_DIR)/data
 	$(MAKE) .server-config .server-secret
-
-clean:
-	@echo "==> Cleaning generated local development state"
-	rm -f $(WEB_DIR)/.env.development
-	rm -rf $(SERVER_DIR)/data
 
 .server-config:
 	@if [ ! -f "$(SERVER_CONFIG_LOCAL)" ]; then \

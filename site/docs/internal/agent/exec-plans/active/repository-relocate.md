@@ -298,16 +298,77 @@ Both fixes are covered by platform-independent tests
 (`TestCloudSyncProviderMatchesBothSeparators`,
 `TestCanonicalVolumeNameUppercasesDriveLetter`) that run on the existing CI.
 
-CI now covers the automated half. A new `server-windows` job runs
-`go test ./internal/storage/...` on `windows-2025` as a blocking gate; the
-package is CGo-free, so it needs no MSYS2/libvips toolchain and stays fast.
-`desktop-windows` lost its `continue-on-error`, making the mingw64 CGo compile
-blocking as well — if that job starts failing for toolchain reasons rather than
-code reasons, pin or fix the toolchain instead of quietly restoring the flag.
+Enabling the job then surfaced four more defects, none introduced by this work —
+`internal/storage` had simply been written against POSIX semantics and never
+executed on Windows:
 
-The storage tests have never actually been executed on Windows, only
-cross-compiled (`GOOS=windows go vet` and `go test -c` both pass). The first run
-of `server-windows` is therefore itself an experiment; a failure there is
+- **`filepath.IsAbs` is the wrong containment check.** It answers false on
+  Windows for a rooted-but-driveless path like `/etc/passwd`, because Go
+  requires a volume there. `CleanWorkspacePath` (the scanner's workspace guard),
+  `CommitStagingFile`, and the discover task's relative-path check therefore let
+  exactly the paths they exist to stop through. Replaced by `IsRootedPath`,
+  which also catches `C:foo` and UNC paths, and whose rules are applied
+  uniformly rather than switching on `GOOS` so they stay testable off Windows.
+  `IsProtectedPath` is deliberately unchanged: it branches rather than rejects,
+  and the undetected case joins under the repository root, which is the safe
+  direction.
+- **Directory handles were leaked.** Both `checkDirectoryPermissions`
+  implementations called `os.Open` and discarded the handle. On Unix that is an
+  fd leak; on Windows an open handle to a directory blocks its deletion, which
+  is what made repository and test temp directories undeletable.
+- **Permission hardening did nothing on Windows.** Windows has no POSIX mode
+  bits, and `os.Chmod` there only toggles the read-only attribute, so
+  `MkdirAll(dir, 0o700)` and `Chmod(dir, 0o700)` left the storage root's
+  `.secrets` and `.cloud` — and a repository's staging and temp trees — readable
+  by every account on the machine. This is the security-relevant one, since the
+  database bootstrap secret lives under `.secrets`. `applyDirectoryMode` now
+  splits by platform: `os.Chmod` on Unix, and on Windows an explicit DACL
+  granting only the current user, LocalSystem and Administrators, with
+  `PROTECTED_DACL_SECURITY_INFORMATION` severing inheritance so a permissive
+  ancestor cannot widen it. World-readable modes (0755) are left to the
+  inherited default.
+- **Per-repository audit logs were never closed.** `newRollingWriter` returned
+  `*lumberjack.Logger` as `io.Writer`, discarding the only handle that could
+  close the file, and the provider caches one logger per repository path without
+  eviction. Two fallbacks were worse, building a throwaway provider per call
+  whenever the field was nil. The provider now exposes `Close`, wired into
+  `app.Run`, and an unconfigured value returns the noop logger.
+
+Tests that asserted POSIX specifics were rewritten to assert the *property*
+instead, through build-tagged helpers: `requireDirectoryIsPrivate` checks the
+mode on Unix and a protected DACL on Windows, and `unwritableDir` /
+`invalidStructurePath` supply platform-appropriate fixtures.
+
+The Windows-only code path is verified locally by cross-compilation
+(`GOOS=windows go vet ./internal/storage/...`, which type-checks tests too) and
+then natively by the Windows Desktop CI job. The cross-built amd64 storage test
+binary has also been executed successfully on Windows 11 ARM64 under Parallels
+(x64 emulation), exercising the real Windows filesystem and DACL APIs.
+
+CI now covers the automated half as part of the shipped product boundary.
+macOS and Windows are Desktop App targets, not standalone Server deployments,
+but the App hosts the complete `server/app` runtime in-process. Their two
+Desktop jobs therefore mirror the same scope: full `server` tests, full
+`desktop` tests, and a native CGo build. The earlier storage-only
+`server-windows` job was folded into that broader Windows gate. Linux remains
+the standalone Server test platform. Windows also lost its former
+`continue-on-error`; if the job starts failing for toolchain reasons rather
+than code reasons, pin or fix the toolchain instead of quietly restoring it.
+
+The first broader Windows probe immediately found more POSIX assumptions: a
+staging assertion compared a native path with a slash-delimited fragment,
+backup tool discovery created `pg_dump` instead of `pg_dump.exe`, the config
+fixture treated `/opt/ffprobe` as absolute, private-file assertions inspected
+POSIX mode bits, and global rolling log writers had no close path. The fixtures
+now express platform-independent properties; filesystem privacy uses POSIX
+modes on Unix and protected DACLs on Windows; and the global logging runtime
+owns and closes its lumberjack writers. Cross-built Windows binaries for
+storage, logging, config loading, backup, secret initialization, and the shared
+filesystem-privacy package all pass in the Parallels VM.
+
+The complete Server and Desktop suites have not yet run on Windows with CGo;
+the VM does not have the MSYS2/libvips/libraw development toolchain. The first
+full Windows Desktop CI run is therefore still an experiment, and a failure is
 information we do not currently have, not necessarily a regression. Two known
 risks: `os.Symlink` needs Developer Mode or elevation on Windows (the two
 symlink tests self-skip), and 8.3 short paths in the runner's temp directory
@@ -323,8 +384,9 @@ Two Windows behaviours remain unverified and need a real machine:
   junctions/reparse points, are assumed to behave like the APFS path but have
   never been run.
 
-Making `desktop-windows` non-experimental and adding `go test ./internal/storage/...`
-to it would cover the automated half cheaply; that is not done here.
+The remaining platform-behaviour checks belong on real machines or in packaged
+App smoke tests rather than in a separately supported Windows/macOS standalone
+Server path.
 
 Manual integration run against a live server and database (macOS, 2026-07-21),
 all passing:
@@ -370,5 +432,6 @@ Still outstanding:
 - `/Volumes/Name 1` remount: the helper canonicalizes such a path fine, but
   macOS assigns the suffixed name at mount time, so it needs the real
   unplug/remount test, not a unit test.
-- `make desktop-test` and a manual TCC durability run per step 2.
+- A manual TCC durability run per step 2 (`make desktop-test` now passes on
+  macOS).
 - Step 6 desktop UI, and the free-path input it carries.

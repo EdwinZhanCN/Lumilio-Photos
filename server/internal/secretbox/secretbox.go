@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"server/platform/fsprivacy"
 )
 
 // Box encrypts and decrypts small application secrets with a scoped key.
@@ -110,6 +112,9 @@ func LoadOrCreateLumilioSecretKey(configuredPath string) (string, error) {
 		if secret == "" {
 			return "", fmt.Errorf("LUMILIO secret key file is empty: %s", keyFile)
 		}
+		if err := fsprivacy.ApplyFileMode(keyFile, 0o600); err != nil {
+			return "", fmt.Errorf("protect LUMILIO secret key: %w", err)
+		}
 		return secret, nil
 	case errors.Is(err, os.ErrNotExist):
 	default:
@@ -118,6 +123,9 @@ func LoadOrCreateLumilioSecretKey(configuredPath string) (string, error) {
 
 	if err := os.MkdirAll(filepath.Dir(keyFile), 0o700); err != nil {
 		return "", fmt.Errorf("create secret key directory: %w", err)
+	}
+	if err := fsprivacy.ApplyDirectoryMode(filepath.Dir(keyFile), 0o700); err != nil {
+		return "", fmt.Errorf("protect secret key directory: %w", err)
 	}
 
 	random := make([]byte, 32)
@@ -128,6 +136,9 @@ func LoadOrCreateLumilioSecretKey(configuredPath string) (string, error) {
 	secret := fmt.Sprintf("%x", random)
 	if err := os.WriteFile(keyFile, []byte(secret+"\n"), 0o600); err != nil {
 		return "", fmt.Errorf("persist LUMILIO secret key: %w", err)
+	}
+	if err := fsprivacy.ApplyFileMode(keyFile, 0o600); err != nil {
+		return "", fmt.Errorf("protect LUMILIO secret key: %w", err)
 	}
 
 	return secret, nil
