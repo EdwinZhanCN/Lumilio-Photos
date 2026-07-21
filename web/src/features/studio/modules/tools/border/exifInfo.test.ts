@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { cameraLabel, extractBorderExif, hasSufficientExif, shootingParams } from "./exifInfo";
 import { brandDisplayName, matchBrandKey } from "./logoAssets";
 

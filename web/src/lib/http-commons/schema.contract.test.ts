@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import type { components, paths } from "./schema.d.ts";
 
 type LoginBody = paths["/api/v1/auth/login"]["post"]["requestBody"]["content"]["application/json"];

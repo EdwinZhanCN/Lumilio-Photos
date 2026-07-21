@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { usePreferencesStore } from "@/lib/preferences/preferences";
 import { resetSession } from "./resetSession.ts";
 

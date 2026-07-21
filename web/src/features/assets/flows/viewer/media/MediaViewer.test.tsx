@@ -1,50 +1,36 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import type { Asset } from "@/lib/assets/types";
+import { describe, expect, it, vi } from "vite-plus/test";
+import { http, HttpResponse, worker } from "@test/msw";
+import { renderWithProviders } from "@test/render";
+import { t } from "@test/i18n";
+import type { Asset, MediaItemByAssetResponse } from "@/lib/assets/types";
 import MediaViewer from "./MediaViewer";
 
-vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key,
-  }),
-}));
-
-vi.mock("@/lib/assets/assetUrls", () => ({
-  assetUrls: {
-    getThumbnailUrl: (assetId: string) => `/thumbnail/${assetId}`,
-    getWebVideoUrl: (assetId: string) => `/video/${assetId}`,
-  },
-}));
-
-vi.mock("../../../api/useAssetMediaItem", () => ({
-  useAssetMediaItem: () => ({
-    data: {
-      media_item: {
-        media_kind: "photo",
-        primary_asset_id: "raw",
-        components: [
-          { asset_id: "raw", relation: "raw_original" },
-          { asset_id: "jpeg", relation: "jpeg_original" },
-        ],
-      },
+// Real component + real useAssetMediaItem query + real assetUrls; only the
+// media-item HTTP response is mocked. The RAW/JPEG picker is the subject.
+function serveMediaItem(assetId: string) {
+  const response = {
+    asset_id: assetId,
+    media_item: {
+      media_kind: "photo",
+      primary_asset_id: "raw",
+      components: [
+        { asset_id: "raw", relation: "raw_original" },
+        { asset_id: "jpeg", relation: "jpeg_original" },
+      ],
     },
-  }),
-}));
+  } satisfies MediaItemByAssetResponse;
 
-vi.mock("../useLivePhotoPlayback", () => ({
-  useLivePhotoPlayback: () => ({
-    videoRef: { current: null },
-    isPlaying: false,
-    handlePlay: vi.fn(),
-    handleStop: vi.fn(),
-    handleEnded: vi.fn(),
-  }),
-}));
-
-afterEach(() => cleanup());
+  worker.use(
+    http.get("*/api/v1/assets/:id/media-item", () => HttpResponse.json(response)),
+    // The <img> actually requests its thumbnail; the URL is the subject, not the
+    // bytes, so answer with an empty 200 to keep the /api/ guard quiet.
+    http.get("*/api/v1/assets/:id/thumbnail", () => new HttpResponse(null, { status: 200 })),
+  );
+}
 
 describe("MediaViewer RAW/JPEG component selection", () => {
-  it("uses the controlled component for the image and reports tab changes", () => {
+  it("uses the controlled component for the image and reports tab changes", async () => {
+    serveMediaItem("raw");
     const onSelectedAssetChange = vi.fn();
     const asset = {
       asset_id: "raw",
@@ -52,17 +38,22 @@ describe("MediaViewer RAW/JPEG component selection", () => {
       type: "PHOTO",
     } as Asset;
 
-    const { container } = render(
+    const screen = await renderWithProviders(
       <MediaViewer
         asset={asset}
         selectedAssetId="jpeg"
         onSelectedAssetChange={onSelectedAssetChange}
       />,
+      { router: false },
     );
 
-    expect(screen.getByRole("img")).toHaveAttribute("src", "/thumbnail/jpeg");
-    fireEvent.click(screen.getByRole("radio", { name: "RAW" }));
+    // The controlled selection ("jpeg") drives the real thumbnail URL.
+    await expect.element(screen.getByRole("img")).toBeVisible();
+    const img = screen.getByRole("img").element() as HTMLImageElement;
+    expect(img.src).toContain("/api/v1/assets/jpeg/thumbnail");
+
+    await screen.getByRole("radio", { name: t("assets.mediaViewer.componentRaw") }).click();
     expect(onSelectedAssetChange).toHaveBeenCalledWith("raw");
-    expect(container.querySelector('[role="tablist"]')).toHaveClass("tabs", "tabs-box");
+    await expect.element(screen.getByRole("tablist")).toHaveClass("tabs-box");
   });
 });

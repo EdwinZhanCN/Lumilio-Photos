@@ -1,14 +1,14 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { renderWithProviders } from "@test/render";
+import { t } from "@test/i18n";
 import type { Asset } from "@/lib/assets/types";
+import type { BrowseStackItem } from "../../../../types";
 import StackedThumbnail from "./StackedThumbnail";
 
-vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key,
-  }),
-}));
-
+// The two heavy children are the boundaries of this component test: MediaThumbnail
+// renders the real image tile, StackCarouselOverlay is exercised in its own spec.
+// Stubs let us assert this component's own logic — stopPropagation and the
+// focus-asset handoff — without dragging their internals in.
 vi.mock("./MediaThumbnail", () => ({
   default: ({ onClick }: { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void }) => (
     <button type="button" onClick={onClick}>
@@ -17,21 +17,16 @@ vi.mock("./MediaThumbnail", () => ({
   ),
 }));
 
-let lastOverlayProps: {
-  open: boolean;
-  focusAssetId?: string;
-} | null = null;
+const overlayProbe: { current: { open: boolean; focusAssetId?: string } | null } = {
+  current: null,
+};
 
 vi.mock("./StackCarouselOverlay", () => ({
   default: ({ open, focusAssetId }: { open: boolean; focusAssetId?: string }) => {
-    lastOverlayProps = { open, focusAssetId };
+    overlayProbe.current = { open, focusAssetId };
     return open ? <div>stack-carousel-overlay</div> : null;
   },
 }));
-
-afterEach(() => {
-  cleanup();
-});
 
 const asset = {
   asset_id: "stack-cover",
@@ -44,7 +39,7 @@ const asset = {
   },
 } as Asset;
 
-const plainBrowseStack = {
+const plainBrowseStack: BrowseStackItem = {
   type: "stack",
   id: "stack:stack-1",
   stackId: "stack-1",
@@ -52,46 +47,50 @@ const plainBrowseStack = {
   assets: [asset],
   memberAssetIds: ["stack-cover", "stack-member"],
   matchedMemberIds: [],
-} as const;
+};
 
 describe("StackedThumbnail", () => {
   beforeEach(() => {
-    lastOverlayProps = null;
+    overlayProbe.current = null;
   });
 
-  it("opens the stack carousel overlay without triggering tile click", () => {
+  it("opens the stack carousel overlay without triggering the tile click", async () => {
     const handleClick = vi.fn();
 
-    render(
+    const screen = await renderWithProviders(
       <StackedThumbnail
         asset={asset}
         stackInfo={asset.stack!}
-        browseStack={plainBrowseStack as any}
+        browseStack={plainBrowseStack}
         onClick={handleClick}
       />,
+      { router: false },
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /view 3 related assets/i }));
+    await screen
+      .getByRole("button", { name: t("assets.stackDetail.openButton", { count: 3 }) })
+      .click();
 
     expect(handleClick).not.toHaveBeenCalled();
-    expect(screen.getByText("stack-carousel-overlay")).toBeInTheDocument();
-    expect(lastOverlayProps?.open).toBe(true);
-    expect(lastOverlayProps?.focusAssetId).toBe("stack-cover");
+    await expect.element(screen.getByText("stack-carousel-overlay")).toBeVisible();
+    expect(overlayProbe.current?.open).toBe(true);
+    expect(overlayProbe.current?.focusAssetId).toBe("stack-cover");
   });
 
-  it("keeps thumbnail click behavior unchanged", () => {
+  it("keeps thumbnail click behavior unchanged", async () => {
     const handleClick = vi.fn();
 
-    render(
+    const screen = await renderWithProviders(
       <StackedThumbnail
         asset={asset}
         stackInfo={asset.stack!}
-        browseStack={plainBrowseStack as any}
+        browseStack={plainBrowseStack}
         onClick={handleClick}
       />,
+      { router: false },
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "thumbnail" }));
+    await screen.getByRole("button", { name: "thumbnail" }).click();
 
     expect(handleClick).toHaveBeenCalledTimes(1);
   });

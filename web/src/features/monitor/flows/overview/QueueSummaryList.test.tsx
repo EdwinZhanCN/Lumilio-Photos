@@ -1,71 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
+import { http, HttpResponse, worker } from "@test/msw";
+import { renderWithProviders } from "@test/render";
 import { QueueSummaryList } from "./QueueSummaryList";
-
-const mocks = vi.hoisted(() => ({
-  useQuery: vi.fn(),
-  queryResult: {} as any,
-}));
-
-const translations: Record<string, string> = {
-  "monitor.queueSummary.copyError": "Copy error",
-  "monitor.queueSummary.copied": "Copied",
-  "monitor.queueSummary.errorAttempt": "Attempt {{current}} / {{max}}",
-  "monitor.queueSummary.errorFallback": "No error message was recorded.",
-  "monitor.queueSummary.errorStates.retryable": "Will retry",
-  "monitor.queueSummary.errorStates.unknown": "Needs attention",
-  "monitor.queueSummary.kinds.thumbnail_asset": "Build previews",
-  "monitor.queueSummary.metrics.attention": "Needs attention",
-  "monitor.queueSummary.metrics.averageLatency": "Avg total time",
-  "monitor.queueSummary.metrics.averageRuntime": "Avg work time",
-  "monitor.queueSummary.metrics.latestActivity": "Latest activity {{value}}",
-  "monitor.queueSummary.metrics.notEnoughData": "-",
-  "monitor.queueSummary.metrics.oldestRemaining": "Oldest remaining {{value}}",
-  "monitor.queueSummary.metrics.processed": "Processed",
-  "monitor.queueSummary.metrics.remaining": "Remaining",
-  "monitor.queueSummary.metrics.total": "Total",
-  "monitor.queueSummary.queues.default.description": "Background work for the photo library.",
-  "monitor.queueSummary.queues.thumbnail_asset.description":
-    "Creates previews used throughout the gallery.",
-  "monitor.queueSummary.queues.thumbnail_asset.name": "Previews",
-  "monitor.queueSummary.reviewErrors_other": "Review {{count}} issues",
-  "monitor.queueSummary.status.needsAttention": "Needs attention",
-  "monitor.queueSummary.subtitle":
-    "Grouped by the part of the photo library pipeline doing the work.",
-  "monitor.queueSummary.time.justNow": "just now",
-  "monitor.queueSummary.time.minutesAgo_other": "{{count}} minutes ago",
-  "monitor.queueSummary.time.never": "never",
-  "monitor.queueSummary.title": "Processing activity",
-  "monitor.queueSummary.updated": "Updated {{time}}",
-};
-
-vi.mock("@/lib/i18n.tsx", () => ({
-  useI18n: () => ({
-    i18n: { language: "en", resolvedLanguage: "en" },
-    t: (key: string, options?: Record<string, unknown>) => {
-      const pluralKey =
-        typeof options?.count === "number"
-          ? `${key}_${options.count === 1 ? "one" : "other"}`
-          : key;
-      let value =
-        translations[pluralKey] ??
-        translations[key] ??
-        (options?.defaultValue as string | undefined) ??
-        key;
-
-      for (const [name, replacement] of Object.entries(options ?? {})) {
-        value = value.replaceAll(`{{${name}}}`, String(replacement));
-      }
-      return value;
-    },
-  }),
-}));
-
-vi.mock("@/lib/http-commons/queryClient", () => ({
-  $api: {
-    useQuery: mocks.useQuery,
-  },
-}));
 
 const now = new Date("2026-06-12T12:00:00.000Z").toISOString();
 const oneMinuteAgo = new Date("2026-06-12T11:59:00.000Z").toISOString();
@@ -101,56 +37,51 @@ const summaryResponse = {
   ],
 };
 
-let clipboardWriteText: ReturnType<typeof vi.fn>;
+function serveSummary() {
+  worker.use(
+    http.get("/api/v1/admin/river/queue-summary", () => HttpResponse.json(summaryResponse)),
+  );
+}
 
 describe("QueueSummaryList", () => {
-  beforeEach(() => {
-    mocks.queryResult = {
-      data: summaryResponse,
-      isError: false,
-      isLoading: false,
-    };
-    mocks.useQuery.mockImplementation(() => mocks.queryResult);
-    clipboardWriteText = vi.fn().mockResolvedValue(undefined);
+  it("renders each queue as a processing area with aggregate metrics", async () => {
+    serveSummary();
+    const screen = await renderWithProviders(<QueueSummaryList />);
 
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: clipboardWriteText,
-      },
-    });
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
-  it("renders each queue as a processing area with aggregate metrics", () => {
-    render(<QueueSummaryList />);
-
-    expect(screen.getByText("Previews")).toBeInTheDocument();
-    expect(screen.getByText("Creates previews used throughout the gallery.")).toBeInTheDocument();
-    expect(screen.getByText("Total")).toBeInTheDocument();
-    expect(screen.getByText("100")).toBeInTheDocument();
-    expect(screen.getByText("Processed")).toBeInTheDocument();
-    expect(screen.getByText("80")).toBeInTheDocument();
-    expect(screen.getByText("Remaining")).toBeInTheDocument();
-    expect(screen.getByText("20")).toBeInTheDocument();
-    expect(screen.getAllByText("Needs attention").length).toBeGreaterThan(0);
-    expect(screen.getByText("2")).toBeInTheDocument();
+    await expect.element(screen.getByRole("heading", { name: "Previews" })).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Creates previews used throughout the gallery."))
+      .toBeInTheDocument();
+    await expect.element(screen.getByText("Total", { exact: true })).toBeInTheDocument();
+    await expect.element(screen.getByText("100", { exact: true })).toBeInTheDocument();
+    await expect.element(screen.getByText("Processed", { exact: true })).toBeInTheDocument();
+    await expect.element(screen.getByText("80", { exact: true })).toBeInTheDocument();
+    await expect.element(screen.getByText("Remaining", { exact: true })).toBeInTheDocument();
+    await expect.element(screen.getByText("20", { exact: true })).toBeInTheDocument();
+    await expect.element(screen.getByText("Needs attention").first()).toBeInTheDocument();
+    await expect.element(screen.getByText("2", { exact: true })).toBeInTheDocument();
   });
 
   it("expands queue issues and copies diagnostic details", async () => {
-    render(<QueueSummaryList />);
+    serveSummary();
+    const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: clipboardWriteText },
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Review 2 issues" }));
+    const screen = await renderWithProviders(<QueueSummaryList />);
 
-    expect(screen.getByText("Build previews")).toBeInTheDocument();
-    expect(screen.getByText("thumbnail failed: decode error")).toBeInTheDocument();
+    await screen.getByRole("button", { name: "Review 2 issues" }).click();
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy error" }));
+    await expect.element(screen.getByText("Build previews")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("thumbnail failed: decode error"))
+      .toBeInTheDocument();
 
-    await waitFor(() => {
+    await screen.getByRole("button", { name: "Copy error" }).click();
+
+    await vi.waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(
         expect.stringContaining("queue=thumbnail_asset"),
       );

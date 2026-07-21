@@ -1,49 +1,27 @@
-import "@testing-library/jest-dom/vitest";
-import { afterEach, vi } from "vite-plus/test";
+import { afterAll, afterEach, beforeAll, vi } from "vite-plus/test";
+import { worker } from "./msw";
 
-class MemoryStorage implements Storage {
-  private store = new Map<string, string>();
+// Integration tests run in real Chromium, so localStorage, CSS and browser APIs
+// are the real implementations — no polyfills. vitest-browser-react cleans up
+// rendered components on its own; this only resets state that persists within a
+// browser context across tests in the same file, and the MSW handlers.
 
-  get length() {
-    return this.store.size;
-  }
-
-  clear() {
-    this.store.clear();
-  }
-
-  getItem(key: string) {
-    return this.store.get(key) ?? null;
-  }
-
-  key(index: number) {
-    return Array.from(this.store.keys())[index] ?? null;
-  }
-
-  removeItem(key: string) {
-    this.store.delete(key);
-  }
-
-  setItem(key: string, value: string) {
-    this.store.set(key, String(value));
-  }
-}
-
-const testLocalStorage = new MemoryStorage();
-
-Object.defineProperty(globalThis, "localStorage", {
-  value: testLocalStorage,
-  configurable: true,
-});
-
-if (typeof window !== "undefined") {
-  Object.defineProperty(window, "localStorage", {
-    value: testLocalStorage,
-    configurable: true,
+beforeAll(async () => {
+  await worker.start({
+    quiet: true,
+    // Guard the API surface only: Vite still has to serve modules and assets, so
+    // erroring on every unhandled request would break the page itself.
+    onUnhandledRequest(request, print) {
+      if (new URL(request.url).pathname.startsWith("/api/")) print.error();
+    },
   });
-}
+});
 
 afterEach(() => {
-  testLocalStorage.clear();
+  worker.resetHandlers();
+  localStorage.clear();
+  sessionStorage.clear();
   vi.clearAllMocks();
 });
+
+afterAll(() => worker.stop());
