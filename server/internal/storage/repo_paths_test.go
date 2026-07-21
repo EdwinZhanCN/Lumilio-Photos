@@ -144,6 +144,41 @@ func TestCanonicalVolumeNameUppercasesDriveLetter(t *testing.T) {
 	}
 }
 
+// filepath.IsAbs answers false on Windows for a rooted-but-driveless path, so
+// every containment check written against it alone lets "/etc/passwd" through
+// there. These cases must hold identically on every platform.
+func TestIsRootedPath(t *testing.T) {
+	rooted := []string{
+		"/absolute/photo.jpg",
+		"/",
+		`\Windows\System32`,
+		`\`,
+		`C:\Users\someone`,
+		"C:/Users/someone",
+		`C:relative`,
+		`\\server\share\photo.jpg`,
+	}
+	for _, path := range rooted {
+		if !IsRootedPath(path) {
+			t.Errorf("IsRootedPath(%q) = false, want true", path)
+		}
+	}
+
+	relative := []string{
+		"",
+		"inbox/2026/07/photo.jpg",
+		"photo.jpg",
+		"./photo.jpg",
+		"../escape.jpg", // rooted-ness is a separate check from traversal
+		"album/.hidden/photo.jpg",
+	}
+	for _, path := range relative {
+		if IsRootedPath(path) {
+			t.Errorf("IsRootedPath(%q) = true, want false", path)
+		}
+	}
+}
+
 // canonicalTempDir returns a temp directory in the same canonical form the
 // repository manager stores. On macOS t.TempDir() sits under /var, a symlink to
 // /private/var, so raw temp paths never equal what the manager persists.

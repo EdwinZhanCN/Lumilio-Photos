@@ -99,6 +99,11 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	indexingLogger := logRuntime.Named("indexing")
 	scannerLogger := logRuntime.Named("repository_scanner")
 	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), appConfig.LoggingConfig.RepositoryAuditVerbose)
+	defer func() {
+		if err := repoAuditProvider.Close(); err != nil {
+			appLogger.Warn("failed to close repository audit logs", zap.Error(err))
+		}
+	}()
 
 	appLogger.Info("starting Lumilio Photos API",
 		zap.String("operation", "server.start"),

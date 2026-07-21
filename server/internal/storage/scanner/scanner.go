@@ -655,7 +655,7 @@ func CleanWorkspacePath(path string) (string, bool) {
 		return "", false
 	}
 	clean := filepath.Clean(filepath.FromSlash(path))
-	if clean == "." || filepath.IsAbs(clean) {
+	if clean == "." || storage.IsRootedPath(clean) {
 		return "", false
 	}
 	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
