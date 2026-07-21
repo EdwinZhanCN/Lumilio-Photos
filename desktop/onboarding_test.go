@@ -51,6 +51,27 @@ func newTestApp(t *testing.T) *desktopApp {
 	return d
 }
 
+func TestCancelledRepositoryDirectoryPickersDoNotAccessControlPlane(t *testing.T) {
+	d := &desktopApp{
+		nativeDirectoryPicker: func(string, bool) (string, bool) { return "", true },
+	}
+	for _, handler := range []struct {
+		name string
+		fn   http.HandlerFunc
+	}{
+		{name: "storage location", fn: d.handlePickStorageLocation},
+		{name: "attach repository", fn: d.handleAttachRepository},
+	} {
+		t.Run(handler.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.fn(rec, httptest.NewRequest(http.MethodPost, "/", nil))
+			if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cancelled":true`) {
+				t.Fatalf("cancel response = %d %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestNormalizeLang(t *testing.T) {
 	cases := map[string]string{
 		"zh": "zh", "zh-CN": "zh", "zh_CN.UTF-8": "zh", "ZH": "zh",
@@ -148,6 +169,10 @@ func TestOnboardingComplete(t *testing.T) {
 	d := newTestApp(t)
 	h := d.onboardingHandler()
 	lib := filepath.Join(t.TempDir(), "My Library")
+	defaultLib, err := d.sup.DefaultStoragePath()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	body := `{"path":` + jsonString(lib) + `,"lang":"zh","agreed":true}`
 	rec := httptest.NewRecorder()
@@ -172,8 +197,8 @@ func TestOnboardingComplete(t *testing.T) {
 	if !settings.OnboardingCompleted {
 		t.Error("OnboardingCompleted not persisted")
 	}
-	if settings.StoragePath != lib {
-		t.Errorf("StoragePath = %q, want %q", settings.StoragePath, lib)
+	if settings.StoragePath != defaultLib {
+		t.Errorf("StoragePath = %q, want fixed default %q", settings.StoragePath, defaultLib)
 	}
 	if settings.Language != "zh" {
 		t.Errorf("Language = %q, want zh", settings.Language)
@@ -205,17 +230,25 @@ func TestOnboardingCompleteRejectsUnaccepted(t *testing.T) {
 	}
 }
 
-func TestOnboardingCompleteRejectsUnwritable(t *testing.T) {
+func TestOnboardingCompleteIgnoresCallerSuppliedStoragePath(t *testing.T) {
 	d := newTestApp(t)
 	h := d.onboardingHandler()
-	// A path under a non-existent parent is unreachable/unwritable.
+	// Host paths are authorized later through the running Control Panel. A stale
+	// or tampered onboarding payload cannot redirect the default media root.
 	lib := filepath.Join(t.TempDir(), "missing", "lib")
 
 	body := `{"path":` + jsonString(lib) + `,"lang":"en","agreed":true}`
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/__onb/complete", strings.NewReader(body)))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 for unwritable location", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 using the fixed local default: %s", rec.Code, rec.Body.String())
+	}
+	settings, err := d.sup.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.StoragePath == lib {
+		t.Fatalf("caller-supplied path %q was persisted", lib)
 	}
 }
 

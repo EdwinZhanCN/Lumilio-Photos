@@ -11,6 +11,8 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Provisioning errors. Callers (HTTP handlers) map these to status codes.
@@ -24,13 +26,10 @@ var (
 // DuplicateHandling are optional; empty values fall back to the storage-owned
 // repository defaults.
 type CreateRepositorySpec struct {
-	Name string
-	Role dbtypes.RepoRole
-	Root string
-	// Path is the caller-requested absolute location. Only FreePolicy honours
-	// it; RootedPolicy rejects a non-empty Path rather than silently placing the
-	// repository somewhere else.
-	Path              string
+	Name              string
+	Role              dbtypes.RepoRole
+	Root              string
+	RootID            string
 	OwnerID           *int32
 	StorageStrategy   string
 	DuplicateHandling string
@@ -61,16 +60,30 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		return nil, ErrPrimaryRepositoryRequired
 	}
 
-	repoPath, warnings, err := pathPolicyForRole(rm.pathPolicy(), role, spec).ResolveCreatePath(spec)
+	var rootIDs []pgtype.UUID
+	if strings.TrimSpace(spec.RootID) != "" && strings.TrimSpace(spec.Root) != "" {
+		return nil, fmt.Errorf("%w: root_id and root path cannot both be supplied", ErrPathNotAllowed)
+	}
+	if strings.TrimSpace(spec.Root) == "" {
+		selectedRoot, err := rm.resolveRepositoryRootForCreate(ctx, spec.RootID, role)
+		if err != nil {
+			return nil, err
+		}
+		spec.Root = selectedRoot.Path
+		rootIDs = append(rootIDs, selectedRoot.RootID)
+	}
+
+	repoPath, err := resolveRepositoryCreatePath(spec.Root, spec.Name, role)
 	if err != nil {
 		return nil, err
 	}
+	warnings := RepositoryRootWarnings(spec.Root)
 	if existing, err := rm.GetRepositoryByPath(repoPath); err == nil && existing != nil {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, repoPath)
 	}
 
 	if repocfg.IsRepositoryRoot(repoPath) {
-		dbRepo, err := rm.AddRepository(repoPath, spec.OwnerID, role)
+		dbRepo, err := rm.AddRepository(repoPath, spec.OwnerID, role, rootIDs...)
 		if err != nil {
 			return nil, err
 		}
@@ -86,21 +99,11 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		repocfg.WithStorageStrategy(firstNonEmpty(spec.StorageStrategy, defaults.Strategy, "date")),
 		repocfg.WithLocalSettings(firstNonEmpty(spec.DuplicateHandling, defaults.DuplicateHandling, "rename")),
 	)
-	dbRepo, err := rm.InitializeRepository(repoPath, *cfg, spec.OwnerID, role)
+	dbRepo, err := rm.InitializeRepository(repoPath, *cfg, spec.OwnerID, role, rootIDs...)
 	if err != nil {
 		return nil, err
 	}
 	return &CreateRepositoryResult{Repository: dbRepo, Warnings: warnings}, nil
-}
-
-// pathPolicy returns the configured policy, defaulting to RootedPolicy so a
-// deployment that has not opted into free placement cannot accidentally accept
-// caller-supplied paths.
-func (rm *DefaultRepositoryManager) pathPolicy() PathPolicy {
-	if rm.policy == nil {
-		return RootedPolicy{}
-	}
-	return rm.policy
 }
 
 // EnsurePrimaryRepository idempotently ensures a primary repository exists at
@@ -122,7 +125,7 @@ func (rm *DefaultRepositoryManager) EnsurePrimaryRepository(ctx context.Context,
 }
 
 func (rm *DefaultRepositoryManager) primaryRepositoryExists(ctx context.Context) (bool, error) {
-	count, err := rm.queries.CountActivePrimaryRepositories(ctx)
+	count, err := rm.queries.CountPrimaryRepositories(ctx)
 	if err != nil {
 		return false, fmt.Errorf("count primary repositories: %w", err)
 	}

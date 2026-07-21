@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"desktop/lumen"
@@ -72,6 +74,12 @@ type Supervisor struct {
 	serverErr chan error
 
 	warnings []string
+	// pendingStorageRoot migrates the pre-Storage-Location desktop setting after
+	// the in-process repository control plane is ready.
+	pendingStorageRoot string
+
+	repositoryMu      sync.RWMutex
+	repositoryManager app.RepositoryControl
 }
 
 // Options configures a Supervisor.
@@ -95,7 +103,55 @@ func New(opts Options) *Supervisor {
 	if logf == nil {
 		logf = log.Printf
 	}
-	return &Supervisor{logf: logf, onStage: opts.OnStage, operatorControls: opts.OperatorControls}
+	s := &Supervisor{logf: logf, onStage: opts.OnStage, operatorControls: opts.OperatorControls}
+	hostHook := s.operatorControls.RepositoryManagerReady
+	s.operatorControls.RepositoryManagerReady = func(manager app.RepositoryControl) {
+		s.repositoryMu.Lock()
+		s.repositoryManager = manager
+		s.repositoryMu.Unlock()
+		if manager != nil {
+			s.migratePendingStorageRoot(manager)
+		}
+		if hostHook != nil {
+			hostHook(manager)
+		}
+	}
+	return s
+}
+
+func (s *Supervisor) migratePendingStorageRoot(control app.RepositoryControl) {
+	path := strings.TrimSpace(s.pendingStorageRoot)
+	if path == "" || s.paths == nil || path == s.paths.DefaultLib {
+		return
+	}
+	if _, _, err := control.AddStorageLocation(context.Background(), path, filepath.Base(path)); err != nil {
+		s.warnings = append(s.warnings, fmt.Sprintf("legacy Storage Location %q needs attention: %v", path, err))
+		s.logf("migrate legacy Storage Location %q: %v", path, err)
+		return
+	}
+	settings, err := LoadSettings(s.paths.DesktopSettingsFile())
+	if err == nil {
+		settings.StoragePath = s.paths.DefaultLib
+		err = SaveSettings(s.paths.DesktopSettingsFile(), settings)
+	}
+	if err != nil {
+		s.logf("persist legacy Storage Location migration: %v", err)
+		return
+	}
+	s.pendingStorageRoot = ""
+}
+
+// RepositoryControl returns the in-process storage control plane after the
+// server reaches repository initialization. It is intentionally not exposed by
+// the shared HTTP API.
+func (s *Supervisor) RepositoryControl() (app.RepositoryControl, error) {
+	s.repositoryMu.RLock()
+	manager := s.repositoryManager
+	s.repositoryMu.RUnlock()
+	if manager == nil {
+		return nil, errors.New("repository control plane is not ready")
+	}
+	return manager, nil
 }
 
 // reportStage logs and, if configured, notifies the host that Start has entered
@@ -170,13 +226,8 @@ func (s *Supervisor) DashboardPaths() (map[string]string, error) {
 	if err := s.ensurePaths(); err != nil {
 		return nil, err
 	}
-	settings, _ := s.Settings()
-	storage := settings.StoragePath
-	if storage == "" {
-		storage = s.paths.DefaultLib
-	}
 	return map[string]string{
-		"appData": s.paths.AppData, "storage": storage, "logs": s.paths.Logs,
+		"appData": s.paths.AppData, "storage": s.paths.DefaultLib, "logs": s.paths.Logs,
 		"backups": s.paths.Backups, "lumen": s.paths.LumenDir(),
 	}, nil
 }
@@ -361,6 +412,7 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	appConfig, err := compileAndLoadServerManifest(paths.ServerConfigFile(), serverManifestBindings{
 		Port: serverPort, BrowserOrigin: "http://localhost:" + serverPort,
 		WebRoot: bundledWebRoot(resources), LogDir: paths.Logs, StoragePath: storagePath,
+		CloudStatePath: paths.Cloud, BackupsPath: paths.Backups,
 		DBHost: paths.DBHost(), DBPort: pgPort, DBUser: dbUser, DBName: dbName,
 		BootstrapPasswordFile: paths.DBBootstrapPasswordFile(), RotatedPasswordFile: paths.DBRotatedPasswordFile(),
 		SecretKeyFile: paths.SecretKeyFile(), PGBinDir: pgBinDir(resources),
@@ -428,10 +480,10 @@ func (s *Supervisor) Stop() error {
 	return firstErr
 }
 
-// resolveStoragePath returns the media library location, persisting a default on
-// first run. If a previously chosen location is unreachable (external drive
-// unmounted), it falls back to the default and records a warning rather than
-// crashing; the UI can later offer to re-pick.
+// resolveStoragePath returns the machine-local default Storage Location. A
+// pre-Storage-Location user choice is migrated as an external authorized root
+// after the repository control plane is ready; it is never substituted as app
+// state and an unavailable path is never silently recreated.
 func (s *Supervisor) resolveStoragePath() (string, error) {
 	settingsFile := s.paths.DesktopSettingsFile()
 	settings, err := LoadSettings(settingsFile)
@@ -444,16 +496,17 @@ func (s *Supervisor) resolveStoragePath() (string, error) {
 		if err := SaveSettings(settingsFile, settings); err != nil {
 			return "", err
 		}
-		return settings.StoragePath, nil
-	}
-
-	if !storageReachable(settings.StoragePath) {
-		s.warnings = append(s.warnings, fmt.Sprintf(
-			"%v: %q — using default location instead", ErrStorageUnreachable, settings.StoragePath))
-		s.logf("storage %q unreachable; falling back to default %q", settings.StoragePath, s.paths.DefaultLib)
 		return s.paths.DefaultLib, nil
 	}
-	return settings.StoragePath, nil
+	if settings.StoragePath != s.paths.DefaultLib {
+		s.pendingStorageRoot = settings.StoragePath
+		if !storageReachable(settings.StoragePath) {
+			s.warnings = append(s.warnings, fmt.Sprintf(
+				"%v: %q — it remains offline; the local default Storage Location is unchanged", ErrStorageUnreachable, settings.StoragePath))
+			s.logf("legacy external storage %q is unreachable; leaving it offline", settings.StoragePath)
+		}
+	}
+	return s.paths.DefaultLib, nil
 }
 
 // checkPortAvailable verifies the app port can be bound, matching the address

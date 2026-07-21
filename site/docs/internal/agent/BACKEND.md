@@ -75,9 +75,10 @@ contracts, not server configuration.
 
 ## Storage Model
 
-`storage.path` is the default repository root used to seed runtime repository
-defaults. Startup does not create a repository there. During authenticated
-first-run setup, the primary repository form defaults to:
+`storage.path` is the non-removable default Storage Location. Startup creates
+or validates its portable `.lumilioroot` marker and associates legacy child
+repositories, but does not create a repository. During authenticated first-run
+setup, the primary repository defaults to:
 
 ```text
 <storage.path>/primary
@@ -88,6 +89,17 @@ Repository identity is explicit in the database through `repositories.role`
 credential setup is complete, an admin exists, and exactly one active primary
 repository exists. Repository config lives in `.lumiliorepo` files and is handled
 by `internal/storage/repocfg`.
+
+Additional Storage Locations are rows in `repository_roots`, keyed by the UUID
+stored in `.lumilioroot`. The Web API accepts `root_id` for repository creation
+and never an arbitrary host path. External root grants, existing repository
+attachment, and explicit moved-vs-copied conflict resolution are Desktop-only
+operations performed through the native picker and in-process control plane.
+
+`storage.cloud_state_path` and `storage.backups_path`, database/auth secrets,
+and logs are machine-bound app state and must be outside `storage.path`. A media
+root can therefore move without carrying credentials, cloud sessions, or the
+database backup policy with it.
 
 Repositories are unowned shared storage; per-user visibility and mutation
 authorization run entirely on `assets.owner_id`.

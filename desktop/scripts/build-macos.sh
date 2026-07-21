@@ -100,6 +100,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSUIElement</key><true/>
   <key>NSLocalNetworkUsageDescription</key>
   <string>Lumilio Photos discovers Lumen ML servers on your local network via mDNS to enable optional AI features (semantic search, face recognition, OCR).</string>
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>Lumilio Photos needs access to folders you select on the Desktop to store and manage your photo repositories.</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>Lumilio Photos needs access to folders you select in Documents to store and manage your photo repositories.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>Lumilio Photos needs access to folders you select in Downloads to import or manage your photo repositories.</string>
+  <key>NSRemovableVolumesUsageDescription</key>
+  <string>Lumilio Photos needs ongoing access to external drives you select as Storage Locations for your photo repositories.</string>
+  <key>NSNetworkVolumesUsageDescription</key>
+  <string>Lumilio Photos needs ongoing access to network folders you select as Storage Locations for your photo repositories.</string>
+  <key>NSFileProviderDomainUsageDescription</key>
+  <string>Lumilio Photos needs access to folders you select in iCloud Drive or other file provider storage to manage your photo repositories.</string>
   <key>NSBonjourServices</key>
   <array>
     <string>_lumen._tcp</string>

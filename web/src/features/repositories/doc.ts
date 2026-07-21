@@ -11,6 +11,9 @@
  * {@link useRepositoryOptions} reads the server's active repository list.
  * {@link normalizeRepositoryOptions} is the React-free DTO adapter that
  * produces {@link RepositoryOption} values for every consumer.
+ * {@link useRepositoryRoots} reads the admin-visible Storage Locations that
+ * the native Desktop host has authorized; Web callers receive identities and
+ * reachability, never an arbitrary host-path write capability.
  * {@link useRepositoryScan} starts repository scans and stack detection, while
  * {@link waitForRepositoryScan} follows the requested scan run to a terminal
  * state before repository-aware queries are invalidated.
@@ -23,7 +26,7 @@
  *
  * {@link useWorkingRepository} forms the upload-target flow. It must resolve a
  * concrete repository and falls back to the primary or first option that
- * {@link isRepositoryOffline} reports as reachable — auto-selecting an
+ * {@link isRepositoryUnavailable} reports as writable — auto-selecting an
  * unreachable repository would guarantee the next upload is refused. An
  * explicit user choice is left alone even when it goes offline. Browse scope
  * and working repository remain separate preferences because their empty-state
@@ -33,17 +36,20 @@
  *
  * {@link RepositoryStatus} carries a repository's reachability alongside its
  * activity. An `offline` repository is one whose folder is not currently
- * mounted — an unplugged external drive — and is distinct from one whose data
- * is gone: it stays selectable as a browse filter while being refused as an
- * upload target. An unrecognized status normalizes to `active`, because
- * wrongly reading a repository as offline blocks writes to it.
+ * mounted — an unplugged external drive — while `error` means the on-disk
+ * identity or config needs attention. Both stay selectable as browse filters
+ * and are refused as write targets. An unrecognized status normalizes to
+ * `active`, because a client-side guess must not incorrectly block a valid
+ * repository.
  *
  * {@link RepositoryGrid} owns the repository-management surface. Its create
- * modal delegates server mutation and invalidation to
- * {@link useCreateRepository}; Auth setup uses the same public mutation for
- * primary-repository creation. {@link isStorageStrategy} keeps storage-policy
- * parsing in the repository model. The grid receives maintenance commands from
- * the higher Manage composition route rather than importing those domains.
+ * modal selects a registered root and sends explicit storage-layout and
+ * duplicate-filename policies through {@link useCreateRepository}; local and
+ * cloud creation share the same body, with only the cloud credential differing.
+ * Auth setup uses the same public mutation for primary-repository creation.
+ * {@link isStorageStrategy} keeps storage-policy parsing in the repository
+ * model. The grid receives maintenance commands from the higher Manage
+ * composition route rather than importing those domains.
  *
  * ## State
  *
@@ -57,6 +63,7 @@
  */
 import type { useCreateRepository } from "./api/useCreateRepository.ts";
 import type { useRepositoryOptions } from "./api/useRepositoryOptions.ts";
+import type { useRepositoryRoots } from "./api/useRepositoryRoots.ts";
 import type { useRepositoryScan } from "./api/useRepositoryScan.ts";
 import type { waitForRepositoryScan } from "./api/waitForRepositoryScan.ts";
 import type BrowseScopeSelect from "./flows/browse-scope/BrowseScopeSelect.tsx";
@@ -64,7 +71,7 @@ import type { useBrowseScope } from "./flows/browse-scope/useBrowseScope.ts";
 import type RepositoryGrid from "./flows/manage/RepositoryGrid.tsx";
 import type { useWorkingRepository } from "./flows/working-repository/useWorkingRepository.ts";
 import type {
-  isRepositoryOffline,
+  isRepositoryUnavailable,
   normalizeRepositoryOptions,
 } from "./model/repositoryOptions.ts";
 import type { isStorageStrategy } from "./model/repositorySetup.ts";

@@ -34,6 +34,8 @@ file_format = "json"
 repository_audit_verbose = false
 [storage]
 path = "data/storage"
+cloud_state_path = "data/app-state/cloud"
+backups_path = "data/app-state/backups"
 [repository_scan]
 enabled = true
 interval_seconds = 300
@@ -46,7 +48,7 @@ nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
 language = "en"
 user_agent = "Lumilio-Photos/1.0"
 [auth]
-secret_key_file = "data/storage/.secrets/key"
+secret_key_file = "data/app-state/secrets/key"
 access_token_ttl = "15m"
 refresh_token_ttl = "168h"
 media_token_ttl = "10m"
@@ -121,6 +123,9 @@ func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
 	}
 	if cfg.StorageConfig.Path != filepath.Join(base, "data/storage") {
 		t.Fatalf("storage path = %q", cfg.StorageConfig.Path)
+	}
+	if cfg.StorageConfig.CloudDir() != filepath.Join(base, "data/app-state/cloud") || cfg.StorageConfig.BackupsDir() != filepath.Join(base, "data/app-state/backups") {
+		t.Fatalf("private storage paths = %+v", cfg.StorageConfig)
 	}
 	if cfg.Tools.FFmpegPath != filepath.Join(base, "bin/ffmpeg") || cfg.Tools.ExifToolPath != "exiftool" || cfg.Tools.FFprobePath != absoluteToolFixturePath() {
 		t.Fatalf("tool path resolution = %+v", cfg.Tools)
@@ -227,5 +232,29 @@ func TestLoadAppConfigRequiresExplicitPath(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing.toml")
 	if _, err := LoadAppConfig(missing); err == nil || !strings.Contains(err.Error(), missing) {
 		t.Fatalf("expected path in error, got %v", err)
+	}
+}
+
+func TestLoadAppConfigRejectsPrivateStateInsideMediaRoot(t *testing.T) {
+	cases := map[string]struct {
+		old  string
+		new  string
+		want string
+	}{
+		"cloud state": {`cloud_state_path = "data/app-state/cloud"`, `cloud_state_path = "data/storage/.cloud"`, "storage.cloud_state_path"},
+		"backups":     {`backups_path = "data/app-state/backups"`, `backups_path = "data/storage/backups"`, "storage.backups_path"},
+		"logs":        {`dir = "logs"`, `dir = "data/storage/logs"`, "logging.dir"},
+		"app secret":  {`secret_key_file = "data/app-state/secrets/key"`, `secret_key_file = "data/storage/.secrets/key"`, "auth.secret_key_file"},
+		"db rotated":  {`rotated_password_file = "data/rotated"`, `rotated_password_file = "data/storage/.secrets/rotated"`, "database.rotated_password_file"},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			contents := strings.Replace(completeManifest, test.old, test.new, 1)
+			_, err := LoadAppConfig(writeManifestFixture(t, contents))
+			if err == nil || !strings.Contains(err.Error(), test.want+" must be outside storage.path") {
+				t.Fatalf("expected %s separation error, got %v", test.want, err)
+			}
+		})
 	}
 }

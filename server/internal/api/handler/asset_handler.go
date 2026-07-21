@@ -139,7 +139,7 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 // currently reachable. Staging a file for a repository that cannot be written is
 // a guaranteed failure later, with a worse error attached.
 func rejectOfflineRepository(repository repo.Repository) error {
-	if repository.Status == dbtypes.RepoStatusOffline {
+	if repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError {
 		return fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
 	}
 	return nil
@@ -153,7 +153,7 @@ func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 	case errors.Is(err, errRepositoryNotFound):
 		api.GinNotFound(c, err, "Repository not found")
 	case errors.Is(err, storage.ErrRepositoryOffline):
-		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is offline")
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is unavailable")
 	default:
 		api.GinBadRequest(c, err, "Please specify a repository_id or create a repository first")
 	}
@@ -2496,6 +2496,11 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/indexing/repositories [get]
 func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
+	if err := h.repoManager.ReconcileAll(c.Request.Context()); err != nil {
+		log.Printf("Failed to refresh repository reachability: %v", err)
+		api.GinInternalError(c, err, "Failed to refresh repository reachability")
+		return
+	}
 	repositories, err := h.repoManager.ListRepositories()
 	if err != nil {
 		log.Printf("Failed to list repositories for indexing: %v", err)
@@ -3587,7 +3592,7 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 			for _, repo := range repositories {
 				// An offline repository has no reachable staging directory;
 				// walking it only produces I/O errors and false failure counts.
-				if repo.Status == dbtypes.RepoStatusOffline {
+				if repo.Status == dbtypes.RepoStatusOffline || repo.Status == dbtypes.RepoStatusError {
 					continue
 				}
 				// Use staging manager's cleanup function with short max age (1 hour)

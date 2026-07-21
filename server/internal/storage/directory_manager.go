@@ -95,9 +95,9 @@ var repoLogFiles = []string{
 // DirectoryManager owns the structure *inside* a single repository (the
 // .lumilio/* system tree and inbox) and the file operations over it. All paths
 // are repo-relative and resolved under repoPath; operations never escape the
-// repository root. It does not deal with the storage root layout
-// (<path>/.secrets, <path>/.cloud) — that is the storage package's provisioning
-// concern. Staging is owned by StagingManager, not here.
+// repository root. It does not deal with the default Storage Location or the
+// separately configured app-private directories; provisioning owns those.
+// Staging is owned by StagingManager, not here.
 //
 // Implementations are stateless and safe for concurrent use across different
 // repositories.

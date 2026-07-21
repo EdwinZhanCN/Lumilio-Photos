@@ -45,6 +45,7 @@ services:
         #     - /dev/dri:/dev/dri
         volumes:
             - ${LUMILIO_STORAGE:?set LUMILIO_STORAGE to your media root directory}:/data/storage
+            - app_state:/data/app-state
         ports:
             - "6680:6680"
         extra_hosts:
@@ -72,6 +73,7 @@ services:
 
 volumes:
     db_data:
+    app_state:
 
 secrets:
     db_bootstrap_password:

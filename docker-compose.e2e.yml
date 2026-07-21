@@ -34,6 +34,7 @@ services:
             # up. Docker seeds a fresh named volume from the image, so the
             # chowned /data/storage/primary is already there.
             - storage_data:/data/storage
+            - app_state_data:/data/app-state
             - ./web/e2e/support/server.e2e.toml:/app/config/server.container.toml:ro
         healthcheck:
             test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
@@ -60,6 +61,7 @@ services:
 volumes:
     db_data:
     storage_data:
+    app_state_data:
 
 secrets:
     db_bootstrap_password:

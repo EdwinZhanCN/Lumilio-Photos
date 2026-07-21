@@ -4,10 +4,9 @@ import "time"
 
 type CreateRepositoryRequestDTO struct {
 	Name string `json:"name" binding:"required" example:"Family Photos"`
-	// Path is an absolute on-disk location for the repository. It is only
-	// accepted by deployments whose path policy allows free placement (desktop);
-	// a server rejects it and places the repository under its storage root.
-	Path              string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
+	// RootID identifies a registered Storage Location. Empty selects the
+	// configured default location. Clients never submit an arbitrary root path.
+	RootID            string `json:"root_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Role              string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
 	StorageStrategy   string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
 	DuplicateHandling string `json:"duplicate_handling,omitempty" binding:"omitempty,oneof=rename uuid overwrite" example:"rename"`
@@ -20,6 +19,8 @@ type RepositoryDTO struct {
 	Path            string                  `json:"path" example:"/data/storage/family-photos"`
 	Role            string                  `json:"role" example:"regular"`
 	IsPrimary       bool                    `json:"is_primary" example:"false"`
+	RootID          *string                 `json:"root_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Status          string                  `json:"status" example:"active"`
 	DefaultOwnerID  *int32                  `json:"default_owner_id,omitempty"`
 	StorageStrategy string                  `json:"storage_strategy" example:"date"`
 	LocalSettings   RepositoryLocalSettings `json:"local_settings"`
@@ -52,14 +53,25 @@ type CreateRepositoryResponseDTO struct {
 // RepositoryConflictDTO describes a repository whose identity is already
 // registered at a different path, and the two actions that resolve it.
 type RepositoryConflictDTO struct {
-	RepositoryID   string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RegisteredPath string `json:"registered_path" example:"/Volumes/OldDrive/Photos"`
-	RequestedPath  string `json:"requested_path" example:"/Volumes/NewDrive/Photos"`
+	Code           int      `json:"code" example:"409"`
+	Message        string   `json:"message" example:"Repository identity is already registered"`
+	ConflictType   string   `json:"conflict_type" example:"repository_identity"`
+	RepositoryID   string   `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RegisteredPath string   `json:"registered_path,omitempty" example:"/Volumes/OldDrive/Photos"`
+	RequestedPath  string   `json:"requested_path,omitempty" example:"/Volumes/NewDrive/Photos"`
+	Actions        []string `json:"actions,omitempty" example:"relocate,copy"`
 }
 
-// RelocateRepositoryRequestDTO points an existing repository at a new location.
-type RelocateRepositoryRequestDTO struct {
-	Path string `json:"path" binding:"required" example:"/Volumes/NewDrive/Photos"`
+type RepositoryRootDTO struct {
+	ID     string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name   string `json:"name" example:"External Archive"`
+	Path   string `json:"path" example:"/Volumes/Photos"`
+	Kind   string `json:"kind" example:"external"`
+	Status string `json:"status" example:"active"`
+}
+
+type ListRepositoryRootsResponseDTO struct {
+	Roots []RepositoryRootDTO `json:"roots"`
 }
 
 type RepositoryScanRequestDTO struct {

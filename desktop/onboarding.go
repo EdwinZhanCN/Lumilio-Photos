@@ -140,7 +140,8 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			http.Error(w, "terms not accepted", http.StatusBadRequest)
 			return
 		}
-		if v := validateStorage(body.Path); !v.Writable {
+		storagePath := d.onboardingDefaultPath()
+		if v := validateStorage(storagePath); !v.Writable {
 			http.Error(w, "storage location is not writable", http.StatusBadRequest)
 			return
 		}
@@ -150,7 +151,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		settings.StoragePath = body.Path
+		settings.StoragePath = storagePath
 		settings.Language = normalizeLang(body.Lang)
 		settings.Region = effectiveRegion(body.Region, settings.Language)
 		settings.TOSAcceptedVersion = tosVersion
@@ -222,6 +223,12 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 	mux.HandleFunc("/__onb/lumen-save", d.handleLumenSave)
 	mux.HandleFunc("/__onb/lumen-action", d.handleLumenAction)
 	mux.HandleFunc("/__onb/log", d.handleDashboardLog)
+	mux.HandleFunc("/__onb/storage-locations", d.handleStorageLocations)
+	mux.HandleFunc("/__onb/pick-storage-location", d.handlePickStorageLocation)
+	mux.HandleFunc("/__onb/storage-location-conflict", d.handleStorageLocationConflict)
+	mux.HandleFunc("/__onb/remove-storage-location", d.handleRemoveStorageLocation)
+	mux.HandleFunc("/__onb/attach-repository", d.handleAttachRepository)
+	mux.HandleFunc("/__onb/repository-conflict", d.handleRepositoryConflict)
 
 	mux.HandleFunc("/__onb/legal/license", serveLegalText("licenses/GPL-3.0.txt"))
 	mux.HandleFunc("/__onb/legal/third-party", serveLegalText("licenses/THIRD_PARTY_NOTICES.txt"))
@@ -316,12 +323,10 @@ func totalMemoryGB() float64 {
 	return float64(v.Total) / (1 << 30)
 }
 
-// onboardingDefaultPath is the path pre-filled in the setup window: a previously
-// chosen location if any, otherwise the built-in default.
+// onboardingDefaultPath is the fixed machine-local default Storage Location.
+// External locations are authorized explicitly from the running Control Panel,
+// where they can also be reconciled when a removable volume moves.
 func (d *desktopApp) onboardingDefaultPath() string {
-	if settings, err := d.sup.Settings(); err == nil && settings.StoragePath != "" {
-		return settings.StoragePath
-	}
 	if def, err := d.sup.DefaultStoragePath(); err == nil {
 		return def
 	}

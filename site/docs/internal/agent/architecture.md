@@ -50,7 +50,11 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 - OpenAPI is the HTTP contract source of truth. Run `make dto` after backend API changes.
 - Do not hand-edit generated OpenAPI artifacts.
-- `storage.path` seeds repository defaults and suggests the first primary path
-  (`<storage.path>/primary`); startup does not create repositories. Primary
-  identity is explicit via `repositories.role`.
+- `storage.path` is registered at startup as the non-removable default Storage
+  Location, identified by `.lumilioroot`; startup does not create repositories.
+  Web creation selects a registered `root_id`, while the Desktop Control Panel
+  alone can authorize host paths or attach `.lumiliorepo` directories.
+- Cloud sessions, secrets, logs, and database backups are app-private state and
+  must be configured outside `storage.path`. Repository staging remains inside
+  its repository under `.lumilio/staging`.
 - ML/Lumen paths should degrade when features are disabled; media management should remain usable without external ML.

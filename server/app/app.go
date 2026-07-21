@@ -60,6 +60,10 @@ type OperatorControls struct {
 	AgentAuditLogPath  string
 	BreakGlass         bool
 	BreakGlassUsername string
+	// RepositoryManagerReady exposes the in-process repository control plane to
+	// the Desktop host. Standalone leaves it nil; no HTTP path or secret is
+	// created by this hook.
+	RepositoryManagerReady func(RepositoryControl)
 }
 
 // Run boots the API server from an already-resolved configuration and blocks
@@ -125,9 +129,8 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	imaging.StartVips()
 	defer imaging.ShutdownVips()
 
-	// Ensure the storage root layout (.secrets, .cloud) exists before anything
-	// reads it. Storage owns the <root> layout; subdirectories are derived from
-	// the immutable storage path by convention.
+	// Ensure the default media root and explicitly separate private cloud/backup
+	// directories exist before any service reads them.
 	if err := storage.EnsureRootLayout(appConfig.StorageConfig); err != nil {
 		return fmt.Errorf("ensure storage layout: %w", err)
 	}
@@ -191,6 +194,14 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	if err != nil {
 		return fmt.Errorf("initialize repository manager: %w", err)
 	}
+	defaultRoot, err := repoManager.EnsureDefaultRepositoryRoot(ctx, appConfig.StorageConfig.Path)
+	if err != nil {
+		return fmt.Errorf("initialize default storage location: %w", err)
+	}
+	appLogger.Info("default storage location initialized",
+		zap.String("operation", "repository_root.init"),
+		zap.String("path", defaultRoot.Path),
+	)
 	stagingManager := storage.NewStagingManager()
 	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
 
@@ -200,6 +211,10 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// mid-scan.
 	if err := repoManager.ReconcileAll(ctx); err != nil {
 		appLogger.Warn("failed to reconcile repositories", zap.Error(err))
+	}
+	if controls.RepositoryManagerReady != nil {
+		controls.RepositoryManagerReady(newRepositoryControl(repoManager))
+		defer controls.RepositoryManagerReady(nil)
 	}
 
 	workers := river.NewWorkers()
@@ -286,11 +301,10 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		EnqueueAll: repositoryScanner.EnqueueAllPeriodicScans,
 	})
 
-	// Automatic database backups (exec-plans/active/db-backup-upgrade.md,
-	// Phase 1): dumps land next to the media so one storage backup captures
-	// assets and metadata together. Policy (enabled/interval/retention) is
-	// read from runtime settings on every tick, so the periodic job below can
-	// stay a fixed hourly heartbeat.
+	// Automatic database backups use their explicit private destination rather
+	// than following any removable repository root. Policy
+	// (enabled/interval/retention) is read from runtime settings on every tick,
+	// so the periodic job below can stay a fixed hourly heartbeat.
 	backupLogger := appLogger.Named("db_backup").Sugar()
 	backupScheduler := &dbbackup.Scheduler{
 		Conn: dbbackup.Conn{
@@ -302,7 +316,6 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		},
 		Pool:        pgxPool,
 		ToolsBinDir: dbConfig.ToolsBinDir,
-		StorageRoot: appConfig.StorageConfig.Path,
 		Dir:         appConfig.StorageConfig.BackupsDir(),
 		AppVersion:  version.Version,
 		Settings:    settingsService.GetBackupConfig,
@@ -398,7 +411,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	settingsController := handler.NewSettingsHandler(settingsService, backupService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
-	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyFile, appConfig.StorageConfig.Path, appLogger.Named("cloud_sync"))
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyFile, appConfig.StorageConfig.CloudDir(), appLogger.Named("cloud_sync"))
 	// Reconcile import runs left "running"/"queued" by a previous crash/restart
 	// so repositories are not stuck with an import that never finishes.
 	if err := cloudSyncService.RecoverInterruptedRuns(ctx); err != nil {
@@ -410,7 +423,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		appLogger.Warn("failed to reclaim interrupted repository scan runs", zap.Error(err))
 	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, appConfig.StorageConfig.Path, cloudSyncService)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, cloudSyncService)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries)
 
