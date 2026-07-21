@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Cloud, FolderPlus, X } from "lucide-react";
-import { useCloudCredentials } from "@/features/cloud";
+import { useCloudCredentials, createProviderTextResolver } from "@/features/cloud";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useCreateRepository } from "../../api/useCreateRepository";
@@ -14,6 +14,7 @@ export default function AddRepositoryModal({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const providerText = createProviderTextResolver(t);
   const showMessage = useMessage();
   const createRepositoryMutation = useCreateRepository();
   const credentialsQuery = useCloudCredentials();
@@ -166,7 +167,8 @@ export default function AddRepositoryModal({
                 </option>
                 {credentials.map((credential) => (
                   <option key={credential.id} value={credential.id}>
-                    {credential.display_name} · {credential.provider_title ?? credential.provider} ·{" "}
+                    {credential.display_name} ·{" "}
+                    {providerText(credential.provider_title) || credential.provider} ·{" "}
                     {credential.masked_identity}
                   </option>
                 ))}
