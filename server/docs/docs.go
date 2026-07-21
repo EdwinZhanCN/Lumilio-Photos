@@ -1708,7 +1708,7 @@ const docTemplate = `{
             "dto.CloudAuthChallengeDTO": {
                 "properties": {
                     "description": {
-                        "example": "Enter the code sent to your trusted devices.",
+                        "example": "cloudProvider.icloud.challenge.sms.description",
                         "type": "string"
                     },
                     "fields": {
@@ -1718,8 +1718,14 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
+                    "params": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    },
                     "title": {
-                        "example": "Verification required",
+                        "example": "cloudProvider.icloud.challenge.sms.title",
                         "type": "string"
                     },
                     "type": {
@@ -1751,7 +1757,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "provider_title": {
-                        "example": "iCloud",
+                        "example": "cloudProvider.icloud.title",
                         "type": "string"
                     },
                     "public_config": {
@@ -1840,7 +1846,7 @@ const docTemplate = `{
                         "uniqueItems": false
                     },
                     "description": {
-                        "example": "Import originals from iCloud Photos.",
+                        "example": "cloudProvider.icloud.description",
                         "type": "string"
                     },
                     "form_fields": {
@@ -1862,7 +1868,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "title": {
-                        "example": "iCloud",
+                        "example": "cloudProvider.icloud.title",
                         "type": "string"
                     }
                 },
@@ -1878,7 +1884,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "label": {
-                        "example": "Apple ID",
+                        "example": "cloudProvider.icloud.field.username",
                         "type": "string"
                     },
                     "name": {

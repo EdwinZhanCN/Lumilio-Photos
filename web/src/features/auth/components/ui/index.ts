@@ -9,7 +9,6 @@
 
 export { cx } from "./classNames";
 export { passwordStrength } from "./passwordStrength";
-export type { PasswordStrength } from "./passwordStrength";
 export { Brand, AuthShell, CardHead } from "./Shell";
 export type { HeadTone } from "./Shell";
 export { Field, TextInput, PasswordField } from "./Fields";

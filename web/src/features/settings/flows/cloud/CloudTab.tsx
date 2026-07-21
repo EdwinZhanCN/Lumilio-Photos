@@ -20,6 +20,7 @@ import {
   useReconnectCloudCredential,
   useRemoveCloudCredential,
   useVerifyCloudCredentialChallenge,
+  createProviderTextResolver,
   type CloudAuthChallenge,
   type CloudCredential,
   type CloudProvider,
@@ -48,6 +49,7 @@ const credentialStatusClass = (status?: string) => {
 
 export default function CloudTab() {
   const { t } = useI18n();
+  const providerText = createProviderTextResolver(t);
   const providersQuery = useCloudProviders();
   const credentialsQuery = useCloudCredentials();
   const createCredential = useCreateCloudCredential();
@@ -233,12 +235,13 @@ export default function CloudTab() {
     if (!field.name) return null;
     const id = `cloud-field-${field.name}`;
     const value = values[field.name] ?? "";
+    const label = providerText(field.label);
     const onChange = (next: string) =>
       setValues((current) => ({ ...current, [field.name!]: next }));
 
     return (
       <label key={field.name} className="form-control w-full" htmlFor={id}>
-        <span className="label-text pb-1 text-sm font-medium">{field.label}</span>
+        <span className="label-text pb-1 text-sm font-medium">{label}</span>
         {field.type === "select" ? (
           <SettingsDropdown
             id={id}
@@ -246,10 +249,10 @@ export default function CloudTab() {
             disabled={disabled}
             options={(field.options ?? []).map((option) => ({
               value: option.value ?? "",
-              label: option.label ?? option.value ?? "",
+              label: providerText(option.label) || option.value || "",
             }))}
             onChange={onChange}
-            ariaLabel={field.label}
+            ariaLabel={label}
             className="w-full"
             menuClassName="w-full"
           />
@@ -260,14 +263,14 @@ export default function CloudTab() {
             className={`input input-bordered w-full ${field.type === "password" ? "font-mono" : ""}`}
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            placeholder={field.placeholder}
+            placeholder={providerText(field.placeholder) || undefined}
             autoComplete={field.autocomplete}
             disabled={disabled}
             required={field.required}
           />
         )}
         {field.help_text && (
-          <span className="mt-1 text-xs text-base-content/55">{field.help_text}</span>
+          <span className="mt-1 text-xs text-base-content/55">{providerText(field.help_text)}</span>
         )}
       </label>
     );
@@ -309,7 +312,7 @@ export default function CloudTab() {
               iconColor="bg-info text-info-content"
               label={credential.display_name}
               description={t("settings.cloud.credentialMeta", {
-                provider: credential.provider_title ?? credential.provider,
+                provider: providerText(credential.provider_title) || credential.provider,
                 identity: credential.masked_identity,
               })}
               value={
@@ -380,19 +383,22 @@ export default function CloudTab() {
               <div>
                 <h3 className="text-lg font-semibold">
                   {pendingChallenge
-                    ? (pendingChallenge.title ?? t("settings.cloud.verifyTitle"))
+                    ? (providerText(pendingChallenge.title) ||
+                      t("settings.cloud.verifyTitle"))
                     : selectedProvider
-                      ? t("settings.cloud.providerFormTitle", { provider: selectedProvider.title })
+                      ? t("settings.cloud.providerFormTitle", {
+                          provider: providerText(selectedProvider.title),
+                        })
                       : t("settings.cloud.providerTitle")}
                 </h3>
                 <p className="mt-1 text-sm text-base-content/65">
                   {pendingChallenge
-                    ? (pendingChallenge.description ??
+                    ? (providerText(pendingChallenge.description, pendingChallenge.params) ||
                       t("settings.cloud.verifyDescription", {
                         name: pendingCredential?.display_name,
                       }))
                     : selectedProvider
-                      ? (selectedProvider.security_note ??
+                      ? (providerText(selectedProvider.security_note) ||
                         t("settings.cloud.providerFormDescription"))
                       : t("settings.cloud.providerDescription")}
                 </p>
@@ -422,8 +428,10 @@ export default function CloudTab() {
                       <CloudIcon size={20} />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold">{provider.title}</div>
-                      <div className="text-sm text-base-content/60">{provider.description}</div>
+                      <div className="font-semibold">{providerText(provider.title)}</div>
+                      <div className="text-sm text-base-content/60">
+                        {providerText(provider.description)}
+                      </div>
                     </div>
                   </button>
                 ))}
