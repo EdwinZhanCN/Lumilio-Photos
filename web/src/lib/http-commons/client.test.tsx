@@ -1,16 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { http, HttpResponse, worker } from "@test/msw";
+import { client } from "./client.ts";
+import { registerSessionExpiredHandler } from "./sessionEvents.ts";
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+// The real OpenAPI client runs against MSW at the HTTP boundary, so the
+// 401 → refresh → retry rotation, body replay and session-expiry signalling are
+// exercised end to end without stubbing fetch (which fights the MSW worker).
 
 describe("authenticated OpenAPI client", () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.restoreAllMocks();
-    vi.resetModules();
   });
 
   it("serializes refresh-token rotation across concurrent 401 responses", async () => {
@@ -24,25 +23,22 @@ describe("authenticated OpenAPI client", () => {
       releaseRefresh = resolve;
     });
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (request.url.endsWith("/api/v1/auth/refresh")) {
+    worker.use(
+      http.post("*/api/v1/auth/refresh", async () => {
         refreshRequests += 1;
         await bothRequestsStarted;
-        return json({ token: "fresh-access", refreshToken: "refresh-two" });
-      }
+        return HttpResponse.json({ token: "fresh-access", refreshToken: "refresh-two" });
+      }),
+      http.get("*/api/v1/auth/me", ({ request }) => {
+        if (request.headers.get("Authorization") === "Bearer expired-access") {
+          initialRequests += 1;
+          if (initialRequests === 2) releaseRefresh?.();
+          return HttpResponse.json({ message: "expired" }, { status: 401 });
+        }
+        return HttpResponse.json({ user_id: 1, username: "alice" });
+      }),
+    );
 
-      if (request.headers.get("Authorization") === "Bearer expired-access") {
-        initialRequests += 1;
-        if (initialRequests === 2) releaseRefresh?.();
-        return json({ message: "expired" }, 401);
-      }
-
-      return json({ user_id: 1, username: "alice" });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const { client } = await import("./client.ts");
     const [first, second] = await Promise.all([
       client.GET("/api/v1/auth/me"),
       client.GET("/api/v1/auth/me"),
@@ -60,21 +56,19 @@ describe("authenticated OpenAPI client", () => {
     localStorage.setItem("refresh_token", "refresh-one");
 
     const seenBodies: string[] = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (request.url.endsWith("/api/v1/auth/refresh")) {
-        return json({ token: "fresh-access", refreshToken: "refresh-two" });
-      }
+    worker.use(
+      http.post("*/api/v1/auth/refresh", () =>
+        HttpResponse.json({ token: "fresh-access", refreshToken: "refresh-two" }),
+      ),
+      http.post("*/api/v1/assets/precheck", async ({ request }) => {
+        seenBodies.push(await request.text());
+        if (request.headers.get("Authorization") === "Bearer expired-access") {
+          return HttpResponse.json({ message: "expired" }, { status: 401 });
+        }
+        return HttpResponse.json({ results: [] });
+      }),
+    );
 
-      seenBodies.push(await request.text());
-      if (request.headers.get("Authorization") === "Bearer expired-access") {
-        return json({ message: "expired" }, 401);
-      }
-      return json({ results: [] });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const { client } = await import("./client.ts");
     const result = await client.POST("/api/v1/assets/precheck", {
       body: { files: [{ hash: "abc", size: 123 }] },
     });
@@ -90,18 +84,17 @@ describe("authenticated OpenAPI client", () => {
     localStorage.setItem("auth_token", "expired-access");
     localStorage.setItem("refresh_token", "expired-refresh");
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      return request.url.endsWith("/api/v1/auth/refresh")
-        ? json({ message: "invalid refresh token" }, 401)
-        : json({ message: "expired access token" }, 401);
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    worker.use(
+      http.post("*/api/v1/auth/refresh", () =>
+        HttpResponse.json({ message: "invalid refresh token" }, { status: 401 }),
+      ),
+      http.get("*/api/v1/auth/me", () =>
+        HttpResponse.json({ message: "expired access token" }, { status: 401 }),
+      ),
+    );
 
-    const { registerSessionExpiredHandler } = await import("./sessionEvents.ts");
     const handleSessionExpired = vi.fn();
     const unregister = registerSessionExpiredHandler(handleSessionExpired);
-    const { client } = await import("./client.ts");
 
     await client.GET("/api/v1/auth/me");
     await client.GET("/api/v1/auth/me");

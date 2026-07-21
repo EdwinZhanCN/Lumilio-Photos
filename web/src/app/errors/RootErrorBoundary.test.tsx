@@ -1,27 +1,25 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
+import { renderWithProviders } from "@test/render";
 import { RootErrorFallback } from "./RootErrorBoundary";
 
-vi.mock("@/lib/i18n.tsx", () => ({
-  useI18n: () => ({ t: (_key: string, fallback: string) => fallback }),
-}));
-
 describe("RootErrorFallback", () => {
-  it("offers recovery without depending on the router", () => {
+  it("offers recovery without depending on the router", async () => {
     const resetErrorBoundary = vi.fn();
 
-    render(
-      <RootErrorFallback
-        error={new Error("render failed")}
-        resetErrorBoundary={resetErrorBoundary}
-      />,
+    const screen = await renderWithProviders(
+      <RootErrorFallback error={new Error("render failed")} resetErrorBoundary={resetErrorBoundary} />,
+      { router: false },
     );
 
-    expect(screen.getByRole("heading", { name: "Lumilio could not continue" })).toBeVisible();
-    expect(screen.getByText("render failed")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Return home" })).toHaveAttribute("href", "/");
+    await expect
+      .element(screen.getByRole("heading", { name: "Lumilio could not continue" }))
+      .toBeVisible();
+    await expect.element(screen.getByText("render failed")).toBeVisible();
+    await expect
+      .element(screen.getByRole("link", { name: "Return home" }))
+      .toHaveAttribute("href", "/");
 
-    fireEvent.click(screen.getByRole("button", { name: "Reload application" }));
+    await screen.getByRole("button", { name: "Reload application" }).click();
     expect(resetErrorBoundary).toHaveBeenCalledOnce();
   });
 });

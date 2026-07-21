@@ -11,13 +11,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const hashPerformanceEnabled = process.env.VITEST_HASH_PERF === "true";
 const testProjects = [
   {
+    // Pure logic in Node: no DOM, window, storage, Testing Library, Router or
+    // QueryClient. The missing browser globals are the point — they turn an
+    // accidental browser dependency into a failure instead of hiding it.
     extends: true,
     test: {
-      name: "happy-dom",
-      environment: "happy-dom",
-      setupFiles: ["./setup.happy-dom.ts"],
-      include: ["src/**/*.{test,spec}.{ts,tsx}"],
-      exclude: ["src/workers/*", "src/**/*.browser.test.ts", "**/node_modules/**"],
+      name: "unit",
+      environment: "node",
+      include: ["src/**/*.test.ts"],
+      exclude: ["src/**/*.browser.test.ts", "src/workers/**", "**/node_modules/**"],
+    },
+  },
+  {
+    // Components (*.test.tsx) and colocated flow integration (*.spec.tsx) run in
+    // real Chromium via vitest-browser-react, so CSS, browser APIs and event
+    // handling are the real thing rather than a simulated-DOM approximation. MSW
+    // at the HTTP boundary is wired in test/setup.integration.ts.
+    extends: true,
+    test: {
+      name: "integration",
+      setupFiles: ["./test/setup.integration.ts"],
+      include: ["src/**/*.test.tsx", "src/**/*.spec.tsx"],
+      exclude: ["src/**/*.browser.test.ts", "**/node_modules/**"],
+      browser: {
+        enabled: true,
+        provider: playwright(),
+        instances: [{ browser: "chromium", headless: true }],
+      },
     },
   },
   {
@@ -26,7 +46,7 @@ const testProjects = [
       name: hashPerformanceEnabled ? "hash-performance" : "browser",
       include: hashPerformanceEnabled
         ? ["src/workers/hash.perf.test.ts"]
-        : ["src/workers/hash.test.ts", "src/**/*.browser.test.ts"],
+        : ["src/**/*.browser.test.ts"],
       exclude: ["**/node_modules/**"],
       testTimeout: 300_000,
       browser: {
@@ -49,6 +69,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@test": path.resolve(__dirname, "./test"),
     },
   },
   server: {
@@ -85,6 +106,7 @@ export default defineConfig({
       "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
+      "public/mockServiceWorker.js",
     ],
     jsPlugins: ["@edwinzhancn/docts/oxlint"],
     rules: {
@@ -114,6 +136,7 @@ export default defineConfig({
       "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
+      "public/mockServiceWorker.js",
     ],
     semi: true,
     singleQuote: false,

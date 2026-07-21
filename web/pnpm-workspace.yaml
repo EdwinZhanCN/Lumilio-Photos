@@ -2,11 +2,27 @@ allowBuilds:
   "@parcel/watcher": true
   "@swc/core": true
   esbuild: true
+  msw: true
 
 minimumReleaseAgeExclude:
   - "@edwinzhancn/docts@0.1.0"
 
 # Route transitive Vite/Vitest consumers through the Vite+ alpha packages.
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@0.1.23
-  vitest: npm:@voidzero-dev/vite-plus-test@0.1.23
+  vite: 'catalog:'
+  vitest: 'catalog:'
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.5
+  vitest: 4.1.10
+  vite-plus: 0.2.5
+  '@vitest/browser-playwright': 4.1.10
+  '@vitest/coverage-istanbul': 4.1.10
+  '@vitest/coverage-v8': 4.1.10
+  '@vitest/ui': 4.1.10
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: '*'
+    vitest: '*'

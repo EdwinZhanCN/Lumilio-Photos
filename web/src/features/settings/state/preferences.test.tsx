@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { PREFERENCES_STORAGE_KEY, PREFERENCES_STORAGE_VERSION } from "@/lib/settings/registry";
 import {
   DEFAULT_PREFERENCES,

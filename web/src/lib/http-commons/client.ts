@@ -116,7 +116,10 @@ export const authMiddleware: Middleware = {
 
     const headers = new Headers(replay.headers);
     headers.set("Authorization", `Bearer ${token}`);
-    return options.fetch(new Request(replay, { headers }));
+    // Call through a local binding: `options.fetch(...)` invokes native fetch with
+    // `this === options`, which throws "Illegal invocation" in the browser.
+    const { fetch: forwardRequest } = options;
+    return forwardRequest(new Request(replay, { headers }));
   },
   onError({ id }) {
     replayRequests.delete(id);

@@ -21,7 +21,7 @@ profile-pinned assets, isolated state, and Playwright diagnostics.
   in `src/workers/hash.test.ts`; upload SSE/fallback transitions moved to
   `src/lib/upload/uploadLifecycle.browser.test.ts` (Vitest browser project,
   renamed from `hash-contract` to `browser`); upload non-2xx error mapping
-  moved to `src/lib/upload/uploadTransport.test.ts` (happy-dom); the
+  moved to `src/lib/upload/uploadTransport.test.ts` (Vitest `unit` project, Node); the
   cross-origin-isolation header check moved to
   `e2e/specs/capabilities.spec.ts`, now asserted against the real Compose web
   service (Caddy) instead of a Vite preview.
