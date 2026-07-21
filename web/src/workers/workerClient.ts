@@ -10,7 +10,7 @@
 import { detectDeviceCapabilities } from "@/lib/workers/batchSizing.ts";
 import type { LayoutBox, LayoutConfig, LayoutResult } from "@/lib/layout/justifiedLayout";
 
-export type WorkerType = "hash" | "justified" | "tool";
+export type WorkerType = "hash" | "justified";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
@@ -26,11 +26,8 @@ export interface SingleHashResult {
 export class AppWorkerClient {
   private hashWorkers: Worker[] = [];
   private justifiedLayoutWorker: Worker | null = null;
-  private toolWorker: Worker | null = null;
   private justifiedInitPromise: Promise<void> | null = null;
   private justifiedRequestId = 0;
-  private toolRequestId = 0;
-  private toolLoadedSet: Set<string> = new Set();
 
   private eventTarget: EventTarget;
 
@@ -63,13 +60,6 @@ export class AppWorkerClient {
         }
         return this.justifiedLayoutWorker;
 
-      case "tool":
-        if (!this.toolWorker) {
-          this.toolWorker = new Worker(new URL("./tool.worker.ts", import.meta.url), {
-            type: "module",
-          });
-        }
-        return this.toolWorker;
 
       default:
         throw new Error(`Unknown worker type: ${String(type)}`);
@@ -85,11 +75,6 @@ export class AppWorkerClient {
   private nextJustifiedRequestId(): number {
     this.justifiedRequestId += 1;
     return this.justifiedRequestId;
-  }
-
-  private nextToolRequestId(): number {
-    this.toolRequestId += 1;
-    return this.toolRequestId;
   }
 
   async initializeJustifiedLayout(): Promise<void> {
@@ -262,120 +247,6 @@ export class AppWorkerClient {
     this.hashWorkers.forEach((w) => w.postMessage({ type: "ABORT" }));
   }
 
-  // --- Tool Runtime ---
-  async loadTool(toolId: string): Promise<void> {
-    if (this.toolLoadedSet.has(toolId)) {
-      return;
-    }
-
-    const worker = this.getOrInitializeWorker("tool");
-
-    await new Promise<void>((resolve, reject) => {
-      const timeoutId = globalThis.setTimeout(() => {
-        worker.removeEventListener("message", handler);
-        reject(new Error(`Timed out loading tool: ${toolId}`));
-      }, 15000);
-
-      const handler = (event: MessageEvent) => {
-        const { type, payload } = event.data || {};
-
-        if (type === "TOOL_LOADED" && payload?.toolId === toolId) {
-          globalThis.clearTimeout(timeoutId);
-          worker.removeEventListener("message", handler);
-          this.toolLoadedSet.add(toolId);
-          resolve();
-          return;
-        }
-
-        if (type === "ERROR" && payload?.stage === "load_tool" && payload?.toolId === toolId) {
-          globalThis.clearTimeout(timeoutId);
-          worker.removeEventListener("message", handler);
-          reject(new Error(payload?.error || `Failed to load tool: ${toolId}`));
-        }
-      };
-
-      worker.addEventListener("message", handler);
-      worker.postMessage({
-        type: "LOAD_TOOL",
-        payload: { toolId },
-      });
-    });
-  }
-
-  async runTool(
-    toolId: string,
-    file: File,
-    params: Record<string, unknown>,
-  ): Promise<{
-    fileName: string;
-    mimeType: string;
-    blob: Blob;
-  }> {
-    await this.loadTool(toolId);
-    const worker = this.getOrInitializeWorker("tool");
-    const requestId = this.nextToolRequestId();
-
-    return new Promise((resolve, reject) => {
-      const handler = (event: MessageEvent) => {
-        const { type, payload } = event.data || {};
-
-        if (!payload || payload.requestId !== requestId) {
-          return;
-        }
-
-        if (type === "TOOL_PROGRESS") {
-          this.eventTarget.dispatchEvent(
-            new CustomEvent("progress", {
-              detail: {
-                operation: "tool",
-                processed: payload.processed,
-                total: payload.total,
-              },
-            }),
-          );
-          return;
-        }
-
-        if (type === "TOOL_COMPLETE") {
-          worker.removeEventListener("message", handler);
-          const bytes =
-            payload.bytes instanceof Uint8Array ? payload.bytes : new Uint8Array(payload.bytes);
-
-          resolve({
-            fileName: payload.fileName || "tool-output.bin",
-            mimeType: payload.mimeType || "application/octet-stream",
-            blob: new Blob([bytes], {
-              type: payload.mimeType || "application/octet-stream",
-            }),
-          });
-          return;
-        }
-
-        if (type === "ERROR" && payload.stage === "run_tool") {
-          worker.removeEventListener("message", handler);
-          reject(new Error(payload.error || `Tool execution failed: ${toolId}`));
-        }
-      };
-
-      worker.addEventListener("message", handler);
-      worker.postMessage({
-        type: "RUN_TOOL",
-        payload: {
-          requestId,
-          toolId,
-          file,
-          params,
-        },
-      });
-    });
-  }
-
-  abortTool(): void {
-    if (this.toolWorker) {
-      this.toolWorker.postMessage({ type: "ABORT" });
-    }
-  }
-
   // --- Lifecycle Management ---
   terminateAllWorkers(): void {
     this.hashWorkers.forEach((w) => {
@@ -386,12 +257,7 @@ export class AppWorkerClient {
       this.justifiedLayoutWorker.terminate();
       this.justifiedLayoutWorker = null;
     }
-    if (this.toolWorker) {
-      this.toolWorker.terminate();
-      this.toolWorker = null;
-    }
     this.justifiedInitPromise = null;
-    this.toolLoadedSet.clear();
     console.log("All workers terminated.");
   }
 }

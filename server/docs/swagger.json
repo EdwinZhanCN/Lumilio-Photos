@@ -3109,6 +3109,16 @@
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
+                    "canvas": {
+                        "$ref": "#/components/schemas/dto.StudioCanvasDTO"
+                    },
+                    "layers": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.StudioLayerDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "source": {
                         "$ref": "#/components/schemas/dto.LumilioSidecarSourceDTO"
                     },
@@ -4832,6 +4842,111 @@
                 },
                 "type": "object"
             },
+            "dto.StudioCanvasBackgroundDTO": {
+                "properties": {
+                    "angle": {
+                        "example": 180,
+                        "type": "number"
+                    },
+                    "blur": {
+                        "example": 0.06,
+                        "type": "number"
+                    },
+                    "brightness": {
+                        "example": -0.16,
+                        "type": "number"
+                    },
+                    "color": {
+                        "example": "#ffffff",
+                        "type": "string"
+                    },
+                    "from": {
+                        "example": "#ffffff",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "example": "solid",
+                        "type": "string"
+                    },
+                    "overscan": {
+                        "example": 1.12,
+                        "type": "number"
+                    },
+                    "to": {
+                        "example": "#d4d4d4",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioCanvasDTO": {
+                "properties": {
+                    "background": {
+                        "$ref": "#/components/schemas/dto.StudioCanvasBackgroundDTO"
+                    },
+                    "innerRadius": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "outerRadius": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "pad": {
+                        "$ref": "#/components/schemas/dto.StudioCanvasPadDTO"
+                    },
+                    "scrim": {
+                        "$ref": "#/components/schemas/dto.StudioCanvasScrimDTO"
+                    },
+                    "vignette": {
+                        "example": 0,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioCanvasPadDTO": {
+                "properties": {
+                    "bottom": {
+                        "example": 0.18,
+                        "type": "number"
+                    },
+                    "left": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "right": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "top": {
+                        "example": 0,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioCanvasScrimDTO": {
+                "properties": {
+                    "edge": {
+                        "example": "bottom",
+                        "type": "string"
+                    },
+                    "from": {
+                        "example": "rgba(0,0,0,0)",
+                        "type": "string"
+                    },
+                    "height": {
+                        "example": 0.32,
+                        "type": "number"
+                    },
+                    "to": {
+                        "example": "rgba(0,0,0,0.5)",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.StudioEditAdjustmentsDTO": {
                 "properties": {
                     "blacks": {
@@ -4920,6 +5035,228 @@
                     },
                     "y": {
                         "example": 0,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioLayerDTO": {
+                "properties": {
+                    "align": {
+                        "example": "center",
+                        "type": "string"
+                    },
+                    "background": {
+                        "$ref": "#/components/schemas/dto.StudioTextBackgroundDTO"
+                    },
+                    "brand": {
+                        "description": "Logo layers.",
+                        "example": "fujifilm",
+                        "type": "string"
+                    },
+                    "color": {
+                        "example": "#1a1a1a",
+                        "type": "string"
+                    },
+                    "fill": {
+                        "$ref": "#/components/schemas/dto.StudioLayerFillDTO"
+                    },
+                    "font": {
+                        "$ref": "#/components/schemas/dto.StudioTextFontDTO"
+                    },
+                    "fromTemplate": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "example": "text-lz4k2p-1",
+                        "type": "string"
+                    },
+                    "opacity": {
+                        "example": 1,
+                        "type": "number"
+                    },
+                    "rotation": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "shadow": {
+                        "$ref": "#/components/schemas/dto.StudioLayerShadowDTO"
+                    },
+                    "size": {
+                        "example": 0.12,
+                        "type": "number"
+                    },
+                    "strikethrough": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "stroke": {
+                        "$ref": "#/components/schemas/dto.StudioTextStrokeDTO"
+                    },
+                    "text": {
+                        "description": "Text layers.",
+                        "example": "X-T5",
+                        "type": "string"
+                    },
+                    "textCase": {
+                        "example": "none",
+                        "type": "string"
+                    },
+                    "type": {
+                        "example": "text",
+                        "type": "string"
+                    },
+                    "underline": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "variant": {
+                        "example": "wordmark",
+                        "type": "string"
+                    },
+                    "x": {
+                        "example": 0.5,
+                        "type": "number"
+                    },
+                    "y": {
+                        "example": 0.9,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioLayerFillDTO": {
+                "properties": {
+                    "angle": {
+                        "example": 90,
+                        "type": "number"
+                    },
+                    "color": {
+                        "example": "#ffffff",
+                        "type": "string"
+                    },
+                    "from": {
+                        "example": "#ffffff",
+                        "type": "string"
+                    },
+                    "fromOpacity": {
+                        "example": 1,
+                        "type": "number"
+                    },
+                    "kind": {
+                        "example": "solid",
+                        "type": "string"
+                    },
+                    "opacity": {
+                        "example": 1,
+                        "type": "number"
+                    },
+                    "to": {
+                        "example": "#d2a05a",
+                        "type": "string"
+                    },
+                    "toOpacity": {
+                        "example": 1,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioLayerShadowDTO": {
+                "properties": {
+                    "blur": {
+                        "example": 0.006,
+                        "type": "number"
+                    },
+                    "color": {
+                        "example": "#000000",
+                        "type": "string"
+                    },
+                    "offsetX": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "offsetY": {
+                        "example": 0.003,
+                        "type": "number"
+                    },
+                    "opacity": {
+                        "example": 0.6,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioTextBackgroundDTO": {
+                "properties": {
+                    "fill": {
+                        "$ref": "#/components/schemas/dto.StudioLayerFillDTO"
+                    },
+                    "padding": {
+                        "$ref": "#/components/schemas/dto.StudioTextBackgroundPaddingDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioTextBackgroundPaddingDTO": {
+                "properties": {
+                    "bottom": {
+                        "example": 0.15,
+                        "type": "number"
+                    },
+                    "left": {
+                        "example": 0.25,
+                        "type": "number"
+                    },
+                    "right": {
+                        "example": 0.25,
+                        "type": "number"
+                    },
+                    "top": {
+                        "example": 0.15,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioTextFontDTO": {
+                "properties": {
+                    "family": {
+                        "example": "Plus Jakarta Sans",
+                        "type": "string"
+                    },
+                    "italic": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "lineHeight": {
+                        "example": 1.2,
+                        "type": "number"
+                    },
+                    "size": {
+                        "example": 0.06,
+                        "type": "number"
+                    },
+                    "tracking": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "weight": {
+                        "example": 400,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioTextStrokeDTO": {
+                "properties": {
+                    "color": {
+                        "example": "#000000",
+                        "type": "string"
+                    },
+                    "width": {
+                        "example": 0.002,
                         "type": "number"
                     }
                 },
