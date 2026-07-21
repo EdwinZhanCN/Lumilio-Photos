@@ -1,49 +1,20 @@
-import { cleanup, render, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
+import { renderWithProviders } from "@test/render";
 import type { Asset } from "@/lib/assets/types";
 import { createBrowseGroupsFromAssets } from "../../../../model/browseItems";
+import { AssetBrowserScope } from "../../selection/AssetBrowserScope";
 import SquareGallery from "./SquareGallery";
 
+// Real browser layout, matchMedia, ResizeObserver and IntersectionObserver drive
+// the viewport windowing under test — the whole point of running in Chromium
+// rather than approximating them. Only the leaf thumbnails are stubbed so the
+// windowing is measured without loading thousands of images.
 vi.mock("../media/MediaThumbnail", () => ({
   default: ({ asset }: { asset: Asset }) => <div>{asset.asset_id}</div>,
 }));
 vi.mock("../media/StackedThumbnail", () => ({
   default: ({ asset }: { asset: Asset }) => <div>{asset.asset_id}</div>,
 }));
-vi.mock("../../selection/useSelectionKeyboard", () => ({
-  useSelectionKeyboard: () => ({
-    enabled: false,
-    handleClick: vi.fn(),
-    handleKeyDown: vi.fn(),
-    isSelected: () => false,
-  }),
-}));
-vi.mock("../useGalleryInfiniteScroll", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../useGalleryInfiniteScroll")>();
-  return { ...original, useGalleryInfiniteScroll: () => ({ supportsIntersectionObserver: true }) };
-});
-vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({
-    t: (_key: string, options?: { count?: number }) => String(options?.count ?? _key),
-    i18n: { language: "en", resolvedLanguage: "en" },
-  }),
-}));
-
-beforeEach(() => {
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })),
-  );
-});
-
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-});
 
 describe("SquareGallery large-library window", () => {
   it("keeps mounted media bounded for a 10,000-item fixture", async () => {
@@ -54,20 +25,23 @@ describe("SquareGallery large-library window", () => {
         original_filename: `asset-${index}.jpg`,
       }),
     );
-    const { container } = render(
-      <SquareGallery
-        browseGroups={createBrowseGroupsFromAssets(assets)}
-        openCarousel={vi.fn()}
-        onLoadMore={vi.fn()}
-        hasMore={false}
-        isLoadingMore={false}
-        columns={4}
-      />,
+
+    await renderWithProviders(
+      <AssetBrowserScope scopeId="square-gallery-test">
+        <SquareGallery
+          browseGroups={createBrowseGroupsFromAssets(assets)}
+          openCarousel={vi.fn()}
+          onLoadMore={vi.fn()}
+          hasMore={false}
+          isLoadingMore={false}
+          columns={4}
+        />
+      </AssetBrowserScope>,
     );
 
-    await waitFor(() => {
-      expect(container.querySelector("[data-gallery-total='10000']")).not.toBeNull();
+    await vi.waitFor(() => {
+      expect(document.querySelector("[data-gallery-total='10000']")).not.toBeNull();
     });
-    expect(container.querySelectorAll("[data-asset-id]").length).toBeLessThanOrEqual(48);
+    expect(document.querySelectorAll("[data-asset-id]").length).toBeLessThanOrEqual(48);
   });
 });

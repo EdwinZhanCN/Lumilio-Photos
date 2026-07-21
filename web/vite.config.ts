@@ -23,15 +23,21 @@ const testProjects = [
     },
   },
   {
-    // Components (*.test.tsx) and colocated flow integration (*.spec.tsx) share
-    // happy-dom, Testing Library and the same setup.
+    // Components (*.test.tsx) and colocated flow integration (*.spec.tsx) run in
+    // real Chromium via vitest-browser-react, so CSS, browser APIs and event
+    // handling are the real thing rather than a simulated-DOM approximation. MSW
+    // at the HTTP boundary is wired in test/setup.integration.ts.
     extends: true,
     test: {
       name: "integration",
-      environment: "happy-dom",
       setupFiles: ["./test/setup.integration.ts"],
       include: ["src/**/*.test.tsx", "src/**/*.spec.tsx"],
       exclude: ["src/**/*.browser.test.ts", "**/node_modules/**"],
+      browser: {
+        enabled: true,
+        provider: playwright(),
+        instances: [{ browser: "chromium", headless: true }],
+      },
     },
   },
   {
@@ -63,6 +69,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@test": path.resolve(__dirname, "./test"),
     },
   },
   server: {
@@ -99,6 +106,7 @@ export default defineConfig({
       "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
+      "public/mockServiceWorker.js",
     ],
     jsPlugins: ["@edwinzhancn/docts/oxlint"],
     rules: {
@@ -128,6 +136,7 @@ export default defineConfig({
       "src/features/*/doc.md",
       "src/wasm/**",
       "src/lib/http-commons/schema.d.ts",
+      "public/mockServiceWorker.js",
     ],
     semi: true,
     singleQuote: false,

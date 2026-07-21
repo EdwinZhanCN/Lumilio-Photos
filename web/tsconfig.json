@@ -20,9 +20,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@test/*": ["./test/*"]
     },
-    "types": ["node", "vite-plus/client", "vite-plus/test/globals", "@testing-library/jest-dom"]
+    "types": ["node", "vite-plus/client", "vite-plus/test/globals"]
   },
   "include": ["src", "e2e", "test", "playwright.config.ts", "vite.config.ts"]
 }
