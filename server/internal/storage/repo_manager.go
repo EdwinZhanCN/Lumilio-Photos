@@ -596,7 +596,7 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 
 func (rm *DefaultRepositoryManager) repoAudit(repoPath string) logging.RepositoryAuditLogger {
 	if rm.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(rm.logger, false).ForPath(repoPath)
+		return logging.NoopRepositoryAuditLogger()
 	}
 	return rm.auditProvider.ForPath(repoPath)
 }

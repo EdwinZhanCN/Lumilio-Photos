@@ -84,11 +84,8 @@ func NewAssetProcessor(
 }
 
 func (ap *AssetProcessor) repoAudit(repoPath string) logging.RepositoryAuditLogger {
-	if ap == nil {
-		return logging.NewRepositoryAuditProvider(zap.NewNop(), false).ForPath(repoPath)
-	}
-	if ap.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(ap.logger, false).ForPath(repoPath)
+	if ap == nil || ap.auditProvider == nil {
+		return logging.NoopRepositoryAuditLogger()
 	}
 	return ap.auditProvider.ForPath(repoPath)
 }

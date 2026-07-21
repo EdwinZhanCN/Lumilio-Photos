@@ -165,7 +165,10 @@ func newEncoder(format string, development bool, fileOutput bool) zapcore.Encode
 	}
 }
 
-func newRollingWriter(path string) io.Writer {
+// newRollingWriter returns the concrete *lumberjack.Logger rather than an
+// io.Writer: lumberjack holds the file open, so a caller that cannot reach
+// Close leaks a handle for the process's lifetime.
+func newRollingWriter(path string) *lumberjack.Logger {
 	return &lumberjack.Logger{
 		Filename:   path,
 		MaxSize:    defaultMaxSizeMB,

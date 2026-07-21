@@ -13,6 +13,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/sourcing"
+	"server/internal/storage"
 )
 
 // ProcessDiscoveredAsset ingests files discovered by repository tree monitoring.
@@ -84,7 +85,7 @@ func sanitizeDiscoveredPath(path string) (string, error) {
 	}
 
 	clean := filepath.Clean(filepath.FromSlash(raw))
-	if filepath.IsAbs(clean) || clean == "." || clean == ".." {
+	if storage.IsRootedPath(clean) || clean == "." || clean == ".." {
 		return "", fmt.Errorf("invalid discovered relative path: %s", path)
 	}
 	if strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
