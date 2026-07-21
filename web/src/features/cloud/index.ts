@@ -16,3 +16,5 @@ export {
   useVerifyCloudCredentialChallenge,
 } from "./api/useCloudCredentials";
 export { useRepositoryCloudStatus, useStartRepositoryCloudImport } from "./api/useRepositoryCloud";
+export { createProviderTextResolver } from "./model/providerText";
+export type { ProviderTextResolver } from "./model/providerText";

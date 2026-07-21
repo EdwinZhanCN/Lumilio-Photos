@@ -11995,10 +11995,13 @@ export interface components {
             matches?: components["schemas"]["dto.ClassifierPreviewMatchDTO"][];
         };
         "dto.CloudAuthChallengeDTO": {
-            /** @example Enter the code sent to your trusted devices. */
+            /** @example cloudProvider.icloud.challenge.sms.description */
             description?: string;
             fields?: components["schemas"]["dto.CloudProviderFieldDTO"][];
-            /** @example Verification required */
+            params?: {
+                [key: string]: string;
+            };
+            /** @example cloudProvider.icloud.challenge.sms.title */
             title?: string;
             /** @example verification_code */
             type?: string;
@@ -12013,7 +12016,7 @@ export interface components {
             masked_identity?: string;
             /** @example icloud */
             provider?: string;
-            /** @example iCloud */
+            /** @example cloudProvider.icloud.title */
             provider_title?: string;
             public_config?: {
                 [key: string]: string;
@@ -12051,7 +12054,7 @@ export interface components {
         };
         "dto.CloudProviderDTO": {
             challenge_fields?: components["schemas"]["dto.CloudProviderFieldDTO"][];
-            /** @example Import originals from iCloud Photos. */
+            /** @example cloudProvider.icloud.description */
             description?: string;
             form_fields?: components["schemas"]["dto.CloudProviderFieldDTO"][];
             /** @example icloud */
@@ -12059,14 +12062,14 @@ export interface components {
             security_note?: string;
             /** @example enabled */
             status?: string;
-            /** @example iCloud */
+            /** @example cloudProvider.icloud.title */
             title?: string;
         };
         "dto.CloudProviderFieldDTO": {
             /** @example username */
             autocomplete?: string;
             help_text?: string;
-            /** @example Apple ID */
+            /** @example cloudProvider.icloud.field.username */
             label?: string;
             /** @example username */
             name?: string;

@@ -519,6 +519,18 @@
         "activeLabel": "Passkey active"
       }
     },
+    "passwordField": {
+      "hidePassword": "Hide password",
+      "password": "Password",
+      "showPassword": "Show password"
+    },
+    "passwordStrength": {
+      "fair": "Fair",
+      "good": "Good",
+      "strong": "Strong",
+      "tooShort": "Too short",
+      "weak": "Weak"
+    },
     "primaryRepository": {
       "description": "Choose where Lumilio should store the first local repository. Existing settings use this as the default for future repositories too.",
       "duplicates": "Duplicates",
@@ -604,6 +616,33 @@
     "updateError": "Failed to update items",
     "updateSuccess_one": "Updated {{count}} item.",
     "updateSuccess_other": "Updated {{count}} items."
+  },
+  "cloudProvider": {
+    "icloud": {
+      "challenge": {
+        "field": {
+          "code": "Verification code"
+        },
+        "sms": {
+          "description": "Enter the verification code sent to {{phone}}.",
+          "title": "Verification required"
+        }
+      },
+      "description": "Import originals from iCloud Photos.",
+      "field": {
+        "domain": "Apple domain",
+        "password": "Password",
+        "username": "Apple ID"
+      },
+      "option": {
+        "domain": {
+          "cn": "Mainland China iCloud",
+          "com": "Global iCloud"
+        }
+      },
+      "securityNote": "Lumilio uses the password only during authentication and stores the resulting session in an isolated credential directory.",
+      "title": "iCloud"
+    }
   },
   "collections": {
     "album": "Album",
