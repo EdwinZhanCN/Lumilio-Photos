@@ -2004,15 +2004,69 @@
       "properties": "图像属性",
       "title": "EXIF 元数据"
     },
-    "home": {
-      "border": {
-        "body": "为照片添加彩色、磨砂或暗角边框 — 在您的编辑之上应用。",
-        "title": "添加边框"
+    "frame": {
+      "blur": "模糊",
+      "border": "边框",
+      "bottomExtra": "底部加宽",
+      "brightness": "亮度",
+      "clear": "移除边框",
+      "color": "颜色",
+      "family": {
+        "bar": "信息条",
+        "dual": "双标",
+        "editorial": "杂志",
+        "margin": "留白",
+        "overlay": "图内叠加",
+        "vertical": "竖排"
       },
+      "frosted": "毛玻璃",
+      "gradient": "渐变",
+      "gradientAngle": "角度",
+      "gradientFrom": "渐变起色",
+      "gradientStops": "起止色",
+      "gradientTo": "渐变止色",
+      "innerRadius": "照片圆角",
+      "noExif": "这张照片没有相机 EXIF，会打印相机信息的预设内容会比较空。",
+      "outerRadius": "外框圆角",
+      "padding": "边框宽度",
+      "resetBorder": "重置边框",
+      "solid": "纯色",
+      "template": {
+        "barDark": "信息条 · 黑",
+        "barExif": "信息条 · 参数",
+        "barFull": "信息条 · 全信息",
+        "barId": "信息条 · 机型",
+        "borderStack": "白边 · 居中",
+        "cornerLogo": "图内叠加 · 角标",
+        "cornerVertical": "大留白 · 角标竖参数",
+        "dualBar": "双标 · 信息条",
+        "dualStack": "双标 · 居中",
+        "gallerySplit": "画廊 · 两端对齐",
+        "magazineCover": "杂志封面",
+        "marginGold": "留白 · 金标",
+        "marginLogo": "留白 · 标志居中",
+        "marginTopBottom": "留白 · 上下分置",
+        "overlayCorners": "图内叠加 · 四角",
+        "overlayExif": "图内叠加 · 居中",
+        "overlayMinimal": "图内叠加 · 仅参数",
+        "overlayStack": "图内叠加 · 左下",
+        "overlayTop": "图内叠加 · 顶标",
+        "textMargin": "留白 · 仅机型",
+        "verticalLeft": "竖排 · 左侧条",
+        "verticalRight": "竖排 · 右侧条"
+      },
+      "templates": "预设",
+      "vignette": "暗角"
+    },
+    "home": {
       "clear": "清除",
       "empty": {
         "body": "从您的图库中打开一张照片开始编辑。最近的作品会显示在这里。",
         "title": "暂无最近的编辑"
+      },
+      "frame": {
+        "body": "用相机品牌预设为照片加框，或自己搭配边框与文字。",
+        "title": "添加边框"
       },
       "openEditor": "打开编辑器",
       "recent": "最近的编辑",
@@ -2020,32 +2074,38 @@
       "tools": "工具"
     },
     "pickPhoto": "选择要编辑的照片",
+    "tab": {
+      "develop": "调整",
+      "frame": "边框",
+      "text": "文字"
+    },
     "tagline": "对图库中的照片进行快速、无损的编辑。",
-    "title": "工作室",
-    "tools": {
-      "border": {
-        "apply": "应用边框",
-        "blur": "模糊",
-        "borderWidth": "边框宽度",
-        "brandLogo": "{{brand}}（徽标）",
-        "brandText": "{{brand}}（文字）",
-        "brightness": "亮度",
-        "clear": "清除",
-        "color": "颜色",
-        "cornerRadius": "圆角半径",
-        "done": "边框已应用",
-        "exifAuto": "已从 EXIF 自动填充",
-        "exifMissing": "此样式需要相机 EXIF（型号，以及焦距 / 光圈 / 快门 / ISO 至少一项），此照片不可用。",
-        "hint": "边框在当前编辑之上叠加新像素。应用后可预览，然后导出。",
-        "modeColored": "彩色",
-        "modeFrosted": "磨砂",
-        "modeFrostedInfo": "磨砂信息",
-        "modeInfoStrip": "信息栏",
-        "modeVignette": "暗角",
-        "strength": "强度"
-      },
-      "title": "工具"
-    }
+    "text": {
+      "add": "添加文字",
+      "caseLower": "aa",
+      "caseNone": "Aa",
+      "caseTitle": "Ab",
+      "caseUpper": "AA",
+      "color": "颜色",
+      "content": "文字",
+      "duplicate": "复制",
+      "empty": "还没有文字。添加一个图层，或套用一个边框预设。",
+      "font": "字体",
+      "italic": "斜体",
+      "lineHeight": "行高",
+      "newLayer": "输入文字",
+      "opacity": "不透明度",
+      "outline": "描边",
+      "positionX": "水平位置",
+      "positionY": "垂直位置",
+      "rotation": "旋转",
+      "shadow": "阴影",
+      "size": "字号",
+      "tracking": "字距",
+      "untitled": "空文字",
+      "weight": "字重"
+    },
+    "title": "工作室"
   },
   "upload": {
     "FileUploadProgress": {
@@ -2066,9 +2126,6 @@
       "failed_other": "{{count}} 个失败",
       "openPage": "打开上传页面",
       "title": "上传队列"
-    },
-    "ProgressIndicator": {
-      "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
     },
     "SupportedFormatsModal": {
       "category_audio": "音频",
