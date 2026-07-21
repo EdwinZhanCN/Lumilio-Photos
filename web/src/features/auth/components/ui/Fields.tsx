@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { CircleAlert, Eye, EyeOff, Info, Lock, type LucideIcon } from "lucide-react";
+import { useI18n } from "@/lib/i18n.tsx";
 import { cx } from "./classNames.ts";
 import { passwordStrength } from "./passwordStrength.ts";
 
@@ -108,11 +109,10 @@ type PasswordFieldProps = {
   autoComplete?: string;
   meter?: boolean;
   inputRef?: React.Ref<HTMLInputElement>;
-  strengthLabels?: string[];
 };
 
 export const PasswordField: React.FC<PasswordFieldProps> = ({
-  label = "Password",
+  label,
   hint,
   error,
   value,
@@ -121,13 +121,19 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
   autoComplete = "new-password",
   meter = false,
   inputRef,
-  strengthLabels,
 }) => {
+  const { t } = useI18n();
   const [show, setShow] = useState(false);
-  const st = passwordStrength(value);
-  const label_ = strengthLabels && st.score > 0 ? strengthLabels[st.score] : st.label;
+  const score = passwordStrength(value);
+  const strengthLabels = [
+    t("auth.passwordStrength.tooShort", "Too short"),
+    t("auth.passwordStrength.weak", "Weak"),
+    t("auth.passwordStrength.fair", "Fair"),
+    t("auth.passwordStrength.good", "Good"),
+    t("auth.passwordStrength.strong", "Strong"),
+  ];
   return (
-    <Field label={label} hint={hint} error={error}>
+    <Field label={label ?? t("auth.passwordField.password", "Password")} hint={hint} error={error}>
       <div
         className={cx(
           "input input-bordered flex w-full min-w-0 items-center gap-2.5 bg-base-100",
@@ -149,7 +155,11 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
           onClick={() => setShow((s) => !s)}
           className="text-base-content/40 transition hover:text-base-content/70"
           tabIndex={-1}
-          aria-label={show ? "Hide password" : "Show password"}
+          aria-label={
+            show
+              ? t("auth.passwordField.hidePassword", "Hide password")
+              : t("auth.passwordField.showPassword", "Show password")
+          }
         >
           {show ? <EyeOff size={17} /> : <Eye size={17} />}
         </button>
@@ -162,12 +172,14 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
                 key={i}
                 className={cx(
                   "h-1 grow rounded-full transition-colors",
-                  i <= st.score ? STRENGTH_COLORS[st.score] : "bg-base-300",
+                  i <= score ? STRENGTH_COLORS[score] : "bg-base-300",
                 )}
               />
             ))}
           </div>
-          <span className="w-12 text-right text-xs font-medium text-base-content/50">{label_}</span>
+          <span className="w-12 text-right text-xs font-medium text-base-content/50">
+            {strengthLabels[score]}
+          </span>
         </div>
       )}
     </Field>

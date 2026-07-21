@@ -50,10 +50,13 @@ type ProviderDescriptor struct {
 }
 
 // AuthChallenge describes a pending provider authentication challenge.
+// Title and Description carry frontend i18n keys; Params holds their
+// interpolation values.
 type AuthChallenge struct {
 	Type        string
 	Title       string
 	Description string
+	Params      map[string]string
 	Fields      []ProviderField
 }
 

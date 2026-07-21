@@ -26,13 +26,13 @@ func NewICloudCredentialProvider(storageRoot string) CredentialProvider {
 func (p *iCloudCredentialProvider) Descriptor() ProviderDescriptor {
 	return ProviderDescriptor{
 		ID:          ProviderICloud,
-		Title:       "iCloud",
-		Description: "Import originals from iCloud Photos.",
+		Title:       "cloudProvider.icloud.title",
+		Description: "cloudProvider.icloud.description",
 		Status:      ProviderStatusEnabled,
 		FormFields: []ProviderField{
 			{
 				Name:         "username",
-				Label:        "Apple ID",
+				Label:        "cloudProvider.icloud.field.username",
 				Type:         "email",
 				Required:     true,
 				Placeholder:  "you@icloud.com",
@@ -40,7 +40,7 @@ func (p *iCloudCredentialProvider) Descriptor() ProviderDescriptor {
 			},
 			{
 				Name:         "password",
-				Label:        "Password",
+				Label:        "cloudProvider.icloud.field.password",
 				Type:         "password",
 				Required:     true,
 				Placeholder:  "",
@@ -48,24 +48,24 @@ func (p *iCloudCredentialProvider) Descriptor() ProviderDescriptor {
 			},
 			{
 				Name:     "domain",
-				Label:    "Apple domain",
+				Label:    "cloudProvider.icloud.field.domain",
 				Type:     "select",
 				Required: true,
 				Options: []ProviderOption{
-					{Value: "com", Label: "Global iCloud"},
-					{Value: "cn", Label: "Mainland China iCloud"},
+					{Value: "com", Label: "cloudProvider.icloud.option.domain.com"},
+					{Value: "cn", Label: "cloudProvider.icloud.option.domain.cn"},
 				},
 			},
 		},
 		ChallengeFields: iCloudChallengeFields(),
-		SecurityNote:    "Lumilio uses the password only during authentication and stores the resulting session in an isolated credential directory.",
+		SecurityNote:    "cloudProvider.icloud.securityNote",
 	}
 }
 
 func iCloudChallengeFields() []ProviderField {
 	return []ProviderField{{
 		Name:         "code",
-		Label:        "Verification code",
+		Label:        "cloudProvider.icloud.challenge.field.code",
 		Type:         "text",
 		Required:     true,
 		Placeholder:  "123456",
@@ -201,14 +201,11 @@ func (p *iCloudCredentialProvider) NewImporter(ctx context.Context, credential r
 }
 
 func iCloudSMSChallenge(maskedPhone string) *AuthChallenge {
-	desc := "Enter the verification code sent via SMS."
-	if maskedPhone != "" {
-		desc = fmt.Sprintf("Enter the verification code sent to %s.", maskedPhone)
-	}
 	return &AuthChallenge{
 		Type:        "verification_code",
-		Title:       "Verification required",
-		Description: desc,
+		Title:       "cloudProvider.icloud.challenge.sms.title",
+		Description: "cloudProvider.icloud.challenge.sms.description",
+		Params:      map[string]string{"phone": maskedPhone},
 		Fields:      iCloudChallengeFields(),
 	}
 }

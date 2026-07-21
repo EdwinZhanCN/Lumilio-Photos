@@ -519,6 +519,18 @@
         "activeLabel": "Passkey 已启用"
       }
     },
+    "passwordField": {
+      "hidePassword": "隐藏密码",
+      "password": "密码",
+      "showPassword": "显示密码"
+    },
+    "passwordStrength": {
+      "fair": "一般",
+      "good": "良好",
+      "strong": "强",
+      "tooShort": "太短",
+      "weak": "弱"
+    },
     "primaryRepository": {
       "description": "选择 Lumilio 存放第一个本地仓库的位置。现有设置也会作为后续仓库的默认值。",
       "duplicates": "重复文件处理",
@@ -604,6 +616,33 @@
     "updateError": "更新失败",
     "updateSuccess_one": "已更新 {{count}} 个项目。",
     "updateSuccess_other": "已更新 {{count}} 个项目。"
+  },
+  "cloudProvider": {
+    "icloud": {
+      "challenge": {
+        "field": {
+          "code": "验证码"
+        },
+        "sms": {
+          "description": "输入发送到 {{phone}} 的验证码。",
+          "title": "需要验证"
+        }
+      },
+      "description": "从 iCloud 照片导入原片。",
+      "field": {
+        "domain": "Apple 区域",
+        "password": "密码",
+        "username": "Apple ID"
+      },
+      "option": {
+        "domain": {
+          "cn": "中国大陆 iCloud",
+          "com": "全球 iCloud"
+        }
+      },
+      "securityNote": "Lumilio 仅在认证时使用密码，认证产生的会话将存储在隔离的凭证目录中。",
+      "title": "iCloud"
+    }
   },
   "collections": {
     "album": "相册",

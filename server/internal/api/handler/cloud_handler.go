@@ -447,6 +447,7 @@ func toCloudAuthChallengeDTO(challenge *cloud.AuthChallenge) *dto.CloudAuthChall
 		Type:        challenge.Type,
 		Title:       challenge.Title,
 		Description: challenge.Description,
+		Params:      challenge.Params,
 		Fields:      toCloudProviderFieldDTOs(challenge.Fields),
 	}
 }

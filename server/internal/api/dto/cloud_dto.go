@@ -3,9 +3,10 @@ package dto
 import "time"
 
 // CloudProviderFieldDTO describes one provider-specific form input.
+// Label, Placeholder, and HelpText carry frontend i18n keys.
 type CloudProviderFieldDTO struct {
 	Name         string   `json:"name" example:"username"`
-	Label        string   `json:"label" example:"Apple ID"`
+	Label        string   `json:"label" example:"cloudProvider.icloud.field.username"`
 	Type         string   `json:"type" example:"email"`
 	Required     bool     `json:"required" example:"true"`
 	Placeholder  string   `json:"placeholder,omitempty" example:"you@example.com"`
@@ -21,10 +22,11 @@ type Option struct {
 }
 
 // CloudProviderDTO describes a cloud provider that can create credentials.
+// Title, Description, and SecurityNote carry frontend i18n keys.
 type CloudProviderDTO struct {
 	ID              string                  `json:"id" example:"icloud"`
-	Title           string                  `json:"title" example:"iCloud"`
-	Description     string                  `json:"description" example:"Import originals from iCloud Photos."`
+	Title           string                  `json:"title" example:"cloudProvider.icloud.title"`
+	Description     string                  `json:"description" example:"cloudProvider.icloud.description"`
 	Status          string                  `json:"status" example:"enabled"`
 	FormFields      []CloudProviderFieldDTO `json:"form_fields"`
 	ChallengeFields []CloudProviderFieldDTO `json:"challenge_fields,omitempty"`
@@ -54,10 +56,12 @@ type ReconnectCloudCredentialRequest struct {
 }
 
 // CloudAuthChallengeDTO describes a pending credential authentication challenge.
+// Title and Description carry frontend i18n keys; Params holds interpolation values.
 type CloudAuthChallengeDTO struct {
 	Type        string                  `json:"type" example:"verification_code"`
-	Title       string                  `json:"title" example:"Verification required"`
-	Description string                  `json:"description" example:"Enter the code sent to your trusted devices."`
+	Title       string                  `json:"title" example:"cloudProvider.icloud.challenge.sms.title"`
+	Description string                  `json:"description" example:"cloudProvider.icloud.challenge.sms.description"`
+	Params      map[string]string       `json:"params,omitempty"`
 	Fields      []CloudProviderFieldDTO `json:"fields"`
 }
 
@@ -65,7 +69,7 @@ type CloudAuthChallengeDTO struct {
 type CloudCredentialDTO struct {
 	ID             string            `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Provider       string            `json:"provider" example:"icloud"`
-	ProviderTitle  string            `json:"provider_title" example:"iCloud"`
+	ProviderTitle  string            `json:"provider_title" example:"cloudProvider.icloud.title"`
 	DisplayName    string            `json:"display_name" example:"Personal cloud account"`
 	MaskedIdentity string            `json:"masked_identity" example:"u***r@example.com"`
 	Status         string            `json:"status" example:"connected"`
