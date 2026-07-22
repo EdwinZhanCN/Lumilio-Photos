@@ -6335,7 +6335,7 @@ export interface paths {
         };
         /**
          * List cloud credentials
-         * @description List configured cloud credentials without exposing secrets.
+         * @description List the current user's cloud credentials without exposing secrets. Administrators receive all credentials.
          */
         get: {
             parameters: {
@@ -6378,7 +6378,7 @@ export interface paths {
         put?: never;
         /**
          * Create cloud credential
-         * @description Authenticate with a cloud provider and save a repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
+         * @description Authenticate with a cloud provider and save a user-owned, repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
          */
         post: {
             parameters: {
@@ -6414,6 +6414,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Credential belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6484,6 +6493,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Credential belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6564,6 +6582,15 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
+                /** @description Credential belongs to another user */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -6626,6 +6653,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Credential belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6707,6 +6743,15 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
+                /** @description Credential belongs to another user */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -6767,6 +6812,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Import run belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9005,7 +9059,7 @@ export interface paths {
         head?: never;
         /**
          * Update repository
-         * @description Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).
+         * @description Update mutable repository fields (name, storage_strategy, local_settings). Repository ownership is fixed to the Host Owner.
          */
         patch: {
             parameters: {
@@ -11899,6 +11953,8 @@ export interface components {
             id?: string;
             /** @example u***r@example.com */
             masked_identity?: string;
+            /** @example 123 */
+            owner_id?: number;
             /** @example icloud */
             provider?: string;
             /** @example cloudProvider.icloud.title */
@@ -11924,6 +11980,8 @@ export interface components {
             id?: string;
             /** @example 75 */
             imported_count?: number;
+            /** @example 123 */
+            owner_id?: number;
             /** @example icloud */
             provider?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -12796,6 +12854,8 @@ export interface components {
             enabled?: boolean;
             last_import_run_id?: string;
             latest_run?: components["schemas"]["dto.CloudImportRunDTO"];
+            /** @example 123 */
+            owner_id?: number;
             /** @example icloud */
             provider?: string;
         };
@@ -13484,7 +13544,6 @@ export interface components {
             rating?: number;
         };
         "dto.UpdateRepositoryRequestDTO": {
-            default_owner_id?: number;
             local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
             /** @example My Photos */
             name?: string;

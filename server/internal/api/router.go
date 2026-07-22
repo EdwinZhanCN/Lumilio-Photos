@@ -537,9 +537,11 @@ func NewRouter(
 			duplicates.POST("/groups/:id/dismiss", duplicateController.DismissDuplicateGroup)
 		}
 
-		// Cloud sync routes - admin only
+		// Cloud account routes are owner-scoped in the handler/service; admins
+		// receive global access. Repository cloud operations remain on the
+		// administrator-only repositories group above.
 		cloud := v1.Group("/cloud")
-		cloud.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
+		cloud.Use(authController.AuthMiddleware(), appInitializedMiddleware)
 		{
 			cloud.GET("/providers", cloudController.ListProviders)
 			cloud.GET("/credentials", cloudController.ListCredentials)

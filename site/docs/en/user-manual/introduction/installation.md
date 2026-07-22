@@ -23,11 +23,10 @@ nothing else to install. All downloads are on the
    the first time: open **System Settings → Privacy & Security** and click
    **Open Anyway** (once).
 3. Lumilio Photos lives in the **menu bar** (no Dock icon). On first run a
-   setup window appears:
-   - **Photo library location** — where originals are stored. An external
-     drive is fine; the database and secrets always stay on the local disk.
-     The window live-checks that the location is writable and shows free space.
-   - **Terms & open-source licenses** — read and accept.
+   setup window shows the machine-local default media location, download
+   region, and open-source terms. External Storage Locations can be authorized
+   later in the Desktop Control Panel; the database and credentials remain on
+   the local disk.
 4. The app initializes its private database, then opens your default browser at
    `http://localhost:6680`.
 5. In the browser, the first-run wizard creates your **admin account**
@@ -57,8 +56,8 @@ menu bar, delete the app, and delete that folder if you also want the data gone
    shortcuts, and installs the Microsoft Edge WebView2 runtime automatically if
    it is missing (needed by the first-run setup window).
 3. Launch **Lumilio Photos** from the Start Menu. It runs in the **system
-   tray** and shows the same first-run setup window as macOS: choose the photo
-   library location, accept the terms, and the browser opens at
+   tray** and shows the same first-run setup window as macOS: review the local
+   default location, accept the terms, and the browser opens at
    `http://localhost:6680` for the admin-account wizard.
 
 Uninstall from **Settings → Apps & features**; the uninstaller stops the app
@@ -83,8 +82,9 @@ LUMILIO_STORAGE=/srv/photos docker compose -f docker-compose.release.yml up -d
 
 Set `LUMILIO_STORAGE` to the directory that should hold your media library.
 Then open `http://<host>:6657` and complete the first-run wizard — it creates
-the admin account and automatically rotates the bootstrap database credentials
-(the generated secrets are persisted under your storage directory).
+the admin account and automatically rotates the bootstrap database credentials.
+Application state and generated secrets use the separate `app_state` volume;
+they are not stored below `LUMILIO_STORAGE`.
 
 - Pin a version with `LUMILIO_VERSION=v1.0.0` (default `latest`).
 - Ports: web UI on `6657` (HTTP) / `6658` (HTTPS), API on `6680`.

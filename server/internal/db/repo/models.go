@@ -237,7 +237,7 @@ type CloudCredential struct {
 	MaskedIdentity   string             `db:"masked_identity" json:"masked_identity"`
 	Status           string             `db:"status" json:"status"`
 	ArtifactDir      *string            `db:"artifact_dir" json:"artifact_dir"`
-	CreatedByUserID  *int32             `db:"created_by_user_id" json:"created_by_user_id"`
+	OwnerID          int32              `db:"owner_id" json:"owner_id"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	PublicConfig     []byte             `db:"public_config" json:"public_config"`
@@ -260,6 +260,7 @@ type CloudImportRun struct {
 	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	OwnerID         int32              `db:"owner_id" json:"owner_id"`
 }
 
 type CloudSyncCursor struct {
@@ -502,6 +503,7 @@ type RepositoryCloudBinding struct {
 	LastImportRunID pgtype.UUID        `db:"last_import_run_id" json:"last_import_run_id"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	OwnerID         int32              `db:"owner_id" json:"owner_id"`
 }
 
 type RepositoryDefault struct {

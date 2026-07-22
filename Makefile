@@ -61,7 +61,7 @@ setup: .server-config .server-secret
 
 db: .server-secret
 	@echo "==> Starting database and waiting for healthy status"
-	@$(COMPOSE) up -d --wait db
+	@$(COMPOSE) up -d --wait --build db
 
 dev: db
 	@echo "==> Starting server and web"

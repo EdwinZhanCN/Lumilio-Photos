@@ -9,7 +9,7 @@ INSERT INTO cloud_credentials (
     public_config,
     secret_ciphertext,
     artifact_dir,
-    created_by_user_id,
+    owner_id,
     created_at,
     updated_at
 ) VALUES (
@@ -18,6 +18,11 @@ INSERT INTO cloud_credentials (
 
 -- name: ListCloudCredentials :many
 SELECT * FROM cloud_credentials
+ORDER BY created_at DESC;
+
+-- name: ListCloudCredentialsForOwner :many
+SELECT * FROM cloud_credentials
+WHERE owner_id = $1
 ORDER BY created_at DESC;
 
 -- name: GetCloudCredential :one
@@ -62,16 +67,18 @@ INSERT INTO repository_cloud_bindings (
     repository_id,
     credential_id,
     provider,
+    owner_id,
     enabled,
     last_import_run_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, true, NULL, now(), now()
+    $1, $2, $3, $4, true, NULL, now(), now()
 )
 ON CONFLICT (repository_id, provider)
 DO UPDATE SET
     credential_id = $2,
+    owner_id = $4,
     enabled = true,
     updated_at = now()
 RETURNING *;
@@ -104,10 +111,11 @@ INSERT INTO cloud_import_runs (
     credential_id,
     provider,
     status,
+    owner_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, now(), now()
+    $1, $2, $3, $4, $5, $6, now(), now()
 ) RETURNING *;
 
 -- name: GetCloudImportRun :one

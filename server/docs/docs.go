@@ -1752,6 +1752,10 @@ const docTemplate = `{
                         "example": "u***r@example.com",
                         "type": "string"
                     },
+                    "owner_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
                     "provider": {
                         "example": "icloud",
                         "type": "string"
@@ -1805,6 +1809,10 @@ const docTemplate = `{
                     },
                     "imported_count": {
                         "example": 75,
+                        "type": "integer"
+                    },
+                    "owner_id": {
+                        "example": 123,
                         "type": "integer"
                     },
                     "provider": {
@@ -4077,6 +4085,10 @@ const docTemplate = `{
                     "latest_run": {
                         "$ref": "#/components/schemas/dto.CloudImportRunDTO"
                     },
+                    "owner_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
                     "provider": {
                         "example": "icloud",
                         "type": "string"
@@ -5664,9 +5676,6 @@ const docTemplate = `{
             },
             "dto.UpdateRepositoryRequestDTO": {
                 "properties": {
-                    "default_owner_id": {
-                        "type": "integer"
-                    },
                     "local_settings": {
                         "$ref": "#/components/schemas/dto.RepositoryLocalSettings"
                     },
@@ -13046,7 +13055,7 @@ const docTemplate = `{
         },
         "/api/v1/cloud/credentials": {
             "get": {
-                "description": "List configured cloud credentials without exposing secrets.",
+                "description": "List the current user's cloud credentials without exposing secrets. Administrators receive all credentials.",
                 "responses": {
                     "200": {
                         "content": {
@@ -13090,7 +13099,7 @@ const docTemplate = `{
                 ]
             },
             "post": {
-                "description": "Authenticate with a cloud provider and save a repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.",
+                "description": "Authenticate with a cloud provider and save a user-owned, repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -13141,6 +13150,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -13208,6 +13227,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -13296,6 +13325,16 @@ const docTemplate = `{
                         },
                         "description": "Unauthorized"
                     },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -13362,6 +13401,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -13450,6 +13499,16 @@ const docTemplate = `{
                         },
                         "description": "Unauthorized"
                     },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -13516,6 +13575,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Import run belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -15902,7 +15971,7 @@ const docTemplate = `{
                 ]
             },
             "patch": {
-                "description": "Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).",
+                "description": "Update mutable repository fields (name, storage_strategy, local_settings). Repository ownership is fixed to the Host Owner.",
                 "parameters": [
                     {
                         "description": "Repository UUID",

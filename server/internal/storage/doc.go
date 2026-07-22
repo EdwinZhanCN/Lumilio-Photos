@@ -22,6 +22,10 @@
 //     .lumiliorepo file and the DB config column (storage strategy, filename
 //     preservation, duplicate handling). This is per-repository mutable
 //     behaviour and is owned here, decoupled from the global settings service.
+//   - Repository ownership is deliberately not per-repository. The first
+//     account is the Host Owner and is used as every repository's fallback
+//     owner for filesystem discovery; explicit upload owners and stable cloud
+//     binding owners still win.
 //
 // # Storage layout
 //

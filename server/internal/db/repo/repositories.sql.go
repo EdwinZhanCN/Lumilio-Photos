@@ -128,6 +128,33 @@ func (q *Queries) DeleteRepository(ctx context.Context, repoID pgtype.UUID) erro
 	return err
 }
 
+const getHostOwnerID = `-- name: GetHostOwnerID :one
+SELECT candidate.owner_id::integer AS host_owner_id
+FROM (
+    SELECT default_owner_id AS owner_id, 0 AS priority, created_at, repo_id::text AS tie_breaker
+    FROM repositories
+    WHERE role = 'primary'
+      AND default_owner_id IS NOT NULL
+
+    UNION ALL
+
+    SELECT user_id AS owner_id, 1 AS priority, created_at, user_id::text AS tie_breaker
+    FROM users
+) candidate
+ORDER BY candidate.priority ASC, candidate.created_at ASC, candidate.tie_breaker ASC
+LIMIT 1
+`
+
+// The primary repository pins the Host Owner after bootstrap. Before the
+// primary exists, the first account is the initial administrator and therefore
+// the Host Owner.
+func (q *Queries) GetHostOwnerID(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, getHostOwnerID)
+	var host_owner_id int32
+	err := row.Scan(&host_owner_id)
+	return host_owner_id, err
+}
+
 const getPrimaryRepository = `-- name: GetPrimaryRepository :one
 SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE role = 'primary'
@@ -290,32 +317,17 @@ func (q *Queries) RepositoryExists(ctx context.Context, path string) (bool, erro
 	return exists, err
 }
 
-const setPrimaryRepositoryOwner = `-- name: SetPrimaryRepositoryOwner :one
+const setUnownedRepositoryHostOwner = `-- name: SetUnownedRepositoryHostOwner :exec
 UPDATE repositories
 SET
     default_owner_id = $1,
     updated_at = NOW()
-WHERE role = 'primary' AND default_owner_id IS NULL
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
+WHERE default_owner_id IS NULL
 `
 
-func (q *Queries) SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error) {
-	row := q.db.QueryRow(ctx, setPrimaryRepositoryOwner, defaultOwnerID)
-	var i Repository
-	err := row.Scan(
-		&i.RepoID,
-		&i.Name,
-		&i.Path,
-		&i.Config,
-		&i.Status,
-		&i.LastSync,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DefaultOwnerID,
-		&i.Role,
-		&i.RootID,
-	)
-	return i, err
+func (q *Queries) SetUnownedRepositoryHostOwner(ctx context.Context, defaultOwnerID *int32) error {
+	_, err := q.db.Exec(ctx, setUnownedRepositoryHostOwner, defaultOwnerID)
+	return err
 }
 
 const updateRepository = `-- name: UpdateRepository :one
