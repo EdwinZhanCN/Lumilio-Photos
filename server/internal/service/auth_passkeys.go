@@ -147,12 +147,14 @@ func (s *AuthService) StartRegistration(ctx context.Context, req RegistrationSta
 		}
 		createdUser = user
 
-		// Assign primary repository owner on first user creation.
-		ownerID := user.UserID
-		if _, ownerErr := q.SetPrimaryRepositoryOwner(ctx, &ownerID); ownerErr != nil {
-			if !errors.Is(ownerErr, pgx.ErrNoRows) {
-				return fmt.Errorf("set primary repository owner: %w", ownerErr)
-			}
+		// The first account is the Host Owner. Resolving after the insert keeps
+		// later registrations from ever claiming a legacy ownerless repository.
+		hostOwnerID, ownerErr := q.GetHostOwnerID(ctx)
+		if ownerErr != nil {
+			return fmt.Errorf("resolve repository host owner: %w", ownerErr)
+		}
+		if ownerErr := q.SetUnownedRepositoryHostOwner(ctx, &hostOwnerID); ownerErr != nil {
+			return fmt.Errorf("set repository host owner: %w", ownerErr)
 		}
 		return nil
 	}); err != nil {

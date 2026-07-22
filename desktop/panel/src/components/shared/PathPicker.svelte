@@ -7,13 +7,15 @@
     path,
     validation,
     checking = false,
+    readonly = false,
     onpick,
   }: {
     label: string;
     path: string;
     validation: Validation | null;
     checking?: boolean;
-    onpick: () => void;
+    readonly?: boolean;
+    onpick?: () => void;
   } = $props();
 
   const state = $derived(checking || !validation ? "checking" : validation.writable ? "ok" : "bad");
@@ -38,7 +40,9 @@
     >
       {path || "—"}
     </div>
-    <button class="btn btn-sm whitespace-nowrap" onclick={onpick}>{t("choose")}</button>
+    {#if !readonly && onpick}
+      <button class="btn btn-sm whitespace-nowrap" onclick={onpick}>{t("choose")}</button>
+    {/if}
   </div>
   <div class="flex items-center gap-2 text-xs text-muted">
     <span class={`h-[7px] w-[7px] shrink-0 rounded-full ${dotColor}`}></span>

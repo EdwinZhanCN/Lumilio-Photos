@@ -36,7 +36,7 @@ macOS Intel 当前尚未进入 Desktop 发布矩阵。
 
 ### 首次启动
 
-Desktop 会引导你选择语言、下载区域和 storage root。它会管理私有 PostgreSQL 数据库；Lumen Hub 为可选组件，只在你启用本地 AI 时另行下载。
+Desktop 会引导你选择语言和下载区域，并显示本机默认存储位置。外部目录在启动完成后通过 Desktop 控制面板授权；不要把“挂载资源库”用于初始化空目录。Desktop 会管理私有 PostgreSQL 数据库；Lumen Hub 为可选组件，只在你启用本地 AI 时另行下载。
 
 ::: tip 本地网络权限
 如需通过 mDNS 发现其他 Lumen 节点，请允许 macOS 的本地网络访问或 Windows 防火墙提示。拒绝该权限不影响基础媒体管理。
@@ -90,7 +90,7 @@ make dev
 ## 安装后检查
 
 1. 确认流明集界面可以打开，且首次设置页没有报告服务失联。
-2. 确认 storage root 指向预期的本机目录或 Docker 持久化挂载。
+2. 确认默认存储位置指向预期的本机目录或 Docker 持久化挂载。
 3. 使用少量已有备份的照片完成首次试用。
 
-继续阅读[首次使用](./first-use.md)。
+继续阅读[首次使用](./first-use.md)和[存储位置与仓库](./repositories.md)。

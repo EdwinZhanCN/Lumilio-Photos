@@ -129,6 +129,45 @@ func TestClientToolName(t *testing.T) {
 	}
 }
 
+func TestPlatformToolDirs(t *testing.T) {
+	tests := []struct {
+		name  string
+		goos  string
+		major int
+		want  []string
+	}{
+		{
+			name:  "Apple Silicon Homebrew",
+			goos:  "darwin",
+			major: 18,
+			want: []string{
+				"/opt/homebrew/opt/postgresql@18/bin",
+				"/usr/local/opt/postgresql@18/bin",
+			},
+		},
+		{
+			name:  "Debian PGDG",
+			goos:  "linux",
+			major: 18,
+			want:  []string{"/usr/lib/postgresql/18/bin"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := platformToolDirs(tt.major, tt.goos)
+			if len(got) != len(tt.want) {
+				t.Fatalf("platformToolDirs() = %v, want %v", got, tt.want)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Fatalf("platformToolDirs()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestLocateToolsFailsLoudlyWhenNothingMatches(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // hide any real pg_dump
 	_, err := LocateTools("", 99)
@@ -143,12 +182,14 @@ func schedulerFixture(t *testing.T, cfg settings.Backup, now time.Time) (*Schedu
 	t.Helper()
 	storage := t.TempDir()
 	s := &Scheduler{
-		StorageRoot: storage,
-		Dir:         filepath.Join(storage, "backups"),
-		AppVersion:  "test",
-		Settings:    func(context.Context) (settings.Backup, error) { return cfg, nil },
-		Logf:        t.Logf,
-		now:         func() time.Time { return now },
+		Dir:        filepath.Join(storage, "backups"),
+		AppVersion: "test",
+		Settings:   func(context.Context) (settings.Backup, error) { return cfg, nil },
+		Logf:       t.Logf,
+		now:        func() time.Time { return now },
+	}
+	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+		t.Fatal(err)
 	}
 	return s, storage
 }
@@ -174,7 +215,7 @@ func TestSchedulerSkipsWhenNotDue(t *testing.T) {
 	}
 }
 
-func TestSchedulerSkipsWhenStorageUnreachable(t *testing.T) {
+func TestSchedulerSkipsWhenBackupDestinationUnreachable(t *testing.T) {
 	now := time.Now()
 	s, storage := schedulerFixture(t, settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 3}, now)
 	if err := os.RemoveAll(storage); err != nil {
@@ -186,7 +227,7 @@ func TestSchedulerSkipsWhenStorageUnreachable(t *testing.T) {
 	}
 }
 
-func TestSchedulerForcedRunErrorsOnUnreachableStorage(t *testing.T) {
+func TestSchedulerForcedRunErrorsOnUnreachableBackupDestination(t *testing.T) {
 	s, storage := schedulerFixture(t, settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 3}, time.Now())
 	if err := os.RemoveAll(storage); err != nil {
 		t.Fatal(err)

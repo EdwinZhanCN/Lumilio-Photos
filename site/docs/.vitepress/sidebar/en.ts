@@ -7,6 +7,10 @@ export const enSidebar: DefaultTheme.Sidebar = {
       collapsed: false,
       items: [
         { text: "Overview", link: "/user-manual/introduction/" },
+        {
+          text: "Storage Locations and Repositories",
+          link: "/user-manual/introduction/repositories",
+        },
         { text: "Installation", link: "/user-manual/introduction/installation" },
         { text: "Recover administrator access", link: "/user-manual/introduction/break-glass" },
       ],

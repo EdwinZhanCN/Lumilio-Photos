@@ -7,6 +7,7 @@
   import PathsPanel from "./PathsPanel.svelte";
   import PhotosCard from "./PhotosCard.svelte";
   import SettingsPanel from "./SettingsPanel.svelte";
+  import StorageLocationsPanel from "./StorageLocationsPanel.svelte";
 
   const data = $derived(store.data!);
 
@@ -34,6 +35,7 @@
   </div>
 
   <PhotosCard />
+  <StorageLocationsPanel />
   <HubCard />
   <LogPanel />
   <SettingsPanel />

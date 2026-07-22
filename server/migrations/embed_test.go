@@ -107,3 +107,49 @@ func TestAssetBaselineUsesLayeredHashes(t *testing.T) {
 		}
 	}
 }
+
+func TestHostOwnerMigrationRepairsRepositoryAndDerivedOwnership(t *testing.T) {
+	sql, err := FS.ReadFile("000010_host_owner.up.sql")
+	if err != nil {
+		t.Fatalf("read Host Owner migration: %v", err)
+	}
+	migration := strings.ToLower(string(sql))
+	for _, required := range []string{
+		"order by created_at asc, user_id asc",
+		"update repositories",
+		"update assets",
+		"update media_items",
+		"update asset_stacks",
+		"update duplicate_groups",
+		"update face_clusters",
+		"update location_clusters",
+		"insert into location_cluster_assets",
+	} {
+		if !strings.Contains(migration, required) {
+			t.Fatalf("Host Owner migration missing %q", required)
+		}
+	}
+	if !strings.Contains(migration, "where owner_id is null") {
+		t.Fatal("Host Owner migration must preserve explicitly owned assets")
+	}
+}
+
+func TestCloudOwnershipMigrationPinsCredentialBindingAndRunOwners(t *testing.T) {
+	sql, err := FS.ReadFile("000011_cloud_ownership.up.sql")
+	if err != nil {
+		t.Fatalf("read cloud ownership migration: %v", err)
+	}
+	migration := strings.ToLower(string(sql))
+	for _, required := range []string{
+		"rename column created_by_user_id to owner_id",
+		"alter column owner_id set not null",
+		"update repository_cloud_bindings",
+		"update cloud_import_runs",
+		"repository_cloud_bindings_owner_id_fkey",
+		"cloud_import_runs_owner_id_fkey",
+	} {
+		if !strings.Contains(migration, required) {
+			t.Fatalf("cloud ownership migration missing %q", required)
+		}
+	}
+}

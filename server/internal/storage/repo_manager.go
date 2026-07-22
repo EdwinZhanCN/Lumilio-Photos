@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
@@ -35,14 +37,25 @@ type RepositoryManager interface {
 	// directory structure, writes the .lumiliorepo config, and inserts the
 	// database record. It fails if a repository already exists at path or path
 	// is nested inside one, and removes any partially created files on failure.
-	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error)
 
 	// AddRepository registers an already-initialized on-disk repository (one
 	// that has a valid .lumiliorepo). It fails if the path is not a valid
 	// repository or is already registered. If the repository's ID is registered
 	// at a different path it returns a *RepositoryConflictError, which the caller
 	// resolves with RelocateRepository or RegisterRepositoryCopy.
-	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error)
+	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error)
+
+	// Storage Locations are host-authorized repository containers. The default
+	// location comes from immutable config; external locations come only from a
+	// native Desktop grant, never an arbitrary shared-API path.
+	EnsureDefaultRepositoryRoot(ctx context.Context, path string) (*repo.RepositoryRoot, error)
+	AddRepositoryRoot(ctx context.Context, path, name string) (*repo.RepositoryRoot, error)
+	RelocateRepositoryRoot(ctx context.Context, id, path string) (*repo.RepositoryRoot, error)
+	ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error)
+	GetRepositoryRoot(ctx context.Context, id string) (*repo.RepositoryRoot, error)
+	DeleteRepositoryRoot(ctx context.Context, id string) error
+	ReconcileRepositoryRoots(ctx context.Context) error
 
 	// RelocateRepository points an existing repository at a new on-disk
 	// location. Assets are untouched because assets.storage_path is
@@ -68,6 +81,11 @@ type RepositoryManager interface {
 
 	// ListRepositories returns all registered repositories.
 	ListRepositories() ([]*repo.Repository, error)
+
+	// HostOwnerID returns the initial administrator that represents ownership
+	// of this host. The primary repository pins the identity after bootstrap;
+	// before then, the first account is used. Nil means setup has no user yet.
+	HostOwnerID(ctx context.Context) (*int32, error)
 
 	// UpdateRepository validates and persists config to both the database record
 	// and the on-disk .lumiliorepo file.
@@ -106,15 +124,6 @@ type DefaultRepositoryManager struct {
 	stagingManager StagingManager
 	logger         *zap.Logger
 	auditProvider  logging.RepositoryAuditProvider
-	policy         PathPolicy
-}
-
-// WithPathPolicy selects where new repositories may live. The zero value is
-// RootedPolicy; desktop builds pass FreePolicy.
-func WithPathPolicy(policy PathPolicy) func(*DefaultRepositoryManager) {
-	return func(rm *DefaultRepositoryManager) {
-		rm.policy = policy
-	}
 }
 
 // NewRepositoryManager creates a new repository manager instance
@@ -122,7 +131,6 @@ func NewRepositoryManager(
 	queries *repo.Queries,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
-	options ...func(*DefaultRepositoryManager),
 ) (*DefaultRepositoryManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -138,18 +146,28 @@ func NewRepositoryManager(
 		logger:         logger.With(zap.String("component", "repository")),
 		auditProvider:  auditProvider,
 	}
-	for _, option := range options {
-		option(rm)
-	}
-
 	return rm, nil
 }
 
 // Ensure the concrete type satisfies the consumer interface.
 var _ RepositoryManager = (*DefaultRepositoryManager)(nil)
 
+// HostOwnerID resolves the one host-level fallback owner used by every
+// repository. Repository defaults are ingestion policy, not per-repository
+// authorization; explicit upload and cloud owners still take precedence.
+func (rm *DefaultRepositoryManager) HostOwnerID(ctx context.Context) (*int32, error) {
+	ownerID, err := rm.queries.GetHostOwnerID(ctx)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("resolve host owner: %w", err)
+	}
+	return &ownerID, nil
+}
+
 // AddRepository registers an existing repository with the system
-func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
@@ -196,6 +214,13 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
+	associatedRootID := firstRootID(rootID)
+	if !associatedRootID.Valid {
+		associatedRootID, err = rm.repositoryRootIDForPath(context.Background(), cleanPath)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(context.Background(), repo.CreateRepositoryParams{
@@ -208,6 +233,7 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 		DefaultOwnerID: defaultOwnerID,
 		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
 		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+		RootID:         associatedRootID,
 	})
 	if err != nil {
 		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_id", config.ID))
@@ -390,7 +416,7 @@ func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error
 }
 
 // InitializeRepository creates a new repository with full directory structure
-func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
@@ -450,6 +476,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 		DefaultOwnerID: defaultOwnerID,
 		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
 		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+		RootID:         firstRootID(rootID),
 	})
 	if err != nil {
 		// Clean up on failure
@@ -469,6 +496,13 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	)
 
 	return &dbRepo, nil
+}
+
+func firstRootID(ids []pgtype.UUID) pgtype.UUID {
+	if len(ids) == 0 {
+		return pgtype.UUID{}
+	}
+	return ids[0]
 }
 
 func (rm *DefaultRepositoryManager) GetRepository(id string) (*repo.Repository, error) {
@@ -569,7 +603,7 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 	if err != nil {
 		return nil, err
 	}
-	if existing.Status == dbtypes.RepoStatusOffline {
+	if existing.Status == dbtypes.RepoStatusOffline || existing.Status == dbtypes.RepoStatusError {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryOffline, existing.Path)
 	}
 
@@ -626,7 +660,7 @@ func (rm *DefaultRepositoryManager) GetRepositoryPath(repoID string) (string, er
 	// Same reason as the media read path: a caller handed an unreachable path
 	// can only produce a bare I/O error, which cannot be told apart from missing
 	// data.
-	if repository.Status == dbtypes.RepoStatusOffline {
+	if repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError {
 		return "", fmt.Errorf("%w: %s", ErrRepositoryOffline, repository.Name)
 	}
 	return repository.Path, nil

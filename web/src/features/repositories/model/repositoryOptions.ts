@@ -22,6 +22,6 @@ function normalizeRepositoryStatus(status?: string): RepositoryStatus {
   return REPOSITORY_STATUSES.find((candidate) => candidate === status) ?? "active";
 }
 
-export function isRepositoryOffline(repository: RepositoryOption): boolean {
-  return repository.status === "offline";
+export function isRepositoryUnavailable(repository: RepositoryOption): boolean {
+  return repository.status === "offline" || repository.status === "error";
 }

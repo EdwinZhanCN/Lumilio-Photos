@@ -47,16 +47,16 @@ export default function SettingsShell() {
       icon: UserCircle2Icon,
     },
     { key: "appearance", label: t("settings.appearance"), icon: PaintbrushIcon },
+    {
+      key: "cloud",
+      label: t("settings.cloud.title", { defaultValue: "Cloud Sync" }),
+      icon: CloudIcon,
+    },
     { key: "server", label: t("settings.server"), icon: ServerIcon },
     { key: "about", label: t("settings.about.title", "About"), icon: InfoIcon },
   ];
   if (isAdmin) {
     tabs.splice(2, 0, { key: "ai", label: t("settings.ai"), icon: SparklesIcon });
-    tabs.push({
-      key: "cloud",
-      label: t("settings.cloud.title", { defaultValue: "Cloud Sync" }),
-      icon: CloudIcon,
-    });
     tabs.push({
       key: "users",
       label: t("settings.users.title", { defaultValue: "Users" }),

@@ -118,8 +118,8 @@ func NewProviderRegistry(providers ...CredentialProvider) *ProviderRegistry {
 	return registry
 }
 
-func NewDefaultProviderRegistry(storageRoot string) *ProviderRegistry {
-	return NewProviderRegistry(NewICloudCredentialProvider(storageRoot))
+func NewDefaultProviderRegistry(cloudStateDir string) *ProviderRegistry {
+	return NewProviderRegistry(NewICloudCredentialProvider(cloudStateDir))
 }
 
 func (r *ProviderRegistry) List() []CredentialProvider {
@@ -168,13 +168,10 @@ func unmarshalPublicConfig(data []byte) map[string]string {
 	return config
 }
 
-func providerArtifactRoot(storageRoot string, provider ProviderKind) string {
-	normalized := filepath.Clean(strings.TrimSpace(storageRoot))
+func providerArtifactRoot(cloudStateDir string, provider ProviderKind) string {
+	normalized := filepath.Clean(strings.TrimSpace(cloudStateDir))
 	if normalized != "" && normalized != "." {
-		if strings.EqualFold(filepath.Base(normalized), "primary") {
-			normalized = filepath.Dir(normalized)
-		}
-		return filepath.Join(normalized, ".cloud", string(provider))
+		return filepath.Join(normalized, string(provider))
 	}
-	return filepath.Join("data", "storage", ".cloud", string(provider))
+	return filepath.Join("data", "app-state", "cloud", string(provider))
 }

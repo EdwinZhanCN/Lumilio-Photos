@@ -68,6 +68,7 @@ type CloudAuthChallengeDTO struct {
 // CloudCredentialDTO is a safe public view of a saved cloud credential.
 type CloudCredentialDTO struct {
 	ID             string            `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	OwnerID        int32             `json:"owner_id" example:"123"`
 	Provider       string            `json:"provider" example:"icloud"`
 	ProviderTitle  string            `json:"provider_title" example:"cloudProvider.icloud.title"`
 	DisplayName    string            `json:"display_name" example:"Personal cloud account"`
@@ -99,6 +100,7 @@ type ListCloudCredentialsResponse struct {
 // CloudImportRunDTO is a safe public view of a repo-scoped cloud import run.
 type CloudImportRunDTO struct {
 	ID              string     `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	OwnerID         int32      `json:"owner_id" example:"123"`
 	RepositoryID    string     `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	CredentialID    string     `json:"credential_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Provider        string     `json:"provider" example:"icloud"`
@@ -123,6 +125,7 @@ type StartCloudImportResponse struct {
 // RepositoryCloudStatusDTO describes a repository's cloud binding.
 type RepositoryCloudStatusDTO struct {
 	Provider      string              `json:"provider,omitempty" example:"icloud"`
+	OwnerID       int32               `json:"owner_id,omitempty" example:"123"`
 	Enabled       bool                `json:"enabled" example:"true"`
 	Credential    *CloudCredentialDTO `json:"credential,omitempty"`
 	LatestRun     *CloudImportRunDTO  `json:"latest_run,omitempty"`

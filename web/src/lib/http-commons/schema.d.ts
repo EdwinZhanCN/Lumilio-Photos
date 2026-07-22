@@ -6335,7 +6335,7 @@ export interface paths {
         };
         /**
          * List cloud credentials
-         * @description List configured cloud credentials without exposing secrets.
+         * @description List the current user's cloud credentials without exposing secrets. Administrators receive all credentials.
          */
         get: {
             parameters: {
@@ -6378,7 +6378,7 @@ export interface paths {
         put?: never;
         /**
          * Create cloud credential
-         * @description Authenticate with a cloud provider and save a repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
+         * @description Authenticate with a cloud provider and save a user-owned, repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
          */
         post: {
             parameters: {
@@ -6414,6 +6414,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Credential belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6484,6 +6493,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Credential belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6564,6 +6582,15 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
+                /** @description Credential belongs to another user */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -6626,6 +6653,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Credential belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6707,6 +6743,15 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
+                /** @description Credential belongs to another user */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -6767,6 +6812,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Import run belongs to another user */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -8842,7 +8896,7 @@ export interface paths {
         put?: never;
         /**
          * Create repository
-         * @description Create a repository folder under the server storage root. If the target folder already contains a .lumiliorepo file, it is registered instead.
+         * @description Create a repository folder under a registered Storage Location. Empty root_id selects the configured default. If the target already contains a .lumiliorepo file, it is registered instead.
          */
         post: {
             parameters: {
@@ -8892,6 +8946,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Repository identity conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryConflictDTO"];
                     };
                 };
                 /** @description Internal server error */
@@ -8996,7 +9059,7 @@ export interface paths {
         head?: never;
         /**
          * Update repository
-         * @description Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).
+         * @description Update mutable repository fields (name, storage_strategy, local_settings). Repository ownership is fixed to the Host Owner.
          */
         patch: {
             parameters: {
@@ -9169,98 +9232,6 @@ export interface paths {
                 };
                 /** @description Internal server error */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/relocate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Relocate repository
-         * @description Update a repository's recorded location after its folder moved. The .lumiliorepo at the new path must carry the same repository ID. Assets are not moved: their storage paths are repository-relative.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description New repository path */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.RelocateRepositoryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository relocated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Another repository already occupies the path */
-                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9490,71 +9461,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/repositories/copies": {
+    "/api/v1/repository-roots": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Register repository copy
-         * @description Register a folder whose .lumiliorepo carries an already-registered repository ID as an independent repository. A fresh repository ID is written into the folder, the way cloning a git repository produces a distinct working copy.
+         * List Storage Locations
+         * @description Return registered repository roots with their current reachability. Filesystem paths are admin-only through this route.
          */
-        post: {
+        get: {
             parameters: {
                 query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
-            /** @description Repository path */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.RelocateRepositoryRequestDTO"];
-                };
-            };
+            requestBody?: never;
             responses: {
-                /** @description Repository registered successfully */
+                /** @description Storage Locations retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/json": components["schemas"]["dto.ListRepositoryRootsResponseDTO"];
                     };
                 };
             };
         };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -12014,6 +11953,8 @@ export interface components {
             id?: string;
             /** @example u***r@example.com */
             masked_identity?: string;
+            /** @example 123 */
+            owner_id?: number;
             /** @example icloud */
             provider?: string;
             /** @example cloudProvider.icloud.title */
@@ -12039,6 +11980,8 @@ export interface components {
             id?: string;
             /** @example 75 */
             imported_count?: number;
+            /** @example 123 */
+            owner_id?: number;
             /** @example icloud */
             provider?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -12137,17 +12080,16 @@ export interface components {
             /** @example Family Photos */
             name: string;
             /**
-             * @description Path is an absolute on-disk location for the repository. It is only
-             *     accepted by deployments whose path policy allows free placement (desktop);
-             *     a server rejects it and places the repository under its storage root.
-             * @example /Volumes/Media/Photos
-             */
-            path?: string;
-            /**
              * @example regular
              * @enum {string}
              */
             role?: "primary" | "regular";
+            /**
+             * @description RootID identifies a registered Storage Location. Empty selects the
+             *     configured default location. Clients never submit an arbitrary root path.
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            root_id?: string;
             /**
              * @example date
              * @enum {string}
@@ -12471,6 +12413,9 @@ export interface components {
         };
         "dto.ListRepositoriesResponseDTO": {
             repositories?: components["schemas"]["dto.RepositoryDTO"][];
+        };
+        "dto.ListRepositoryRootsResponseDTO": {
+            roots?: components["schemas"]["dto.RepositoryRootDTO"][];
         };
         "dto.ListShareLinksResponseDTO": {
             items?: components["schemas"]["dto.ShareLinkDTO"][];
@@ -12903,18 +12848,37 @@ export interface components {
             password: string;
             username: string;
         };
-        "dto.RelocateRepositoryRequestDTO": {
-            /** @example /Volumes/NewDrive/Photos */
-            path: string;
-        };
         "dto.RepositoryCloudStatusDTO": {
             credential?: components["schemas"]["dto.CloudCredentialDTO"];
             /** @example true */
             enabled?: boolean;
             last_import_run_id?: string;
             latest_run?: components["schemas"]["dto.CloudImportRunDTO"];
+            /** @example 123 */
+            owner_id?: number;
             /** @example icloud */
             provider?: string;
+        };
+        "dto.RepositoryConflictDTO": {
+            /**
+             * @example [
+             *       "relocate",
+             *       "copy"
+             *     ]
+             */
+            actions?: string[];
+            /** @example 409 */
+            code?: number;
+            /** @example repository_identity */
+            conflict_type?: string;
+            /** @example Repository identity is already registered */
+            message?: string;
+            /** @example /Volumes/OldDrive/Photos */
+            registered_path?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example /Volumes/NewDrive/Photos */
+            requested_path?: string;
         };
         "dto.RepositoryDTO": {
             default_owner_id?: number;
@@ -12929,6 +12893,10 @@ export interface components {
             path?: string;
             /** @example regular */
             role?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            root_id?: string;
+            /** @example active */
+            status?: string;
             /** @example date */
             storage_strategy?: string;
         };
@@ -12943,6 +12911,18 @@ export interface components {
         "dto.RepositoryLocalSettings": {
             /** @example uuid */
             handle_duplicate_filenames?: string;
+        };
+        "dto.RepositoryRootDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example external */
+            kind?: string;
+            /** @example External Archive */
+            name?: string;
+            /** @example /Volumes/Photos */
+            path?: string;
+            /** @example active */
+            status?: string;
         };
         "dto.RepositoryScanQueuedDTO": {
             /** @example 12345 */
@@ -13564,7 +13544,6 @@ export interface components {
             rating?: number;
         };
         "dto.UpdateRepositoryRequestDTO": {
-            default_owner_id?: number;
             local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
             /** @example My Photos */
             name?: string;

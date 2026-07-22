@@ -42,6 +42,8 @@ func (s stubRepositoryManager) ListRepositories() ([]*repo.Repository, error) {
 	return s.listRepositoriesFn()
 }
 
+func (s stubRepositoryManager) ReconcileAll(context.Context) error { return nil }
+
 func testRepository(t *testing.T, rawID string, name string, path string) *repo.Repository {
 	t.Helper()
 

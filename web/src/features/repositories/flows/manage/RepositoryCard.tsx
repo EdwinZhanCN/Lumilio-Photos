@@ -5,6 +5,7 @@ import {
   Copy,
   Ellipsis,
   Folder,
+  HardDrive,
   Layers,
   MapPin,
   RefreshCcw,
@@ -54,6 +55,7 @@ export default function RepositoryCard({
     isScanning || isDetecting || isDuplicateScanning || isRebuildingLocation || isCloudImporting;
   const hasCloudBinding = Boolean(cloudStatus?.credential);
   const latestRunStatus = latestRun?.status;
+  const isUnavailable = repository.status === "offline" || repository.status === "error";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -89,6 +91,16 @@ export default function RepositoryCard({
                   {t("manage.repositories.sourceCloud")}
                 </span>
               )}
+              {isUnavailable && (
+                <span
+                  className={`badge badge-sm gap-1 ${repository.status === "error" ? "badge-error" : "badge-warning"}`}
+                >
+                  <HardDrive size={12} />
+                  {repository.status === "error"
+                    ? t("manage.repositories.errorBadge", "Needs attention")
+                    : t("manage.repositories.offlineBadge", "Offline")}
+                </span>
+              )}
             </div>
             <p className="mt-1 truncate text-xs text-base-content/55" title={repository.path}>
               {repository.path}
@@ -121,7 +133,7 @@ export default function RepositoryCard({
                   setMenuOpen(false);
                   onScan(repository);
                 }}
-                disabled={isBusy}
+                disabled={isBusy || isUnavailable}
               >
                 {isScanning ? (
                   <span className="loading loading-spinner loading-xs" />
@@ -142,7 +154,7 @@ export default function RepositoryCard({
                   setMenuOpen(false);
                   onDetectStacks(repository);
                 }}
-                disabled={isBusy}
+                disabled={isBusy || isUnavailable}
               >
                 {isDetecting ? (
                   <span className="loading loading-spinner loading-xs" />
@@ -163,7 +175,7 @@ export default function RepositoryCard({
                   setMenuOpen(false);
                   onDuplicateScan(repository);
                 }}
-                disabled={isBusy}
+                disabled={isBusy || isUnavailable}
               >
                 {isDuplicateScanning ? (
                   <span className="loading loading-spinner loading-xs" />
@@ -179,7 +191,7 @@ export default function RepositoryCard({
                   setMenuOpen(false);
                   onLocationRebuild(repository);
                 }}
-                disabled={isBusy}
+                disabled={isBusy || isUnavailable}
               >
                 {isRebuildingLocation ? (
                   <span className="loading loading-spinner loading-xs" />
@@ -196,7 +208,12 @@ export default function RepositoryCard({
                     setMenuOpen(false);
                     onCloudImport(repository);
                   }}
-                  disabled={isBusy || latestRunStatus === "running" || latestRunStatus === "queued"}
+                  disabled={
+                    isBusy ||
+                    isUnavailable ||
+                    latestRunStatus === "running" ||
+                    latestRunStatus === "queued"
+                  }
                 >
                   {isCloudImporting ||
                   latestRunStatus === "running" ||

@@ -52,9 +52,10 @@ services:
         #                   capabilities: [gpu]
         volumes:
             # Replace /PATH/TO/YOUR/ASSETS with your host storage root directory.
-            # This is the only mounted volume: media, the rotated DB secret
-            # (.secrets/db_password), and the server secret key all live here.
             - /PATH/TO/YOUR/ASSETS:/data/storage
+            # Machine-bound cloud sessions, secrets, and database backups stay
+            # separate from the portable media root.
+            - app_state:/data/app-state
         ports:
             - "6680:6680"
         extra_hosts:
@@ -84,6 +85,7 @@ services:
 
 volumes:
     db_data:
+    app_state:
 
 secrets:
     db_bootstrap_password:

@@ -19,6 +19,7 @@ var desktopServerTemplate string
 
 type serverManifestBindings struct {
 	Port, BrowserOrigin, WebRoot, LogDir, StoragePath string
+	CloudStatePath, BackupsPath                       string
 	DBHost, DBPort, DBUser, DBName                    string
 	BootstrapPasswordFile, RotatedPasswordFile        string
 	SecretKeyFile, PGBinDir                           string

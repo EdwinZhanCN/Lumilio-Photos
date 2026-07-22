@@ -1,6 +1,6 @@
 // Package storage owns Lumilio's on-disk media layout and the lifecycle of
-// repositories. It is the single authority over what exists under the immutable
-// storage root and how each repository is structured on disk; other packages
+// repositories. It is the single authority over registered Storage Locations
+// and how each repository is structured on disk; other packages
 // reach storage only through its interfaces and never touch repository paths
 // directly.
 //
@@ -22,23 +22,22 @@
 //     .lumiliorepo file and the DB config column (storage strategy, filename
 //     preservation, duplicate handling). This is per-repository mutable
 //     behaviour and is owned here, decoupled from the global settings service.
+//   - Repository ownership is deliberately not per-repository. The first
+//     account is the Host Owner and is used as every repository's fallback
+//     owner for filesystem discovery; explicit upload owners and stable cloud
+//     binding owners still win.
 //
 // # Storage layout
 //
-// The storage root <path> is immutable boot configuration (see server/config,
-// StorageConfig). Every well-known location under it is derived by convention,
-// not configured:
+// The configured storage.path is the non-removable default Storage Location.
+// External locations are registered by portable .lumilioroot identity. A
+// Storage Location contains only its marker and repository directories:
 //
-//	<path>/primary       the mandatory primary repository
+//	<path>/.lumilioroot  portable Storage Location identity
+//	<path>/primary       the mandatory primary repository (default only)
 //	<path>/<name>        additional user-created repositories
-//	<path>/.secrets      db_password and the app secret key
-//	<path>/.cloud        cloud sync working area
 //
-// # Direction (in progress)
-//
-// Provisioning of the root layout and the mandatory primary repository, plus
-// repository default behaviour, is being consolidated into this package so the
-// bootstrap "dirs_ready" gate has a single owner. Until that lands, root
-// directory creation and repository-creation policy are still partly performed
-// by the setup flow and the HTTP handlers.
+// Cloud sessions, secrets, logs, and backups are app-private state configured
+// outside storage.path. Repository staging remains repository-owned under
+// .lumilio because it is recoverable work tied to that repository.
 package storage

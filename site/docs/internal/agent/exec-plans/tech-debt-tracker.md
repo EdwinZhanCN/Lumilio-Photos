@@ -50,24 +50,6 @@ Last aligned with the codebase: 2026-07-18.
   `s3 provider not implemented`; it is not currently wired into a usable import
   path. Either implement and wire the existing `CloudProvider` contract or
   remove the placeholder when the provider is formally descoped.
-- **Desktop has no reconnect flow for an unavailable external library.**
-  Owners: `desktop/supervisor/supervisor.go` (`resolveStoragePath`) and
-  `desktop/onboarding.go`. First-run native storage selection is implemented,
-  but a previously selected unmounted drive only produces a warning and falls
-  back to the default library for that launch. Add a native reconnect/change
-  dialog that makes the active fallback explicit and does not silently create a
-  second library where the user expected the external one.
-- **External repositories need a Desktop-owned authorization flow.** Owners:
-  `desktop/onboarding.go`, `desktop/supervisor/supervisor.go`, and
-  `server/internal/storage/repo_provisioning.go`. Repository creation is
-  intentionally confined to the configured storage root for both Desktop and
-  Docker. A future Desktop-only external repository feature must obtain the
-  directory through the native Finder/File Explorer picker, persist an
-  explicit host grant, and surface unavailable or moved paths for reconnection;
-  it must not reintroduce an arbitrary client-supplied root on the shared HTTP
-  API. Docker should remain limited to its configured, explicitly mounted
-  storage root because container paths cannot safely prove or repair host
-  mounts.
 - **AgentBoard has no mobile column reflow.** Owner:
   `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one
   persisted 12-column layout at every width, so phone columns compress into
