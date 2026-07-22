@@ -34,12 +34,22 @@ const (
 	ImportRunStatusInterrupted = "interrupted"
 )
 
+var ErrCredentialAccessDenied = errors.New("cloud credential access denied")
+
+// CredentialAccess identifies the caller for owner-scoped cloud operations.
+// Administrators may access every credential; other users may access only
+// credentials, bindings, and import runs owned by UserID.
+type CredentialAccess struct {
+	UserID  int32
+	IsAdmin bool
+}
+
 // CreateCloudCredentialInput holds provider-neutral credential inputs.
 type CreateCloudCredentialInput struct {
-	Provider        ProviderKind
-	DisplayName     string
-	Inputs          map[string]string
-	CreatedByUserID *int32
+	Provider    ProviderKind
+	DisplayName string
+	Inputs      map[string]string
+	Access      CredentialAccess
 }
 
 // CreateCloudCredentialResult is returned after attempting provider auth.
@@ -53,19 +63,20 @@ type CreateCloudCredentialResult struct {
 type VerifyCredentialChallengeInput struct {
 	CredentialID uuid.UUID
 	Inputs       map[string]string
+	Access       CredentialAccess
 }
 
 // StartRepositoryImportInput identifies a repository import request.
 type StartRepositoryImportInput struct {
 	RepositoryID uuid.UUID
-	OwnerID      *int32
+	Access       CredentialAccess
 }
 
 // BindRepositoryCredentialInput binds a repo to a credential and starts import.
 type BindRepositoryCredentialInput struct {
 	RepositoryID uuid.UUID
 	CredentialID uuid.UUID
-	OwnerID      *int32
+	Access       CredentialAccess
 }
 
 // RepositoryCloudStatus describes a repository's cloud binding and latest run.
@@ -78,16 +89,16 @@ type RepositoryCloudStatus struct {
 // CloudSyncService manages cloud providers, credentials, and repo-scoped imports.
 type CloudSyncService interface {
 	ListProviders(ctx context.Context) ([]ProviderDescriptor, error)
-	ListCredentials(ctx context.Context) ([]repo.CloudCredential, error)
+	ListCredentials(ctx context.Context, access CredentialAccess) ([]repo.CloudCredential, error)
 	CreateCredential(ctx context.Context, input CreateCloudCredentialInput) (CreateCloudCredentialResult, error)
 	VerifyCredentialChallenge(ctx context.Context, input VerifyCredentialChallengeInput) (CreateCloudCredentialResult, error)
-	DisconnectCredential(ctx context.Context, credentialID uuid.UUID) error
+	DisconnectCredential(ctx context.Context, credentialID uuid.UUID, access CredentialAccess) error
 	ReconnectCredential(ctx context.Context, input ReconnectCredentialInput) (CreateCloudCredentialResult, error)
-	RemoveCredential(ctx context.Context, credentialID uuid.UUID) error
+	RemoveCredential(ctx context.Context, credentialID uuid.UUID, access CredentialAccess) error
 	BindRepositoryCredentialAndStartImport(ctx context.Context, input BindRepositoryCredentialInput) (uuid.UUID, error)
 	StartRepositoryImport(ctx context.Context, input StartRepositoryImportInput) (uuid.UUID, error)
-	GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID) (RepositoryCloudStatus, error)
-	GetImportRun(ctx context.Context, runID uuid.UUID) (repo.CloudImportRun, error)
+	GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID, access CredentialAccess) (RepositoryCloudStatus, error)
+	GetImportRun(ctx context.Context, runID uuid.UUID, access CredentialAccess) (repo.CloudImportRun, error)
 	RecoverInterruptedRuns(ctx context.Context) error
 	ProviderTitle(provider ProviderKind) string
 }
@@ -96,6 +107,7 @@ type CloudSyncService interface {
 type ReconnectCredentialInput struct {
 	CredentialID uuid.UUID
 	Inputs       map[string]string // optional; if empty, tries existing session
+	Access       CredentialAccess
 }
 
 type pendingICloudAuth struct {
@@ -134,7 +146,7 @@ func NewCloudSyncService(
 	queries *repo.Queries,
 	materializer *sourcing.SourceMaterializer,
 	secretKeyPath string,
-	storageRoot string,
+	cloudStateDir string,
 	logger *zap.Logger,
 ) CloudSyncService {
 	if logger == nil {
@@ -149,7 +161,7 @@ func NewCloudSyncService(
 		queries:       queries,
 		materializer:  materializer,
 		logger:        scopedLogger,
-		registry:      NewDefaultProviderRegistry(storageRoot),
+		registry:      NewDefaultProviderRegistry(cloudStateDir),
 		secretBox:     box,
 		pendingAuth:   make(map[uuid.UUID]pendingCredentialAuth),
 		activeImports: make(map[uuid.UUID]*activeImport),
@@ -172,7 +184,10 @@ func (s *cloudSyncService) ListProviders(ctx context.Context) ([]ProviderDescrip
 	return descriptors, nil
 }
 
-func (s *cloudSyncService) ListCredentials(ctx context.Context) ([]repo.CloudCredential, error) {
+func (s *cloudSyncService) ListCredentials(ctx context.Context, access CredentialAccess) ([]repo.CloudCredential, error) {
+	if !access.IsAdmin {
+		return s.queries.ListCloudCredentialsForOwner(ctx, access.UserID)
+	}
 	return s.queries.ListCloudCredentials(ctx)
 }
 
@@ -207,6 +222,9 @@ func (s *cloudSyncService) CreateCredential(ctx context.Context, input CreateClo
 		IdentityHash: identity.IdentityHash,
 	})
 	if err == nil {
+		if err := authorizeCredential(existing, input.Access); err != nil {
+			return CreateCloudCredentialResult{}, err
+		}
 		credentialID = uuid.UUID(existing.CredentialID.Bytes)
 		if strings.TrimSpace(existing.DisplayName) != "" {
 			displayName = existing.DisplayName
@@ -229,7 +247,7 @@ func (s *cloudSyncService) CreateCredential(ctx context.Context, input CreateClo
 		return CreateCloudCredentialResult{}, err
 	}
 
-	credential, err := s.upsertCredentialForAuth(ctx, credentialID, input.Provider, displayName, identity, authResult, input.CreatedByUserID)
+	credential, err := s.upsertCredentialForAuth(ctx, credentialID, input.Provider, displayName, identity, authResult, input.Access)
 	if err != nil {
 		return CreateCloudCredentialResult{}, err
 	}
@@ -246,6 +264,11 @@ func (s *cloudSyncService) CreateCredential(ctx context.Context, input CreateClo
 }
 
 func (s *cloudSyncService) VerifyCredentialChallenge(ctx context.Context, input VerifyCredentialChallengeInput) (CreateCloudCredentialResult, error) {
+	credential, err := s.getAuthorizedCredential(ctx, input.CredentialID, input.Access)
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
+
 	s.mu.Lock()
 	pending, ok := s.pendingAuth[input.CredentialID]
 	s.mu.Unlock()
@@ -253,10 +276,6 @@ func (s *cloudSyncService) VerifyCredentialChallenge(ctx context.Context, input 
 		return CreateCloudCredentialResult{}, fmt.Errorf("no pending authentication challenge for credential")
 	}
 
-	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(input.CredentialID))
-	if err != nil {
-		return CreateCloudCredentialResult{}, err
-	}
 	provider, err := s.registry.Get(pending.provider)
 	if err != nil {
 		return CreateCloudCredentialResult{}, err
@@ -285,7 +304,10 @@ func (s *cloudSyncService) VerifyCredentialChallenge(ctx context.Context, input 
 	return CreateCloudCredentialResult{Credential: updated, AuthStatus: authResult.AuthStatus}, nil
 }
 
-func (s *cloudSyncService) DisconnectCredential(ctx context.Context, credentialID uuid.UUID) error {
+func (s *cloudSyncService) DisconnectCredential(ctx context.Context, credentialID uuid.UUID, access CredentialAccess) error {
+	if _, err := s.getAuthorizedCredential(ctx, credentialID, access); err != nil {
+		return err
+	}
 	_, err := s.queries.UpdateCloudCredentialStatus(ctx, repo.UpdateCloudCredentialStatusParams{
 		CredentialID: toPGUUID(credentialID),
 		Status:       CredentialStatusDisabled,
@@ -297,7 +319,7 @@ func (s *cloudSyncService) DisconnectCredential(ctx context.Context, credentialI
 }
 
 func (s *cloudSyncService) ReconnectCredential(ctx context.Context, input ReconnectCredentialInput) (CreateCloudCredentialResult, error) {
-	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(input.CredentialID))
+	credential, err := s.getAuthorizedCredential(ctx, input.CredentialID, input.Access)
 	if err != nil {
 		return CreateCloudCredentialResult{}, fmt.Errorf("credential not found: %w", err)
 	}
@@ -374,8 +396,8 @@ func (s *cloudSyncService) ReconnectCredential(ctx context.Context, input Reconn
 	}, nil
 }
 
-func (s *cloudSyncService) RemoveCredential(ctx context.Context, credentialID uuid.UUID) error {
-	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(credentialID))
+func (s *cloudSyncService) RemoveCredential(ctx context.Context, credentialID uuid.UUID, access CredentialAccess) error {
+	credential, err := s.getAuthorizedCredential(ctx, credentialID, access)
 	if err != nil {
 		return fmt.Errorf("credential not found: %w", err)
 	}
@@ -411,7 +433,7 @@ func (s *cloudSyncService) cancelCredentialWork(credentialID uuid.UUID) {
 }
 
 func (s *cloudSyncService) BindRepositoryCredentialAndStartImport(ctx context.Context, input BindRepositoryCredentialInput) (uuid.UUID, error) {
-	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(input.CredentialID))
+	credential, err := s.getAuthorizedCredential(ctx, input.CredentialID, input.Access)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -427,13 +449,14 @@ func (s *cloudSyncService) BindRepositoryCredentialAndStartImport(ctx context.Co
 		RepositoryID: toPGUUID(input.RepositoryID),
 		CredentialID: toPGUUID(input.CredentialID),
 		Provider:     credential.Provider,
+		OwnerID:      credential.OwnerID,
 	}); err != nil {
 		return uuid.Nil, err
 	}
 
 	return s.StartRepositoryImport(ctx, StartRepositoryImportInput{
 		RepositoryID: input.RepositoryID,
-		OwnerID:      input.OwnerID,
+		Access:       input.Access,
 	})
 }
 
@@ -444,6 +467,9 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 	}
 	if !binding.Enabled {
 		return uuid.Nil, fmt.Errorf("repository cloud binding is disabled")
+	}
+	if !input.Access.IsAdmin && binding.OwnerID != input.Access.UserID {
+		return uuid.Nil, ErrCredentialAccessDenied
 	}
 
 	credential, err := s.queries.GetCloudCredential(ctx, binding.CredentialID)
@@ -475,6 +501,7 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 		CredentialID: binding.CredentialID,
 		Provider:     credential.Provider,
 		Status:       ImportRunStatusQueued,
+		OwnerID:      binding.OwnerID,
 	})
 	if err != nil {
 		s.finishActiveImport(runID)
@@ -497,7 +524,7 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 	entry.cancel = cancel
 	s.mu.Unlock()
 
-	go s.runImport(runCtx, run, credential, input.OwnerID)
+	go s.runImport(runCtx, run, credential, binding.OwnerID)
 	return uuid.UUID(run.RunID.Bytes), nil
 }
 
@@ -513,13 +540,16 @@ func (s *cloudSyncService) finishActiveImport(runID uuid.UUID) {
 	}
 }
 
-func (s *cloudSyncService) GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID) (RepositoryCloudStatus, error) {
+func (s *cloudSyncService) GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID, access CredentialAccess) (RepositoryCloudStatus, error) {
 	binding, err := s.queries.GetActiveRepositoryCloudBinding(ctx, toPGUUID(repositoryID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return RepositoryCloudStatus{}, nil
 		}
 		return RepositoryCloudStatus{}, err
+	}
+	if !access.IsAdmin && binding.OwnerID != access.UserID {
+		return RepositoryCloudStatus{}, ErrCredentialAccessDenied
 	}
 
 	credential, err := s.queries.GetCloudCredential(ctx, binding.CredentialID)
@@ -542,11 +572,18 @@ func (s *cloudSyncService) GetRepositoryCloudStatus(ctx context.Context, reposit
 	return status, nil
 }
 
-func (s *cloudSyncService) GetImportRun(ctx context.Context, runID uuid.UUID) (repo.CloudImportRun, error) {
-	return s.queries.GetCloudImportRun(ctx, toPGUUID(runID))
+func (s *cloudSyncService) GetImportRun(ctx context.Context, runID uuid.UUID, access CredentialAccess) (repo.CloudImportRun, error) {
+	run, err := s.queries.GetCloudImportRun(ctx, toPGUUID(runID))
+	if err != nil {
+		return repo.CloudImportRun{}, err
+	}
+	if !access.IsAdmin && run.OwnerID != access.UserID {
+		return repo.CloudImportRun{}, ErrCredentialAccessDenied
+	}
+	return run, nil
 }
 
-func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRun, credential repo.CloudCredential, ownerID *int32) {
+func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRun, credential repo.CloudCredential, ownerID int32) {
 	runID := uuid.UUID(run.RunID.Bytes)
 	repositoryID := uuid.UUID(run.RepositoryID.Bytes)
 	credentialID := uuid.UUID(run.CredentialID.Bytes)
@@ -652,7 +689,7 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 		State:      stateStore,
 		StagingDir: stagingDir,
 		RepoID:     repositoryID,
-		OwnerID:    ownerID,
+		OwnerID:    &ownerID,
 		OnProgress: progress,
 		Logger:     s.logger,
 	})
@@ -686,24 +723,22 @@ func (s *cloudSyncService) upsertCredentialForAuth(
 	displayName string,
 	identity CredentialIdentity,
 	authResult CredentialAuthResult,
-	createdByUserID *int32,
+	access CredentialAccess,
 ) (repo.CloudCredential, error) {
 	existing, err := s.queries.GetCloudCredentialByIdentity(ctx, repo.GetCloudCredentialByIdentityParams{
 		Provider:     string(provider),
 		IdentityHash: identity.IdentityHash,
 	})
 	if err == nil {
+		if err := authorizeCredential(existing, access); err != nil {
+			return repo.CloudCredential{}, err
+		}
 		return s.updateCredentialAuthState(ctx, existing, authResult)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return repo.CloudCredential{}, err
 	}
 
-	var userID *int32
-	if createdByUserID != nil {
-		v := *createdByUserID
-		userID = &v
-	}
 	publicConfig, err := marshalPublicConfig(authResult.PublicConfig)
 	if err != nil {
 		return repo.CloudCredential{}, err
@@ -719,8 +754,26 @@ func (s *cloudSyncService) upsertCredentialForAuth(
 		PublicConfig:     publicConfig,
 		SecretCiphertext: authResult.SecretCiphertext,
 		ArtifactDir:      artifactDir,
-		CreatedByUserID:  userID,
+		OwnerID:          access.UserID,
 	})
+}
+
+func (s *cloudSyncService) getAuthorizedCredential(ctx context.Context, credentialID uuid.UUID, access CredentialAccess) (repo.CloudCredential, error) {
+	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(credentialID))
+	if err != nil {
+		return repo.CloudCredential{}, err
+	}
+	if err := authorizeCredential(credential, access); err != nil {
+		return repo.CloudCredential{}, err
+	}
+	return credential, nil
+}
+
+func authorizeCredential(credential repo.CloudCredential, access CredentialAccess) error {
+	if access.IsAdmin || credential.OwnerID == access.UserID {
+		return nil
+	}
+	return ErrCredentialAccessDenied
 }
 
 func (s *cloudSyncService) updateCredentialAuthState(ctx context.Context, credential repo.CloudCredential, authResult CredentialAuthResult) (repo.CloudCredential, error) {

@@ -68,19 +68,20 @@ type LoggingConfig struct {
 	RepositoryAuditVerbose bool
 }
 
-type StorageConfig struct{ Path string }
+type StorageConfig struct {
+	// Path is the configured default repository root. It contains only the
+	// .lumilioroot marker and repository directories.
+	Path string
+	// CloudStatePath stores provider sessions and credential artifacts. It must
+	// stay outside Path because it is machine-bound private state.
+	CloudStatePath string
+	// BackupsPath is an explicit database-backup destination. Desktop binds it
+	// to local app data; standalone operators may choose another private mount.
+	BackupsPath string
+}
 
-const (
-	secretsDirName = ".secrets"
-	cloudDirName   = ".cloud"
-	primaryDirName = "primary"
-	backupsDirName = "backups"
-)
-
-func (c StorageConfig) SecretsDir() string { return filepath.Join(c.Path, secretsDirName) }
-func (c StorageConfig) CloudDir() string   { return filepath.Join(c.Path, cloudDirName) }
-func (c StorageConfig) PrimaryDir() string { return filepath.Join(c.Path, primaryDirName) }
-func (c StorageConfig) BackupsDir() string { return filepath.Join(c.Path, backupsDirName) }
+func (c StorageConfig) CloudDir() string   { return c.CloudStatePath }
+func (c StorageConfig) BackupsDir() string { return c.BackupsPath }
 
 type RepositoryScanConfig struct {
 	Enabled            bool
@@ -174,7 +175,9 @@ type loggingManifest struct {
 	RepositoryAuditVerbose *bool   `toml:"repository_audit_verbose"`
 }
 type storageManifest struct {
-	Path *string `toml:"path"`
+	Path           *string `toml:"path"`
+	CloudStatePath *string `toml:"cloud_state_path"`
+	BackupsPath    *string `toml:"backups_path"`
 }
 type repositoryScanManifest struct {
 	Enabled            *bool `toml:"enabled"`
@@ -301,6 +304,8 @@ func validateManifestPresence(m manifest) []string {
 	}
 	if m.Storage != nil {
 		required(&p, "storage.path", m.Storage.Path)
+		required(&p, "storage.cloud_state_path", m.Storage.CloudStatePath)
+		required(&p, "storage.backups_path", m.Storage.BackupsPath)
 	}
 	if m.RepositoryScan != nil {
 		required(&p, "repository_scan.enabled", m.RepositoryScan.Enabled)
@@ -412,8 +417,19 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requireOneOf(&p, "logging.console_format", logging.ConsoleFormat, "console", "json")
 	requireOneOf(&p, "logging.file_format", logging.FileFormat, "console", "json")
 
-	storage := StorageConfig{Path: resolvePath(base, *m.Storage.Path)}
+	storage := StorageConfig{
+		Path:           resolvePath(base, *m.Storage.Path),
+		CloudStatePath: resolvePath(base, *m.Storage.CloudStatePath),
+		BackupsPath:    resolvePath(base, *m.Storage.BackupsPath),
+	}
 	requireNonEmpty(&p, "storage.path", strings.TrimSpace(*m.Storage.Path))
+	requireNonEmpty(&p, "storage.cloud_state_path", strings.TrimSpace(*m.Storage.CloudStatePath))
+	requireNonEmpty(&p, "storage.backups_path", strings.TrimSpace(*m.Storage.BackupsPath))
+	requireOutsidePath(&p, "storage.cloud_state_path", storage.CloudStatePath, storage.Path)
+	requireOutsidePath(&p, "storage.backups_path", storage.BackupsPath, storage.Path)
+	requireOutsidePath(&p, "logging.dir", logging.LogDir, storage.Path)
+	requireOutsidePath(&p, "database.bootstrap_password_file", db.BootstrapPasswordFile, storage.Path)
+	requireOutsidePath(&p, "database.rotated_password_file", db.RotatedPasswordFile, storage.Path)
 	scan := RepositoryScanConfig{Enabled: *m.RepositoryScan.Enabled, IntervalSeconds: *m.RepositoryScan.IntervalSeconds, SettleSeconds: *m.RepositoryScan.SettleSeconds, MaxConcurrentRepos: *m.RepositoryScan.MaxConcurrentRepos, BatchSize: *m.RepositoryScan.BatchSize}
 	requirePositive(&p, "repository_scan.interval_seconds", scan.IntervalSeconds)
 	requirePositive(&p, "repository_scan.settle_seconds", scan.SettleSeconds)
@@ -429,6 +445,7 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 
 	auth := AuthConfig{SecretKeyFile: resolvePath(base, *m.Auth.SecretKeyFile), WebAuthnRPName: strings.TrimSpace(*m.Auth.WebAuthnRPName), WebAuthnRPMode: strings.ToLower(strings.TrimSpace(*m.Auth.WebAuthnRPMode)), WebAuthnRPID: strings.TrimSpace(*m.Auth.WebAuthnRPID), WebAuthnRPOrigins: cleanStrings(*m.Auth.WebAuthnRPOrigins)}
 	requireNonEmpty(&p, "auth.secret_key_file", strings.TrimSpace(*m.Auth.SecretKeyFile))
+	requireOutsidePath(&p, "auth.secret_key_file", auth.SecretKeyFile, storage.Path)
 	requireNonEmpty(&p, "auth.webauthn_rp_name", auth.WebAuthnRPName)
 	requireOneOf(&p, "auth.webauthn_rp_mode", auth.WebAuthnRPMode, "origin-derived", "fixed")
 	auth.AccessTokenTTL = parsePositiveDuration(&p, "auth.access_token_ttl", *m.Auth.AccessTokenTTL)
@@ -527,6 +544,18 @@ func requireOneOf(p *[]string, name, value string, allowed ...string) {
 		}
 	}
 	*p = append(*p, fmt.Sprintf("%s must be one of %s", name, strings.Join(allowed, ", ")))
+}
+func requireOutsidePath(p *[]string, name, candidate, root string) {
+	if strings.TrimSpace(candidate) == "" || strings.TrimSpace(root) == "" {
+		return
+	}
+	rel, err := filepath.Rel(root, candidate)
+	if err != nil || filepath.IsAbs(rel) {
+		return
+	}
+	if rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
+		*p = append(*p, name+" must be outside storage.path")
+	}
 }
 func requireHTTPURL(p *[]string, name, value string) {
 	u, err := url.Parse(value)

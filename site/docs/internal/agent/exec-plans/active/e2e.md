@@ -80,8 +80,9 @@ loosely. All three were host/container uid conflicts on the same bind mount.
    files as-is and has no uid/gid/mode option, so the file is now 0644. It is
    random per run and lives in an ignored cache directory.
 2. The server could not create its storage layout under a host-owned directory.
-3. Teardown could not remove `/data/storage/.secrets`, which the server creates
-   with restrictive permissions.
+3. Teardown could not remove the then-current `/data/storage/.secrets` legacy
+   layout, which the server created with restrictive permissions. Private state
+   now lives on the separate `/data/app-state` volume.
 
 Opening directory modes only relocated the conflict, since the container kept
 creating paths the host had not anticipated. Storage is now a named volume, so
@@ -179,4 +180,3 @@ its LFS pull is already seconds. Revisit if a heavier profile enters CI.
 ## Remaining work
 
 - Retire `server/tools/devseed` once nobody depends on it.
-

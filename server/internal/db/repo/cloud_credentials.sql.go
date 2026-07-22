@@ -34,12 +34,12 @@ INSERT INTO cloud_credentials (
     public_config,
     secret_ciphertext,
     artifact_dir,
-    created_by_user_id,
+    owner_id,
     created_at,
     updated_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now()
-) RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext
+) RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext
 `
 
 type CreateCloudCredentialParams struct {
@@ -52,7 +52,7 @@ type CreateCloudCredentialParams struct {
 	PublicConfig     []byte      `db:"public_config" json:"public_config"`
 	SecretCiphertext []byte      `db:"secret_ciphertext" json:"secret_ciphertext"`
 	ArtifactDir      *string     `db:"artifact_dir" json:"artifact_dir"`
-	CreatedByUserID  *int32      `db:"created_by_user_id" json:"created_by_user_id"`
+	OwnerID          int32       `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) CreateCloudCredential(ctx context.Context, arg CreateCloudCredentialParams) (CloudCredential, error) {
@@ -66,7 +66,7 @@ func (q *Queries) CreateCloudCredential(ctx context.Context, arg CreateCloudCred
 		arg.PublicConfig,
 		arg.SecretCiphertext,
 		arg.ArtifactDir,
-		arg.CreatedByUserID,
+		arg.OwnerID,
 	)
 	var i CloudCredential
 	err := row.Scan(
@@ -77,7 +77,7 @@ func (q *Queries) CreateCloudCredential(ctx context.Context, arg CreateCloudCred
 		&i.MaskedIdentity,
 		&i.Status,
 		&i.ArtifactDir,
-		&i.CreatedByUserID,
+		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublicConfig,
@@ -93,11 +93,12 @@ INSERT INTO cloud_import_runs (
     credential_id,
     provider,
     status,
+    owner_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, now(), now()
-) RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+    $1, $2, $3, $4, $5, $6, now(), now()
+) RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at, owner_id
 `
 
 type CreateCloudImportRunParams struct {
@@ -106,6 +107,7 @@ type CreateCloudImportRunParams struct {
 	CredentialID pgtype.UUID `db:"credential_id" json:"credential_id"`
 	Provider     string      `db:"provider" json:"provider"`
 	Status       string      `db:"status" json:"status"`
+	OwnerID      int32       `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) CreateCloudImportRun(ctx context.Context, arg CreateCloudImportRunParams) (CloudImportRun, error) {
@@ -115,6 +117,7 @@ func (q *Queries) CreateCloudImportRun(ctx context.Context, arg CreateCloudImpor
 		arg.CredentialID,
 		arg.Provider,
 		arg.Status,
+		arg.OwnerID,
 	)
 	var i CloudImportRun
 	err := row.Scan(
@@ -133,6 +136,7 @@ func (q *Queries) CreateCloudImportRun(ctx context.Context, arg CreateCloudImpor
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -162,7 +166,7 @@ const finishCloudImportRun = `-- name: FinishCloudImportRun :one
 UPDATE cloud_import_runs
 SET status = $2, error = $3, finished_at = now(), updated_at = now()
 WHERE run_id = $1
-RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at, owner_id
 `
 
 type FinishCloudImportRunParams struct {
@@ -190,12 +194,13 @@ func (q *Queries) FinishCloudImportRun(ctx context.Context, arg FinishCloudImpor
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
 
 const getActiveRepositoryCloudBinding = `-- name: GetActiveRepositoryCloudBinding :one
-SELECT repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+SELECT repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at, owner_id FROM repository_cloud_bindings
 WHERE repository_id = $1 AND enabled = true
 ORDER BY created_at DESC
 LIMIT 1
@@ -212,12 +217,13 @@ func (q *Queries) GetActiveRepositoryCloudBinding(ctx context.Context, repositor
 		&i.LastImportRunID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
 
 const getCloudCredential = `-- name: GetCloudCredential :one
-SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
+SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
 WHERE credential_id = $1
 `
 
@@ -232,7 +238,7 @@ func (q *Queries) GetCloudCredential(ctx context.Context, credentialID pgtype.UU
 		&i.MaskedIdentity,
 		&i.Status,
 		&i.ArtifactDir,
-		&i.CreatedByUserID,
+		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublicConfig,
@@ -242,7 +248,7 @@ func (q *Queries) GetCloudCredential(ctx context.Context, credentialID pgtype.UU
 }
 
 const getCloudCredentialByIdentity = `-- name: GetCloudCredentialByIdentity :one
-SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
+SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
 WHERE provider = $1 AND identity_hash = $2
 `
 
@@ -262,7 +268,7 @@ func (q *Queries) GetCloudCredentialByIdentity(ctx context.Context, arg GetCloud
 		&i.MaskedIdentity,
 		&i.Status,
 		&i.ArtifactDir,
-		&i.CreatedByUserID,
+		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublicConfig,
@@ -272,7 +278,7 @@ func (q *Queries) GetCloudCredentialByIdentity(ctx context.Context, arg GetCloud
 }
 
 const getCloudImportRun = `-- name: GetCloudImportRun :one
-SELECT run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at FROM cloud_import_runs
+SELECT run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at, owner_id FROM cloud_import_runs
 WHERE run_id = $1
 `
 
@@ -295,12 +301,13 @@ func (q *Queries) GetCloudImportRun(ctx context.Context, runID pgtype.UUID) (Clo
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
 
 const getRepositoryCloudBinding = `-- name: GetRepositoryCloudBinding :one
-SELECT repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+SELECT repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at, owner_id FROM repository_cloud_bindings
 WHERE repository_id = $1 AND provider = $2
 `
 
@@ -320,6 +327,7 @@ func (q *Queries) GetRepositoryCloudBinding(ctx context.Context, arg GetReposito
 		&i.LastImportRunID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -334,7 +342,7 @@ SET
     failed_count = failed_count + $6,
     updated_at = now()
 WHERE run_id = $1
-RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at, owner_id
 `
 
 type IncrementCloudImportRunCountsParams struct {
@@ -372,12 +380,13 @@ func (q *Queries) IncrementCloudImportRunCounts(ctx context.Context, arg Increme
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
 
 const listCloudCredentials = `-- name: ListCloudCredentials :many
-SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
+SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
 ORDER BY created_at DESC
 `
 
@@ -398,7 +407,46 @@ func (q *Queries) ListCloudCredentials(ctx context.Context) ([]CloudCredential, 
 			&i.MaskedIdentity,
 			&i.Status,
 			&i.ArtifactDir,
-			&i.CreatedByUserID,
+			&i.OwnerID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.PublicConfig,
+			&i.SecretCiphertext,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCloudCredentialsForOwner = `-- name: ListCloudCredentialsForOwner :many
+SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
+WHERE owner_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListCloudCredentialsForOwner(ctx context.Context, ownerID int32) ([]CloudCredential, error) {
+	rows, err := q.db.Query(ctx, listCloudCredentialsForOwner, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CloudCredential
+	for rows.Next() {
+		var i CloudCredential
+		if err := rows.Scan(
+			&i.CredentialID,
+			&i.Provider,
+			&i.DisplayName,
+			&i.IdentityHash,
+			&i.MaskedIdentity,
+			&i.Status,
+			&i.ArtifactDir,
+			&i.OwnerID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.PublicConfig,
@@ -415,7 +463,7 @@ func (q *Queries) ListCloudCredentials(ctx context.Context) ([]CloudCredential, 
 }
 
 const listCloudImportRunsForRepository = `-- name: ListCloudImportRunsForRepository :many
-SELECT run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at FROM cloud_import_runs
+SELECT run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at, owner_id FROM cloud_import_runs
 WHERE repository_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -452,6 +500,7 @@ func (q *Queries) ListCloudImportRunsForRepository(ctx context.Context, arg List
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OwnerID,
 		); err != nil {
 			return nil, err
 		}
@@ -464,7 +513,7 @@ func (q *Queries) ListCloudImportRunsForRepository(ctx context.Context, arg List
 }
 
 const listRepositoryCloudBindings = `-- name: ListRepositoryCloudBindings :many
-SELECT repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+SELECT repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at, owner_id FROM repository_cloud_bindings
 WHERE repository_id = $1
 ORDER BY created_at DESC
 `
@@ -486,6 +535,7 @@ func (q *Queries) ListRepositoryCloudBindings(ctx context.Context, repositoryID 
 			&i.LastImportRunID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OwnerID,
 		); err != nil {
 			return nil, err
 		}
@@ -501,7 +551,7 @@ const markCloudImportRunStarted = `-- name: MarkCloudImportRunStarted :one
 UPDATE cloud_import_runs
 SET status = 'running', started_at = now(), updated_at = now()
 WHERE run_id = $1
-RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+RETURNING run_id, repository_id, credential_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at, owner_id
 `
 
 func (q *Queries) MarkCloudImportRunStarted(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error) {
@@ -523,6 +573,7 @@ func (q *Queries) MarkCloudImportRunStarted(ctx context.Context, runID pgtype.UU
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -546,7 +597,7 @@ SET status = $2,
     artifact_dir = $5,
     updated_at = now()
 WHERE credential_id = $1
-RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext
+RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext
 `
 
 type UpdateCloudCredentialAuthStateParams struct {
@@ -574,7 +625,7 @@ func (q *Queries) UpdateCloudCredentialAuthState(ctx context.Context, arg Update
 		&i.MaskedIdentity,
 		&i.Status,
 		&i.ArtifactDir,
-		&i.CreatedByUserID,
+		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublicConfig,
@@ -587,7 +638,7 @@ const updateCloudCredentialStatus = `-- name: UpdateCloudCredentialStatus :one
 UPDATE cloud_credentials
 SET status = $2, updated_at = now()
 WHERE credential_id = $1
-RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext
+RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext
 `
 
 type UpdateCloudCredentialStatusParams struct {
@@ -606,7 +657,7 @@ func (q *Queries) UpdateCloudCredentialStatus(ctx context.Context, arg UpdateClo
 		&i.MaskedIdentity,
 		&i.Status,
 		&i.ArtifactDir,
-		&i.CreatedByUserID,
+		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublicConfig,
@@ -619,7 +670,7 @@ const updateRepositoryCloudBindingLastRun = `-- name: UpdateRepositoryCloudBindi
 UPDATE repository_cloud_bindings
 SET last_import_run_id = $3, updated_at = now()
 WHERE repository_id = $1 AND provider = $2
-RETURNING repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at
+RETURNING repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at, owner_id
 `
 
 type UpdateRepositoryCloudBindingLastRunParams struct {
@@ -639,6 +690,7 @@ func (q *Queries) UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg U
 		&i.LastImportRunID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -648,29 +700,37 @@ INSERT INTO repository_cloud_bindings (
     repository_id,
     credential_id,
     provider,
+    owner_id,
     enabled,
     last_import_run_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, true, NULL, now(), now()
+    $1, $2, $3, $4, true, NULL, now(), now()
 )
 ON CONFLICT (repository_id, provider)
 DO UPDATE SET
     credential_id = $2,
+    owner_id = $4,
     enabled = true,
     updated_at = now()
-RETURNING repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at
+RETURNING repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at, owner_id
 `
 
 type UpsertRepositoryCloudBindingParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
 	CredentialID pgtype.UUID `db:"credential_id" json:"credential_id"`
 	Provider     string      `db:"provider" json:"provider"`
+	OwnerID      int32       `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error) {
-	row := q.db.QueryRow(ctx, upsertRepositoryCloudBinding, arg.RepositoryID, arg.CredentialID, arg.Provider)
+	row := q.db.QueryRow(ctx, upsertRepositoryCloudBinding,
+		arg.RepositoryID,
+		arg.CredentialID,
+		arg.Provider,
+		arg.OwnerID,
+	)
 	var i RepositoryCloudBinding
 	err := row.Scan(
 		&i.RepositoryID,
@@ -680,6 +740,7 @@ func (q *Queries) UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRe
 		&i.LastImportRunID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }

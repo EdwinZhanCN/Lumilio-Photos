@@ -13,14 +13,13 @@ import (
 	"server/internal/storage/repocfg"
 )
 
-const countActivePrimaryRepositories = `-- name: CountActivePrimaryRepositories :one
+const countPrimaryRepositories = `-- name: CountPrimaryRepositories :one
 SELECT COUNT(*) FROM repositories
 WHERE role = 'primary'
-  AND status = 'active'
 `
 
-func (q *Queries) CountActivePrimaryRepositories(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countActivePrimaryRepositories)
+func (q *Queries) CountPrimaryRepositories(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPrimaryRepositories)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -59,10 +58,11 @@ INSERT INTO repositories (
     status,
     default_owner_id,
     created_at,
-    updated_at
+    updated_at,
+    root_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9
-) RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type CreateRepositoryParams struct {
@@ -75,6 +75,7 @@ type CreateRepositoryParams struct {
 	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
 	CreatedAt      pgtype.Timestamptz       `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	RootID         pgtype.UUID              `db:"root_id" json:"root_id"`
 }
 
 func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
@@ -88,6 +89,7 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		arg.DefaultOwnerID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.RootID,
 	)
 	var i Repository
 	err := row.Scan(
@@ -101,6 +103,7 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }
@@ -125,8 +128,35 @@ func (q *Queries) DeleteRepository(ctx context.Context, repoID pgtype.UUID) erro
 	return err
 }
 
+const getHostOwnerID = `-- name: GetHostOwnerID :one
+SELECT candidate.owner_id::integer AS host_owner_id
+FROM (
+    SELECT default_owner_id AS owner_id, 0 AS priority, created_at, repo_id::text AS tie_breaker
+    FROM repositories
+    WHERE role = 'primary'
+      AND default_owner_id IS NOT NULL
+
+    UNION ALL
+
+    SELECT user_id AS owner_id, 1 AS priority, created_at, user_id::text AS tie_breaker
+    FROM users
+) candidate
+ORDER BY candidate.priority ASC, candidate.created_at ASC, candidate.tie_breaker ASC
+LIMIT 1
+`
+
+// The primary repository pins the Host Owner after bootstrap. Before the
+// primary exists, the first account is the initial administrator and therefore
+// the Host Owner.
+func (q *Queries) GetHostOwnerID(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, getHostOwnerID)
+	var host_owner_id int32
+	err := row.Scan(&host_owner_id)
+	return host_owner_id, err
+}
+
 const getPrimaryRepository = `-- name: GetPrimaryRepository :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE role = 'primary'
   AND status = 'active'
 `
@@ -145,12 +175,13 @@ func (q *Queries) GetPrimaryRepository(ctx context.Context) (Repository, error) 
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }
 
 const getRepository = `-- name: GetRepository :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE repo_id = $1
 `
 
@@ -168,12 +199,13 @@ func (q *Queries) GetRepository(ctx context.Context, repoID pgtype.UUID) (Reposi
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }
 
 const getRepositoryByPath = `-- name: GetRepositoryByPath :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE path = $1
 `
 
@@ -191,12 +223,13 @@ func (q *Queries) GetRepositoryByPath(ctx context.Context, path string) (Reposit
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }
 
 const listActiveRepositories = `-- name: ListActiveRepositories :many
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE status = 'active'
 ORDER BY created_at DESC
 `
@@ -221,6 +254,7 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 			&i.UpdatedAt,
 			&i.DefaultOwnerID,
 			&i.Role,
+			&i.RootID,
 		); err != nil {
 			return nil, err
 		}
@@ -233,7 +267,7 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 }
 
 const listRepositories = `-- name: ListRepositories :many
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 ORDER BY created_at DESC
 `
 
@@ -257,6 +291,7 @@ func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
 			&i.UpdatedAt,
 			&i.DefaultOwnerID,
 			&i.Role,
+			&i.RootID,
 		); err != nil {
 			return nil, err
 		}
@@ -282,31 +317,17 @@ func (q *Queries) RepositoryExists(ctx context.Context, path string) (bool, erro
 	return exists, err
 }
 
-const setPrimaryRepositoryOwner = `-- name: SetPrimaryRepositoryOwner :one
+const setUnownedRepositoryHostOwner = `-- name: SetUnownedRepositoryHostOwner :exec
 UPDATE repositories
 SET
     default_owner_id = $1,
     updated_at = NOW()
-WHERE role = 'primary' AND default_owner_id IS NULL
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
+WHERE default_owner_id IS NULL
 `
 
-func (q *Queries) SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error) {
-	row := q.db.QueryRow(ctx, setPrimaryRepositoryOwner, defaultOwnerID)
-	var i Repository
-	err := row.Scan(
-		&i.RepoID,
-		&i.Name,
-		&i.Path,
-		&i.Config,
-		&i.Status,
-		&i.LastSync,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DefaultOwnerID,
-		&i.Role,
-	)
-	return i, err
+func (q *Queries) SetUnownedRepositoryHostOwner(ctx context.Context, defaultOwnerID *int32) error {
+	_, err := q.db.Exec(ctx, setUnownedRepositoryHostOwner, defaultOwnerID)
+	return err
 }
 
 const updateRepository = `-- name: UpdateRepository :one
@@ -317,7 +338,7 @@ SET
     default_owner_id = $4,
     updated_at = $5
 WHERE repo_id = $1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryParams struct {
@@ -351,6 +372,7 @@ func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryPara
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }
@@ -361,7 +383,7 @@ SET
     last_sync = $2,
     updated_at = $3
 WHERE repo_id = $1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryLastSyncParams struct {
@@ -384,6 +406,7 @@ func (q *Queries) UpdateRepositoryLastSync(ctx context.Context, arg UpdateReposi
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }
@@ -392,15 +415,17 @@ const updateRepositoryPath = `-- name: UpdateRepositoryPath :one
 UPDATE repositories
 SET
     path = $2,
-    status = $3,
-    updated_at = $4
+    root_id = $3,
+    status = $4,
+    updated_at = $5
 WHERE repo_id = $1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryPathParams struct {
 	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
 	Path      string             `db:"path" json:"path"`
+	RootID    pgtype.UUID        `db:"root_id" json:"root_id"`
 	Status    dbtypes.RepoStatus `db:"status" json:"status"`
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
@@ -409,6 +434,7 @@ func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepository
 	row := q.db.QueryRow(ctx, updateRepositoryPath,
 		arg.RepoID,
 		arg.Path,
+		arg.RootID,
 		arg.Status,
 		arg.UpdatedAt,
 	)
@@ -424,6 +450,7 @@ func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepository
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }
@@ -434,7 +461,7 @@ SET
     status = $2,
     updated_at = $3
 WHERE repo_id = $1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryStatusParams struct {
@@ -457,6 +484,7 @@ func (q *Queries) UpdateRepositoryStatus(ctx context.Context, arg UpdateReposito
 		&i.UpdatedAt,
 		&i.DefaultOwnerID,
 		&i.Role,
+		&i.RootID,
 	)
 	return i, err
 }

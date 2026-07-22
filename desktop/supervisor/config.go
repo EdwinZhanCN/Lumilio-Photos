@@ -15,8 +15,9 @@ import (
 // source of truth for those choices. The generated server.toml is rebuilt from
 // these choices and is the authoritative immutable input for one launch.
 type DesktopSettings struct {
-	// StoragePath is the user-chosen media library location. Empty means "use
-	// the default" (<appdata>/storage), resolved at startup.
+	// StoragePath is the onboarding/legacy location choice. New runtimes always
+	// use <appdata>/storage as the default root and migrate a different value to
+	// the repository_roots registry as an external Storage Location.
 	StoragePath string `json:"storage_path,omitempty"`
 
 	// OnboardingCompleted gates the first-run native onboarding window. Once the

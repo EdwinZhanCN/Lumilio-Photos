@@ -32,8 +32,9 @@ var trayIcon []byte
 // status line + Quit. There is deliberately no embedded webview for the app UI —
 // that runs in the user's real browser at http://localhost:6680, which (unlike an
 // embedded WKWebView) surfaces platform passkeys correctly and needs no Apple
-// entitlement. The one webview the host does own is the first-run onboarding
-// window (see onboarding.go), which never touches accounts/passkeys.
+// entitlement. The one webview the host does own is the private onboarding and
+// supervisor Control Panel (see onboarding.go), which never handles product
+// accounts or passkeys.
 type desktopApp struct {
 	sup  *supervisor.Supervisor
 	app  *application.App
@@ -55,6 +56,9 @@ type desktopApp struct {
 	onboardOnce sync.Once
 	onboardCh   chan struct{}
 	onboardFlag atomic.Bool
+	// nativeDirectoryPicker is a test seam for proving that cancelled native
+	// grants stop before the in-process repository control plane is accessed.
+	nativeDirectoryPicker func(title string, canCreate bool) (string, bool)
 
 	// Local AI (supervised Lumen Hub) — see lumen_app.go.
 	lumenHub           *lumen.Hub

@@ -108,7 +108,7 @@ COPY --from=builder /app/migrations ./migrations
 COPY server/config/server.container.toml ./config/server.toml
 
 # Prepare storage path
-RUN mkdir -p /data/storage/primary && chown -R app:app /data /app
+RUN mkdir -p /data/storage /data/app-state/cloud /data/app-state/backups /data/app-state/secrets && chown -R app:app /data /app
 
 USER app
 

@@ -67,7 +67,6 @@ type Querier interface {
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
-	CountActivePrimaryRepositories(ctx context.Context) (int64, error)
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
@@ -98,6 +97,7 @@ type Querier interface {
 	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	// Count query matching GetPhotoMapPoints.
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
+	CountPrimaryRepositories(ctx context.Context) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) (int64, error)
@@ -136,6 +136,7 @@ type Querier interface {
 	DeleteEmptyFaceClusters(ctx context.Context) error
 	DeleteEmptyUnconfirmedFaceClusters(ctx context.Context) error
 	DeleteExpiredRegistrationSessions(ctx context.Context) error
+	DeleteExternalRepositoryRoot(ctx context.Context, rootID pgtype.UUID) (int64, error)
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
 	DeleteFaceClusterMembersByCluster(ctx context.Context, clusterID int32) error
@@ -250,6 +251,7 @@ type Querier interface {
 	// 获取每日拍摄活跃度热力图数据
 	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)
 	GetDefaultEmbeddingSpaceByType(ctx context.Context, embeddingType string) (EmbeddingSpace, error)
+	GetDefaultRepositoryRoot(ctx context.Context) (RepositoryRoot, error)
 	GetDistinctCameraModels(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
 	GetDuplicateGroupAssets(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupAsset, error)
@@ -300,6 +302,10 @@ type Querier interface {
 	// folder detail header/hero.
 	GetFolderSummary(ctx context.Context, arg GetFolderSummaryParams) (GetFolderSummaryRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
+	// The primary repository pins the Host Owner after bootstrap. Before the
+	// primary exists, the first account is the initial administrator and therefore
+	// the Host Owner.
+	GetHostOwnerID(ctx context.Context) (int32, error)
 	GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
@@ -339,6 +345,8 @@ type Querier interface {
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
 	GetRepositoryCloudBinding(ctx context.Context, arg GetRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	GetRepositoryDefaults(ctx context.Context) (RepositoryDefault, error)
+	GetRepositoryRoot(ctx context.Context, rootID pgtype.UUID) (RepositoryRoot, error)
+	GetRepositoryRootByPath(ctx context.Context, path string) (RepositoryRoot, error)
 	GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) (RepositoryScanRun, error)
 	GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	GetSettings(ctx context.Context) (Setting, error)
@@ -401,6 +409,7 @@ type Querier interface {
 	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
 	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
 	ListCloudCredentials(ctx context.Context) ([]CloudCredential, error)
+	ListCloudCredentialsForOwner(ctx context.Context, ownerID int32) ([]CloudCredential, error)
 	ListCloudImportRunsForRepository(ctx context.Context, arg ListCloudImportRunsForRepositoryParams) ([]CloudImportRun, error)
 	// Paginated list of duplicate groups for the given repository, owner, and
 	// status. owner_id NULL means no owner scope (admin); non-admin callers pass
@@ -421,6 +430,7 @@ type Querier interface {
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID pgtype.UUID) ([]RepositoryCloudBinding, error)
+	ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
 	ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
@@ -482,7 +492,8 @@ type Querier interface {
 	SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
-	SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error)
+	SetRepositoryRoot(ctx context.Context, arg SetRepositoryRootParams) (Repository, error)
+	SetUnownedRepositoryHostOwner(ctx context.Context, defaultOwnerID *int32) error
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
 	UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLayoutParams) error
 	UpdateAgentPinTitle(ctx context.Context, arg UpdateAgentPinTitleParams) error
@@ -521,6 +532,7 @@ type Querier interface {
 	UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg UpdateRepositoryCloudBindingLastRunParams) (RepositoryCloudBinding, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error)
+	UpdateRepositoryRootFromDisk(ctx context.Context, arg UpdateRepositoryRootFromDiskParams) (RepositoryRoot, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
@@ -540,6 +552,7 @@ type Querier interface {
 	UpsertEmbeddingSpace(ctx context.Context, arg UpsertEmbeddingSpaceParams) (EmbeddingSpace, error)
 	UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	UpsertRepositoryDefaults(ctx context.Context, arg UpsertRepositoryDefaultsParams) (RepositoryDefault, error)
+	UpsertRepositoryRoot(ctx context.Context, arg UpsertRepositoryRootParams) (RepositoryRoot, error)
 	UpsertReverseGeocodeCache(ctx context.Context, arg UpsertReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
 	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)

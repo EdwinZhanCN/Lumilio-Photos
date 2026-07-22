@@ -16,13 +16,12 @@ services:
     # inside the container. It happens to be readable under OrbStack's virtiofs,
     # but not on Linux.
     secretinit:
-        image: alpine:3
+        image: golang:1.25.0-trixie
+        working_dir: /workspace/server
         volumes:
             - ..:/workspace:ro
-            - db-bootstrap-secret:/secrets
-        command: >-
-            sh -c 'install -m 600 /workspace/server/config/.secrets/db_bootstrap_password
-            /secrets/db_bootstrap_password'
+            - ../server/config/.secrets:/secrets
+        command: go run ./tools/secretinit /secrets/db_bootstrap_password
 
     db:
         build:
@@ -36,7 +35,7 @@ services:
             POSTGRES_PASSWORD_FILE: /run/secrets/db_bootstrap_password
         volumes:
             - db_data:/var/lib/postgresql
-            - db-bootstrap-secret:/run/secrets:ro
+            - ../server/config/.secrets:/run/secrets:ro
         ports:
             - "5433:5432"
         command:
@@ -64,10 +63,7 @@ services:
             - go-mod-cache:/root/go
             - pnpm-store:/root/.local/share/pnpm
             - cargo-cache:/usr/local/cargo/registry
-        # No db-bootstrap-secret mount: the secret's home is the repository, at
-        # server/config/.secrets, which /workspace already provides read-write.
-        # Mounting the volume over that path would shadow the source with the
-        # derived copy and make `make .server-secret` fail on a read-only file.
+            - ../server/config/.secrets:/workspace/server/config/.secrets:ro
         environment:
             CGO_ENABLED: "1"
             GOFLAGS: -buildvcs=false
@@ -91,4 +87,3 @@ volumes:
     go-mod-cache:
     pnpm-store:
     cargo-cache:
-    db-bootstrap-secret:

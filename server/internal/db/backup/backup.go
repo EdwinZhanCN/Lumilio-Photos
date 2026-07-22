@@ -84,11 +84,11 @@ func majorOf(version string) (int, error) {
 //
 //  1. binDirOverride (desktop: the bundled bin dir) — trusted, only checked
 //     for the binary's existence;
-//  2. the Debian/PGDG layout /usr/lib/postgresql/<major>/bin (Docker);
+//  2. versioned platform layouts (PGDG on Linux, Homebrew on macOS);
 //  3. pg_dump on PATH, accepted only when `pg_dump --version` reports the
 //     same major (dev machines).
 func LocateTools(binDirOverride string, major int) (string, error) {
-	tried := make([]string, 0, 3)
+	tried := make([]string, 0, 5)
 
 	if dir := strings.TrimSpace(binDirOverride); dir != "" {
 		if _, err := os.Stat(filepath.Join(dir, clientToolName("pg_dump", runtime.GOOS))); err == nil {
@@ -97,11 +97,12 @@ func LocateTools(binDirOverride string, major int) (string, error) {
 		tried = append(tried, dir)
 	}
 
-	debianDir := fmt.Sprintf("/usr/lib/postgresql/%d/bin", major)
-	if _, err := os.Stat(filepath.Join(debianDir, "pg_dump")); err == nil {
-		return debianDir, nil
+	for _, dir := range platformToolDirs(major, runtime.GOOS) {
+		if _, err := os.Stat(filepath.Join(dir, clientToolName("pg_dump", runtime.GOOS))); err == nil {
+			return dir, nil
+		}
+		tried = append(tried, dir)
 	}
-	tried = append(tried, debianDir)
 
 	if pathBin, err := exec.LookPath("pg_dump"); err == nil {
 		out, verr := exec.Command(pathBin, "--version").Output()
@@ -120,6 +121,21 @@ func LocateTools(binDirOverride string, major int) (string, error) {
 	}
 
 	return "", &ErrUnsupportedTools{Major: major, Tried: tried}
+}
+
+func platformToolDirs(major int, goos string) []string {
+	switch goos {
+	case "darwin":
+		formula := fmt.Sprintf("postgresql@%d", major)
+		return []string{
+			filepath.Join("/opt/homebrew/opt", formula, "bin"),
+			filepath.Join("/usr/local/opt", formula, "bin"),
+		}
+	case "linux":
+		return []string{fmt.Sprintf("/usr/lib/postgresql/%d/bin", major)}
+	default:
+		return nil
+	}
 }
 
 // Dump runs pg_dump --clean --if-exists against conn and writes a gzip dump

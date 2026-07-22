@@ -1752,6 +1752,10 @@ const docTemplate = `{
                         "example": "u***r@example.com",
                         "type": "string"
                     },
+                    "owner_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
                     "provider": {
                         "example": "icloud",
                         "type": "string"
@@ -1805,6 +1809,10 @@ const docTemplate = `{
                     },
                     "imported_count": {
                         "example": 75,
+                        "type": "integer"
+                    },
+                    "owner_id": {
+                        "example": 123,
                         "type": "integer"
                     },
                     "provider": {
@@ -2057,17 +2065,17 @@ const docTemplate = `{
                         "example": "Family Photos",
                         "type": "string"
                     },
-                    "path": {
-                        "description": "Path is an absolute on-disk location for the repository. It is only\naccepted by deployments whose path policy allows free placement (desktop);\na server rejects it and places the repository under its storage root.",
-                        "example": "/Volumes/Media/Photos",
-                        "type": "string"
-                    },
                     "role": {
                         "enum": [
                             "primary",
                             "regular"
                         ],
                         "example": "regular",
+                        "type": "string"
+                    },
+                    "root_id": {
+                        "description": "RootID identifies a registered Storage Location. Empty selects the\nconfigured default location. Clients never submit an arbitrary root path.",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
                     "storage_strategy": {
@@ -2895,6 +2903,18 @@ const docTemplate = `{
                     "repositories": {
                         "items": {
                             "$ref": "#/components/schemas/dto.RepositoryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ListRepositoryRootsResponseDTO": {
+                "properties": {
+                    "roots": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryRootDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -4050,18 +4070,6 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
-            "dto.RelocateRepositoryRequestDTO": {
-                "properties": {
-                    "path": {
-                        "example": "/Volumes/NewDrive/Photos",
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "path"
-                ],
-                "type": "object"
-            },
             "dto.RepositoryCloudStatusDTO": {
                 "properties": {
                     "credential": {
@@ -4077,8 +4085,52 @@ const docTemplate = `{
                     "latest_run": {
                         "$ref": "#/components/schemas/dto.CloudImportRunDTO"
                     },
+                    "owner_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
                     "provider": {
                         "example": "icloud",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryConflictDTO": {
+                "properties": {
+                    "actions": {
+                        "example": [
+                            "relocate",
+                            "copy"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "code": {
+                        "example": 409,
+                        "type": "integer"
+                    },
+                    "conflict_type": {
+                        "example": "repository_identity",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "Repository identity is already registered",
+                        "type": "string"
+                    },
+                    "registered_path": {
+                        "example": "/Volumes/OldDrive/Photos",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "requested_path": {
+                        "example": "/Volumes/NewDrive/Photos",
                         "type": "string"
                     }
                 },
@@ -4112,6 +4164,14 @@ const docTemplate = `{
                         "example": "regular",
                         "type": "string"
                     },
+                    "root_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "active",
+                        "type": "string"
+                    },
                     "storage_strategy": {
                         "example": "date",
                         "type": "string"
@@ -4140,6 +4200,31 @@ const docTemplate = `{
                 "properties": {
                     "handle_duplicate_filenames": {
                         "example": "uuid",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryRootDTO": {
+                "properties": {
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "example": "external",
+                        "type": "string"
+                    },
+                    "name": {
+                        "example": "External Archive",
+                        "type": "string"
+                    },
+                    "path": {
+                        "example": "/Volumes/Photos",
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "active",
                         "type": "string"
                     }
                 },
@@ -5591,9 +5676,6 @@ const docTemplate = `{
             },
             "dto.UpdateRepositoryRequestDTO": {
                 "properties": {
-                    "default_owner_id": {
-                        "type": "integer"
-                    },
                     "local_settings": {
                         "$ref": "#/components/schemas/dto.RepositoryLocalSettings"
                     },
@@ -12973,7 +13055,7 @@ const docTemplate = `{
         },
         "/api/v1/cloud/credentials": {
             "get": {
-                "description": "List configured cloud credentials without exposing secrets.",
+                "description": "List the current user's cloud credentials without exposing secrets. Administrators receive all credentials.",
                 "responses": {
                     "200": {
                         "content": {
@@ -13017,7 +13099,7 @@ const docTemplate = `{
                 ]
             },
             "post": {
-                "description": "Authenticate with a cloud provider and save a repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.",
+                "description": "Authenticate with a cloud provider and save a user-owned, repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -13068,6 +13150,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -13135,6 +13227,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -13223,6 +13325,16 @@ const docTemplate = `{
                         },
                         "description": "Unauthorized"
                     },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -13289,6 +13401,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -13377,6 +13499,16 @@ const docTemplate = `{
                         },
                         "description": "Unauthorized"
                     },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Credential belongs to another user"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -13443,6 +13575,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Import run belongs to another user"
                     },
                     "500": {
                         "content": {
@@ -15643,7 +15785,7 @@ const docTemplate = `{
                 ]
             },
             "post": {
-                "description": "Create a repository folder under the server storage root. If the target folder already contains a .lumiliorepo file, it is registered instead.",
+                "description": "Create a repository folder under a registered Storage Location. Empty root_id selects the configured default. If the target already contains a .lumiliorepo file, it is registered instead.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -15705,6 +15847,16 @@ const docTemplate = `{
                         },
                         "description": "Forbidden"
                     },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryConflictDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository identity conflict"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -15722,82 +15874,6 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Create repository",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/copies": {
-            "post": {
-                "description": "Register a folder whose .lumiliorepo carries an already-registered repository ID as an independent repository. A fresh repository ID is written into the folder, the way cloning a git repository produces a distinct working copy.",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RelocateRepositoryRequestDTO",
-                                        "summary": "request",
-                                        "description": "Repository path"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Repository path",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository registered successfully"
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid request"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "403": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Forbidden"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Register repository copy",
                 "tags": [
                     "repositories"
                 ]
@@ -15895,7 +15971,7 @@ const docTemplate = `{
                 ]
             },
             "patch": {
-                "description": "Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).",
+                "description": "Update mutable repository fields (name, storage_strategy, local_settings). Repository ownership is fixed to the Host Owner.",
                 "parameters": [
                     {
                         "description": "Repository UUID",
@@ -16101,113 +16177,6 @@ const docTemplate = `{
                 "summary": "Start repository cloud import",
                 "tags": [
                     "cloud"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}/relocate": {
-            "post": {
-                "description": "Update a repository's recorded location after its folder moved. The .lumiliorepo at the new path must carry the same repository ID. Assets are not moved: their storage paths are repository-relative.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RelocateRepositoryRequestDTO",
-                                        "summary": "request",
-                                        "description": "New repository path"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "New repository path",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository relocated successfully"
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid request"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "403": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Forbidden"
-                    },
-                    "404": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository not found"
-                    },
-                    "409": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Another repository already occupies the path"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Relocate repository",
-                "tags": [
-                    "repositories"
                 ]
             }
         },
@@ -16431,6 +16400,32 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Auto-detect stacks",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repository-roots": {
+            "get": {
+                "description": "Return registered repository roots with their current reachability. Filesystem paths are admin-only through this route.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ListRepositoryRootsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Storage Locations retrieved successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List Storage Locations",
                 "tags": [
                     "repositories"
                 ]

@@ -11,9 +11,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"desktop/lumen"
+	serverapp "server/app"
 )
 
 const dashboardLogTailLines = 240
@@ -23,6 +25,159 @@ var dashboardLogFiles = map[string]string{
 	"error":    "error.log",
 	"postgres": "postgres.log",
 	"lumen":    "lumen-hub.log",
+}
+
+func (d *desktopApp) handleStorageLocations(w http.ResponseWriter, r *http.Request) {
+	control, err := d.sup.RepositoryControl()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	locations, err := control.ListStorageLocations(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"locations": locations})
+}
+
+func (d *desktopApp) handlePickStorageLocation(w http.ResponseWriter, r *http.Request) {
+	path, cancelled := d.pickNativeDirectory("Add Storage Location", true)
+	if cancelled {
+		writeJSON(w, map[string]any{"cancelled": true})
+		return
+	}
+	control, err := d.sup.RepositoryControl()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	location, warnings, err := control.AddStorageLocation(r.Context(), path, filepath.Base(path))
+	if err != nil {
+		var conflict *serverapp.StorageLocationIdentityConflict
+		if errors.As(err, &conflict) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			writeJSON(w, map[string]any{
+				"message":  "Storage Location identity is already registered",
+				"conflict": conflict,
+			})
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"location": location, "warnings": warnings})
+}
+
+func (d *desktopApp) handleStorageLocationConflict(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		RootID string `json:"rootId"`
+		Path   string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	control, err := d.sup.RepositoryControl()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	location, err := control.ResolveStorageLocationConflict(r.Context(), body.RootID, body.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"location": location})
+}
+
+func (d *desktopApp) handleRemoveStorageLocation(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.ID) == "" {
+		http.Error(w, "storage location id is required", http.StatusBadRequest)
+		return
+	}
+	control, err := d.sup.RepositoryControl()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	if err := control.RemoveStorageLocation(r.Context(), body.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (d *desktopApp) handleAttachRepository(w http.ResponseWriter, r *http.Request) {
+	path, cancelled := d.pickNativeDirectory("Attach Lumilio Repository", false)
+	if cancelled {
+		writeJSON(w, map[string]any{"cancelled": true})
+		return
+	}
+	control, err := d.sup.RepositoryControl()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	repository, err := control.AttachRepository(r.Context(), path)
+	if err != nil {
+		var conflict *serverapp.RepositoryIdentityConflict
+		if errors.As(err, &conflict) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			writeJSON(w, map[string]any{
+				"message":  "Repository identity is already registered",
+				"conflict": conflict,
+			})
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"repository": repository})
+}
+
+func (d *desktopApp) handleRepositoryConflict(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Action       string `json:"action"`
+		RepositoryID string `json:"repositoryId"`
+		Path         string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	control, err := d.sup.RepositoryControl()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	repository, err := control.ResolveRepositoryConflict(r.Context(), body.Action, body.RepositoryID, body.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"repository": repository})
+}
+
+func (d *desktopApp) pickNativeDirectory(title string, canCreate bool) (string, bool) {
+	if d.nativeDirectoryPicker != nil {
+		return d.nativeDirectoryPicker(title, canCreate)
+	}
+	dialog := d.app.Dialog.OpenFile().
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		CanCreateDirectories(canCreate).
+		SetTitle(title)
+	if d.onboardWin != nil {
+		dialog = dialog.AttachToWindow(d.onboardWin)
+	}
+	path, err := dialog.PromptForSingleSelection()
+	return path, err != nil || strings.TrimSpace(path) == ""
 }
 
 // handleDashboardLog exposes a bounded, read-only tail of known local logs to

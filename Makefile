@@ -61,7 +61,7 @@ setup: .server-config .server-secret
 
 db: .server-secret
 	@echo "==> Starting database and waiting for healthy status"
-	@$(COMPOSE) up -d --wait db
+	@$(COMPOSE) up -d --wait --build db
 
 dev: db
 	@echo "==> Starting server and web"
@@ -123,7 +123,7 @@ db-reset:
 	@if $(DOCKER) volume inspect $(DB_VOLUME) >/dev/null 2>&1; then \
 		$(DOCKER) volume rm $(DB_VOLUME) >/dev/null; \
 	fi
-	@rm -f $(SERVER_DIR)/data/storage/.secrets/db_password
+	@rm -f $(SERVER_DIR)/data/app-state/secrets/db_password
 
 dev-reset: db-reset
 	@echo "==> Removing incompatible pre-manifest local state"

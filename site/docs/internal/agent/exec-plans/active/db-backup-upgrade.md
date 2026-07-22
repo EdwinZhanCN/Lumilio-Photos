@@ -6,8 +6,9 @@ upgrade orchestration is deferred until the first major bump.
 ## Current contract
 
 - The server owns scheduled logical backups for Docker and Desktop.
-- Routine dumps live in `<storage>/backups/` and use version-matched PostgreSQL
-  client tools.
+- Routine dumps live at the explicit `storage.backups_path` (Desktop defaults
+  it to local app data) and use version-matched PostgreSQL client tools. They do
+  not follow a removable media Storage Location.
 - Dumps are gzip-compressed SQL, written through a temporary file and renamed
   atomically. Retention does not remove restore points.
 - Restore is admin-only, takes a fresh restore point, runs transactionally, and
@@ -48,8 +49,8 @@ manual fallback.
 
 ### Optional recovery entry
 
-The fresh-install flow may offer restore from dumps already present in
-`<storage>/backups/`. This is useful but is not required before the first
+The fresh-install flow may offer restore from dumps already present at the
+configured `storage.backups_path`. This is useful but is not required before the first
 PostgreSQL major bump.
 
 ## Outstanding verification

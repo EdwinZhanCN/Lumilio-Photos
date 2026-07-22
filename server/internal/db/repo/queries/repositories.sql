@@ -8,9 +8,10 @@ INSERT INTO repositories (
     status,
     default_owner_id,
     created_at,
-    updated_at
+    updated_at,
+    root_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 ) RETURNING *;
 
 -- name: GetRepository :one
@@ -26,6 +27,25 @@ SELECT * FROM repositories
 WHERE role = 'primary'
   AND status = 'active';
 
+-- name: GetHostOwnerID :one
+-- The primary repository pins the Host Owner after bootstrap. Before the
+-- primary exists, the first account is the initial administrator and therefore
+-- the Host Owner.
+SELECT candidate.owner_id::integer AS host_owner_id
+FROM (
+    SELECT default_owner_id AS owner_id, 0 AS priority, created_at, repo_id::text AS tie_breaker
+    FROM repositories
+    WHERE role = 'primary'
+      AND default_owner_id IS NOT NULL
+
+    UNION ALL
+
+    SELECT user_id AS owner_id, 1 AS priority, created_at, user_id::text AS tie_breaker
+    FROM users
+) candidate
+ORDER BY candidate.priority ASC, candidate.created_at ASC, candidate.tie_breaker ASC
+LIMIT 1;
+
 -- name: ListRepositories :many
 SELECT * FROM repositories
 ORDER BY created_at DESC;
@@ -35,10 +55,9 @@ SELECT * FROM repositories
 WHERE status = 'active'
 ORDER BY created_at DESC;
 
--- name: CountActivePrimaryRepositories :one
+-- name: CountPrimaryRepositories :one
 SELECT COUNT(*) FROM repositories
-WHERE role = 'primary'
-  AND status = 'active';
+WHERE role = 'primary';
 
 -- Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
 -- Letting a settings edit write status resurrects a repository that reconcile
@@ -57,8 +76,9 @@ RETURNING *;
 UPDATE repositories
 SET
     path = $2,
-    status = $3,
-    updated_at = $4
+    root_id = $3,
+    status = $4,
+    updated_at = $5
 WHERE repo_id = $1
 RETURNING *;
 
@@ -99,10 +119,9 @@ SELECT COUNT(*) FROM repositories;
 SELECT COUNT(*) FROM repositories
 WHERE status = $1;
 
--- name: SetPrimaryRepositoryOwner :one
+-- name: SetUnownedRepositoryHostOwner :exec
 UPDATE repositories
 SET
     default_owner_id = $1,
     updated_at = NOW()
-WHERE role = 'primary' AND default_owner_id IS NULL
-RETURNING *;
+WHERE default_owner_id IS NULL;

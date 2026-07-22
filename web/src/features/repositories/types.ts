@@ -4,9 +4,8 @@ export type RepositoryOption = {
   path: string;
   role: string;
   /**
-   * Reachability of the repository's on-disk location. An "offline" repository
-   * stays selectable as a browse filter but must not be offered as an upload
-   * target: its drive is elsewhere, its assets are not gone.
+   * Reachability of the repository's on-disk location. Offline and invalid
+   * repositories stay selectable as browse filters but are not upload targets.
    */
   status: RepositoryStatus;
   isPrimary: boolean;

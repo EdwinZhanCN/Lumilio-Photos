@@ -56,6 +56,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	cfg, err := compileAndLoadServerManifest(path, serverManifestBindings{
 		Port: "6680", BrowserOrigin: "http://localhost:6680", WebRoot: webRoot,
 		LogDir: logDir, StoragePath: storagePath,
+		CloudStatePath: filepath.Join(dir, "appdata", "cloud"), BackupsPath: filepath.Join(dir, "appdata", "backups"),
 		DBHost: dbHost, DBPort: "5487", DBUser: "lumilio", DBName: "lumiliophotos",
 		BootstrapPasswordFile: bootstrap, RotatedPasswordFile: filepath.Join(dir, "rotated"), SecretKeyFile: secretKeyFile,
 		PGBinDir: pgBinDir, ExifToolPath: exifToolPath, FFmpegPath: ffmpegPath, FFprobePath: ffprobePath,
@@ -191,7 +192,7 @@ func TestEnsureDirsArePrivate(t *testing.T) {
 	if err := paths.EnsureDirs(); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{paths.AppData, paths.PGData, paths.PGRun, paths.PGLogs, paths.Logs, paths.Secrets, paths.Config, paths.Backups} {
+	for _, path := range []string{paths.AppData, paths.PGData, paths.PGRun, paths.PGLogs, paths.Logs, paths.Secrets, paths.Config, paths.Backups, paths.Cloud} {
 		private, err := isPrivatePath(path)
 		if err != nil || !private {
 			t.Errorf("%s private = %v, err = %v", path, private, err)
@@ -211,6 +212,60 @@ func TestStorageReachable(t *testing.T) {
 	// A path under a non-existent parent (e.g. unmounted drive) is unreachable.
 	if storageReachable(filepath.Join(dir, "missing", "library")) {
 		t.Error("path under missing parent should be unreachable")
+	}
+}
+
+func TestResolveStoragePathKeepsLocalDefaultAndQueuesLegacyExternal(t *testing.T) {
+	appData := filepath.Join(t.TempDir(), "appdata")
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	s := New(Options{Logf: func(string, ...any) {}})
+	if err := s.ensurePaths(); err != nil {
+		t.Fatal(err)
+	}
+	external := t.TempDir()
+	if err := SaveSettings(s.paths.DesktopSettingsFile(), DesktopSettings{StoragePath: external}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.resolveStoragePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != s.paths.DefaultLib {
+		t.Fatalf("resolved storage = %q, want local default %q", got, s.paths.DefaultLib)
+	}
+	if s.pendingStorageRoot != external {
+		t.Fatalf("pending root = %q, want legacy external %q", s.pendingStorageRoot, external)
+	}
+	settings, err := LoadSettings(s.paths.DesktopSettingsFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.StoragePath != external {
+		t.Fatalf("legacy grant was overwritten before registration: %q", settings.StoragePath)
+	}
+}
+
+func TestResolveStoragePathDoesNotRecreateUnavailableLegacyExternal(t *testing.T) {
+	appData := filepath.Join(t.TempDir(), "appdata")
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	s := New(Options{Logf: func(string, ...any) {}})
+	if err := s.ensurePaths(); err != nil {
+		t.Fatal(err)
+	}
+	external := filepath.Join(t.TempDir(), "missing", "photos")
+	if err := SaveSettings(s.paths.DesktopSettingsFile(), DesktopSettings{StoragePath: external}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.resolveStoragePath(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(external); !os.IsNotExist(err) {
+		t.Fatalf("unavailable legacy path was recreated: %v", err)
+	}
+	if len(s.warnings) == 0 || !strings.Contains(s.warnings[len(s.warnings)-1], "remains offline") {
+		t.Fatalf("missing explicit offline warning: %v", s.warnings)
 	}
 }
 

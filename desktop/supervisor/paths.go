@@ -41,6 +41,7 @@ type Paths struct {
 	Secrets    string // db_password + lumilio_secret_key
 	Config     string // authoritative generated manifest + desktop-settings.json
 	Backups    string // pg_dump auto-backups (upgrades)
+	Cloud      string // cloud provider sessions and credential artifacts
 	DefaultLib string // default media library location (<appdata>/storage)
 }
 
@@ -63,6 +64,7 @@ func NewPaths() (*Paths, error) {
 		Secrets:    filepath.Join(root, "secrets"),
 		Config:     filepath.Join(root, "config"),
 		Backups:    filepath.Join(root, "backups"),
+		Cloud:      filepath.Join(root, "cloud"),
 		DefaultLib: filepath.Join(root, "storage"),
 	}, nil
 }
@@ -88,7 +90,7 @@ func resolveAppDataRoot() (string, error) {
 // EnsureDirs creates the full app-data directory tree. The media library is
 // created separately once its (possibly user-chosen) location is resolved.
 func (p *Paths) EnsureDirs() error {
-	for _, dir := range []string{p.AppData, p.PGData, p.PGRun, p.PGLogs, p.Logs, p.Secrets, p.Config, p.Backups} {
+	for _, dir := range []string{p.AppData, p.PGData, p.PGRun, p.PGLogs, p.Logs, p.Secrets, p.Config, p.Backups, p.Cloud} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}
