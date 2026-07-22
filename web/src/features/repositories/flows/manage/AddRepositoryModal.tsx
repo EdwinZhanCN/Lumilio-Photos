@@ -279,7 +279,7 @@ export default function AddRepositoryModal({
             </div>
           )}
 
-          <fieldset className="fieldset grid gap-3 rounded-lg border border-base-300 px-4 pb-4 sm:grid-cols-2">
+          <fieldset className="fieldset grid gap-4 rounded-lg border border-base-300 px-4 pb-4">
             <legend className="fieldset-legend px-1">
               {t("manage.repositories.policyLegend", "Repository policy")}
             </legend>

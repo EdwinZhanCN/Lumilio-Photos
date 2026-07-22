@@ -129,6 +129,45 @@ func TestClientToolName(t *testing.T) {
 	}
 }
 
+func TestPlatformToolDirs(t *testing.T) {
+	tests := []struct {
+		name  string
+		goos  string
+		major int
+		want  []string
+	}{
+		{
+			name:  "Apple Silicon Homebrew",
+			goos:  "darwin",
+			major: 18,
+			want: []string{
+				"/opt/homebrew/opt/postgresql@18/bin",
+				"/usr/local/opt/postgresql@18/bin",
+			},
+		},
+		{
+			name:  "Debian PGDG",
+			goos:  "linux",
+			major: 18,
+			want:  []string{"/usr/lib/postgresql/18/bin"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := platformToolDirs(tt.major, tt.goos)
+			if len(got) != len(tt.want) {
+				t.Fatalf("platformToolDirs() = %v, want %v", got, tt.want)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Fatalf("platformToolDirs()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestLocateToolsFailsLoudlyWhenNothingMatches(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // hide any real pg_dump
 	_, err := LocateTools("", 99)

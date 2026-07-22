@@ -3,9 +3,10 @@
  *
  * The settings feature owns the authenticated settings route, local
  * preferences, server-backed system settings drafts, runtime info display, AI
- * and cloud admin tabs, and the user-management surface. Repository scope and
- * cloud data access live in their own feature boundaries; Settings composes
- * those capabilities without owning their persistence or query rules.
+ * and cloud account tabs, and the administrator-only user-management surface.
+ * Repository scope and cloud data access live in their own feature boundaries;
+ * Settings composes those capabilities without owning their persistence or
+ * query rules.
  *
  * ## State
  *
@@ -64,7 +65,7 @@
  *     SHELL --> SERVER["ServerTab"]
  *     SHELL --> ABOUT["AboutTab"]
  *     SHELL -. admin .-> AI["AiTab"]
- *     SHELL -. admin .-> CLOUD["CloudTab"]
+ *     SHELL --> CLOUD["CloudTab"]
  *     SHELL -. admin .-> USERS["UsersTab"]
  *     APPEAR --> PREFS["usePreferencesStore"]
  *     SERVER --> RUNTIME["useRuntimeInfo"]
@@ -74,9 +75,10 @@
  *
  * {@link Settings} renders the route header and delegates the tabbed surface to
  * {@link SettingsShell}. The shell always shows {@link AccountTab},
- * {@link AppearanceTab}, {@link ServerTab}, and {@link AboutTab}; admin users additionally see
- * {@link AiTab}, {@link CloudTab}, and {@link UsersTab}. The visual hierarchy is
- * centralized in {@link SettingsPage}, {@link SettingsGroup},
+ * {@link AppearanceTab}, {@link CloudTab}, {@link ServerTab}, and
+ * {@link AboutTab}; admin users additionally see {@link AiTab} and
+ * {@link UsersTab}. The visual hierarchy is centralized in
+ * {@link SettingsPage}, {@link SettingsGroup},
  * {@link SettingsRow}, and {@link SettingsBlock}; tabs should compose those
  * primitives instead of inventing local section chrome.
  *

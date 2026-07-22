@@ -102,7 +102,15 @@ root can therefore move without carrying credentials, cloud sessions, or the
 database backup policy with it.
 
 Repositories are unowned shared storage; per-user visibility and mutation
-authorization run entirely on `assets.owner_id`.
+authorization run entirely on `assets.owner_id`. The first account is the Host
+Owner. Every repository uses that same account as `default_owner_id`, solely as
+the fallback for filesystem scans or other ingest sources without an explicit
+user. Uploads keep their initiating user. Cloud credentials belong to the user
+who connected the account; repository cloud bindings retain that identity as
+the stable imported-asset owner, and import runs snapshot it. Administrators
+may manage every credential while regular users can only access their own.
+Owner identity is instance-local database policy rather than portable
+`.lumiliorepo` metadata.
 
 ## Database And API Contracts
 

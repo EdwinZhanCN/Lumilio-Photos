@@ -34,7 +34,6 @@ type UpdateRepositoryRequestDTO struct {
 	Name            *string                  `json:"name,omitempty" example:"My Photos"`
 	StorageStrategy *string                  `json:"storage_strategy,omitempty" example:"flat"`
 	LocalSettings   *RepositoryLocalSettings `json:"local_settings,omitempty"`
-	DefaultOwnerID  *int32                   `json:"default_owner_id,omitempty"`
 }
 
 type ListRepositoriesResponseDTO struct {

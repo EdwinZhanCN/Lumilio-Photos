@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
@@ -80,6 +82,11 @@ type RepositoryManager interface {
 	// ListRepositories returns all registered repositories.
 	ListRepositories() ([]*repo.Repository, error)
 
+	// HostOwnerID returns the initial administrator that represents ownership
+	// of this host. The primary repository pins the identity after bootstrap;
+	// before then, the first account is used. Nil means setup has no user yet.
+	HostOwnerID(ctx context.Context) (*int32, error)
+
 	// UpdateRepository validates and persists config to both the database record
 	// and the on-disk .lumiliorepo file.
 	UpdateRepository(id string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error)
@@ -144,6 +151,20 @@ func NewRepositoryManager(
 
 // Ensure the concrete type satisfies the consumer interface.
 var _ RepositoryManager = (*DefaultRepositoryManager)(nil)
+
+// HostOwnerID resolves the one host-level fallback owner used by every
+// repository. Repository defaults are ingestion policy, not per-repository
+// authorization; explicit upload and cloud owners still take precedence.
+func (rm *DefaultRepositoryManager) HostOwnerID(ctx context.Context) (*int32, error) {
+	ownerID, err := rm.queries.GetHostOwnerID(ctx)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("resolve host owner: %w", err)
+	}
+	return &ownerID, nil
+}
 
 // AddRepository registers an existing repository with the system
 func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error) {

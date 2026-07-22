@@ -302,6 +302,10 @@ type Querier interface {
 	// folder detail header/hero.
 	GetFolderSummary(ctx context.Context, arg GetFolderSummaryParams) (GetFolderSummaryRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
+	// The primary repository pins the Host Owner after bootstrap. Before the
+	// primary exists, the first account is the initial administrator and therefore
+	// the Host Owner.
+	GetHostOwnerID(ctx context.Context) (int32, error)
 	GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
@@ -405,6 +409,7 @@ type Querier interface {
 	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
 	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
 	ListCloudCredentials(ctx context.Context) ([]CloudCredential, error)
+	ListCloudCredentialsForOwner(ctx context.Context, ownerID int32) ([]CloudCredential, error)
 	ListCloudImportRunsForRepository(ctx context.Context, arg ListCloudImportRunsForRepositoryParams) ([]CloudImportRun, error)
 	// Paginated list of duplicate groups for the given repository, owner, and
 	// status. owner_id NULL means no owner scope (admin); non-admin callers pass
@@ -487,8 +492,8 @@ type Querier interface {
 	SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
-	SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error)
 	SetRepositoryRoot(ctx context.Context, arg SetRepositoryRootParams) (Repository, error)
+	SetUnownedRepositoryHostOwner(ctx context.Context, defaultOwnerID *int32) error
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
 	UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLayoutParams) error
 	UpdateAgentPinTitle(ctx context.Context, arg UpdateAgentPinTitleParams) error

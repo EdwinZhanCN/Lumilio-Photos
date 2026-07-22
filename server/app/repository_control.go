@@ -63,6 +63,8 @@ func (e *RepositoryIdentityConflict) Error() string {
 
 type repositoryControl struct{ manager storage.RepositoryManager }
 
+var ErrHostOwnerUnavailable = errors.New("Host Owner unavailable; complete initial administrator setup before attaching a repository")
+
 func newRepositoryControl(manager storage.RepositoryManager) RepositoryControl {
 	return &repositoryControl{manager: manager}
 }
@@ -106,8 +108,12 @@ func (c *repositoryControl) RemoveStorageLocation(ctx context.Context, id string
 	return c.manager.DeleteRepositoryRoot(ctx, id)
 }
 
-func (c *repositoryControl) AttachRepository(_ context.Context, path string) (RepositoryInfo, error) {
-	repository, err := c.manager.AddRepository(path, nil, dbtypes.RepoRoleRegular)
+func (c *repositoryControl) AttachRepository(ctx context.Context, path string) (RepositoryInfo, error) {
+	ownerID, err := c.requireHostOwnerID(ctx)
+	if err != nil {
+		return RepositoryInfo{}, err
+	}
+	repository, err := c.manager.AddRepository(path, ownerID, dbtypes.RepoRoleRegular)
 	if err != nil {
 		var conflict *storage.RepositoryConflictError
 		if errors.As(err, &conflict) {
@@ -128,7 +134,11 @@ func (c *repositoryControl) ResolveRepositoryConflict(ctx context.Context, actio
 	case "relocate":
 		repository, err = c.manager.RelocateRepository(ctx, repositoryID, path)
 	case "copy":
-		repository, err = c.manager.RegisterRepositoryCopy(ctx, path, nil, dbtypes.RepoRoleRegular)
+		var ownerID *int32
+		ownerID, err = c.requireHostOwnerID(ctx)
+		if err == nil {
+			repository, err = c.manager.RegisterRepositoryCopy(ctx, path, ownerID, dbtypes.RepoRoleRegular)
+		}
 	default:
 		return RepositoryInfo{}, fmt.Errorf("unknown repository conflict action %q", action)
 	}
@@ -136,6 +146,17 @@ func (c *repositoryControl) ResolveRepositoryConflict(ctx context.Context, actio
 		return RepositoryInfo{}, err
 	}
 	return repositoryInfo(repository), nil
+}
+
+func (c *repositoryControl) requireHostOwnerID(ctx context.Context) (*int32, error) {
+	ownerID, err := c.manager.HostOwnerID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if ownerID == nil {
+		return nil, ErrHostOwnerUnavailable
+	}
+	return ownerID, nil
 }
 
 func storageLocationInfo(root repo.RepositoryRoot) StorageLocationInfo {

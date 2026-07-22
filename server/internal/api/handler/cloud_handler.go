@@ -14,6 +14,7 @@ import (
 	"server/internal/api/dto"
 	"server/internal/cloud"
 	"server/internal/db/repo"
+	"server/internal/service"
 )
 
 // CloudHandler handles cloud credential and import endpoints.
@@ -37,7 +38,7 @@ func NewCloudHandler(cloudService cloud.CloudSyncService) *CloudHandler {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/providers [get]
 func (h *CloudHandler) ListProviders(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	if _, ok := requireCurrentUser(c); !ok {
 		return
 	}
 
@@ -56,7 +57,7 @@ func (h *CloudHandler) ListProviders(c *gin.Context) {
 
 // ListCredentials returns all saved cloud credentials.
 // @Summary List cloud credentials
-// @Description List configured cloud credentials without exposing secrets.
+// @Description List the current user's cloud credentials without exposing secrets. Administrators receive all credentials.
 // @Tags cloud
 // @Produce json
 // @Security BearerAuth
@@ -65,11 +66,12 @@ func (h *CloudHandler) ListProviders(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials [get]
 func (h *CloudHandler) ListCredentials(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	user, ok := requireCurrentUser(c)
+	if !ok {
 		return
 	}
 
-	credentials, err := h.cloudService.ListCredentials(c.Request.Context())
+	credentials, err := h.cloudService.ListCredentials(c.Request.Context(), cloudCredentialAccess(user))
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to list cloud credentials")
 		return
@@ -84,7 +86,7 @@ func (h *CloudHandler) ListCredentials(c *gin.Context) {
 
 // CreateCredential initiates cloud credential creation.
 // @Summary Create cloud credential
-// @Description Authenticate with a cloud provider and save a repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
+// @Description Authenticate with a cloud provider and save a user-owned, repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
 // @Tags cloud
 // @Accept json
 // @Produce json
@@ -93,10 +95,11 @@ func (h *CloudHandler) ListCredentials(c *gin.Context) {
 // @Success 200 {object} dto.CreateCloudCredentialResponse "Credential creation result"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Credential belongs to another user"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials [post]
 func (h *CloudHandler) CreateCredential(c *gin.Context) {
-	user, ok := requireAdminUser(c)
+	user, ok := requireCurrentUser(c)
 	if !ok {
 		return
 	}
@@ -110,15 +113,14 @@ func (h *CloudHandler) CreateCredential(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	createdBy := int32(user.UserID)
 	result, err := h.cloudService.CreateCredential(ctx, cloud.CreateCloudCredentialInput{
-		Provider:        cloud.ProviderKind(req.Provider),
-		DisplayName:     req.DisplayName,
-		Inputs:          req.Inputs,
-		CreatedByUserID: &createdBy,
+		Provider:    cloud.ProviderKind(req.Provider),
+		DisplayName: req.DisplayName,
+		Inputs:      req.Inputs,
+		Access:      cloudCredentialAccess(user),
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to create cloud credential")
+		writeCloudAccessError(c, err, "Failed to create cloud credential")
 		return
 	}
 
@@ -141,10 +143,12 @@ func (h *CloudHandler) CreateCredential(c *gin.Context) {
 // @Success 200 {object} dto.VerifyCloudAuthChallengeResponse "Challenge verified successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Credential belongs to another user"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id}/auth-challenge [post]
 func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	user, ok := requireCurrentUser(c)
+	if !ok {
 		return
 	}
 
@@ -166,9 +170,10 @@ func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
 	result, err := h.cloudService.VerifyCredentialChallenge(ctx, cloud.VerifyCredentialChallengeInput{
 		CredentialID: credentialID,
 		Inputs:       req.Inputs,
+		Access:       cloudCredentialAccess(user),
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Cloud credential challenge verification failed")
+		writeCloudAccessError(c, err, "Cloud credential challenge verification failed")
 		return
 	}
 
@@ -188,10 +193,12 @@ func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
 // @Success 200 {object} api.SuccessResponse "Credential disconnected"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Credential belongs to another user"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id}/disconnect [post]
 func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	user, ok := requireCurrentUser(c)
+	if !ok {
 		return
 	}
 
@@ -201,8 +208,8 @@ func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
 		return
 	}
 
-	if err := h.cloudService.DisconnectCredential(c.Request.Context(), credentialID); err != nil {
-		api.GinInternalError(c, err, "Failed to disconnect credential")
+	if err := h.cloudService.DisconnectCredential(c.Request.Context(), credentialID, cloudCredentialAccess(user)); err != nil {
+		writeCloudAccessError(c, err, "Failed to disconnect credential")
 		return
 	}
 
@@ -221,10 +228,12 @@ func (h *CloudHandler) DisconnectCredential(c *gin.Context) {
 // @Success 200 {object} dto.CreateCloudCredentialResponse "Reconnect result"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Credential belongs to another user"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id}/reconnect [post]
 func (h *CloudHandler) ReconnectCredential(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	user, ok := requireCurrentUser(c)
+	if !ok {
 		return
 	}
 
@@ -246,9 +255,10 @@ func (h *CloudHandler) ReconnectCredential(c *gin.Context) {
 	result, err := h.cloudService.ReconnectCredential(ctx, cloud.ReconnectCredentialInput{
 		CredentialID: credentialID,
 		Inputs:       req.Inputs,
+		Access:       cloudCredentialAccess(user),
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to reconnect credential")
+		writeCloudAccessError(c, err, "Failed to reconnect credential")
 		return
 	}
 
@@ -269,10 +279,12 @@ func (h *CloudHandler) ReconnectCredential(c *gin.Context) {
 // @Success 200 {object} api.SuccessResponse "Credential removed"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Credential belongs to another user"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/credentials/{id} [delete]
 func (h *CloudHandler) RemoveCredential(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	user, ok := requireCurrentUser(c)
+	if !ok {
 		return
 	}
 
@@ -282,8 +294,8 @@ func (h *CloudHandler) RemoveCredential(c *gin.Context) {
 		return
 	}
 
-	if err := h.cloudService.RemoveCredential(c.Request.Context(), credentialID); err != nil {
-		api.GinInternalError(c, err, "Failed to remove credential")
+	if err := h.cloudService.RemoveCredential(c.Request.Context(), credentialID, cloudCredentialAccess(user)); err != nil {
+		writeCloudAccessError(c, err, "Failed to remove credential")
 		return
 	}
 
@@ -314,17 +326,16 @@ func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 		return
 	}
 
-	ownerID := int32(user.UserID)
 	runID, err := h.cloudService.StartRepositoryImport(c.Request.Context(), cloud.StartRepositoryImportInput{
 		RepositoryID: repositoryID,
-		OwnerID:      &ownerID,
+		Access:       cloudCredentialAccess(user),
 	})
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to start cloud import")
 		return
 	}
 
-	run, err := h.cloudService.GetImportRun(c.Request.Context(), runID)
+	run, err := h.cloudService.GetImportRun(c.Request.Context(), runID, cloudCredentialAccess(user))
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to load cloud import run")
 		return
@@ -345,7 +356,8 @@ func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/repositories/{id}/cloud [get]
 func (h *CloudHandler) GetRepositoryCloudStatus(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	user, ok := requireAdminUser(c)
+	if !ok {
 		return
 	}
 
@@ -355,7 +367,7 @@ func (h *CloudHandler) GetRepositoryCloudStatus(c *gin.Context) {
 		return
 	}
 
-	status, err := h.cloudService.GetRepositoryCloudStatus(c.Request.Context(), repositoryID)
+	status, err := h.cloudService.GetRepositoryCloudStatus(c.Request.Context(), repositoryID, cloudCredentialAccess(user))
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to load repository cloud status")
 		return
@@ -373,10 +385,12 @@ func (h *CloudHandler) GetRepositoryCloudStatus(c *gin.Context) {
 // @Success 200 {object} dto.CloudImportRunDTO "Import run"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 403 {object} api.ErrorResponse "Import run belongs to another user"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/cloud/import-runs/{id} [get]
 func (h *CloudHandler) GetImportRun(c *gin.Context) {
-	if _, ok := requireAdminUser(c); !ok {
+	user, ok := requireCurrentUser(c)
+	if !ok {
 		return
 	}
 
@@ -386,9 +400,9 @@ func (h *CloudHandler) GetImportRun(c *gin.Context) {
 		return
 	}
 
-	run, err := h.cloudService.GetImportRun(c.Request.Context(), runID)
+	run, err := h.cloudService.GetImportRun(c.Request.Context(), runID, cloudCredentialAccess(user))
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load cloud import run")
+		writeCloudAccessError(c, err, "Failed to load cloud import run")
 		return
 	}
 	api.JSONOK(c, toCloudImportRunDTO(run))
@@ -460,6 +474,7 @@ func toCloudCredentialDTO(credential repo.CloudCredential, providerTitle string)
 		DisplayName:    credential.DisplayName,
 		MaskedIdentity: credential.MaskedIdentity,
 		Status:         credential.Status,
+		OwnerID:        credential.OwnerID,
 		PublicConfig:   publicConfigMap(credential.PublicConfig),
 		CreatedAt:      pgTimeOrZero(credential.CreatedAt),
 		UpdatedAt:      pgTimeOrZero(credential.UpdatedAt),
@@ -473,6 +488,7 @@ func toCloudImportRunDTO(run repo.CloudImportRun) dto.CloudImportRunDTO {
 		CredentialID:    uuid.UUID(run.CredentialID.Bytes).String(),
 		Provider:        run.Provider,
 		Status:          run.Status,
+		OwnerID:         run.OwnerID,
 		TotalSeen:       run.TotalSeen,
 		DownloadedCount: run.DownloadedCount,
 		ImportedCount:   run.ImportedCount,
@@ -493,6 +509,7 @@ func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus, cloudService
 	result := dto.RepositoryCloudStatusDTO{
 		Provider: status.Binding.Provider,
 		Enabled:  status.Binding.Enabled,
+		OwnerID:  status.Binding.OwnerID,
 	}
 	if status.Binding.LastImportRunID.Valid {
 		result.LastImportRun = uuid.UUID(status.Binding.LastImportRunID.Bytes).String()
@@ -506,6 +523,21 @@ func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus, cloudService
 		result.LatestRun = &run
 	}
 	return result
+}
+
+func cloudCredentialAccess(user *service.UserResponse) cloud.CredentialAccess {
+	return cloud.CredentialAccess{
+		UserID:  int32(user.UserID),
+		IsAdmin: service.IsAdminRole(user.Role),
+	}
+}
+
+func writeCloudAccessError(c *gin.Context, err error, message string) {
+	if errors.Is(err, cloud.ErrCredentialAccessDenied) {
+		api.GinForbidden(c, err, "You don't have permission to access this cloud account")
+		return
+	}
+	api.GinInternalError(c, err, message)
 }
 
 func publicConfigMap(data []byte) map[string]string {

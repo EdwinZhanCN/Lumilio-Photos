@@ -80,12 +80,23 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		return
 	}
 
-	ownerID := adminIDFromContext(c)
+	actorOwnerID := adminIDFromContext(c)
+	hostOwnerID, err := h.repoManager.HostOwnerID(c.Request.Context())
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to resolve host owner")
+		return
+	}
+	// Authenticated first-run setup always has an admin, but retain this
+	// bootstrap fallback for a repository created before the primary pins the
+	// Host Owner identity.
+	if hostOwnerID == nil {
+		hostOwnerID = actorOwnerID
+	}
 	result, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
 		Name:              name,
 		Role:              role,
 		RootID:            strings.TrimSpace(req.RootID),
-		OwnerID:           ownerID,
+		OwnerID:           hostOwnerID,
 		StorageStrategy:   req.StorageStrategy,
 		DuplicateHandling: req.DuplicateHandling,
 	})
@@ -136,10 +147,14 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 				cloudImportError = &errText
 			} else {
 				repositoryID := uuid.UUID(dbRepo.RepoID.Bytes)
+				access := cloud.CredentialAccess{IsAdmin: true}
+				if actorOwnerID != nil {
+					access.UserID = *actorOwnerID
+				}
 				runID, bindErr := h.cloudService.BindRepositoryCredentialAndStartImport(c.Request.Context(), cloud.BindRepositoryCredentialInput{
 					RepositoryID: repositoryID,
 					CredentialID: credentialID,
-					OwnerID:      ownerID,
+					Access:       access,
 				})
 				if bindErr != nil {
 					errText := bindErr.Error()
@@ -341,7 +356,7 @@ func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
 
 // UpdateRepository updates mutable fields of a repository.
 // @Summary Update repository
-// @Description Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).
+// @Description Update mutable repository fields (name, storage_strategy, local_settings). Repository ownership is fixed to the Host Owner.
 // @Tags repositories
 // @Accept json
 // @Produce json
@@ -379,12 +394,7 @@ func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 		cfg.LocalSettings.HandleDuplicateFilenames = req.LocalSettings.HandleDuplicateFilenames
 	}
 
-	defaultOwnerID := existing.DefaultOwnerID
-	if req.DefaultOwnerID != nil {
-		defaultOwnerID = req.DefaultOwnerID
-	}
-
-	updated, err := h.repoManager.UpdateRepository(id, cfg, defaultOwnerID)
+	updated, err := h.repoManager.UpdateRepository(id, cfg, existing.DefaultOwnerID)
 	if err != nil {
 		api.GinBadRequest(c, err, "Failed to update repository")
 		return

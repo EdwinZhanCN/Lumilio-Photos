@@ -7,7 +7,7 @@ export const zhcnSidebar: DefaultTheme.Sidebar = {
             items: [
                 { text: '产品概览', link: '/zh-cn/user-manual/introduction/' },
                 { text: '核心概念', link: '/zh-cn/user-manual/introduction/concepts' },
-                { text: '媒体与仓库', link: '/zh-cn/user-manual/introduction/repositories' },
+                { text: '存储位置与仓库', link: '/zh-cn/user-manual/introduction/repositories' },
                 { text: '数据完整性与备份', link: '/zh-cn/user-manual/introduction/integrity' },
                 { text: 'AI 与 Lumen', link: '/zh-cn/user-manual/introduction/lumen' },
                 { text: '实验性功能与已知风险', link: '/zh-cn/user-manual/introduction/experimental' },
