@@ -182,9 +182,11 @@ export default defineConfig({
     // imported module" / "Vitest failed to find the runner" failures in CI (see
     // vitest-dev/vitest#8447, #9509). This list is the union of the specifiers
     // captured from node_modules/.vite/vitest/*/deps/_metadata.json after a full
-    // `vp test` run; refresh it if the optimizer starts reloading again.
+    // `vp test` run; refresh it if the optimizer starts reloading again. Keep
+    // wasm packages OUT of this list and in `exclude` above — pre-bundling wasm
+    // wedges the optimizer on CI (same reason @immich/justified-layout-wasm is
+    // excluded), which hangs `vp test` until the job timeout.
     include: [
-      "@colorhythm/exiftool-wasm",
       "@microsoft/fetch-event-source",
       "@tanstack/react-query",
       "@vidstack/react",
