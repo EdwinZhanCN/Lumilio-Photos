@@ -40,6 +40,14 @@ const testProjects = [
       setupFiles: ["./test/setup.integration.ts"],
       include: ["src/**/*.test.tsx", "src/**/*.spec.tsx"],
       exclude: ["src/**/*.browser.test.ts", "**/node_modules/**"],
+      // Vitest browser mode can still re-optimize deps mid-run and reload a
+      // test, aborting an in-flight dynamic import ("Failed to fetch
+      // dynamically imported module" / "Vitest failed to find the runner" /
+      // "Vite unexpectedly reloaded a test"). optimizeDeps.include below cuts
+      // how often that happens but cannot eliminate it; retry re-runs the few
+      // files a reload catches (they pass once deps are warm). See
+      // vitest-dev/vitest#8447, #9509.
+      retry: 2,
       browser: {
         enabled: true,
         provider: playwright(),
@@ -56,6 +64,8 @@ const testProjects = [
         : ["src/**/*.browser.test.ts"],
       exclude: ["**/node_modules/**"],
       testTimeout: 300_000,
+      // Same browser-mode reload race as the integration project (see there).
+      retry: 2,
       browser: {
         api: {
           host: "127.0.0.1",
@@ -174,24 +184,24 @@ export default defineConfig({
 
   optimizeDeps: {
     exclude: ["@immich/justified-layout-wasm"],
-    // Pre-bundle every dependency the browser (integration) and jsdom (unit)
-    // test projects end up optimizing, so Vite finishes dep optimization during
-    // its initial scan instead of discovering a dep mid-run. A mid-run
-    // re-optimize triggers a full page reload that aborts in-flight dynamic
-    // test-file imports, which surfaces as flaky "Failed to fetch dynamically
-    // imported module" / "Vitest failed to find the runner" failures in CI (see
-    // vitest-dev/vitest#8447, #9509). This list is the union of the specifiers
-    // captured from node_modules/.vite/vitest/*/deps/_metadata.json after a full
-    // `vp test` run; refresh it if the optimizer starts reloading again. Keep
-    // wasm packages OUT of this list and in `exclude` above — pre-bundling wasm
-    // wedges the optimizer on CI (same reason @immich/justified-layout-wasm is
-    // excluded), which hangs `vp test` until the job timeout.
+    // Pre-bundle the deps the browser (integration) and jsdom (unit) test
+    // projects optimize, so Vite gets most dep optimization done in its initial
+    // scan instead of discovering deps mid-run. A mid-run re-optimize reloads
+    // the page and aborts in-flight dynamic test-file imports (flaky "Failed to
+    // fetch dynamically imported module" / "Vitest failed to find the runner"
+    // in CI, see vitest-dev/vitest#8447, #9509). This reduces reload frequency
+    // but does not eliminate it — the `retry` on the browser test projects is
+    // the actual safety net. List captured from
+    // node_modules/.vite/vitest/*/deps/_metadata.json after a full `vp test`
+    // run. Keep wasm packages OUT of this list and in `exclude` above —
+    // pre-bundling wasm wedges the optimizer on CI (same reason
+    // @immich/justified-layout-wasm is excluded) and hangs `vp test` until the
+    // job timeout.
     include: [
       "@microsoft/fetch-event-source",
       "@tanstack/react-query",
       "@vidstack/react",
       "@vidstack/react/player/layouts/default",
-      "expect-type",
       "i18next",
       "i18next-browser-languagedetector",
       "immer",
