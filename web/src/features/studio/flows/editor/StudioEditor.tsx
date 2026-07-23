@@ -17,21 +17,55 @@ import {
 } from "../../model/editTypes";
 import type { AdjustmentKey } from "../../model/developConfig";
 import { TopBar } from "./TopBar";
+import { StatusBar } from "./StatusBar";
 import { AssetPanel, type AssetExifRow } from "./AssetPanel";
 import { Viewport } from "./Viewport";
 import { EditorPanel, type EditorTab } from "./EditorPanel";
 import { useComposition } from "./useComposition";
+import {
+  ExportPanel,
+  DEFAULT_EXPORT_SETTINGS,
+  type ExportFormat,
+  type ExportSettings,
+} from "./export/ExportPanel";
+import { preserveExif } from "../../modules/export/exif";
+import { CropOverlay } from "./crop/CropOverlay";
+import { TextOverlay } from "./text/TextOverlay";
+import { getAspectRatio } from "../../modules/crop/cropMath";
+import { displayedFrameSize } from "../../modules/rendering/coordinateSystem";
+import { estimateDepthField, disposeDepthPipeline } from "../../modules/depth/depthEstimation";
 
-type WorkerResult = {
+export type DepthStatus = "idle" | "generating" | "ready" | "error";
+
+type RenderEngineName = "webgl2" | "webgpu";
+
+type PreviewResult = {
+  outWidth: number;
+  outHeight: number;
+  engine?: RenderEngineName;
+};
+
+type LoadResult = PreviewResult & {
+  originalWidth: number;
+  originalHeight: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  snapshot: ImageBitmap;
+};
+
+type ExportResult = {
   blob: Blob;
   width: number;
   height: number;
-  engine?: "webgpu" | "webgl2" | "wasm-cpu" | "canvas-2d";
-  originalWidth?: number;
-  originalHeight?: number;
+  downscaled?: boolean;
+  nativeLongEdge?: number;
 };
 
-type WorkerSuccessType = "IMAGE_LOADED" | "PREVIEW_COMPLETE" | "EXPORT_COMPLETE";
+const EXPORT_EXTENSION: Record<ExportFormat, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
 export type StudioEditorActivity = {
   assetId: string;
@@ -44,8 +78,8 @@ type StudioEditorProps = {
   assetId: string;
   onBack: () => void;
   onActivity?: (activity: StudioEditorActivity) => void;
-  /** Open the Frame tab on entry, e.g. arriving from a 'add a frame' action. */
-  focusFrame?: boolean;
+  /** Tab to open on entry, e.g. arriving from a Studio Home tool card. */
+  initialTab?: EditorTab;
 };
 
 const apiClient = client as typeof client & {
@@ -53,12 +87,18 @@ const apiClient = client as typeof client & {
   PUT: (url: string, init?: unknown) => Promise<{ data?: unknown; error?: unknown }>;
 };
 
+// The working source is fetched at up to this long edge — the export ceiling.
+// 8192 covers the full resolution of essentially every camera (a 45MP frame is
+// 8192×5464); larger sources are guardrailed down in the worker/GPU. Preview
+// still renders far smaller, so this only affects export fidelity and memory.
+const WORKING_SOURCE_MAX = 8192;
+
 function getStudioSourceUrl(asset: Asset, assetId: string): string {
   return assetUrls.getExportUrl(assetId, {
     format: "jpeg",
     quality: 95,
-    maxWidth: 4096,
-    maxHeight: 4096,
+    maxWidth: WORKING_SOURCE_MAX,
+    maxHeight: WORKING_SOURCE_MAX,
     filename: (asset.original_filename ?? "studio-source").replace(/\.[^.]+$/, ""),
   });
 }
@@ -177,42 +217,6 @@ function triggerDownload(url: string, fileName: string): void {
   link.remove();
 }
 
-async function decodeBlobToImageData(
-  blob: Blob,
-  maxSize: number,
-): Promise<{ imageData: ImageData; originalWidth: number; originalHeight: number }> {
-  const url = URL.createObjectURL(blob);
-  try {
-    const image = new Image();
-    image.decoding = "async";
-    image.src = url;
-    await image.decode();
-
-    const originalWidth = image.naturalWidth;
-    const originalHeight = image.naturalHeight;
-    const scale = Math.min(1, maxSize / Math.max(originalWidth, originalHeight));
-    const width = Math.max(1, Math.round(originalWidth * scale));
-    const height = Math.max(1, Math.round(originalHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) throw new Error("Canvas decode context is not available");
-    ctx.drawImage(image, 0, 0, width, height);
-    return {
-      imageData: ctx.getImageData(0, 0, width, height),
-      originalWidth,
-      originalHeight,
-    };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-function cloneImageData(imageData: ImageData): ImageData {
-  return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
-}
-
 // ===========================================================================
 // StudioEditor
 // ===========================================================================
@@ -220,19 +224,18 @@ export function StudioEditor({
   assetId,
   onBack,
   onActivity,
-  focusFrame = false,
+  initialTab = "develop",
 }: StudioEditorProps): React.JSX.Element {
   const { t } = useI18n();
   const showMessage = useMessage();
 
-  // Worker + source refs
+  // Worker + canvas refs
   const workerRef = useRef<Worker | null>(null);
   const workerRequestIdRef = useRef(0);
-  const workerHasSourceRef = useRef(false);
-  const sourceImageDataRef = useRef<ImageData | null>(null);
-  const sourceOriginalSizeRef = useRef<{ width: number; height: number } | null>(null);
-  const previewUrlRef = useRef<string | null>(null);
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const originalPreviewUrlRef = useRef<string | null>(null);
+  // The untouched original file, fetched lazily on export to copy its EXIF.
+  const exifSourceRef = useRef<{ assetId: string; blob: Blob } | null>(null);
   const lastSavedSignatureRef = useRef(
     JSON.stringify({ adjustments: DEFAULT_STUDIO_ADJUSTMENTS, composition: EMPTY_COMPOSITION }),
   );
@@ -244,33 +247,55 @@ export function StudioEditor({
   const [asset, setAsset] = useState<Asset | null>(null);
   const [adjustments, setAdjustments] = useState<StudioEditAdjustments>(DEFAULT_STUDIO_ADJUSTMENTS);
   const [history, setHistory] = useState<StudioEditAdjustments[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
-  const [mobileDevelopOpen, setMobileDevelopOpen] = useState(false);
+  // Desktop side-rail visibility; mobile uses one bottom sheet at a time.
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [mobileSheet, setMobileSheet] = useState<"none" | "info" | "edit">("none");
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  // Effective source (post-guardrail) — the pixel space crop rectangles live in.
+  const [cropSpace, setCropSpace] = useState<{ width: number; height: number } | null>(null);
+  const [cropAspectKey, setCropAspectKey] = useState("free");
+  const [cropResetToken, setCropResetToken] = useState(0);
+  const [outputAspect, setOutputAspect] = useState(3 / 2);
+  const [ready, setReady] = useState(false);
   const [exifRows, setExifRows] = useState<AssetExifRow[]>([]);
   const [isLoadingAsset, setIsLoadingAsset] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [renderEngine, setRenderEngine] = useState<WorkerResult["engine"]>(undefined);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
+  const [renderEngine, setRenderEngine] = useState<RenderEngineName | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  // Bumped when marks reach the worker, to re-render a composition whose logos
+  // rasterized after its first paint (logos arrive async, gated on the snapshot).
+  const [logosVersion, setLogosVersion] = useState(0);
+  // Scene depth for layer occlusion.
+  const [depthStatus, setDepthStatus] = useState<DepthStatus>("idle");
+  const [depthFeather, setDepthFeather] = useState(0.08);
+  const [depthVersion, setDepthVersion] = useState(0);
+  // A text layer being dragged on-canvas: hidden from the worker so its live DOM
+  // preview is the only copy, avoiding a lagging rasterized duplicate.
+  const [hiddenLayerId, setHiddenLayerId] = useState<string | null>(null);
 
   // Composition
-  const [tab, setTab] = useState<EditorTab>(focusFrame ? "frame" : "develop");
+  const [tab, setTab] = useState<EditorTab>(initialTab);
   const [frameExif, setFrameExif] = useState<FrameExif>({});
   const [photoBitmap, setPhotoBitmap] = useState<ImageBitmap | null>(null);
 
   const sendLogosToWorker = useCallback((logos: Map<string, ImageBitmap>) => {
     if (logos.size === 0) return;
-    const worker = ensureWorker();
+    const worker = workerRef.current;
+    if (!worker) return;
     const entries = Array.from(logos.entries());
     worker.postMessage(
       { type: "SET_LOGOS", payload: { requestId: ++workerRequestIdRef.current, logos: entries } },
       entries.map(([, bitmap]) => bitmap),
     );
+    setLogosVersion((v) => v + 1);
   }, []);
 
   const composition = useComposition({
@@ -296,44 +321,29 @@ export function StudioEditor({
   );
   const isDirty = currentSignature !== lastSavedSignatureRef.current;
 
-  const baseAspect = useMemo(() => {
+  const originalAspect = useMemo(() => {
     if (imageSize && imageSize.width > 0 && imageSize.height > 0) {
       return imageSize.width / imageSize.height;
     }
     return 3 / 2;
   }, [imageSize]);
 
-  // ----- Worker plumbing -----
-  const ensureWorker = useCallback(() => {
-    if (!workerRef.current) {
-      workerRef.current = new Worker(
-        new URL("../../modules/rendering/studioEdit.worker.ts", import.meta.url),
-        {
-        type: "module",
-        },
-      );
-      workerHasSourceRef.current = false;
-    }
-    return workerRef.current;
+  const handleCanvasReady = useCallback((canvas: HTMLCanvasElement) => {
+    canvasElRef.current = canvas;
   }, []);
 
+  // ----- Worker plumbing -----
   const callWorker = useCallback(
-    <T extends WorkerResult>(
-      type: "LOAD_IMAGE_DATA" | "RENDER_PREVIEW" | "EXPORT_IMAGE",
+    <T,>(
+      worker: Worker,
+      type: "LOAD_IMAGE" | "RENDER" | "EXPORT_IMAGE" | "SNAPSHOT",
       payload: Record<string, unknown>,
-      successType: WorkerSuccessType,
+      successType: string,
     ): Promise<T> => {
-      const activeWorker = ensureWorker();
       const requestId = ++workerRequestIdRef.current;
-
       return new Promise<T>((resolve, reject) => {
         const timeoutId = window.setTimeout(() => {
-          activeWorker.removeEventListener("message", onMessage);
-          activeWorker.terminate();
-          if (workerRef.current === activeWorker) {
-            workerRef.current = null;
-            workerHasSourceRef.current = false;
-          }
+          worker.removeEventListener("message", onMessage);
           reject(new Error("Studio worker timed out"));
         }, 20000);
 
@@ -342,75 +352,23 @@ export function StudioEditor({
           if (!eventPayload || eventPayload.requestId !== requestId) return;
           if (eventType === successType) {
             window.clearTimeout(timeoutId);
-            activeWorker.removeEventListener("message", onMessage);
+            worker.removeEventListener("message", onMessage);
             resolve(eventPayload as T);
             return;
           }
           if (eventType === "ERROR") {
             window.clearTimeout(timeoutId);
-            activeWorker.removeEventListener("message", onMessage);
+            worker.removeEventListener("message", onMessage);
             reject(new Error(eventPayload.error || "Studio worker failed"));
           }
         };
 
-        activeWorker.addEventListener("message", onMessage);
-        const message = { type, payload: { requestId, ...payload } };
-        if (payload.imageData instanceof ImageData) {
-          activeWorker.postMessage(message, { transfer: [payload.imageData.data.buffer] });
-        } else {
-          activeWorker.postMessage(message);
-        }
+        worker.addEventListener("message", onMessage);
+        worker.postMessage({ type, payload: { requestId, ...payload } });
       });
     },
-    [ensureWorker],
+    [],
   );
-
-  const renderFromWorker = useCallback(
-    async (
-      nextAdjustments: StudioEditAdjustments,
-      nextComposition: StudioComposition,
-      previewMaxSize: number,
-    ): Promise<WorkerResult> => {
-      const sourceImageData = sourceImageDataRef.current;
-      const sourceOriginalSize = sourceOriginalSizeRef.current;
-
-      if (!workerHasSourceRef.current) {
-        if (!sourceImageData || !sourceOriginalSize) {
-          throw new Error("Studio source image is not loaded");
-        }
-        const loaded = await callWorker<WorkerResult>(
-          "LOAD_IMAGE_DATA",
-          {
-            imageData: cloneImageData(sourceImageData),
-            originalWidth: sourceOriginalSize.width,
-            originalHeight: sourceOriginalSize.height,
-            adjustments: nextAdjustments,
-            composition: nextComposition,
-            previewMaxSize,
-          },
-          "IMAGE_LOADED",
-        );
-        workerHasSourceRef.current = true;
-        return loaded;
-      }
-
-      return callWorker<WorkerResult>(
-        "RENDER_PREVIEW",
-        { adjustments: nextAdjustments, composition: nextComposition, previewMaxSize },
-        "PREVIEW_COMPLETE",
-      );
-    },
-    [callWorker],
-  );
-
-  const setPreviewBlob = useCallback((blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    setPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous);
-      previewUrlRef.current = url;
-      return url;
-    });
-  }, []);
 
   // ----- Adjustment mutations -----
   const pushHistory = useCallback((prev: StudioEditAdjustments) => {
@@ -457,12 +415,35 @@ export function StudioEditor({
     });
   }, [pushHistory]);
 
+  // ----- Crop -----
+  const cropMode = tab === "crop";
+
+  const handleCropChange = useCallback(
+    (crop: StudioEditAdjustments["crop"]) => {
+      setJustSaved(false);
+      setAdjustments((prev) => {
+        if (JSON.stringify(prev.crop) === JSON.stringify(crop)) return prev;
+        pushHistory(prev);
+        return { ...prev, crop };
+      });
+    },
+    [pushHistory],
+  );
+
+  const handleResetCrop = useCallback(() => {
+    setCropAspectKey("free");
+    setCropResetToken((token) => token + 1);
+    handleCropChange(null);
+  }, [handleCropChange]);
+
   // ----- Asset load -----
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       setIsLoadingAsset(true);
+      setReady(false);
+      setDepthStatus("idle");
       setError(null);
       setExifRows([]);
       setImageSize(null);
@@ -471,6 +452,11 @@ export function StudioEditor({
         previous?.close();
         return null;
       });
+
+      // A fresh worker per asset: the previous one holds a transferred canvas we
+      // can no longer draw to, and its source texture is the wrong photo.
+      workerRef.current?.terminate();
+      workerRef.current = null;
 
       try {
         const assetResponse = await client.GET("/api/v1/assets/{id}", {
@@ -510,18 +496,6 @@ export function StudioEditor({
           composition: nextComposition,
         });
 
-        let decoded: Awaited<ReturnType<typeof decodeBlobToImageData>>;
-        try {
-          decoded = await decodeBlobToImageData(imageBlob, 4096);
-        } catch (decodeError) {
-          throw new Error(
-            decodeError instanceof Error
-              ? `The exported source image cannot be decoded. ${decodeError.message}`
-              : "The exported source image cannot be decoded.",
-          );
-        }
-        if (cancelled) return;
-
         const originalUrl = URL.createObjectURL(imageBlob);
         setOriginalPreviewUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
@@ -529,67 +503,68 @@ export function StudioEditor({
           return originalUrl;
         });
 
-        const initialPreviewUrl = URL.createObjectURL(imageBlob);
-        setPreviewUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          previewUrlRef.current = initialPreviewUrl;
-          return initialPreviewUrl;
-        });
-
-        const originalWidth = getAssetDimension(loadedAsset.width, decoded.originalWidth);
-        const originalHeight = getAssetDimension(loadedAsset.height, decoded.originalHeight);
-        sourceImageDataRef.current = decoded.imageData;
-        sourceOriginalSizeRef.current = {
-          width: originalWidth,
-          height: originalHeight,
-        };
-        workerHasSourceRef.current = false;
-
-        const render = await callWorker<WorkerResult>(
-          "LOAD_IMAGE_DATA",
+        // Spin up the worker and hand it control of the on-screen canvas before
+        // asking for the first render — the worker draws straight onto it.
+        const canvas = canvasElRef.current;
+        if (!canvas) throw new Error("Preview canvas is not mounted");
+        const worker = new Worker(
+          new URL("../../modules/rendering/studioEdit.worker.ts", import.meta.url),
+          { type: "module" },
+        );
+        workerRef.current = worker;
+        const offscreen = canvas.transferControlToOffscreen();
+        worker.postMessage(
           {
-            imageData: cloneImageData(decoded.imageData),
-            originalWidth,
-            originalHeight,
+            type: "INIT_CANVAS",
+            payload: { requestId: ++workerRequestIdRef.current, canvas: offscreen },
+          },
+          [offscreen],
+        );
+
+        const loaded = await callWorker<LoadResult>(
+          worker,
+          "LOAD_IMAGE",
+          {
+            blob: imageBlob,
             adjustments: nextAdjustments,
+            composition: nextComposition,
             previewMaxSize: 1800,
+            snapshotMaxSize: 1024,
           },
           "IMAGE_LOADED",
         );
-        if (cancelled) return;
-        workerHasSourceRef.current = true;
+        if (cancelled) {
+          loaded.snapshot.close();
+          return;
+        }
 
-        setPreviewBlob(render.blob);
-        setRenderEngine(render.engine);
-        const width = render.originalWidth ?? loadedAsset.width ?? render.width;
-        const height = render.originalHeight ?? loadedAsset.height ?? render.height;
-        setImageSize({ width, height });
+        setReady(true);
+        setRenderEngine(loaded.engine);
+        setOutputAspect(loaded.outWidth / loaded.outHeight);
+
+        const originalWidth = getAssetDimension(loadedAsset.width, loaded.originalWidth);
+        const originalHeight = getAssetDimension(loadedAsset.height, loaded.originalHeight);
+        setImageSize({ width: originalWidth, height: originalHeight });
+        setCropSpace({ width: loaded.sourceWidth, height: loaded.sourceHeight });
 
         const exif = exifResponse
           ? (unwrapData(exifResponse.data, isExifResponse)?.exif_raw ?? null)
           : null;
         setExifRows(filterExifRows(exif));
-
         setFrameExif(extractFrameExif(exif));
 
-        // Template previews and adaptive overlay ink need real pixels. The
-        // developed preview is the right source: presets should be judged
-        // against the photo as edited, not as imported.
-        const bitmap = await createImageBitmap(render.blob);
-        if (cancelled) {
-          bitmap.close();
-          return;
-        }
+        // Template previews and adaptive overlay ink need real pixels: the
+        // developed snapshot is judged against the photo as edited on entry.
         setPhotoBitmap((previous) => {
           previous?.close();
-          return bitmap;
+          return loaded.snapshot;
         });
 
         onActivity?.({
           assetId,
           name: loadedAsset.original_filename ?? assetId,
-          width: loadedAsset.width ?? width ?? null,
-          height: loadedAsset.height ?? height ?? null,
+          width: loadedAsset.width ?? originalWidth ?? null,
+          height: loadedAsset.height ?? originalHeight ?? null,
         });
       } catch (loadError) {
         if (cancelled) return;
@@ -612,23 +587,45 @@ export function StudioEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetId]);
 
-  // ----- Debounced preview render on adjustment change -----
+  // ----- Debounced preview render on adjustment / composition change -----
   useEffect(() => {
-    if (!asset) return;
+    if (!asset || !ready) return;
     if (skipNextRenderRef.current) {
       skipNextRenderRef.current = false;
       return;
     }
+    const worker = workerRef.current;
+    if (!worker) return;
 
     const generation = ++renderGenerationRef.current;
     const timeoutId = window.setTimeout(() => {
       setIsRendering(true);
       setError(null);
-      renderFromWorker(adjustments, currentComposition, 1800)
+      // In crop mode the preview shows the whole frame so the crop box can be
+      // dragged over all of it; the crop applies once the user leaves the tab.
+      const renderAdjustments = cropMode ? { ...adjustments, crop: null } : adjustments;
+      // Drop the layer being dragged — the overlay renders it live in the DOM.
+      const renderComposition = hiddenLayerId
+        ? {
+            ...currentComposition,
+            layers: currentComposition.layers.filter((layer) => layer.id !== hiddenLayerId),
+          }
+        : currentComposition;
+      callWorker<PreviewResult>(
+        worker,
+        "RENDER",
+        {
+          adjustments: renderAdjustments,
+          composition: renderComposition,
+          previewMaxSize: 1800,
+          depthFeather,
+        },
+        "RENDER_COMPLETE",
+      )
         .then((result) => {
           if (generation !== renderGenerationRef.current) return;
-          setPreviewBlob(result.blob);
           setRenderEngine(result.engine);
+          setOutputAspect(result.outWidth / result.outHeight);
           setError(null);
         })
         .catch((renderError) => {
@@ -641,7 +638,18 @@ export function StudioEditor({
     }, 80);
 
     return () => window.clearTimeout(timeoutId);
-  }, [asset, adjustments, currentComposition, renderFromWorker, setPreviewBlob]);
+  }, [
+    asset,
+    ready,
+    adjustments,
+    currentComposition,
+    logosVersion,
+    cropMode,
+    depthFeather,
+    depthVersion,
+    hiddenLayerId,
+    callWorker,
+  ]);
 
   // ----- Cleanup -----
   useEffect(() => {
@@ -649,8 +657,9 @@ export function StudioEditor({
       workerRef.current?.terminate();
       workerRef.current = null;
       if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
-      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       if (originalPreviewUrlRef.current) URL.revokeObjectURL(originalPreviewUrlRef.current);
+      exifSourceRef.current = null;
+      disposeDepthPipeline();
     };
   }, []);
 
@@ -686,28 +695,118 @@ export function StudioEditor({
     } finally {
       setIsSaving(false);
     }
-  }, [adjustments, asset, currentComposition, currentSignature, imageSize, onActivity, showMessage, t]);
+  }, [
+    adjustments,
+    asset,
+    currentComposition,
+    currentSignature,
+    imageSize,
+    onActivity,
+    showMessage,
+    t,
+  ]);
+
+  const generateDepth = useCallback(async () => {
+    const worker = workerRef.current;
+    if (!worker) return;
+    setDepthStatus("generating");
+    try {
+      // Depth must align with the edited image, so estimate on the developed +
+      // cropped/rotated photo (no border/layers), not the raw source.
+      const snapshot = await callWorker<{ blob: Blob }>(
+        worker,
+        "SNAPSHOT",
+        { adjustments, maxSize: 1024 },
+        "SNAPSHOT_COMPLETE",
+      );
+      const field = await estimateDepthField(snapshot.blob);
+      worker.postMessage(
+        {
+          type: "SET_DEPTH",
+          payload: {
+            requestId: ++workerRequestIdRef.current,
+            depth: field.bitmap,
+            feather: depthFeather,
+          },
+        },
+        [field.bitmap],
+      );
+      setDepthStatus("ready");
+      setDepthVersion((version) => version + 1);
+    } catch (depthError) {
+      setDepthStatus("error");
+      showMessage(
+        "error",
+        depthError instanceof Error
+          ? depthError.message
+          : t("studio.depth.failed", { defaultValue: "Depth estimation failed" }),
+      );
+    }
+  }, [adjustments, depthFeather, callWorker, showMessage, t]);
+
+  const getExifSource = useCallback(async (id: string): Promise<Blob | null> => {
+    if (exifSourceRef.current?.assetId === id) return exifSourceRef.current.blob;
+    try {
+      const response = await fetch(assetUrls.getOriginalFileUrl(id));
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      exifSourceRef.current = { assetId: id, blob };
+      return blob;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const handleExport = useCallback(async () => {
     if (!asset) return;
+    const worker = workerRef.current;
+    if (!worker) return;
     const baseName = (asset.original_filename ?? "lumilio-edit").replace(/\.[^.]+$/, "");
 
     setIsExporting(true);
     try {
-      const result = await callWorker<WorkerResult>(
+      const result = await callWorker<ExportResult>(
+        worker,
         "EXPORT_IMAGE",
         {
           adjustments,
           composition: currentComposition,
-          format: "image/jpeg",
-          quality: 0.92,
-          maxSize: 8192,
+          format: exportSettings.format,
+          quality: exportSettings.quality,
+          sizeMode: exportSettings.sizeMode,
         },
         "EXPORT_COMPLETE",
       );
-      const url = URL.createObjectURL(result.blob);
-      triggerDownload(url, `${baseName}-lumilio.jpg`);
+
+      // Copy the original's EXIF onto the re-encoded export (best-effort; PNG and
+      // any failure fall through to the raw export).
+      let outBlob = result.blob;
+      if (exportSettings.format !== "image/png" && asset.asset_id) {
+        const originalBlob = await getExifSource(asset.asset_id);
+        if (originalBlob) {
+          outBlob = await preserveExif(result.blob, originalBlob, {
+            format: exportSettings.format,
+            width: result.width,
+            height: result.height,
+          });
+        }
+      }
+
+      const url = URL.createObjectURL(outBlob);
+      triggerDownload(url, `${baseName}-lumilio.${EXPORT_EXTENSION[exportSettings.format]}`);
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportOpen(false);
+
+      if (result.downscaled) {
+        showMessage(
+          "info",
+          t("studio.export.downscaledToast", {
+            defaultValue: "Export was scaled to {{w}}×{{h}} to stay within limits.",
+            w: result.width,
+            h: result.height,
+          }),
+        );
+      }
     } catch (exportError) {
       const message = exportError instanceof Error ? exportError.message : "Failed to export image";
       setError(message);
@@ -715,37 +814,79 @@ export function StudioEditor({
     } finally {
       setIsExporting(false);
     }
-  }, [adjustments, asset, currentComposition, callWorker, showMessage]);
+  }, [
+    adjustments,
+    asset,
+    currentComposition,
+    exportSettings,
+    callWorker,
+    getExifSource,
+    showMessage,
+    t,
+  ]);
 
   const fileName =
     asset?.original_filename ?? t("studio.editor.loading", { defaultValue: "Loading…" });
-  // Geometry, canvas, and layers are all rendered into the preview by the
-  // worker, so the viewport presents it as-is. Rotating with CSS here would
-  // spin the frame along with the photo.
-  const previewAspect = useMemo(() => {
-    const quarterTurn = adjustments.rotation === 90 || adjustments.rotation === 270;
-    return quarterTurn ? 1 / baseAspect : baseAspect;
-  }, [baseAspect, adjustments.rotation]);
+
+  // What the export can actually reach: the smaller of the true source long edge
+  // and the working-source cap. The worker may guardrail further on weak GPUs.
+  const exportSourceLongEdge = useMemo(() => {
+    const longEdge = imageSize ? Math.max(imageSize.width, imageSize.height) : WORKING_SOURCE_MAX;
+    return Math.min(WORKING_SOURCE_MAX, longEdge);
+  }, [imageSize]);
+
+  // Aspect presets are picked in the DISPLAYED orientation, so "original" and
+  // the fit math resolve against the rotated frame.
+  const cropAspect = useMemo(() => {
+    if (!cropSpace) return null;
+    const displayed = displayedFrameSize(cropSpace.width, cropSpace.height, adjustments.rotation);
+    return getAspectRatio(cropAspectKey, displayed.width / displayed.height);
+  }, [cropSpace, cropAspectKey, adjustments.rotation]);
+
+  const viewportOverlay =
+    cropMode && cropSpace ? (
+      <CropOverlay
+        key={`${assetId}:${cropResetToken}`}
+        sourceWidth={cropSpace.width}
+        sourceHeight={cropSpace.height}
+        rotation={adjustments.rotation}
+        flipHorizontal={adjustments.flipHorizontal}
+        flipVertical={adjustments.flipVertical}
+        aspect={cropAspect}
+        initialCrop={adjustments.crop}
+        onChange={handleCropChange}
+      />
+    ) : tab === "text" && ready ? (
+      <TextOverlay
+        layers={composition.layers}
+        selectedLayerId={composition.selectedLayerId}
+        onSelectLayer={composition.setSelectedLayerId}
+        onLayersChange={composition.setLayers}
+        onInteractLayer={setHiddenLayerId}
+      />
+    ) : undefined;
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-screen-label="Studio Editor">
       <TopBar
         fileName={fileName}
-        engine={renderEngine}
-        dirty={isDirty}
-        justSaved={justSaved}
         canUndo={history.length > 0}
         beforeActive={showOriginal}
         isSaving={isSaving}
         isExporting={isExporting}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
         onBack={onBack}
         onUndo={undo}
         onResetAll={resetAll}
         onBeforeDown={() => setShowOriginal(true)}
         onBeforeUp={() => setShowOriginal(false)}
         onSave={handleSave}
-        onExport={handleExport}
-        onToggleDevelopPanel={() => setMobileDevelopOpen((v) => !v)}
+        onExport={() => setExportOpen(true)}
+        onToggleLeft={() => setLeftOpen((v) => !v)}
+        onToggleRight={() => setRightOpen((v) => !v)}
+        onOpenInfo={() => setMobileSheet("info")}
+        onOpenEdit={() => setMobileSheet("edit")}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -756,20 +897,24 @@ export function StudioEditor({
           dimensionsText={imageSize ? `${imageSize.width} × ${imageSize.height}` : "-"}
           typeText={asset?.mime_type ?? "-"}
           exifRows={exifRows}
+          open={leftOpen}
+          mobileOpen={mobileSheet === "info"}
+          onMobileClose={() => setMobileSheet("none")}
         />
 
         <Viewport
-          previewUrl={previewUrl}
+          onCanvasReady={handleCanvasReady}
+          canvasKey={assetId}
           originalUrl={originalPreviewUrl}
           showOriginal={showOriginal}
-          sourceAspect={previewAspect}
-          rotation={0}
-          flipH={false}
-          flipV={false}
+          outputAspect={outputAspect}
+          originalAspect={originalAspect}
+          ready={ready}
           loading={isLoadingAsset || isRendering}
           error={error}
           onDismissError={() => setError(null)}
           fileName={fileName}
+          overlay={viewportOverlay}
         />
 
         <EditorPanel
@@ -790,11 +935,33 @@ export function StudioEditor({
           onCanvasChange={composition.setCanvas}
           onLayersChange={composition.setLayers}
           onSelectLayer={composition.setSelectedLayerId}
+          cropAspectKey={cropAspectKey}
+          onCropAspectChange={setCropAspectKey}
+          onResetCrop={handleResetCrop}
+          depthStatus={depthStatus}
+          depthFeather={depthFeather}
+          onGenerateDepth={() => void generateDepth()}
+          onDepthFeatherChange={setDepthFeather}
           disabled={!asset || isLoadingAsset}
-          mobileOpen={mobileDevelopOpen}
-          onMobileClose={() => setMobileDevelopOpen(false)}
+          open={rightOpen}
+          mobileOpen={mobileSheet === "edit"}
+          onMobileClose={() => setMobileSheet("none")}
         />
       </div>
+
+      <StatusBar dirty={isDirty} justSaved={justSaved} engine={renderEngine} />
+
+      <ExportPanel
+        open={exportOpen}
+        settings={exportSettings}
+        onChange={setExportSettings}
+        sourceLongEdge={exportSourceLongEdge}
+        sourceWidth={imageSize?.width ?? 0}
+        sourceHeight={imageSize?.height ?? 0}
+        isExporting={isExporting}
+        onExport={() => void handleExport()}
+        onClose={() => setExportOpen(false)}
+      />
     </div>
   );
 }

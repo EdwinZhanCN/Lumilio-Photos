@@ -1,6 +1,6 @@
 import React from "react";
 import type { TFunction } from "i18next";
-import { Frame, MousePointerClick, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Crop, Frame, MousePointerClick, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import type { StudioEditAdjustments } from "../../model/editTypes";
 import type { AdjustmentKey } from "../../model/developConfig";
@@ -9,8 +9,10 @@ import type { Layer } from "../../model/layers";
 import { DevelopSections } from "./develop/DevelopSections";
 import { FramePanel } from "./frame/FramePanel";
 import { TextPanel } from "./text/TextPanel";
+import { CropPanel } from "./crop/CropPanel";
+import type { DepthStatus } from "./StudioEditor";
 
-export type EditorTab = "develop" | "frame" | "text";
+export type EditorTab = "develop" | "crop" | "frame" | "text";
 
 type EditorPanelProps = {
   tab: EditorTab;
@@ -36,7 +38,18 @@ type EditorPanelProps = {
   onLayersChange: (next: Layer[]) => void;
   onSelectLayer: (layerId: string | null) => void;
 
+  cropAspectKey: string;
+  onCropAspectChange: (key: string) => void;
+  onResetCrop: () => void;
+
+  depthStatus: DepthStatus;
+  depthFeather: number;
+  onGenerateDepth: () => void;
+  onDepthFeatherChange: (value: number) => void;
+
   disabled?: boolean;
+  /** Desktop rail visibility. */
+  open?: boolean;
   /** Below `lg` the panel becomes a bottom sheet; these control its visibility. */
   mobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -44,6 +57,7 @@ type EditorPanelProps = {
 
 const TABS: Array<{ id: EditorTab; icon: typeof SlidersHorizontal }> = [
   { id: "develop", icon: SlidersHorizontal },
+  { id: "crop", icon: Crop },
   { id: "frame", icon: Frame },
   { id: "text", icon: Type },
 ];
@@ -51,6 +65,8 @@ const TABS: Array<{ id: EditorTab; icon: typeof SlidersHorizontal }> = [
 /** Spelled out so the i18n extractor can see the keys; it cannot read a computed one. */
 function tabLabel(t: TFunction, tab: EditorTab): string {
   switch (tab) {
+    case "crop":
+      return t("studio.tab.crop", { defaultValue: "Crop" });
     case "frame":
       return t("studio.tab.frame", { defaultValue: "Frame" });
     case "text":
@@ -87,7 +103,15 @@ export function EditorPanel({
   onCanvasChange,
   onLayersChange,
   onSelectLayer,
+  cropAspectKey,
+  onCropAspectChange,
+  onResetCrop,
+  depthStatus,
+  depthFeather,
+  onGenerateDepth,
+  onDepthFeatherChange,
   disabled = false,
+  open = true,
   mobileOpen = false,
   onMobileClose,
 }: EditorPanelProps): React.JSX.Element {
@@ -106,8 +130,10 @@ export function EditorPanel({
       <aside
         className={`${
           mobileOpen ? "flex" : "hidden"
-        } fixed inset-x-0 bottom-0 z-50 max-h-[75vh] w-full shrink-0 flex-col rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:flex lg:h-full lg:max-h-none lg:w-[340px] lg:rounded-none lg:border-t-0 lg:border-l lg:bg-base-200/40 lg:shadow-none`}
-        aria-label="Editor panel"
+        } fixed inset-x-0 bottom-0 z-50 max-h-[75vh] w-full shrink-0 flex-col rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:h-full lg:max-h-none lg:w-[340px] lg:rounded-none lg:border-t-0 lg:border-l lg:bg-base-200/40 lg:shadow-none ${
+          open ? "lg:flex" : "lg:hidden"
+        }`}
+        aria-label={t("studio.panel.edit", { defaultValue: "Editor panel" })}
       >
         <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-base-content">
@@ -170,6 +196,14 @@ export function EditorPanel({
               onGeometryChange={onGeometryChange}
             />
           )}
+          {tab === "crop" && (
+            <CropPanel
+              aspectKey={cropAspectKey}
+              onAspectChange={onCropAspectChange}
+              onReset={onResetCrop}
+              disabled={disabled}
+            />
+          )}
           {tab === "frame" && (
             <FramePanel
               canvas={canvas}
@@ -189,6 +223,10 @@ export function EditorPanel({
               disabled={disabled}
               onSelectLayer={onSelectLayer}
               onLayersChange={onLayersChange}
+              depthStatus={depthStatus}
+              depthFeather={depthFeather}
+              onGenerateDepth={onGenerateDepth}
+              onDepthFeatherChange={onDepthFeatherChange}
             />
           )}
           <div className="h-4" />

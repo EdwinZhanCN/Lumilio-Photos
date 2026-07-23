@@ -29,6 +29,17 @@ import {
 import { resolveFontFamily, resolveFontWeight } from "../../model/fonts";
 import { angledLinearGradient, clamp, withOpacity } from "./canvasUtils";
 import { cssFontShorthand } from "./fonts/loadStudioFonts";
+import { buildDepthAlphaMask } from "../depth/depthMask";
+
+/**
+ * Scene depth for occlusion: the grayscale field (0=far, 255=near) plus the
+ * feather width. A layer whose `zPosition < 1` is hidden where the scene is
+ * nearer than its plane, so it reads as sitting inside the photo.
+ */
+export type DepthOcclusion = {
+  field: { data: Uint8ClampedArray; width: number; height: number };
+  feather: number;
+};
 
 /** Identifies a rasterized logo. Tinting happens before rasterization. */
 export function logoKey(brand: string, variant: string, color: string | null): string {
@@ -270,23 +281,74 @@ function drawLogoLayer(
   ctx.restore();
 }
 
-/** Draw layers in order; later layers sit on top. */
+function drawOneLayer(
+  ctx: Ctx,
+  layer: Layer,
+  outWidth: number,
+  outHeight: number,
+  logos: LogoImages,
+): void {
+  if (layer.type === "text") {
+    drawTextLayer(ctx, layer, outWidth, outHeight);
+  } else {
+    drawLogoLayer(ctx, layer, outWidth, outHeight, logos);
+  }
+}
+
+/**
+ * A field-resolution occlusion mask for `zPosition`, stretched by the caller to
+ * output size on draw. Returns null when the plane is fully in front.
+ */
+function occlusionMask(
+  occlusion: DepthOcclusion,
+  zPosition: number,
+): OffscreenCanvas | null {
+  const { field, feather } = occlusion;
+  const bytes = buildDepthAlphaMask(field.data, field.width, field.height, zPosition, feather);
+  if (!bytes) return null;
+  const canvas = new OffscreenCanvas(field.width, field.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const pixels = bytes as Uint8ClampedArray<ArrayBuffer>;
+  ctx.putImageData(new ImageData(pixels, field.width, field.height), 0, 0);
+  return canvas;
+}
+
+/**
+ * Draw layers in order; later layers sit on top. When `occlusion` is given, a
+ * layer with `zPosition < 1` is rendered onto a scratch surface, masked by the
+ * depth field, then composited — so nearer scene pixels hide it.
+ */
 export function drawLayers(
   ctx: Ctx,
   outWidth: number,
   outHeight: number,
   layers: readonly Layer[],
   logos: LogoImages,
+  occlusion?: DepthOcclusion,
 ): void {
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   for (const layer of layers) {
-    if (layer.type === "text") {
-      drawTextLayer(ctx, layer, outWidth, outHeight);
-    } else {
-      drawLogoLayer(ctx, layer, outWidth, outHeight, logos);
+    const mask = occlusion && layer.zPosition < 1 ? occlusionMask(occlusion, layer.zPosition) : null;
+    if (mask) {
+      const scratch = new OffscreenCanvas(
+        Math.max(1, Math.round(outWidth)),
+        Math.max(1, Math.round(outHeight)),
+      );
+      const sctx = scratch.getContext("2d");
+      if (sctx) {
+        sctx.imageSmoothingEnabled = true;
+        sctx.imageSmoothingQuality = "high";
+        drawOneLayer(sctx, layer, outWidth, outHeight, logos);
+        sctx.globalCompositeOperation = "destination-in";
+        sctx.drawImage(mask, 0, 0, outWidth, outHeight);
+        ctx.drawImage(scratch, 0, 0);
+        continue;
+      }
     }
+    drawOneLayer(ctx, layer, outWidth, outHeight, logos);
   }
   ctx.restore();
 }

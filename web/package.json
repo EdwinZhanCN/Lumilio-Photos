@@ -12,6 +12,7 @@
     "e2e:seed": "vp run assets:sync && node e2e/support/seed.mjs",
     "e2e:test": "playwright test",
     "demo:seed": "node scripts/demo-seed.mjs",
+    "setup:depth": "node scripts/fetch-depth-model.mjs",
     "dev": "vp dev",
     "build": "vp build",
     "lint": "vp lint",
@@ -31,6 +32,7 @@
     "test:ui": "vp test --ui"
   },
   "dependencies": {
+    "@colorhythm/exiftool-wasm": "^1.0.4",
     "@fontsource/caveat": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/noto-sans-sc": "^5.3.0",
@@ -38,6 +40,7 @@
     "@fontsource/playfair-display": "^5.3.0",
     "@fontsource/plus-jakarta-sans": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
+    "@huggingface/transformers": "^4.2.0",
     "@immich/justified-layout-wasm": "^0.4.3",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@streamdown/cjk": "^1.0.3",

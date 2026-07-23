@@ -44,8 +44,7 @@ export function CanvasControls({
   const setEvenPad = (value: number) =>
     setPad({ top: value, left: value, right: value, bottom: value + bottomExtra });
 
-  const setBottomExtra = (value: number) =>
-    setPad({ ...canvas.pad, bottom: evenPad + value });
+  const setBottomExtra = (value: number) => setPad({ ...canvas.pad, bottom: evenPad + value });
 
   return (
     <div>

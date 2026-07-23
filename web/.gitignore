@@ -23,3 +23,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Self-hosted Studio depth model + onnxruntime wasm (fetched via scripts/fetch-depth-model.mjs)
+public/models/
+public/ort/

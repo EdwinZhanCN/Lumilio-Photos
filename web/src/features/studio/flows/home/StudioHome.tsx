@@ -1,23 +1,58 @@
 import React from "react";
-import { Clock, Frame, Image as ImageIcon, ImageOff, SlidersHorizontal } from "lucide-react";
+import {
+  Clock,
+  Crop,
+  Frame,
+  Image as ImageIcon,
+  ImageOff,
+  SlidersHorizontal,
+  Type,
+  type LucideIcon,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import PageHeader from "@/components/ui/PageHeader";
 import { RecentEditItem } from "./RecentEditItem";
 import type { RecentEditRecord } from "../../state/recentEdits";
+import type { EditorTab } from "../editor/EditorPanel";
 
 type StudioHomeProps = {
   recent: RecentEditRecord[];
-  onOpenEditor: () => void;
   onResume: (assetId: string) => void;
-  onOpenFrameTool: () => void;
+  /** Pick a photo, then open the editor on the given tool. */
+  onOpenTool: (tab: EditorTab) => void;
   onClearRecent: () => void;
 };
 
+function ToolCard({
+  icon: Icon,
+  title,
+  body,
+  onClick,
+}: {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative overflow-hidden rounded-xl border border-base-300 bg-base-100 p-5 text-left transition-all hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+    >
+      <div className="mb-3.5 grid h-11 w-11 place-items-center rounded-lg bg-primary/10 text-primary">
+        <Icon size={22} />
+      </div>
+      <h3 className="text-base font-semibold text-base-content">{title}</h3>
+      <p className="mt-1.5 text-sm text-base-content/55">{body}</p>
+    </button>
+  );
+}
+
 export function StudioHome({
   recent,
-  onOpenEditor,
   onResume,
-  onOpenFrameTool,
+  onOpenTool,
   onClearRecent,
 }: StudioHomeProps): React.JSX.Element {
   const { t } = useI18n();
@@ -34,7 +69,11 @@ export function StudioHome({
         })}
         icon={<SlidersHorizontal className="h-6 w-6 text-primary" />}
       >
-        <button type="button" onClick={onOpenEditor} className="btn btn-primary btn-sm gap-2">
+        <button
+          type="button"
+          onClick={() => onOpenTool("develop")}
+          className="btn btn-primary btn-sm gap-2"
+        >
           <ImageIcon size={16} />
           {t("studio.home.openEditor", { defaultValue: "Open editor" })}
         </button>
@@ -89,25 +128,39 @@ export function StudioHome({
             <Frame size={15} />
             {t("studio.home.tools", { defaultValue: "Tools" })}
           </h2>
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <button
-              type="button"
-              onClick={onOpenFrameTool}
-              className="group relative overflow-hidden rounded-xl border border-base-300 bg-base-100 p-6 text-left transition-all hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-            >
-              <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-primary/10 text-primary">
-                <Frame size={22} />
-              </div>
-              <h3 className="text-base font-semibold text-base-content">
-                {t("studio.home.frame.title", { defaultValue: "Add a Frame" })}
-              </h3>
-              <p className="mt-1.5 text-sm text-base-content/55">
-                {t("studio.home.frame.body", {
-                  defaultValue:
-                    "Frame a photo with a camera-branded preset, or build your own border and captions.",
-                })}
-              </p>
-            </button>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <ToolCard
+              icon={SlidersHorizontal}
+              title={t("studio.home.adjust.title", { defaultValue: "Adjust" })}
+              body={t("studio.home.adjust.body", {
+                defaultValue: "Exposure, color, and detail with a lightweight color panel.",
+              })}
+              onClick={() => onOpenTool("develop")}
+            />
+            <ToolCard
+              icon={Crop}
+              title={t("studio.home.crop.title", { defaultValue: "Crop" })}
+              body={t("studio.home.crop.body", {
+                defaultValue: "Reframe with aspect presets, rotate, and flip.",
+              })}
+              onClick={() => onOpenTool("crop")}
+            />
+            <ToolCard
+              icon={Frame}
+              title={t("studio.home.frame.title", { defaultValue: "Add a Frame" })}
+              body={t("studio.home.frame.body", {
+                defaultValue: "Camera-branded presets, or your own border and captions.",
+              })}
+              onClick={() => onOpenTool("frame")}
+            />
+            <ToolCard
+              icon={Type}
+              title={t("studio.home.text.title", { defaultValue: "Text" })}
+              body={t("studio.home.text.body", {
+                defaultValue: "Add captions on the photo, with depth-aware placement.",
+              })}
+              onClick={() => onOpenTool("text")}
+            />
           </div>
         </section>
       </div>

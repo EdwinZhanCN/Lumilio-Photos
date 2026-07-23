@@ -7,34 +7,47 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 5;
 
 type ViewportProps = {
-  /** Developed / border preview object URL. */
-  previewUrl: string | null;
+  /**
+   * Receives the preview canvas element once, so the editor can hand its
+   * control to the render worker via `transferControlToOffscreen`.
+   */
+  onCanvasReady: (canvas: HTMLCanvasElement) => void;
+  /**
+   * Identity of the current photo. A change remounts the canvas, because
+   * `transferControlToOffscreen` may be called only once per element, so each
+   * asset needs a fresh one to hand to its worker.
+   */
+  canvasKey: string;
   /** Untouched original object URL, shown while "Before" is held. */
   originalUrl: string | null;
   showOriginal: boolean;
-  /** Un-rotated aspect ratio (width / height) of the source image. */
-  sourceAspect: number;
-  rotation: number;
-  flipH: boolean;
-  flipV: boolean;
+  /** Aspect (w/h) of the composed preview the worker draws — sizes the canvas box. */
+  outputAspect: number;
+  /** Aspect (w/h) of the untouched original — sizes the "Before" image box. */
+  originalAspect: number;
+  /** True once the worker has drawn at least one frame. */
+  ready: boolean;
   loading: boolean;
   error: string | null;
   onDismissError: () => void;
   fileName: string;
+  /** Rendered over the canvas box (e.g. the crop overlay), aligned to the image. */
+  overlay?: React.ReactNode;
 };
 
 export function Viewport({
-  previewUrl,
+  onCanvasReady,
+  canvasKey,
   originalUrl,
   showOriginal,
-  sourceAspect,
-  rotation,
-  flipH,
-  flipV,
+  outputAspect,
+  originalAspect,
+  ready,
   loading,
   error,
   onDismissError,
   fileName,
+  overlay,
 }: ViewportProps): React.JSX.Element {
   const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -42,10 +55,14 @@ export function Viewport({
   const [zoom, setZoom] = useState(1);
   const [fitMode, setFitMode] = useState(true);
 
-  // While "Before" is held we present the original at its native orientation.
-  const effRotation = showOriginal ? 0 : ((rotation % 360) + 360) % 360;
-  const quarterTurn = effRotation === 90 || effRotation === 270;
-  const displayedAr = quarterTurn ? 1 / sourceAspect : sourceAspect;
+  const displayedAr = showOriginal ? originalAspect : outputAspect;
+
+  const canvasCallback = useCallback(
+    (node: HTMLCanvasElement | null) => {
+      if (node) onCanvasReady(node);
+    },
+    [onCanvasReady],
+  );
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -62,7 +79,7 @@ export function Viewport({
   const fit = useMemo(() => {
     const availW = Math.max(0, box.w - VIEWPORT_PAD * 2);
     const availH = Math.max(0, box.h - VIEWPORT_PAD * 2);
-    if (availW <= 0 || availH <= 0 || !Number.isFinite(displayedAr)) {
+    if (availW <= 0 || availH <= 0 || !Number.isFinite(displayedAr) || displayedAr <= 0) {
       return { w: 0, h: 0 };
     }
     let w = availW;
@@ -77,9 +94,6 @@ export function Viewport({
   const eff = fitMode ? 1 : zoom;
   const boxW = fit.w * eff;
   const boxH = fit.h * eff;
-  // Pre-rotation content box (the image fills this, then the wrapper rotates).
-  const contentW = quarterTurn ? boxH : boxW;
-  const contentH = quarterTurn ? boxW : boxH;
 
   const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
   const zoomTo = useCallback((z: number) => {
@@ -105,11 +119,7 @@ export function Viewport({
     [fitMode, zoom, zoomTo],
   );
 
-  const transform = `rotate(${effRotation}deg) scaleX(${
-    !showOriginal && flipH ? -1 : 1
-  }) scaleY(${!showOriginal && flipV ? -1 : 1})`;
-
-  const activeUrl = showOriginal && originalUrl ? originalUrl : previewUrl;
+  const showWaiting = !ready && !showOriginal;
 
   return (
     <div className="relative flex min-w-0 flex-1">
@@ -129,36 +139,36 @@ export function Viewport({
           className="flex min-h-full min-w-full items-center justify-center"
           style={{ padding: `${VIEWPORT_PAD}px` }}
         >
-          {boxW > 0 && activeUrl ? (
-            <div
-              className={`relative shrink-0 ${fitMode ? "" : "cursor-zoom-out"}`}
-              style={{ width: `${boxW}px`, height: `${boxH}px` }}
-            >
-              <div
-                className="absolute left-1/2 top-1/2 overflow-hidden rounded-md shadow-2xl ring-1 ring-black/10"
-                style={{
-                  width: `${contentW}px`,
-                  height: `${contentH}px`,
-                  transform: `translate(-50%, -50%) ${transform}`,
-                }}
-              >
-                <img
-                  src={activeUrl}
-                  alt={fileName}
-                  className="h-full w-full object-contain"
-                  draggable={false}
-                />
-              </div>
+          <div
+            className={`relative shrink-0 ${fitMode ? "" : "cursor-zoom-out"}`}
+            style={{ width: `${boxW}px`, height: `${boxH}px` }}
+          >
+            {/* The worker owns this canvas after transferControlToOffscreen; we
+                never touch its backing size, only its CSS display size. */}
+            <canvas
+              key={canvasKey}
+              ref={canvasCallback}
+              className="absolute inset-0 h-full w-full rounded-md shadow-2xl ring-1 ring-black/10"
+              style={{ display: showOriginal ? "none" : "block" }}
+            />
+            {showOriginal && originalUrl && (
+              <img
+                src={originalUrl}
+                alt={fileName}
+                className="absolute inset-0 h-full w-full rounded-md object-contain shadow-2xl ring-1 ring-black/10"
+                draggable={false}
+              />
+            )}
+            {overlay}
+          </div>
+
+          {showWaiting && boxW <= 0 && (
+            <div className="flex flex-col items-center gap-3 text-base-content/40">
+              <SlidersHorizontal className="h-12 w-12" />
+              <span className="text-sm">
+                {t("studio.editor.waiting", { defaultValue: "Waiting for preview" })}
+              </span>
             </div>
-          ) : (
-            !activeUrl && (
-              <div className="flex flex-col items-center gap-3 text-base-content/40">
-                <SlidersHorizontal className="h-12 w-12" />
-                <span className="text-sm">
-                  {t("studio.editor.waiting", { defaultValue: "Waiting for preview" })}
-                </span>
-              </div>
-            )
           )}
         </div>
       </div>
@@ -177,7 +187,7 @@ export function Viewport({
             <button
               type="button"
               onClick={onDismissError}
-              aria-label="Dismiss"
+              aria-label={t("common.dismiss", { defaultValue: "Dismiss" })}
               className="btn btn-ghost btn-xs"
             >
               <X size={14} />
@@ -204,7 +214,7 @@ export function Viewport({
           type="button"
           onClick={() => zoomTo(eff / 1.25)}
           disabled={eff <= MIN_ZOOM + 0.001}
-          aria-label="Zoom out"
+          aria-label={t("studio.editor.zoomOut", { defaultValue: "Zoom out" })}
           className="btn btn-ghost btn-xs btn-square text-base-content/70"
         >
           <Minus size={15} />
@@ -212,7 +222,7 @@ export function Viewport({
         <button
           type="button"
           onClick={doFit}
-          aria-label="Fit to screen"
+          aria-label={t("studio.editor.fitToScreen", { defaultValue: "Fit to screen" })}
           className="btn btn-ghost btn-xs min-w-[3.25rem] font-mono text-[11px] tabular-nums text-base-content/80"
         >
           {fitMode ? t("studio.editor.fit", { defaultValue: "Fit" }) : `${Math.round(eff * 100)}%`}
@@ -221,7 +231,7 @@ export function Viewport({
           type="button"
           onClick={() => zoomTo(eff * 1.25)}
           disabled={eff >= MAX_ZOOM - 0.001}
-          aria-label="Zoom in"
+          aria-label={t("studio.editor.zoomIn", { defaultValue: "Zoom in" })}
           className="btn btn-ghost btn-xs btn-square text-base-content/70"
         >
           <Plus size={15} />
@@ -234,7 +244,7 @@ export function Viewport({
           <button
             type="button"
             onClick={doFit}
-            aria-label="Reset zoom"
+            aria-label={t("studio.editor.resetZoom", { defaultValue: "Reset zoom" })}
             className="btn btn-ghost btn-xs btn-square text-base-content/70"
           >
             <Maximize2 size={14} />

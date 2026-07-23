@@ -45,16 +45,25 @@ Home can update recent edits.
 
 ## Rendering
 
-All rendering runs in the feature worker. The main thread decodes the source
-into image data, then sends `LOAD_IMAGE_DATA`, `RENDER_PREVIEW`,
-`EXPORT_IMAGE`, and `SET_LOGOS`. The worker develops the photo on WebGPU,
-WebGL2, WASM CPU, or Canvas 2D, then composes:
-[composeStudioImage](./modules/rendering/composeStudioImage.ts) applies [renderCanvasSpec](./modules/rendering/renderCanvas.ts) and
-[drawLayers](./modules/rendering/renderLayers.ts). The worker is an implementation boundary, not a public
-API.
+All rendering runs in the feature worker, which owns the on-screen preview
+canvas: the main thread hands over control once with
+`transferControlToOffscreen` (INIT_CANVAS) and sends the source blob
+(LOAD_IMAGE), then RENDER, EXPORT_IMAGE, and SET_LOGOS.
 
-Geometry renders in the worker rather than as CSS on [Viewport](./flows/editor/Viewport.tsx),
-because a frame drawn around the photo must rotate with it, not on top of it.
+The pipeline is three layers over one coordinate system
+([deriveRenderSize](./modules/rendering/coordinateSystem.ts)): the [DevelopEngine](./modules/rendering/developEngine.ts) — a persistent WebGL2
+pipeline that uploads the source texture and compiles the program once, so a
+dragging slider only updates uniforms and redraws — then [applyGeometry](./modules/rendering/geometry.ts)
+(crop, rotate, flip) and [composeStudioImage](./modules/rendering/composeStudioImage.ts) ([renderCanvasSpec](./modules/rendering/renderCanvas.ts)
+plus [drawLayers](./modules/rendering/renderLayers.ts)) on a 2D canvas, blitted straight onto the visible
+canvas. A preview never produces a blob or leaves the GPU; only EXPORT_IMAGE
+encodes one, at the chosen output resolution. The worker is an implementation
+boundary, not a public API.
+
+Geometry is applied after develop rather than before, and in the worker rather
+than as CSS on [Viewport](./flows/editor/Viewport.tsx), because a frame drawn around the photo must
+rotate with it, and the color pipeline must keep working on one stable texture
+that a crop or a 90° turn does not invalidate.
 
 Fonts load inside the worker through [ensureStudioFontsLoaded](./modules/rendering/fonts/loadStudioFonts.ts), so text
 is measured with the same context that draws it. Measuring in one place and
@@ -62,6 +71,39 @@ drawing in another is what makes alignment drift with line width.
 
 Logos cannot be rasterized in the worker — decoding SVG needs the DOM — so
 [rasterizeLogos](./modules/frame/logoRaster.ts) runs on the main thread and transfers bitmaps across.
+
+## Export
+
+[ExportPanel](./flows/editor/export/ExportPanel.tsx) offers the Pixelmator Quick Export subset — format
+(JPEG/PNG/WebP), quality, and size (original / percent / long edge). The size
+is resolved and guardrailed by [resolveExportSize](./modules/rendering/coordinateSystem.ts): it never upscales
+past the source and never exceeds the GPU texture limit, and the worker backs
+off by halves if a browser rejects an oversized canvas. [preserveExif](./modules/export/exif.ts)
+then copies the original file's EXIF onto the re-encoded export, forcing
+Orientation upright because rotation is baked into the pixels. It is
+best-effort: PNG and any failure download the export unchanged.
+
+## Crop
+
+The crop box is dragged over the viewport by [CropOverlay](./flows/editor/crop/CropOverlay.tsx), whose
+eight-handle free/aspect geometry ([resizeCropRect](./modules/crop/cropMath.ts) and the aspect
+presets) is ported from AfterFrame and operates on the displayed, rotated
+frame. On commit [mapRectDisplayedToSource](./modules/rendering/coordinateSystem.ts) converts the box to the
+source-pixel rectangle stored in the adjustments — so a crop is resolution-
+and orientation-independent — and the worker applies it in
+[applyGeometry](./modules/rendering/geometry.ts) before rotation. While the Crop tab is open the preview
+shows the whole frame; the crop takes effect on leaving the tab.
+
+## Depth occlusion
+
+Layers can sit inside the scene. [estimateDepthField](./modules/depth/depthEstimation.ts) runs Depth Anything
+V2 (small, q4f16) through transformers.js on WebGPU, fully self-hosted from
+public/ (vendored by scripts/fetch-depth-model.mjs — no HuggingFace CDN at
+runtime), and transfers the grayscale field (0=far, 255=near) to the worker. A
+layer's `zPosition` (1 = always in front, lower = deeper) drives
+[buildDepthAlphaMask](./modules/depth/depthMask.ts), whose alpha hides the layer where the scene is
+nearer; it is applied per layer inside [drawLayers](./modules/rendering/renderLayers.ts). Best-effort: with no
+WebGPU or model the field never arrives and occlusion is simply off.
 
 ## Frames
 
@@ -98,10 +140,13 @@ flowchart TD
 
 [TopBar](./flows/editor/TopBar.tsx) owns session commands. [AssetPanel](./flows/editor/AssetPanel.tsx) shows source
 metadata and EXIF. [Viewport](./flows/editor/Viewport.tsx) owns fit/zoom, before preview, and render
-errors. [EditorPanel](./flows/editor/EditorPanel.tsx) hosts the three tabs and the mobile bottom sheet;
+errors. [EditorPanel](./flows/editor/EditorPanel.tsx) hosts the tabs and the mobile bottom sheet;
 [DevelopSections](./flows/editor/develop/DevelopSections.tsx) renders the adjustment groups defined by
 [DEVELOP_GROUPS](./model/developConfig.ts), [FramePanel](./flows/editor/frame/FramePanel.tsx) the presets and border, and
-[TextPanel](./flows/editor/text/TextPanel.tsx) the layer stack.
+[TextPanel](./flows/editor/text/TextPanel.tsx) the layer stack and depth controls. Text is also edited on
+the photo itself via [TextOverlay](./flows/editor/text/TextOverlay.tsx) — drag to move, handles to scale and
+rotate, double-click to edit — while [Viewport](./flows/editor/Viewport.tsx) carries the overlay slot
+that both it and the crop [CropOverlay](./flows/editor/crop/CropOverlay.tsx) render into.
 
 ## Decisions
 

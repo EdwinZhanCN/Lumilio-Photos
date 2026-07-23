@@ -18,7 +18,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 
 - `site/docs/internal/agent/architecture.md`: system map, backend/frontend boundaries, config/runtime notes.
 - `site/docs/internal/agent/BACKEND.md`: backend runtime, package map, config, queues, storage, API contracts.
-- `site/docs/internal/agent/FRONTEND.md`: frontend runtime, toolchain, routes, state boundaries, API usage.
+- `site/docs/internal/agent/FRONTEND.md`: frontend runtime, toolchain, routes, state boundaries, API usage, and the test-layer taxonomy (which file name / runner for a given test, incl. GPU/WebGL capability tests).
 - `web/ARCHITECTURE.md`: enforceable frontend directory ownership, public-entry rules, dependency direction, and boundary gates.
 - `site/docs/internal/agent/DESIGN.md`: product and interface guidance for app work.
 - `site/docs/internal/agent/core-beliefs.md`: decision principles for product and engineering tradeoffs.
@@ -43,6 +43,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 - If you are in a sandbox without host environment, like cloud/container, use `make setup` to set up the local dev environment. Do not use your own cli tooling if possible.
 - Backend quality gate: prefer `make server-test`. Do not bypass it with `cd server && go test ./...` unless there is a concrete reason and you preserve the Makefile environment (notably `CGO_LDFLAGS_ALLOW` / `CGO_CFLAGS_ALLOW` for local media dependencies).
 - Frontend quality gate: prefer `make web-test`. Direct `cd web && vp check --no-fmt --no-lint && vp lint && vp test` is acceptable when you are intentionally running only the web gate.
+- Choosing which test to write (file name → runner, from unit through browser-capability to E2E, including GPU/WebGL capability tests) follows the test-layer taxonomy in [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) "Test layers". Do not invent test-file conventions outside it.
 - API contracts are OpenAPI-first. Do not hand-edit `web/src/lib/http-commons/schema.d.ts`; change backend annotations and run `make dto`. An `as`-cast on an API response (`query.data?.data as {...}`) is a red flag: the DTO/`@Success` annotation is missing or `make dto` is stale — fix the contract, never cast around it. If generated `data` is `Record<string, never>` or `unknown` for an endpoint that returns payload data, that is a contract failure and must be fixed in backend DTO/annotation/codegen before frontend work proceeds; do not add compatibility shims for stale DTOs. See [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) "API Contract".
 - A complete schema-versioned TOML manifest is required runtime input. Runtime-immutable fields have no code defaults, consumer fallbacks, automatic config search, or ordinary environment overrides.
 - Do not commit secrets. TOML contains only explicit secret-file paths; secret values and secret-path overrides do not belong in environment variables.

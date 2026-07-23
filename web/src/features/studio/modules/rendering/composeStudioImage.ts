@@ -18,7 +18,7 @@ import { isCanvasActive, type CanvasSpec } from "../../model/canvasSpec";
 import type { Layer } from "../../model/layers";
 import { context2d } from "./canvasUtils";
 import { renderCanvasSpec } from "./renderCanvas";
-import { drawLayers, type LogoImages } from "./renderLayers";
+import { drawLayers, type DepthOcclusion, type LogoImages } from "./renderLayers";
 
 export type Composition = {
   canvas: CanvasSpec | null;
@@ -35,6 +35,7 @@ export function composeStudioImage(
   photo: OffscreenCanvas,
   composition: Composition,
   logos: LogoImages,
+  occlusion?: DepthOcclusion,
 ): OffscreenCanvas {
   const hasCanvas = isCanvasActive(composition.canvas);
   const hasLayers = composition.layers.length > 0;
@@ -42,7 +43,7 @@ export function composeStudioImage(
 
   if (!composition.canvas) {
     // Layers with no canvas treatment draw straight onto the photo.
-    drawLayers(context2d(photo), photo.width, photo.height, composition.layers, logos);
+    drawLayers(context2d(photo), photo.width, photo.height, composition.layers, logos, occlusion);
     return photo;
   }
 
@@ -54,6 +55,7 @@ export function composeStudioImage(
       framed.height,
       composition.layers,
       logos,
+      occlusion,
     );
   }
   return framed.canvas;

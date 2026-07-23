@@ -9,6 +9,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const hashPerformanceEnabled = process.env.VITEST_HASH_PERF === "true";
+// Headless Chromium falls back to SwiftShader, whose WebGL is disabled on Apple
+// Silicon — so the Studio GPU capability tests (develop engine, render worker)
+// can only get a real WebGL2 context in a headed browser. STUDIO_GPU=true runs
+// the browser project headed so a developer can verify them locally; the default
+// stays headless so CI never fails to launch (those tests skip themselves when
+// WebGL2 is absent). See vite-plus `hash-performance` for the same env-gated shape.
+const studioGpuEnabled = process.env.STUDIO_GPU === "true";
 const testProjects = [
   {
     // Pure logic in Node: no DOM, window, storage, Testing Library, Router or
@@ -54,7 +61,25 @@ const testProjects = [
           host: "127.0.0.1",
         },
         provider: playwright(),
-        instances: [{ browser: "chromium", headless: true }],
+        // Headed (STUDIO_GPU=true) uses the machine's real GPU, the only way the
+        // Studio WebGL2 capability tests get a context on Apple Silicon. Headless
+        // (default) tries ANGLE+SwiftShader and otherwise lets those tests skip —
+        // keeping CI launchable where no display or GPU exists.
+        instances: [
+          {
+            browser: "chromium",
+            headless: !studioGpuEnabled,
+            launchOptions: studioGpuEnabled
+              ? undefined
+              : {
+                  args: [
+                    "--use-gl=angle",
+                    "--use-angle=swiftshader",
+                    "--enable-unsafe-swiftshader",
+                  ],
+                },
+          },
+        ],
         enabled: true,
       },
     },
