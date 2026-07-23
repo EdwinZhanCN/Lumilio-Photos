@@ -40,13 +40,16 @@ const testProjects = [
       setupFiles: ["./test/setup.integration.ts"],
       include: ["src/**/*.test.tsx", "src/**/*.spec.tsx"],
       exclude: ["src/**/*.browser.test.ts", "**/node_modules/**"],
-      // Vitest browser mode can still re-optimize deps mid-run and reload a
-      // test, aborting an in-flight dynamic import ("Failed to fetch
-      // dynamically imported module" / "Vitest failed to find the runner" /
-      // "Vite unexpectedly reloaded a test"). optimizeDeps.include below cuts
-      // how often that happens but cannot eliminate it; retry re-runs the few
-      // files a reload catches (they pass once deps are warm). See
-      // vitest-dev/vitest#8447, #9509.
+      // Vitest browser mode re-optimizes deps mid-run and reloads the page,
+      // aborting the dynamic test-file imports that other files have in flight
+      // ("Failed to fetch dynamically imported module" / "Vitest failed to find
+      // the runner" / "Vite unexpectedly reloaded a test"). Under parallel file
+      // execution on CI this races badly enough to wedge the whole run, not
+      // just fail a file. Running the browser files serially removes the
+      // concurrent in-flight imports the reload was aborting; optimizeDeps
+      // .include front-loads most optimization and retry mops up any residual
+      // reload. See vitest-dev/vitest#8447, #9509.
+      fileParallelism: false,
       retry: 2,
       browser: {
         enabled: true,
@@ -65,6 +68,7 @@ const testProjects = [
       exclude: ["**/node_modules/**"],
       testTimeout: 300_000,
       // Same browser-mode reload race as the integration project (see there).
+      fileParallelism: false,
       retry: 2,
       browser: {
         api: {
