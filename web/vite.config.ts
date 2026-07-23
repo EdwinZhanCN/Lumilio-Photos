@@ -174,5 +174,47 @@ export default defineConfig({
 
   optimizeDeps: {
     exclude: ["@immich/justified-layout-wasm"],
+    // Pre-bundle every dependency the browser (integration) and jsdom (unit)
+    // test projects end up optimizing, so Vite finishes dep optimization during
+    // its initial scan instead of discovering a dep mid-run. A mid-run
+    // re-optimize triggers a full page reload that aborts in-flight dynamic
+    // test-file imports, which surfaces as flaky "Failed to fetch dynamically
+    // imported module" / "Vitest failed to find the runner" failures in CI (see
+    // vitest-dev/vitest#8447, #9509). This list is the union of the specifiers
+    // captured from node_modules/.vite/vitest/*/deps/_metadata.json after a full
+    // `vp test` run; refresh it if the optimizer starts reloading again.
+    include: [
+      "@colorhythm/exiftool-wasm",
+      "@microsoft/fetch-event-source",
+      "@tanstack/react-query",
+      "@vidstack/react",
+      "@vidstack/react/player/layouts/default",
+      "expect-type",
+      "i18next",
+      "i18next-browser-languagedetector",
+      "immer",
+      "leaflet",
+      "lucide-react",
+      "openapi-fetch",
+      "openapi-react-query",
+      "react",
+      "react-dom",
+      "react-error-boundary",
+      "react-i18next",
+      "react-leaflet",
+      "react-router-dom",
+      "react/jsx-dev-runtime",
+      "react/jsx-runtime",
+      "sonner",
+      "supercluster",
+      "swiper/modules",
+      "swiper/react",
+      "vite-plus/test",
+      "vitest-browser-react",
+      "zustand",
+      "zustand/middleware",
+      "zustand/middleware/immer",
+      "zustand/vanilla",
+    ],
   },
 });
