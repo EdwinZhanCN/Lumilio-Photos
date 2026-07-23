@@ -10,7 +10,8 @@ import SideBar from "@/app/shell/SideBar";
 export default function AppShellLayout(): ReactNode {
   const { t } = useI18n();
   const location = useLocation();
-  // The /lumilio board embeds its own dock; everywhere else gets the global FAB.
+  // The /lumilio board embeds its own dock; everywhere else gets the global
+  // agent drawer (launched from the NavBar button, see AgentDockLauncher).
   const showAgentDock = location.pathname !== "/lumilio";
 
   return (

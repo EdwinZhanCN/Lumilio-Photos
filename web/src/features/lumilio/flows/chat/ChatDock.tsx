@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BarChart3,
@@ -43,15 +43,14 @@ const MODE_ICON: Record<string, LucideIcon> = {
 };
 
 interface ChatDockProps {
-  /** "embedded" = in-flow panel (Lumilio board page); "fab" = bottom-right FAB
-   * whose expanded panel portals above gallery/carousel. */
+  /** "embedded" = in-flow panel (Lumilio board page); "fab" = global
+   * right-edge drawer portaled above the app, launched from AgentDockLauncher. */
   variant?: "embedded" | "fab";
 }
 
 export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const { t } = useI18n();
   const QUICK_ACTIONS = useSlashMacros();
-  const [fabHovered, setFabHovered] = useState(false);
   // Sticky agent mode: set once (empty-state chip, "/" menu, or Plus button),
   // kept across turns until the user clears it. Single source of truth for the
   // tool-subset constraint sent with every message.
@@ -59,8 +58,10 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const collapsedOverride = useDockStore((s) => s.collapsedOverride);
   const setCollapsedOverride = useDockStore((s) => s.setCollapsed);
 
-  // fab defaults collapsed (just a button); embedded defaults expanded.
+  // fab defaults collapsed (drawer closed); embedded defaults expanded.
   const collapsed = collapsedOverride ?? variant === "fab";
+  // "fab" now renders a right-edge drawer, launched from the NavBar button.
+  const isDrawer = variant === "fab";
 
   const contributions = useContextStore((s) => s.contributions);
   const excluded = useContextStore((s) => s.excluded);
@@ -93,6 +94,16 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const toggleCollapsed = useCallback(() => {
     setCollapsedOverride(!collapsed);
   }, [collapsed, setCollapsedOverride]);
+
+  // Drawer: Escape closes it, matching the scrim click-away.
+  useEffect(() => {
+    if (!isDrawer || collapsed) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCollapsedOverride(true);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isDrawer, collapsed, setCollapsedOverride]);
 
   const handleSubmit = useCallback(
     (value: string, mentions: MentionPayload[]) => {
@@ -129,8 +140,10 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   const header = (
     <header
-      className="flex cursor-pointer items-center gap-2 border-b border-base-300 px-3 py-2"
-      onClick={toggleCollapsed}
+      className={`flex items-center gap-2 border-b border-base-300 px-3 py-2 ${
+        isDrawer ? "" : "cursor-pointer"
+      }`}
+      onClick={isDrawer ? undefined : toggleCollapsed}
     >
       <LumilioAvatar start={isGenerating} size={0.13} className="shrink-0" />
       <div className="min-w-0 flex-1">
@@ -186,19 +199,19 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         className="btn btn-ghost btn-sm btn-circle shrink-0 text-base-content/60"
         aria-controls="lumilio-chat-dock-panel"
         aria-expanded={!collapsed}
-        title={toggleLabel}
+        title={isDrawer ? t("lumilio.dock.close", "Close") : toggleLabel}
         onClick={(event) => {
           event.stopPropagation();
           toggleCollapsed();
         }}
       >
-        <ChevronDown size={18} strokeWidth={1.8} />
+        {isDrawer ? <X size={18} strokeWidth={1.8} /> : <ChevronDown size={18} strokeWidth={1.8} />}
       </button>
     </header>
   );
 
-  const body = (
-    <div className="max-h-[calc(58vh-3.5rem)] overflow-y-auto">
+  const bodyContent = (
+    <>
       {agentDisabledReason && (
         <div className="border-b border-base-300 bg-warning/10 px-3 py-2 text-xs text-base-content/80">
           <span>{agentDisabledReason}</span>{" "}
@@ -259,8 +272,10 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           <ChatMessages messages={messages} isGenerating={isGenerating} />
         </Suspense>
       )}
-    </div>
+    </>
   );
+
+  const body = <div className="max-h-[calc(58vh-3.5rem)] overflow-y-auto">{bodyContent}</div>;
 
   const ModePillIcon = activeMode ? (MODE_ICON[activeMode] ?? Sparkles) : null;
   const modePill =
@@ -294,60 +309,39 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
     </>
   );
 
-  // ── FAB variant: morphing pill ⇄ portaled expanded panel ──────────────────
-  // The collapsed pill carries the avatar; expanding grows it into the panel
-  // (whose header also shows the avatar), so the avatar stays put and morphs.
-  if (variant === "fab") {
+  // ── FAB variant: right-edge drawer, launched from the NavBar button ────────
+  // A chrome citizen with a home, not a floating orb: it owns a real region on
+  // the right, slides in over content behind a light scrim, and is dismissed by
+  // the scrim, Escape, or the header's close button.
+  if (isDrawer) {
     return createPortal(
-      <section className="fixed bottom-10 left-1/2 z-[35] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2">
-        {/* Expanded: panel + input */}
+      <>
+        {/* Scrim: dims content, click to dismiss. Sits above the fullscreen
+         * asset viewer (z-9999) so the agent is reachable from inside it. */}
         <div
+          aria-hidden
+          onClick={() => setCollapsedOverride(true)}
+          className={`fixed inset-0 z-[10000] bg-black/20 backdrop-blur-[1px] transition-opacity duration-300 ${
+            collapsed ? "pointer-events-none opacity-0" : "opacity-100"
+          }`}
+        />
+        <section
+          id="lumilio-chat-dock-panel"
           aria-hidden={collapsed}
           inert={collapsed ? true : undefined}
-          className={`flex origin-bottom flex-col gap-2 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out ${
-            collapsed
-              ? "pointer-events-none max-h-0 translate-y-2 scale-[0.98] opacity-0"
-              : "max-h-[80vh] translate-y-0 scale-100 opacity-100"
+          className={`fixed inset-y-0 right-0 z-[10001] flex w-[min(28rem,100vw)] flex-col border-l border-base-300 bg-base-100/95 shadow-xl backdrop-blur transition-transform duration-300 ease-out ${
+            collapsed ? "translate-x-full" : "translate-x-0"
           }`}
         >
-          <div
-            id="lumilio-chat-dock-panel"
-            className="overflow-hidden rounded-box border border-base-300 bg-base-100/95 backdrop-blur"
-          >
-            {header}
-            {!collapsed && body}
-          </div>
-          {!collapsed && inputArea}
-        </div>
-
-        {/* Collapsed: morphing avatar pill */}
-        <div
-          aria-hidden={!collapsed}
-          inert={!collapsed ? true : undefined}
-          className={`flex justify-center overflow-hidden transition-[max-height,opacity,transform] duration-[250ms] ease-out ${
-            collapsed
-              ? "max-h-16 translate-y-0 opacity-100"
-              : "pointer-events-none max-h-0 translate-y-2 opacity-0"
-          }`}
-        >
-          <button
-            type="button"
-            onMouseEnter={() => setFabHovered(true)}
-            onMouseLeave={() => setFabHovered(false)}
-            className="btn h-auto min-h-0 items-center gap-1.5 rounded-full border border-base-300 bg-base-100/95 py-1.5 pl-2 pr-2 hover:bg-base-100 sm:pr-4"
-            aria-controls="lumilio-chat-dock-panel"
-            aria-expanded={false}
-            title={toggleLabel}
-            onClick={toggleCollapsed}
-          >
-            <LumilioAvatar start={fabHovered || isGenerating} size={0.13} />
-            <span className="hidden text-sm font-semibold sm:inline">
-              {t("lumilio.dock.title", "Lumilio Agent")}
-            </span>
-            {statusDot}
-          </button>
-        </div>
-      </section>,
+          {header}
+          {!collapsed && (
+            <>
+              <div className="min-h-0 flex-1 overflow-y-auto">{bodyContent}</div>
+              <div className="border-t border-base-300 p-2">{inputArea}</div>
+            </>
+          )}
+        </section>
+      </>,
       document.body,
     );
   }
