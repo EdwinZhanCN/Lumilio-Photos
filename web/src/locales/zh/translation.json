@@ -1015,6 +1015,7 @@
     },
     "dock": {
       "busy": "处理中",
+      "close": "关闭",
       "collapse": "折叠对话",
       "conversation": "对话",
       "expand": "展开对话",
@@ -1083,6 +1084,9 @@
     "tools": {
       "emptyResult": "没有匹配的照片",
       "resultSet": "结果集"
+    },
+    "viewer": {
+      "ask": "问 Lumilio 这张照片"
     },
     "widgets": {
       "frozen": "已冻结",

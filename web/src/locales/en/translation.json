@@ -1020,6 +1020,7 @@
     },
     "dock": {
       "busy": "Working",
+      "close": "Close",
       "collapse": "Collapse chat",
       "conversation": "Conversation",
       "expand": "Expand chat",
@@ -1088,6 +1089,9 @@
     "tools": {
       "emptyResult": "No matching photos",
       "resultSet": "Result set"
+    },
+    "viewer": {
+      "ask": "Ask Lumilio about this photo"
     },
     "widgets": {
       "frozen": "Frozen",
