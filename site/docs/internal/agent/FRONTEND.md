@@ -225,6 +225,33 @@ The production web image uses Caddy:
 - `web/scripts/check-bundle-budget.mjs` enforces a 420 KiB gzip budget for the
   production entry chunk as part of `make web-browser-test`.
 
+## Z-Index Strategy
+
+Three rules, in priority order:
+
+1. **Decorative overlays → DOM order.** Gradient tints, badges, hover masks, and
+   other purely visual layers must not carry a z-index. Place them after the
+   content they cover in DOM order.
+2. **Component-internal overlap → `isolation: isolate`.** When a component has
+   multiple overlapping layers (dropdown inside a card, sticky header inside a
+   panel), add `isolate` to the component root and keep internal values small
+   (z-10 / z-20 / z-30). Internal z-index must never leak into the global stack.
+3. **Cross-component floating layers → z-index tokens.** Use the theme tokens
+   defined in `App.css` `@theme inline`:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `z-sticky` | 100 | Sticky headers, save bars |
+| `z-dropdown` | 200 | Dropdown menus, popovers, autocomplete |
+| `z-overlay` | 300 | FABs, floating docks, drag overlays |
+| `z-modal` | 400 | Modals, drawers, mobile bottom-sheets |
+| `z-lightbox` | 500 | Fullscreen viewers (AssetViewer, PublicShareLightbox) |
+| `z-tooltip` | 600 | Portaled tooltips/popovers that escape a lightbox |
+
+Inline styles use `var(--z-<token>)`. Do not introduce new numeric z-index
+values for cross-component layers; extend the token scale if a new tier is
+genuinely needed.
+
 ## Test layers
 
 Pick the layer by what the test must exercise; the file name and directory pick

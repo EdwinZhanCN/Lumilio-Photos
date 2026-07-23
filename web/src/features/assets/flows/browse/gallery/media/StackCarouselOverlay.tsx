@@ -13,7 +13,7 @@ interface StackCarouselOverlayProps {
   onClose: () => void;
 }
 
-const overlayMessageClasses = "fixed inset-0 z-[80] flex items-center justify-center bg-black/90";
+const overlayMessageClasses = "fixed inset-0 z-lightbox isolate flex items-center justify-center bg-black/90";
 
 export default function StackCarouselOverlay({
   asset,
@@ -51,7 +51,7 @@ export default function StackCarouselOverlay({
       <div className={overlayMessageClasses}>
         <button
           type="button"
-          className="btn btn-ghost btn-sm absolute left-4 top-2 z-20 text-white"
+          className="btn btn-ghost btn-sm absolute left-4 top-2 z-10 text-white"
           onClick={onClose}
           aria-label={t("assets.stackDetail.close", {
             defaultValue: "Close stack details",
@@ -78,7 +78,7 @@ export default function StackCarouselOverlay({
       <div className={overlayMessageClasses}>
         <button
           type="button"
-          className="btn btn-ghost btn-sm absolute left-4 top-2 z-20 text-white"
+          className="btn btn-ghost btn-sm absolute left-4 top-2 z-10 text-white"
           onClick={onClose}
           aria-label={t("assets.stackDetail.close", {
             defaultValue: "Close stack details",

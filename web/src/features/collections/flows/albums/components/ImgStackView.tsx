@@ -81,8 +81,9 @@ function ImgStackView({
           <div className="absolute inset-0 bg-primary/10 pointer-events-none animate-in fade-in duration-300" />
         )}
 
+        <div className="pointer-events-none absolute inset-0 transition-transform duration-300 ease-out group-hover:-translate-y-0.5" />
         {isBioAlbum && (
-          <div className="absolute bottom-2 right-2 z-10 rounded-full bg-black/55 px-2 py-1 shadow-lg backdrop-blur-md">
+          <div className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2 py-1 shadow-lg backdrop-blur-md">
             <div
               className="tooltip m-0 inline-flex items-center text-xs font-medium gap-1.5 text-white"
               data-tip="生物图鉴"
@@ -91,9 +92,6 @@ function ImgStackView({
             </div>
           </div>
         )}
-
-        {/* Subtle floating animation on hover */}
-        <div className="pointer-events-none absolute inset-0 transition-transform duration-300 ease-out group-hover:-translate-y-0.5" />
       </div>
     </div>
   );

@@ -171,7 +171,7 @@ export default function SettingsShell() {
     <div className="space-y-4 pt-4 pb-4">
       {/* Full-bleed bar so the tab strip background spans the whole width,
           while the tab items stay aligned with the centered content. */}
-      <div className="sticky top-0 z-30 w-full bg-base-200">
+      <div className="sticky top-0 z-sticky w-full bg-base-200">
         <div
           role="tablist"
           aria-label={t("settings.title")}

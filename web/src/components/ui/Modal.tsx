@@ -59,7 +59,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="modal modal-open modal-bottom sm:modal-middle z-50">
+    <div className="modal modal-open modal-bottom sm:modal-middle z-modal">
       <div
         className={`modal-box flex max-h-[85vh] w-full flex-col overflow-hidden p-0 rounded-b-none sm:rounded-b-2xl ${SIZE_CLASS[size]} ${className}`}
       >

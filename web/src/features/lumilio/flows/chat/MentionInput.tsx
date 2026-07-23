@@ -391,7 +391,7 @@ export function MentionInput({
   return (
     <div className="relative">
       {menuOpen && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-full overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-2xl shadow-base-content/10">
+        <div className="absolute bottom-full left-0 z-dropdown mb-2 w-full overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-2xl shadow-base-content/10">
           <div className="px-3 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-wider text-base-content/45">
             {menuHeader}
           </div>

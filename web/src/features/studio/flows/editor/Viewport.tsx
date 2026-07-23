@@ -122,7 +122,7 @@ export function Viewport({
   const showWaiting = !ready && !showOriginal;
 
   return (
-    <div className="relative flex min-w-0 flex-1">
+    <div className="relative isolate flex min-w-0 flex-1">
       <div
         ref={scrollRef}
         onWheel={onWheel}

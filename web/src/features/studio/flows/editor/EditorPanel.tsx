@@ -122,7 +122,7 @@ export function EditorPanel({
     <>
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-modal bg-black/40 lg:hidden"
           onClick={onMobileClose}
           aria-hidden="true"
         />
@@ -130,7 +130,7 @@ export function EditorPanel({
       <aside
         className={`${
           mobileOpen ? "flex" : "hidden"
-        } fixed inset-x-0 bottom-0 z-50 max-h-[75vh] w-full shrink-0 flex-col rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:h-full lg:max-h-none lg:w-[340px] lg:rounded-none lg:border-t-0 lg:border-l lg:bg-base-200/40 lg:shadow-none ${
+        } fixed inset-x-0 bottom-0 z-modal max-h-[75vh] w-full shrink-0 flex-col rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:h-full lg:max-h-none lg:w-[340px] lg:rounded-none lg:border-t-0 lg:border-l lg:bg-base-200/40 lg:shadow-none ${
           open ? "lg:flex" : "lg:hidden"
         }`}
         aria-label={t("studio.panel.edit", { defaultValue: "Editor panel" })}

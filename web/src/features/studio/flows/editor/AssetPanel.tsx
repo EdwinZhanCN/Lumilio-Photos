@@ -67,13 +67,13 @@ export function AssetPanel({
     <>
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-modal bg-black/40 lg:hidden"
           onClick={onMobileClose}
           aria-hidden="true"
         />
       )}
       <aside
-        className={`${mobileOpen ? "flex" : "hidden"} fixed inset-x-0 bottom-0 z-50 max-h-[75vh] w-full shrink-0 flex-col overflow-y-auto rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:max-h-none lg:w-[260px] lg:rounded-none lg:border-r lg:border-t-0 lg:bg-base-200/40 lg:shadow-none ${
+        className={`${mobileOpen ? "flex" : "hidden"} fixed inset-x-0 bottom-0 z-modal max-h-[75vh] w-full shrink-0 flex-col overflow-y-auto rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:max-h-none lg:w-[260px] lg:rounded-none lg:border-r lg:border-t-0 lg:bg-base-200/40 lg:shadow-none ${
           open ? "lg:flex" : "lg:hidden"
         }`}
         aria-label={t("studio.panel.info", { defaultValue: "Asset info" })}

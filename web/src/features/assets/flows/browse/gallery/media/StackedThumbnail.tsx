@@ -56,7 +56,7 @@ const StackedThumbnail: React.FC<StackedThumbnailProps> = ({
         {hasStack && !isSelectionMode && (
           <button
             type="button"
-            className="btn btn-sm btn-neutral absolute bottom-3 right-3 z-10 shadow-lg"
+            className="btn btn-sm btn-neutral absolute bottom-3 right-3 shadow-lg"
             onClick={(event) => {
               event.stopPropagation();
               setStackCarouselOpen(true);
