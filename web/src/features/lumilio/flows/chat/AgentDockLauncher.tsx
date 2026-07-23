@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useDockStore } from "@/lib/assistant";
-import { LumilioAvatar } from "./avatar/LumilioAvatar";
+import { LumilioAvatar } from "@/components/assistant/LumilioAvatar";
 import { useLumilioChatStore } from "../../state/chatStore";
 
 /** NavBar entry point for the global agent drawer. Lives in the right cluster

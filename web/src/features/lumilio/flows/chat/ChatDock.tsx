@@ -15,7 +15,7 @@ import {
 import { Link } from "react-router-dom";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useI18n } from "@/lib/i18n.tsx";
-import { LumilioAvatar } from "./avatar/LumilioAvatar";
+import { LumilioAvatar } from "@/components/assistant/LumilioAvatar";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useContextStore, useDockStore } from "@/lib/assistant";
 import { useSlashMacros } from "../../modules/slash/slashMacros";
@@ -57,6 +57,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const [activeMode, setActiveMode] = useState<string | null>(null);
   const collapsedOverride = useDockStore((s) => s.collapsedOverride);
   const setCollapsedOverride = useDockStore((s) => s.setCollapsed);
+  const setGenerating = useDockStore((s) => s.setGenerating);
 
   // fab defaults collapsed (drawer closed); embedded defaults expanded.
   const collapsed = collapsedOverride ?? variant === "fab";
@@ -75,6 +76,10 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   const messages = useLumilioChatStore((s) => s.messages);
   const isGenerating = useLumilioChatStore((s) => s.isGenerating);
+
+  useEffect(() => {
+    setGenerating(isGenerating);
+  }, [isGenerating, setGenerating]);
   const connectionError = useLumilioChatStore((s) => s.connectionError);
   const usage = useLumilioChatStore((s) => s.usage);
   const sendMessage = useLumilioChatStore((s) => s.sendMessage);
