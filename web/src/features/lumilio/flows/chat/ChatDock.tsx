@@ -15,7 +15,7 @@ import {
 import { Link } from "react-router-dom";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useI18n } from "@/lib/i18n.tsx";
-import { LumilioAvatar } from "./avatar/LumilioAvatar";
+import { LumilioAvatar } from "@/components/assistant/LumilioAvatar";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useContextStore, useDockStore } from "@/lib/assistant";
 import { useSlashMacros } from "../../modules/slash/slashMacros";
@@ -57,6 +57,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const [activeMode, setActiveMode] = useState<string | null>(null);
   const collapsedOverride = useDockStore((s) => s.collapsedOverride);
   const setCollapsedOverride = useDockStore((s) => s.setCollapsed);
+  const setGenerating = useDockStore((s) => s.setGenerating);
 
   // fab defaults collapsed (drawer closed); embedded defaults expanded.
   const collapsed = collapsedOverride ?? variant === "fab";
@@ -75,6 +76,10 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   const messages = useLumilioChatStore((s) => s.messages);
   const isGenerating = useLumilioChatStore((s) => s.isGenerating);
+
+  useEffect(() => {
+    setGenerating(isGenerating);
+  }, [isGenerating, setGenerating]);
   const connectionError = useLumilioChatStore((s) => s.connectionError);
   const usage = useLumilioChatStore((s) => s.usage);
   const sendMessage = useLumilioChatStore((s) => s.sendMessage);
@@ -316,12 +321,10 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   if (isDrawer) {
     return createPortal(
       <>
-        {/* Scrim: dims content, click to dismiss. Sits above the fullscreen
-         * asset viewer (z-9999) so the agent is reachable from inside it. */}
         <div
           aria-hidden
           onClick={() => setCollapsedOverride(true)}
-          className={`fixed inset-0 z-[10000] bg-black/20 backdrop-blur-[1px] transition-opacity duration-300 ${
+          className={`fixed inset-0 z-tooltip bg-black/20 backdrop-blur-[1px] transition-opacity duration-300 ${
             collapsed ? "pointer-events-none opacity-0" : "opacity-100"
           }`}
         />
@@ -329,7 +332,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           id="lumilio-chat-dock-panel"
           aria-hidden={collapsed}
           inert={collapsed ? true : undefined}
-          className={`fixed inset-y-0 right-0 z-[10001] flex w-[min(28rem,100vw)] flex-col border-l border-base-300 bg-base-100/95 shadow-xl backdrop-blur transition-transform duration-300 ease-out ${
+          className={`fixed inset-y-0 right-0 z-tooltip isolate flex w-[min(28rem,100vw)] flex-col border-l border-base-300 bg-base-100/95 shadow-xl backdrop-blur transition-transform duration-300 ease-out ${
             collapsed ? "translate-x-full" : "translate-x-0"
           }`}
         >
@@ -348,7 +351,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   // ── Embedded variant: in-flow centered panel (Lumilio board page) ─────────
   return (
-    <section className="absolute bottom-4 left-1/2 z-20 flex w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2.5">
+    <section className="absolute bottom-4 left-1/2 z-overlay isolate flex w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2.5">
       <div
         id="lumilio-chat-dock-panel"
         aria-hidden={collapsed}

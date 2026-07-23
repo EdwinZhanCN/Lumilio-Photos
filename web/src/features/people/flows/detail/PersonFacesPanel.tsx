@@ -140,8 +140,8 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
   };
 
   return (
-    <section className="space-y-3">
-      <header className="relative z-40 flex flex-wrap items-center justify-between gap-2">
+    <section className="isolate space-y-3">
+      <header className="relative z-10 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold">{t("people.faces.title", "Faces")}</h2>
           {!isLoading && (
@@ -165,7 +165,7 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
                     ? t("people.faces.clearSelection", "Clear")
                     : t("people.faces.selectAll", "Select all")}
                 </button>
-                <details className="dropdown dropdown-end z-50">
+                <details className="dropdown dropdown-end z-20">
                   <summary
                     className={`btn btn-soft btn-accent btn-sm gap-2 rounded-full ${
                       selectedFaceIds.length === 0 || busy ? "btn-disabled opacity-50" : ""
@@ -182,7 +182,7 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
                     )}
                     {t("people.faces.actions", "Actions")}
                   </summary>
-                  <ul className="menu dropdown-content z-[80] mt-2 w-60 rounded-box border border-base-200 bg-base-100 p-2 shadow-xl">
+                  <ul className="menu dropdown-content z-30 mt-2 w-60 rounded-box border border-base-200 bg-base-100 p-2 shadow-xl">
                     <li className="menu-title px-3 py-1 text-xs text-base-content/45">
                       {t("people.faces.selectedCount", "{{count}} selected", {
                         count: selectedFaceIds.length,

@@ -78,8 +78,8 @@ export default function TagList({ assetId }: TagListProps) {
       position: "fixed",
       left,
       width: POPOVER_WIDTH,
-      // Must sit above the fullscreen overlay (z-9999) it portals out of.
-      zIndex: 10000,
+      // Must sit above the fullscreen lightbox (z-lightbox) it portals out of.
+      zIndex: "var(--z-tooltip)" as unknown as number,
     };
     if (spaceBelow >= POPOVER_MAX_HEIGHT || spaceBelow >= r.top) {
       next.top = r.bottom + 4;

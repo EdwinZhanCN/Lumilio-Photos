@@ -70,10 +70,10 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({ isOpen, o
   return (
     <>
       {/* Modal backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50 z-modal backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal dialog */}
-      <dialog open className="modal modal-open z-50">
+      <dialog open className="modal modal-open z-modal">
         <div className="modal-box max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">

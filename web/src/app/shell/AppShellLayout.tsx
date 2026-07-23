@@ -27,7 +27,7 @@ export default function AppShellLayout(): ReactNode {
           </div>
           {showAgentDock && <ChatDock variant="fab" />}
         </div>
-        <div className="drawer-side z-50">
+        <div className="drawer-side z-modal">
           <label
             htmlFor="app-drawer"
             aria-label={t("sidebar.closeMenu", { defaultValue: "Close menu" })}

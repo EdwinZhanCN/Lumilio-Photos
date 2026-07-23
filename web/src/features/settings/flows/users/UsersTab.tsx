@@ -515,7 +515,7 @@ export default function UsersTab() {
       )}
 
       {isChoosingAvatar && selectedUser && (
-        <div className="fixed inset-0 z-100 flex flex-col bg-base-100 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-modal flex flex-col bg-base-100 animate-in slide-in-from-bottom duration-300">
           <div className="sticky top-0 z-10 flex items-center border-b border-base-200 bg-base-100 p-3 shadow-sm">
             <button
               type="button"

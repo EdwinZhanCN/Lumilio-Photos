@@ -94,7 +94,7 @@ export function MoreMenu({ currentSize, onRename, onSize, onRemove, glass }: Mor
             ref={menuRef}
             role="menu"
             style={{ position: "fixed", top: rect.top, left: rect.left, width: MENU_W }}
-            className="menu menu-sm z-[60] gap-0.5 rounded-box border border-base-300 bg-base-100 p-1.5 text-base-content shadow-xl"
+            className="menu menu-sm z-dropdown gap-0.5 rounded-box border border-base-300 bg-base-100 p-1.5 text-base-content shadow-xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <li>

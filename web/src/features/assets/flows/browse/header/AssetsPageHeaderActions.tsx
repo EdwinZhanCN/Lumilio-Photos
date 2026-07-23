@@ -65,7 +65,7 @@ export default function AssetsPageHeaderActions({
       title={title ?? tabTitle}
       subtitle={subtitle}
       icon={icon ?? <ImageIcon className="w-6 h-6 text-primary" />}
-      className="sticky top-0 z-40 bg-base-100 border-b border-base-200"
+      className="sticky top-0 z-sticky bg-base-100 border-b border-base-200"
     >
       {selection.enabled && (
         <div className="badge badge-lg badge-neutral hidden gap-2 rounded-full px-3 py-3 text-xs font-medium sm:inline-flex shrink-0">
@@ -91,7 +91,7 @@ export default function AssetsPageHeaderActions({
           </div>
           <ul
             tabIndex={0}
-            className="dropdown-content menu bg-base-200 rounded-box z-[100] w-40 p-2 shadow-xl"
+            className="dropdown-content menu bg-base-200 rounded-box z-dropdown w-40 p-2 shadow-xl"
           >
             <li>
               <button
@@ -181,7 +181,7 @@ export default function AssetsPageHeaderActions({
             </div>
             <ul
               tabIndex={0}
-              className="dropdown-content menu z-[100] mt-2 w-64 rounded-box bg-base-100 p-3 shadow-xl border border-base-200"
+              className="dropdown-content menu z-dropdown mt-2 w-64 rounded-box bg-base-100 p-3 shadow-xl border border-base-200"
             >
               <li className="menu-title px-3 py-2 text-xs uppercase tracking-[0.18em] text-base-content/45">
                 {t("assets.assetsPageHeader.actions.applyToItems", {
@@ -209,7 +209,7 @@ export default function AssetsPageHeaderActions({
         </div>
         <ul
           tabIndex={0}
-          className="dropdown-content menu bg-base-100 rounded-box z-[100] w-56 p-2 shadow-xl border border-base-200 mt-2"
+          className="dropdown-content menu bg-base-100 rounded-box z-dropdown w-56 p-2 shadow-xl border border-base-200 mt-2"
         >
           <li className="menu-title text-xs text-base-content/45">
             {t("assets.assetsPageHeader.compactMenu.viewSort", {

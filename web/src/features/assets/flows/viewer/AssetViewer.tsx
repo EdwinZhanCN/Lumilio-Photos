@@ -8,7 +8,7 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "./asset-viewer.css";
 import FullScreenBasicInfo from "./info/FullScreenBasicInfo";
-import { AgentDockViewerButton } from "@/features/lumilio";
+import { AgentDockButton } from "@/components/assistant/AgentDockButton";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useViewerContextContributor } from "./useViewerContextContributor";
 import MediaViewer from "./media/MediaViewer";
@@ -209,7 +209,7 @@ const AssetViewer = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-9999 flex items-center justify-center animate-fade-in">
+    <div className="fixed inset-0 bg-black/90 z-lightbox flex items-center justify-center animate-fade-in">
       <button
         type="button"
         onClick={handleClose}
@@ -220,7 +220,7 @@ const AssetViewer = ({
       </button>
       {/* Mirrors the close button on the right. Sits below the info panel
        * (z-10) so an open FullScreenBasicInfo covers it, as intended. */}
-      <AgentDockViewerButton className="absolute top-2 right-4 z-[5]" />
+      <AgentDockButton className="absolute top-2 right-4 z-[5]" />
       <Swiper
         ref={swiperRef}
         modules={[Virtual, Navigation, Pagination]}
