@@ -2,6 +2,7 @@ import React from "react";
 import { FallbackProps } from "react-error-boundary";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Home, RefreshCw, Bug, ExternalLink, Copy } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type ErrorFallbackProps = {
   code: string | number;
@@ -18,6 +19,7 @@ export default function ErrorFallback({
   error,
   resetErrorBoundary,
 }: ErrorFallbackProps & FallbackProps): React.ReactElement {
+  const { t } = useI18n();
   const [copied, setCopied] = React.useState(false);
 
   const details = React.useMemo(() => {
@@ -61,7 +63,10 @@ export default function ErrorFallback({
     }
   };
 
-  const displayMessage = message || error?.message || "Something went wrong. Please try again.";
+  const displayMessage =
+    message ||
+    error?.message ||
+    t("errorFallback.defaultMessage", { defaultValue: "Something went wrong. Please try again." });
 
   return (
     <main
@@ -87,9 +92,14 @@ export default function ErrorFallback({
 
           <div className="w-full mt-4">
             <div className="collapse collapse-arrow border border-base-300 bg-base-100">
-              <input type="checkbox" aria-label="Toggle error details" />
+              <input
+                type="checkbox"
+                aria-label={t("errorFallback.toggleDetails", { defaultValue: "Toggle error details" })}
+              />
               <div className="collapse-title text-left font-medium flex items-center justify-between gap-2">
-                <span>View technical details</span>
+                <span>
+                  {t("errorFallback.viewDetails", { defaultValue: "View technical details" })}
+                </span>
               </div>
               <div className="collapse-content max-h-64 md:max-h-80 overflow-auto">
                 <div className="mockup-code w-full">
@@ -104,13 +114,13 @@ export default function ErrorFallback({
           <div className="card-actions justify-center mt-4 flex-wrap gap-2">
             <Link to="/" className="btn btn-primary">
               <Home className="size-4" aria-hidden="true" />
-              <span className="ml-1">Go home</span>
+              <span className="ml-1">{t("errorFallback.goHome", { defaultValue: "Go home" })}</span>
             </Link>
 
             {resetErrorBoundary && (
               <button type="button" onClick={resetErrorBoundary} className="btn btn-secondary">
                 <RefreshCw className="size-4" aria-hidden="true" />
-                <span className="ml-1">Try again</span>
+                <span className="ml-1">{t("errorFallback.tryAgain", { defaultValue: "Try again" })}</span>
               </button>
             )}
 
@@ -121,13 +131,17 @@ export default function ErrorFallback({
               className="btn btn-outline"
             >
               <Bug className="size-4" aria-hidden="true" />
-              <span className="ml-1">Report issue</span>
+              <span className="ml-1">{t("errorFallback.reportIssue", { defaultValue: "Report issue" })}</span>
               <ExternalLink className="size-4 ml-1" aria-hidden="true" />
             </a>
 
             <button type="button" onClick={onCopyDetails} className="btn btn-ghost">
               <Copy className="size-4" aria-hidden="true" />
-              <span className="ml-1">{copied ? "Copied!" : "Copy details"}</span>
+              <span className="ml-1">
+                {copied
+                  ? t("errorFallback.copied", { defaultValue: "Copied!" })
+                  : t("errorFallback.copyDetails", { defaultValue: "Copy details" })}
+              </span>
             </button>
           </div>
         </div>
@@ -136,7 +150,11 @@ export default function ErrorFallback({
       {copied && (
         <div className="toast toast-end">
           <div className="alert alert-success">
-            <span>Copied error details to clipboard.</span>
+            <span>
+              {t("errorFallback.copiedToast", {
+                defaultValue: "Copied error details to clipboard.",
+              })}
+            </span>
           </div>
         </div>
       )}

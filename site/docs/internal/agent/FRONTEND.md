@@ -225,6 +225,48 @@ The production web image uses Caddy:
 - `web/scripts/check-bundle-budget.mjs` enforces a 420 KiB gzip budget for the
   production entry chunk as part of `make web-browser-test`.
 
+## Test layers
+
+Pick the layer by what the test must exercise; the file name and directory pick
+the runner and dependency boundary for you (`web/vite.config.ts` `test.projects`
+maps them). Do not invent other conventions — e.g. there is no
+`*.integration.test.tsx`; `flows/<flow>/*.spec.tsx` and `e2e/specs/*.spec.ts`
+share the word "spec" but their directory, extension, runner and dependency edge
+already disambiguate.
+
+| Layer | File | Runner / Vitest project | Answers |
+| --- | --- | --- | --- |
+| Unit | `*.test.ts` | `unit` — Node, no DOM | React-free rules, transforms, codecs, validators, reducers, state migrations, algorithms |
+| Component | `*.test.tsx` | `integration` — Browser Mode (real Chromium) | one component or small tree: accessible semantics, state, interaction |
+| Flow Integration | `*.spec.tsx` | `integration` — Browser Mode + MSW | flows, routes, multi-component, Router, Query, HTTP workflows |
+| Browser Capability | `*.browser.test.ts` | `browser` — Chromium | Worker, WASM, SSE, Blob, Canvas/WebGL — real browser capabilities |
+| Full E2E | `web/e2e/specs/*.spec.ts` | Playwright + real services | key user paths on real API, DB, storage, queues |
+
+The `unit` project excludes `*.browser.test.ts` and `src/workers/**` so an
+accidental browser dependency fails instead of hiding; `integration` and
+`browser` run real Chromium via the Playwright provider. Details per layer:
+Integration Specs and E2E have their own sections below.
+
+### GPU / WebGL capability tests
+
+A `*.browser.test.ts` gets a real Worker, WASM, Canvas and WebGL context — but
+**headless Chromium falls back to SwiftShader, whose WebGL is disabled on Apple
+Silicon**, so a WebGL2-dependent test cannot get a context headless on an M-series
+Mac (and usually not on a GPU-less CI runner either). Such a test must therefore:
+
+- **Guard the capability** at runtime and skip, never fail: probe with a helper
+  like `webgl2Available()` (`new OffscreenCanvas(1,1).getContext("webgl2")`) and
+  wrap the suite in `describe.skipIf(!webgl2Available())`. A skipped capability is
+  correct; a suite that fails to launch a browser is not.
+- **Run headed locally** to actually exercise it. The `browser` project reads
+  `STUDIO_GPU=true` (see `vite.config.ts`, same env-gated shape as
+  `hash-performance`) and switches to `headless: false`, using the machine's real
+  GPU. So `STUDIO_GPU=true vp test <files>` runs them for real; the default stays
+  headless so CI can always launch (those suites skip there).
+
+Non-GPU capability tests (Canvas 2D, Worker, WASM) run headless everywhere and
+need no guard — keep them assertable in CI.
+
 ## Quality Gate
 
 Frontend gate:

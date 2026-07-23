@@ -1,5 +1,5 @@
 import React from "react";
-import { Aperture, Camera, Clock, Focus, Sun, Timer, type LucideIcon } from "lucide-react";
+import { Aperture, Camera, Clock, Focus, Sun, Timer, X, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { PhotoThumb } from "../../components/PhotoThumb";
 
@@ -12,6 +12,11 @@ type AssetPanelProps = {
   dimensionsText: string;
   typeText: string;
   exifRows: AssetExifRow[];
+  /** Desktop rail visibility. */
+  open: boolean;
+  /** Below `lg` the panel is a bottom sheet; these control it. */
+  mobileOpen: boolean;
+  onMobileClose: () => void;
 };
 
 const EXIF_ICONS: Record<string, LucideIcon> = {
@@ -52,67 +57,95 @@ export function AssetPanel({
   dimensionsText,
   typeText,
   exifRows,
+  open,
+  mobileOpen,
+  onMobileClose,
 }: AssetPanelProps): React.JSX.Element {
   const { t } = useI18n();
 
   return (
-    <aside
-      className="hidden h-full w-[260px] shrink-0 flex-col overflow-y-auto border-r border-base-300 bg-base-200/40 lg:flex"
-      aria-label="Asset info"
-    >
-      <div className="border-b border-base-300 p-4">
-        <PhotoThumb
-          assetId={assetId}
-          size="medium"
-          alt={fileName}
-          className="aspect-[3/2] w-full"
+    <>
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={onMobileClose}
+          aria-hidden="true"
         />
-      </div>
-
-      <div className="border-b border-base-300 px-4 py-3">
-        <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-base-content/45">
-          {t("studio.asset.file", { defaultValue: "File" })}
-        </h3>
-        <MetaRow label={t("studio.asset.name", { defaultValue: "Name" })} value={fileName} mono />
-        <MetaRow label={t("studio.asset.size", { defaultValue: "Size" })} value={sizeText} />
-        <MetaRow
-          label={t("studio.asset.dim", { defaultValue: "Dimensions" })}
-          value={dimensionsText}
-          mono
-        />
-        <MetaRow label={t("studio.asset.type", { defaultValue: "Type" })} value={typeText} />
-      </div>
-
-      {exifRows.length > 0 && (
-        <div className="px-4 py-3">
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-base-content/45">
-            {t("studio.asset.exif", { defaultValue: "Capture · EXIF" })}
-          </h3>
-          <div className="flex flex-col gap-0.5">
-            {exifRows.map((row) => {
-              const Icon = EXIF_ICONS[row.label] ?? Aperture;
-              return (
-                <div
-                  key={row.label}
-                  className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-base-200/60"
-                >
-                  <div className="grid h-6 w-6 shrink-0 place-items-center rounded text-base-content/40">
-                    <Icon size={14} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] uppercase tracking-wide text-base-content/40">
-                      {row.label}
-                    </div>
-                    <div className="truncate text-xs font-medium text-base-content/85">
-                      {row.value}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       )}
-    </aside>
+      <aside
+        className={`${mobileOpen ? "flex" : "hidden"} fixed inset-x-0 bottom-0 z-50 max-h-[75vh] w-full shrink-0 flex-col overflow-y-auto rounded-t-2xl border-t border-base-300 bg-base-100 shadow-2xl lg:static lg:z-auto lg:max-h-none lg:w-[260px] lg:rounded-none lg:border-r lg:border-t-0 lg:bg-base-200/40 lg:shadow-none ${
+          open ? "lg:flex" : "lg:hidden"
+        }`}
+        aria-label={t("studio.panel.info", { defaultValue: "Asset info" })}
+      >
+        <div className="flex items-center justify-between border-b border-base-300 px-4 py-3 lg:hidden">
+          <h2 className="text-sm font-semibold text-base-content">
+            {t("studio.panel.info", { defaultValue: "Info" })}
+          </h2>
+          <button
+            type="button"
+            onClick={onMobileClose}
+            aria-label={t("common.close", { defaultValue: "Close" })}
+            className="btn btn-ghost btn-xs btn-square text-base-content/60"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="border-b border-base-300 p-4">
+          <PhotoThumb
+            assetId={assetId}
+            size="medium"
+            alt={fileName}
+            className="aspect-[3/2] w-full"
+          />
+        </div>
+
+        <div className="border-b border-base-300 px-4 py-3">
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-base-content/45">
+            {t("studio.asset.file", { defaultValue: "File" })}
+          </h3>
+          <MetaRow label={t("studio.asset.name", { defaultValue: "Name" })} value={fileName} mono />
+          <MetaRow label={t("studio.asset.size", { defaultValue: "Size" })} value={sizeText} />
+          <MetaRow
+            label={t("studio.asset.dim", { defaultValue: "Dimensions" })}
+            value={dimensionsText}
+            mono
+          />
+          <MetaRow label={t("studio.asset.type", { defaultValue: "Type" })} value={typeText} />
+        </div>
+
+        {exifRows.length > 0 && (
+          <div className="px-4 py-3">
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-base-content/45">
+              {t("studio.asset.exif", { defaultValue: "Capture · EXIF" })}
+            </h3>
+            <div className="flex flex-col gap-0.5">
+              {exifRows.map((row) => {
+                const Icon = EXIF_ICONS[row.label] ?? Aperture;
+                return (
+                  <div
+                    key={row.label}
+                    className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-base-200/60"
+                  >
+                    <div className="grid h-6 w-6 shrink-0 place-items-center rounded text-base-content/40">
+                      <Icon size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[10px] uppercase tracking-wide text-base-content/40">
+                        {row.label}
+                      </div>
+                      <div className="truncate text-xs font-medium text-base-content/85">
+                        {row.value}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
   );
 }

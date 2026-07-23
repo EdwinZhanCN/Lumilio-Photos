@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { useI18n } from "@/lib/i18n";
 import { cx } from "./classNames.ts";
 
 export const OtpInput: React.FC<{
@@ -82,6 +83,7 @@ export const OtpInput: React.FC<{
 };
 
 export const AuthQR: React.FC<{ value: string; size?: number }> = ({ value, size = 168 }) => {
+  const { t } = useI18n();
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -110,7 +112,12 @@ export const AuthQR: React.FC<{ value: string; size?: number }> = ({ value, size
   return (
     <div className="inline-block rounded-2xl border border-base-200 bg-white p-3.5 shadow-sm">
       {dataUrl ? (
-        <img src={dataUrl} alt="Authenticator QR code" width={size} height={size} />
+        <img
+          src={dataUrl}
+          alt={t("auth.mfa.qrAlt", { defaultValue: "Authenticator QR code" })}
+          width={size}
+          height={size}
+        />
       ) : (
         <div
           className="grid place-items-center text-base-content/30"

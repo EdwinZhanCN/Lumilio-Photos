@@ -12,7 +12,11 @@ export default function Settings() {
     <div className="flex h-full min-h-0 flex-col">
       <ErrorBoundary
         FallbackComponent={(props) => (
-          <ErrorFallback code={500} title="Something went wrong" {...props} />
+          <ErrorFallback
+            code={500}
+            title={t("settings.errorFallback", { defaultValue: "Something went wrong" })}
+            {...props}
+          />
         )}
       >
         <PageHeader

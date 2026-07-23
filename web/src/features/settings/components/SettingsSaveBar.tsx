@@ -25,11 +25,11 @@ interface SettingsSaveBarProps {
   extraAction?: ReactNode;
 }
 
-function errorMessage(error: unknown): string | null {
+function errorMessage(error: unknown, fallback: string): string | null {
   if (!error) return null;
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  return "Save failed";
+  return fallback;
 }
 
 export function SettingsSaveBar({
@@ -45,7 +45,7 @@ export function SettingsSaveBar({
   extraAction,
 }: SettingsSaveBarProps) {
   const { t } = useTranslation();
-  const err = errorMessage(error);
+  const err = errorMessage(error, t("settings.section.saveFailed", { defaultValue: "Save failed" }));
   const visible = Boolean(err) || isSaving || justSaved || isDirty;
 
   return (

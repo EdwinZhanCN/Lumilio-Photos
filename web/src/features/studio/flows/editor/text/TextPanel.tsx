@@ -6,11 +6,14 @@ import {
   AlignRight,
   Copy,
   Italic,
+  Layers,
+  Loader2,
   Plus,
   Trash2,
   Type,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import type { DepthStatus } from "../StudioEditor";
 import { STUDIO_FONTS } from "../../../model/fonts";
 import {
   createTextLayer,
@@ -30,7 +33,24 @@ type TextPanelProps = {
   disabled?: boolean;
   onSelectLayer: (layerId: string | null) => void;
   onLayersChange: (next: Layer[]) => void;
+  depthStatus: DepthStatus;
+  depthFeather: number;
+  onGenerateDepth: () => void;
+  onDepthFeatherChange: (value: number) => void;
 };
+
+function depthActionLabel(t: TFunction, status: DepthStatus): string {
+  switch (status) {
+    case "generating":
+      return t("studio.depth.generating", { defaultValue: "Estimating…" });
+    case "ready":
+      return t("studio.depth.regenerate", { defaultValue: "Regenerate" });
+    case "error":
+      return t("studio.depth.retry", { defaultValue: "Retry" });
+    default:
+      return t("studio.depth.generate", { defaultValue: "Estimate depth" });
+  }
+}
 
 /**
  * Text layers: the stack, and the properties of whichever one is selected.
@@ -45,9 +65,14 @@ export function TextPanel({
   disabled = false,
   onSelectLayer,
   onLayersChange,
+  depthStatus,
+  depthFeather,
+  onGenerateDepth,
+  onDepthFeatherChange,
 }: TextPanelProps): React.JSX.Element {
   const { t } = useI18n();
   const selected = layers.find((layer) => layer.id === selectedLayerId) ?? null;
+  const depthReady = depthStatus === "ready";
 
   const replaceLayer = (next: TextLayer) =>
     onLayersChange(layers.map((layer) => (layer.id === next.id ? next : layer)));
@@ -147,10 +172,54 @@ export function TextPanel({
         {t("studio.text.add", { defaultValue: "Add text" })}
       </button>
 
+      {/* Scene depth: estimate once, then layers can sit behind nearer pixels. */}
+      <div className="rounded-lg border border-base-300 bg-base-100 p-2.5">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-[12px] font-medium text-base-content/70">
+            <Layers size={13} />
+            {t("studio.depth.title", { defaultValue: "Scene depth" })}
+          </span>
+          <button
+            type="button"
+            onClick={onGenerateDepth}
+            disabled={disabled || depthStatus === "generating"}
+            className="btn btn-xs gap-1 border-base-300 bg-base-100 text-base-content/80"
+          >
+            {depthStatus === "generating" && <Loader2 size={12} className="animate-spin" />}
+            {depthActionLabel(t, depthStatus)}
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-base-content/45">
+          {depthReady
+            ? t("studio.depth.readyHint", {
+                defaultValue: "Lower a layer's Depth to tuck it behind nearer objects.",
+              })
+            : t("studio.depth.hint", {
+                defaultValue: "Estimate depth to let text sit inside the scene.",
+              })}
+        </p>
+        {depthReady && (
+          <div className="mt-2">
+            <ValueSlider
+              label={t("studio.depth.feather", { defaultValue: "Feather" })}
+              value={depthFeather}
+              defaultValue={0.08}
+              min={0}
+              max={0.4}
+              step={0.01}
+              modified={depthFeather !== 0.08}
+              disabled={disabled}
+              onChange={onDepthFeatherChange}
+            />
+          </div>
+        )}
+      </div>
+
       {selected && isTextLayer(selected) && (
         <TextLayerEditor
           layer={selected}
           disabled={disabled}
+          depthReady={depthReady}
           onChange={replaceLayer}
         />
       )}
@@ -183,10 +252,12 @@ const ALIGN_OPTIONS: Array<{ value: TextAlign; icon: typeof AlignLeft }> = [
 function TextLayerEditor({
   layer,
   disabled,
+  depthReady,
   onChange,
 }: {
   layer: TextLayer;
   disabled: boolean;
+  depthReady: boolean;
   onChange: (next: TextLayer) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
@@ -404,6 +475,18 @@ function TextLayerEditor({
         modified={layer.y !== 0.5}
         disabled={disabled}
         onChange={(y) => patch({ y })}
+      />
+      {/* 1 = always in front; lower tucks the layer behind nearer scene pixels. */}
+      <ValueSlider
+        label={t("studio.text.depth", { defaultValue: "Depth" })}
+        value={layer.zPosition}
+        defaultValue={1}
+        min={0}
+        max={1}
+        step={0.02}
+        modified={layer.zPosition !== 1}
+        disabled={disabled || !depthReady}
+        onChange={(zPosition) => patch({ zPosition })}
       />
     </div>
   );

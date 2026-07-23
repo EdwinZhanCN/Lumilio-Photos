@@ -71,6 +71,12 @@ type LayerBase = {
   opacity: number;
   shadow: LayerShadow | null;
   /**
+   * Depth plane in 0..1 for scene occlusion: 1 = always in front (no
+   * occlusion), lower sits deeper so nearer scene pixels hide the layer. Applied
+   * only when a depth field has been computed; the default 1 is a no-op.
+   */
+  zPosition: number;
+  /**
    * Set when a frame template produced this layer. Purely informational — it
    * lets the UI offer "reset to preset" and does not restrict editing.
    */
@@ -151,6 +157,7 @@ export function createTextLayer(overrides: Partial<Omit<TextLayer, "type">> = {}
     rotation: 0,
     opacity: 1,
     shadow: null,
+    zPosition: 1,
     fromTemplate: false,
     ...overrides,
   };
@@ -173,6 +180,7 @@ export function createLogoLayer(
     rotation: 0,
     opacity: 1,
     shadow: null,
+    zPosition: 1,
     fromTemplate: false,
     ...overrides,
   };
@@ -286,6 +294,7 @@ function normalizeLayer(input: unknown): Layer | null {
     rotation: num(raw.rotation, 0, -360, 360),
     opacity: num(raw.opacity, 1, 0, 1),
     shadow: normalizeShadow(raw.shadow),
+    zPosition: num(raw.zPosition, 1, 0, 1),
     fromTemplate: bool(raw.fromTemplate),
   };
 

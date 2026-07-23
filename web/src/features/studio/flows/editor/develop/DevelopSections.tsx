@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  Crop,
-  FlipHorizontal2,
-  FlipVertical2,
-  RotateCcw,
-  RotateCw,
-} from "lucide-react";
+import { Crop, FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_STUDIO_ADJUSTMENTS, type StudioEditAdjustments } from "../../../model/editTypes";
 import {
@@ -103,7 +97,9 @@ export function DevelopSections({
                 icon={RotateCcw}
                 label="Rotate left"
                 disabled={disabled}
-                onClick={() => onGeometryChange("rotation", (adjustments.rotation - 90 + 360) % 360)}
+                onClick={() =>
+                  onGeometryChange("rotation", (adjustments.rotation - 90 + 360) % 360)
+                }
               />
               <GeoButton
                 icon={RotateCw}

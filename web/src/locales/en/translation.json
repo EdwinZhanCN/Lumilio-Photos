@@ -509,6 +509,7 @@
       "enabledTitle": "Two-factor is on",
       "introSubtitle": "Protect your account with a TOTP authenticator app.",
       "introTitle": "Two-factor authentication",
+      "qrAlt": "Authenticator QR code",
       "recoverySubtitle": "Your last resort if you lose your authenticator.",
       "regenerateSubtitle": "This invalidates your existing codes.",
       "setupSubtitle": "Scan the code with your authenticator app.",
@@ -811,6 +812,7 @@
     "copied": "Copied",
     "copy": "Copy",
     "delete": "Delete",
+    "dismiss": "Dismiss",
     "done": "Done",
     "edit": "Edit",
     "emptyState": {
@@ -890,6 +892,17 @@
       "recoverableBytes": "Reclaimable space"
     },
     "summaryLoadError": "Failed to load duplicate summary: {{message}}"
+  },
+  "errorFallback": {
+    "copied": "Copied!",
+    "copiedToast": "Copied error details to clipboard.",
+    "copyDetails": "Copy details",
+    "defaultMessage": "Something went wrong. Please try again.",
+    "goHome": "Go home",
+    "reportIssue": "Report issue",
+    "toggleDetails": "Toggle error details",
+    "tryAgain": "Try again",
+    "viewDetails": "View technical details"
   },
   "exportModal": {
     "addToAlbum": "Add to album",
@@ -1782,6 +1795,7 @@
       "verifyDescription": "Complete verification for {{name}}.",
       "verifyTitle": "Verification required"
     },
+    "errorFallback": "Something went wrong",
     "language": "Language",
     "languageAndRegion": "Language & Region",
     "pageDescriptions": {
@@ -1798,6 +1812,7 @@
       "reset": "Reset",
       "save": "Save",
       "saved": "Changes saved",
+      "saveFailed": "Save failed",
       "saving": "Saving changes...",
       "unsavedCareful": "Careful, you have unsaved changes."
     },
@@ -1857,7 +1872,7 @@
         "bioClipClassify": "BioCLIP classify",
         "faceDetectAndEmbed": "Face detect & embed",
         "ocr": "OCR",
-        "semanticImageEmbed": "settings.serverSettings.taskNames.semanticImageEmbed",
+        "semanticImageEmbed": "CLIP image embed",
         "semanticTextEmbed": "CLIP text embed"
       },
       "unavailable": "Unavailable",
@@ -1960,20 +1975,20 @@
       "extendError": "Failed to extend share link.",
       "extendSuccess": "Extended by 30 days.",
       "filters": {
-        "active": "share.manage.filters.active",
-        "expired": "share.manage.filters.expired",
-        "revoked": "share.manage.filters.revoked"
+        "active": "Active",
+        "expired": "Expired",
+        "revoked": "Revoked"
       },
       "neverViewed": "Never",
       "pageTitle": "Shared Links",
       "revokeError": "Failed to revoke share link.",
       "revokeSuccess": "Share link revoked.",
       "source": {
-        "album": "share.manage.source.album",
-        "assetSnapshot": "share.manage.source.assetSnapshot",
-        "person": "share.manage.source.person",
-        "pin": "share.manage.source.pin",
-        "utilityQuery": "share.manage.source.utilityQuery"
+        "album": "Album",
+        "assetSnapshot": "Photo",
+        "person": "Person",
+        "pin": "Pin",
+        "utilityQuery": "Smart query"
       }
     },
     "public": {
@@ -2026,6 +2041,22 @@
       "type": "Type"
     },
     "backToStudio": "Back to Studio",
+    "crop": {
+      "aspect": "Aspect ratio",
+      "hint": "Drag the handles on the photo to set the crop.",
+      "reset": "Reset crop"
+    },
+    "depth": {
+      "failed": "Depth estimation failed",
+      "feather": "Feather",
+      "generate": "Estimate depth",
+      "generating": "Estimating…",
+      "hint": "Estimate depth to let text sit inside the scene.",
+      "readyHint": "Lower a layer's Depth to tuck it behind nearer objects.",
+      "regenerate": "Regenerate",
+      "retry": "Retry",
+      "title": "Scene depth"
+    },
     "develop": {
       "blacks": "Blacks",
       "clarity": "Clarity",
@@ -2046,26 +2077,30 @@
       "sharpness": "Sharpness",
       "temperature": "Temperature",
       "tint": "Tint",
-      "title": "Develop",
       "vibrance": "Vibrance",
       "whites": "Whites"
     },
     "editor": {
       "before": "Before",
+      "beforeHold": "Hold to view before",
       "change": "Change Photo",
       "export": "Export",
       "fit": "Fit",
+      "fitToScreen": "Fit to screen",
       "loading": "Loading…",
       "renderFailed": "Render failed",
       "rendering": "Rendering preview…",
       "resetAll": "Reset all",
+      "resetZoom": "Reset zoom",
       "save": "Save",
       "saved": "Saved",
       "savedToast": "Sidecar saved",
       "undo": "Undo",
       "unsaved": "Unsaved changes",
       "upToDate": "Up to date",
-      "waiting": "Waiting for preview"
+      "waiting": "Waiting for preview",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out"
     },
     "exif": {
       "download": "Download JSON",
@@ -2075,6 +2110,21 @@
       "fieldsCount_other": "{{count}} fields",
       "properties": "Image Properties",
       "title": "EXIF Metadata"
+    },
+    "export": {
+      "cancel": "Cancel",
+      "confirm": "Export",
+      "downscaledToast": "Export was scaled to {{w}}×{{h}} to stay within limits.",
+      "estimate": "Approx. output",
+      "format": "Format",
+      "longEdge": "Long edge",
+      "longEdgePx": "Long edge (px)",
+      "original": "Original",
+      "percent": "Percent",
+      "quality": "Quality",
+      "scale": "Scale",
+      "size": "Size",
+      "title": "Export"
     },
     "frame": {
       "blur": "Blur",
@@ -2131,7 +2181,15 @@
       "vignette": "Vignette"
     },
     "home": {
+      "adjust": {
+        "body": "Exposure, color, and detail with a lightweight color panel.",
+        "title": "Adjust"
+      },
       "clear": "Clear",
+      "crop": {
+        "body": "Reframe with aspect presets, rotate, and flip.",
+        "title": "Crop"
+      },
       "empty": {
         "body": "Open a photo from your library to start editing. Your latest work shows up here.",
         "title": "No recent edits yet"
@@ -2143,10 +2201,19 @@
       "openEditor": "Open editor",
       "recent": "Recent Edits",
       "resume": "Resume",
+      "text": {
+        "body": "Add captions on the photo, with depth-aware placement.",
+        "title": "Text"
+      },
       "tools": "Tools"
+    },
+    "panel": {
+      "edit": "Editor",
+      "info": "Info panel"
     },
     "pickPhoto": "Pick a photo to edit",
     "tab": {
+      "crop": "Crop",
       "develop": "Develop",
       "frame": "Frame",
       "text": "Text"
@@ -2160,6 +2227,7 @@
       "caseUpper": "AA",
       "color": "Color",
       "content": "Text",
+      "depth": "Depth",
       "duplicate": "Duplicate",
       "empty": "No text yet. Add a layer, or apply a frame preset.",
       "font": "Font",
