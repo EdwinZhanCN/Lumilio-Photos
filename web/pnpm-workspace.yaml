@@ -3,9 +3,9 @@ allowBuilds:
   "@swc/core": true
   esbuild: true
   msw: true
-  onnxruntime-node: set this to true or false
-  protobufjs: set this to true or false
-  sharp: set this to true or false
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: true
 
 minimumReleaseAgeExclude:
   - "@edwinzhancn/docts@0.1.0"
