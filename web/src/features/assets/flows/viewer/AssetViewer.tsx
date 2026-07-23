@@ -209,7 +209,7 @@ const AssetViewer = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-9999 flex items-center justify-center animate-fade-in">
+    <div className="fixed inset-0 bg-black/90 z-lightbox flex items-center justify-center animate-fade-in">
       <button
         type="button"
         onClick={handleClose}

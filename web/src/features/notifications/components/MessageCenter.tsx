@@ -43,7 +43,7 @@ export default function MessageCenter() {
       </button>
       <div
         tabIndex={0}
-        className="dropdown-content z-30 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-base-300 bg-base-100 shadow-xl"
+        className="dropdown-content z-dropdown mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-base-300 bg-base-100 shadow-xl"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
           <h3 className="font-semibold">{t("navbar.notifications.title")}</h3>

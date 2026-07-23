@@ -123,7 +123,7 @@ export default function AddRepositoryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal modal-open z-50">
+    <div className="modal modal-open z-modal">
       <div className="modal-box max-w-md">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">

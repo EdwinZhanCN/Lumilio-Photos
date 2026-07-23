@@ -86,7 +86,7 @@ const SquareGalleryItem = memo(
               />
             )}
             {caption && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-[0.25rem] bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-[0.25rem] bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
                 {caption}
               </div>
             )}

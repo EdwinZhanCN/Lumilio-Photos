@@ -27,6 +27,13 @@
   --color-sidebar: var(--color-base-100);
   --color-sidebar-foreground: var(--color-base-content);
   --color-sidebar-border: var(--color-base-300);
+
+  --z-sticky: 100;
+  --z-dropdown: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-lightbox: 500;
+  --z-tooltip: 600;
 }
 
 @plugin "daisyui/theme" {
