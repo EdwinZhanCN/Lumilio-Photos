@@ -176,7 +176,7 @@ export default function NavbarUploadQueue() {
         {failedCount > 0 && <span className="badge badge-error badge-sm">{failedCount}</span>}
       </button>
 
-      <div className="dropdown-content z-30 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-base-300 bg-base-100 shadow-xl">
+      <div className="dropdown-content z-dropdown mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-base-300 bg-base-100 shadow-xl">
         <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
           <div>
             <h3 className="font-semibold">{t("upload.NavbarQueue.title")}</h3>

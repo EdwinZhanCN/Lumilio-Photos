@@ -64,16 +64,6 @@ function ImgStackGrid({
             `}
             onClick={() => onAlbumClick?.(album)}
           >
-            {isSelectionMode && (
-              <div className="absolute top-1 right-1 z-10">
-                {isSelected ? (
-                  <CheckCircle2 className="text-primary fill-base-100" size={22} />
-                ) : (
-                  <Circle className="text-base-content/30" size={22} />
-                )}
-              </div>
-            )}
-
             <div className="mb-3 w-full flex justify-center">
               <ImgStackView
                 coverImages={album.coverImages}
@@ -95,6 +85,16 @@ function ImgStackGrid({
                 {t("collections.itemsCount", { count: album.imageCount })}
               </p>
             </div>
+
+            {isSelectionMode && (
+              <div className="absolute top-1 right-1">
+                {isSelected ? (
+                  <CheckCircle2 className="text-primary fill-base-100" size={22} />
+                ) : (
+                  <Circle className="text-base-content/30" size={22} />
+                )}
+              </div>
+            )}
           </div>
         );
       })}

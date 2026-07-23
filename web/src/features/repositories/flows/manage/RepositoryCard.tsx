@@ -125,7 +125,7 @@ export default function RepositoryCard({
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl">
+            <div className="absolute right-0 top-full z-dropdown mt-2 w-52 overflow-hidden rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl">
               <button
                 type="button"
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"

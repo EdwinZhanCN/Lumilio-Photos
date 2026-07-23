@@ -55,7 +55,7 @@ export function SettingsDropdown<T extends string = string>({
       {!disabled && (
         <ul
           tabIndex={-1}
-          className={`dropdown-content menu menu-sm z-[120] mt-1 rounded-box border border-base-300 bg-base-100 p-1 shadow-sm ${menuClassName}`}
+          className={`dropdown-content menu menu-sm z-dropdown mt-1 rounded-box border border-base-300 bg-base-100 p-1 shadow-sm ${menuClassName}`}
         >
           {options.map((option) => (
             <li key={option.value}>

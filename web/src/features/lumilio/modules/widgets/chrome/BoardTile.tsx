@@ -36,7 +36,7 @@ export function BoardTile({ pin, onRename, onViewChange, onSize, onRemove }: Boa
   });
 
   const cardCls =
-    "card group relative flex h-full flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm transition-all hover:border-base-content/15 hover:shadow-md";
+    "card group relative isolate flex h-full flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm transition-all hover:border-base-content/15 hover:shadow-md";
 
   if (!definition) {
     return (

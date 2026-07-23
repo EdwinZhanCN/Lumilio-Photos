@@ -130,12 +130,6 @@ function AlbumsContent() {
       </PageHeader>
 
       <div className="relative flex-1 min-h-0 overflow-y-auto p-4">
-        {isFetching && !isPending && !isFetchingNextPage && (
-          <div className="absolute right-8 top-20 z-20">
-            <span className="loading loading-spinner loading-sm text-primary opacity-50" />
-          </div>
-        )}
-
         <ImgStackGrid
           albums={albums}
           onAlbumClick={handleAlbumClick}
@@ -146,6 +140,12 @@ function AlbumsContent() {
 
         {hasNextPage && (
           <LoadMoreButton onClick={() => fetchNextPage()} loading={isFetchingNextPage} />
+        )}
+
+        {isFetching && !isPending && !isFetchingNextPage && (
+          <div className="absolute right-8 top-20">
+            <span className="loading loading-spinner loading-sm text-primary opacity-50" />
+          </div>
         )}
       </div>
 

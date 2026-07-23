@@ -50,7 +50,7 @@ export function SettingsSaveBar({
 
   return (
     <div
-      className={`pointer-events-none sticky bottom-4 z-40 mt-2 transition-all duration-200 ${
+      className={`pointer-events-none sticky bottom-4 z-sticky mt-2 transition-all duration-200 ${
         visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
       }`}
       aria-hidden={!visible}

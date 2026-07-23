@@ -33,7 +33,7 @@ export function PublicShareHeader({
     : null;
 
   return (
-    <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-base-200 bg-base-100/90 px-4 py-3 backdrop-blur">
+    <header className="sticky top-0 z-sticky flex flex-wrap items-center justify-between gap-3 border-b border-base-200 bg-base-100/90 px-4 py-3 backdrop-blur">
       <div className="min-w-0">
         <h1 className="truncate text-lg font-semibold">{title}</h1>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-content/60">
