@@ -191,7 +191,6 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	}
 
 	// Enqueue ML tasks directly if requested (now decoupled from metadata)
-	// ML tasks are only applicable to photos
 	if assetType == dbtypes.AssetTypePhoto {
 		// Check each ML task queue name
 		if queueSet["process_semantic"] || queueSet["process_bioclip"] || queueSet["process_ocr"] || queueSet["process_face"] {
@@ -199,6 +198,11 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 			if err != nil {
 				return fmt.Errorf("enqueue ML retry: %w", err)
 			}
+		}
+	}
+	if assetType == dbtypes.AssetTypeVideo && queueSet["process_video_frames"] {
+		if err := ap.enqueueVideoFramesJob(ctx, asset.AssetID); err != nil {
+			return fmt.Errorf("enqueue process_video_frames retry: %w", err)
 		}
 	}
 

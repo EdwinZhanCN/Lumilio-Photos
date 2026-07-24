@@ -15,6 +15,8 @@ export interface BrowseAssetItem {
   type: "asset";
   id: `asset:${string}`;
   asset: Asset;
+  /** Nearest matching video frame timestamp from semantic search (ms). */
+  bestTsMs?: number;
 }
 
 export interface BrowseStackItem {
@@ -25,6 +27,8 @@ export interface BrowseStackItem {
   assets: Asset[];
   memberAssetIds?: string[];
   matchedMemberIds?: string[];
+  /** Nearest matching video frame timestamp from semantic search (ms). */
+  bestTsMs?: number;
 }
 
 export type BrowseItem = BrowseAssetItem | BrowseStackItem;

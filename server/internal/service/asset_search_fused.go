@@ -56,6 +56,16 @@ func (f fusedSearchSet) ids() []uuid.UUID {
 	return ids
 }
 
+func (f fusedSearchSet) bestTsByID() map[uuid.UUID]*int32 {
+	out := make(map[uuid.UUID]*int32, len(f.Members))
+	for _, member := range f.Members {
+		if member.BestTsMs != nil {
+			out[member.AssetID] = member.BestTsMs
+		}
+	}
+	return out
+}
+
 func (f fusedSearchSet) meta() SearchTopResultsMeta {
 	meta := SearchTopResultsMeta{Enabled: true, SourceTypes: f.Sources}
 	if meta.SourceTypes == nil {

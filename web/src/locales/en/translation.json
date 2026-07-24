@@ -1698,13 +1698,15 @@
         "bioclip": "Identify plants, animals, and other biological subjects.",
         "face": "Detect and group recognizable faces.",
         "ocr": "Read visible text inside photos.",
-        "semantic": "Analyze visual meaning for similarity retrieval and zero-shot recognition."
+        "semantic": "Analyze visual meaning for similarity retrieval and zero-shot recognition.",
+        "videoSemantic": "Embed sampled frames from videos for text search. Requires semantic search."
       },
       "taskNames": {
         "bioclip": "Field guide",
         "face": "Face recognition",
         "ocr": "Text recognition",
-        "semantic": "Semantic analysis"
+        "semantic": "Semantic analysis",
+        "videoSemantic": "Video semantic search"
       },
       "validate": "Validate connection",
       "validationError": "Failed to validate LLM configuration.",

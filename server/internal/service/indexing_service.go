@@ -28,6 +28,7 @@ const (
 	AssetIndexingTaskBioCLIP         AssetIndexingTask = "bioclip"
 	AssetIndexingTaskOCR             AssetIndexingTask = "ocr"
 	AssetIndexingTaskFaceRecognition AssetIndexingTask = "face"
+	AssetIndexingTaskVideoSemantic   AssetIndexingTask = "video_semantic"
 )
 
 const defaultIndexingBatchSize = 200
@@ -41,12 +42,14 @@ type AssetIndexingTaskStats struct {
 
 type AssetIndexingStats struct {
 	PhotoTotal  int64
+	VideoTotal  int64
 	ReindexJobs int64
 	Tasks       struct {
-		Semantic AssetIndexingTaskStats
-		BioCLIP  AssetIndexingTaskStats
-		OCR      AssetIndexingTaskStats
-		Face     AssetIndexingTaskStats
+		Semantic      AssetIndexingTaskStats
+		BioCLIP       AssetIndexingTaskStats
+		OCR           AssetIndexingTaskStats
+		Face          AssetIndexingTaskStats
+		VideoSemantic AssetIndexingTaskStats
 	}
 }
 
@@ -152,6 +155,7 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 			AssetIndexingTaskSemanticImage,
 			AssetIndexingTaskOCR,
 			AssetIndexingTaskFaceRecognition,
+			AssetIndexingTaskVideoSemantic,
 		}
 	}
 
@@ -159,7 +163,7 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 	result := make([]AssetIndexingTask, 0, len(tasks))
 	for _, task := range tasks {
 		switch task {
-		case AssetIndexingTaskSemanticImage, AssetIndexingTaskOCR, AssetIndexingTaskFaceRecognition:
+		case AssetIndexingTaskSemanticImage, AssetIndexingTaskOCR, AssetIndexingTaskFaceRecognition, AssetIndexingTaskVideoSemantic:
 			if seen[task] {
 				continue
 			}
@@ -198,9 +202,14 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 	if err != nil {
 		return AssetIndexingStats{}, fmt.Errorf("count photo assets: %w", err)
 	}
+	stats.VideoTotal, err = s.queries.CountVideoAssetsForIndexing(ctx, repositoryUUID)
+	if err != nil {
+		return AssetIndexingStats{}, fmt.Errorf("count video assets: %w", err)
+	}
 	stats.Tasks.Semantic.TotalCount = stats.PhotoTotal
 	stats.Tasks.OCR.TotalCount = stats.PhotoTotal
 	stats.Tasks.Face.TotalCount = stats.PhotoTotal
+	stats.Tasks.VideoSemantic.TotalCount = stats.VideoTotal
 
 	stats.Tasks.Semantic.IndexedCount, err = s.queries.CountPhotoAssetsWithSemanticEmbedding(ctx, repositoryUUID)
 	if err != nil {
@@ -227,10 +236,16 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 		return AssetIndexingStats{}, fmt.Errorf("count face coverage: %w", err)
 	}
 
+	stats.Tasks.VideoSemantic.IndexedCount, err = s.queries.CountVideoAssetsWithSemanticFrames(ctx, repositoryUUID)
+	if err != nil {
+		return AssetIndexingStats{}, fmt.Errorf("count video semantic coverage: %w", err)
+	}
+
 	stats.Tasks.Semantic.QueuedJobs = s.countPendingQueueJobs(ctx, "process_semantic")
 	stats.Tasks.BioCLIP.QueuedJobs = s.countPendingQueueJobs(ctx, "process_bioclip")
 	stats.Tasks.OCR.QueuedJobs = s.countPendingQueueJobs(ctx, "process_ocr")
 	stats.Tasks.Face.QueuedJobs = s.countPendingQueueJobs(ctx, "process_face")
+	stats.Tasks.VideoSemantic.QueuedJobs = s.countPendingQueueJobs(ctx, "process_video_frames")
 	stats.ReindexJobs = s.countPendingQueueJobs(ctx, "reindex_assets")
 
 	return stats, nil
@@ -323,6 +338,12 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		if err := s.queries.ClearDefaultSearchSpaceByType(ctx, string(EmbeddingTypeSemantic)); err != nil {
 			return fmt.Errorf("reset semantic index: clear default space: %w", err)
 		}
+		// Video frame rows were wiped with the table; ensure videos are
+		// re-queued when video semantic indexing is enabled.
+		if effectiveConfig.SemanticEnabled && effectiveConfig.VideoSemanticEnabled &&
+			!containsIndexingTask(enabledTasks, AssetIndexingTaskVideoSemantic) {
+			enabledTasks = append(enabledTasks, AssetIndexingTaskVideoSemantic)
+		}
 		s.logger.Info("semantic index reset for model swap",
 			zap.String("operation", "reindex.process"),
 		)
@@ -386,17 +407,21 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 	// backfills are intentionally one-shot because their result set shrinks as
 	// downstream ML jobs complete, which would make offset pagination skip or
 	// reprocess assets; callers re-trigger to make further progress.
-	if nextOffset, hasMore := nextReindexPageOffset(input.MissingOnly, len(candidates), input.Limit, input.Offset); hasMore {
+	//
+	// Mixed photo+video pages may return up to 2*Limit candidates; treat a
+	// page as complete when fewer than Limit candidates were collected.
+	pageFilled := len(candidates) >= input.Limit
+	if !input.MissingOnly && pageFilled {
 		if _, err := s.queueClient.Insert(ctx, jobs.ReindexAssetsArgs{
 			RepositoryID: input.RepositoryID,
 			Tasks:        indexingTasksToStrings(enabledTasks),
 			Limit:        input.Limit,
-			Offset:       nextOffset,
+			Offset:       input.Offset + input.Limit,
 			MissingOnly:  false,
 		}, &river.InsertOpts{Queue: "reindex_assets"}); err != nil {
 			s.logger.Warn("reindex failed to enqueue next page",
 				zap.String("operation", "reindex.process"),
-				zap.Int("next_offset", nextOffset),
+				zap.Int("next_offset", input.Offset+input.Limit),
 				zap.Int("limit", input.Limit),
 				zap.Error(err),
 			)
@@ -404,7 +429,7 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		}
 		s.logger.Info("reindex enqueued next page",
 			zap.String("operation", "reindex.process"),
-			zap.Int("next_offset", nextOffset),
+			zap.Int("next_offset", input.Offset+input.Limit),
 			zap.Int("limit", input.Limit),
 		)
 	}
@@ -448,19 +473,55 @@ func (s *assetIndexingService) collectReindexCandidates(
 		}
 		candidate.tasks[task] = true
 	}
+	addCandidateUnbounded := func(asset repo.Asset, task AssetIndexingTask) {
+		assetID := asset.AssetID.String()
+		candidate, exists := candidateMap[assetID]
+		if !exists {
+			candidate = &reindexCandidate{
+				asset: asset,
+				tasks: map[AssetIndexingTask]bool{},
+			}
+			candidateMap[assetID] = candidate
+			orderedIDs = append(orderedIDs, assetID)
+		}
+		candidate.tasks[task] = true
+	}
 
 	if !input.MissingOnly {
-		assets, err := s.queries.ListPhotoAssetsForIndexingBatch(ctx, repo.ListPhotoAssetsForIndexingBatchParams{
-			RepositoryID: repositoryUUID,
-			Limit:        int32(input.Limit),
-			Offset:       int32(input.Offset),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("list photo assets for indexing: %w", err)
+		photoTasks := photoIndexingTasks(tasks)
+		videoTasks := videoIndexingTasks(tasks)
+
+		// Photo and video lists each use the page window independently so a
+		// mixed rebuild does not starve one asset type under a shared Limit.
+		if len(photoTasks) > 0 {
+			assets, err := s.queries.ListPhotoAssetsForIndexingBatch(ctx, repo.ListPhotoAssetsForIndexingBatchParams{
+				RepositoryID: repositoryUUID,
+				Limit:        int32(input.Limit),
+				Offset:       int32(input.Offset),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("list photo assets for indexing: %w", err)
+			}
+			for _, asset := range assets {
+				for _, task := range photoTasks {
+					addCandidateUnbounded(asset, task)
+				}
+			}
 		}
-		for _, asset := range assets {
-			for _, task := range tasks {
-				addCandidate(asset, task)
+
+		if len(videoTasks) > 0 {
+			assets, err := s.queries.ListVideoAssetsForIndexingBatch(ctx, repo.ListVideoAssetsForIndexingBatchParams{
+				RepositoryID: repositoryUUID,
+				Limit:        int32(input.Limit),
+				Offset:       int32(input.Offset),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("list video assets for indexing: %w", err)
+			}
+			for _, asset := range assets {
+				for _, task := range videoTasks {
+					addCandidateUnbounded(asset, task)
+				}
 			}
 		}
 	} else {
@@ -507,6 +568,12 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 		})
 	case AssetIndexingTaskFaceRecognition:
 		return s.queries.ListPhotoAssetsMissingFaceResults(ctx, repo.ListPhotoAssetsMissingFaceResultsParams{
+			RepositoryID: repositoryUUID,
+			Limit:        int32(limit),
+			Offset:       0,
+		})
+	case AssetIndexingTaskVideoSemantic:
+		return s.queries.ListVideoAssetsMissingSemanticFrames(ctx, repo.ListVideoAssetsMissingSemanticFramesParams{
 			RepositoryID: repositoryUUID,
 			Limit:        int32(limit),
 			Offset:       0,
@@ -572,6 +639,15 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 			queued++
 		}
 	}
+	if candidate.tasks[AssetIndexingTaskVideoSemantic] {
+		inserted, err := s.enqueueVideoFramesTask(ctx, candidate.asset.AssetID)
+		if err != nil {
+			return queued, err
+		}
+		if inserted {
+			queued++
+		}
+	}
 
 	return queued, nil
 }
@@ -614,6 +690,20 @@ func (s *assetIndexingService) enqueueFaceTask(
 	}, &river.InsertOpts{Queue: "process_face"})
 	if err != nil {
 		return false, fmt.Errorf("enqueue face job: %w", err)
+	}
+	return !res.UniqueSkippedAsDuplicate, nil
+}
+
+func (s *assetIndexingService) enqueueVideoFramesTask(
+	ctx context.Context,
+	assetID pgtype.UUID,
+) (bool, error) {
+	res, err := s.queueClient.Insert(ctx, jobs.ProcessVideoFramesArgs{
+		AssetID:           assetID,
+		PreprocessVersion: jobs.MLPreprocessVersionV1,
+	}, &river.InsertOpts{Queue: "process_video_frames"})
+	if err != nil {
+		return false, fmt.Errorf("enqueue video frames job: %w", err)
 	}
 	return !res.UniqueSkippedAsDuplicate, nil
 }
@@ -698,10 +788,35 @@ func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg settings.ML) []As
 			if cfg.FaceEnabled {
 				enabled = append(enabled, task)
 			}
+		case AssetIndexingTaskVideoSemantic:
+			if cfg.SemanticEnabled && cfg.VideoSemanticEnabled {
+				enabled = append(enabled, task)
+			}
 		}
 	}
 
 	return enabled
+}
+
+func photoIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingTask {
+	out := make([]AssetIndexingTask, 0, len(tasks))
+	for _, task := range tasks {
+		switch task {
+		case AssetIndexingTaskSemanticImage, AssetIndexingTaskOCR, AssetIndexingTaskFaceRecognition, AssetIndexingTaskBioCLIP:
+			out = append(out, task)
+		}
+	}
+	return out
+}
+
+func videoIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingTask {
+	out := make([]AssetIndexingTask, 0, len(tasks))
+	for _, task := range tasks {
+		if task == AssetIndexingTaskVideoSemantic {
+			out = append(out, task)
+		}
+	}
+	return out
 }
 
 func indexingTasksToStrings(tasks []AssetIndexingTask) []string {

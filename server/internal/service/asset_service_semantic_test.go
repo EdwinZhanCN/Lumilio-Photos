@@ -85,6 +85,10 @@ func (s *semanticTestEmbeddingStub) SaveEmbedding(context.Context, pgtype.UUID, 
 	panic("not implemented")
 }
 
+func (s *semanticTestEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, pgtype.UUID, string, []VideoFrameEmbedding) error {
+	return nil
+}
+
 func (s *semanticTestEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
 	panic("not implemented")
 }

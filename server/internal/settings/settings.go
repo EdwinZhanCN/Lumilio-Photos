@@ -41,18 +41,56 @@ func (c LLM) IsConfigured() bool {
 	}
 }
 
-// ML holds the runtime ML task toggles. Zero-shot classification has no separate
-// toggle: it is gated by SemanticEnabled (the classify job is enqueued only after
-// a successful semantic embed).
+// ML holds the runtime ML task toggles and video-semantic sampling knobs.
+// Zero-shot classification has no separate toggle: it is gated by
+// SemanticEnabled (the classify job is enqueued only after a successful
+// semantic embed). Video frame embedding requires both SemanticEnabled and
+// VideoSemanticEnabled.
 type ML struct {
-	SemanticEnabled bool
-	BioCLIPEnabled  bool
-	OCREnabled      bool
-	FaceEnabled     bool
+	SemanticEnabled           bool
+	BioCLIPEnabled            bool
+	OCREnabled                bool
+	FaceEnabled               bool
+	VideoSemanticEnabled      bool
+	VideoMaxFrames            int
+	VideoLongThresholdSeconds int
+	VideoSceneThreshold       float64
 }
 
+const (
+	DefaultVideoMaxFrames            = 8
+	DefaultVideoLongThresholdSeconds = 300
+	DefaultVideoSceneThreshold       = 0.4
+)
+
 func (c ML) HasManualTasksEnabled() bool {
-	return c.SemanticEnabled || c.BioCLIPEnabled || c.OCREnabled || c.FaceEnabled
+	return c.SemanticEnabled || c.BioCLIPEnabled || c.OCREnabled || c.FaceEnabled ||
+		(c.SemanticEnabled && c.VideoSemanticEnabled)
+}
+
+// EffectiveVideoMaxFrames returns a positive frame cap, falling back to the
+// default when the stored value is unset or invalid.
+func (c ML) EffectiveVideoMaxFrames() int {
+	if c.VideoMaxFrames <= 0 {
+		return DefaultVideoMaxFrames
+	}
+	return c.VideoMaxFrames
+}
+
+// EffectiveVideoLongThresholdSeconds returns the short/long sampling boundary.
+func (c ML) EffectiveVideoLongThresholdSeconds() int {
+	if c.VideoLongThresholdSeconds <= 0 {
+		return DefaultVideoLongThresholdSeconds
+	}
+	return c.VideoLongThresholdSeconds
+}
+
+// EffectiveVideoSceneThreshold returns the ffmpeg scene-change threshold.
+func (c ML) EffectiveVideoSceneThreshold() float64 {
+	if c.VideoSceneThreshold <= 0 || c.VideoSceneThreshold >= 1 {
+		return DefaultVideoSceneThreshold
+	}
+	return c.VideoSceneThreshold
 }
 
 func (c ML) HasRuntimeDemand() bool {
@@ -81,13 +119,23 @@ type Settings struct {
 // development disables them so local dev does not require an ML node.
 func Default(environment string) Settings {
 	ml := ML{
-		SemanticEnabled: true,
-		BioCLIPEnabled:  true,
-		OCREnabled:      true,
-		FaceEnabled:     true,
+		SemanticEnabled:           true,
+		BioCLIPEnabled:            true,
+		OCREnabled:                true,
+		FaceEnabled:               true,
+		VideoSemanticEnabled:      true,
+		VideoMaxFrames:            DefaultVideoMaxFrames,
+		VideoLongThresholdSeconds: DefaultVideoLongThresholdSeconds,
+		VideoSceneThreshold:       DefaultVideoSceneThreshold,
 	}
 	if strings.EqualFold(strings.TrimSpace(environment), "development") {
-		ml = ML{}
+		// Zero toggles so local dev does not require an ML node; keep sampling
+		// knobs at their defaults so a later enable works without re-seed.
+		ml = ML{
+			VideoMaxFrames:            DefaultVideoMaxFrames,
+			VideoLongThresholdSeconds: DefaultVideoLongThresholdSeconds,
+			VideoSceneThreshold:       DefaultVideoSceneThreshold,
+		}
 	}
 	return Settings{
 		LLM: LLM{},

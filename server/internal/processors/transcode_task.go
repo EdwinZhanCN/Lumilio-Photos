@@ -7,6 +7,8 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/queue/jobs"
+
+	"go.uber.org/zap"
 )
 
 // ProcessTranscodeTask handles video/audio transcoding.
@@ -30,7 +32,18 @@ func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.Tr
 				if err != nil {
 					return err
 				}
-				return ap.transcodeVideoSmart(ctx, repository.Path, asset, fullPath, info, ap.transcodeConfig)
+				if err := ap.transcodeVideoSmart(ctx, repository.Path, asset, fullPath, info, ap.transcodeConfig); err != nil {
+					return err
+				}
+				if err := ap.enqueueVideoFramesJob(ctx, asset.AssetID); err != nil {
+					if ap.logger != nil {
+						ap.logger.Warn("enqueue video frames after transcode failed",
+							zap.String("asset_id", asset.AssetID.String()),
+							zap.Error(err),
+						)
+					}
+				}
+				return nil
 			case dbtypes.AssetTypeAudio:
 				info, err := ap.getAudioInfo(fullPath)
 				if err != nil {

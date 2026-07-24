@@ -58,10 +58,14 @@ func (s LLMSettings) IsConfigured() bool {
 }
 
 type MLSettings struct {
-	SemanticEnabled bool
-	BioCLIPEnabled  bool
-	OCREnabled      bool
-	FaceEnabled     bool
+	SemanticEnabled           bool
+	BioCLIPEnabled            bool
+	OCREnabled                bool
+	FaceEnabled               bool
+	VideoSemanticEnabled      bool
+	VideoMaxFrames            int32
+	VideoLongThresholdSeconds int32
+	VideoSceneThreshold       float64
 }
 
 type UpdateSystemSettingsInput struct {
@@ -86,10 +90,14 @@ type UpdateLLMSettingsInput struct {
 }
 
 type UpdateMLSettingsInput struct {
-	SemanticEnabled *bool
-	BioCLIPEnabled  *bool
-	OCREnabled      *bool
-	FaceEnabled     *bool
+	SemanticEnabled           *bool
+	BioCLIPEnabled            *bool
+	OCREnabled                *bool
+	FaceEnabled               *bool
+	VideoSemanticEnabled      *bool
+	VideoMaxFrames            *int32
+	VideoLongThresholdSeconds *int32
+	VideoSceneThreshold       *float64
 }
 
 type SettingsService interface {
@@ -151,21 +159,25 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 	}
 
 	params := repo.UpsertSettingsParams{
-		LlmAgentEnabled:     row.LlmAgentEnabled,
-		LlmProvider:         normalizeStoredLLMProvider(row.LlmProvider),
-		LlmModelName:        strings.TrimSpace(row.LlmModelName),
-		LlmBaseUrl:          strings.TrimSpace(row.LlmBaseUrl),
-		LlmApiKeyCiphertext: cloneBytes(row.LlmApiKeyCiphertext),
-		LlmApiKeyConfigured: row.LlmApiKeyConfigured,
-		MlAuto:              row.MlAuto,
-		MlSemanticEnabled:   row.MlSemanticEnabled,
-		MlBioclipEnabled:    row.MlBioclipEnabled,
-		MlOcrEnabled:        row.MlOcrEnabled,
-		MlFaceEnabled:       row.MlFaceEnabled,
-		BackupEnabled:       row.BackupEnabled,
-		BackupIntervalHours: row.BackupIntervalHours,
-		BackupKeepLast:      row.BackupKeepLast,
-		UpdatedBy:           input.UpdatedBy,
+		LlmAgentEnabled:             row.LlmAgentEnabled,
+		LlmProvider:                 normalizeStoredLLMProvider(row.LlmProvider),
+		LlmModelName:                strings.TrimSpace(row.LlmModelName),
+		LlmBaseUrl:                  strings.TrimSpace(row.LlmBaseUrl),
+		LlmApiKeyCiphertext:         cloneBytes(row.LlmApiKeyCiphertext),
+		LlmApiKeyConfigured:         row.LlmApiKeyConfigured,
+		MlAuto:                      row.MlAuto,
+		MlSemanticEnabled:           row.MlSemanticEnabled,
+		MlBioclipEnabled:            row.MlBioclipEnabled,
+		MlOcrEnabled:                row.MlOcrEnabled,
+		MlFaceEnabled:               row.MlFaceEnabled,
+		MlVideoSemanticEnabled:      row.MlVideoSemanticEnabled,
+		MlVideoMaxFrames:            row.MlVideoMaxFrames,
+		MlVideoLongThresholdSeconds: row.MlVideoLongThresholdSeconds,
+		MlVideoSceneThreshold:       row.MlVideoSceneThreshold,
+		BackupEnabled:               row.BackupEnabled,
+		BackupIntervalHours:         row.BackupIntervalHours,
+		BackupKeepLast:              row.BackupKeepLast,
+		UpdatedBy:                   input.UpdatedBy,
 	}
 
 	if input.LLM != nil {
@@ -209,6 +221,18 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		}
 		if input.ML.FaceEnabled != nil {
 			params.MlFaceEnabled = *input.ML.FaceEnabled
+		}
+		if input.ML.VideoSemanticEnabled != nil {
+			params.MlVideoSemanticEnabled = *input.ML.VideoSemanticEnabled
+		}
+		if input.ML.VideoMaxFrames != nil {
+			params.MlVideoMaxFrames = clampInt32(*input.ML.VideoMaxFrames, 1, 32)
+		}
+		if input.ML.VideoLongThresholdSeconds != nil {
+			params.MlVideoLongThresholdSeconds = clampInt32(*input.ML.VideoLongThresholdSeconds, 30, 3600)
+		}
+		if input.ML.VideoSceneThreshold != nil {
+			params.MlVideoSceneThreshold = clampFloat64(*input.ML.VideoSceneThreshold, 0.05, 0.95)
 		}
 	}
 
@@ -262,10 +286,14 @@ func (s *settingsService) GetMLConfig(ctx context.Context) (settings.ML, error) 
 	}
 
 	return settings.ML{
-		SemanticEnabled: row.MlSemanticEnabled,
-		BioCLIPEnabled:  row.MlBioclipEnabled,
-		OCREnabled:      row.MlOcrEnabled,
-		FaceEnabled:     row.MlFaceEnabled,
+		SemanticEnabled:           row.MlSemanticEnabled,
+		BioCLIPEnabled:            row.MlBioclipEnabled,
+		OCREnabled:                row.MlOcrEnabled,
+		FaceEnabled:               row.MlFaceEnabled,
+		VideoSemanticEnabled:      row.MlVideoSemanticEnabled,
+		VideoMaxFrames:            int(row.MlVideoMaxFrames),
+		VideoLongThresholdSeconds: int(row.MlVideoLongThresholdSeconds),
+		VideoSceneThreshold:       row.MlVideoSceneThreshold,
 	}, nil
 }
 
@@ -307,16 +335,20 @@ func (s *settingsService) seedFromDefaults(ctx context.Context) error {
 	mlCfg := s.defaults.ML
 
 	params := repo.UpsertSettingsParams{
-		LlmAgentEnabled:     llmCfg.AgentEnabled,
-		LlmProvider:         normalizeStoredLLMProvider(llmCfg.Provider),
-		LlmModelName:        strings.TrimSpace(llmCfg.ModelName),
-		LlmBaseUrl:          strings.TrimSpace(llmCfg.BaseURL),
-		LlmApiKeyConfigured: strings.TrimSpace(llmCfg.APIKey) != "",
-		MlAuto:              "disable",
-		MlSemanticEnabled:   mlCfg.SemanticEnabled,
-		MlBioclipEnabled:    mlCfg.BioCLIPEnabled,
-		MlOcrEnabled:        mlCfg.OCREnabled,
-		MlFaceEnabled:       mlCfg.FaceEnabled,
+		LlmAgentEnabled:             llmCfg.AgentEnabled,
+		LlmProvider:                 normalizeStoredLLMProvider(llmCfg.Provider),
+		LlmModelName:                strings.TrimSpace(llmCfg.ModelName),
+		LlmBaseUrl:                  strings.TrimSpace(llmCfg.BaseURL),
+		LlmApiKeyConfigured:         strings.TrimSpace(llmCfg.APIKey) != "",
+		MlAuto:                      "disable",
+		MlSemanticEnabled:           mlCfg.SemanticEnabled,
+		MlBioclipEnabled:            mlCfg.BioCLIPEnabled,
+		MlOcrEnabled:                mlCfg.OCREnabled,
+		MlFaceEnabled:               mlCfg.FaceEnabled,
+		MlVideoSemanticEnabled:      mlCfg.VideoSemanticEnabled,
+		MlVideoMaxFrames:            int32(mlCfg.EffectiveVideoMaxFrames()),
+		MlVideoLongThresholdSeconds: int32(mlCfg.EffectiveVideoLongThresholdSeconds()),
+		MlVideoSceneThreshold:       mlCfg.EffectiveVideoSceneThreshold(),
 		// Mirror the migration's column defaults: this INSERT names the backup
 		// columns explicitly, so zero values here would override them.
 		BackupEnabled:       true,
@@ -367,10 +399,14 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 			APIKeyConfigured: row.LlmApiKeyConfigured,
 		},
 		ML: MLSettings{
-			SemanticEnabled: row.MlSemanticEnabled,
-			BioCLIPEnabled:  row.MlBioclipEnabled,
-			OCREnabled:      row.MlOcrEnabled,
-			FaceEnabled:     row.MlFaceEnabled,
+			SemanticEnabled:           row.MlSemanticEnabled,
+			BioCLIPEnabled:            row.MlBioclipEnabled,
+			OCREnabled:                row.MlOcrEnabled,
+			FaceEnabled:               row.MlFaceEnabled,
+			VideoSemanticEnabled:      row.MlVideoSemanticEnabled,
+			VideoMaxFrames:            row.MlVideoMaxFrames,
+			VideoLongThresholdSeconds: row.MlVideoLongThresholdSeconds,
+			VideoSceneThreshold:       row.MlVideoSceneThreshold,
 		},
 		Backup: BackupSettings{
 			Enabled:       row.BackupEnabled,
@@ -383,6 +419,16 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 }
 
 func clampInt32(v, lo, hi int32) int32 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+func clampFloat64(v, lo, hi float64) float64 {
 	if v < lo {
 		return lo
 	}

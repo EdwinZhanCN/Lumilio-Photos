@@ -1127,6 +1127,10 @@ const docTemplate = `{
                     },
                     "tasks": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskSetStatsDTO"
+                    },
+                    "video_total": {
+                        "example": 120,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -1143,6 +1147,9 @@ const docTemplate = `{
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
                     "semantic": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "video_semantic": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     }
                 },
@@ -1562,6 +1569,10 @@ const docTemplate = `{
                 "properties": {
                     "asset": {
                         "$ref": "#/components/schemas/dto.AssetDTO"
+                    },
+                    "best_ts_ms": {
+                        "example": 12500,
+                        "type": "integer"
                     },
                     "id": {
                         "example": "stack:550e8400-e29b-41d4-a716-446655440000",
@@ -3218,6 +3229,21 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "semantic_enabled": {
+                        "type": "boolean"
+                    },
+                    "video_long_threshold_seconds": {
+                        "example": 300,
+                        "type": "integer"
+                    },
+                    "video_max_frames": {
+                        "example": 8,
+                        "type": "integer"
+                    },
+                    "video_scene_threshold": {
+                        "example": 0.4,
+                        "type": "number"
+                    },
+                    "video_semantic_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -5624,6 +5650,22 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "semantic_enabled": {
+                        "type": "boolean"
+                    },
+                    "video_long_threshold_seconds": {
+                        "maximum": 3600,
+                        "minimum": 30,
+                        "type": "integer"
+                    },
+                    "video_max_frames": {
+                        "maximum": 32,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "video_scene_threshold": {
+                        "type": "number"
+                    },
+                    "video_semantic_enabled": {
                         "type": "boolean"
                     }
                 },

@@ -11713,12 +11713,15 @@ export interface components {
             /** @example 1 */
             reindex_jobs?: number;
             tasks?: components["schemas"]["dto.AssetIndexingTaskSetStatsDTO"];
+            /** @example 120 */
+            video_total?: number;
         };
         "dto.AssetIndexingTaskSetStatsDTO": {
             bioclip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             face?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             ocr?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             semantic?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+            video_semantic?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
         };
         "dto.AssetIndexingTaskStatsDTO": {
             /** @example 1200 */
@@ -11886,6 +11889,8 @@ export interface components {
         };
         "dto.BrowseItemDTO": {
             asset?: components["schemas"]["dto.AssetDTO"];
+            /** @example 12500 */
+            best_ts_ms?: number;
             /** @example stack:550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
             stack?: components["schemas"]["dto.BrowseStackDTO"];
@@ -12535,6 +12540,13 @@ export interface components {
             face_enabled?: boolean;
             ocr_enabled?: boolean;
             semantic_enabled?: boolean;
+            /** @example 300 */
+            video_long_threshold_seconds?: number;
+            /** @example 8 */
+            video_max_frames?: number;
+            /** @example 0.4 */
+            video_scene_threshold?: number;
+            video_semantic_enabled?: boolean;
         };
         "dto.MLTaskCapabilityDTO": {
             available?: boolean;
@@ -13530,6 +13542,10 @@ export interface components {
             face_enabled?: boolean;
             ocr_enabled?: boolean;
             semantic_enabled?: boolean;
+            video_long_threshold_seconds?: number;
+            video_max_frames?: number;
+            video_scene_threshold?: number;
+            video_semantic_enabled?: boolean;
         };
         "dto.UpdateOwnProfileRequestDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */

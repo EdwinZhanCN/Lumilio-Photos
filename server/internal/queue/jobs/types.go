@@ -165,6 +165,26 @@ func (ProcessFaceArgs) InsertOpts() river.InsertOpts {
 	}
 }
 
+// ProcessVideoFramesArgs is the River job payload for video frame semantic
+// embedding. Frames are extracted from the transcoded web.mp4 and written as
+// multi-row search_embeddings with frame_ts_ms set.
+type ProcessVideoFramesArgs struct {
+	AssetID           pgtype.UUID `json:"assetId"`
+	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+}
+
+func (ProcessVideoFramesArgs) Kind() string { return "process_video_frames" }
+
+func (ProcessVideoFramesArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		MaxAttempts: MLProcessMaxAttempts,
+		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
+			ByPeriod: MLProcessUniquePeriod,
+		},
+	}
+}
+
 // ReindexAssetsArgs queues a batch backfill for existing photo indexing tasks.
 // Offset advances across self-chained full-rebuild pages (MissingOnly=false);
 // it is ignored for missing-only backfills.

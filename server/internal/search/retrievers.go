@@ -59,14 +59,15 @@ func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candi
 	query := fmt.Sprintf(`
 SELECT
   a.asset_id,
-  MIN(%s)::float8 AS raw_score
+  MIN(%s)::float8 AS raw_score,
+  (array_agg(e.frame_ts_ms ORDER BY %s ASC NULLS LAST))[1] AS best_ts
 FROM search_embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
 WHERE %s
 GROUP BY a.asset_id
 ORDER BY raw_score, a.asset_id DESC
 LIMIT %s
-`, distanceExpr, joinConditions(conditions), limitPlaceholder)
+`, distanceExpr, distanceExpr, joinConditions(conditions), limitPlaceholder)
 
 	rows, err := r.pool.Query(ctx, query, builder.args...)
 	if err != nil {
@@ -188,7 +189,8 @@ func (r *TextRetriever) retrieveOCR(ctx context.Context, req Request) ([]Candida
 	query := fmt.Sprintf(`
 SELECT
   a.asset_id,
-  word_similarity(%s, r.full_text)::float8 AS raw_score
+  word_similarity(%s, r.full_text)::float8 AS raw_score,
+  NULL::int AS best_ts
 FROM ocr_results r
 JOIN assets a ON a.asset_id = r.asset_id
 WHERE %s
@@ -259,7 +261,8 @@ func (r *TextRetriever) retrievePlace(ctx context.Context, req Request) ([]Candi
 WITH q AS (SELECT plainto_tsquery('simple', %s) AS query)
 SELECT
   a.asset_id,
-  MAX(ts_rank_cd(lc.search_vector, q.query))::float8 AS raw_score
+  MAX(ts_rank_cd(lc.search_vector, q.query))::float8 AS raw_score,
+  NULL::int AS best_ts
 FROM q
 JOIN location_clusters lc ON lc.search_vector @@ q.query
 JOIN location_cluster_assets lca ON lca.cluster_id = lc.cluster_id
@@ -302,7 +305,8 @@ func collectCandidates(rows pgx.Rows, source string) ([]Candidate, error) {
 	for rows.Next() {
 		var assetID pgtype.UUID
 		var rawScore float64
-		if err := rows.Scan(&assetID, &rawScore); err != nil {
+		var bestTs *int32
+		if err := rows.Scan(&assetID, &rawScore, &bestTs); err != nil {
 			return nil, fmt.Errorf("scan %s candidate: %w", source, err)
 		}
 		if !assetID.Valid {
@@ -313,6 +317,7 @@ func collectCandidates(rows pgx.Rows, source string) ([]Candidate, error) {
 			Source:   source,
 			Rank:     rank,
 			RawScore: rawScore,
+			BestTsMs: bestTs,
 		})
 		rank++
 	}

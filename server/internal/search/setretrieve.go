@@ -198,14 +198,15 @@ func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req 
 	query := fmt.Sprintf(`
 SELECT
   a.asset_id,
-  MIN(%s)::float8 AS raw_score
+  MIN(%s)::float8 AS raw_score,
+  (array_agg(e.frame_ts_ms ORDER BY %s ASC NULLS LAST))[1] AS best_ts
 FROM search_embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
 WHERE %s
 GROUP BY a.asset_id
 ORDER BY raw_score, a.asset_id DESC
 LIMIT %s
-`, distanceExpr, joinConditions(conditions), limitPlaceholder)
+`, distanceExpr, distanceExpr, joinConditions(conditions), limitPlaceholder)
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -253,8 +254,9 @@ func filterWithinCutoff(candidates []Candidate, cutoff float64) []Candidate {
 
 // ScoredAsset is one member of a fused set with its aggregate RRF confidence.
 type ScoredAsset struct {
-	AssetID uuid.UUID
-	Score   float64
+	AssetID  uuid.UUID
+	Score    float64
+	BestTsMs *int32
 }
 
 // FuseSet fuses per-channel candidate rankings with weighted RRF and returns
@@ -265,7 +267,7 @@ func FuseSet(candidates []Candidate, weights map[string]float64) []ScoredAsset {
 	fused := fuseWeightedRRF(candidates, weights, DefaultRRFK)
 	out := make([]ScoredAsset, len(fused))
 	for i, item := range fused {
-		out[i] = ScoredAsset{AssetID: item.assetID, Score: item.score}
+		out[i] = ScoredAsset{AssetID: item.assetID, Score: item.score, BestTsMs: item.bestTsMs}
 	}
 	return out
 }

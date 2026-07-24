@@ -222,6 +222,7 @@ type fusedCandidate struct {
 	score         float64
 	contributions map[string]Contribution
 	bestRank      int
+	bestTsMs      *int32
 }
 
 func fuseWeightedRRF(candidates []Candidate, weights map[string]float64, rrfK float64) []fusedCandidate {
@@ -241,6 +242,7 @@ func fuseWeightedRRF(candidates []Candidate, weights map[string]float64, rrfK fl
 				assetID:       candidate.AssetID,
 				contributions: make(map[string]Contribution),
 				bestRank:      candidate.Rank,
+				bestTsMs:      candidate.BestTsMs,
 			}
 			byAsset[candidate.AssetID] = item
 		}
@@ -259,6 +261,12 @@ func fuseWeightedRRF(candidates []Candidate, weights map[string]float64, rrfK fl
 		}
 		if candidate.Rank < item.bestRank {
 			item.bestRank = candidate.Rank
+		}
+		// Prefer the embedding-channel timestamp when present.
+		if candidate.Source == SourceEmbedding && candidate.BestTsMs != nil {
+			item.bestTsMs = candidate.BestTsMs
+		} else if item.bestTsMs == nil && candidate.BestTsMs != nil {
+			item.bestTsMs = candidate.BestTsMs
 		}
 	}
 

@@ -16,6 +16,10 @@ INSERT INTO settings (
     ml_bioclip_enabled,
     ml_ocr_enabled,
     ml_face_enabled,
+    ml_video_semantic_enabled,
+    ml_video_max_frames,
+    ml_video_long_threshold_seconds,
+    ml_video_scene_threshold,
     backup_enabled,
     backup_interval_hours,
     backup_keep_last,
@@ -37,7 +41,11 @@ VALUES (
     $12,
     $13,
     $14,
-    $15
+    $15,
+    $16,
+    $17,
+    $18,
+    $19
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -51,6 +59,10 @@ ON CONFLICT (id) DO UPDATE SET
     ml_bioclip_enabled = EXCLUDED.ml_bioclip_enabled,
     ml_ocr_enabled = EXCLUDED.ml_ocr_enabled,
     ml_face_enabled = EXCLUDED.ml_face_enabled,
+    ml_video_semantic_enabled = EXCLUDED.ml_video_semantic_enabled,
+    ml_video_max_frames = EXCLUDED.ml_video_max_frames,
+    ml_video_long_threshold_seconds = EXCLUDED.ml_video_long_threshold_seconds,
+    ml_video_scene_threshold = EXCLUDED.ml_video_scene_threshold,
     backup_enabled = EXCLUDED.backup_enabled,
     backup_interval_hours = EXCLUDED.backup_interval_hours,
     backup_keep_last = EXCLUDED.backup_keep_last,
