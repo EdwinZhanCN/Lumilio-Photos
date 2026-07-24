@@ -40,6 +40,17 @@ const testProjects = [
       setupFiles: ["./test/setup.integration.ts"],
       include: ["src/**/*.test.tsx", "src/**/*.spec.tsx"],
       exclude: ["src/**/*.browser.test.ts", "**/node_modules/**"],
+      // Vitest browser mode re-optimizes deps mid-run and reloads the page,
+      // aborting the dynamic test-file imports that other files have in flight
+      // ("Failed to fetch dynamically imported module" / "Vitest failed to find
+      // the runner" / "Vite unexpectedly reloaded a test"). Under parallel file
+      // execution on CI this races badly enough to wedge the whole run, not
+      // just fail a file. Running the browser files serially removes the
+      // concurrent in-flight imports the reload was aborting; optimizeDeps
+      // .include front-loads most optimization and retry mops up any residual
+      // reload. See vitest-dev/vitest#8447, #9509.
+      fileParallelism: false,
+      retry: 2,
       browser: {
         enabled: true,
         provider: playwright(),
@@ -56,6 +67,9 @@ const testProjects = [
         : ["src/**/*.browser.test.ts"],
       exclude: ["**/node_modules/**"],
       testTimeout: 300_000,
+      // Same browser-mode reload race as the integration project (see there).
+      fileParallelism: false,
+      retry: 2,
       browser: {
         api: {
           host: "127.0.0.1",
@@ -174,5 +188,51 @@ export default defineConfig({
 
   optimizeDeps: {
     exclude: ["@immich/justified-layout-wasm"],
+    // Pre-bundle the deps the browser (integration) and jsdom (unit) test
+    // projects optimize, so Vite gets most dep optimization done in its initial
+    // scan instead of discovering deps mid-run. A mid-run re-optimize reloads
+    // the page and aborts in-flight dynamic test-file imports (flaky "Failed to
+    // fetch dynamically imported module" / "Vitest failed to find the runner"
+    // in CI, see vitest-dev/vitest#8447, #9509). This reduces reload frequency
+    // but does not eliminate it — the `retry` on the browser test projects is
+    // the actual safety net. List captured from
+    // node_modules/.vite/vitest/*/deps/_metadata.json after a full `vp test`
+    // run. Keep wasm packages OUT of this list and in `exclude` above —
+    // pre-bundling wasm wedges the optimizer on CI (same reason
+    // @immich/justified-layout-wasm is excluded) and hangs `vp test` until the
+    // job timeout.
+    include: [
+      "@microsoft/fetch-event-source",
+      "@tanstack/react-query",
+      "@vidstack/react",
+      "@vidstack/react/player/layouts/default",
+      "i18next",
+      "i18next-browser-languagedetector",
+      "immer",
+      "leaflet",
+      "lucide-react",
+      "openapi-fetch",
+      "openapi-react-query",
+      "qrcode",
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react-error-boundary",
+      "react-i18next",
+      "react-leaflet",
+      "react-router-dom",
+      "react/jsx-dev-runtime",
+      "react/jsx-runtime",
+      "sonner",
+      "supercluster",
+      "swiper/modules",
+      "swiper/react",
+      "vite-plus/test",
+      "vitest-browser-react",
+      "zustand",
+      "zustand/middleware",
+      "zustand/middleware/immer",
+      "zustand/vanilla",
+    ],
   },
 });

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -179,11 +180,29 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
+// resolveHardwareAccel translates "auto" or requested hardware acceleration mode
+// to the actual acceleration backend supported by the host operating system/hardware.
+func resolveHardwareAccel(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode != "auto" {
+		return mode
+	}
+	if runtime.GOOS == "darwin" {
+		return "videotoolbox"
+	}
+	if _, err := os.Stat("/dev/dri/renderD128"); err == nil {
+		return "vaapi"
+	}
+	return "none"
+}
+
 func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, approxHeight int, cfg config.TranscodeConfig) []string {
 	scaleExpr := scaleFilter[len("scale="):] // w:h portion, reused for VAAPI
 	maxrate, bufsize := bitrateForResolution(approxWidth, approxHeight)
 
-	switch cfg.HardwareAccel {
+	accel := resolveHardwareAccel(cfg.HardwareAccel)
+
+	switch accel {
 	case "vaapi":
 		return []string{
 			"-vaapi_device", "/dev/dri/renderD128",
@@ -214,6 +233,44 @@ func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, 
 			"-c:v", "h264_nvenc",
 			"-preset", "p4",
 			"-qp", "23",
+			"-maxrate", maxrate,
+			"-bufsize", bufsize,
+			"-vf", scaleFilter,
+			"-pix_fmt", "yuv420p",
+			"-c:a", "aac",
+			"-b:a", "128k",
+			"-movflags", "+faststart",
+			"-avoid_negative_ts", "make_zero",
+			"-f", "mp4",
+			"-y",
+			outputPath,
+		}
+	case "qsv":
+		return []string{
+			"-i", inputPath,
+			"-map", "0:v:0",
+			"-map", "0:a?",
+			"-c:v", "h264_qsv",
+			"-global_quality", "23",
+			"-maxrate", maxrate,
+			"-bufsize", bufsize,
+			"-vf", scaleFilter,
+			"-pix_fmt", "yuv420p",
+			"-c:a", "aac",
+			"-b:a", "128k",
+			"-movflags", "+faststart",
+			"-avoid_negative_ts", "make_zero",
+			"-f", "mp4",
+			"-y",
+			outputPath,
+		}
+	case "videotoolbox":
+		return []string{
+			"-i", inputPath,
+			"-map", "0:v:0",
+			"-map", "0:a?",
+			"-c:v", "h264_videotoolbox",
+			"-realtime", "0",
 			"-maxrate", maxrate,
 			"-bufsize", bufsize,
 			"-vf", scaleFilter,
@@ -285,10 +342,24 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 
 	args := []string{}
 
-	if cfg.HardwareAccel == "vaapi" {
+	accel := resolveHardwareAccel(cfg.HardwareAccel)
+	switch accel {
+	case "vaapi":
 		args = append(args,
 			"-hwaccel", "vaapi",
 			"-vaapi_device", "/dev/dri/renderD128",
+		)
+	case "videotoolbox":
+		args = append(args,
+			"-hwaccel", "videotoolbox",
+		)
+	case "nvenc":
+		args = append(args,
+			"-hwaccel", "cuda",
+		)
+	case "qsv":
+		args = append(args,
+			"-hwaccel", "qsv",
 		)
 	}
 

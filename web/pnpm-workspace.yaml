@@ -3,9 +3,15 @@ allowBuilds:
   "@swc/core": true
   esbuild: true
   msw: true
-  onnxruntime-node: set this to true or false
-  protobufjs: set this to true or false
-  sharp: set this to true or false
+  # Web runs in the browser and uses onnxruntime-web (WASM); the onnxruntime-node
+  # native binding is a transitive dep that is never used here, and its
+  # postinstall downloads a large native binary over the network, which flakes
+  # the CI install (ETIMEDOUT). Skip its build instead of downloading it.
+  onnxruntime-node: false
+  # protobufjs runs a local-only postinstall; sharp resolves the prebuilt
+  # platform package from the lockfile (no heavy download). Both are safe to run.
+  protobufjs: true
+  sharp: true
 
 minimumReleaseAgeExclude:
   - "@edwinzhancn/docts@0.1.0"
