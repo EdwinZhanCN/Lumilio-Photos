@@ -15,7 +15,9 @@ tools_bin_dir = {{toml .PGBinDir}}
 
 [server]
 port = {{toml .Port}}
-cors_allowed_origins = [{{toml .BrowserOrigin}}]
+# The private Wails control panel uses its own /__onb host boundary. The React
+# product Web and API are served together at BrowserOrigin, so they are same-origin.
+cors_allowed_origins = []
 web_root = {{toml .WebRoot}}
 
 [logging]

@@ -15,7 +15,9 @@ tools_bin_dir = ""
 
 [server]
 port = "6680"
-cors_allowed_origins = ["http://localhost:6657", "https://localhost:6657"]
+# The bundled web container proxies /api on the same public origin.
+# Add only separately hosted browser frontends that need cookie sessions.
+cors_allowed_origins = []
 web_root = ""
 
 [logging]

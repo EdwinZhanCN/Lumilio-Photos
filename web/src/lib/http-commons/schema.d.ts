@@ -4850,6 +4850,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get refresh-session CSRF token
+         * @description Return a CSRF token bound to the current HttpOnly refresh cookie
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description CSRF token issued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.CSRFTokenDTO"];
+                    };
+                };
+                /** @description No refresh-cookie session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -5012,7 +5060,7 @@ export interface paths {
         put?: never;
         /**
          * Logout user
-         * @description Revoke the user's refresh token
+         * @description Revoke and clear the current HttpOnly refresh-cookie session
          */
         post: {
             parameters: {
@@ -5021,12 +5069,7 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Refresh token to revoke */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.RefreshTokenRequestDTO"];
-                };
-            };
+            requestBody?: never;
             responses: {
                 /** @description Logout successful */
                 200: {
@@ -5037,17 +5080,8 @@ export interface paths {
                         "application/json": components["schemas"]["api.SuccessResponse"];
                     };
                 };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Invalid refresh token */
-                401: {
+                /** @description Invalid CSRF token */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6117,7 +6151,7 @@ export interface paths {
         put?: never;
         /**
          * Refresh access token
-         * @description Generate a new access token using a valid refresh token
+         * @description Rotate the HttpOnly refresh cookie and issue a new access token. Requires X-CSRF-Token bound to the current cookie session.
          */
         post: {
             parameters: {
@@ -6126,12 +6160,7 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Refresh token */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.RefreshTokenRequestDTO"];
-                };
-            };
+            requestBody?: never;
             responses: {
                 /** @description Token refreshed successfully */
                 200: {
@@ -6142,8 +6171,8 @@ export interface paths {
                         "application/json": components["schemas"]["dto.AuthResponseDTO"];
                     };
                 };
-                /** @description Invalid request data */
-                400: {
+                /** @description Invalid or expired refresh token */
+                401: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6151,8 +6180,8 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
-                /** @description Invalid or expired refresh token */
-                401: {
+                /** @description Invalid CSRF token */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -11892,11 +11921,11 @@ export interface components {
         };
         "dto.AuthResponseDTO": {
             bootstrap_admin?: boolean;
+            csrfToken?: string;
             expiresAt?: string;
             mfa_methods?: string[];
             mfa_token?: string;
             password_change_token?: string;
-            refreshToken?: string;
             requires_mfa?: boolean;
             requires_password_change?: boolean;
             token?: string;
@@ -11969,6 +11998,9 @@ export interface components {
             stack_kind?: "burst" | "manual";
             /** @example 3 */
             stack_size?: number;
+        };
+        "dto.CSRFTokenDTO": {
+            csrfToken?: string;
         };
         "dto.CapabilitiesResponseDTO": {
             llm?: components["schemas"]["dto.LLMCapabilitiesDTO"];
@@ -12910,9 +12942,6 @@ export interface components {
             generated_at?: string;
             recovery_codes?: string[];
             status?: components["schemas"]["dto.MFAStatusDTO"];
-        };
-        "dto.RefreshTokenRequestDTO": {
-            refreshToken: string;
         };
         "dto.RegenerateRecoveryCodesRequestDTO": {
             current_password: string;

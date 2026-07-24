@@ -109,7 +109,7 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 	}
 
 	h.resetAuthOpaqueSubject(authRateScopePasskeyVerify, req.ChallengeToken)
-	api.JSONOK(c, dto.ToAuthResponseDTO(response))
+	h.writeAuthResponse(c, response)
 }
 
 // ListPasskeys returns the authenticated user's passkeys.

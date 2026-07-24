@@ -88,5 +88,5 @@ export function getTypedMetadata(
 }
 
 // Re-export token management functions and client
-export { getToken, getRefreshToken, saveToken, removeToken } from "./auth.ts";
+export { getToken, getCSRFToken, saveToken, saveCSRFToken, removeToken } from "./auth.ts";
 export { default as client } from "./client";

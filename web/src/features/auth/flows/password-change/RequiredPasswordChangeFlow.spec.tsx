@@ -48,7 +48,7 @@ describe("RequiredPasswordChangeFlow", () => {
   it("exchanges the one-use token and authenticates only after completion", async () => {
     const authResponse = {
       token: "access-token",
-      refreshToken: "refresh-token",
+      csrfToken: "csrf-token",
       user: { user_id: 1, username: "admin" },
     } satisfies AuthResponse;
 
@@ -59,7 +59,10 @@ describe("RequiredPasswordChangeFlow", () => {
         return HttpResponse.json(authResponse);
       }),
       http.get("/api/v1/auth/media-token", () =>
-        HttpResponse.json({ token: "media-token", expires_at: new Date(Date.now() + 3_600_000).toISOString() }),
+        HttpResponse.json({
+          token: "media-token",
+          expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+        }),
       ),
     );
 

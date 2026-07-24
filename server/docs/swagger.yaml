@@ -972,6 +972,8 @@ components:
       properties:
         bootstrap_admin:
           type: boolean
+        csrfToken:
+          type: string
         expiresAt:
           type: string
         mfa_methods:
@@ -982,8 +984,6 @@ components:
         mfa_token:
           type: string
         password_change_token:
-          type: string
-        refreshToken:
           type: string
         requires_mfa:
           type: boolean
@@ -1114,6 +1114,11 @@ components:
         stack_size:
           example: 3
           type: integer
+      type: object
+    dto.CSRFTokenDTO:
+      properties:
+        csrfToken:
+          type: string
       type: object
     dto.CapabilitiesResponseDTO:
       properties:
@@ -2816,13 +2821,6 @@ components:
           uniqueItems: false
         status:
           $ref: '#/components/schemas/dto.MFAStatusDTO'
-      type: object
-    dto.RefreshTokenRequestDTO:
-      properties:
-        refreshToken:
-          type: string
-      required:
-      - refreshToken
       type: object
     dto.RegenerateRecoveryCodesRequestDTO:
       properties:
@@ -7700,6 +7698,25 @@ paths:
       summary: Get supported asset types
       tags:
       - assets
+  /api/v1/auth/csrf:
+    get:
+      description: Return a CSRF token bound to the current HttpOnly refresh cookie
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.CSRFTokenDTO'
+          description: CSRF token issued
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: No refresh-cookie session
+      summary: Get refresh-session CSRF token
+      tags:
+      - auth
   /api/v1/auth/login:
     post:
       description: Authenticate user with username and password. Returns an MFA challenge
@@ -7796,18 +7813,7 @@ paths:
       - auth
   /api/v1/auth/logout:
     post:
-      description: Revoke the user's refresh token
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.RefreshTokenRequestDTO'
-                description: Refresh token to revoke
-                summary: request
-        description: Refresh token to revoke
-        required: true
+      description: Revoke and clear the current HttpOnly refresh-cookie session
       responses:
         "200":
           content:
@@ -7815,18 +7821,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/api.SuccessResponse'
           description: Logout successful
-        "400":
+        "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/api.ErrorResponse'
-          description: Invalid request data
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.ErrorResponse'
-          description: Invalid refresh token
+          description: Invalid CSRF token
         "500":
           content:
             application/json:
@@ -8447,18 +8447,8 @@ paths:
       - auth
   /api/v1/auth/refresh:
     post:
-      description: Generate a new access token using a valid refresh token
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.RefreshTokenRequestDTO'
-                description: Refresh token
-                summary: request
-        description: Refresh token
-        required: true
+      description: Rotate the HttpOnly refresh cookie and issue a new access token.
+        Requires X-CSRF-Token bound to the current cookie session.
       responses:
         "200":
           content:
@@ -8466,18 +8456,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/dto.AuthResponseDTO'
           description: Token refreshed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.ErrorResponse'
-          description: Invalid request data
         "401":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/api.ErrorResponse'
           description: Invalid or expired refresh token
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.ErrorResponse'
+          description: Invalid CSRF token
         "429":
           content:
             application/json:

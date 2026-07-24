@@ -2,9 +2,16 @@
 
 [AuthProvider](./state/AuthProvider.tsx) owns the verified user session and exposes login, MFA,
 completion, and logout commands. HTTP authentication is centralized in
-[authMiddleware](@/lib/http-commons/client.ts): it attaches the access token, permits only one
-refresh-token rotation at a time, and replays a failed request from a clone
-captured before its body was consumed.
+[authMiddleware](@/lib/http-commons/client.ts): it attaches the short-lived access token, supplies
+the session-bound CSRF proof to unsafe requests, and replays a failed request
+from a clone captured before its body was consumed.
+
+The long-lived refresh credential exists only in a host-only `HttpOnly`
+cookie scoped to `/api/v1/auth`; browser JavaScript never receives or stores
+it. [refreshBrowserSession](@/lib/http-commons/client.ts) recovers a non-secret CSRF proof from the
+cookie session, rotates the cookie and access token under a cross-tab Web
+Lock, and is also the bootstrap session probe. [logoutBrowserSession](@/lib/http-commons/client.ts)
+uses the same lock so logout cannot race a refresh in another tab.
 
 Every session exit converges on [resetSession](./state/resetSession.ts). The reset invalidates
 late refresh responses, removes tokens, aborts Lumilio streams, cancels and

@@ -32,11 +32,6 @@ func ToLoginOptionsResponseDTO(options service.LoginOptions) LoginOptionsRespons
 	}
 }
 
-// RefreshTokenRequestDTO represents the request structure for token refresh
-type RefreshTokenRequestDTO struct {
-	RefreshToken string `json:"refreshToken" binding:"required"`
-}
-
 type CompleteRequiredPasswordChangeRequestDTO struct {
 	PasswordChangeToken string `json:"password_change_token" binding:"required"`
 	NewPassword         string `json:"new_password" binding:"required"`
@@ -60,7 +55,7 @@ type UserDTO struct {
 type AuthResponseDTO struct {
 	User                   *UserDTO   `json:"user,omitempty"`
 	AccessToken            string     `json:"token,omitempty"`
-	RefreshToken           string     `json:"refreshToken,omitempty"`
+	CSRFToken              string     `json:"csrfToken,omitempty"`
 	ExpiresAt              *time.Time `json:"expiresAt,omitempty"`
 	RequiresMFA            bool       `json:"requires_mfa"`
 	MFAToken               string     `json:"mfa_token,omitempty"`
@@ -68,6 +63,10 @@ type AuthResponseDTO struct {
 	BootstrapAdmin         bool       `json:"bootstrap_admin,omitempty"`
 	RequiresPasswordChange bool       `json:"requires_password_change"`
 	PasswordChangeToken    string     `json:"password_change_token,omitempty"`
+}
+
+type CSRFTokenDTO struct {
+	CSRFToken string `json:"csrfToken"`
 }
 
 type MediaTokenDTO struct {
@@ -89,7 +88,6 @@ func ToAuthResponseDTO(response *service.AuthResponse) *AuthResponseDTO {
 	return &AuthResponseDTO{
 		User:                   user,
 		AccessToken:            response.AccessToken,
-		RefreshToken:           response.RefreshToken,
 		ExpiresAt:              response.ExpiresAt,
 		RequiresMFA:            response.RequiresMFA,
 		MFAToken:               response.MFAToken,

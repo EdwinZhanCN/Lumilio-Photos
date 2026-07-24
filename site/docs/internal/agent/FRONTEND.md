@@ -163,6 +163,16 @@ refresh exhaustion must use that boundary so in-flight Query/Lumilio work and
 all user-scoped caches, notifications, repository choices, searches, and
 filters are cleared before another user authenticates.
 
+The browser stores only the short-lived access token and a browser-readable,
+session-bound CSRF proof that is not independently authenticating but must not
+leak cross-origin. The refresh credential is a host-only `HttpOnly` cookie and
+must never be added to response DTOs or browser storage.
+`http-commons/client.ts` includes credentials, recovers CSRF through the safe
+session endpoint, and serializes refresh/logout with the
+`lumilio-auth-refresh` Web Lock so multiple tabs cannot replay a rotated
+credential. Unsafe typed-client requests carry `X-CSRF-Token`; refresh and
+logout must use the dedicated session helpers.
+
 Do not mirror the same data across Query, Context, Zustand, URL, or storage.
 Root feature `state/` is reserved for lifecycles that genuinely span flows or
 refreshes; otherwise colocate state with the owning flow.
@@ -386,8 +396,9 @@ infrastructure lives under `web/test/` (alias `@test`):
   requests are guarded (erroring when unhandled) so Vite can still serve modules.
 - `@test/i18n` — `t(key, opts?)` resolves a translation key to its current `en`
   copy through the app's own i18next instance.
-- `@test/session` — `seedSession(user)` stores tokens and answers the auth
-  bootstrap (`/auth/me` + media token) so the real `AuthProvider` settles to
+- `@test/session` — `seedSession(user)` stores an access token plus CSRF proof
+  and answers the cookie-session bootstrap (`/auth/csrf` + `/auth/refresh`),
+  `/auth/me`, and media-token requests so the real `AuthProvider` settles to
   `user`. Pair with `renderWithProviders(ui, { auth: true })`.
 
 Mock **only** the HTTP boundary through MSW. Do not mock `$api`, Query/Router

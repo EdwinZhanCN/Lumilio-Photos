@@ -1,13 +1,10 @@
 import { AuthAction, AuthState } from "../types.ts";
-import { getToken, getRefreshToken } from "@/lib/http-commons/auth.ts";
-
-// Production approach: Start in loading state if we have tokens to verify
-const hasTokens = !!(getToken() || getRefreshToken());
-
 export const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: hasTokens,
+  // The refresh credential is HttpOnly and intentionally invisible here, so
+  // every fresh document performs one cookie-session probe before routing.
+  isLoading: true,
   error: null,
 };
 
