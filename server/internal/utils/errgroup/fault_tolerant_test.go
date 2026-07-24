@@ -3,6 +3,7 @@ package errgroup_test
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"server/internal/utils/errgroup"
@@ -14,21 +15,26 @@ func TestFaultTolerantGroup(t *testing.T) {
 	t.Run("All tasks succeed", func(t *testing.T) {
 		g := errgroup.NewFaultTolerant()
 
-		results := make([]int, 0)
+		completed := make(chan int, 3)
 		g.Go(func() error {
-			results = append(results, 1)
+			completed <- 1
 			return nil
 		})
 		g.Go(func() error {
-			results = append(results, 2)
+			completed <- 2
 			return nil
 		})
 		g.Go(func() error {
-			results = append(results, 3)
+			completed <- 3
 			return nil
 		})
 
 		errors := g.Wait()
+		close(completed)
+		results := make([]int, 0, 3)
+		for result := range completed {
+			results = append(results, result)
+		}
 		assert.Empty(t, errors, "Should have no errors when all tasks succeed")
 		assert.Len(t, results, 3, "All tasks should have executed")
 		assert.ElementsMatch(t, []int{1, 2, 3}, results, "All tasks should have completed")
@@ -37,27 +43,27 @@ func TestFaultTolerantGroup(t *testing.T) {
 	t.Run("Some tasks fail", func(t *testing.T) {
 		g := errgroup.NewFaultTolerant()
 
-		successCount := 0
+		var executionCount atomic.Int32
 		g.Go(func() error {
-			successCount++
+			executionCount.Add(1)
 			return nil
 		})
 		g.Go(func() error {
-			successCount++
+			executionCount.Add(1)
 			return errors.New("task 2 failed")
 		})
 		g.Go(func() error {
-			successCount++
+			executionCount.Add(1)
 			return nil
 		})
 		g.Go(func() error {
-			successCount++
+			executionCount.Add(1)
 			return errors.New("task 4 failed")
 		})
 
 		errors := g.Wait()
 		assert.Len(t, errors, 2, "Should have 2 errors")
-		assert.Equal(t, 4, successCount, "All tasks should have executed despite failures")
+		assert.EqualValues(t, 4, executionCount.Load(), "All tasks should have executed despite failures")
 
 		// Check error messages
 		errorMessages := make([]string, len(errors))
@@ -70,23 +76,23 @@ func TestFaultTolerantGroup(t *testing.T) {
 	t.Run("All tasks fail", func(t *testing.T) {
 		g := errgroup.NewFaultTolerant()
 
-		executionCount := 0
+		var executionCount atomic.Int32
 		g.Go(func() error {
-			executionCount++
+			executionCount.Add(1)
 			return errors.New("error 1")
 		})
 		g.Go(func() error {
-			executionCount++
+			executionCount.Add(1)
 			return errors.New("error 2")
 		})
 		g.Go(func() error {
-			executionCount++
+			executionCount.Add(1)
 			return errors.New("error 3")
 		})
 
 		errors := g.Wait()
 		assert.Len(t, errors, 3, "Should have 3 errors")
-		assert.Equal(t, 3, executionCount, "All tasks should have executed")
+		assert.EqualValues(t, 3, executionCount.Load(), "All tasks should have executed")
 	})
 
 	t.Run("No tasks", func(t *testing.T) {
