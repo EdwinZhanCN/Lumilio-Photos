@@ -29,10 +29,11 @@ func (w *ReindexAssetsWorker) Work(ctx context.Context, job *river.Job[ReindexAs
 	}
 
 	return w.IndexingService.ProcessReindexAssets(ctx, service.ReindexAssetsInput{
-		RepositoryID: args.RepositoryID,
-		Tasks:        tasks,
-		Limit:        args.Limit,
-		Offset:       args.Offset,
-		MissingOnly:  args.MissingOnly,
+		RepositoryID:  args.RepositoryID,
+		Tasks:         tasks,
+		Limit:         args.Limit,
+		Offset:        args.Offset,
+		MissingOnly:   args.MissingOnly,
+		ResetSemantic: args.ResetSemantic,
 	})
 }

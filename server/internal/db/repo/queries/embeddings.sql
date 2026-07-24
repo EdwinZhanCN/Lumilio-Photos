@@ -14,6 +14,13 @@ WHERE embedding_type = $1
   AND dimensions = $3
   AND distance_metric = $4;
 
+-- name: ClearDefaultSearchSpaceByType :exec
+UPDATE embedding_spaces
+SET is_default_search = false,
+    updated_at = NOW()
+WHERE embedding_type = $1
+  AND is_default_search = true;
+
 -- name: GetDefaultEmbeddingSpaceByType :one
 SELECT id, embedding_type, model_id, dimensions, distance_metric, search_enabled, is_default_search, created_at, updated_at
 FROM embedding_spaces

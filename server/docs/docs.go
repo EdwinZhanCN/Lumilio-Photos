@@ -3914,6 +3914,11 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
+                    "reset_semantic": {
+                        "description": "ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use\nafter switching the embedding model (drop+refill) so no two models' vectors\nare mixed. Honored only when the semantic task is included.",
+                        "example": false,
+                        "type": "boolean"
+                    },
                     "tasks": {
                         "example": [
                             "semantic",

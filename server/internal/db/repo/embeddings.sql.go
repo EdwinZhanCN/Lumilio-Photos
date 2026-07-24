@@ -12,6 +12,19 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
+const clearDefaultSearchSpaceByType = `-- name: ClearDefaultSearchSpaceByType :exec
+UPDATE embedding_spaces
+SET is_default_search = false,
+    updated_at = NOW()
+WHERE embedding_type = $1
+  AND is_default_search = true
+`
+
+func (q *Queries) ClearDefaultSearchSpaceByType(ctx context.Context, embeddingType string) error {
+	_, err := q.db.Exec(ctx, clearDefaultSearchSpaceByType, embeddingType)
+	return err
+}
+
 const countEmbeddingsByType = `-- name: CountEmbeddingsByType :one
 SELECT COUNT(*) as count
 FROM embeddings

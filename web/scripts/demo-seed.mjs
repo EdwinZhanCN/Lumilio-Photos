@@ -72,8 +72,37 @@ async function ensureAdmin() {
 /**
  * Demo media lands in its own named repository so it never mixes with a
  * developer's real library. An existing repository is reused, never recreated.
+ *
+ * A fresh instance is not "app initialized" until a primary repository exists,
+ * and `GET /repositories` is gated behind that readiness — so on first run we
+ * must create the primary repository through the ungated `POST /repositories`
+ * before any gated call. On a fresh instance the demo repository itself becomes
+ * the primary; when a primary already exists (e.g. a developer's real library),
+ * the demo lands in a separate regular repository.
  */
 async function ensureRepository(token) {
+  const status = await api("/api/v1/setup/status");
+
+  if (!status.primary_repository_initialized) {
+    try {
+      const { repository } = await api("/api/v1/repositories", {
+        method: "POST",
+        token,
+        body: JSON.stringify({
+          name: repositoryName,
+          role: "primary",
+          storage_strategy: "date",
+          duplicate_handling: "rename",
+        }),
+      });
+      return repository;
+    } catch (error) {
+      // A primary created concurrently or by a prior partial run is fine; fall
+      // through to discover and reuse it below.
+      if (!String(error).includes("primary_exists")) throw error;
+    }
+  }
+
   const { repositories } = await api("/api/v1/repositories", { token });
   const existing = repositories?.find((candidate) => candidate.name === repositoryName);
   if (existing) return existing;
