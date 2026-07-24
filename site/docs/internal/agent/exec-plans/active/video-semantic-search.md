@@ -4,24 +4,28 @@ Status: active, not started. **Sequenced after
 [embedding-architecture](../completed/embedding-architecture.md)** — it builds directly on the
 unified `search_embeddings` table and must not start until that refactor lands.
 Ships production text→video semantic search by generating SigLIP2 frame
-embeddings for video assets. Video reuses the same canonical (768-dim, cosine)
-space and the same retriever as photos, so one text query ranks photos and
-videos together.
+embeddings for video assets. Video reuses the same canonical (768-dim, L2
+unit-vector) space and the same retriever as photos, so one text query ranks
+photos and videos together.
 
 ## Dependency on the embedding refactor
 
-The architecture plan already delivers everything storage- and search-side:
+The architecture plan already delivers most of the storage/search side:
 
 - `search_embeddings` is **multi-row per asset** (`asset_id`, nullable
   `frame_ts_ms`, `vector(768)`), so a video is just N frame rows — no separate
   video table.
-- The **max-pool retriever** already returns `best_ts` (nearest frame timestamp),
-  which is exactly the video deep-link signal.
-- `canonicalizeEmbedding(emb, 768)` (truncate + renorm) is already the shared
+- The retriever already **max-pools per asset** (`MIN(dist) + GROUP BY asset_id`)
+  across all semantic paths, so video assets rank correctly out of the box.
+- `canonicalizeSemanticVector` (truncate 768 + L2 renorm) is the shared
   write/query path; video frames call the same helper.
 
-So this plan is only: **extract frames → embed them → write rows → wire the
-pipeline → backfill → surface in the UI.** The earlier draft's separate
+Still owned by **this** plan: adding `best_ts` (the nearest frame's `frame_ts_ms`)
+to the max-pool query and threading it to the search DTO — it was deferred here
+since photos are single-row and need no timestamp.
+
+So this plan is: **extract frames → embed them → write rows → add best_ts → wire
+the pipeline → backfill → surface in the UI.** The earlier draft's separate
 `video_frame_embeddings` table and bespoke retriever are dropped; they are
 subsumed by the unified table.
 
@@ -87,9 +91,10 @@ Bounded by `N_max`.
 2. `internal/queue/ml_video_frames_worker.go`: gated by `SemanticEnabled` (+ new
    `VideoSemanticEnabled` sub-toggle). For each frame:
    `imagesource.ProcessMLImageTensorBytes(..., PurposeSemantic)` →
-   `LumenService.SemanticImageEmbed` → `canonicalizeEmbedding(emb, 768)` → collect
-   rows → replace the asset's frame rows in one transaction
-   (`DeleteSearchEmbeddingsByAsset` + `UpsertSearchEmbeddings`).
+   `LumenService.SemanticImageEmbed` → `canonicalizeSemanticVector` → resolve the
+   default semantic space → replace the asset's rows in one transaction
+   (`DeleteSearchEmbeddingsByAsset` + per-frame `InsertSearchEmbedding` with
+   `frame_ts_ms` set).
 3. Register the worker in `app/app.go` (next to the ML workers ~line 288) and add
    `process_video_frames` to `internal/queue/queue_setup.go:48` with low
    `MaxWorkers` (start at 1, matching the transcode budget) to bound CPU.
@@ -117,11 +122,14 @@ The reindex path is photo-scoped (`CountPhotoAssetsForIndexing`,
 Note: the architecture plan's model-swap reindex (`DeleteAllSearchEmbeddings` +
 reprocess) must reprocess videos too — reuse this task on that path.
 
-### Phase 5 — Frontend
+### Phase 5 — best_ts + Frontend
 
-1. Search results: render video hits (badge, poster) and, when `best_ts` is
+1. Add `best_ts` to the max-pool query — `(array_agg(frame_ts_ms ORDER BY
+   dist))[1]` — in the retriever(s) under `internal/search`, thread it through
+   `Candidate` and the search DTO, then run `make dto`. NULL for photos.
+2. Search results: render video hits (badge, poster) and, when `best_ts` is
    present, deep-link the player to that timestamp.
-2. Settings → indexing: expose `VideoSemanticEnabled` and reindex progress. i18n
+3. Settings → indexing: expose `VideoSemanticEnabled` and reindex progress. i18n
    keys via extract-then-fill.
 
 ## Config additions
