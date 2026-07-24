@@ -5,6 +5,8 @@ services:
         build:
             context: .
             dockerfile: web/e2e/support/fakelumen.Dockerfile
+        ports:
+            - "127.0.0.1:${LUMILIO_E2E_LUMEN_METRICS_PORT:-16658}:50052"
         healthcheck:
             test: ["CMD", "/fakelumen", "-health-check", "127.0.0.1:50051"]
             interval: 1s

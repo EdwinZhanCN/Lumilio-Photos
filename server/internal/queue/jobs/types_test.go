@@ -2,10 +2,12 @@ package jobs
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
 
 func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
@@ -48,6 +50,7 @@ func TestMLProcessArgsInsertOpts(t *testing.T) {
 		"ocr":      ProcessOcrArgs{}.InsertOpts(),
 		"face":     ProcessFaceArgs{}.InsertOpts(),
 		"zeroshot": ZeroshotClassifyArgs{}.InsertOpts(),
+		"video":    ProcessVideoFramesArgs{}.InsertOpts(),
 	}
 
 	for name, opts := range tests {
@@ -64,7 +67,36 @@ func TestMLProcessArgsInsertOpts(t *testing.T) {
 			if opts.UniqueOpts.ByPeriod != 5*time.Minute {
 				t.Fatalf("expected %s jobs to use a 5-minute uniqueness period, got %s", name, opts.UniqueOpts.ByPeriod)
 			}
+			if slices.Contains(opts.UniqueOpts.ByState, rivertype.JobStateCompleted) {
+				t.Fatalf("completed %s jobs must not block explicit reprocessing", name)
+			}
+			for _, state := range []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateRunning,
+				rivertype.JobStateScheduled,
+			} {
+				if !slices.Contains(opts.UniqueOpts.ByState, state) {
+					t.Fatalf("expected %s jobs to dedupe active state %s", name, state)
+				}
+			}
 		})
+	}
+}
+
+func TestAssetRetryPayloadDedupesOnlyOverlappingRequestsPerAsset(t *testing.T) {
+	t.Parallel()
+
+	opts := AssetRetryPayload{}.InsertOpts()
+	if !opts.UniqueOpts.ByArgs {
+		t.Fatal("retry jobs must be unique by asset arguments")
+	}
+	if slices.Contains(opts.UniqueOpts.ByState, rivertype.JobStateCompleted) {
+		t.Fatal("a completed retry must not block a later explicit retry")
+	}
+	if !slices.Contains(opts.UniqueOpts.ByState, rivertype.JobStateRunning) {
+		t.Fatal("overlapping running retries must be deduplicated")
 	}
 }
 

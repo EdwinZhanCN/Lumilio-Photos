@@ -4184,18 +4184,8 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 
 	// Validate requested tasks (using queue names as canonical task identifiers)
 	if len(req.Tasks) > 0 {
-		validQueues := map[string]bool{
-			"metadata_asset":   true,
-			"thumbnail_asset":  true,
-			"transcode_asset":  true,
-			"process_semantic": true,
-			"process_bioclip":  true,
-			"process_ocr":      true,
-			"process_face":     true,
-		}
-
 		for _, task := range req.Tasks {
-			if !validQueues[task] {
+			if !isValidReprocessQueue(task) {
 				api.GinBadRequest(c, fmt.Errorf("invalid queue name: %s", task), fmt.Sprintf("Invalid queue name: %s", task))
 				return
 			}
@@ -4372,6 +4362,22 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 
 		api.JSONOK(c, response)
 		return
+	}
+}
+
+func isValidReprocessQueue(queue string) bool {
+	switch queue {
+	case "metadata_asset",
+		"thumbnail_asset",
+		"transcode_asset",
+		"process_semantic",
+		"process_bioclip",
+		"process_ocr",
+		"process_face",
+		"process_video_frames":
+		return true
+	default:
+		return false
 	}
 }
 

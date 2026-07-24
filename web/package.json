@@ -10,6 +10,7 @@
     "e2e:down": "node e2e/support/environment.mjs down",
     "e2e:logs": "node e2e/support/environment.mjs logs",
     "e2e:seed": "vp run assets:sync && node e2e/support/seed.mjs",
+    "e2e:seed:video-semantic": "vp run assets:sync -- --profile e2e && node e2e/support/seed.mjs",
     "e2e:test": "playwright test",
     "demo:seed": "node scripts/demo-seed.mjs",
     "setup:depth": "node scripts/fetch-depth-model.mjs",
@@ -28,6 +29,7 @@
     "test:hash-perf": "VITEST_HASH_PERF=true vp test run src/workers/hash.perf.test.ts",
     "test:watch": "vp test watch",
     "test:browser": "vp run e2e:test --grep @smoke",
+    "test:video-semantic": "vp run e2e:test --grep @video-regression --workers=1",
     "test:bundle": "vp build && node scripts/check-bundle-budget.mjs",
     "test:ui": "vp test --ui"
   },

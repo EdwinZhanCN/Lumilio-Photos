@@ -15,8 +15,10 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -30,13 +32,20 @@ import (
 )
 
 const (
-	defaultAddress = ":50051"
-	modelID        = "lumilio-e2e-deterministic-v1"
+	defaultAddress        = ":50051"
+	defaultMetricsAddress = ":50052"
+	modelID               = "lumilio-e2e-deterministic-v1"
 )
+
+type inferenceMetrics struct {
+	semanticImage atomic.Uint64
+	semanticText  atomic.Uint64
+}
 
 type inferenceServer struct {
 	pb.UnimplementedInferenceServer
-	result []byte
+	result  []byte
+	metrics *inferenceMetrics
 }
 
 func newInferenceServer() (*inferenceServer, error) {
@@ -50,7 +59,7 @@ func newInferenceServer() (*inferenceServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal deterministic embedding: %w", err)
 	}
-	return &inferenceServer{result: result}, nil
+	return &inferenceServer{result: result, metrics: &inferenceMetrics{}}, nil
 }
 
 func semanticCapability() *pb.Capability {
@@ -115,7 +124,10 @@ func (s *inferenceServer) Infer(stream grpc.BidiStreamingServer[pb.InferRequest,
 		return status.Error(codes.InvalidArgument, "inference request is empty")
 	}
 	switch request.GetTask() {
-	case types.TaskSemanticImageEmbed, types.TaskSemanticTextEmbed:
+	case types.TaskSemanticImageEmbed:
+		s.metrics.semanticImage.Add(1)
+	case types.TaskSemanticTextEmbed:
+		s.metrics.semanticText.Add(1)
 	default:
 		return status.Errorf(codes.Unimplemented, "unsupported E2E task %q", request.GetTask())
 	}
@@ -148,12 +160,29 @@ func runHealthCheck(endpoint string) error {
 	return err
 }
 
-func run(address string) error {
+func metricsHandler(metrics *inferenceMetrics) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]uint64{
+			"semantic_image": metrics.semanticImage.Load(),
+			"semantic_text":  metrics.semanticText.Load(),
+		})
+	})
+	return mux
+}
+
+func run(address string, metricsAddress string) error {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
+	metricsListener, err := net.Listen("tcp", metricsAddress)
+	if err != nil {
+		return err
+	}
+	defer metricsListener.Close()
 
 	service, err := newInferenceServer()
 	if err != nil {
@@ -161,16 +190,38 @@ func run(address string) error {
 	}
 	server := grpc.NewServer()
 	pb.RegisterInferenceServer(server, service)
+	metricsServer := &http.Server{
+		Handler:           metricsHandler(service.metrics),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	serveErrors := make(chan error, 2)
 	go func() {
-		<-ctx.Done()
-		server.GracefulStop()
+		serveErrors <- server.Serve(listener)
+	}()
+	go func() {
+		serveErrors <- metricsServer.Serve(metricsListener)
 	}()
 
-	log.Printf("deterministic Lumen E2E fixture listening on %s", listener.Addr())
-	if err := server.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+	log.Printf(
+		"deterministic Lumen E2E fixture listening on %s (metrics %s)",
+		listener.Addr(),
+		metricsListener.Addr(),
+	)
+	select {
+	case <-ctx.Done():
+	case err := <-serveErrors:
+		if err != nil && !errors.Is(err, grpc.ErrServerStopped) && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+	}
+
+	server.GracefulStop()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
@@ -178,6 +229,7 @@ func run(address string) error {
 
 func main() {
 	address := flag.String("listen", defaultAddress, "gRPC listen address")
+	metricsAddress := flag.String("metrics-listen", defaultMetricsAddress, "HTTP metrics listen address")
 	healthCheck := flag.String("health-check", "", "probe an existing fixture endpoint")
 	flag.Parse()
 
@@ -185,7 +237,7 @@ func main() {
 	if *healthCheck != "" {
 		err = runHealthCheck(*healthCheck)
 	} else {
-		err = run(*address)
+		err = run(*address, *metricsAddress)
 	}
 	if err != nil {
 		log.Fatal(err)
