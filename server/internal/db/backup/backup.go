@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -128,8 +129,8 @@ func platformToolDirs(major int, goos string) []string {
 	case "darwin":
 		formula := fmt.Sprintf("postgresql@%d", major)
 		return []string{
-			filepath.Join("/opt/homebrew/opt", formula, "bin"),
-			filepath.Join("/usr/local/opt", formula, "bin"),
+			path.Join("/opt/homebrew/opt", formula, "bin"),
+			path.Join("/usr/local/opt", formula, "bin"),
 		}
 	case "linux":
 		return []string{fmt.Sprintf("/usr/lib/postgresql/%d/bin", major)}

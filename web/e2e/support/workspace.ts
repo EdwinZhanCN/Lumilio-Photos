@@ -2,7 +2,12 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { api } from "./api";
-import { smokeAsset, SMOKE_SCAN_ASSET, SMOKE_UPLOAD_ASSET } from "./assets";
+import {
+  smokeAsset,
+  SMOKE_SCAN_ASSET,
+  SMOKE_UPLOAD_ASSET,
+  SMOKE_VIDEO_ASSET,
+} from "./assets";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const compose = ["compose", "-f", "docker-compose.e2e.yml", "-p", "lumilio-photos-e2e"];
@@ -16,12 +21,16 @@ const bootstrap = {
 export type Workspace = {
   username: string;
   password: string;
+  token: string;
+  repositoryId: string;
   repositoryName: string;
   scanFilename: string;
   /** Absolute path of the shared source image the upload spec sends. */
   uploadSource: string;
   /** Per-worker name it is uploaded under, so assertions cannot cross workers. */
   uploadFilename: string;
+  videoSource: string;
+  videoFilename: string;
 };
 
 type Auth = { token: string };
@@ -112,9 +121,13 @@ export async function provisionWorkspace(index: number): Promise<Workspace> {
   return {
     username,
     password: bootstrap.password,
+    token,
+    repositoryId: repository.id,
     repositoryName: repository.name,
     scanFilename,
     uploadSource: smokeAsset(SMOKE_UPLOAD_ASSET),
     uploadFilename: `e2e-upload-w${index}.jpg`,
+    videoSource: smokeAsset(SMOKE_VIDEO_ASSET),
+    videoFilename: `e2e-video-w${index}.mp4`,
   };
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useState } from "react";
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
+import { useSearchParams } from "react-router-dom";
 
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { isVideo } from "../../../model/mediaTypes";
@@ -22,6 +23,8 @@ interface MediaViewerProps {
   isActive?: boolean;
   selectedAssetId?: string;
   onSelectedAssetChange?: (assetId: string) => void;
+  /** Optional start time in milliseconds (e.g. semantic search best frame). */
+  startTimeMs?: number;
 }
 
 /**
@@ -39,8 +42,19 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
   isActive = true,
   selectedAssetId: controlledSelectedAssetId,
   onSelectedAssetChange,
+  startTimeMs: startTimeMsProp,
 }) => {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
+  const startTimeMs = useMemo(() => {
+    if (startTimeMsProp != null && Number.isFinite(startTimeMsProp)) {
+      return startTimeMsProp;
+    }
+    const raw = searchParams.get("t_ms");
+    if (!raw) return undefined;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  }, [searchParams, startTimeMsProp]);
   const videoAsset = isVideo(asset);
   const mediaItemQuery = useAssetMediaItem(asset.asset_id, isActive);
   const mediaItem = mediaItemQuery.data?.media_item;
@@ -93,6 +107,11 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
             load="visible"
             crossOrigin
             playsInline
+            currentTime={
+              startTimeMs != null && Number.isFinite(startTimeMs) && startTimeMs > 0
+                ? startTimeMs / 1000
+                : undefined
+            }
             onError={(error) => console.error("Video player error:", error)}
           >
             <MediaProvider />

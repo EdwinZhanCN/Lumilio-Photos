@@ -1645,7 +1645,8 @@ func (s *assetService) searchAssetsBySemanticSpace(ctx context.Context, params Q
 WITH candidate_ids AS MATERIALIZED (
   SELECT
     a.asset_id,
-    MIN(%s) AS distance
+    MIN(%s) AS distance,
+    (array_agg(e.frame_ts_ms ORDER BY %s ASC NULLS LAST))[1] AS best_ts
   %s
   GROUP BY a.asset_id
   ORDER BY distance, a.asset_id DESC
@@ -1655,7 +1656,7 @@ SELECT a.*
 FROM candidate_ids c
 JOIN assets a ON a.asset_id = c.asset_id
 ORDER BY c.distance, c.asset_id DESC
-`, distanceExpr, baseSQL, limitPlaceholder, offsetPlaceholder)
+`, distanceExpr, distanceExpr, baseSQL, limitPlaceholder, offsetPlaceholder)
 
 	rows, err := s.pool.Query(ctx, query, builder.args...)
 	if err != nil {

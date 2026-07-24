@@ -1687,13 +1687,15 @@
         "bioclip": "识别植物、动物等生物主题。",
         "face": "检测并归类可识别的人脸。",
         "ocr": "读取照片画面中的可见文字。",
-        "semantic": "分析画面语义，用于相似检索和 0 样本识别。"
+        "semantic": "分析画面语义，用于相似检索和 0 样本识别。",
+        "videoSemantic": "从视频采样帧并嵌入，用于文本搜索。需要开启图像语义分析。"
       },
       "taskNames": {
         "bioclip": "BioCLIP 物种识别",
         "face": "人物识别",
         "ocr": "OCR 文字识别",
-        "semantic": "图像语义分析"
+        "semantic": "图像语义分析",
+        "videoSemantic": "视频语义搜索"
       },
       "validate": "验证连接",
       "validationError": "LLM 配置验证失败。",
