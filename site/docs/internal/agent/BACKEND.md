@@ -152,6 +152,28 @@ tags still define the contract.
 > `Record<string, never>`, so a frontend cast guessed `cameras` and silently
 > broke a feature.
 
+## Browser Session And Cross-Origin Boundary
+
+Short-lived access tokens remain explicit Bearer credentials. Long-lived
+refresh credentials are host-only `HttpOnly` cookies named `lumilio_refresh`,
+scoped to `/api/v1/auth`; they are never returned in JSON. Every successful
+session creation or rotation also returns a CSRF proof derived from that
+specific refresh credential. Refresh and logout require the proof in
+`X-CSRF-Token`, and `GET /api/v1/auth/csrf` lets an existing cookie session
+recover it after browser-readable state is cleared. Refresh rotation replaces
+the cookie, the CSRF proof, and any previous browser session presented on a new
+login.
+
+Same-origin browser access is dynamic and zero-config, including direct LAN
+addresses, public domains behind a reverse proxy, and Desktop localhost.
+`server.cors_allowed_origins` is only the exact allowlist for credentialed
+cross-origin browser sessions. Unlisted origins may still call public or Bearer
+API endpoints without cookies and receive wildcard CORS, but they never receive
+`Access-Control-Allow-Credentials`. Browser requests that create, rotate, or
+destroy cookie sessions must match the reconstructed request origin or that
+allowlist. Reverse proxies must overwrite, rather than append client-supplied,
+`X-Forwarded-Proto` and `X-Forwarded-Host`.
+
 ## Queues And Processing
 
 River worker counts and queue config live in `internal/queue/queue_setup.go`. Worker registration happens in `server/app/app.go`, and the implementations live in `internal/queue`. The processing pipeline uses services and processors for:

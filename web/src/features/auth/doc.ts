@@ -3,9 +3,16 @@
  *
  * {@link AuthProvider} owns the verified user session and exposes login, MFA,
  * completion, and logout commands. HTTP authentication is centralized in
- * {@link authMiddleware}: it attaches the access token, permits only one
- * refresh-token rotation at a time, and replays a failed request from a clone
- * captured before its body was consumed.
+ * {@link authMiddleware}: it attaches the short-lived access token, supplies
+ * the session-bound CSRF proof to unsafe requests, and replays a failed request
+ * from a clone captured before its body was consumed.
+ *
+ * The long-lived refresh credential exists only in a host-only `HttpOnly`
+ * cookie scoped to `/api/v1/auth`; browser JavaScript never receives or stores
+ * it. {@link refreshBrowserSession} recovers a non-secret CSRF proof from the
+ * cookie session, rotates the cookie and access token under a cross-tab Web
+ * Lock, and is also the bootstrap session probe. {@link logoutBrowserSession}
+ * uses the same lock so logout cannot race a refresh in another tab.
  *
  * Every session exit converges on {@link resetSession}. The reset invalidates
  * late refresh responses, removes tokens, aborts Lumilio streams, cancels and
@@ -57,6 +64,10 @@ import type { getPasskeySupport } from "./modules/webauthn/webauthn.ts";
 import type { AuthProvider } from "./state/AuthProvider.tsx";
 import type { resetSession } from "./state/resetSession.ts";
 import type { registerSessionExpiredHandler } from "../../lib/http-commons/sessionEvents.ts";
-import type { authMiddleware } from "@/lib/http-commons/client.ts";
+import type {
+  authMiddleware,
+  logoutBrowserSession,
+  refreshBrowserSession,
+} from "@/lib/http-commons/client.ts";
 
 export {};

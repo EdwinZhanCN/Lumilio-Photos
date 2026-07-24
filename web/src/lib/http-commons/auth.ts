@@ -1,15 +1,17 @@
 /**
  * Token management utilities for authentication
  *
- * This module provides functions for managing JWT tokens in localStorage.
- * Used by the openapi-fetch client for authentication.
+ * The short-lived access token and session-bound CSRF proof are
+ * browser-readable. The CSRF proof is not an independent credential, but still
+ * must not leak cross-origin. The long-lived refresh credential is an HttpOnly
+ * cookie and never enters this module.
  */
 
 import { resetSessionExpiredNotification } from "./sessionEvents.ts";
 
 // JWT Token management
 const TOKEN_KEY = "auth_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
+const CSRF_TOKEN_KEY = "csrf_token";
 const MEDIA_TOKEN_KEY = "media_token";
 const MEDIA_TOKEN_EXPIRES_AT_KEY = "media_token_expires_at";
 
@@ -21,21 +23,26 @@ const hasStorage = () => typeof localStorage !== "undefined";
 export const getToken = () => (hasStorage() ? localStorage.getItem(TOKEN_KEY) : null);
 
 /**
- * Get the current refresh token from localStorage
+ * Get the CSRF proof bound to the current HttpOnly refresh-cookie session.
  */
-export const getRefreshToken = () =>
-  hasStorage() ? localStorage.getItem(REFRESH_TOKEN_KEY) : null;
+export const getCSRFToken = () => (hasStorage() ? localStorage.getItem(CSRF_TOKEN_KEY) : null);
 
 /**
- * Save both access and refresh tokens to localStorage
+ * Save the short-lived access token and session-bound CSRF proof.
  */
-export const saveToken = (token: string, refreshToken: string) => {
+export const saveToken = (token: string, csrfToken: string) => {
   if (!hasStorage()) return;
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
-  if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  else localStorage.removeItem(REFRESH_TOKEN_KEY);
+  if (csrfToken) localStorage.setItem(CSRF_TOKEN_KEY, csrfToken);
+  else localStorage.removeItem(CSRF_TOKEN_KEY);
   resetSessionExpiredNotification();
+};
+
+export const saveCSRFToken = (csrfToken: string) => {
+  if (!hasStorage()) return;
+  if (csrfToken) localStorage.setItem(CSRF_TOKEN_KEY, csrfToken);
+  else localStorage.removeItem(CSRF_TOKEN_KEY);
 };
 
 export const getMediaToken = () => (hasStorage() ? localStorage.getItem(MEDIA_TOKEN_KEY) : null);
@@ -73,12 +80,12 @@ export const removeMediaToken = () => {
 };
 
 /**
- * Remove both tokens from localStorage (logout)
+ * Remove all browser-readable session material (logout)
  */
 export const removeToken = () => {
   if (!hasStorage()) return;
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(CSRF_TOKEN_KEY);
   localStorage.removeItem(MEDIA_TOKEN_KEY);
   localStorage.removeItem(MEDIA_TOKEN_EXPIRES_AT_KEY);
 };

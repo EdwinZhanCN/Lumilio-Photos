@@ -403,7 +403,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
-	authController := handler.NewAuthHandler(authService, authRateLimiter)
+	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL)
 	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, pgxPool, bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)

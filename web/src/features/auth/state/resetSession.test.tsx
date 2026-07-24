@@ -25,7 +25,7 @@ describe("resetSession", () => {
       })
       .catch(() => undefined);
     localStorage.setItem("auth_token", "token-a");
-    localStorage.setItem("refresh_token", "refresh-a");
+    localStorage.setItem("csrf_token", "csrf-a");
     localStorage.setItem("lumilio.settings.assets_state", "private filters");
     localStorage.setItem("assets_state_v1", "legacy private filters");
     usePreferencesStore.setState({
@@ -46,7 +46,7 @@ describe("resetSession", () => {
     expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
     expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
     expect(localStorage.getItem("auth_token")).toBeNull();
-    expect(localStorage.getItem("refresh_token")).toBeNull();
+    expect(localStorage.getItem("csrf_token")).toBeNull();
     expect(localStorage.getItem("lumilio.settings.assets_state")).toBeNull();
     expect(localStorage.getItem("assets_state_v1")).toBeNull();
     expect(usePreferencesStore.getState().workingRepositoryId).toBeUndefined();

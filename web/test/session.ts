@@ -8,8 +8,12 @@ import { http, HttpResponse, worker } from "./msw";
  */
 export function seedSession(user: Record<string, unknown>) {
   localStorage.setItem("auth_token", "test-access");
-  localStorage.setItem("refresh_token", "test-refresh");
+  localStorage.setItem("csrf_token", "test-csrf");
   worker.use(
+    http.get("*/api/v1/auth/csrf", () => HttpResponse.json({ csrfToken: "test-csrf" })),
+    http.post("*/api/v1/auth/refresh", () =>
+      HttpResponse.json({ token: "test-access", csrfToken: "test-csrf" }),
+    ),
     http.get("*/api/v1/auth/me", () => HttpResponse.json(user)),
     http.get("*/api/v1/auth/media-token", () =>
       HttpResponse.json({

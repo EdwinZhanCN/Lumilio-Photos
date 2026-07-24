@@ -18,7 +18,9 @@ tools_bin_dir = ""
 
 [server]
 port = "6680"
-# An empty array disables cross-origin access.
+# Browser origins listed here may use credentialed cross-origin cookie
+# sessions. Empty still permits same-origin Web/Desktop access and
+# credentialless cross-origin Bearer/public API calls.
 cors_allowed_origins = ["http://localhost:6657", "https://localhost:6657"]
 # Empty serves API only; otherwise this is the SPA root.
 web_root = ""

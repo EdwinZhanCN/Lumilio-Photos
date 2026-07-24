@@ -1,7 +1,9 @@
 package api
 
 import (
+	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -86,6 +88,7 @@ type AuthControllerInterface interface {
 	CompleteRequiredPasswordChange(c *gin.Context)
 	BeginPasskeyLogin(c *gin.Context)
 	VerifyPasskeyLogin(c *gin.Context)
+	GetCSRFToken(c *gin.Context)
 	RefreshToken(c *gin.Context)
 	Logout(c *gin.Context)
 	Me(c *gin.Context)
@@ -297,13 +300,10 @@ func NewRouter(
 	r.Use(gin.Recovery())
 	r.Use(requestErrorLogger(logger))
 	allowedOrigins := mapAllowedCORSOrigins(corsAllowedOrigins)
+	trustedSessionOrigin := trustedSessionOriginMiddleware(allowedOrigins)
 
 	// Add CORS middleware
-	r.Use(func(c *gin.Context) {
-		corsMiddleware(allowedOrigins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			c.Next()
-		})).ServeHTTP(c.Writer, c.Request)
-	})
+	r.Use(corsMiddleware(allowedOrigins))
 
 	// API routes
 	api := r.Group("/api")
@@ -324,7 +324,7 @@ func NewRouter(
 		setup := v1.Group("/setup")
 		{
 			setup.GET("/status", setupController.GetSetupStatus)
-			setup.POST("", setupController.Setup)
+			setup.POST("", trustedSessionOrigin, setupController.Setup)
 		}
 
 		settings := v1.Group("/settings")
@@ -350,15 +350,16 @@ func NewRouter(
 		// Authentication routes
 		auth := v1.Group("/auth")
 		{
-			auth.POST("/register/start", authController.StartRegistration)
+			auth.POST("/register/start", trustedSessionOrigin, authController.StartRegistration)
 			auth.POST("/login/options", authController.GetLoginOptions)
-			auth.POST("/login", authController.Login)
-			auth.POST("/password-change/complete", authController.CompleteRequiredPasswordChange)
+			auth.POST("/login", trustedSessionOrigin, authController.Login)
+			auth.POST("/password-change/complete", trustedSessionOrigin, authController.CompleteRequiredPasswordChange)
 			auth.POST("/passkeys/login/options", authController.BeginPasskeyLogin)
-			auth.POST("/passkeys/login/verify", authController.VerifyPasskeyLogin)
-			auth.POST("/mfa/verify", authController.VerifyMFA)
-			auth.POST("/refresh", authController.RefreshToken)
-			auth.POST("/logout", authController.Logout)
+			auth.POST("/passkeys/login/verify", trustedSessionOrigin, authController.VerifyPasskeyLogin)
+			auth.POST("/mfa/verify", trustedSessionOrigin, authController.VerifyMFA)
+			auth.GET("/csrf", authController.GetCSRFToken)
+			auth.POST("/refresh", trustedSessionOrigin, authController.RefreshToken)
+			auth.POST("/logout", trustedSessionOrigin, authController.Logout)
 			auth.GET("/me", authController.AuthMiddleware(), authController.Me)
 			auth.GET("/media-token", authController.AuthMiddleware(), authController.GetMediaToken)
 			auth.GET("/mfa", authController.AuthMiddleware(), authController.GetMFAStatus)
@@ -664,52 +665,88 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 }
 
 func mapAllowedCORSOrigins(configured []string) map[string]struct{} {
-	origins := map[string]struct{}{
-		"http://localhost:6657":  {},
-		"https://localhost:6657": {},
-	}
-
-	customOrigins := make(map[string]struct{})
+	origins := make(map[string]struct{})
 	for _, origin := range configured {
-		normalized := strings.TrimSpace(origin)
-		if normalized != "" {
-			customOrigins[normalized] = struct{}{}
+		normalized, _, ok := NormalizeOrigin(origin)
+		if ok {
+			origins[normalized] = struct{}{}
 		}
 	}
-
-	if len(customOrigins) == 0 {
-		return origins
-	}
-
-	return customOrigins
+	return origins
 }
 
-// corsMiddleware handles CORS headers
-func corsMiddleware(allowedOrigins map[string]struct{}, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-content-hash")
-		w.Header().Set("Vary", "Origin")
+// corsMiddleware keeps bearer/public API requests open to browser origins while
+// reserving credentialed cross-origin cookie sessions for explicitly trusted
+// origins. A wildcard is never combined with cookies or credentials.
+func corsMiddleware(allowedOrigins map[string]struct{}) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Content-Hash, X-CSRF-Token")
+		c.Writer.Header().Add("Vary", "Origin")
+		c.Writer.Header().Add("Vary", "Access-Control-Request-Method")
+		c.Writer.Header().Add("Vary", "Access-Control-Request-Headers")
 
-		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
 		if origin != "" {
-			if _, allowed := allowedOrigins[origin]; allowed {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			normalized, _, valid := NormalizeOrigin(origin)
+			_, trusted := allowedOrigins[normalized]
+			switch {
+			case valid && trusted:
+				c.Header("Access-Control-Allow-Origin", normalized)
+				c.Header("Access-Control-Allow-Credentials", "true")
+			case c.Request.Method == http.MethodOptions || c.GetHeader("Cookie") == "":
+				c.Header("Access-Control-Allow-Origin", "*")
 			}
 		}
 
-		if r.Method == "OPTIONS" {
-			if origin != "" {
-				if _, allowed := allowedOrigins[origin]; !allowed {
-					w.WriteHeader(http.StatusForbidden)
-					return
-				}
-			}
-			w.WriteHeader(http.StatusOK)
+		if c.Request.Method == http.MethodOptions {
+			c.Status(http.StatusNoContent)
+			c.Abort()
 			return
 		}
 
-		next.ServeHTTP(w, r)
-	})
+		c.Next()
+	}
+}
+
+// trustedSessionOriginMiddleware protects endpoints that create, rotate, or
+// destroy browser cookie sessions. Non-browser clients commonly omit Origin
+// and Referer; browser requests that provide either must match the dynamic
+// target origin or the explicit credentialed-CORS allowlist.
+func trustedSessionOriginMiddleware(allowedOrigins map[string]struct{}) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		if origin == "" {
+			referer := strings.TrimSpace(c.GetHeader("Referer"))
+			if referer != "" {
+				parsed, err := url.Parse(referer)
+				if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+					GinForbidden(c, errors.New("invalid request referer"), "Untrusted request origin")
+					c.Abort()
+					return
+				}
+				origin = (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host}).String()
+			}
+		}
+
+		if origin == "" {
+			if strings.EqualFold(strings.TrimSpace(c.GetHeader("Sec-Fetch-Site")), "cross-site") {
+				GinForbidden(c, errors.New("cross-site request has no verifiable origin"), "Untrusted request origin")
+				c.Abort()
+				return
+			}
+			c.Next()
+			return
+		}
+
+		normalized, _, valid := NormalizeOrigin(origin)
+		_, configured := allowedOrigins[normalized]
+		if !valid || (!IsSameRequestOrigin(c.Request, normalized) && !configured) {
+			GinForbidden(c, errors.New("request origin is not trusted"), "Untrusted request origin")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }

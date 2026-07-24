@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"server/config"
 	"server/internal/service"
@@ -21,7 +22,7 @@ func TestGetLoginOptions_InvalidUsername(t *testing.T) {
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
 	svc, err := service.NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
 	require.NoError(t, err)
-	h := NewAuthHandler(svc, nil)
+	h := NewAuthHandler(svc, nil, time.Hour)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -46,7 +47,7 @@ func TestGetLoginOptions_MissingUsername(t *testing.T) {
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
 	svc, err := service.NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
 	require.NoError(t, err)
-	h := NewAuthHandler(svc, nil)
+	h := NewAuthHandler(svc, nil, time.Hour)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)

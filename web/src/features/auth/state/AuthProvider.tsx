@@ -2,8 +2,9 @@ import React, { createContext, useReducer, useEffect, ReactNode, useRef, useCall
 import { useQueryClient } from "@tanstack/react-query";
 import { authReducer, initialState } from "./reducer";
 import { AuthAction, AuthResponse, AuthState, LoginResult, MFAMethod, User } from "../types.ts";
-import { getToken, getRefreshToken, saveToken } from "@/lib/http-commons/auth.ts";
+import { getCSRFToken, getToken, saveToken } from "@/lib/http-commons/auth.ts";
 import { $api } from "@/lib/http-commons/queryClient";
+import { logoutBrowserSession, refreshBrowserSession } from "@/lib/http-commons/client.ts";
 import { ensureMediaToken, getMediaTokenRefreshIntervalMs } from "@/lib/assets/mediaAccess.ts";
 import { useGlobal } from "@/contexts/GlobalContext.tsx";
 import { resetSession } from "./resetSession.ts";
@@ -33,10 +34,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatu
   const { resetSessionState } = useGlobal();
   const isInitialized = useRef(false);
   const currentUserMutation = $api.useMutation("get", "/api/v1/auth/me");
-  const refreshMutation = $api.useMutation("post", "/api/v1/auth/refresh");
   const loginMutation = $api.useMutation("post", "/api/v1/auth/login");
   const verifyMFAMutation = $api.useMutation("post", "/api/v1/auth/mfa/verify");
-  const logoutMutation = $api.useMutation("post", "/api/v1/auth/logout");
 
   const resetClientSession = useCallback(
     () =>
@@ -64,12 +63,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatu
   };
 
   const completeAuth = async (response: AuthResponse): Promise<User> => {
-    const { token, refreshToken, user } = response;
-    if (!token || !refreshToken || !user) {
+    const { token, csrfToken, user } = response;
+    if (!token || !csrfToken || !user) {
       throw new Error("auth.errors.invalidSessionResponse");
     }
 
-    saveToken(token, refreshToken || "");
+    saveToken(token, csrfToken);
     await ensureMediaToken(true);
     dispatch({ type: "AUTH_SUCCESS", payload: user });
     return user;
@@ -79,56 +78,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatu
     if (isInitialized.current) return;
 
     const initAuth = async () => {
-      const token = getToken();
-      const refreshToken = getRefreshToken();
-
-      if (!token && !refreshToken) {
-        // No stored session: not authenticated, but this is idle, not a failure.
-        dispatch({ type: "AUTH_IDLE" });
-        isInitialized.current = true;
-        return;
-      }
+      const hadSessionHint = Boolean(getToken() || getCSRFToken());
 
       try {
-        // 1. Try to get current user with existing access token
-        if (token) {
-          try {
-            const response = await currentUserMutation.mutateAsync({});
-            const responseData = response;
-            if (responseData) {
-              await ensureMediaToken();
-              dispatch({ type: "AUTH_SUCCESS", payload: responseData });
-              isInitialized.current = true;
-              return;
-            }
-          } catch (error) {
-            console.warn("Auth token validation failed:", error);
+        // The refresh cookie is HttpOnly, so bootstrap probes it directly.
+        // Rotation happens before reading user data and is serialized across
+        // browser tabs by the HTTP client.
+        const refreshedToken = await refreshBrowserSession();
+        if (refreshedToken) {
+          const responseData = await currentUserMutation.mutateAsync({});
+          if (responseData) {
+            await ensureMediaToken();
+            dispatch({ type: "AUTH_SUCCESS", payload: responseData });
+            isInitialized.current = true;
+            return;
           }
         }
 
-        // 2. If access token failed or missing, try refresh token
-        if (!token && refreshToken) {
-          try {
-            const refreshRes = await refreshMutation.mutateAsync({
-              body: { refreshToken },
-            });
-            const refreshData = refreshRes;
-            if (refreshData) {
-              await completeAuth(refreshData);
-              isInitialized.current = true;
-              return;
-            }
-          } catch (error) {
-            console.warn("Token refresh failed:", error);
-          }
+        if (hadSessionHint) {
+          await resetClientSession();
+          dispatch({
+            type: "AUTH_FAILURE",
+            payload: "auth.errors.sessionExpired",
+          });
+        } else {
+          dispatch({ type: "AUTH_IDLE" });
         }
-
-        // 3. Everything failed
-        await resetClientSession();
-        dispatch({
-          type: "AUTH_FAILURE",
-          payload: "auth.errors.sessionExpired",
-        });
       } catch (error) {
         console.error("Auth initialization failed:", error);
         await resetClientSession();
@@ -244,16 +219,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatu
   };
 
   const logout = async () => {
-    // Best-effort server-side revocation of the current device's refresh token.
+    // Best-effort server-side revocation of the current device's cookie session.
     // Always clear local state afterwards, even if the request fails, so the
     // user is never trapped in a logged-in UI.
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        await logoutMutation.mutateAsync({ body: { refreshToken } });
-      } catch (error) {
-        console.warn("Logout request failed; clearing local session anyway:", error);
+    try {
+      if (!(await logoutBrowserSession())) {
+        throw new Error("server did not confirm logout");
       }
+    } catch (error) {
+      console.warn("Logout request failed; clearing local session anyway:", error);
     }
     await resetClientSession();
     dispatch({ type: "LOGOUT" });
