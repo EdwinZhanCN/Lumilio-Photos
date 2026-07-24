@@ -51,6 +51,26 @@ if (!primary) {
   primary = created.repository;
 }
 
+// Keep the E2E ML surface deliberate. The deterministic external fixture only
+// implements the two semantic contracts under test; unrelated OCR, face and
+// BioCLIP workers stay disabled instead of accumulating retries.
+await request("/api/v1/settings/system", {
+  method: "PATCH",
+  headers,
+  body: JSON.stringify({
+    ml: {
+      semantic_enabled: true,
+      bioclip_enabled: false,
+      ocr_enabled: false,
+      face_enabled: false,
+      video_semantic_enabled: true,
+      video_max_frames: 8,
+      video_long_threshold_seconds: 300,
+      video_scene_threshold: 0.4,
+    },
+  }),
+});
+
 // Per-worker users, repositories and fixtures are provisioned by the
 // worker-scoped `workspace` fixture, not here: this layer only has to leave a
 // migrated database, a bootstrap admin, and the instance's single primary

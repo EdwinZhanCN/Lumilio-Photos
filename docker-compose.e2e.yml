@@ -1,6 +1,16 @@
 name: lumilio-photos-e2e
 
 services:
+    lumen-fixture:
+        build:
+            context: .
+            dockerfile: web/e2e/support/fakelumen.Dockerfile
+        healthcheck:
+            test: ["CMD", "/fakelumen", "-health-check", "127.0.0.1:50051"]
+            interval: 1s
+            timeout: 5s
+            retries: 30
+
     db:
         build:
             context: .
@@ -26,6 +36,8 @@ services:
         depends_on:
             db:
                 condition: service_healthy
+            lumen-fixture:
+                condition: service_healthy
         secrets:
             - db_bootstrap_password
         volumes:
@@ -35,7 +47,7 @@ services:
             # chowned /data/storage/primary is already there.
             - storage_data:/data/storage
             - app_state_data:/data/app-state
-            - ./web/e2e/support/server.e2e.toml:/app/config/server.container.toml:ro
+            - ./web/e2e/support/server.e2e.toml:/app/config/server.toml:ro
         healthcheck:
             test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
             interval: 2s
