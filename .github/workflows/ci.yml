@@ -132,6 +132,9 @@ jobs:
             - name: Run Chromium smoke
               run: make web-browser-test
 
+            - name: Run video semantic regression
+              run: make web-video-semantic-test
+
             - name: Capture E2E service logs
               if: failure()
               run: |
