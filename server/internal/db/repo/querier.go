@@ -64,6 +64,7 @@ type Querier interface {
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
 	CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error)
+	ClearDefaultSearchSpaceByType(ctx context.Context, embeddingType string) error
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
@@ -76,6 +77,7 @@ type Querier interface {
 	// Count query matching GetAssetsUnified WHERE clause
 	// Returns total count of assets matching the filters (for pagination)
 	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
+	CountAssetsWithSearchEmbedding(ctx context.Context) (int64, error)
 	CountBioAlbumPhotoAssets(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error)
@@ -92,9 +94,9 @@ type Querier interface {
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPersonFacesScoped(ctx context.Context, arg CountPersonFacesScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error)
 	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountPhotoAssetsWithSemanticEmbedding(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	// Count query matching GetPhotoMapPoints.
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
 	CountPrimaryRepositories(ctx context.Context) (int64, error)
@@ -130,6 +132,7 @@ type Querier interface {
 	DeleteAgentPin(ctx context.Context, arg DeleteAgentPinParams) error
 	DeleteAlbum(ctx context.Context, albumID int32) error
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteAllSearchEmbeddings(ctx context.Context) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteCloudCredential(ctx context.Context, credentialID pgtype.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
@@ -157,6 +160,7 @@ type Querier interface {
 	DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error
 	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
 	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
+	DeleteSearchEmbeddingsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteShareLink(ctx context.Context, arg DeleteShareLinkParams) (int64, error)
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	// Presentation stacks ------------------------------------------------------
@@ -336,6 +340,7 @@ type Querier interface {
 	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (GetPrimaryEmbeddingRow, error)
 	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
 	GetPrimaryRepository(ctx context.Context) (Repository, error)
+	GetPrimarySearchEmbedding(ctx context.Context, assetID pgtype.UUID) (GetPrimarySearchEmbeddingRow, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRefreshTokenRecordByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRegistrationSessionByID(ctx context.Context, sessionID pgtype.UUID) (RegistrationSession, error)
@@ -403,6 +408,9 @@ type Querier interface {
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
 	InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error
 	InsertLocationClustersForScope(ctx context.Context, arg InsertLocationClustersForScopeParams) ([]LocationCluster, error)
+	// Dedicated fixed-dimension semantic search vectors (see migration 000012).
+	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
+	InsertSearchEmbedding(ctx context.Context, arg InsertSearchEmbeddingParams) error
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
@@ -425,9 +433,9 @@ type Querier interface {
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
 	ListPersonFacesScoped(ctx context.Context, arg ListPersonFacesScopedParams) ([]ListPersonFacesScopedRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
-	ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error)
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
+	ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, arg ListPhotoAssetsMissingSemanticEmbeddingParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID pgtype.UUID) ([]RepositoryCloudBinding, error)
 	ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, error)

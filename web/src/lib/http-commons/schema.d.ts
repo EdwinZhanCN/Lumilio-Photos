@@ -12791,6 +12791,13 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /**
+             * @description ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use
+             *     after switching the embedding model (drop+refill) so no two models' vectors
+             *     are mixed. Honored only when the semantic task is included.
+             * @example false
+             */
+            reset_semantic?: boolean;
+            /**
              * @example [
              *       "semantic",
              *       "ocr"

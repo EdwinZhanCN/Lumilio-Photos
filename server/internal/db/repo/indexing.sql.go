@@ -67,33 +67,6 @@ func (q *Queries) CountPhotoAssetsForIndexing(ctx context.Context, repositoryID 
 	return count, err
 }
 
-const countPhotoAssetsWithEmbeddingType = `-- name: CountPhotoAssetsWithEmbeddingType :one
-SELECT COUNT(*) AS count
-FROM assets a
-WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
-  AND EXISTS (
-    SELECT 1
-    FROM embeddings e
-    WHERE e.asset_id = a.asset_id
-      AND e.embedding_type = $1::text
-      AND e.is_primary = true
-  )
-  AND ($2::uuid IS NULL OR a.repository_id = $2)
-`
-
-type CountPhotoAssetsWithEmbeddingTypeParams struct {
-	EmbeddingType string      `db:"embedding_type" json:"embedding_type"`
-	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
-}
-
-func (q *Queries) CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPhotoAssetsWithEmbeddingType, arg.EmbeddingType, arg.RepositoryID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countPhotoAssetsWithFaceResults = `-- name: CountPhotoAssetsWithFaceResults :one
 SELECT COUNT(*) AS count
 FROM assets a
@@ -134,6 +107,27 @@ func (q *Queries) CountPhotoAssetsWithOCRResults(ctx context.Context, repository
 	return count, err
 }
 
+const countPhotoAssetsWithSemanticEmbedding = `-- name: CountPhotoAssetsWithSemanticEmbedding :one
+SELECT COUNT(*) AS count
+FROM assets a
+WHERE a.type = 'PHOTO'
+  AND a.is_deleted = false
+  AND EXISTS (
+    SELECT 1
+    FROM search_embeddings se
+    WHERE se.asset_id = a.asset_id
+      AND se.frame_ts_ms IS NULL
+  )
+  AND ($1::uuid IS NULL OR a.repository_id = $1)
+`
+
+func (q *Queries) CountPhotoAssetsWithSemanticEmbedding(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPhotoAssetsWithSemanticEmbedding, repositoryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const listPhotoAssetsForIndexingBatch = `-- name: ListPhotoAssetsForIndexingBatch :many
 WITH page_ids AS MATERIALIZED (
   SELECT
@@ -161,94 +155,6 @@ type ListPhotoAssetsForIndexingBatchParams struct {
 
 func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, listPhotoAssetsForIndexingBatch, arg.RepositoryID, arg.Offset, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Asset
-	for rows.Next() {
-		var i Asset
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-			&i.GpsLatitude,
-			&i.GpsLongitude,
-			&i.GpsGeohash5,
-			&i.GpsGeohash7,
-			&i.ExifRaw,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPhotoAssetsMissingEmbeddingType = `-- name: ListPhotoAssetsMissingEmbeddingType :many
-WITH page_ids AS MATERIALIZED (
-  SELECT
-    a.asset_id,
-    COALESCE(a.taken_time, a.upload_time) AS sort_time
-  FROM assets a
-  WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
-    AND NOT EXISTS (
-      SELECT 1
-      FROM embeddings e
-      WHERE e.asset_id = a.asset_id
-        AND e.embedding_type = $1::text
-        AND e.is_primary = true
-    )
-    AND ($2::uuid IS NULL OR a.repository_id = $2)
-  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT $4
-  OFFSET $3
-)
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
-FROM page_ids p
-JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.sort_time DESC, p.asset_id DESC
-`
-
-type ListPhotoAssetsMissingEmbeddingTypeParams struct {
-	EmbeddingType string      `db:"embedding_type" json:"embedding_type"`
-	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Offset        int32       `db:"offset" json:"offset"`
-	Limit         int32       `db:"limit" json:"limit"`
-}
-
-func (q *Queries) ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listPhotoAssetsMissingEmbeddingType,
-		arg.EmbeddingType,
-		arg.RepositoryID,
-		arg.Offset,
-		arg.Limit,
-	)
 	if err != nil {
 		return nil, err
 	}
@@ -409,6 +315,87 @@ type ListPhotoAssetsMissingOCRResultsParams struct {
 
 func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, listPhotoAssetsMissingOCRResults, arg.RepositoryID, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.ContentHash,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
+			&i.ExifRaw,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPhotoAssetsMissingSemanticEmbedding = `-- name: ListPhotoAssetsMissingSemanticEmbedding :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'PHOTO'
+    AND a.is_deleted = false
+    AND NOT EXISTS (
+      SELECT 1
+      FROM search_embeddings se
+      WHERE se.asset_id = a.asset_id
+        AND se.frame_ts_ms IS NULL
+    )
+    AND ($1::uuid IS NULL OR a.repository_id = $1)
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT $3
+  OFFSET $2
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC
+`
+
+type ListPhotoAssetsMissingSemanticEmbeddingParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	Offset       int32       `db:"offset" json:"offset"`
+	Limit        int32       `db:"limit" json:"limit"`
+}
+
+func (q *Queries) ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, arg ListPhotoAssetsMissingSemanticEmbeddingParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, listPhotoAssetsMissingSemanticEmbedding, arg.RepositoryID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

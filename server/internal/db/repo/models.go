@@ -553,6 +553,16 @@ type ReverseGeocodeCache struct {
 	ExpiresAt   pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
+type SearchEmbedding struct {
+	ID        int64              `db:"id" json:"id"`
+	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	SpaceID   int64              `db:"space_id" json:"space_id"`
+	FrameTsMs *int32             `db:"frame_ts_ms" json:"frame_ts_ms"`
+	Vector    *pgvector.Vector   `db:"vector" json:"vector"`
+	ModelID   string             `db:"model_id" json:"model_id"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type Setting struct {
 	ID                  int32              `db:"id" json:"id"`
 	LlmAgentEnabled     bool               `db:"llm_agent_enabled" json:"llm_agent_enabled"`
