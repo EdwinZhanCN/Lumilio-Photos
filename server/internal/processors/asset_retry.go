@@ -132,7 +132,9 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	}
 
 	// Enqueue tasks based on queue names (bijection: queue name = task name)
-	// Available queues: metadata_asset, thumbnail_asset, transcode_asset, process_semantic, process_bioclip, process_ocr, process_face
+	// Available queues: metadata_asset, thumbnail_asset, transcode_asset,
+	// process_semantic, process_bioclip, process_ocr, process_face,
+	// process_video_frames
 
 	// Enqueue metadata_asset if requested (all asset types support metadata)
 	if queueSet["metadata_asset"] {

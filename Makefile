@@ -42,7 +42,7 @@ COMPOSE = $(if $(COMPOSE_BIN),$(COMPOSE_BIN) -f $(COMPOSE_FILE) -p $(COMPOSE_PRO
 
 DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
 
-.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test dto db db-reset dev-reset \
+.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-video-semantic-test dto db db-reset dev-reset \
 	desktop-dev desktop-build desktop-test desktop-panel \
 	.server-config .server-secret .web-env
 
@@ -89,6 +89,9 @@ web-test:
 
 web-browser-test:
 	cd $(WEB_DIR) && $(VP) run e2e:seed && $(VP) run test:browser
+
+web-video-semantic-test:
+	cd $(WEB_DIR) && $(VP) run e2e:seed:video-semantic && $(VP) run test:video-semantic
 
 desktop-panel:
 	@echo "==> Building desktop control panel (Svelte, embedded into the Go binary)"
