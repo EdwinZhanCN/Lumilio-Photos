@@ -30,10 +30,14 @@ type LLMSettingsDTO struct {
 }
 
 type MLSettingsDTO struct {
-	SemanticEnabled bool `json:"semantic_enabled"`
-	BioCLIPEnabled  bool `json:"bioclip_enabled"`
-	OCREnabled      bool `json:"ocr_enabled"`
-	FaceEnabled     bool `json:"face_enabled"`
+	SemanticEnabled           bool    `json:"semantic_enabled"`
+	BioCLIPEnabled            bool    `json:"bioclip_enabled"`
+	OCREnabled                bool    `json:"ocr_enabled"`
+	FaceEnabled               bool    `json:"face_enabled"`
+	VideoSemanticEnabled      bool    `json:"video_semantic_enabled"`
+	VideoMaxFrames            int32   `json:"video_max_frames" example:"8"`
+	VideoLongThresholdSeconds int32   `json:"video_long_threshold_seconds" example:"300"`
+	VideoSceneThreshold       float64 `json:"video_scene_threshold" example:"0.4"`
 }
 
 type RepositoryDefaultsDTO struct {
@@ -63,10 +67,14 @@ type UpdateLLMSettingsDTO struct {
 }
 
 type UpdateMLSettingsDTO struct {
-	SemanticEnabled *bool `json:"semantic_enabled,omitempty"`
-	BioCLIPEnabled  *bool `json:"bioclip_enabled,omitempty"`
-	OCREnabled      *bool `json:"ocr_enabled,omitempty"`
-	FaceEnabled     *bool `json:"face_enabled,omitempty"`
+	SemanticEnabled           *bool    `json:"semantic_enabled,omitempty"`
+	BioCLIPEnabled            *bool    `json:"bioclip_enabled,omitempty"`
+	OCREnabled                *bool    `json:"ocr_enabled,omitempty"`
+	FaceEnabled               *bool    `json:"face_enabled,omitempty"`
+	VideoSemanticEnabled      *bool    `json:"video_semantic_enabled,omitempty"`
+	VideoMaxFrames            *int32   `json:"video_max_frames,omitempty" binding:"omitempty,min=1,max=32"`
+	VideoLongThresholdSeconds *int32   `json:"video_long_threshold_seconds,omitempty" binding:"omitempty,min=30,max=3600"`
+	VideoSceneThreshold       *float64 `json:"video_scene_threshold,omitempty" binding:"omitempty,min=0.05,max=0.95"`
 }
 
 type ValidateLLMSettingsResponseDTO struct {
@@ -114,10 +122,14 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 			APIKeyConfigured: settings.LLM.APIKeyConfigured,
 		},
 		ML: MLSettingsDTO{
-			SemanticEnabled: settings.ML.SemanticEnabled,
-			BioCLIPEnabled:  settings.ML.BioCLIPEnabled,
-			OCREnabled:      settings.ML.OCREnabled,
-			FaceEnabled:     settings.ML.FaceEnabled,
+			SemanticEnabled:           settings.ML.SemanticEnabled,
+			BioCLIPEnabled:            settings.ML.BioCLIPEnabled,
+			OCREnabled:                settings.ML.OCREnabled,
+			FaceEnabled:               settings.ML.FaceEnabled,
+			VideoSemanticEnabled:      settings.ML.VideoSemanticEnabled,
+			VideoMaxFrames:            settings.ML.VideoMaxFrames,
+			VideoLongThresholdSeconds: settings.ML.VideoLongThresholdSeconds,
+			VideoSceneThreshold:       settings.ML.VideoSceneThreshold,
 		},
 		Backup: BackupSettingsDTO{
 			Enabled:       settings.Backup.Enabled,
@@ -146,10 +158,14 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 
 	if dto.ML != nil {
 		input.ML = &service.UpdateMLSettingsInput{
-			SemanticEnabled: dto.ML.SemanticEnabled,
-			BioCLIPEnabled:  dto.ML.BioCLIPEnabled,
-			OCREnabled:      dto.ML.OCREnabled,
-			FaceEnabled:     dto.ML.FaceEnabled,
+			SemanticEnabled:           dto.ML.SemanticEnabled,
+			BioCLIPEnabled:            dto.ML.BioCLIPEnabled,
+			OCREnabled:                dto.ML.OCREnabled,
+			FaceEnabled:               dto.ML.FaceEnabled,
+			VideoSemanticEnabled:      dto.ML.VideoSemanticEnabled,
+			VideoMaxFrames:            dto.ML.VideoMaxFrames,
+			VideoLongThresholdSeconds: dto.ML.VideoLongThresholdSeconds,
+			VideoSceneThreshold:       dto.ML.VideoSceneThreshold,
 		}
 	}
 

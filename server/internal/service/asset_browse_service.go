@@ -52,11 +52,13 @@ func preferredStackFocusAssetID(stack *BrowseStack) uuid.UUID {
 
 // BrowseItem is one gallery row: Type is "asset" or "stack", ID is a stable prefixed key ("asset:..." / "stack:...").
 // Asset always carries the thumbnail row payload (cover for stacks). Stack is set only when Type is "stack".
+// BestTsMs is search-hit metadata (nearest matching video frame); nil for photos / non-search browse.
 type BrowseItem struct {
-	Type  string
-	ID    string
-	Asset repo.Asset
-	Stack *BrowseStack
+	Type     string
+	ID       string
+	Asset    repo.Asset
+	Stack    *BrowseStack
+	BestTsMs *int32
 }
 
 // BrowseQueryResult is the unified browse/list response: Items matches pagination, TotalVisible counts rows
@@ -167,6 +169,7 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 		if fused, ok := s.runSearchAssetsFusedSet(ctx, params); ok {
 			result.TopResultsMeta = fused.meta()
 			ids := fused.ids()
+			bestTsByID := fused.bestTsByID()
 
 			// Best Results exists only when the set exceeds the showcase size.
 			if len(ids) >= params.TopResultsLimit {
@@ -174,7 +177,7 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 				if err != nil {
 					return SearchBrowseResult{}, err
 				}
-				result.TopResults = assetsToBrowseItems(topAssets)
+				result.TopResults = assetsToBrowseItemsWithBestTs(topAssets, bestTsByID)
 			}
 
 			if params.EnhancementMode != SearchEnhancementModeOnly {
@@ -182,7 +185,7 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 				if err != nil {
 					return SearchBrowseResult{}, err
 				}
-				result.Results = assetsToBrowseItems(page)
+				result.Results = assetsToBrowseItemsWithBestTs(page, bestTsByID)
 				result.ResultsTotalVisible = int64(len(ids))
 				result.ResultsTotalAssets = int64(len(ids))
 			}
@@ -333,17 +336,25 @@ func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, p
 
 // assetsToBrowseItems maps plain asset rows to browse items without stack merging (expanded / pre-collapsed paths).
 func assetsToBrowseItems(assets []repo.Asset) []BrowseItem {
+	return assetsToBrowseItemsWithBestTs(assets, nil)
+}
+
+func assetsToBrowseItemsWithBestTs(assets []repo.Asset, bestTsByID map[uuid.UUID]*int32) []BrowseItem {
 	items := make([]BrowseItem, 0, len(assets))
 	for _, asset := range assets {
 		assetID, ok := uuidFromPgUUID(asset.AssetID)
 		if !ok {
 			continue
 		}
-		items = append(items, BrowseItem{
+		item := BrowseItem{
 			Type:  "asset",
 			ID:    "asset:" + assetID.String(),
 			Asset: asset,
-		})
+		}
+		if bestTsByID != nil {
+			item.BestTsMs = bestTsByID[assetID]
+		}
+		items = append(items, item)
 	}
 	return items
 }

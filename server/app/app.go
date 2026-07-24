@@ -183,6 +183,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		appLogger.Info("ML task processing enabled",
 			zap.String("operation", "settings.ml"),
 			zap.Bool("semantic_enabled", currentMLConfig.SemanticEnabled),
+			zap.Bool("video_semantic_enabled", currentMLConfig.VideoSemanticEnabled),
 			zap.Bool("bioclip_enabled", currentMLConfig.BioCLIPEnabled),
 			zap.Bool("ocr_enabled", currentMLConfig.OCREnabled),
 			zap.Bool("face_enabled", currentMLConfig.FaceEnabled),
@@ -287,6 +288,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
 	river.AddWorker[queue.ThumbnailArgs](workers, &queue.ThumbnailWorker{Process: assetProcessor.ProcessThumbnailTask})
 	river.AddWorker[queue.TranscodeArgs](workers, &queue.TranscodeWorker{Process: assetProcessor.ProcessTranscodeTask})
+	river.AddWorker[queue.ProcessVideoFramesArgs](workers, &queue.ProcessVideoFramesWorker{Process: assetProcessor.ProcessVideoFramesTask})
 	river.AddWorker[queue.AssetRetryArgs](workers, &queue.AssetRetryWorker{ProcessRetry: assetProcessor.ProcessRetryTask})
 	river.AddWorker[queue.ReindexAssetsArgs](workers, &queue.ReindexAssetsWorker{IndexingService: indexingService})
 	river.AddWorker[queue.RebuildLocationClustersArgs](workers, &queue.RebuildLocationClustersWorker{LocationService: locationService})

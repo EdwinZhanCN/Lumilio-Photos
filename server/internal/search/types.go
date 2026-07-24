@@ -90,6 +90,9 @@ type Candidate struct {
 	Source   string
 	Rank     int
 	RawScore float64
+	// BestTsMs is the nearest matching frame timestamp for video assets
+	// (frame_ts_ms of the max-pooled row). Nil for photos / non-embedding sources.
+	BestTsMs *int32
 }
 
 type Retriever interface {

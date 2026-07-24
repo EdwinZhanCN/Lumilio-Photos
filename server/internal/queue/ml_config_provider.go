@@ -29,6 +29,8 @@ func isMLTaskEnabled(ctx context.Context, provider MLConfigProvider, queueName s
 		return cfg.OCREnabled, nil
 	case "process_face":
 		return cfg.FaceEnabled, nil
+	case "process_video_frames":
+		return cfg.SemanticEnabled && cfg.VideoSemanticEnabled, nil
 	case "classify_zeroshot":
 		return cfg.SemanticEnabled, nil
 	default:

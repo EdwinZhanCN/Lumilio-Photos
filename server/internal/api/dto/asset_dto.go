@@ -82,14 +82,16 @@ type AssetIndexingTaskStatsDTO struct {
 }
 
 type AssetIndexingTaskSetStatsDTO struct {
-	Semantic AssetIndexingTaskStatsDTO `json:"semantic"`
-	BioCLIP  AssetIndexingTaskStatsDTO `json:"bioclip"`
-	OCR      AssetIndexingTaskStatsDTO `json:"ocr"`
-	Face     AssetIndexingTaskStatsDTO `json:"face"`
+	Semantic      AssetIndexingTaskStatsDTO `json:"semantic"`
+	BioCLIP       AssetIndexingTaskStatsDTO `json:"bioclip"`
+	OCR           AssetIndexingTaskStatsDTO `json:"ocr"`
+	Face          AssetIndexingTaskStatsDTO `json:"face"`
+	VideoSemantic AssetIndexingTaskStatsDTO `json:"video_semantic"`
 }
 
 type AssetIndexingStatsResponseDTO struct {
 	PhotoTotal  int                          `json:"photo_total" example:"2400"`
+	VideoTotal  int                          `json:"video_total" example:"120"`
 	ReindexJobs int                          `json:"reindex_jobs" example:"1"`
 	Tasks       AssetIndexingTaskSetStatsDTO `json:"tasks"`
 }
@@ -1112,8 +1114,9 @@ type BrowseStackDTO struct {
 }
 
 type BrowseItemDTO struct {
-	Type  string          `json:"type" example:"stack" enums:"asset,stack"`
-	ID    string          `json:"id" example:"stack:550e8400-e29b-41d4-a716-446655440000"`
-	Asset *AssetDTO       `json:"asset,omitempty"`
-	Stack *BrowseStackDTO `json:"stack,omitempty"`
+	Type     string          `json:"type" example:"stack" enums:"asset,stack"`
+	ID       string          `json:"id" example:"stack:550e8400-e29b-41d4-a716-446655440000"`
+	Asset    *AssetDTO       `json:"asset,omitempty"`
+	Stack    *BrowseStackDTO `json:"stack,omitempty"`
+	BestTsMs *int32          `json:"best_ts_ms,omitempty" example:"12500"`
 }
