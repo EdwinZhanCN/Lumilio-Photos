@@ -48,21 +48,25 @@ func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candi
 	}
 	conditions = append(conditions,
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
-		"e.is_primary = true",
 	)
+	// L2 distance over the fixed-dimension search_embeddings table (vectors are
+	// unit-length, so L2 ranks identically to cosine). Assets may carry multiple
+	// vectors (video frames), so rank each asset by its best (nearest) frame via
+	// MIN — a max-pool over the per-asset frame set.
 	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", space.Dimensions, vectorPlaceholder, space.Dimensions)
 	limitPlaceholder := builder.addArg(req.TopK)
 
 	query := fmt.Sprintf(`
 SELECT
   a.asset_id,
-  %s::float8 AS raw_score
-FROM embeddings e
+  MIN(%s)::float8 AS raw_score
+FROM search_embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
 WHERE %s
-ORDER BY %s, a.asset_id DESC
+GROUP BY a.asset_id
+ORDER BY raw_score, a.asset_id DESC
 LIMIT %s
-`, distanceExpr, joinConditions(conditions), distanceExpr, limitPlaceholder)
+`, distanceExpr, joinConditions(conditions), limitPlaceholder)
 
 	rows, err := r.pool.Query(ctx, query, builder.args...)
 	if err != nil {
@@ -90,14 +94,14 @@ func (r *EmbeddingRetriever) CountQuery(ctx context.Context, builder *sqlBuilder
 	}
 	conditions = append(conditions,
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
-		"e.is_primary = true",
 	)
 
 	return fmt.Sprintf(`
 SELECT a.asset_id
-FROM embeddings e
+FROM search_embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
 WHERE %s
+GROUP BY a.asset_id
 `, joinConditions(conditions)), nil
 }
 

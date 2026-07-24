@@ -2577,11 +2577,17 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 		missingOnly = *req.MissingOnly
 	}
 
+	resetSemantic := false
+	if req.ResetSemantic != nil {
+		resetSemantic = *req.ResetSemantic
+	}
+
 	result, err := h.indexingService.EnqueueReindexAssets(c.Request.Context(), service.ReindexAssetsInput{
-		RepositoryID: repositoryIDPtr,
-		Tasks:        tasks,
-		Limit:        normalizeRebuildIndexLimit(req.Limit),
-		MissingOnly:  missingOnly,
+		RepositoryID:  repositoryIDPtr,
+		Tasks:         tasks,
+		Limit:         normalizeRebuildIndexLimit(req.Limit),
+		MissingOnly:   missingOnly,
+		ResetSemantic: resetSemantic,
 	})
 	if err != nil {
 		log.Printf("Failed to queue reindex job: %v", err)

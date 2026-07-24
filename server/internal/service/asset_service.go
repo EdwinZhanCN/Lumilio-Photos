@@ -1590,6 +1590,10 @@ func (s *assetService) resolveSemanticQueryEmbedding(ctx context.Context, query 
 	if embeddingResult == nil || len(embeddingResult.Vector) == 0 {
 		return nil, fmt.Errorf("%w: semantic_text_embed returned empty embedding", ErrSemanticSearchUnavailable)
 	}
+	// Canonicalize the query vector identically to stored image vectors (see
+	// SaveEmbedding) so query and index live in the same MRL-truncated,
+	// unit-length space.
+	embeddingResult.Vector = canonicalizeSemanticVector(embeddingResult.Vector)
 	return embeddingResult, nil
 }
 
@@ -1635,20 +1639,23 @@ func (s *assetService) searchAssetsBySemanticSpace(ctx context.Context, params Q
 
 	limitPlaceholder := builder.addArg(limit)
 	offsetPlaceholder := builder.addArg(offset)
+	// Assets may carry multiple vectors (video frames); rank each asset by its
+	// best (nearest) frame via MIN — a max-pool over the per-asset frame set.
 	query := fmt.Sprintf(`
 WITH candidate_ids AS MATERIALIZED (
   SELECT
     a.asset_id,
-    %s AS distance
+    MIN(%s) AS distance
   %s
-  ORDER BY %s, a.asset_id DESC
+  GROUP BY a.asset_id
+  ORDER BY distance, a.asset_id DESC
   LIMIT %s OFFSET %s
 )
 SELECT a.*
 FROM candidate_ids c
 JOIN assets a ON a.asset_id = c.asset_id
 ORDER BY c.distance, c.asset_id DESC
-`, distanceExpr, baseSQL, distanceExpr, limitPlaceholder, offsetPlaceholder)
+`, distanceExpr, baseSQL, limitPlaceholder, offsetPlaceholder)
 
 	rows, err := s.pool.Query(ctx, query, builder.args...)
 	if err != nil {
@@ -1671,7 +1678,7 @@ func (s *assetService) countAssetsBySemanticSpace(ctx context.Context, params Qu
 		return 0, err
 	}
 
-	query := "SELECT COUNT(*) " + baseSQL
+	query := "SELECT COUNT(DISTINCT a.asset_id) " + baseSQL
 	var count int64
 	if err := s.pool.QueryRow(ctx, query, builder.args...).Scan(&count); err != nil {
 		return 0, fmt.Errorf("failed to count assets: %w", err)
@@ -1699,7 +1706,6 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 	conditions := []string{
 		fmt.Sprintf("a.is_deleted = %s", builder.addArg(isDeleted)),
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
-		"e.is_primary = true",
 	}
 
 	if params.Source != nil {
@@ -1829,7 +1835,7 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 	}
 
 	baseSQL := fmt.Sprintf(`
-FROM embeddings e
+FROM search_embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
 WHERE %s`, strings.Join(conditions, "\n  AND "))
 

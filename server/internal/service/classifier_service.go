@@ -129,7 +129,10 @@ func (s *classifierService) buildPrototype(ctx context.Context, prompts []string
 		} else if model != emb.ModelID {
 			return nil, "", fmt.Errorf("prompt model mismatch: %s != %s", model, emb.ModelID)
 		}
-		vectors = append(vectors, emb.Vector)
+		// Canonicalize each prompt vector into the same MRL-truncated, unit-length
+		// space as stored image vectors before ensembling, so the prototype is
+		// directly comparable to image embeddings.
+		vectors = append(vectors, canonicalizeSemanticVector(emb.Vector))
 	}
 	proto, err := classify.EnsemblePrototype(vectors)
 	if err != nil {
@@ -293,14 +296,16 @@ func (s *classifierService) Preview(ctx context.Context, positivePrompts, negati
 		"((1 - power(e.vector::vector(%d) <-> $1::vector(%d), 2) / 2) - (1 - power(e.vector::vector(%d) <-> $2::vector(%d), 2) / 2))",
 		space.Dimensions, space.Dimensions, space.Dimensions, space.Dimensions,
 	)
+	// Assets may carry multiple vectors (video frames); represent each asset by
+	// its best-matching frame via MAX over the contrastive margin.
 	query := fmt.Sprintf(`
-SELECT a.asset_id, %s::float8 AS score
-FROM embeddings e
+SELECT a.asset_id, MAX(%s)::float8 AS score
+FROM search_embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
 WHERE e.space_id = $3
-  AND e.is_primary = true
   AND a.is_deleted = false
   AND %s >= $4
+GROUP BY a.asset_id
 ORDER BY score DESC, a.asset_id DESC
 LIMIT $5
 `, marginExpr, marginExpr)

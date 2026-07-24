@@ -187,9 +187,10 @@ func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req 
 		return nil, false, err
 	}
 	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", dimensions, vectorPlaceholder, dimensions)
+	// The cutoff is a per-frame predicate: an asset qualifies if any of its frames
+	// falls within the cutoff, then it is ranked by its best (nearest) frame.
 	conditions = append(conditions,
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
-		"e.is_primary = true",
 		fmt.Sprintf("%s <= %s", distanceExpr, builder.addArg(cutoff)),
 	)
 	limitPlaceholder := builder.addArg(maxResults + 1)
@@ -197,13 +198,14 @@ func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req 
 	query := fmt.Sprintf(`
 SELECT
   a.asset_id,
-  %s::float8 AS raw_score
-FROM embeddings e
+  MIN(%s)::float8 AS raw_score
+FROM search_embeddings e
 JOIN assets a ON a.asset_id = e.asset_id
 WHERE %s
-ORDER BY %s, a.asset_id DESC
+GROUP BY a.asset_id
+ORDER BY raw_score, a.asset_id DESC
 LIMIT %s
-`, distanceExpr, joinConditions(conditions), distanceExpr, limitPlaceholder)
+`, distanceExpr, joinConditions(conditions), limitPlaceholder)
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
