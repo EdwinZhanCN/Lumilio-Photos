@@ -53,6 +53,13 @@ webauthn_rp_mode = "fixed"
 webauthn_rp_id = "localhost"
 webauthn_rp_origins = [{{toml .BrowserOrigin}}]
 
+[auth.rate_limit]
+ip_attempts = 60
+subject_attempts = 8
+window = "1m"
+lockout = "5m"
+max_entries = 10000
+
 [transcode]
 hardware_accel = "auto"
 

@@ -24,9 +24,14 @@ import (
 // @Success 200 {object} dto.PasskeyOptionsResponseDTO "Passkey login options created successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request data"
 // @Failure 401 {object} api.ErrorResponse "Invalid credentials"
+// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/options [post]
 func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
+	if !h.allowAuthNetwork(c, authRateScopePasskeyOptions) {
+		return
+	}
+
 	var req dto.PasskeyOptionsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
@@ -34,6 +39,9 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.Username) == "" {
 		api.GinBadRequest(c, errors.New("username is required"), "Invalid request data")
+		return
+	}
+	if !h.allowAuthUsername(c, authRateScopePasskeyOptions, req.Username) {
 		return
 	}
 
@@ -49,6 +57,7 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 		return
 	}
 
+	h.resetAuthUsername(authRateScopePasskeyOptions, req.Username)
 	api.JSONOK(c, dto.ToPasskeyOptionsResponseDTO(response))
 }
 
@@ -62,12 +71,20 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 // @Success 200 {object} dto.AuthResponseDTO "Passkey login verified successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request data"
 // @Failure 401 {object} api.ErrorResponse "Invalid credentials"
+// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/verify [post]
 func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
+	if !h.allowAuthNetwork(c, authRateScopePasskeyVerify) {
+		return
+	}
+
 	var req dto.PasskeyVerifyRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	if !h.allowAuthOpaqueSubject(c, authRateScopePasskeyVerify, req.ChallengeToken) {
 		return
 	}
 
@@ -91,6 +108,7 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 		return
 	}
 
+	h.resetAuthOpaqueSubject(authRateScopePasskeyVerify, req.ChallengeToken)
 	api.JSONOK(c, dto.ToAuthResponseDTO(response))
 }
 

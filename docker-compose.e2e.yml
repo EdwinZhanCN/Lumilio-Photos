@@ -26,7 +26,11 @@ services:
         volumes:
             - db_data:/var/lib/postgresql
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
+            test:
+                [
+                    "CMD-SHELL",
+                    "test \"$$(cat /proc/1/comm)\" = postgres && pg_isready -U postgres -d lumiliophotos",
+                ]
             interval: 2s
             timeout: 5s
             retries: 30

@@ -20,12 +20,20 @@ import (
 // @Success 200 {object} dto.AuthResponseDTO "MFA verification successful"
 // @Failure 400 {object} api.ErrorResponse "Invalid request data"
 // @Failure 401 {object} api.ErrorResponse "Invalid or expired MFA challenge"
+// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/verify [post]
 func (h *AuthHandler) VerifyMFA(c *gin.Context) {
+	if !h.allowAuthNetwork(c, authRateScopeMFAVerify) {
+		return
+	}
+
 	var req dto.VerifyMFARequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	if !h.allowAuthOpaqueSubject(c, authRateScopeMFAVerify, req.MFAToken) {
 		return
 	}
 
@@ -48,6 +56,7 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 		return
 	}
 
+	h.resetAuthOpaqueSubject(authRateScopeMFAVerify, req.MFAToken)
 	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
 }
 

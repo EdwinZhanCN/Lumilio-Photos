@@ -51,6 +51,13 @@ webauthn_rp_mode = "origin-derived"
 webauthn_rp_id = ""
 webauthn_rp_origins = []
 
+[auth.rate_limit]
+ip_attempts = 1000
+subject_attempts = 3
+window = "1s"
+lockout = "2s"
+max_entries = 10000
+
 [transcode]
 hardware_accel = "none"
 
