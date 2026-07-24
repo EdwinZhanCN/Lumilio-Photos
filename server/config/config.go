@@ -468,7 +468,7 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	}
 
 	transcode := TranscodeConfig{HardwareAccel: strings.ToLower(strings.TrimSpace(*m.Transcode.HardwareAccel))}
-	requireOneOf(&p, "transcode.hardware_accel", transcode.HardwareAccel, "auto", "vaapi", "nvenc", "qsv", "none")
+	requireOneOf(&p, "transcode.hardware_accel", transcode.HardwareAccel, "auto", "vaapi", "nvenc", "qsv", "videotoolbox", "none")
 
 	lumen := LumenConfig{DiscoveryEnabled: *m.Lumen.DiscoveryEnabled, DiscoveryMDNSEnabled: *m.Lumen.DiscoveryMDNSEnabled, DiscoveryHubURL: strings.TrimSpace(*m.Lumen.DiscoveryHubURL), DiscoveryStaticNodes: cleanStrings(*m.Lumen.DiscoveryStaticNodes), DiscoveryServiceType: strings.TrimSpace(*m.Lumen.DiscoveryServiceType), DiscoveryDomain: strings.TrimSpace(*m.Lumen.DiscoveryDomain), DeploymentID: strings.TrimSpace(*m.Lumen.DeploymentID), ChunkAuto: *m.Lumen.ChunkAuto, ChunkThresholdBytes: *m.Lumen.ChunkThresholdBytes, ChunkMaxBytes: *m.Lumen.ChunkMaxBytes}
 	requireNonEmpty(&p, "lumen.discovery_service_type", lumen.DiscoveryServiceType)
