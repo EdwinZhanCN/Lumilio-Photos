@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { http, HttpResponse, worker } from "@test/msw";
-import { client } from "./client.ts";
+import { client, logoutBrowserSession } from "./client.ts";
 import { registerSessionExpiredHandler } from "./sessionEvents.ts";
 
 // The real OpenAPI client runs against MSW at the HTTP boundary, so the
@@ -14,7 +14,7 @@ describe("authenticated OpenAPI client", () => {
 
   it("serializes refresh-token rotation across concurrent 401 responses", async () => {
     localStorage.setItem("auth_token", "expired-access");
-    localStorage.setItem("refresh_token", "refresh-one");
+    localStorage.setItem("csrf_token", "csrf-one");
 
     let initialRequests = 0;
     let refreshRequests = 0;
@@ -24,10 +24,12 @@ describe("authenticated OpenAPI client", () => {
     });
 
     worker.use(
-      http.post("*/api/v1/auth/refresh", async () => {
+      http.get("*/api/v1/auth/csrf", () => HttpResponse.json({ csrfToken: "csrf-one" })),
+      http.post("*/api/v1/auth/refresh", async ({ request }) => {
         refreshRequests += 1;
+        expect(request.headers.get("X-CSRF-Token")).toBe("csrf-one");
         await bothRequestsStarted;
-        return HttpResponse.json({ token: "fresh-access", refreshToken: "refresh-two" });
+        return HttpResponse.json({ token: "fresh-access", csrfToken: "csrf-two" });
       }),
       http.get("*/api/v1/auth/me", ({ request }) => {
         if (request.headers.get("Authorization") === "Bearer expired-access") {
@@ -48,17 +50,18 @@ describe("authenticated OpenAPI client", () => {
     expect(second.response.status).toBe(200);
     expect(refreshRequests).toBe(1);
     expect(localStorage.getItem("auth_token")).toBe("fresh-access");
-    expect(localStorage.getItem("refresh_token")).toBe("refresh-two");
+    expect(localStorage.getItem("csrf_token")).toBe("csrf-two");
   });
 
   it("replays a mutation from a pristine request-body clone", async () => {
     localStorage.setItem("auth_token", "expired-access");
-    localStorage.setItem("refresh_token", "refresh-one");
+    localStorage.setItem("csrf_token", "csrf-one");
 
     const seenBodies: string[] = [];
     worker.use(
+      http.get("*/api/v1/auth/csrf", () => HttpResponse.json({ csrfToken: "csrf-one" })),
       http.post("*/api/v1/auth/refresh", () =>
-        HttpResponse.json({ token: "fresh-access", refreshToken: "refresh-two" }),
+        HttpResponse.json({ token: "fresh-access", csrfToken: "csrf-two" }),
       ),
       http.post("*/api/v1/assets/precheck", async ({ request }) => {
         seenBodies.push(await request.text());
@@ -82,9 +85,10 @@ describe("authenticated OpenAPI client", () => {
 
   it("notifies the session owner only once when refresh cannot recover", async () => {
     localStorage.setItem("auth_token", "expired-access");
-    localStorage.setItem("refresh_token", "expired-refresh");
+    localStorage.setItem("csrf_token", "expired-csrf");
 
     worker.use(
+      http.get("*/api/v1/auth/csrf", () => HttpResponse.json({ csrfToken: "expired-csrf" })),
       http.post("*/api/v1/auth/refresh", () =>
         HttpResponse.json({ message: "invalid refresh token" }, { status: 401 }),
       ),
@@ -101,7 +105,25 @@ describe("authenticated OpenAPI client", () => {
 
     expect(handleSessionExpired).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem("auth_token")).toBeNull();
-    expect(localStorage.getItem("refresh_token")).toBeNull();
+    expect(localStorage.getItem("csrf_token")).toBeNull();
     unregister();
+  });
+
+  it("restores a fresh CSRF proof before revoking the cookie session", async () => {
+    localStorage.setItem("auth_token", "access");
+    localStorage.setItem("csrf_token", "stale-csrf");
+    let logoutCSRF: string | null = null;
+
+    worker.use(
+      http.get("*/api/v1/auth/csrf", () => HttpResponse.json({ csrfToken: "fresh-csrf" })),
+      http.post("*/api/v1/auth/logout", ({ request }) => {
+        logoutCSRF = request.headers.get("X-CSRF-Token");
+        return HttpResponse.json({ message: "Logout successful" });
+      }),
+    );
+
+    expect(await logoutBrowserSession()).toBe(true);
+    expect(logoutCSRF).toBe("fresh-csrf");
+    expect(localStorage.getItem("csrf_token")).toBe("fresh-csrf");
   });
 });

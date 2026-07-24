@@ -1424,6 +1424,9 @@ const docTemplate = `{
                     "bootstrap_admin": {
                         "type": "boolean"
                     },
+                    "csrfToken": {
+                        "type": "string"
+                    },
                     "expiresAt": {
                         "type": "string"
                     },
@@ -1438,9 +1441,6 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "password_change_token": {
-                        "type": "string"
-                    },
-                    "refreshToken": {
                         "type": "string"
                     },
                     "requires_mfa": {
@@ -1630,6 +1630,14 @@ const docTemplate = `{
                     "stack_size": {
                         "example": 3,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.CSRFTokenDTO": {
+                "properties": {
+                    "csrfToken": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4059,17 +4067,6 @@ const docTemplate = `{
                         "$ref": "#/components/schemas/dto.MFAStatusDTO"
                     }
                 },
-                "type": "object"
-            },
-            "dto.RefreshTokenRequestDTO": {
-                "properties": {
-                    "refreshToken": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "refreshToken"
-                ],
                 "type": "object"
             },
             "dto.RegenerateRecoveryCodesRequestDTO": {
@@ -11645,6 +11642,37 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/auth/csrf": {
+            "get": {
+                "description": "Return a CSRF token bound to the current HttpOnly refresh cookie",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.CSRFTokenDTO"
+                                }
+                            }
+                        },
+                        "description": "CSRF token issued"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "No refresh-cookie session"
+                    }
+                },
+                "summary": "Get refresh-session CSRF token",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
         "/api/v1/auth/login": {
             "post": {
                 "description": "Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.",
@@ -11799,27 +11827,7 @@ const docTemplate = `{
         },
         "/api/v1/auth/logout": {
             "post": {
-                "description": "Revoke the user's refresh token",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RefreshTokenRequestDTO",
-                                        "summary": "request",
-                                        "description": "Refresh token to revoke"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Refresh token to revoke",
-                    "required": true
-                },
+                "description": "Revoke and clear the current HttpOnly refresh-cookie session",
                 "responses": {
                     "200": {
                         "content": {
@@ -11831,7 +11839,7 @@ const docTemplate = `{
                         },
                         "description": "Logout successful"
                     },
-                    "400": {
+                    "403": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11839,17 +11847,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Invalid request data"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid refresh token"
+                        "description": "Invalid CSRF token"
                     },
                     "500": {
                         "content": {
@@ -12894,27 +12892,7 @@ const docTemplate = `{
         },
         "/api/v1/auth/refresh": {
             "post": {
-                "description": "Generate a new access token using a valid refresh token",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RefreshTokenRequestDTO",
-                                        "summary": "request",
-                                        "description": "Refresh token"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Refresh token",
-                    "required": true
-                },
+                "description": "Rotate the HttpOnly refresh cookie and issue a new access token. Requires X-CSRF-Token bound to the current cookie session.",
                 "responses": {
                     "200": {
                         "content": {
@@ -12926,16 +12904,6 @@ const docTemplate = `{
                         },
                         "description": "Token refreshed successfully"
                     },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid request data"
-                    },
                     "401": {
                         "content": {
                             "application/json": {
@@ -12945,6 +12913,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Invalid or expired refresh token"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid CSRF token"
                     },
                     "429": {
                         "content": {

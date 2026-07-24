@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"server/internal/api"
 	"server/internal/api/dto"
@@ -14,15 +15,17 @@ import (
 
 // AuthHandler handles authentication-related HTTP requests
 type AuthHandler struct {
-	authService *service.AuthService
-	rateLimiter *AuthRateLimiter
+	authService     *service.AuthService
+	rateLimiter     *AuthRateLimiter
+	refreshTokenTTL time.Duration
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(authService *service.AuthService, rateLimiter *AuthRateLimiter) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, rateLimiter *AuthRateLimiter, refreshTokenTTL time.Duration) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
-		rateLimiter: rateLimiter,
+		authService:     authService,
+		rateLimiter:     rateLimiter,
+		refreshTokenTTL: refreshTokenTTL,
 	}
 }
 
@@ -63,7 +66,7 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, dto.ToAuthResponseDTO(response))
+	h.writeAuthResponse(c, response)
 }
 
 // GetLoginOptions returns which login methods to offer for a username.
@@ -143,7 +146,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	h.resetAuthUsername(authRateScopeLogin, req.Username)
-	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
+	h.writeAuthResponse(c, authResponse)
 }
 
 // CompleteRequiredPasswordChange exchanges a single-purpose challenge for a
@@ -177,42 +180,42 @@ func (h *AuthHandler) CompleteRequiredPasswordChange(c *gin.Context) {
 		}
 		return
 	}
-	api.JSONOK(c, dto.ToAuthResponseDTO(response))
+	h.writeAuthResponse(c, response)
 }
 
 // RefreshToken handles JWT token refresh
 // @Summary Refresh access token
-// @Description Generate a new access token using a valid refresh token
+// @Description Rotate the HttpOnly refresh cookie and issue a new access token. Requires X-CSRF-Token bound to the current cookie session.
 // @Tags auth
-// @Accept json
 // @Produce json
-// @Param request body dto.RefreshTokenRequestDTO true "Refresh token"
 // @Success 200 {object} dto.AuthResponseDTO "Token refreshed successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 403 {object} api.ErrorResponse "Invalid CSRF token"
 // @Failure 401 {object} api.ErrorResponse "Invalid or expired refresh token"
 // @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	refreshToken, ok := h.requireRefreshCookie(c)
+	if !ok {
+		return
+	}
+	if !h.requireCSRFToken(c, refreshToken) {
+		return
+	}
 	if !h.allowAuthNetwork(c, authRateScopeRefresh) {
 		return
 	}
-
-	var req dto.RefreshTokenRequestDTO
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
-		return
-	}
-	if !h.allowAuthOpaqueSubject(c, authRateScopeRefresh, req.RefreshToken) {
+	if !h.allowAuthOpaqueSubject(c, authRateScopeRefresh, refreshToken) {
 		return
 	}
 
-	authResponse, err := h.authService.RefreshToken(req.RefreshToken)
+	authResponse, err := h.authService.RefreshToken(refreshToken)
 	if err != nil {
 		if errors.Is(err, service.ErrTokenNotFound) ||
 			errors.Is(err, service.ErrInvalidToken) ||
 			errors.Is(err, service.ErrExpiredToken) ||
 			errors.Is(err, service.ErrPasswordChangeRequired) {
+			h.clearAuthCookies(c)
 			api.GinUnauthorized(c, err, "Invalid or expired refresh token")
 			return
 		}
@@ -220,39 +223,43 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	h.resetAuthOpaqueSubject(authRateScopeRefresh, req.RefreshToken)
-	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
+	h.resetAuthOpaqueSubject(authRateScopeRefresh, refreshToken)
+	h.writeAuthResponse(c, authResponse)
 }
 
 // Logout handles user logout
 // @Summary Logout user
-// @Description Revoke the user's refresh token
+// @Description Revoke and clear the current HttpOnly refresh-cookie session
 // @Tags auth
-// @Accept json
 // @Produce json
-// @Param request body dto.RefreshTokenRequestDTO true "Refresh token to revoke"
 // @Success 200 {object} api.SuccessResponse "Logout successful"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Invalid refresh token"
+// @Failure 403 {object} api.ErrorResponse "Invalid CSRF token"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
-	var req dto.RefreshTokenRequestDTO
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+	refreshToken, err := c.Cookie(refreshCookieName)
+	if errors.Is(err, http.ErrNoCookie) || strings.TrimSpace(refreshToken) == "" {
+		h.clearAuthCookies(c)
+		api.JSONOK(c, api.SuccessResponse{Message: "Logout successful"})
+		return
+	}
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid refresh cookie")
+		return
+	}
+	if !h.requireCSRFToken(c, refreshToken) {
 		return
 	}
 
-	err := h.authService.RevokeRefreshToken(req.RefreshToken)
+	err = h.authService.RevokeRefreshToken(refreshToken)
 	if err != nil {
-		if errors.Is(err, service.ErrTokenNotFound) {
-			api.GinUnauthorized(c, err, "Invalid refresh token")
+		if !errors.Is(err, service.ErrTokenNotFound) {
+			api.GinInternalError(c, err, "Failed to logout")
 			return
 		}
-		api.GinInternalError(c, err, "Failed to logout")
-		return
 	}
 
+	h.clearAuthCookies(c)
 	api.JSONOK(c, api.SuccessResponse{Message: "Logout successful"})
 }
 

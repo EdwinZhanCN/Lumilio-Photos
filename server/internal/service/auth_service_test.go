@@ -42,6 +42,19 @@ func TestNewAuthService_UsesConfiguredDerivedSecretPath(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCSRFTokenIsBoundToRefreshSession(t *testing.T) {
+	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
+	require.NoError(t, err)
+
+	token := svc.CSRFTokenForRefresh("refresh-session-a")
+	require.NotEmpty(t, token)
+	require.True(t, svc.ValidateCSRFToken("refresh-session-a", token))
+	require.False(t, svc.ValidateCSRFToken("refresh-session-b", token))
+	require.False(t, svc.ValidateCSRFToken("refresh-session-a", token+"tampered"))
+	require.False(t, svc.ValidateCSRFToken("", token))
+	require.False(t, svc.ValidateCSRFToken("refresh-session-a", "not-a-csrf-token"))
+}
+
 func TestRequiredPasswordChangeTokenIsPurposeBoundAndCarriesAuthVersion(t *testing.T) {
 	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
 	require.NoError(t, err)

@@ -6,14 +6,6 @@ the relevant exec plan, not in this file.
 
 Last aligned with the codebase: 2026-07-24.
 
-## Security and test coverage
-
-- **Refresh tokens are stored in `localStorage`.** Owner:
-  `web/src/lib/http-commons/auth.ts`. An XSS can exfiltrate both access and
-  refresh tokens. Moving the refresh token to an `HttpOnly` cookie requires an
-  explicit CSRF design and must preserve Desktop localhost and authenticated
-  media behavior; track that cross-cutting change in its own hardening plan.
-
 ## Product paths
 
 - **The S3/R2 cloud provider is a runtime placeholder.** Owner:

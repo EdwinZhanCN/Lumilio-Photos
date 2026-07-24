@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -68,10 +71,6 @@ func resolveLoginOptions(found bool, active bool, passkeyCount int64) LoginOptio
 	return loginOptionsFromPasskeyCount(passkeyCount)
 }
 
-type RefreshTokenRequest struct {
-	RefreshToken string `json:"refreshToken" binding:"required"`
-}
-
 type UserResponse struct {
 	UserID        int        `json:"user_id"`
 	Username      string     `json:"username"`
@@ -88,7 +87,7 @@ type UserResponse struct {
 type AuthResponse struct {
 	User                   *UserResponse `json:"user,omitempty"`
 	AccessToken            string        `json:"token,omitempty"`
-	RefreshToken           string        `json:"refreshToken,omitempty"`
+	RefreshToken           string        `json:"-"`
 	ExpiresAt              *time.Time    `json:"expiresAt,omitempty"`
 	RequiresMFA            bool          `json:"requires_mfa"`
 	MFAToken               string        `json:"mfa_token,omitempty"`
@@ -107,6 +106,7 @@ type AuthService struct {
 	passkeyTokenSecret        []byte
 	mediaTokenSecret          []byte
 	passwordChangeTokenSecret []byte
+	csrfTokenSecret           []byte
 	mfaEncryptKey             []byte
 	accessTokenTTL            time.Duration
 	refreshTokenTTL           time.Duration
@@ -138,6 +138,8 @@ type MediaTokenClaims struct {
 
 const mediaTokenScope = "media"
 
+const csrfTokenPrefix = "v1."
+
 // NewAuthService creates a new authentication service. An optional zap logger
 // can be supplied for structured auth/audit logging; when omitted, a no-op
 // logger is used so callers (and tests) without logging stay valid.
@@ -159,6 +161,7 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConf
 	passkeyTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "passkey.signing.v1")
 	mediaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "media.url.signing.v1")
 	passwordChangeTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "password.change.signing.v1")
+	csrfTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "csrf.refresh.binding.v1")
 	mfaEncryptKey := secretbox.DeriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
 	return &AuthService{
@@ -169,6 +172,7 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConf
 		passkeyTokenSecret:        passkeyTokenSecret,
 		mediaTokenSecret:          mediaTokenSecret,
 		passwordChangeTokenSecret: passwordChangeTokenSecret,
+		csrfTokenSecret:           csrfTokenSecret,
 		mfaEncryptKey:             mfaEncryptKey,
 		accessTokenTTL:            cfg.AccessTokenTTL,
 		refreshTokenTTL:           cfg.RefreshTokenTTL,
@@ -179,6 +183,32 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConf
 		logger:                    logger,
 		securityLogger:            securityLogger,
 	}, nil
+}
+
+// CSRFTokenForRefresh returns a versioned token bound to one refresh session.
+// The refresh credential is random and HttpOnly; the derived value can be
+// exposed to browser JavaScript without revealing that credential.
+func (s *AuthService) CSRFTokenForRefresh(refreshToken string) string {
+	mac := hmac.New(sha256.New, s.csrfTokenSecret)
+	_, _ = mac.Write([]byte("lumilio.refresh.csrf.v1\x00"))
+	_, _ = mac.Write([]byte(refreshToken))
+	return csrfTokenPrefix + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// ValidateCSRFToken verifies the session binding in constant time.
+func (s *AuthService) ValidateCSRFToken(refreshToken, csrfToken string) bool {
+	if refreshToken == "" || !strings.HasPrefix(csrfToken, csrfTokenPrefix) {
+		return false
+	}
+	provided, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(csrfToken, csrfTokenPrefix))
+	if err != nil || len(provided) != sha256.Size {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, s.csrfTokenSecret)
+	_, _ = mac.Write([]byte("lumilio.refresh.csrf.v1\x00"))
+	_, _ = mac.Write([]byte(refreshToken))
+	return hmac.Equal(provided, mac.Sum(nil))
 }
 
 func normalizeConfiguredWebAuthnOrigins(values []string) []string {

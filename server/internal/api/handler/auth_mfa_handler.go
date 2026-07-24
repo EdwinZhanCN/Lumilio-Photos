@@ -57,7 +57,7 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 	}
 
 	h.resetAuthOpaqueSubject(authRateScopeMFAVerify, req.MFAToken)
-	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
+	h.writeAuthResponse(c, authResponse)
 }
 
 // GetMFAStatus returns the current user's MFA status.
