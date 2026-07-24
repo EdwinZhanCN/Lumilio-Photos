@@ -36,3 +36,4 @@ export function smokeAsset(id: string): string {
 
 export const SMOKE_SCAN_ASSET = "picsum-scan-000";
 export const SMOKE_UPLOAD_ASSET = "picsum-upload-123";
+export const SMOKE_VIDEO_ASSET = "commons-video-ocean-waves";
