@@ -41,6 +41,10 @@ type RebuildAssetIndexesRequestDTO struct {
 	Tasks        []string `json:"tasks,omitempty" example:"semantic,ocr"`
 	Limit        int      `json:"limit,omitempty" minimum:"1" maximum:"500" example:"200"`
 	MissingOnly  *bool    `json:"missing_only,omitempty" example:"true"`
+	// ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use
+	// after switching the embedding model (drop+refill) so no two models' vectors
+	// are mixed. Honored only when the semantic task is included.
+	ResetSemantic *bool `json:"reset_semantic,omitempty" example:"false"`
 }
 
 type RebuildAssetIndexesResponseDTO struct {

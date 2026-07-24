@@ -70,6 +70,14 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		return fmt.Errorf("embedding vector is empty")
 	}
 
+	// Semantic vectors are canonicalized (MRL-truncated to CanonicalEmbeddingDim
+	// and L2-normalized) so stored image vectors share one comparable, unit-length
+	// space with text queries and zero-shot prototypes. Other embedding types
+	// (e.g. pHash) carry their own semantics and are stored verbatim.
+	if embeddingType == EmbeddingTypeSemantic {
+		vector = canonicalizeSemanticVector(vector)
+	}
+
 	tx, err := e.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin embedding transaction: %w", err)
@@ -83,20 +91,40 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		return err
 	}
 
+	pgVector := pgvector.NewVector(vector)
+
 	if embeddingType == EmbeddingTypeSemantic {
-		defaultSpace, err := e.ensureDefaultSpace(ctx, queries, embeddingType, space)
+		// Semantic vectors live in the dedicated fixed-dimension search_embeddings
+		// table (cosine HNSW). The default space records the active model for query
+		// routing and model-change detection; the vector index itself is static
+		// (migration 000012), so no per-space index creation is needed here.
+		space, err = e.ensureDefaultSpace(ctx, queries, embeddingType, space)
 		if err != nil {
 			return err
 		}
-		if defaultSpace.ID == space.ID && defaultSpace.SearchEnabled {
-			space = defaultSpace
-			if err := e.ensureSearchIndexForSpace(ctx, tx, space); err != nil {
-				return err
-			}
+
+		// Replace the asset's primary (whole-asset) semantic row. Video frame rows
+		// (frame_ts_ms IS NOT NULL) are written by the video frames worker, not here.
+		if err := queries.DeleteSearchEmbeddingsByAsset(ctx, assetID); err != nil {
+			return fmt.Errorf("clear search embeddings: %w", err)
 		}
+		if err := queries.InsertSearchEmbedding(ctx, repo.InsertSearchEmbeddingParams{
+			AssetID:   assetID,
+			SpaceID:   space.ID,
+			FrameTsMs: nil,
+			Vector:    &pgVector,
+			ModelID:   model,
+		}); err != nil {
+			return fmt.Errorf("insert search embedding: %w", err)
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit embedding transaction: %w", err)
+		}
+		return nil
 	}
 
-	pgVector := pgvector.NewVector(vector)
+	// Non-search vectors (e.g. pHash) stay in the generic exact-scan table.
 	params := repo.UpsertEmbeddingParams{
 		AssetID:             assetID,
 		EmbeddingType:       string(embeddingType),
@@ -165,12 +193,6 @@ func (e *embeddingService) ResolveDefaultSearchSpace(ctx context.Context, embedd
 		)
 	}
 
-	if defaultSpace.SearchEnabled {
-		if err := e.ensureSearchIndexForSpace(ctx, tx, defaultSpace); err != nil {
-			return repo.EmbeddingSpace{}, err
-		}
-	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return repo.EmbeddingSpace{}, fmt.Errorf("commit embedding space transaction: %w", err)
 	}
@@ -209,6 +231,22 @@ func (e *embeddingService) GetPrimaryEmbedding(ctx context.Context, assetID pgty
 // a decoded []float32 (plus model/dimensions). Reuses the existing
 // GetPrimaryEmbedding query; the worker never re-runs the ML model.
 func (e *embeddingService) GetPrimaryEmbeddingVector(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error) {
+	if embeddingType == EmbeddingTypeSemantic {
+		row, err := e.queries.GetPrimarySearchEmbedding(ctx, assetID)
+		if err != nil {
+			return PrimaryEmbedding{}, err
+		}
+		if row.Vector == nil {
+			return PrimaryEmbedding{}, fmt.Errorf("primary %s embedding has no vector", embeddingType)
+		}
+		vec := row.Vector.Slice()
+		return PrimaryEmbedding{
+			Vector:     vec,
+			Model:      row.ModelID,
+			Dimensions: len(vec),
+		}, nil
+	}
+
 	row, err := e.GetPrimaryEmbedding(ctx, assetID, embeddingType)
 	if err != nil {
 		return PrimaryEmbedding{}, err
@@ -339,30 +377,6 @@ func (e *embeddingService) ensureDefaultSpace(ctx context.Context, queries *repo
 		return repo.EmbeddingSpace{}, fmt.Errorf("load default embedding space: %w", err)
 	}
 	return defaultSpace, nil
-}
-
-func (e *embeddingService) ensureSearchIndexForSpace(ctx context.Context, tx pgx.Tx, space repo.EmbeddingSpace) error {
-	if !space.SearchEnabled {
-		return nil
-	}
-	if space.ID <= 0 {
-		return fmt.Errorf("invalid embedding space id: %d", space.ID)
-	}
-	if space.Dimensions <= 0 {
-		return fmt.Errorf("invalid embedding space dimensions: %d", space.Dimensions)
-	}
-
-	indexName := fmt.Sprintf("embeddings_space_%d_primary_hnsw_l2_idx", space.ID)
-	query := fmt.Sprintf(
-		"CREATE INDEX IF NOT EXISTS %s ON embeddings USING hnsw ((vector::vector(%d)) vector_l2_ops) WHERE space_id = %d AND is_primary = true",
-		indexName,
-		space.Dimensions,
-		space.ID,
-	)
-	if _, err := tx.Exec(ctx, query); err != nil {
-		return fmt.Errorf("ensure embedding search index: %w", err)
-	}
-	return nil
 }
 
 func mapEmbeddingRow(row repo.GetEmbeddingRow) repo.Embedding {

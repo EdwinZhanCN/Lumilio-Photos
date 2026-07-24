@@ -56,6 +56,19 @@ type ReindexAssetsInput struct {
 	Limit        int
 	Offset       int
 	MissingOnly  bool
+	// ResetSemantic wipes all semantic vectors and demotes the default embedding
+	// space before rebuilding. Used for a model swap (drop+refill). Honored only
+	// on the first page (Offset == 0) when the semantic task is enabled.
+	ResetSemantic bool
+}
+
+func containsIndexingTask(tasks []AssetIndexingTask, target AssetIndexingTask) bool {
+	for _, t := range tasks {
+		if t == target {
+			return true
+		}
+	}
+	return false
 }
 
 type ReindexAssetsJobResult struct {
@@ -189,10 +202,7 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 	stats.Tasks.OCR.TotalCount = stats.PhotoTotal
 	stats.Tasks.Face.TotalCount = stats.PhotoTotal
 
-	stats.Tasks.Semantic.IndexedCount, err = s.queries.CountPhotoAssetsWithEmbeddingType(ctx, repo.CountPhotoAssetsWithEmbeddingTypeParams{
-		RepositoryID:  repositoryUUID,
-		EmbeddingType: string(EmbeddingTypeSemantic),
-	})
+	stats.Tasks.Semantic.IndexedCount, err = s.queries.CountPhotoAssetsWithSemanticEmbedding(ctx, repositoryUUID)
 	if err != nil {
 		return AssetIndexingStats{}, fmt.Errorf("count semantic coverage: %w", err)
 	}
@@ -255,10 +265,11 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 	}
 
 	jobResult, err := s.queueClient.Insert(ctx, jobs.ReindexAssetsArgs{
-		RepositoryID: input.RepositoryID,
-		Tasks:        indexingTasksToStrings(enabledTasks),
-		Limit:        input.Limit,
-		MissingOnly:  input.MissingOnly,
+		RepositoryID:  input.RepositoryID,
+		Tasks:         indexingTasksToStrings(enabledTasks),
+		Limit:         input.Limit,
+		MissingOnly:   input.MissingOnly,
+		ResetSemantic: input.ResetSemantic,
 	}, &river.InsertOpts{Queue: "reindex_assets"})
 	if err != nil {
 		return ReindexAssetsJobResult{}, fmt.Errorf("enqueue reindex job: %w", err)
@@ -298,6 +309,23 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 	repositoryUUID, err := parseRepositoryUUID(input.RepositoryID)
 	if err != nil {
 		return err
+	}
+
+	// Model-swap reset: on the first page of a semantic rebuild, drop every
+	// semantic vector and demote the default space so the next re-embed promotes
+	// the newly served model. This is a clean drop+refill — search returns fewer
+	// results until the rebuild completes, but never mixes vectors from two
+	// models. Guarded to Offset == 0 so paginated continuations do not re-wipe.
+	if input.ResetSemantic && input.Offset == 0 && containsIndexingTask(enabledTasks, AssetIndexingTaskSemanticImage) {
+		if err := s.queries.DeleteAllSearchEmbeddings(ctx); err != nil {
+			return fmt.Errorf("reset semantic index: delete search embeddings: %w", err)
+		}
+		if err := s.queries.ClearDefaultSearchSpaceByType(ctx, string(EmbeddingTypeSemantic)); err != nil {
+			return fmt.Errorf("reset semantic index: clear default space: %w", err)
+		}
+		s.logger.Info("semantic index reset for model swap",
+			zap.String("operation", "reindex.process"),
+		)
 	}
 
 	candidates, err := s.collectReindexCandidates(ctx, repositoryUUID, enabledTasks, input)
@@ -466,11 +494,10 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 ) ([]repo.Asset, error) {
 	switch task {
 	case AssetIndexingTaskSemanticImage:
-		return s.queries.ListPhotoAssetsMissingEmbeddingType(ctx, repo.ListPhotoAssetsMissingEmbeddingTypeParams{
-			RepositoryID:  repositoryUUID,
-			EmbeddingType: string(EmbeddingTypeSemantic),
-			Limit:         int32(limit),
-			Offset:        0,
+		return s.queries.ListPhotoAssetsMissingSemanticEmbedding(ctx, repo.ListPhotoAssetsMissingSemanticEmbeddingParams{
+			RepositoryID: repositoryUUID,
+			Limit:        int32(limit),
+			Offset:       0,
 		})
 	case AssetIndexingTaskOCR:
 		return s.queries.ListPhotoAssetsMissingOCRResults(ctx, repo.ListPhotoAssetsMissingOCRResultsParams{

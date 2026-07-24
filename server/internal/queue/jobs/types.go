@@ -169,11 +169,12 @@ func (ProcessFaceArgs) InsertOpts() river.InsertOpts {
 // Offset advances across self-chained full-rebuild pages (MissingOnly=false);
 // it is ignored for missing-only backfills.
 type ReindexAssetsArgs struct {
-	RepositoryID *string  `json:"repositoryId,omitempty"`
-	Tasks        []string `json:"tasks,omitempty"`
-	Limit        int      `json:"limit,omitempty"`
-	Offset       int      `json:"offset,omitempty"`
-	MissingOnly  bool     `json:"missingOnly,omitempty"`
+	RepositoryID  *string  `json:"repositoryId,omitempty"`
+	Tasks         []string `json:"tasks,omitempty"`
+	Limit         int      `json:"limit,omitempty"`
+	Offset        int      `json:"offset,omitempty"`
+	MissingOnly   bool     `json:"missingOnly,omitempty"`
+	ResetSemantic bool     `json:"resetSemantic,omitempty"`
 }
 
 func (ReindexAssetsArgs) Kind() string { return "reindex_assets" }

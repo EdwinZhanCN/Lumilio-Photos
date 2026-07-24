@@ -24,15 +24,6 @@ func TestNormalizeRequestedIndexingTasks_IgnoresBioCLIP(t *testing.T) {
 	}
 }
 
-func containsIndexingTask(tasks []AssetIndexingTask, target AssetIndexingTask) bool {
-	for _, task := range tasks {
-		if task == target {
-			return true
-		}
-	}
-	return false
-}
-
 func TestNormalizeReindexAssetsInput_OffsetClampedToNonNegative(t *testing.T) {
 	cases := []struct {
 		name   string

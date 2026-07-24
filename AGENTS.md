@@ -19,6 +19,7 @@ The system is local-first: preserve original media, keep repository/storage sema
 - `site/docs/internal/agent/architecture.md`: system map, backend/frontend boundaries, config/runtime notes.
 - `site/docs/internal/agent/BACKEND.md`: backend runtime, package map, config, queues, storage, API contracts.
 - `site/docs/internal/agent/FRONTEND.md`: frontend runtime, toolchain, routes, state boundaries, API usage, and the test-layer taxonomy (which file name / runner for a given test, incl. GPU/WebGL capability tests).
+- `site/docs/internal/agent/test-assets.md`: test/demo media toolchain — the git-LFS `Lumilio-Assets` pin (`assets.lock.json`), `vp run assets:sync`, and the `demo:seed` / `e2e:seed` seeders.
 - `web/ARCHITECTURE.md`: enforceable frontend directory ownership, public-entry rules, dependency direction, and boundary gates.
 - `site/docs/internal/agent/DESIGN.md`: product and interface guidance for app work.
 - `site/docs/internal/agent/core-beliefs.md`: decision principles for product and engineering tradeoffs.
