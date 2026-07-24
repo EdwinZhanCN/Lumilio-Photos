@@ -21,6 +21,23 @@ type QueryResponse = {
   }>;
 };
 
+type UploadResponse = {
+  task_id: number;
+  status: string;
+};
+
+type UploadJobStatus = {
+  task_id: number;
+  status: string;
+  terminal: boolean;
+  success: boolean;
+  error?: string;
+};
+
+type UploadJobStatusResponse = {
+  jobs?: UploadJobStatus[];
+};
+
 async function expectAuth(response: APIResponse): Promise<AuthResponse> {
   if (!response.ok()) {
     expect(response.ok(), await response.text()).toBe(true);
@@ -65,7 +82,7 @@ async function uploadAsset(
   request: APIRequestContext,
   workspace: Workspace,
   filename: string,
-): Promise<void> {
+): Promise<number> {
   const response = await request.post("/api/v1/assets", {
     headers: { authorization: `Bearer ${workspace.token}` },
     multipart: {
@@ -73,11 +90,28 @@ async function uploadAsset(
       file: {
         name: filename,
         mimeType: "image/jpeg",
-        buffer: readFileSync(workspace.uploadSource),
+        buffer: readFileSync(workspace.authIsolationSource),
       },
     },
   });
   expect(response.ok(), await response.text()).toBe(true);
+  const upload = (await response.json()) as UploadResponse;
+  expect(upload.status).toBe("processing");
+  expect(upload.task_id).toBeGreaterThan(0);
+  return upload.task_id;
+}
+
+async function uploadJobStatus(
+  request: APIRequestContext,
+  token: string,
+  taskId: number,
+): Promise<UploadJobStatus | undefined> {
+  const response = await request.get(`/api/v1/assets/batch/jobs?task_ids=${taskId}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  expect(response.ok(), await response.text()).toBe(true);
+  const result = (await response.json()) as UploadJobStatusResponse;
+  return result.jobs?.find((job) => job.task_id === taskId);
 }
 
 async function userCanSeeAsset(
@@ -251,17 +285,22 @@ test("@auth-hardening exhausted session clears user A before user B data loads",
 }, testInfo) => {
   test.setTimeout(150_000);
   const privateFilename = `auth-isolation-${testInfo.parallelIndex}-${Date.now()}.jpg`;
-  await uploadAsset(request, workspace, privateFilename);
+  const uploadTaskId = await uploadAsset(request, workspace, privateFilename);
   await expect
     .poll(
-      () => userCanSeeAsset(request, workspace.token, privateFilename, workspace.repositoryId),
+      async () => (await uploadJobStatus(request, workspace.token, uploadTaskId))?.terminal ?? false,
       {
-        message: `${privateFilename} should finish ingest for user A`,
+        message: `${privateFilename} upload task should reach a terminal state for user A`,
         timeout: 120_000,
         intervals: [500, 1_000, 2_000],
       },
     )
     .toBe(true);
+  const completedUpload = await uploadJobStatus(request, workspace.token, uploadTaskId);
+  expect(completedUpload?.success, completedUpload?.error ?? completedUpload?.status).toBe(true);
+  expect(
+    await userCanSeeAsset(request, workspace.token, privateFilename, workspace.repositoryId),
+  ).toBe(true);
 
   await new LoginPage(page).signIn(workspace.username, workspace.password);
   await page.goto("/assets");
