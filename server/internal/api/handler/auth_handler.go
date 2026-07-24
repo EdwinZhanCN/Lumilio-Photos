@@ -15,12 +15,14 @@ import (
 // AuthHandler handles authentication-related HTTP requests
 type AuthHandler struct {
 	authService *service.AuthService
+	rateLimiter *AuthRateLimiter
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, rateLimiter *AuthRateLimiter) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		rateLimiter: rateLimiter,
 	}
 }
 
@@ -73,9 +75,14 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 // @Param request body dto.LoginOptionsRequestDTO true "Username to probe"
 // @Success 200 {object} dto.LoginOptionsResponseDTO "Login options for the username"
 // @Failure 400 {object} api.ErrorResponse "Invalid request data"
+// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/login/options [post]
 func (h *AuthHandler) GetLoginOptions(c *gin.Context) {
+	if !h.allowAuthNetwork(c, authRateScopeLoginOptions) {
+		return
+	}
+
 	var req dto.LoginOptionsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
@@ -105,12 +112,20 @@ func (h *AuthHandler) GetLoginOptions(c *gin.Context) {
 // @Success 200 {object} dto.AuthResponseDTO "Login successful"
 // @Failure 400 {object} api.ErrorResponse "Invalid request data"
 // @Failure 401 {object} api.ErrorResponse "Invalid credentials"
+// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
+	if !h.allowAuthNetwork(c, authRateScopeLogin) {
+		return
+	}
+
 	var req dto.LoginRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	if !h.allowAuthUsername(c, authRateScopeLogin, req.Username) {
 		return
 	}
 
@@ -127,6 +142,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	h.resetAuthUsername(authRateScopeLogin, req.Username)
 	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
 }
 
@@ -174,12 +190,20 @@ func (h *AuthHandler) CompleteRequiredPasswordChange(c *gin.Context) {
 // @Success 200 {object} dto.AuthResponseDTO "Token refreshed successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request data"
 // @Failure 401 {object} api.ErrorResponse "Invalid or expired refresh token"
+// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	if !h.allowAuthNetwork(c, authRateScopeRefresh) {
+		return
+	}
+
 	var req dto.RefreshTokenRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	if !h.allowAuthOpaqueSubject(c, authRateScopeRefresh, req.RefreshToken) {
 		return
 	}
 
@@ -196,6 +220,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	h.resetAuthOpaqueSubject(authRateScopeRefresh, req.RefreshToken)
 	api.JSONOK(c, dto.ToAuthResponseDTO(authResponse))
 }
 

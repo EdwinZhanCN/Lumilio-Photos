@@ -11699,6 +11699,16 @@ const docTemplate = `{
                         },
                         "description": "Invalid credentials"
                     },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Too many authentication attempts"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -11759,6 +11769,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Invalid request data"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Too many authentication attempts"
                     },
                     "500": {
                         "content": {
@@ -12612,6 +12632,16 @@ const docTemplate = `{
                         },
                         "description": "Invalid or expired MFA challenge"
                     },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Too many authentication attempts"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -12683,6 +12713,16 @@ const docTemplate = `{
                         },
                         "description": "Invalid credentials"
                     },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Too many authentication attempts"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -12753,6 +12793,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Invalid credentials"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Too many authentication attempts"
                     },
                     "500": {
                         "content": {
@@ -12895,6 +12945,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Invalid or expired refresh token"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Too many authentication attempts"
                     },
                     "500": {
                         "content": {

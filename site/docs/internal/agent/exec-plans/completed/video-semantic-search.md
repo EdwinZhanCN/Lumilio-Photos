@@ -1,10 +1,10 @@
 # Video Semantic Search
 
-Status: active, **implemented** (pending live verify). Prerequisite
-[embedding-architecture](../completed/embedding-architecture.md) is **shipped**
-(`search_embeddings` + max-pool + canonicalize). Code for frame extract, embed
-worker, `best_ts`, backfill, settings, and UI is in tree; apply migration
-`000013` and smoke-test with real clips before moving to `completed/`.
+Status: **completed and verified** (2026-07-24, PR #169). Prerequisite
+[embedding-architecture](embedding-architecture.md) is **shipped**
+(`search_embeddings` + max-pool + canonicalize). Frame extraction, embedding,
+`best_ts`, backfill, reset/retry, settings, UI seek, and deterministic
+real-service regression coverage are shipped.
 
 Goal: production text→video semantic search. Sample frames from each video's
 transcoded `web.mp4`, embed with SigLIP2 into the same canonical 768-dim L2
@@ -240,7 +240,7 @@ Surface:
 - Audio semantic search (Whisper / CLAP).
 - OCR / face / zero-shot / aesthetic on video frames.
 - Storage schema / HNSW / canonicalize — owned by
-  [embedding-architecture](../completed/embedding-architecture.md).
+  [embedding-architecture](embedding-architecture.md).
 - Separate video retriever or RRF source weight.
 - Fusing frame extract into the transcode ffmpeg invocation.
 

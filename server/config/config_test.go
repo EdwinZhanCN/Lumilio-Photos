@@ -56,6 +56,12 @@ webauthn_rp_name = "Lumilio Photos"
 webauthn_rp_mode = "origin-derived"
 webauthn_rp_id = ""
 webauthn_rp_origins = []
+[auth.rate_limit]
+ip_attempts = 60
+subject_attempts = 8
+window = "1m"
+lockout = "5m"
+max_entries = 10000
 [transcode]
 hardware_accel = "auto"
 [lumen]
@@ -132,6 +138,13 @@ func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
 	}
 	if cfg.Auth.AccessTokenTTL != 15*time.Minute {
 		t.Fatalf("access ttl = %v", cfg.Auth.AccessTokenTTL)
+	}
+	if cfg.Auth.RateLimit.IPAttempts != 60 ||
+		cfg.Auth.RateLimit.SubjectAttempts != 8 ||
+		cfg.Auth.RateLimit.Window != time.Minute ||
+		cfg.Auth.RateLimit.Lockout != 5*time.Minute ||
+		cfg.Auth.RateLimit.MaxEntries != 10_000 {
+		t.Fatalf("auth rate limit = %+v", cfg.Auth.RateLimit)
 	}
 }
 
