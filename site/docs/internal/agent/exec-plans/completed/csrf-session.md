@@ -21,8 +21,9 @@ origin allowlist.
 - Allow credentialless cross-origin API requests by default. Never combine a
   wildcard origin with cookies or `Access-Control-Allow-Credentials`.
 - Accept the dynamically derived request origin without configuration. This is
-  what keeps direct LAN IPs, public domains, reverse proxies, and Desktop
-  localhost zero-config.
+  what keeps direct LAN IPs, public domains, reverse proxies, and the Desktop
+  product Web at localhost zero-config. The private Wails Control Panel remains
+  outside the product HTTP authentication boundary.
 - Require a trusted `Origin`/`Referer` for browser requests that create, rotate,
   or destroy a cookie session. Requests with no browser-origin metadata remain
   available to non-browser clients that maintain a cookie jar.
@@ -46,7 +47,7 @@ origin allowlist.
   session-bound CSRF proof, never the refresh credential.
 - Refresh and logout validate both the cookie-bound proof and the browser
   origin; rejected requests do not consume a valid session.
-- Same-origin LAN/public/Desktop access remains zero-config. Untrusted
+- Same-origin LAN/public/Desktop-browser access remains zero-config. Untrusted
   cross-origin cookie sessions receive no credentialed CORS grant, while
   credentialless Bearer API calls remain available.
 - Rotation and logout share a cross-tab Web Lock, and refresh-token replay still

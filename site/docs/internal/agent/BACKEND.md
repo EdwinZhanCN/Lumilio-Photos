@@ -165,7 +165,8 @@ the cookie, the CSRF proof, and any previous browser session presented on a new
 login.
 
 Same-origin browser access is dynamic and zero-config, including direct LAN
-addresses, public domains behind a reverse proxy, and Desktop localhost.
+addresses, public domains behind a reverse proxy, and the Desktop product Web
+served with the API at `http://localhost:6680`.
 `server.cors_allowed_origins` is only the exact allowlist for credentialed
 cross-origin browser sessions. Unlisted origins may still call public or Bearer
 API endpoints without cookies and receive wildcard CORS, but they never receive
@@ -173,6 +174,14 @@ API endpoints without cookies and receive wildcard CORS, but they never receive
 destroy cookie sessions must match the reconstructed request origin or that
 allowlist. Reverse proxies must overwrite, rather than append client-supplied,
 `X-Forwarded-Proto` and `X-Forwarded-Host`.
+
+Desktop has two distinct browser surfaces. The private Wails Control Panel is
+served by its own asset handler and calls only the host-owned `/__onb/*`
+control plane; it does not participate in product accounts, refresh cookies,
+server CORS, or this CSRF protocol. The React product Web runs in the user's
+default browser and is served by `server/app` on the same localhost origin as
+the API. Desktop's `BrowserOrigin` manifest binding remains the WebAuthn RP
+Origin for that product Web; it is not a CORS entry.
 
 ## Queues And Processing
 

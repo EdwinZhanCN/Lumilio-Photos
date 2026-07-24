@@ -71,6 +71,12 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if got, want := strings.Join(cfg.Auth.WebAuthnRPOrigins, ","), "http://localhost:6680"; got != want {
 		t.Fatalf("webauthn origins = %q, want %q", got, want)
 	}
+	if len(cfg.ServerConfig.CORSAllowedOrigins) != 0 {
+		t.Fatalf(
+			"desktop product Web is same-origin and the private control panel is outside server CORS, got origins %q",
+			cfg.ServerConfig.CORSAllowedOrigins,
+		)
+	}
 	if cfg.DatabaseConfig.Host != dbHost {
 		t.Fatalf("database host = %q", cfg.DatabaseConfig.Host)
 	}
