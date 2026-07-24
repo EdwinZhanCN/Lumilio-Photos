@@ -15,6 +15,7 @@ export interface AISettingsDraft {
   };
   ml: {
     semanticEnabled: boolean;
+    videoSemanticEnabled: boolean;
     bioclipEnabled: boolean;
     ocrEnabled: boolean;
     faceEnabled: boolean;
@@ -43,6 +44,7 @@ function buildPayload(draft: AISettingsDraft): UpdateSystemSettings {
     },
     ml: {
       semantic_enabled: draft.ml.semanticEnabled,
+      video_semantic_enabled: draft.ml.videoSemanticEnabled,
       bioclip_enabled: draft.ml.bioclipEnabled,
       ocr_enabled: draft.ml.ocrEnabled,
       face_enabled: draft.ml.faceEnabled,
@@ -87,6 +89,7 @@ function toServerDraft(
     },
     ml: {
       semanticEnabled: Boolean(data.ml?.semantic_enabled),
+      videoSemanticEnabled: Boolean(data.ml?.video_semantic_enabled),
       bioclipEnabled: Boolean(data.ml?.bioclip_enabled),
       ocrEnabled: Boolean(data.ml?.ocr_enabled),
       faceEnabled: Boolean(data.ml?.face_enabled),

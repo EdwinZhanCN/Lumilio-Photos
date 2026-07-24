@@ -2034,7 +2034,8 @@ func parseIndexingTasks(tasks []string) ([]service.AssetIndexingTask, error) {
 		switch task {
 		case service.AssetIndexingTaskSemanticImage,
 			service.AssetIndexingTaskOCR,
-			service.AssetIndexingTaskFaceRecognition:
+			service.AssetIndexingTaskFaceRecognition,
+			service.AssetIndexingTaskVideoSemantic:
 			result = append(result, task)
 		case service.AssetIndexingTaskBioCLIP:
 			return nil, fmt.Errorf("bioclip indexing is album-scoped")
@@ -2048,6 +2049,7 @@ func parseIndexingTasks(tasks []string) ([]service.AssetIndexingTask, error) {
 func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndexingStatsResponseDTO {
 	return dto.AssetIndexingStatsResponseDTO{
 		PhotoTotal:  int(stats.PhotoTotal),
+		VideoTotal:  int(stats.VideoTotal),
 		ReindexJobs: int(stats.ReindexJobs),
 		Tasks: dto.AssetIndexingTaskSetStatsDTO{
 			Semantic: dto.AssetIndexingTaskStatsDTO{
@@ -2069,6 +2071,11 @@ func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndex
 				IndexedCount: int(stats.Tasks.Face.IndexedCount),
 				QueuedJobs:   int(stats.Tasks.Face.QueuedJobs),
 				TotalCount:   int(stats.Tasks.Face.TotalCount),
+			},
+			VideoSemantic: dto.AssetIndexingTaskStatsDTO{
+				IndexedCount: int(stats.Tasks.VideoSemantic.IndexedCount),
+				QueuedJobs:   int(stats.Tasks.VideoSemantic.QueuedJobs),
+				TotalCount:   int(stats.Tasks.VideoSemantic.TotalCount),
 			},
 		},
 	}
@@ -2269,8 +2276,9 @@ func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
 				StackSize:  &stackSize,
 			}
 			dtos = append(dtos, dto.BrowseItemDTO{
-				Type: item.Type,
-				ID:   item.ID,
+				Type:     item.Type,
+				ID:       item.ID,
+				BestTsMs: item.BestTsMs,
 				Stack: &dto.BrowseStackDTO{
 					StackID:          item.Stack.StackID.String(),
 					StackKind:        string(item.Stack.Kind),
@@ -2285,9 +2293,10 @@ func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
 		}
 
 		dtos = append(dtos, dto.BrowseItemDTO{
-			Type:  "asset",
-			ID:    item.ID,
-			Asset: &assetDTO,
+			Type:     "asset",
+			ID:       item.ID,
+			Asset:    &assetDTO,
+			BestTsMs: item.BestTsMs,
 		})
 	}
 	return dtos

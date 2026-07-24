@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/db/repo"
@@ -19,12 +20,19 @@ const embeddingDistanceMetricL2 = "l2"
 // EmbeddingService interface defines the contract for embedding operations.
 type EmbeddingService interface {
 	SaveEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string, vector []float32, isPrimary bool) error
+	SaveVideoFrameEmbeddings(ctx context.Context, assetID pgtype.UUID, model string, frames []VideoFrameEmbedding) error
 	SaveAestheticScore(ctx context.Context, assetID pgtype.UUID, score float32, modelVersion string) error
 	GetEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) (repo.Embedding, error)
 	GetAssetEmbeddingInfo(ctx context.Context, assetID pgtype.UUID) (map[EmbeddingType]EmbeddingInfo, error)
 	DeleteEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) error
 	ResolveDefaultSearchSpace(ctx context.Context, embeddingType EmbeddingType, model string, dimensions int) (repo.EmbeddingSpace, error)
 	GetPrimaryEmbeddingVector(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error)
+}
+
+// VideoFrameEmbedding is one sampled video frame's semantic vector.
+type VideoFrameEmbedding struct {
+	FrameTsMs int32
+	Vector    []float32
 }
 
 // PrimaryEmbedding is the decoded primary embedding for an asset/type, returned
@@ -104,7 +112,7 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		}
 
 		// Replace the asset's primary (whole-asset) semantic row. Video frame rows
-		// (frame_ts_ms IS NOT NULL) are written by the video frames worker, not here.
+		// (frame_ts_ms IS NOT NULL) are written by SaveVideoFrameEmbeddings.
 		if err := queries.DeleteSearchEmbeddingsByAsset(ctx, assetID); err != nil {
 			return fmt.Errorf("clear search embeddings: %w", err)
 		}
@@ -142,6 +150,77 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		return fmt.Errorf("commit embedding transaction: %w", err)
 	}
 
+	return nil
+}
+
+// SaveVideoFrameEmbeddings replaces all semantic rows for a video asset with
+// N frame rows (frame_ts_ms set). There is no NULL-primary row for videos.
+func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID pgtype.UUID, model string, frames []VideoFrameEmbedding) error {
+	if len(frames) == 0 {
+		return fmt.Errorf("video frame embeddings are empty")
+	}
+	if strings.TrimSpace(model) == "" {
+		return fmt.Errorf("embedding model is empty")
+	}
+
+	canonical := make([]VideoFrameEmbedding, 0, len(frames))
+	for _, frame := range frames {
+		if len(frame.Vector) == 0 {
+			return fmt.Errorf("frame embedding vector is empty at ts=%d", frame.FrameTsMs)
+		}
+		if frame.FrameTsMs < 0 {
+			return fmt.Errorf("frame timestamp must be non-negative: %d", frame.FrameTsMs)
+		}
+		canonical = append(canonical, VideoFrameEmbedding{
+			FrameTsMs: frame.FrameTsMs,
+			Vector:    canonicalizeSemanticVector(frame.Vector),
+		})
+	}
+
+	tx, err := e.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin video frame embedding transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	queries := e.queries.WithTx(tx)
+
+	space, err := e.upsertEmbeddingSpace(ctx, queries, EmbeddingTypeSemantic, model, len(canonical[0].Vector))
+	if err != nil {
+		return err
+	}
+	space, err = e.ensureDefaultSpace(ctx, queries, EmbeddingTypeSemantic, space)
+	if err != nil {
+		return err
+	}
+
+	if err := queries.DeleteSearchEmbeddingsByAsset(ctx, assetID); err != nil {
+		return fmt.Errorf("clear search embeddings: %w", err)
+	}
+
+	seenTS := make(map[int32]struct{}, len(canonical))
+	for _, frame := range canonical {
+		if _, dup := seenTS[frame.FrameTsMs]; dup {
+			return fmt.Errorf("duplicate frame timestamp: %d", frame.FrameTsMs)
+		}
+		seenTS[frame.FrameTsMs] = struct{}{}
+
+		ts := frame.FrameTsMs
+		pgVector := pgvector.NewVector(frame.Vector)
+		if err := queries.InsertSearchEmbedding(ctx, repo.InsertSearchEmbeddingParams{
+			AssetID:   assetID,
+			SpaceID:   space.ID,
+			FrameTsMs: &ts,
+			Vector:    &pgVector,
+			ModelID:   model,
+		}); err != nil {
+			return fmt.Errorf("insert frame embedding at ts=%d: %w", frame.FrameTsMs, err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit video frame embedding transaction: %w", err)
+	}
 	return nil
 }
 

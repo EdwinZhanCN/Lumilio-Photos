@@ -283,3 +283,60 @@ jobs:
 
             - name: Build docs site
               run: cd site && vp run build
+
+    # This is the single stable branch-protection check. It always runs, even
+    # when a path-filtered job is skipped, and verifies that every job which was
+    # expected for this change actually succeeded.
+    ci-required:
+        name: CI required
+        if: always()
+        needs:
+            - changes
+            - server-linux
+            - web
+            - desktop-macos
+            - desktop-windows
+            - site
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require all applicable CI jobs
+              env:
+                  CHANGES_RESULT: ${{ needs.changes.result }}
+                  SERVER_CHANGED: ${{ needs.changes.outputs.server }}
+                  SERVER_RESULT: ${{ needs.server-linux.result }}
+                  WEB_CHANGED: ${{ needs.changes.outputs.web }}
+                  WEB_RESULT: ${{ needs.web.result }}
+                  DESKTOP_CHANGED: ${{ needs.changes.outputs.desktop }}
+                  DESKTOP_MACOS_RESULT: ${{ needs.desktop-macos.result }}
+                  DESKTOP_WINDOWS_RESULT: ${{ needs.desktop-windows.result }}
+                  SITE_CHANGED: ${{ needs.changes.outputs.site }}
+                  SITE_RESULT: ${{ needs.site.result }}
+              run: |
+                  set -eu
+
+                  if [ "$CHANGES_RESULT" != "success" ]; then
+                      echo "::error::changes job finished with $CHANGES_RESULT"
+                      exit 1
+                  fi
+
+                  check_job() {
+                      label="$1"
+                      changed="$2"
+                      result="$3"
+
+                      if [ "$changed" = "true" ]; then
+                          if [ "$result" != "success" ]; then
+                              echo "::error::$label was required but finished with $result"
+                              return 1
+                          fi
+                      elif [ "$result" != "skipped" ]; then
+                          echo "::error::$label was not required but finished with $result"
+                          return 1
+                      fi
+                  }
+
+                  check_job "server linux" "$SERVER_CHANGED" "$SERVER_RESULT"
+                  check_job "web" "$WEB_CHANGED" "$WEB_RESULT"
+                  check_job "desktop macos" "$DESKTOP_CHANGED" "$DESKTOP_MACOS_RESULT"
+                  check_job "desktop windows" "$DESKTOP_CHANGED" "$DESKTOP_WINDOWS_RESULT"
+                  check_job "site" "$SITE_CHANGED" "$SITE_RESULT"

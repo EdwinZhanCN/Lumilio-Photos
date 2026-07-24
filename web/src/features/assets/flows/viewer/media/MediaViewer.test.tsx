@@ -1,9 +1,35 @@
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
 import { t } from "@test/i18n";
 import type { Asset, MediaItemByAssetResponse } from "@/lib/assets/types";
 import MediaViewer from "./MediaViewer";
+
+// Vidstack is a heavy playback boundary. This component test only needs to
+// prove the viewer passes URL state to that boundary; real media playback stays
+// in the Playwright E2E layer.
+vi.mock("@vidstack/react", () => ({
+  MediaPlayer: ({
+    children,
+    currentTime,
+    title,
+  }: {
+    children?: ReactNode;
+    currentTime?: number;
+    title?: string;
+  }) => (
+    <div role="region" aria-label={title} data-current-time={currentTime}>
+      {children}
+    </div>
+  ),
+  MediaProvider: () => null,
+}));
+
+vi.mock("@vidstack/react/player/layouts/default", () => ({
+  defaultLayoutIcons: {},
+  DefaultVideoLayout: () => null,
+}));
 
 // Real component + real useAssetMediaItem query + real assetUrls; only the
 // media-item HTTP response is mocked. The RAW/JPEG picker is the subject.
@@ -44,7 +70,6 @@ describe("MediaViewer RAW/JPEG component selection", () => {
         selectedAssetId="jpeg"
         onSelectedAssetChange={onSelectedAssetChange}
       />,
-      { router: false },
     );
 
     // The controlled selection ("jpeg") drives the real thumbnail URL.
@@ -55,5 +80,24 @@ describe("MediaViewer RAW/JPEG component selection", () => {
     await screen.getByRole("radio", { name: t("assets.mediaViewer.componentRaw") }).click();
     expect(onSelectedAssetChange).toHaveBeenCalledWith("raw");
     await expect.element(screen.getByRole("tablist")).toHaveClass("tabs-box");
+  });
+});
+
+describe("MediaViewer video start time", () => {
+  it("seeks to the semantic match timestamp from the URL", async () => {
+    const asset = {
+      asset_id: "video",
+      original_filename: "semantic-match.mp4",
+      mime_type: "video/mp4",
+      type: "VIDEO",
+    } as Asset;
+
+    const screen = await renderWithProviders(<MediaViewer asset={asset} isActive={false} />, {
+      route: "/assets/video?t_ms=12345",
+    });
+
+    await expect
+      .element(screen.getByRole("region", { name: "semantic-match.mp4" }))
+      .toHaveAttribute("data-current-time", "12.345");
   });
 });
