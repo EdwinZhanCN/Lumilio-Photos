@@ -251,6 +251,10 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	if err != nil {
 		return fmt.Errorf("initialize auth service: %w", err)
 	}
+	authRateLimiter, err := handler.NewAuthRateLimiter(appConfig.Auth.RateLimit, securityLogger)
+	if err != nil {
+		return fmt.Errorf("initialize auth rate limiter: %w", err)
+	}
 	albumService := service.NewAlbumService(queries)
 	userService := service.NewUserService(queries, pgxPool)
 
@@ -399,7 +403,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
-	authController := handler.NewAuthHandler(authService)
+	authController := handler.NewAuthHandler(authService, authRateLimiter)
 	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, pgxPool, bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)

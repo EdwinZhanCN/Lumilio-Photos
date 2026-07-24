@@ -25,7 +25,11 @@ services:
             - -c
             - max_parallel_maintenance_workers=4
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
+            test:
+                [
+                    "CMD-SHELL",
+                    "test \"$$(cat /proc/1/comm)\" = postgres && pg_isready -U postgres -d lumiliophotos",
+                ]
             interval: 10s
             timeout: 5s
             retries: 5

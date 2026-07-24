@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { api } from "./api";
 import {
+  AUTH_ISOLATION_ASSET,
   smokeAsset,
   SMOKE_SCAN_ASSET,
   SMOKE_UPLOAD_ASSET,
@@ -29,6 +30,8 @@ export type Workspace = {
   uploadSource: string;
   /** Per-worker name it is uploaded under, so assertions cannot cross workers. */
   uploadFilename: string;
+  /** Distinct real image reserved for auth/session isolation assertions. */
+  authIsolationSource: string;
   videoSource: string;
   videoFilename: string;
 };
@@ -127,6 +130,7 @@ export async function provisionWorkspace(index: number): Promise<Workspace> {
     scanFilename,
     uploadSource: smokeAsset(SMOKE_UPLOAD_ASSET),
     uploadFilename: `e2e-upload-w${index}.jpg`,
+    authIsolationSource: smokeAsset(AUTH_ISOLATION_ASSET),
     videoSource: smokeAsset(SMOKE_VIDEO_ASSET),
     videoFilename: `e2e-video-w${index}.mp4`,
   };

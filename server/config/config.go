@@ -107,6 +107,15 @@ type AuthConfig struct {
 	WebAuthnRPMode    string
 	WebAuthnRPID      string
 	WebAuthnRPOrigins []string
+	RateLimit         AuthRateLimitConfig
+}
+
+type AuthRateLimitConfig struct {
+	IPAttempts      int
+	SubjectAttempts int
+	Window          time.Duration
+	Lockout         time.Duration
+	MaxEntries      int
 }
 
 type TranscodeConfig struct{ HardwareAccel string }
@@ -193,14 +202,22 @@ type geocodingManifest struct {
 	UserAgent         *string `toml:"user_agent"`
 }
 type authManifest struct {
-	SecretKeyFile     *string   `toml:"secret_key_file"`
-	AccessTokenTTL    *string   `toml:"access_token_ttl"`
-	RefreshTokenTTL   *string   `toml:"refresh_token_ttl"`
-	MediaTokenTTL     *string   `toml:"media_token_ttl"`
-	WebAuthnRPName    *string   `toml:"webauthn_rp_name"`
-	WebAuthnRPMode    *string   `toml:"webauthn_rp_mode"`
-	WebAuthnRPID      *string   `toml:"webauthn_rp_id"`
-	WebAuthnRPOrigins *[]string `toml:"webauthn_rp_origins"`
+	SecretKeyFile     *string                `toml:"secret_key_file"`
+	AccessTokenTTL    *string                `toml:"access_token_ttl"`
+	RefreshTokenTTL   *string                `toml:"refresh_token_ttl"`
+	MediaTokenTTL     *string                `toml:"media_token_ttl"`
+	WebAuthnRPName    *string                `toml:"webauthn_rp_name"`
+	WebAuthnRPMode    *string                `toml:"webauthn_rp_mode"`
+	WebAuthnRPID      *string                `toml:"webauthn_rp_id"`
+	WebAuthnRPOrigins *[]string              `toml:"webauthn_rp_origins"`
+	RateLimit         *authRateLimitManifest `toml:"rate_limit"`
+}
+type authRateLimitManifest struct {
+	IPAttempts      *int    `toml:"ip_attempts"`
+	SubjectAttempts *int    `toml:"subject_attempts"`
+	Window          *string `toml:"window"`
+	Lockout         *string `toml:"lockout"`
+	MaxEntries      *int    `toml:"max_entries"`
 }
 type transcodeManifest struct {
 	HardwareAccel *string `toml:"hardware_accel"`
@@ -329,6 +346,14 @@ func validateManifestPresence(m manifest) []string {
 		required(&p, "auth.webauthn_rp_mode", m.Auth.WebAuthnRPMode)
 		required(&p, "auth.webauthn_rp_id", m.Auth.WebAuthnRPID)
 		required(&p, "auth.webauthn_rp_origins", m.Auth.WebAuthnRPOrigins)
+		requiredSection(&p, "auth.rate_limit", m.Auth.RateLimit)
+		if m.Auth.RateLimit != nil {
+			required(&p, "auth.rate_limit.ip_attempts", m.Auth.RateLimit.IPAttempts)
+			required(&p, "auth.rate_limit.subject_attempts", m.Auth.RateLimit.SubjectAttempts)
+			required(&p, "auth.rate_limit.window", m.Auth.RateLimit.Window)
+			required(&p, "auth.rate_limit.lockout", m.Auth.RateLimit.Lockout)
+			required(&p, "auth.rate_limit.max_entries", m.Auth.RateLimit.MaxEntries)
+		}
 	}
 	if m.Transcode != nil {
 		required(&p, "transcode.hardware_accel", m.Transcode.HardwareAccel)
@@ -451,6 +476,16 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	auth.AccessTokenTTL = parsePositiveDuration(&p, "auth.access_token_ttl", *m.Auth.AccessTokenTTL)
 	auth.RefreshTokenTTL = parsePositiveDuration(&p, "auth.refresh_token_ttl", *m.Auth.RefreshTokenTTL)
 	auth.MediaTokenTTL = parsePositiveDuration(&p, "auth.media_token_ttl", *m.Auth.MediaTokenTTL)
+	auth.RateLimit = AuthRateLimitConfig{
+		IPAttempts:      *m.Auth.RateLimit.IPAttempts,
+		SubjectAttempts: *m.Auth.RateLimit.SubjectAttempts,
+		MaxEntries:      *m.Auth.RateLimit.MaxEntries,
+	}
+	requirePositive(&p, "auth.rate_limit.ip_attempts", auth.RateLimit.IPAttempts)
+	requirePositive(&p, "auth.rate_limit.subject_attempts", auth.RateLimit.SubjectAttempts)
+	requirePositive(&p, "auth.rate_limit.max_entries", auth.RateLimit.MaxEntries)
+	auth.RateLimit.Window = parsePositiveDuration(&p, "auth.rate_limit.window", *m.Auth.RateLimit.Window)
+	auth.RateLimit.Lockout = parsePositiveDuration(&p, "auth.rate_limit.lockout", *m.Auth.RateLimit.Lockout)
 	if auth.WebAuthnRPMode == "origin-derived" && (auth.WebAuthnRPID != "" || len(auth.WebAuthnRPOrigins) != 0) {
 		p = append(p, "auth origin-derived mode requires empty webauthn_rp_id and webauthn_rp_origins")
 	}
