@@ -253,7 +253,9 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
         selection.handleClick(item.id, event as any);
         return;
       }
-      openCarousel(asset.asset_id);
+      openCarousel(asset.asset_id, {
+        bestTsMs: item.bestTsMs,
+      });
     },
     [openCarousel, selection],
   );

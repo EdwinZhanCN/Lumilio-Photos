@@ -35,6 +35,10 @@ func (s *pHashEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.UUID, emb
 	return nil
 }
 
+func (s *pHashEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, pgtype.UUID, string, []service.VideoFrameEmbedding) error {
+	return nil
+}
+
 func (s *pHashEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
 	return nil
 }

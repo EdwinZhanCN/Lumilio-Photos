@@ -84,6 +84,10 @@ func (s *semanticWorkerEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.
 	return nil
 }
 
+func (s *semanticWorkerEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, pgtype.UUID, string, []service.VideoFrameEmbedding) error {
+	return nil
+}
+
 func (s *semanticWorkerEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
 	return nil
 }

@@ -104,6 +104,8 @@ type Querier interface {
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CountVideoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountVideoAssetsWithSemanticFrames(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) (AgentPin, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
@@ -446,6 +448,8 @@ type Querier interface {
 	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
+	ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListVideoAssetsForIndexingBatchParams) ([]Asset, error)
+	ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg ListVideoAssetsMissingSemanticFramesParams) ([]Asset, error)
 	MarkCloudImportRunStarted(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error)
 	MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFileParams) error
 	MarkDuplicateGroupDismissed(ctx context.Context, groupID pgtype.UUID) error

@@ -19,9 +19,11 @@ type AssetIndexingTaskStats = {
 
 export type AssetIndexingStats = {
   photoTotal: number;
+  videoTotal: number;
   reindexJobs: number;
   tasks: {
     semantic: AssetIndexingTaskStats;
+    video_semantic: AssetIndexingTaskStats;
     bioclip: AssetIndexingTaskStats;
     ocr: AssetIndexingTaskStats;
     face: AssetIndexingTaskStats;
@@ -30,11 +32,11 @@ export type AssetIndexingStats = {
 
 function normalizeTaskStats(
   task: AssetIndexingTaskStatsDTO | undefined,
-  photoTotal: number,
+  fallbackTotal: number,
 ): AssetIndexingTaskStats {
   const indexedCount = task?.indexed_count ?? 0;
   const queuedJobs = task?.queued_jobs ?? 0;
-  const totalCount = task?.total_count ?? photoTotal;
+  const totalCount = task?.total_count ?? fallbackTotal;
 
   return {
     indexedCount,
@@ -52,12 +54,15 @@ function normalizeAssetIndexingStats(
   }
 
   const photoTotal = data.photo_total ?? 0;
+  const videoTotal = data.video_total ?? 0;
 
   return {
     photoTotal,
+    videoTotal,
     reindexJobs: data.reindex_jobs ?? 0,
     tasks: {
       semantic: normalizeTaskStats(data.tasks?.semantic, photoTotal),
+      video_semantic: normalizeTaskStats(data.tasks?.video_semantic, videoTotal),
       bioclip: normalizeTaskStats(data.tasks?.bioclip, photoTotal),
       ocr: normalizeTaskStats(data.tasks?.ocr, photoTotal),
       face: normalizeTaskStats(data.tasks?.face, photoTotal),

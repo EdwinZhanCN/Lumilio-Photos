@@ -8,7 +8,7 @@ import {
 } from "./selection.store";
 
 interface AssetBrowserNavigation {
-  openViewer: (assetId: string) => void;
+  openViewer: (assetId: string, opts?: { bestTsMs?: number }) => void;
   replaceViewerAsset: (assetId: string) => void;
   closeViewer: () => void;
 }
@@ -46,8 +46,9 @@ export function AssetBrowserScope({
   }
 
   const navigateTo = useCallback(
-    (path: string, replace: boolean) => {
-      const query = searchParams.toString();
+    (path: string, replace: boolean, nextParams?: URLSearchParams) => {
+      const params = nextParams ?? searchParams;
+      const query = params.toString();
       void navigate(`${path}${query ? `?${query}` : ""}`, { replace });
     },
     [navigate, searchParams],
@@ -55,11 +56,27 @@ export function AssetBrowserScope({
 
   const navigation = useMemo<AssetBrowserNavigation>(
     () => ({
-      openViewer: (assetId) => navigateTo(`${basePath}/${assetId}`, false),
-      replaceViewerAsset: (assetId) => navigateTo(`${basePath}/${assetId}`, true),
-      closeViewer: () => navigateTo(basePath, true),
+      openViewer: (assetId, opts) => {
+        const next = new URLSearchParams(searchParams);
+        if (opts?.bestTsMs != null && Number.isFinite(opts.bestTsMs)) {
+          next.set("t_ms", String(Math.max(0, Math.round(opts.bestTsMs))));
+        } else {
+          next.delete("t_ms");
+        }
+        navigateTo(`${basePath}/${assetId}`, false, next);
+      },
+      replaceViewerAsset: (assetId) => {
+        const next = new URLSearchParams(searchParams);
+        next.delete("t_ms");
+        navigateTo(`${basePath}/${assetId}`, true, next);
+      },
+      closeViewer: () => {
+        const next = new URLSearchParams(searchParams);
+        next.delete("t_ms");
+        navigateTo(basePath, true, next);
+      },
     }),
-    [basePath, navigateTo],
+    [basePath, navigateTo, searchParams],
   );
 
   return (

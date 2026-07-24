@@ -238,6 +238,7 @@ export const createBrowseItemsFromBrowseItemDTOs = (
         assets: [representative],
         memberAssetIds: item.stack.member_asset_ids ?? [],
         matchedMemberIds: item.stack.matched_member_ids ?? [],
+        bestTsMs: item.best_ts_ms ?? undefined,
       });
       return;
     }
@@ -247,6 +248,7 @@ export const createBrowseItemsFromBrowseItemDTOs = (
         type: "asset",
         id: `asset:${item.asset.asset_id}`,
         asset: item.asset as Asset,
+        bestTsMs: item.best_ts_ms ?? undefined,
       });
     }
   });

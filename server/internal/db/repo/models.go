@@ -564,25 +564,29 @@ type SearchEmbedding struct {
 }
 
 type Setting struct {
-	ID                  int32              `db:"id" json:"id"`
-	LlmAgentEnabled     bool               `db:"llm_agent_enabled" json:"llm_agent_enabled"`
-	LlmProvider         string             `db:"llm_provider" json:"llm_provider"`
-	LlmModelName        string             `db:"llm_model_name" json:"llm_model_name"`
-	LlmBaseUrl          string             `db:"llm_base_url" json:"llm_base_url"`
-	LlmApiKeyCiphertext []byte             `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
-	LlmApiKeyConfigured bool               `db:"llm_api_key_configured" json:"llm_api_key_configured"`
-	MlAuto              string             `db:"ml_auto" json:"ml_auto"`
-	MlSemanticEnabled   bool               `db:"ml_semantic_enabled" json:"ml_semantic_enabled"`
-	MlOcrEnabled        bool               `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
-	MlCaptionEnabled    bool               `db:"ml_caption_enabled" json:"ml_caption_enabled"`
-	MlFaceEnabled       bool               `db:"ml_face_enabled" json:"ml_face_enabled"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UpdatedBy           *int32             `db:"updated_by" json:"updated_by"`
-	MlBioclipEnabled    bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
-	BackupEnabled       bool               `db:"backup_enabled" json:"backup_enabled"`
-	BackupIntervalHours int32              `db:"backup_interval_hours" json:"backup_interval_hours"`
-	BackupKeepLast      int32              `db:"backup_keep_last" json:"backup_keep_last"`
+	ID                          int32              `db:"id" json:"id"`
+	LlmAgentEnabled             bool               `db:"llm_agent_enabled" json:"llm_agent_enabled"`
+	LlmProvider                 string             `db:"llm_provider" json:"llm_provider"`
+	LlmModelName                string             `db:"llm_model_name" json:"llm_model_name"`
+	LlmBaseUrl                  string             `db:"llm_base_url" json:"llm_base_url"`
+	LlmApiKeyCiphertext         []byte             `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
+	LlmApiKeyConfigured         bool               `db:"llm_api_key_configured" json:"llm_api_key_configured"`
+	MlAuto                      string             `db:"ml_auto" json:"ml_auto"`
+	MlSemanticEnabled           bool               `db:"ml_semantic_enabled" json:"ml_semantic_enabled"`
+	MlOcrEnabled                bool               `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
+	MlCaptionEnabled            bool               `db:"ml_caption_enabled" json:"ml_caption_enabled"`
+	MlFaceEnabled               bool               `db:"ml_face_enabled" json:"ml_face_enabled"`
+	CreatedAt                   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy                   *int32             `db:"updated_by" json:"updated_by"`
+	MlBioclipEnabled            bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
+	BackupEnabled               bool               `db:"backup_enabled" json:"backup_enabled"`
+	BackupIntervalHours         int32              `db:"backup_interval_hours" json:"backup_interval_hours"`
+	BackupKeepLast              int32              `db:"backup_keep_last" json:"backup_keep_last"`
+	MlVideoSemanticEnabled      bool               `db:"ml_video_semantic_enabled" json:"ml_video_semantic_enabled"`
+	MlVideoMaxFrames            int32              `db:"ml_video_max_frames" json:"ml_video_max_frames"`
+	MlVideoLongThresholdSeconds int32              `db:"ml_video_long_threshold_seconds" json:"ml_video_long_threshold_seconds"`
+	MlVideoSceneThreshold       float64            `db:"ml_video_scene_threshold" json:"ml_video_scene_threshold"`
 }
 
 type ShareLink struct {

@@ -7,6 +7,7 @@ import {
   BotIcon,
   BotMessageSquareIcon,
   EyeIcon,
+  FilmIcon,
   KeyRoundIcon,
   LinkIcon,
   ScanFaceIcon,
@@ -35,6 +36,10 @@ const ML_META = {
   semanticEnabled: {
     icon: <TextSearchIcon className="size-4" />,
     color: "bg-info text-info-content",
+  },
+  videoSemanticEnabled: {
+    icon: <FilmIcon className="size-4" />,
+    color: "bg-accent text-accent-content",
   },
   bioclipEnabled: {
     icon: <BirdIcon className="size-4" />,
@@ -87,6 +92,14 @@ export default function AiTab() {
       key: "semanticEnabled",
       label: t("settings.aiSettings.taskNames.semantic"),
       description: t("settings.aiSettings.taskDescriptions.semantic"),
+    },
+    {
+      key: "videoSemanticEnabled",
+      label: t("settings.aiSettings.taskNames.videoSemantic", "Video semantic search"),
+      description: t(
+        "settings.aiSettings.taskDescriptions.videoSemantic",
+        "Embed sampled frames from videos for text search. Requires semantic search.",
+      ),
     },
     {
       key: "bioclipEnabled",
@@ -292,29 +305,40 @@ export default function AiTab() {
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.aiSettings.mlTitle")}>
-        {mlTasks.map(({ key, label, description }) => (
-          <SettingsRow
-            key={key}
-            align="start"
-            icon={ML_META[key].icon}
-            iconColor={ML_META[key].color}
-            label={label}
-            description={description}
-            control={
-              <input
-                type="checkbox"
-                className="toggle toggle-primary"
-                checked={draft.ml[key]}
-                aria-label={label}
-                onChange={(event) => {
-                  const checked = event.target.checked;
-                  setFeedback(null);
-                  setDraft({ ...draft, ml: { ...draft.ml, [key]: checked } });
-                }}
-              />
-            }
-          />
-        ))}
+        {mlTasks
+          // Video semantic search is a sub-capability of semantic search (it
+          // reuses the same model, space, and query path), so it is only shown
+          // once semantic search itself is enabled.
+          .filter(({ key }) => key !== "videoSemanticEnabled" || draft.ml.semanticEnabled)
+          .map(({ key, label, description }) => (
+            <SettingsRow
+              key={key}
+              align="start"
+              icon={ML_META[key].icon}
+              iconColor={ML_META[key].color}
+              label={label}
+              description={description}
+              control={
+                <input
+                  type="checkbox"
+                  className="toggle toggle-primary"
+                  checked={draft.ml[key]}
+                  aria-label={label}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setFeedback(null);
+                    const nextMl = { ...draft.ml, [key]: checked };
+                    // Turning the parent off also turns off the subordinate
+                    // video toggle so a hidden "on" value is never persisted.
+                    if (key === "semanticEnabled" && !checked) {
+                      nextMl.videoSemanticEnabled = false;
+                    }
+                    setDraft({ ...draft, ml: nextMl });
+                  }}
+                />
+              }
+            />
+          ))}
       </SettingsGroup>
 
       <SettingsSaveBar

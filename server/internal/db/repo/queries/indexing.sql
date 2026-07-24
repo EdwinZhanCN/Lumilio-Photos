@@ -154,3 +154,65 @@ SELECT a.*
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC;
+
+-- name: CountVideoAssetsForIndexing :one
+SELECT COUNT(*) AS count
+FROM assets a
+WHERE a.type = 'VIDEO'
+  AND a.is_deleted = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+
+-- name: CountVideoAssetsWithSemanticFrames :one
+SELECT COUNT(*) AS count
+FROM assets a
+WHERE a.type = 'VIDEO'
+  AND a.is_deleted = false
+  AND EXISTS (
+    SELECT 1
+    FROM search_embeddings se
+    WHERE se.asset_id = a.asset_id
+      AND se.frame_ts_ms IS NOT NULL
+  )
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+
+-- name: ListVideoAssetsForIndexingBatch :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'VIDEO'
+    AND a.is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT sqlc.arg('limit')
+  OFFSET sqlc.arg('offset')
+)
+SELECT a.*
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC;
+
+-- name: ListVideoAssetsMissingSemanticFrames :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'VIDEO'
+    AND a.is_deleted = false
+    AND NOT EXISTS (
+      SELECT 1
+      FROM search_embeddings se
+      WHERE se.asset_id = a.asset_id
+        AND se.frame_ts_ms IS NOT NULL
+    )
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT sqlc.arg('limit')
+  OFFSET sqlc.arg('offset')
+)
+SELECT a.*
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC;
