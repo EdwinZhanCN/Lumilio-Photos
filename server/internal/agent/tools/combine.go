@@ -50,7 +50,7 @@ func RegisterCombine() {
 
 			operands := make([]*ref.Ref, 0, len(input.Refs))
 			for _, id := range input.Refs {
-				r, refErr := deps.RefStore.Get(deps.Scope(), id)
+				r, refErr := deps.ResolveRef(ctx, id)
 				if refErr != nil {
 					sendError(deps, info.Name, execID, start, refErr)
 					return errorOutput(refErr), nil
@@ -65,14 +65,18 @@ func RegisterCombine() {
 			}
 
 			summary := combineSummary(input.Op, input.Refs, operands, len(combined))
-			r := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: map[string]string{"op": input.Op}, Parents: input.Refs},
+			r, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{Op: info.Name, Payload: ref.TypedPayload(map[string]any{"op": input.Op}), Parents: input.Refs},
 				input.Op,
 				summary,
 				combined,
 				truncated,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: r.ID, Count: r.Count()})
 			return receiptOutput(r, summary), nil
 		})

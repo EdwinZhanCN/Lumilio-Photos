@@ -40,3 +40,10 @@ func (s *PostgresStore) Set(ctx context.Context, key string, data []byte) error 
 	}
 	return nil
 }
+
+func (s *PostgresStore) Delete(ctx context.Context, key string) error {
+	if err := s.q.DeleteCheckpoint(ctx, key); err != nil {
+		return fmt.Errorf("db delete checkpoint error: %w", err)
+	}
+	return nil
+}

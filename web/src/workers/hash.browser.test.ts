@@ -24,7 +24,9 @@ describe("Hash worker contract", () => {
   let client: AppWorkerClient;
 
   beforeAll(async () => {
-    await init(new URL("../wasm/blake3/blake3_wasm_bg.wasm", import.meta.url));
+    await init({
+      module_or_path: new URL("../wasm/blake3/blake3_wasm_bg.wasm", import.meta.url),
+    });
   });
 
   beforeEach(() => {

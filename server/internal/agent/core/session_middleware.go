@@ -16,11 +16,14 @@ type sessionMiddleware struct {
 	store    *ConversationStore
 	userID   int32
 	threadID string
-	onUsage  func(usage *schema.TokenUsage)
+	// shouldPersist is false after a user stop has been requested. Incomplete
+	// cancelled turns must never become model replay context.
+	shouldPersist func() bool
+	onUsage       func(usage *schema.TokenUsage)
 }
 
 func (m *sessionMiddleware) AfterAgent(ctx context.Context, state *adk.ChatModelAgentState) (context.Context, error) {
-	if state == nil {
+	if state == nil || ctx.Err() != nil || (m.shouldPersist != nil && !m.shouldPersist()) {
 		return ctx, nil
 	}
 	m.store.Replace(m.userID, m.threadID, state.Messages)

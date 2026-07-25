@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -71,7 +70,7 @@ func RegisterRank() {
 			execID := newExecutionID()
 			sendRunning(deps, info.Name, execID, fmt.Sprintf("Ranking by %s...", input.By), input)
 
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return errorOutput(refErr), nil
@@ -90,7 +89,7 @@ func RegisterRank() {
 			var ranked []uuid.UUID
 			switch input.By {
 			case "time":
-				rows, err := deps.Queries.RankAssetIDsByTime(ctx, toPgUUIDs(r.AssetIDs))
+				rows, err := deps.Library.RankByTime(ctx, r.AssetIDs)
 				if err != nil {
 					refErr := ref.Internal("rank query")
 					sendError(deps, info.Name, execID, start, refErr)
@@ -98,7 +97,7 @@ func RegisterRank() {
 				}
 				ranked = fromPgUUIDs(rows)
 			case "quality":
-				rows, err := deps.Queries.RankAssetIDsByQuality(ctx, toPgUUIDs(r.AssetIDs))
+				rows, err := deps.Library.RankByQuality(ctx, r.AssetIDs)
 				if err != nil {
 					refErr := ref.Internal("rank query")
 					sendError(deps, info.Name, execID, start, refErr)
@@ -128,14 +127,18 @@ func RegisterRank() {
 			}
 
 			summary := fmt.Sprintf("rank(%s, by=%s, desc=%t) → %d assets", r.ID, input.By, desc, len(ranked))
-			out := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: map[string]string{"by": input.By, "desc": strconv.FormatBool(desc)}, Parents: []string{r.ID}},
+			out, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{Op: info.Name, Payload: ref.TypedPayload(map[string]any{"by": input.By, "desc": desc}), Parents: []string{r.ID}},
 				input.By,
 				summary,
 				ranked,
 				r.Truncated,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: out.ID, Count: out.Count()})
 			return receiptOutput(out, summary), nil
 		})
@@ -155,7 +158,7 @@ func RegisterTop() {
 			execID := newExecutionID()
 			sendRunning(deps, info.Name, execID, fmt.Sprintf("Taking top %d...", input.N), input)
 
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return errorOutput(refErr), nil
@@ -176,14 +179,18 @@ func RegisterTop() {
 			if len(kept) == 0 {
 				summary += " (empty set)"
 			}
-			out := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: map[string]string{"n": strconv.Itoa(input.N)}, Parents: []string{r.ID}},
+			out, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{Op: info.Name, Payload: ref.TypedPayload(map[string]any{"n": input.N}), Parents: []string{r.ID}},
 				fmt.Sprintf("top%d", input.N),
 				summary,
 				kept,
 				false,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: out.ID, Count: out.Count()})
 			return receiptOutput(out, summary), nil
 		})
@@ -205,7 +212,7 @@ func RegisterSample() {
 			execID := newExecutionID()
 			sendRunning(deps, info.Name, execID, "Sampling...", input)
 
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &SampleOutput{Error: refErr}, nil
@@ -231,7 +238,7 @@ func RegisterSample() {
 			case "random":
 				sampled = sampleRandom(r.AssetIDs, input.N)
 			case "spread_over_time":
-				rows, err := deps.Queries.RankAssetIDsByTime(ctx, toPgUUIDs(r.AssetIDs))
+				rows, err := deps.Library.RankByTime(ctx, r.AssetIDs)
 				if err != nil {
 					refErr := ref.Internal("sample query")
 					sendError(deps, info.Name, execID, start, refErr)
@@ -245,14 +252,18 @@ func RegisterSample() {
 			}
 
 			summary := fmt.Sprintf("sample(%s, %d, %s) → %d assets", r.ID, input.N, strategy, len(sampled))
-			out := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: map[string]string{"n": strconv.Itoa(input.N), "strategy": strategy}, Parents: []string{r.ID}},
+			out, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{Op: info.Name, Payload: ref.TypedPayload(map[string]any{"n": input.N, "strategy": strategy}), Parents: []string{r.ID}},
 				"sample",
 				summary,
 				sampled,
 				false,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return &SampleOutput{Error: createErr}, nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: out.ID, Count: out.Count()})
 			return &SampleOutput{
 				Receipt:      &ref.ToolReceipt{RefID: out.ID, Count: out.Count(), Summary: summary},
@@ -269,7 +280,7 @@ func sampleDistribution(ctx context.Context, deps *core.ToolDependencies, sample
 	if len(sampled) == 0 {
 		return nil
 	}
-	rows, err := deps.Queries.AgentCapturedTimes(ctx, toPgUUIDs(sampled))
+	rows, err := deps.Library.CapturedTimes(ctx, sampled)
 	if err != nil {
 		return nil
 	}

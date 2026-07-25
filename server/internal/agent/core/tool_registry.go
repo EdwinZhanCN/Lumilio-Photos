@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
 	"server/internal/search"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -207,25 +206,44 @@ var modeInstructionExtras = map[string]string{
 // cutoff decides membership, not a fixed TopK. Implemented by
 // service.AssetService.
 type RetrieverSearch interface {
-	SearchAssetIDsSemantic(ctx context.Context, query string, strictness search.SetStrictness, maxResults int) ([]uuid.UUID, search.SetMeta, error)
-	SearchAssetIDsOCR(ctx context.Context, query string, maxResults int) ([]uuid.UUID, error)
+	SearchAssetIDsSemanticForOwner(ctx context.Context, ownerID int32, query string, strictness search.SetStrictness, maxResults int) ([]uuid.UUID, search.SetMeta, error)
+	SearchAssetIDsOCRForOwner(ctx context.Context, ownerID int32, query string, maxResults int) ([]uuid.UUID, error)
 }
 
 // ToolDependencies carries the per-request state injected into tool
 // factories: DB access, the side channel, the ref store and the scope that
 // pins every created ref to (user, thread) (INV-4).
 type ToolDependencies struct {
-	Queries     *repo.Queries
 	SideChannel chan<- *SideChannelEvent
 	RefStore    ref.Store
-	Search      RetrieverSearch
+	Library     *AuthorizedLibrary
+	Effects     *EffectRuntime
 	UserID      int32
 	ThreadID    string
+	RunID       uuid.UUID
 }
 
 // Scope returns the ref scope for this request.
 func (d *ToolDependencies) Scope() ref.Scope {
 	return ref.Scope{UserID: d.UserID, ThreadID: d.ThreadID}
+}
+
+func (d *ToolDependencies) ResolveRef(ctx context.Context, id string) (*ref.Ref, *ref.Error) {
+	r, refErr := d.RefStore.Get(ctx, d.Scope(), id)
+	if refErr != nil {
+		return nil, refErr
+	}
+	if d.Library == nil {
+		return nil, ref.Internal("authorized library")
+	}
+	if _, err := d.Library.AuthorizeAssetIDs(ctx, d.UserID, r.AssetIDs); err != nil {
+		return nil, ref.NotFound(id)
+	}
+	return r, nil
+}
+
+func (d *ToolDependencies) CreateRef(ctx context.Context, plan ref.Plan, hint, summary string, ids []uuid.UUID, truncated bool) (*ref.Ref, *ref.Error) {
+	return d.RefStore.Create(ctx, d.Scope(), plan, hint, summary, ids, truncated)
 }
 
 // Send emits a side channel event if the channel is attached.
@@ -237,10 +255,21 @@ func (d *ToolDependencies) Send(event *SideChannelEvent) {
 
 type ToolFactory func(ctx context.Context, deps *ToolDependencies) (tool.BaseTool, error)
 
+type EffectPolicy struct {
+	Class          string `json:"class"`
+	Reversible     bool   `json:"reversible"`
+	Confirmation   bool   `json:"confirmation"`
+	MaxCardinality int    `json:"max_cardinality"`
+	Idempotency    string `json:"idempotency"`
+	Authorization  string `json:"authorization"`
+	PolicyVersion  int    `json:"policy_version"`
+}
+
 type ToolRegistry struct {
 	mu        sync.RWMutex
 	factories map[string]ToolFactory
 	infos     map[string]*schema.ToolInfo
+	effects   map[string]EffectPolicy
 }
 
 var (
@@ -253,9 +282,24 @@ func GetRegistry() *ToolRegistry {
 		registry = &ToolRegistry{
 			factories: make(map[string]ToolFactory),
 			infos:     make(map[string]*schema.ToolInfo),
+			effects:   make(map[string]EffectPolicy),
 		}
 	})
 	return registry
+}
+
+func (r *ToolRegistry) RegisterEffect(info *schema.ToolInfo, policy EffectPolicy, factory ToolFactory) {
+	r.Register(info, factory)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.effects[info.Name] = policy
+}
+
+func (r *ToolRegistry) EffectPolicy(name string) (EffectPolicy, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	policy, ok := r.effects[name]
+	return policy, ok
 }
 
 // Register 注册一个工具工厂

@@ -129,6 +129,21 @@ func TestClientToolName(t *testing.T) {
 	}
 }
 
+func TestConnResolvedPasswordTracksRotatedSecret(t *testing.T) {
+	secretPath := filepath.Join(t.TempDir(), "db_password")
+	conn := Conn{Password: "bootstrap", PasswordFile: secretPath}
+
+	if got := conn.ResolvedPassword(); got != "bootstrap" {
+		t.Fatalf("ResolvedPassword before rotation = %q, want bootstrap", got)
+	}
+	if err := os.WriteFile(secretPath, []byte("rotated\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := conn.ResolvedPassword(); got != "rotated" {
+		t.Fatalf("ResolvedPassword after rotation = %q, want rotated", got)
+	}
+}
+
 func TestPlatformToolDirs(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -199,6 +214,20 @@ func TestSchedulerSkipsWhenDisabled(t *testing.T) {
 	// Pool is nil: reaching the version probe would panic, proving the skip.
 	if err := s.Run(context.Background(), false); err != nil {
 		t.Fatalf("disabled scheduler should be a silent no-op, got %v", err)
+	}
+}
+
+func TestSchedulerSkipsBeforeFirstRunSetupIsReady(t *testing.T) {
+	s, _ := schedulerFixture(t, settings.Backup{Enabled: true}, time.Now())
+	s.Ready = func(context.Context) (bool, error) { return false, nil }
+	s.Settings = func(context.Context) (settings.Backup, error) {
+		t.Fatal("settings must not be loaded before backup readiness")
+		return settings.Backup{}, nil
+	}
+
+	// Pool is nil: reaching the version probe would panic, proving the skip.
+	if err := s.Run(context.Background(), false); err != nil {
+		t.Fatalf("pre-setup scheduler should be a silent no-op, got %v", err)
 	}
 }
 

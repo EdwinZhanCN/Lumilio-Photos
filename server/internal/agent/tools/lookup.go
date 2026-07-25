@@ -7,7 +7,6 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -55,10 +54,7 @@ func RegisterLookupPeople() {
 			if input.NameQuery != "" {
 				nameQuery = &input.NameQuery
 			}
-			rows, err := deps.Queries.AgentLookupPeople(ctx, repo.AgentLookupPeopleParams{
-				NameQuery: nameQuery,
-				Limit:     maxLookupResults,
-			})
+			rows, err := deps.Library.LookupPeople(ctx, nameQuery, maxLookupResults)
 			if err != nil {
 				refErr := ref.Internal("people lookup")
 				sendError(deps, info.Name, execID, start, refErr)

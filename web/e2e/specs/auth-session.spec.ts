@@ -188,7 +188,7 @@ async function expectSubjectLockout(
   return blocked;
 }
 
-test("@smoke refresh-token replay revokes every refresh session for the user", async ({
+test("@auth-hardening refresh-token replay revokes every refresh session for the user", async ({
   playwright,
   baseURL,
   workspace,
@@ -237,7 +237,7 @@ test("@smoke refresh-token replay revokes every refresh session for the user", a
   }
 });
 
-test("@smoke browser logout clears local credentials and revokes its refresh token", async ({
+test("@auth-hardening browser logout clears local credentials and revokes its refresh token", async ({
   page,
   request,
   workspace,

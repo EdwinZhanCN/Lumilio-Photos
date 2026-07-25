@@ -82,16 +82,19 @@ type AgentPinLayoutDTO struct {
 // AgentPinDTO is a pinned widget on the agent board: a durable ref snapshot
 // plus widget type and grid placement.
 type AgentPinDTO struct {
-	PinID     string             `json:"pin_id" example:"7d4df41e-9aa2-4d44-9a3d-111111111111"`
-	Title     string             `json:"title" example:"Kyoto 2025"`
-	Widget    string             `json:"widget" example:"cover_card"`
-	Mode      string             `json:"mode" example:"frozen" enums:"frozen,live"`
-	Count     int                `json:"count" example:"24"`
-	Summary   string             `json:"summary,omitempty"`
-	Truncated bool               `json:"truncated,omitempty"`
-	Layout    AgentPinLayoutDTO  `json:"layout"`
-	Facets    *AgentRefFacetsDTO `json:"facets,omitempty"`
-	CreatedAt time.Time          `json:"created_at"`
+	PinID                   string             `json:"pin_id" example:"7d4df41e-9aa2-4d44-9a3d-111111111111"`
+	Title                   string             `json:"title" example:"Kyoto 2025"`
+	Widget                  string             `json:"widget" example:"cover_card"`
+	Mode                    string             `json:"mode" example:"frozen" enums:"frozen,live"`
+	Count                   int                `json:"count" example:"24"`
+	Summary                 string             `json:"summary,omitempty"`
+	Truncated               bool               `json:"truncated,omitempty"`
+	Layout                  AgentPinLayoutDTO  `json:"layout"`
+	Facets                  *AgentRefFacetsDTO `json:"facets,omitempty"`
+	CreatedAt               time.Time          `json:"created_at"`
+	HydrationSource         string             `json:"hydration_source,omitempty" enums:"live_replay,frozen_snapshot,frozen_fallback"`
+	FallbackReason          string             `json:"fallback_reason,omitempty"`
+	LastSuccessfulRefreshAt *time.Time         `json:"last_successful_refresh_at,omitempty"`
 }
 
 // CreateAgentPinRequest pins a session ref onto the board.

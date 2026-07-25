@@ -19,6 +19,7 @@ type Scheduler struct {
 	ToolsBinDir string // optional override (desktop bundle); empty = autodetect
 	Dir         string // explicit private dump target
 	AppVersion  string
+	Ready       func(ctx context.Context) (bool, error)
 	Settings    func(ctx context.Context) (settings.Backup, error)
 	Logf        Logf
 
@@ -40,6 +41,20 @@ func (s *Scheduler) Run(ctx context.Context, force bool) error {
 	nowFn := s.now
 	if nowFn == nil {
 		nowFn = time.Now
+	}
+
+	// A pre-setup database has no administrator or primary repository and cannot
+	// pass restore verification. Do not create a misleading automatic snapshot
+	// during the small window between server startup and first-run setup.
+	if s.Ready != nil {
+		ready, err := s.Ready(ctx)
+		if err != nil {
+			return fmt.Errorf("check backup readiness: %w", err)
+		}
+		if !ready {
+			logf("backup: first-run setup is incomplete, skipping this run")
+			return nil
+		}
 	}
 
 	cfg, err := s.Settings(ctx)

@@ -48,16 +48,16 @@ func RegisterShow() {
 			if widget == "" {
 				widget = core.WidgetCoverCard
 			}
-			return showWidget(deps, info.Name, input.RefID, input.Title, widget)
+			return showWidget(ctx, deps, info.Name, input.RefID, input.Title, widget)
 		})
 	})
 }
 
-func showWidget(deps *core.ToolDependencies, toolName, refID, title, widget string) (*ShowOutput, error) {
+func showWidget(ctx context.Context, deps *core.ToolDependencies, toolName, refID, title, widget string) (*ShowOutput, error) {
 	start := time.Now()
 	execID := newExecutionID()
 
-	r, refErr := deps.RefStore.Get(deps.Scope(), refID)
+	r, refErr := deps.ResolveRef(ctx, refID)
 	if refErr != nil {
 		sendError(deps, toolName, execID, start, refErr)
 		return &ShowOutput{Error: refErr}, nil

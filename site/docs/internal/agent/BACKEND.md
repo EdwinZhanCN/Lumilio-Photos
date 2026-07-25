@@ -50,7 +50,10 @@ explicit path. No secret value appears in TOML, generated desktop manifests, or
 logs.
 
 Standalone accepts diagnostics through `--pprof-addr` and
-`--agent-audit-log`. Only `LUMILIO_BREAK_GLASS` and
+`--agent-audit-log`. Agent ref hot memory is bounded by the single-run
+`--agent-ref-user-hot-budget-mib` and
+`--agent-ref-global-hot-budget-mib` controls (64 MiB and 512 MiB by default);
+the global value must be at least the per-user value. Only `LUMILIO_BREAK_GLASS` and
 `LUMILIO_BREAK_GLASS_USERNAME` remain as product runtime env controls, read by
 the CLI host and passed separately from `AppConfig`. Desktop resource-location
 env, test/conformance opt-ins, and third-party container env are host/harness

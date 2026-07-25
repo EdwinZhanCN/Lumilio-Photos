@@ -299,6 +299,20 @@ const docTemplate = `{
                     "facets": {
                         "$ref": "#/components/schemas/dto.AgentRefFacetsDTO"
                     },
+                    "fallback_reason": {
+                        "type": "string"
+                    },
+                    "hydration_source": {
+                        "enum": [
+                            "live_replay",
+                            "frozen_snapshot",
+                            "frozen_fallback"
+                        ],
+                        "type": "string"
+                    },
+                    "last_successful_refresh_at": {
+                        "type": "string"
+                    },
                     "layout": {
                         "$ref": "#/components/schemas/dto.AgentPinLayoutDTO"
                     },
@@ -6086,6 +6100,41 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "handler.AgentCancelRequest": {
+                "properties": {
+                    "run_id": {
+                        "type": "string"
+                    },
+                    "thread_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "run_id",
+                    "thread_id"
+                ],
+                "type": "object"
+            },
+            "handler.AgentCancelResponse": {
+                "properties": {
+                    "run_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "enum": [
+                            "cancel_requested",
+                            "cancelled",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string"
+                    },
+                    "thread_id": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handler.AgentChatRequest": {
                 "properties": {
                     "context": {
@@ -6104,6 +6153,7 @@ const docTemplate = `{
                     },
                     "mode": {
                         "enum": [
+                            "free",
                             "review",
                             "organize",
                             "analyze",
@@ -6119,6 +6169,7 @@ const docTemplate = `{
                     }
                 },
                 "required": [
+                    "mode",
                     "query"
                 ],
                 "type": "object"
@@ -6596,6 +6647,76 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Chat with Agent",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/api/v1/agent/chat/cancel": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/handler.AgentCancelRequest",
+                                        "summary": "request",
+                                        "description": "Cancel request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Cancel request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handler.AgentCancelResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "summary": "Cancel Agent Chat",
                 "tags": [
                     "agent"
                 ]

@@ -7,6 +7,7 @@
 package ref
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -34,13 +35,57 @@ type Scope struct {
 	ThreadID string
 }
 
-// Plan records the expression that produced a ref: operator, parameters and
-// parent refs. It is lineage/provenance only — never replayed today — and the
-// escape hatch for a future lazy RefStore.
+// Plan is the versioned expression envelope that produced a ref. Producer
+// plans may be replayed only by a handler for the exact schema/tool version;
+// transformed plans remain lineage-only because they depend on parent refs.
 type Plan struct {
-	Op      string            `json:"op"`
-	Params  map[string]string `json:"params,omitempty"`
-	Parents []string          `json:"parents,omitempty"`
+	SchemaVersion         int             `json:"schema_version"`
+	ToolVersion           string          `json:"tool_version"`
+	Op                    string          `json:"op"`
+	Payload               json.RawMessage `json:"payload,omitempty"`
+	EmbeddingIndexVersion string          `json:"embedding_index_version,omitempty"`
+	AuthorizationScope    PlanAuthScope   `json:"authorization_scope"`
+	CreationPolicyVersion int             `json:"creation_policy_version"`
+	Parents               []string        `json:"parents,omitempty"`
+}
+
+type PlanAuthScope struct {
+	UserID int32 `json:"user_id"`
+}
+
+const (
+	CurrentPlanSchemaVersion = 1
+	CurrentToolVersion       = "agent-tools/v1"
+	CurrentPolicyVersion     = 1
+)
+
+func (p Plan) Normalize(userID int32) (Plan, error) {
+	if p.SchemaVersion == 0 {
+		if len(p.Payload) == 0 {
+			p.Payload = json.RawMessage("{}")
+		}
+		p.SchemaVersion = CurrentPlanSchemaVersion
+		p.ToolVersion = CurrentToolVersion
+		p.AuthorizationScope = PlanAuthScope{UserID: userID}
+		p.CreationPolicyVersion = CurrentPolicyVersion
+	}
+	if p.SchemaVersion != CurrentPlanSchemaVersion ||
+		p.ToolVersion != CurrentToolVersion ||
+		p.AuthorizationScope.UserID != userID ||
+		p.CreationPolicyVersion != CurrentPolicyVersion {
+		return Plan{}, fmt.Errorf("unsupported or unauthorized plan envelope")
+	}
+	return p, nil
+}
+
+// TypedPayload serializes a statically known plan payload. Agent tools only
+// pass simple DTOs/maps here, so a marshal failure is a programmer error.
+func TypedPayload(value any) json.RawMessage {
+	payload, err := json.Marshal(value)
+	if err != nil {
+		panic(fmt.Sprintf("marshal typed Agent plan payload: %v", err))
+	}
+	return payload
 }
 
 // Ref is an immutable, ordered snapshot of asset IDs (INV-5). Order is

@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { JustifiedLayout } from "@immich/justified-layout-wasm";
+import { initializeJustifiedLayout, JustifiedLayout } from "@/lib/layout/justifiedWasm";
 import type { LayoutBox, LayoutConfig, LayoutResult } from "@/lib/layout/justifiedLayout";
 
 interface LayoutRequestPayload {
@@ -60,15 +60,9 @@ const buildLayout = (boxes: LayoutBox[], config: LayoutConfig): LayoutResult => 
 
 let isInitialized = false;
 
-const ensureInitialized = (config?: LayoutConfig) => {
+const ensureInitialized = () => {
   if (isInitialized) return;
-  const seedConfig = config ?? {
-    rowHeight: 1,
-    rowWidth: 1,
-    spacing: 0,
-    heightTolerance: 0,
-  };
-  new JustifiedLayout(new Float32Array(0), seedConfig);
+  initializeJustifiedLayout();
   isInitialized = true;
 };
 
@@ -94,7 +88,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     case "CALCULATE_LAYOUT": {
       const { payload } = event.data;
       try {
-        ensureInitialized(payload.config);
+        ensureInitialized();
         const result = buildLayout(payload.boxes, payload.config);
         self.postMessage({
           type: "JUSTIFIED_LAYOUT_COMPLETE",
@@ -115,7 +109,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     case "CALCULATE_MULTIPLE_LAYOUTS": {
       const { payload } = event.data;
       try {
-        ensureInitialized(payload.config);
+        ensureInitialized();
         const results: Record<string, LayoutResult> = {};
 
         for (const [groupKey, boxes] of Object.entries(payload.groups)) {

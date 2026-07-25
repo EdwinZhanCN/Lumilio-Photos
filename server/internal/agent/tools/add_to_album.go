@@ -8,41 +8,39 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+	"github.com/google/uuid"
 )
 
-// AddToAlbumInput adds assets from a ref into an existing album.
 type AddToAlbumInput struct {
 	RefID   string `json:"ref_id" jsonschema:"description=Ref of the assets to add"`
 	AlbumID int    `json:"album_id" jsonschema:"description=Target album id"`
 }
 
-// AddToAlbumOutput reports the mutation outcome.
 type AddToAlbumOutput struct {
-	Message string     `json:"message,omitempty"`
-	AlbumID int        `json:"album_id,omitempty"`
-	Count   int        `json:"count,omitempty"`
-	Error   *ref.Error `json:"error,omitempty"`
+	Message          string     `json:"message,omitempty"`
+	AlbumID          int        `json:"album_id,omitempty"`
+	Count            int        `json:"count,omitempty"`
+	AlreadyCommitted bool       `json:"already_committed,omitempty"`
+	Error            *ref.Error `json:"error,omitempty"`
 }
 
-// AddToAlbumConfirmationInfo is the user-facing interrupt payload.
 type AddToAlbumConfirmationInfo struct {
 	Action  string `json:"action"`
-	Message string `json:"message,omitempty"`
 	AlbumID int    `json:"album_id"`
 	RefID   string `json:"ref_id"`
 	Count   int    `json:"count"`
 }
 
 type addToAlbumInterruptState struct {
-	RefID   string
-	AlbumID int32
-	Count   int
+	EffectID string
+	RefID    string
+	AlbumID  int32
+	Count    int
 }
 
 func init() {
@@ -50,103 +48,84 @@ func init() {
 	gob.Register(&addToAlbumInterruptState{})
 }
 
-// RegisterAddToAlbum registers the add_to_album terminal with confirmation.
 func RegisterAddToAlbum() {
 	info := &schema.ToolInfo{
 		Name: "add_to_album",
-		Desc: "Add every asset in a ref to an existing album. The user is shown a preview and must confirm " +
-			"before assets are added. Sets larger than 5000 are rejected.",
+		Desc: "Add every asset in a ref to an owned album. The user must confirm before commit; sets larger than 5000 are rejected.",
 	}
-
-	const maxAddToAlbumAssets = 5000
-
-	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
+	policy := core.EffectPolicy{
+		Class: "album_membership", Reversible: true, Confirmation: true,
+		MaxCardinality: maxAlbumAssets, Idempotency: "effect_id",
+		Authorization: "owner_snapshot_and_target_recheck", PolicyVersion: core.CurrentAgentPolicyVersion,
+	}
+	core.GetRegistry().RegisterEffect(info, policy, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
 		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *AddToAlbumInput) (*AddToAlbumOutput, error) {
 			start := time.Now()
 			execID := newExecutionID()
-
-			if wasInterrupted, hasState, state := compose.GetInterruptState[*addToAlbumInterruptState](ctx); wasInterrupted && hasState {
+			if interrupted, hasState, state := compose.GetInterruptState[*addToAlbumInterruptState](ctx); interrupted && hasState {
 				return resumeAddToAlbum(ctx, deps, info.Name, execID, start, state)
 			}
-
 			if input.AlbumID <= 0 {
 				refErr := ref.InvalidArgument("album_id must be positive")
 				sendError(deps, info.Name, execID, start, refErr)
 				return &AddToAlbumOutput{Error: refErr}, nil
 			}
-
-			album, err := deps.Queries.GetAlbumByID(ctx, int32(input.AlbumID))
-			if err != nil || album.UserID != deps.UserID {
+			if _, err := deps.Library.Album(ctx, int32(input.AlbumID)); err != nil {
 				refErr := ref.InvalidArgument(fmt.Sprintf("album %d not found", input.AlbumID))
 				sendError(deps, info.Name, execID, start, refErr)
 				return &AddToAlbumOutput{Error: refErr}, nil
 			}
-
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &AddToAlbumOutput{Error: refErr}, nil
 			}
 			if r.Count() == 0 {
-				refErr := ref.EmptySet(r.ID)
+				refErr = ref.EmptySet(r.ID)
+			} else if r.Count() > policy.MaxCardinality {
+				refErr = ref.LimitExceeded(r.Count(), policy.MaxCardinality)
+			}
+			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &AddToAlbumOutput{Error: refErr}, nil
 			}
-			if r.Count() > maxAddToAlbumAssets {
-				refErr := ref.LimitExceeded(r.Count(), maxAddToAlbumAssets)
+			effectID, err := deps.Effects.Prepare(ctx, deps.UserID, deps.ThreadID, deps.RunID, info.Name, r.AssetIDs,
+				map[string]any{}, map[string]any{"album_id": int32(input.AlbumID)})
+			if err != nil {
+				refErr := ref.Internal("pending effect persistence")
 				sendError(deps, info.Name, execID, start, refErr)
 				return &AddToAlbumOutput{Error: refErr}, nil
 			}
-
 			return nil, compose.StatefulInterrupt(ctx,
-				&AddToAlbumConfirmationInfo{
-					Action:  "add_to_album",
-					AlbumID: input.AlbumID,
-					RefID:   r.ID,
-					Count:   r.Count(),
-				},
-				&addToAlbumInterruptState{RefID: r.ID, AlbumID: int32(input.AlbumID), Count: r.Count()},
+				&AddToAlbumConfirmationInfo{Action: info.Name, AlbumID: input.AlbumID, RefID: r.ID, Count: r.Count()},
+				&addToAlbumInterruptState{EffectID: effectID.String(), RefID: r.ID, AlbumID: int32(input.AlbumID), Count: r.Count()},
 			)
 		})
 	})
 }
 
 func resumeAddToAlbum(ctx context.Context, deps *core.ToolDependencies, toolName, execID string, start time.Time, state *addToAlbumInterruptState) (*AddToAlbumOutput, error) {
-	approved := false
-	if _, hasData, data := compose.GetResumeContext[map[string]any](ctx); hasData {
-		if v, ok := data["approved"].(bool); ok {
-			approved = v
-		}
+	effectID, err := uuid.Parse(state.EffectID)
+	if err != nil {
+		return &AddToAlbumOutput{Error: ref.Internal("effect identity")}, nil
 	}
-
-	if !approved {
-		message := fmt.Sprintf("Album update was not applied: the user declined.")
+	if !resumeApproved(ctx) {
+		_ = deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID)
+		message := "Album update was not applied: the user declined."
 		sendSuccess(deps, toolName, execID, start, message, nil)
 		return &AddToAlbumOutput{Message: message}, nil
 	}
-
-	r, refErr := deps.RefStore.Get(deps.Scope(), state.RefID)
-	if refErr != nil {
+	sendRunning(deps, toolName, execID, fmt.Sprintf("Adding %d assets to album...", state.Count), nil)
+	receipt, err := deps.Effects.Commit(ctx, deps.UserID, deps.ThreadID, deps.RunID, effectID)
+	if err != nil {
+		refErr := ref.Internal("adding assets to album")
 		sendError(deps, toolName, execID, start, refErr)
 		return &AddToAlbumOutput{Error: refErr}, nil
 	}
-
-	sendRunning(deps, toolName, execID, fmt.Sprintf("Adding %d assets to album...", r.Count()), nil)
-
-	for i, assetID := range toPgUUIDs(r.AssetIDs) {
-		position := int32(i)
-		if err := deps.Queries.AddAssetToAlbum(ctx, repo.AddAssetToAlbumParams{
-			AssetID:  assetID,
-			AlbumID:  state.AlbumID,
-			Position: &position,
-		}); err != nil {
-			refErr := ref.Internal("adding assets to album")
-			sendError(deps, toolName, execID, start, refErr)
-			return &AddToAlbumOutput{Error: refErr, AlbumID: int(state.AlbumID)}, nil
-		}
-	}
-
-	message := fmt.Sprintf("Added %d photos to album", r.Count())
-	sendSuccess(deps, toolName, execID, start, message, &core.DataPayload{RefID: r.ID, Count: r.Count()})
-	return &AddToAlbumOutput{Message: message, AlbumID: int(state.AlbumID), Count: r.Count()}, nil
+	message := committedReceiptMessage(receipt)
+	sendSuccess(deps, toolName, execID, start, message, &core.DataPayload{RefID: state.RefID, Count: receipt.Count})
+	return &AddToAlbumOutput{
+		Message: message, AlbumID: receipt.AlbumID, Count: receipt.Count,
+		AlreadyCommitted: receipt.AlreadyCommitted,
+	}, nil
 }

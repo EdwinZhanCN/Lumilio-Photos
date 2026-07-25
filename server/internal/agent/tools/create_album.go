@@ -4,168 +4,128 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+	"github.com/google/uuid"
 )
 
-// CreateAlbumInput creates an album from a ref after user confirmation.
+const maxAlbumAssets = 5000
+
 type CreateAlbumInput struct {
 	RefID string `json:"ref_id" jsonschema:"description=Ref of the assets to put in the album"`
 	Title string `json:"title" jsonschema:"description=Album title, in the user's language"`
 }
 
-// CreateAlbumOutput reports the result; only ids/counts, never asset data.
 type CreateAlbumOutput struct {
-	Message string     `json:"message,omitempty"`
-	AlbumID int        `json:"album_id,omitempty"`
-	Count   int        `json:"count,omitempty"`
-	Error   *ref.Error `json:"error,omitempty"`
+	Message          string     `json:"message,omitempty"`
+	AlbumID          int        `json:"album_id,omitempty"`
+	Count            int        `json:"count,omitempty"`
+	AlreadyCommitted bool       `json:"already_committed,omitempty"`
+	Error            *ref.Error `json:"error,omitempty"`
 }
 
-// AlbumConfirmationInfo is the user-facing interrupt payload: the preview
-// the frontend renders before the user approves the album creation.
 type AlbumConfirmationInfo struct {
-	Action  string `json:"action"`
-	Message string `json:"message,omitempty"`
-	Title   string `json:"title"`
-	RefID   string `json:"ref_id"`
-	Count   int    `json:"count"`
+	Action string `json:"action"`
+	Title  string `json:"title"`
+	RefID  string `json:"ref_id"`
+	Count  int    `json:"count"`
 }
 
-// albumInterruptState is the tool's persisted state across interrupt/resume.
 type albumInterruptState struct {
-	RefID string
-	Title string
-	Count int
-}
-
-// albumResumeDecision mirrors the frontend's resume target payload.
-type albumResumeDecision struct {
-	Approved bool `json:"approved"`
+	EffectID string
+	RefID    string
+	Title    string
+	Count    int
 }
 
 func init() {
-	// Interrupt state and info ride the checkpoint (gob-encoded interface
-	// values) — they must be registered or resume after restart fails.
 	gob.Register(&AlbumConfirmationInfo{})
 	gob.Register(&albumInterruptState{})
 	gob.Register(map[string]any{})
 }
 
-// RegisterCreateAlbum registers the create_album terminal. It follows the
-// preview-then-confirm contract for consequential actions: the first call
-// interrupts with a preview (count + title); the actual write happens only
-// after the user resumes with approval.
 func RegisterCreateAlbum() {
 	info := &schema.ToolInfo{
 		Name: "create_album",
-		Desc: "Create an album from the assets in a ref. The user is shown a preview and must confirm " +
-			"before the album is created. Sets larger than 5000 are rejected.",
+		Desc: "Create an album from a ref. The user must confirm before commit; sets larger than 5000 are rejected.",
 	}
-
-	const maxAlbumAssets = 5000
-
-	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
+	policy := core.EffectPolicy{
+		Class: "album_create", Reversible: true, Confirmation: true,
+		MaxCardinality: maxAlbumAssets, Idempotency: "effect_id",
+		Authorization: "owner_snapshot_recheck", PolicyVersion: core.CurrentAgentPolicyVersion,
+	}
+	core.GetRegistry().RegisterEffect(info, policy, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
 		return utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *CreateAlbumInput) (*CreateAlbumOutput, error) {
 			start := time.Now()
 			execID := newExecutionID()
-
-			// Resume path: the tool reruns after the user answered the preview.
-			if wasInterrupted, hasState, state := compose.GetInterruptState[*albumInterruptState](ctx); wasInterrupted && hasState {
+			if interrupted, hasState, state := compose.GetInterruptState[*albumInterruptState](ctx); interrupted && hasState {
 				return resumeCreateAlbum(ctx, deps, info.Name, execID, start, state)
 			}
-
-			// First run: validate, then interrupt with a preview.
-			if input.Title == "" {
+			title := strings.TrimSpace(input.Title)
+			if title == "" {
 				refErr := ref.InvalidArgument("title must not be empty")
 				sendError(deps, info.Name, execID, start, refErr)
 				return &CreateAlbumOutput{Error: refErr}, nil
 			}
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &CreateAlbumOutput{Error: refErr}, nil
 			}
 			if r.Count() == 0 {
-				refErr := ref.EmptySet(r.ID)
+				refErr = ref.EmptySet(r.ID)
+			} else if r.Count() > policy.MaxCardinality {
+				refErr = ref.LimitExceeded(r.Count(), policy.MaxCardinality)
+			}
+			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &CreateAlbumOutput{Error: refErr}, nil
 			}
-			if r.Count() > maxAlbumAssets {
-				refErr := ref.LimitExceeded(r.Count(), maxAlbumAssets)
+			effectID, err := deps.Effects.Prepare(ctx, deps.UserID, deps.ThreadID, deps.RunID, info.Name, r.AssetIDs,
+				map[string]any{"title": title}, map[string]any{})
+			if err != nil {
+				refErr := ref.Internal("pending effect persistence")
 				sendError(deps, info.Name, execID, start, refErr)
 				return &CreateAlbumOutput{Error: refErr}, nil
 			}
-
 			return nil, compose.StatefulInterrupt(ctx,
-				&AlbumConfirmationInfo{
-					Action: "create_album",
-					Title:  input.Title,
-					RefID:  r.ID,
-					Count:  r.Count(),
-				},
-				&albumInterruptState{RefID: r.ID, Title: input.Title, Count: r.Count()},
+				&AlbumConfirmationInfo{Action: info.Name, Title: title, RefID: r.ID, Count: r.Count()},
+				&albumInterruptState{EffectID: effectID.String(), RefID: r.ID, Title: title, Count: r.Count()},
 			)
 		})
 	})
 }
 
 func resumeCreateAlbum(ctx context.Context, deps *core.ToolDependencies, toolName, execID string, start time.Time, state *albumInterruptState) (*CreateAlbumOutput, error) {
-	approved := false
-	if _, hasData, data := compose.GetResumeContext[map[string]any](ctx); hasData {
-		if v, ok := data["approved"].(bool); ok {
-			approved = v
-		}
+	effectID, err := uuid.Parse(state.EffectID)
+	if err != nil {
+		return &CreateAlbumOutput{Error: ref.Internal("effect identity")}, nil
 	}
-
-	if !approved {
+	if !resumeApproved(ctx) {
+		_ = deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID)
 		message := fmt.Sprintf("Album %q was not created: the user declined.", state.Title)
 		sendSuccess(deps, toolName, execID, start, message, nil)
 		return &CreateAlbumOutput{Message: message}, nil
 	}
-
-	// The ref may have expired while waiting for confirmation.
-	r, refErr := deps.RefStore.Get(deps.Scope(), state.RefID)
-	if refErr != nil {
-		sendError(deps, toolName, execID, start, refErr)
-		return &CreateAlbumOutput{Error: refErr}, nil
-	}
-
 	sendRunning(deps, toolName, execID, fmt.Sprintf("Creating album %q...", state.Title), nil)
-
-	album, err := deps.Queries.CreateAlbum(ctx, repo.CreateAlbumParams{
-		UserID:    deps.UserID,
-		AlbumName: state.Title,
-		AlbumType: repo.AlbumTypeDefault,
-	})
+	receipt, err := deps.Effects.Commit(ctx, deps.UserID, deps.ThreadID, deps.RunID, effectID)
 	if err != nil {
 		refErr := ref.Internal("album creation")
 		sendError(deps, toolName, execID, start, refErr)
 		return &CreateAlbumOutput{Error: refErr}, nil
 	}
-
-	for i, assetID := range toPgUUIDs(r.AssetIDs) {
-		position := int32(i)
-		if err := deps.Queries.AddAssetToAlbum(ctx, repo.AddAssetToAlbumParams{
-			AssetID:  assetID,
-			AlbumID:  album.AlbumID,
-			Position: &position,
-		}); err != nil {
-			refErr := ref.Internal("adding assets to album")
-			sendError(deps, toolName, execID, start, refErr)
-			return &CreateAlbumOutput{Error: refErr, AlbumID: int(album.AlbumID)}, nil
-		}
-	}
-
-	message := fmt.Sprintf("Created album %q with %d photos", state.Title, r.Count())
-	sendSuccess(deps, toolName, execID, start, message, &core.DataPayload{RefID: r.ID, Count: r.Count()})
-	return &CreateAlbumOutput{Message: message, AlbumID: int(album.AlbumID), Count: r.Count()}, nil
+	message := committedReceiptMessage(receipt)
+	sendSuccess(deps, toolName, execID, start, message, &core.DataPayload{RefID: state.RefID, Count: receipt.Count})
+	return &CreateAlbumOutput{
+		Message: message, AlbumID: receipt.AlbumID, Count: receipt.Count,
+		AlreadyCommitted: receipt.AlreadyCommitted,
+	}, nil
 }

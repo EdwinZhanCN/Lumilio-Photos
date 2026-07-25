@@ -13,6 +13,7 @@ const (
 	CodeLimitExceeded      Code = "LimitExceeded"
 	CodeInvalidArgument    Code = "InvalidArgument"
 	CodeFeatureUnavailable Code = "FeatureUnavailable"
+	CodeResourceExhausted  Code = "resource_exhausted"
 	CodeInternal           Code = "Internal"
 )
 
@@ -22,6 +23,14 @@ type Error struct {
 	Code    Code   `json:"code"`
 	Message string `json:"message"`
 	Hint    string `json:"hint,omitempty"`
+}
+
+func ResourceExhausted(message string) *Error {
+	return &Error{
+		Code:    CodeResourceExhausted,
+		Message: message,
+		Hint:    "finish or clear another Agent conversation, then retry",
+	}
 }
 
 func (e *Error) Error() string {

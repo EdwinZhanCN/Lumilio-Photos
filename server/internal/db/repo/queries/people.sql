@@ -17,6 +17,10 @@ WHERE (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = fa
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
       AND (
+        sqlc.narg('owner_id')::integer IS NULL
+        OR a.owner_id = sqlc.narg('owner_id')
+      )
+      AND (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
@@ -71,6 +75,10 @@ LEFT JOIN LATERAL (
     WHERE fi.id = fc.representative_face_id
       AND a.is_deleted = false
       AND (
+        sqlc.narg('owner_id')::integer IS NULL
+        OR a.owner_id = sqlc.narg('owner_id')
+      )
+      AND (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
@@ -83,6 +91,10 @@ LEFT JOIN LATERAL (
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
+      AND (
+        sqlc.narg('owner_id')::integer IS NULL
+        OR a.owner_id = sqlc.narg('owner_id')
+      )
       AND (
         sqlc.narg('repository_id')::uuid IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
