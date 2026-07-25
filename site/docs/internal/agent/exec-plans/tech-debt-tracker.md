@@ -8,11 +8,6 @@ Last aligned with the codebase: 2026-07-24.
 
 ## Product paths
 
-- **The S3/R2 cloud provider is a runtime placeholder.** Owner:
-  `server/internal/cloud/provider_s3.go`. `List` and `Download` always return
-  `s3 provider not implemented`; it is not currently wired into a usable import
-  path. Either implement and wire the existing `CloudProvider` contract or
-  remove the placeholder when the provider is formally descoped.
 - **AgentBoard has no mobile column reflow.** Owner:
   `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one
   persisted 12-column layout at every width, so phone columns compress into

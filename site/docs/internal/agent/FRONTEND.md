@@ -319,15 +319,22 @@ Direct equivalent when intentionally scoped to `web/`:
 cd web && vp check --no-fmt --no-lint && vp lint && vp test
 cd web && vp run e2e:up
 cd web && vp run e2e:seed
-cd web && vp run e2e:test --grep @smoke
+cd web && vp run e2e:test --grep @smoke --workers=1
 cd web && vp run e2e:down
 ```
 
 `web-browser-test` runs the `@smoke` subset of the Playwright E2E suite against
-the isolated Compose environment. The first-party API, PostgreSQL, storage, and
-queues are real; only external services may be replaced. Run `e2e:up` first and
-`e2e:down` afterwards. Install the project-pinned browser revision with
-`vp exec playwright install chromium` locally, or
+the isolated Compose environment with one worker. The compact suite covers
+capabilities, login, a real repository scan, and one upload reused across album,
+viewer, Trash, and restore assertions. Authentication hardening, video
+semantics, and database recovery are separate serial suites and CI selects them
+through narrow path filters; do not fold them back into every Web run or add a
+scheduled full-library matrix. `make web-backup-recovery-test` is the targeted
+public UI/API recovery gate.
+
+The first-party API, PostgreSQL, storage, and queues are real; only external
+services may be replaced. Run `e2e:up` first and `e2e:down` afterwards. Install
+the project-pinned browser revision with `vp exec playwright install chromium` locally, or
 `vp exec playwright install --with-deps chromium` on Linux CI.
 
 Rebuild the `web` service (`docker compose -f docker-compose.e2e.yml -p

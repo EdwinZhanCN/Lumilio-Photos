@@ -314,16 +314,18 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	backupLogger := appLogger.Named("db_backup").Sugar()
 	backupScheduler := &dbbackup.Scheduler{
 		Conn: dbbackup.Conn{
-			Host:     dbConfig.Host,
-			Port:     dbConfig.Port,
-			User:     dbConfig.User,
-			Password: dbConfig.Password,
-			DBName:   dbConfig.DBName,
+			Host:         dbConfig.Host,
+			Port:         dbConfig.Port,
+			User:         dbConfig.User,
+			Password:     dbConfig.Password,
+			PasswordFile: dbConfig.RotatedPasswordFile,
+			DBName:       dbConfig.DBName,
 		},
 		Pool:        pgxPool,
 		ToolsBinDir: dbConfig.ToolsBinDir,
 		Dir:         appConfig.StorageConfig.BackupsDir(),
 		AppVersion:  version.Version,
+		Ready:       bootstrapService.IsReady,
 		Settings:    settingsService.GetBackupConfig,
 		Logf:        func(format string, args ...any) { backupLogger.Infof(format, args...) },
 	}
@@ -347,8 +349,17 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 			Resume: func(ctx context.Context) error {
 				return queueClient.QueueResume(ctx, "*", nil)
 			},
+			Reconnect: func(ctx context.Context) error {
+				pgxPool.Reset()
+				if err := pgxPool.Ping(ctx); err != nil {
+					return fmt.Errorf("database pool reconnect failed: %w", err)
+				}
+				return nil
+			},
 			Migrate: func(ctx context.Context) error {
-				return db.AutoMigrate(ctx, dbConfig)
+				migrationConfig := dbConfig
+				migrationConfig.Password = backupScheduler.Conn.ResolvedPassword()
+				return db.AutoMigrate(ctx, migrationConfig)
 			},
 			Verify: func(ctx context.Context) error {
 				if _, err := settingsService.GetSystemSettings(ctx); err != nil {

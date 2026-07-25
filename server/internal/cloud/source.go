@@ -3,7 +3,7 @@
 //
 // Layering:
 //
-//	CloudProvider (S3/WebDAV/iCloud)  ← interface
+//	CloudProvider (iCloud today; other providers may implement the interface)  ← interface
 //	      ↓
 //	SyncStateStore                     ← pagination cursor + etag dedup
 //	      ↓
@@ -24,7 +24,6 @@ type ProviderKind string
 
 const (
 	ProviderICloud ProviderKind = "icloud"
-	ProviderS3     ProviderKind = "s3"
 )
 
 // ReleaseAsset describes a single file discovered in cloud storage.
@@ -63,7 +62,6 @@ type Page struct {
 }
 
 // CloudProvider abstracts a remote file storage backend.
-// Each concrete provider (S3, iCloud, WebDAV) implements this interface.
 type CloudProvider interface {
 	// Name returns the provider identifier.
 	Name() ProviderKind

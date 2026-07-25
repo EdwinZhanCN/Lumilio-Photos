@@ -15,7 +15,7 @@ type SearchResponse = {
   result_items?: BrowseItem[];
 };
 
-test("@smoke video semantic search opens the best matching frame", async ({
+test("@video-regression video semantic search opens the best matching frame", async ({
   page,
   workspace,
 }) => {

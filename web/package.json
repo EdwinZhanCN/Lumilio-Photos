@@ -28,9 +28,10 @@
     "test:coverage": "vp test run --coverage",
     "test:hash-perf": "VITEST_HASH_PERF=true vp test run src/workers/hash.perf.test.ts",
     "test:watch": "vp test watch",
-    "test:browser": "vp run e2e:test --grep @smoke",
+    "test:browser": "vp run e2e:test --grep @smoke --workers=1",
     "test:auth-hardening": "vp run e2e:test --grep @auth-hardening --workers=1",
     "test:video-semantic": "vp run e2e:test --grep @video-regression --workers=1",
+    "test:backup-recovery": "vp run e2e:test --grep @backup-recovery --workers=1",
     "test:bundle": "vp build && node scripts/check-bundle-budget.mjs",
     "test:ui": "vp test --ui"
   },
