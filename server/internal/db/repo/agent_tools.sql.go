@@ -13,10 +13,18 @@ import (
 )
 
 const agentAssetAestheticScores = `-- name: AgentAssetAestheticScores :many
-SELECT asset_id, score
-FROM asset_quality_scores
-WHERE asset_id = ANY($1::uuid[])
+SELECT aqs.asset_id, aqs.score
+FROM asset_quality_scores aqs
+JOIN assets a USING (asset_id)
+WHERE aqs.asset_id = ANY($1::uuid[])
+  AND a.owner_id = $2::integer
+  AND a.is_deleted = false
 `
+
+type AgentAssetAestheticScoresParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	UserID   int32         `db:"user_id" json:"user_id"`
+}
 
 type AgentAssetAestheticScoresRow struct {
 	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
@@ -25,8 +33,8 @@ type AgentAssetAestheticScoresRow struct {
 
 // Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
 // omitted; callers that filter by quality percentile drop them.
-func (q *Queries) AgentAssetAestheticScores(ctx context.Context, assetIds []pgtype.UUID) ([]AgentAssetAestheticScoresRow, error) {
-	rows, err := q.db.Query(ctx, agentAssetAestheticScores, assetIds)
+func (q *Queries) AgentAssetAestheticScores(ctx context.Context, arg AgentAssetAestheticScoresParams) ([]AgentAssetAestheticScoresRow, error) {
+	rows, err := q.db.Query(ctx, agentAssetAestheticScores, arg.AssetIds, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,13 +57,19 @@ const agentCapturedTimes = `-- name: AgentCapturedTimes :many
 SELECT COALESCE(taken_time, upload_time)::timestamptz AS captured_at
 FROM assets
 WHERE asset_id = ANY($1::uuid[])
+  AND owner_id = $2::integer
   AND is_deleted = false
 `
 
+type AgentCapturedTimesParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	UserID   int32         `db:"user_id" json:"user_id"`
+}
+
 // Capture times for a set of assets, for the sample tool's distribution
 // summary. Order is irrelevant; bucketing happens in Go.
-func (q *Queries) AgentCapturedTimes(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.Timestamptz, error) {
-	rows, err := q.db.Query(ctx, agentCapturedTimes, assetIds)
+func (q *Queries) AgentCapturedTimes(ctx context.Context, arg AgentCapturedTimesParams) ([]pgtype.Timestamptz, error) {
+	rows, err := q.db.Query(ctx, agentCapturedTimes, arg.AssetIds, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +92,14 @@ const agentInspectAssets = `-- name: AgentInspectAssets :many
 SELECT asset_id, type, specific_metadata
 FROM assets
 WHERE asset_id = ANY($1::uuid[])
+  AND owner_id = $2::integer
   AND is_deleted = false
 `
+
+type AgentInspectAssetsParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	UserID   int32         `db:"user_id" json:"user_id"`
+}
 
 type AgentInspectAssetsRow struct {
 	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
@@ -88,8 +108,8 @@ type AgentInspectAssetsRow struct {
 }
 
 // inspect observer: per-asset EXIF facets for small refs.
-func (q *Queries) AgentInspectAssets(ctx context.Context, assetIds []pgtype.UUID) ([]AgentInspectAssetsRow, error) {
-	rows, err := q.db.Query(ctx, agentInspectAssets, assetIds)
+func (q *Queries) AgentInspectAssets(ctx context.Context, arg AgentInspectAssetsParams) ([]AgentInspectAssetsRow, error) {
+	rows, err := q.db.Query(ctx, agentInspectAssets, arg.AssetIds, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +132,12 @@ const agentLookupAlbums = `-- name: AgentLookupAlbums :many
 SELECT
     al.album_id,
     al.album_name::text AS title,
-    COUNT(DISTINCT aa.asset_id) AS asset_count
+    COUNT(DISTINCT a.asset_id) AS asset_count
 FROM albums al
 LEFT JOIN album_assets aa ON aa.album_id = al.album_id
-LEFT JOIN assets a ON a.asset_id = aa.asset_id AND a.is_deleted = false
+LEFT JOIN assets a ON a.asset_id = aa.asset_id
+    AND a.owner_id = $1::integer
+    AND a.is_deleted = false
 WHERE al.user_id = $1
   AND ($2::text IS NULL OR al.album_name ILIKE '%' || $2 || '%')
 GROUP BY al.album_id, al.album_name
@@ -164,15 +186,20 @@ SELECT
 FROM face_clusters fc
 JOIN face_cluster_members fcm ON fcm.cluster_id = fc.cluster_id
 JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fc.cluster_name IS NOT NULL
+  AND fc.owner_id = $1::integer
+  AND a.owner_id = $1::integer
+  AND a.is_deleted = false
   AND fc.cluster_name <> ''
-  AND ($1::text IS NULL OR fc.cluster_name ILIKE '%' || $1 || '%')
+  AND ($2::text IS NULL OR fc.cluster_name ILIKE '%' || $2 || '%')
 GROUP BY fc.cluster_id, fc.cluster_name
 ORDER BY asset_count DESC
-LIMIT $2
+LIMIT $3
 `
 
 type AgentLookupPeopleParams struct {
+	UserID    int32   `db:"user_id" json:"user_id"`
 	NameQuery *string `db:"name_query" json:"name_query"`
 	Limit     int32   `db:"limit" json:"limit"`
 }
@@ -185,7 +212,7 @@ type AgentLookupPeopleRow struct {
 
 // lookup_people entity resolver: named face clusters matching a name query.
 func (q *Queries) AgentLookupPeople(ctx context.Context, arg AgentLookupPeopleParams) ([]AgentLookupPeopleRow, error) {
-	rows, err := q.db.Query(ctx, agentLookupPeople, arg.NameQuery, arg.Limit)
+	rows, err := q.db.Query(ctx, agentLookupPeople, arg.UserID, arg.NameQuery, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -226,13 +253,20 @@ SELECT
         JOIN face_cluster_members fcm ON fcm.face_id = fi.id
         JOIN face_clusters fc ON fc.cluster_id = fcm.cluster_id
         WHERE fi.asset_id = a.asset_id
+          AND fc.owner_id = $1::integer
           AND fc.cluster_name IS NOT NULL
           AND fc.cluster_name <> ''
     )::text[] AS people
 FROM assets a
-WHERE a.asset_id = ANY($1::uuid[])
+WHERE a.asset_id = ANY($2::uuid[])
+  AND a.owner_id = $1::integer
   AND a.is_deleted = false
 `
+
+type AgentPeekAssetsParams struct {
+	UserID   int32         `db:"user_id" json:"user_id"`
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+}
 
 type AgentPeekAssetsRow struct {
 	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
@@ -248,8 +282,8 @@ type AgentPeekAssetsRow struct {
 // peek observer: minimal per-asset fields plus place + people; snapshot order
 // restored in Go. place/people are correlated subqueries so each asset stays a
 // single row (no fan-out from the cluster joins).
-func (q *Queries) AgentPeekAssets(ctx context.Context, assetIds []pgtype.UUID) ([]AgentPeekAssetsRow, error) {
-	rows, err := q.db.Query(ctx, agentPeekAssets, assetIds)
+func (q *Queries) AgentPeekAssets(ctx context.Context, arg AgentPeekAssetsParams) ([]AgentPeekAssetsRow, error) {
+	rows, err := q.db.Query(ctx, agentPeekAssets, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -277,23 +311,95 @@ func (q *Queries) AgentPeekAssets(ctx context.Context, assetIds []pgtype.UUID) (
 	return items, nil
 }
 
+const agentRankAssetIDsByTime = `-- name: AgentRankAssetIDsByTime :many
+SELECT asset_id
+FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND owner_id = $2::integer
+  AND is_deleted = false
+ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC
+`
+
+type AgentRankAssetIDsByTimeParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	UserID   int32         `db:"user_id" json:"user_id"`
+}
+
+// Owner-scoped rank(by=time) for Agent refs.
+func (q *Queries) AgentRankAssetIDsByTime(ctx context.Context, arg AgentRankAssetIDsByTimeParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, agentRankAssetIDsByTime, arg.AssetIds, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var asset_id pgtype.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const agentRankAssetIDsByUploadTime = `-- name: AgentRankAssetIDsByUploadTime :many
+SELECT asset_id
+FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND owner_id = $2::integer
+  AND is_deleted = false
+ORDER BY upload_time ASC, asset_id ASC
+`
+
+type AgentRankAssetIDsByUploadTimeParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	UserID   int32         `db:"user_id" json:"user_id"`
+}
+
+// Owner-scoped "recently added" order for Agent refs.
+func (q *Queries) AgentRankAssetIDsByUploadTime(ctx context.Context, arg AgentRankAssetIDsByUploadTimeParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, agentRankAssetIDsByUploadTime, arg.AssetIds, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var asset_id pgtype.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetIDsByPersonIDs = `-- name: GetAssetIDsByPersonIDs :many
 
 SELECT a.asset_id
 FROM assets a
 WHERE a.is_deleted = false
+  AND a.owner_id = $1::integer
   AND EXISTS (
     SELECT 1
     FROM face_items fi
     JOIN face_cluster_members fcm ON fcm.face_id = fi.id
     WHERE fi.asset_id = a.asset_id
-      AND fcm.cluster_id = ANY($1::int[])
+      AND fcm.cluster_id = ANY($2::int[])
   )
 ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-LIMIT $2
+LIMIT $3
 `
 
 type GetAssetIDsByPersonIDsParams struct {
+	UserID    int32   `db:"user_id" json:"user_id"`
 	PersonIds []int32 `db:"person_ids" json:"person_ids"`
 	Limit     int32   `db:"limit" json:"limit"`
 }
@@ -303,7 +409,7 @@ type GetAssetIDsByPersonIDsParams struct {
 // search_people producer: assets containing at least one of the given people
 // (union semantics; the agent intersects refs for "both people" requests).
 func (q *Queries) GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByPersonIDsParams) ([]pgtype.UUID, error) {
-	rows, err := q.db.Query(ctx, getAssetIDsByPersonIDs, arg.PersonIds, arg.Limit)
+	rows, err := q.db.Query(ctx, getAssetIDsByPersonIDs, arg.UserID, arg.PersonIds, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +433,7 @@ SELECT a.asset_id
 FROM assets a
 LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
 WHERE a.asset_id = ANY($1::uuid[])
+  AND a.owner_id = $2::integer
   AND a.is_deleted = false
 ORDER BY COALESCE(
     aqs.score,
@@ -336,11 +443,16 @@ ORDER BY COALESCE(
 ) ASC, a.asset_id ASC
 `
 
+type RankAssetIDsByQualityParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	UserID   int32         `db:"user_id" json:"user_id"`
+}
+
 // rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
 // head when available, falling back to the legacy heuristic (rating, liked,
 // resolution) for unscored assets. Callers reverse for descending order.
-func (q *Queries) RankAssetIDsByQuality(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error) {
-	rows, err := q.db.Query(ctx, rankAssetIDsByQuality, assetIds)
+func (q *Queries) RankAssetIDsByQuality(ctx context.Context, arg RankAssetIDsByQualityParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, rankAssetIDsByQuality, arg.AssetIds, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +475,6 @@ const rankAssetIDsByTime = `-- name: RankAssetIDsByTime :many
 SELECT asset_id
 FROM assets
 WHERE asset_id = ANY($1::uuid[])
-  AND is_deleted = false
 ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC
 `
 
@@ -392,7 +503,6 @@ const rankAssetIDsByUploadTime = `-- name: RankAssetIDsByUploadTime :many
 SELECT asset_id
 FROM assets
 WHERE asset_id = ANY($1::uuid[])
-  AND is_deleted = false
 ORDER BY upload_time ASC, asset_id ASC
 `
 

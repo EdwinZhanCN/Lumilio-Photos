@@ -1030,13 +1030,8 @@
     "input": {
       "modePrompt": "在「{{mode}}」模式下继续…",
       "prompt": "向 Lumilio Agent 提问...",
-      "send": "发送"
-    },
-    "markdown": {
-      "think": {
-        "thinking": "思考中...",
-        "thoughtFor": "思考用时 {{time}} 秒"
-      }
+      "send": "发送",
+      "stop": "停止生成"
     },
     "mention": {
       "album": "相册",
@@ -1051,6 +1046,7 @@
       "select": "选择"
     },
     "messages": {
+      "stopped": "已停止",
       "thinking": "思考中..."
     },
     "mode": {
@@ -1082,6 +1078,7 @@
       }
     },
     "tools": {
+      "cancelled": "已停止",
       "emptyResult": "没有匹配的照片",
       "resultSet": "结果集"
     },

@@ -44,7 +44,7 @@ func RegisterPeek() {
 			start := time.Now()
 			execID := newExecutionID()
 
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &PeekOutput{Error: refErr}, nil
@@ -64,7 +64,7 @@ func RegisterPeek() {
 				return &PeekOutput{Error: refErr}, nil
 			}
 
-			rows, err := deps.Queries.AgentPeekAssets(ctx, toPgUUIDs(page))
+			rows, err := deps.Library.PeekAssets(ctx, page)
 			if err != nil {
 				refErr := ref.Internal("peek query")
 				sendError(deps, info.Name, execID, start, refErr)

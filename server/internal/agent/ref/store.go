@@ -2,29 +2,33 @@ package ref
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"sync"
 	"time"
 
+	"server/internal/db/repo"
+
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Store is the session-scoped handle store. The memory implementation is the
-// eager-first decision on record: snapshots live in process memory, survive
-// for TTL since last access, and die on restart (checkpoints in PostgreSQL
-// outlive them — tools must answer RefNotFound with a recovery hint).
+const (
+	DefaultUserHotBudget   int64 = 64 << 20
+	DefaultGlobalHotBudget int64 = 512 << 20
+)
+
+// MembershipChecker is implemented by the user-bound AuthorizedLibrary.
+type MembershipChecker interface {
+	AuthorizeAssetIDs(ctx context.Context, userID int32, ids []uuid.UUID) ([]uuid.UUID, error)
+}
+
 type Store interface {
-	// Create materializes an ordered snapshot under the scope and returns the
-	// stored ref. The input slice is copied; hint is mnemonic only; summary
-	// is the receipt one-liner kept for the ref ledger.
-	Create(scope Scope, plan Plan, hint, summary string, assetIDs []uuid.UUID, truncated bool) *Ref
-
-	// Get resolves a ref id within scope, refreshing its TTL. Missing,
-	// expired and cross-scope ids all return CodeRefNotFound (INV-4).
-	Get(scope Scope, id string) (*Ref, *Error)
-
-	// List returns the scope's active refs in creation order (ref ledger).
-	List(scope Scope) []*Ref
+	Create(ctx context.Context, scope Scope, plan Plan, hint, summary string, assetIDs []uuid.UUID, truncated bool) (*Ref, *Error)
+	Get(ctx context.Context, scope Scope, id string) (*Ref, *Error)
+	List(ctx context.Context, scope Scope) []*Ref
+	ReleaseScope(ctx context.Context, scope Scope) error
+	DeleteScope(ctx context.Context, scope Scope) error
 }
 
 type scopeKey struct {
@@ -37,19 +41,38 @@ type scopeRefs struct {
 	refs    map[string]*Ref
 }
 
-// MemoryStore is the in-memory Store. It is safe for concurrent use; the
-// eino ToolsNode may execute tool calls in parallel.
+// MemoryStore is a bounded hot cache backed by agent_refs when queries is
+// configured. Every production ref is persisted before becoming visible; LRU
+// eviction therefore spills to PostgreSQL instead of losing checkpoint state.
 type MemoryStore struct {
-	mu          sync.Mutex
-	scopes      map[scopeKey]*scopeRefs
-	ttl         time.Duration
-	maxPerScope int
-	now         func() time.Time
+	mu           sync.Mutex
+	scopes       map[scopeKey]*scopeRefs
+	ttl          time.Duration
+	maxPerScope  int
+	now          func() time.Time
+	queries      *repo.Queries
+	checker      MembershipChecker
+	userBudget   int64
+	globalBudget int64
+	userBytes    map[int32]int64
+	hotBytes     int64
 }
 
-// NewMemoryStore creates a store with the given TTL and per-scope cap;
-// non-positive values fall back to the package defaults.
 func NewMemoryStore(ttl time.Duration, maxPerScope int) *MemoryStore {
+	return newStore(nil, nil, ttl, maxPerScope, 0, 0)
+}
+
+func NewPersistentStore(queries *repo.Queries, checker MembershipChecker, ttl time.Duration, maxPerScope int, userBudget, globalBudget int64) *MemoryStore {
+	if userBudget <= 0 {
+		userBudget = DefaultUserHotBudget
+	}
+	if globalBudget <= 0 {
+		globalBudget = DefaultGlobalHotBudget
+	}
+	return newStore(queries, checker, ttl, maxPerScope, userBudget, globalBudget)
+}
+
+func newStore(queries *repo.Queries, checker MembershipChecker, ttl time.Duration, maxPerScope int, userBudget, globalBudget int64) *MemoryStore {
 	if ttl <= 0 {
 		ttl = DefaultTTL
 	}
@@ -57,80 +80,171 @@ func NewMemoryStore(ttl time.Duration, maxPerScope int) *MemoryStore {
 		maxPerScope = DefaultMaxRefsPerScope
 	}
 	return &MemoryStore{
-		scopes:      make(map[scopeKey]*scopeRefs),
-		ttl:         ttl,
-		maxPerScope: maxPerScope,
-		now:         time.Now,
+		scopes: make(map[scopeKey]*scopeRefs), ttl: ttl, maxPerScope: maxPerScope,
+		now: time.Now, queries: queries, checker: checker,
+		userBudget: userBudget, globalBudget: globalBudget, userBytes: make(map[int32]int64),
 	}
 }
 
-func (s *MemoryStore) Create(scope Scope, plan Plan, hint, summary string, assetIDs []uuid.UUID, truncated bool) *Ref {
+func estimateBytes(r *Ref) int64 { return 256 + int64(len(r.AssetIDs))*16 }
+
+func (s *MemoryStore) Create(ctx context.Context, scope Scope, plan Plan, hint, summary string, assetIDs []uuid.UUID, truncated bool) (*Ref, *Error) {
+	if s.checker != nil {
+		authorized, err := s.checker.AuthorizeAssetIDs(ctx, scope.UserID, assetIDs)
+		if err != nil || len(authorized) != len(assetIDs) {
+			return nil, NotFound("membership")
+		}
+		assetIDs = authorized
+	}
+	normalized, err := plan.Normalize(scope.UserID)
+	if err != nil {
+		return nil, Internal("ref plan encoding")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	key := scopeKey{scope.UserID, scope.ThreadID}
 	sc := s.scopes[key]
 	if sc == nil {
 		sc = &scopeRefs{refs: make(map[string]*Ref)}
 		s.scopes[key] = sc
 	}
+	if s.queries != nil && sc.counter == 0 && len(sc.refs) == 0 {
+		s.loadScopeLocked(ctx, scope, sc)
+	}
 
 	sc.counter++
 	now := s.now()
 	r := &Ref{
-		ID:         formatID(sc.counter, hint),
-		Scope:      scope,
-		Plan:       plan,
-		AssetIDs:   append([]uuid.UUID(nil), assetIDs...),
-		Truncated:  truncated,
-		CreatedAt:  now,
-		LastAccess: now,
-		Summary:    summary,
-		seq:        sc.counter,
+		ID: formatID(sc.counter, hint), Scope: scope, Plan: normalized,
+		AssetIDs: append([]uuid.UUID(nil), assetIDs...), Truncated: truncated,
+		CreatedAt: now, LastAccess: now, Summary: summary, seq: sc.counter,
 	}
-	sc.refs[r.ID] = r
 
-	if len(sc.refs) > s.maxPerScope {
-		s.evictLRULocked(sc)
+	if s.queries != nil {
+		planJSON, marshalErr := json.Marshal(normalized)
+		if marshalErr != nil {
+			return nil, Internal("ref persistence")
+		}
+		pgIDs := make([]pgtype.UUID, len(assetIDs))
+		for i, id := range assetIDs {
+			pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
+		}
+		if err := s.queries.UpsertAgentRef(ctx, repo.UpsertAgentRefParams{
+			UserID: scope.UserID, ThreadID: scope.ThreadID, RefID: r.ID,
+			Sequence: int32(r.seq), Plan: planJSON, AssetIds: pgIDs,
+			Summary: summary, Truncated: truncated,
+			CreatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+			LastAccessedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			ExpiresAt:      pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+		}); err != nil {
+			return nil, ResourceExhausted("ref persistence is unavailable and the hot-memory budget cannot safely accept unspillable state")
+		}
+		trimmed, err := s.queries.TrimAgentThreadRefs(ctx, repo.TrimAgentThreadRefsParams{
+			UserID: scope.UserID, ThreadID: scope.ThreadID, MaxRefs: int32(s.maxPerScope),
+		})
+		if err != nil {
+			return nil, ResourceExhausted("ref persistence is unavailable and the per-thread limit cannot be enforced")
+		}
+		for _, refID := range trimmed {
+			if old := sc.refs[refID]; old != nil {
+				s.removeHotLocked(sc, old)
+			}
+		}
+	} else if s.overBudgetLocked(scope.UserID, estimateBytes(r)) {
+		return nil, ResourceExhausted("ref hot-memory budget exhausted")
 	}
-	return r
-}
 
-func (s *MemoryStore) Get(scope Scope, id string) (*Ref, *Error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	sc := s.scopes[scopeKey{scope.UserID, scope.ThreadID}]
-	if sc == nil {
-		return nil, NotFound(id)
-	}
-	r, ok := sc.refs[id]
-	if !ok {
-		return nil, NotFound(id)
-	}
-	now := s.now()
-	if now.Sub(r.LastAccess) > s.ttl {
-		delete(sc.refs, id)
-		return nil, NotFound(id)
-	}
-	r.LastAccess = now
+	s.addHotLocked(sc, r)
+	s.enforceBudgetsLocked()
 	return r, nil
 }
 
-func (s *MemoryStore) List(scope Scope) []*Ref {
+func (s *MemoryStore) Get(ctx context.Context, scope Scope, id string) (*Ref, *Error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	sc := s.scopes[scopeKey{scope.UserID, scope.ThreadID}]
+	key := scopeKey{scope.UserID, scope.ThreadID}
+	sc := s.scopes[key]
+	now := s.now()
+	if sc != nil {
+		if r := sc.refs[id]; r != nil {
+			if now.Sub(r.LastAccess) > s.ttl {
+				s.removeHotLocked(sc, r)
+			} else {
+				if s.checker != nil {
+					if _, err := s.checker.AuthorizeAssetIDs(ctx, scope.UserID, r.AssetIDs); err != nil {
+						s.removeHotLocked(sc, r)
+						return nil, NotFound(id)
+					}
+				}
+				if s.queries != nil {
+					if _, err := s.queries.GetAgentRef(ctx, repo.GetAgentRefParams{
+						ExpiresAt: pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+						UserID:    scope.UserID,
+						ThreadID:  scope.ThreadID,
+						RefID:     id,
+					}); err != nil {
+						s.removeHotLocked(sc, r)
+						return nil, NotFound(id)
+					}
+				}
+				r.LastAccess = now
+				return r, nil
+			}
+		}
+	}
+	if s.queries == nil {
+		return nil, NotFound(id)
+	}
+	row, err := s.queries.GetAgentRef(ctx, repo.GetAgentRefParams{
+		ExpiresAt: pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+		UserID:    scope.UserID, ThreadID: scope.ThreadID, RefID: id,
+	})
+	if err != nil {
+		return nil, NotFound(id)
+	}
+	r, err := refFromRow(row)
+	if err != nil {
+		return nil, NotFound(id)
+	}
+	if s.checker != nil {
+		if _, err := s.checker.AuthorizeAssetIDs(ctx, scope.UserID, r.AssetIDs); err != nil {
+			return nil, NotFound(id)
+		}
+	}
 	if sc == nil {
-		return nil
+		sc = &scopeRefs{refs: make(map[string]*Ref)}
+		s.scopes[key] = sc
+	}
+	sc.counter = max(sc.counter, r.seq)
+	s.addHotLocked(sc, r)
+	s.enforceBudgetsLocked()
+	return r, nil
+}
+
+func (s *MemoryStore) List(ctx context.Context, scope Scope) []*Ref {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := scopeKey{scope.UserID, scope.ThreadID}
+	sc := s.scopes[key]
+	if sc == nil {
+		sc = &scopeRefs{refs: make(map[string]*Ref)}
+		s.scopes[key] = sc
+	}
+	if s.queries != nil {
+		s.loadScopeLocked(ctx, scope, sc)
 	}
 	now := s.now()
 	out := make([]*Ref, 0, len(sc.refs))
-	for id, r := range sc.refs {
+	for _, r := range sc.refs {
 		if now.Sub(r.LastAccess) > s.ttl {
-			delete(sc.refs, id)
 			continue
+		}
+		if s.checker != nil {
+			if _, err := s.checker.AuthorizeAssetIDs(ctx, scope.UserID, r.AssetIDs); err != nil {
+				s.removeHotLocked(sc, r)
+				continue
+			}
 		}
 		out = append(out, r)
 	}
@@ -138,9 +252,149 @@ func (s *MemoryStore) List(scope Scope) []*Ref {
 	return out
 }
 
-// RunJanitor sweeps expired refs and empty scopes until ctx is done. Expiry
-// is also enforced lazily on Get/List; the janitor only bounds memory for
-// abandoned sessions.
+// ReleaseScope starts the TTL only after a thread reaches a normal terminal
+// state. Active and awaiting-confirmation refs remain durable for recovery.
+func (s *MemoryStore) ReleaseScope(ctx context.Context, scope Scope) error {
+	s.mu.Lock()
+	now := s.now()
+	if sc := s.scopes[scopeKey{scope.UserID, scope.ThreadID}]; sc != nil {
+		for _, r := range sc.refs {
+			r.LastAccess = now
+		}
+	}
+	s.mu.Unlock()
+	if s.queries != nil {
+		return s.queries.ReleaseAgentThreadRefs(ctx, repo.ReleaseAgentThreadRefsParams{
+			ExpiresAt: pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+			UserID:    scope.UserID,
+			ThreadID:  scope.ThreadID,
+		})
+	}
+	return nil
+}
+
+func (s *MemoryStore) DeleteScope(ctx context.Context, scope Scope) error {
+	s.mu.Lock()
+	key := scopeKey{scope.UserID, scope.ThreadID}
+	if sc := s.scopes[key]; sc != nil {
+		for _, r := range sc.refs {
+			s.hotBytes -= estimateBytes(r)
+			s.userBytes[scope.UserID] -= estimateBytes(r)
+		}
+		delete(s.scopes, key)
+	}
+	s.mu.Unlock()
+	if s.queries != nil {
+		return s.queries.DeleteAgentThreadRefs(ctx, repo.DeleteAgentThreadRefsParams{
+			UserID: scope.UserID, ThreadID: scope.ThreadID,
+		})
+	}
+	return nil
+}
+
+func (s *MemoryStore) loadScopeLocked(ctx context.Context, scope Scope, sc *scopeRefs) {
+	rows, err := s.queries.ListAgentRefs(ctx, repo.ListAgentRefsParams{UserID: scope.UserID, ThreadID: scope.ThreadID})
+	if err != nil {
+		return
+	}
+	for _, row := range rows {
+		r, err := refFromRow(row)
+		if err != nil {
+			continue
+		}
+		sc.counter = max(sc.counter, r.seq)
+		if sc.refs[r.ID] == nil {
+			s.addHotLocked(sc, r)
+		}
+	}
+	s.enforceBudgetsLocked()
+}
+
+func refFromRow(row repo.AgentRef) (*Ref, error) {
+	var plan Plan
+	if err := json.Unmarshal(row.Plan, &plan); err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, 0, len(row.AssetIds))
+	for _, id := range row.AssetIds {
+		if id.Valid {
+			ids = append(ids, uuid.UUID(id.Bytes))
+		}
+	}
+	return &Ref{
+		ID: row.RefID, Scope: Scope{UserID: row.UserID, ThreadID: row.ThreadID},
+		Plan: plan, AssetIDs: ids, Summary: row.Summary, Truncated: row.Truncated,
+		CreatedAt: row.CreatedAt.Time, LastAccess: row.LastAccessedAt.Time, seq: int(row.Sequence),
+	}, nil
+}
+
+func (s *MemoryStore) addHotLocked(sc *scopeRefs, r *Ref) {
+	if existing := sc.refs[r.ID]; existing != nil {
+		s.removeHotLocked(sc, existing)
+	}
+	sc.refs[r.ID] = r
+	bytes := estimateBytes(r)
+	s.hotBytes += bytes
+	s.userBytes[r.Scope.UserID] += bytes
+	if len(sc.refs) > s.maxPerScope {
+		s.evictScopeLRULocked(sc)
+	}
+}
+
+func (s *MemoryStore) removeHotLocked(sc *scopeRefs, r *Ref) {
+	delete(sc.refs, r.ID)
+	bytes := estimateBytes(r)
+	s.hotBytes -= bytes
+	s.userBytes[r.Scope.UserID] -= bytes
+}
+
+func (s *MemoryStore) overBudgetLocked(userID int32, additional int64) bool {
+	return (s.userBudget > 0 && s.userBytes[userID]+additional > s.userBudget) ||
+		(s.globalBudget > 0 && s.hotBytes+additional > s.globalBudget)
+}
+
+func (s *MemoryStore) enforceBudgetsLocked() {
+	for (s.globalBudget > 0 && s.hotBytes > s.globalBudget) || s.anyUserOverBudgetLocked() {
+		var oldest *Ref
+		var oldestScope *scopeRefs
+		for _, sc := range s.scopes {
+			for _, r := range sc.refs {
+				if oldest == nil || r.LastAccess.Before(oldest.LastAccess) {
+					oldest, oldestScope = r, sc
+				}
+			}
+		}
+		if oldest == nil {
+			return
+		}
+		s.removeHotLocked(oldestScope, oldest)
+	}
+}
+
+func (s *MemoryStore) anyUserOverBudgetLocked() bool {
+	if s.userBudget <= 0 {
+		return false
+	}
+	for _, size := range s.userBytes {
+		if size > s.userBudget {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *MemoryStore) evictScopeLRULocked(sc *scopeRefs) {
+	for len(sc.refs) > s.maxPerScope {
+		var oldest *Ref
+		for _, r := range sc.refs {
+			if oldest == nil || r.LastAccess.Before(oldest.LastAccess) {
+				oldest = r
+			}
+		}
+		s.removeHotLocked(sc, oldest)
+	}
+}
+
 func (s *MemoryStore) RunJanitor(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -149,36 +403,26 @@ func (s *MemoryStore) RunJanitor(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.sweep()
+			s.sweep(ctx)
 		}
 	}
 }
 
-func (s *MemoryStore) sweep() {
+func (s *MemoryStore) sweep(ctx context.Context) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	now := s.now()
 	for key, sc := range s.scopes {
-		for id, r := range sc.refs {
+		for _, r := range sc.refs {
 			if now.Sub(r.LastAccess) > s.ttl {
-				delete(sc.refs, id)
+				s.removeHotLocked(sc, r)
 			}
 		}
 		if len(sc.refs) == 0 {
 			delete(s.scopes, key)
 		}
 	}
-}
-
-func (s *MemoryStore) evictLRULocked(sc *scopeRefs) {
-	for len(sc.refs) > s.maxPerScope {
-		var oldest *Ref
-		for _, r := range sc.refs {
-			if oldest == nil || r.LastAccess.Before(oldest.LastAccess) {
-				oldest = r
-			}
-		}
-		delete(sc.refs, oldest.ID)
+	s.mu.Unlock()
+	if s.queries != nil {
+		_ = s.queries.DeleteExpiredAgentRefs(ctx)
 	}
 }

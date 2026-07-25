@@ -1,10 +1,4 @@
-import type {
-  Block,
-  ChatMessage,
-  InterruptInfo,
-  ReasoningBlock,
-  SideChannelEvent,
-} from "../model/chatTypes";
+import type { Block, ChatMessage, InterruptInfo, SideChannelEvent } from "../model/chatTypes";
 
 /** Pure reduction rules from SSE events onto the typed-block conversation.
  * The store applies these against the last assistant message; rendering never
@@ -33,49 +27,12 @@ const replaceLastMessage = (messages: ChatMessage[], blocks: Block[]): ChatMessa
   return next;
 };
 
-const closeReasoning = (block: ReasoningBlock): ReasoningBlock => ({
-  ...block,
-  durationS: block.durationS ?? Math.max(0, Math.round((Date.now() - block.startedAt) / 1000)),
-});
-
-/** Closes a trailing open reasoning block, if any. */
-const withClosedTail = (blocks: Block[]): Block[] => {
-  const last = blocks[blocks.length - 1];
-  if (last?.kind === "reasoning" && last.durationS === undefined) {
-    return [...blocks.slice(0, -1), closeReasoning(last)];
-  }
-  return blocks;
-};
-
-/** Streamed text/reasoning chunks append to a matching trailing block or
- * open a new one; switching kinds closes the reasoning block and stamps its
- * duration. */
-export const applyChunk = (
-  messages: ChatMessage[],
-  chunk: { output?: string; reasoning?: string },
-): ChatMessage[] => {
+/** Streamed assistant output appends to a matching trailing text block. */
+export const applyChunk = (messages: ChatMessage[], chunk: { output?: string }): ChatMessage[] => {
   if (!isAssistantLast(messages)) return messages;
   let blocks = messages[messages.length - 1].blocks;
 
-  if (chunk.reasoning) {
-    const last = blocks[blocks.length - 1];
-    if (last?.kind === "reasoning" && last.durationS === undefined) {
-      blocks = [...blocks.slice(0, -1), { ...last, text: last.text + chunk.reasoning }];
-    } else {
-      blocks = [
-        ...blocks,
-        {
-          kind: "reasoning",
-          id: newId(),
-          text: chunk.reasoning,
-          startedAt: Date.now(),
-        },
-      ];
-    }
-  }
-
   if (chunk.output) {
-    blocks = withClosedTail(blocks);
     const last = blocks[blocks.length - 1];
     if (last?.kind === "text") {
       blocks = [...blocks.slice(0, -1), { ...last, markdown: last.markdown + chunk.output }];
@@ -92,7 +49,7 @@ export const applyChunk = (
 export const applySideEvent = (messages: ChatMessage[], event: SideChannelEvent): ChatMessage[] => {
   if (!isAssistantLast(messages)) return messages;
   if (!event.tool?.executionId) return messages;
-  let blocks = withClosedTail(messages[messages.length - 1].blocks);
+  let blocks = messages[messages.length - 1].blocks;
 
   if (event.type === "widget_show") {
     if (event.data?.refId) {
@@ -140,7 +97,7 @@ export const applyInterrupt = (
   interrupt: InterruptInfo,
 ): ChatMessage[] => {
   if (!isAssistantLast(messages)) return messages;
-  const blocks = withClosedTail(messages[messages.length - 1].blocks);
+  const blocks = messages[messages.length - 1].blocks;
   return replaceLastMessage(messages, [...blocks, { kind: "confirm", id: newId(), interrupt }]);
 };
 
@@ -148,7 +105,7 @@ export const applyInterrupt = (
  * in a fresh assistant message). */
 export const resolveConfirm = (
   messages: ChatMessage[],
-  resolved: "approved" | "rejected",
+  resolved: "approved" | "rejected" | "cancelled",
 ): ChatMessage[] =>
   messages.map((message) => ({
     ...message,
@@ -157,10 +114,24 @@ export const resolveConfirm = (
     ),
   }));
 
-export const finishStream = (messages: ChatMessage[]): ChatMessage[] => {
+/** Preserves partial assistant output while making the stopped state
+ * explicit and preventing unfinished tools/confirmations from looking live. */
+export const cancelActiveBlocks = (messages: ChatMessage[]): ChatMessage[] => {
   if (!isAssistantLast(messages)) return messages;
-  const last = messages[messages.length - 1];
-  const blocks = withClosedTail(last.blocks);
-  if (blocks === last.blocks) return messages;
-  return replaceLastMessage(messages, blocks);
+  const next = messages.slice();
+  const last = next[next.length - 1];
+  next[next.length - 1] = {
+    ...last,
+    status: "stopped",
+    blocks: last.blocks.map((block) => {
+      if (block.kind === "tool" && block.status === "running") {
+        return { ...block, status: "cancelled" };
+      }
+      if (block.kind === "confirm" && !block.resolved) {
+        return { ...block, resolved: "cancelled" };
+      }
+      return block;
+    }),
+  };
+  return next;
 };

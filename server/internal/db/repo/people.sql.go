@@ -27,6 +27,10 @@ WHERE ($1::boolean OR COALESCE(fc.is_hidden, false) = false)
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
       AND (
+        $2::integer IS NULL
+        OR a.owner_id = $2
+      )
+      AND (
         $3::uuid IS NULL
         OR a.repository_id = $3
       )
@@ -162,14 +166,14 @@ WITH page_people AS MATERIALIZED (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
-      AND ($2::boolean OR COALESCE(fc.is_hidden, false) = false)
+      AND ($3::boolean OR COALESCE(fc.is_hidden, false) = false)
       AND (
-        $3::integer IS NULL
-        OR fc.owner_id = $3
+        $1::integer IS NULL
+        OR fc.owner_id = $1
       )
       AND (
-        $1::uuid IS NULL
-        OR a.repository_id = $1
+        $2::uuid IS NULL
+        OR a.repository_id = $2
       )
     GROUP BY fc.cluster_id, fc.is_confirmed, fc.updated_at
     ORDER BY
@@ -200,8 +204,12 @@ LEFT JOIN LATERAL (
     WHERE fi.id = fc.representative_face_id
       AND a.is_deleted = false
       AND (
-        $1::uuid IS NULL
-        OR a.repository_id = $1
+        $1::integer IS NULL
+        OR a.owner_id = $1
+      )
+      AND (
+        $2::uuid IS NULL
+        OR a.repository_id = $2
       )
     LIMIT 1
 ) rep ON true
@@ -213,8 +221,12 @@ LEFT JOIN LATERAL (
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
       AND (
-        $1::uuid IS NULL
-        OR a.repository_id = $1
+        $1::integer IS NULL
+        OR a.owner_id = $1
+      )
+      AND (
+        $2::uuid IS NULL
+        OR a.repository_id = $2
       )
     ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
     LIMIT 1
@@ -227,9 +239,9 @@ ORDER BY
 `
 
 type ListPeopleScopedParams struct {
+	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
 	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
 	IncludeHidden bool        `db:"include_hidden" json:"include_hidden"`
-	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
 	Offset        int32       `db:"offset" json:"offset"`
 	Limit         int32       `db:"limit" json:"limit"`
 }
@@ -250,9 +262,9 @@ type ListPeopleScopedRow struct {
 
 func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error) {
 	rows, err := q.db.Query(ctx, listPeopleScoped,
+		arg.OwnerID,
 		arg.RepositoryID,
 		arg.IncludeHidden,
-		arg.OwnerID,
 		arg.Offset,
 		arg.Limit,
 	)

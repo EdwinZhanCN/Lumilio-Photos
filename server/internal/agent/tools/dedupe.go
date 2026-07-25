@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 	"time"
 
 	"server/internal/agent/core"
@@ -42,7 +41,7 @@ func RegisterDedupe() {
 			execID := newExecutionID()
 			sendRunning(deps, info.Name, execID, "Removing near-duplicates...", input)
 
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return errorOutput(refErr), nil
@@ -63,7 +62,7 @@ func RegisterDedupe() {
 				return errorOutput(refErr), nil
 			}
 
-			rows, err := deps.Queries.GetPHashEmbeddingsByAssetIDs(ctx, toPgUUIDs(r.AssetIDs))
+			rows, err := deps.Library.PHashEmbeddings(ctx, r.AssetIDs)
 			if err != nil {
 				refErr := ref.Internal("dedupe query")
 				sendError(deps, info.Name, execID, start, refErr)
@@ -85,11 +84,10 @@ func RegisterDedupe() {
 			summary := fmt.Sprintf(
 				"dedupe(%s, keep_per_cluster=%d) → %d assets (collapsed %d near-duplicate cluster(s), removed %d of %d)",
 				r.ID, keepPerCluster, len(kept), clusters, removed, r.Count())
-			out := deps.RefStore.Create(
-				deps.Scope(),
+			out, createErr := deps.CreateRef(
+				ctx,
 				ref.Plan{
-					Op:      info.Name,
-					Params:  map[string]string{"keep_per_cluster": strconv.Itoa(keepPerCluster)},
+					Op: info.Name, Payload: ref.TypedPayload(map[string]any{"keep_per_cluster": keepPerCluster}),
 					Parents: []string{r.ID},
 				},
 				"dedupe",
@@ -97,6 +95,10 @@ func RegisterDedupe() {
 				kept,
 				r.Truncated,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: out.ID, Count: out.Count()})
 			return receiptOutput(out, summary), nil
 		})

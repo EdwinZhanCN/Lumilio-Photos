@@ -9,8 +9,9 @@ import { provisionWorkspace, type Workspace } from "../support/workspace";
 // own signature for "no extra test-scoped fixtures".
 export const test = base.extend<{}, { workspace: Workspace }>({
   workspace: [
-    // eslint-disable-next-line no-empty-pattern -- Playwright parses this
-    // parameter to infer fixture dependencies and rejects a named one.
+    // Playwright parses this parameter to infer fixture dependencies and
+    // rejects a named one.
+    // eslint-disable-next-line no-empty-pattern
     async ({}, use, workerInfo) => {
       await use(await provisionWorkspace(workerInfo.parallelIndex));
     },

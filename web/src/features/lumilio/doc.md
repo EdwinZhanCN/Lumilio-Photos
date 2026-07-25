@@ -11,10 +11,11 @@ own features and Lumilio consumes them through explicit context or mentions.
 Feature-local interactive state and the shared assistant surface use three
 small Zustand stores with explicit ownership:
 
-- [useLumilioChatStore](./state/chatStore.ts) owns the thread id, streamed message blocks,
-  generation/error state, confirmation interrupts, token usage, and the
-  send/resume/new-conversation commands. Its session reset aborts the active
-  SSE request before clearing the conversation.
+- [useLumilioChatStore](./state/chatStore.ts) owns the thread id, active run id, streamed
+  message blocks, generation/stopping/error state, confirmation interrupts,
+  token usage, and the send/resume/stop/new-conversation commands. Stop is a
+  server operation: it calls [cancelAgentRun](./api/agentStream.ts) with the exact
+  `(thread_id, run_id)` before aborting the local SSE transport.
 - The lower-level [useContextStore](@/lib/assistant/index.ts) is the cross-surface context bus. Contributors
   register current asset selections or carousel viewing context, and
   [ContextChips](./flows/chat/ContextChips.tsx) lets the user exclude a contribution before send.
@@ -28,11 +29,21 @@ component/hook edges instead of being mirrored into those stores.
 ## Data
 
 [streamAgent](./api/agentStream.ts) opens authenticated SSE streams to `/api/v1/agent/chat`
-and `/api/v1/agent/chat/resume`. The stream emits typed chat blocks:
-[TextBlock](./model/chatTypes.ts), [ReasoningBlock](./model/chatTypes.ts), [ToolBlock](./model/chatTypes.ts),
-[WidgetBlock](./model/chatTypes.ts), and [ConfirmBlock](./model/chatTypes.ts). Tool status, widgets, and
-token usage arrive through [SideChannelEvent](./model/chatTypes.ts); an interrupt becomes a
-confirmation card and resumes through the same store.
+and `/api/v1/agent/chat/resume`. Every request sends an explicit mode
+(`free` for the unconstrained tool set). `session_info` binds the stream to a
+fresh run id and `run_status` carries [AgentRunStatus](./model/chatTypes.ts). Product SSE
+contains assistant text only—provider reasoning is never accepted into the
+public stream contract. Assistant chunks become [TextBlock](./model/chatTypes.ts); tool
+status and widgets arrive through [SideChannelEvent](./model/chatTypes.ts) and become
+[ToolBlock](./model/chatTypes.ts) / [WidgetBlock](./model/chatTypes.ts). An interrupt becomes a
+[ConfirmBlock](./model/chatTypes.ts) and resumes through the same store.
+
+[cancelActiveBlocks](./state/blocks.ts) preserves partial assistant text after Stop,
+marks unfinished tools `cancelled`, disables an unresolved confirmation, and
+marks the turn as stopped. [MentionInput](./flows/chat/MentionInput.tsx) reuses its primary action
+slot as a Stop button while a run is generating or awaiting confirmation.
+`newConversation` waits for that cancellation request before clearing local
+state; collapsing or closing the dock never cancels.
 
 The stream side channel passes handles, not full asset payloads:
 [RefPayload](./model/chatTypes.ts) carries a ref id, count, widget hint, and params. Inline
@@ -58,6 +69,7 @@ flowchart TD
     DOCK --> CHIPS["ContextChips"]
     DOCK --> MESSAGES["ChatMessages"]
     INPUT --> STORE["useLumilioChatStore"]
+    STORE --> CANCEL["cancelAgentRun"]
     CHIPS --> CTX["useContextStore"]
     GALLERY["useBrowseSelectionContext"] --> CTX
     CAROUSEL["useViewerContextContributor"] --> CTX
@@ -85,7 +97,8 @@ Context is opt-out at send time. Contributions stay visible as chips, and
 exclusions are cleared after sending so the next message starts from the
 current page context rather than a hidden stale exclusion.
 [resetLumilioSession](./state/resetSession.ts) is the feature reset exposed to application
-composition. It clears the chat store and shared context bus so conversation,
+composition. It starts a best-effort server cancellation before closing the
+transport, then clears the chat store and shared context bus so conversation,
 contributions, and exclusions never cross a user boundary.
 
 Pins are the durability boundary. Chat widgets are session refs; pinning

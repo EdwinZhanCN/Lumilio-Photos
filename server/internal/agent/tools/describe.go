@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"server/internal/agent/core"
-	"server/internal/agent/facets"
 	"server/internal/agent/ref"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -44,13 +43,13 @@ func RegisterDescribe() {
 			start := time.Now()
 			execID := newExecutionID()
 
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &DescribeOutput{Error: refErr}, nil
 			}
 
-			summary, err := facets.Build(ctx, deps.Queries, r)
+			summary, err := deps.Library.BuildFacets(ctx, r)
 			if err != nil {
 				refErr := ref.Internal("facet aggregation")
 				sendError(deps, info.Name, execID, start, refErr)

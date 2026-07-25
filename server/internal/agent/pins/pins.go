@@ -11,7 +11,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -33,13 +34,13 @@ var ErrNotFound = errors.New("pin not found")
 
 // Service owns pin persistence and hydration.
 type Service struct {
-	queries  *repo.Queries
-	refStore ref.Store
-	search   core.RetrieverSearch
+	queries   *repo.Queries
+	refStore  ref.Store
+	libraries *core.AuthorizedLibraryFactory
 }
 
-func NewService(queries *repo.Queries, refStore ref.Store, search core.RetrieverSearch) *Service {
-	return &Service{queries: queries, refStore: refStore, search: search}
+func NewService(queries *repo.Queries, refStore ref.Store, libraries *core.AuthorizedLibraryFactory) *Service {
+	return &Service{queries: queries, refStore: refStore, libraries: libraries}
 }
 
 // CreateParams describes a pin request from the frontend.
@@ -65,13 +66,16 @@ type Layout struct {
 // downgrades to frozen when the plan is not replayable.
 func (s *Service) CreateFromRef(ctx context.Context, params CreateParams) (repo.AgentPin, error) {
 	scope := ref.Scope{UserID: params.UserID, ThreadID: params.ThreadID}
-	r, refErr := s.refStore.Get(scope, params.RefID)
+	r, refErr := s.refStore.Get(ctx, scope, params.RefID)
 	if refErr != nil {
+		return repo.AgentPin{}, ErrNotFound
+	}
+	if _, err := s.libraries.ForUser(params.UserID).AuthorizeAssetIDs(ctx, params.UserID, r.AssetIDs); err != nil {
 		return repo.AgentPin{}, ErrNotFound
 	}
 
 	mode := params.Mode
-	if mode != ModeLive || !isReplayable(r.Plan) {
+	if mode != ModeLive || !isReplayable(r.Plan, params.UserID) {
 		mode = ModeFrozen
 	}
 	widget := params.Widget
@@ -168,35 +172,93 @@ func (s *Service) UpdateTitle(ctx context.Context, userID int32, pinID uuid.UUID
 // frozen pins, a plan replay for live pins (falling back to the snapshot
 // when the replay fails, so widgets degrade instead of breaking).
 func (s *Service) AssetIDs(ctx context.Context, userID int32, pinID uuid.UUID) (repo.AgentPin, []uuid.UUID, error) {
+	pin, ids, _, err := s.AssetIDsWithMeta(ctx, userID, pinID)
+	return pin, ids, err
+}
+
+type HydrationMeta struct {
+	Source           string
+	FallbackReason   string
+	LastSuccessfulAt *time.Time
+}
+
+func (s *Service) AssetIDsWithMeta(ctx context.Context, userID int32, pinID uuid.UUID) (repo.AgentPin, []uuid.UUID, HydrationMeta, error) {
 	pin, err := s.queries.GetAgentPin(ctx, repo.GetAgentPinParams{
 		PinID:  pgtype.UUID{Bytes: pinID, Valid: true},
 		UserID: userID,
 	})
 	if err != nil {
-		return repo.AgentPin{}, nil, ErrNotFound
+		return repo.AgentPin{}, nil, HydrationMeta{}, ErrNotFound
 	}
 
 	if pin.Mode == ModeLive {
 		var plan ref.Plan
+		fallbackReason := "invalid_plan"
 		if err := json.Unmarshal(pin.Plan, &plan); err == nil {
-			if ids, err := s.replay(ctx, plan); err == nil {
-				return pin, ids, nil
+			fallbackReason = "unsupported_plan_version"
+			if isReplayable(plan, userID) {
+				fallbackReason = "replay_failed"
 			}
 		}
+		if isReplayable(plan, userID) {
+			if ids, err := s.replay(ctx, userID, plan); err == nil {
+				now := time.Now().UTC()
+				_ = s.queries.TouchAgentPinLiveRefresh(ctx, repo.TouchAgentPinLiveRefreshParams{
+					PinID: pin.PinID, UserID: userID,
+					LastSuccessfulRefreshAt: pgtype.Timestamptz{Time: now, Valid: true},
+				})
+				return pin, ids, HydrationMeta{Source: "live_replay", LastSuccessfulAt: &now}, nil
+			}
+		}
+		ids, err := s.authorizedFrozenIDs(ctx, userID, pin)
+		if err != nil {
+			return repo.AgentPin{}, nil, HydrationMeta{}, err
+		}
+		return pin, ids, HydrationMeta{
+			Source: "frozen_fallback", FallbackReason: fallbackReason,
+			LastSuccessfulAt: pgTimePointer(pin.LastSuccessfulRefreshAt),
+		}, nil
 	}
 
+	ids, err := s.authorizedFrozenIDs(ctx, userID, pin)
+	if err != nil {
+		return repo.AgentPin{}, nil, HydrationMeta{}, err
+	}
+	return pin, ids, HydrationMeta{
+		Source: "frozen_snapshot", LastSuccessfulAt: pgTimePointer(pin.LastSuccessfulRefreshAt),
+	}, nil
+}
+
+func (s *Service) authorizedFrozenIDs(ctx context.Context, userID int32, pin repo.AgentPin) ([]uuid.UUID, error) {
 	ids := make([]uuid.UUID, 0, len(pin.AssetIds))
 	for _, id := range pin.AssetIds {
 		if id.Valid {
 			ids = append(ids, uuid.UUID(id.Bytes))
 		}
 	}
-	return pin, ids, nil
+	if _, err := s.libraries.ForUser(userID).AuthorizeAssetIDs(ctx, userID, ids); err != nil {
+		return nil, ErrNotFound
+	}
+	return ids, nil
+}
+
+func pgTimePointer(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	t := value.Time
+	return &t
 }
 
 // isReplayable reports whether a plan is a self-contained producer
 // expression that can be re-executed without session refs.
-func isReplayable(plan ref.Plan) bool {
+func isReplayable(plan ref.Plan, userID int32) bool {
+	if plan.SchemaVersion != ref.CurrentPlanSchemaVersion ||
+		plan.ToolVersion != ref.CurrentToolVersion ||
+		plan.AuthorizationScope.UserID != userID ||
+		plan.CreationPolicyVersion != ref.CurrentPolicyVersion {
+		return false
+	}
 	switch plan.Op {
 	case "filter_assets", "search_semantic", "search_text", "search_people":
 		return len(plan.Parents) == 0
@@ -205,37 +267,76 @@ func isReplayable(plan ref.Plan) bool {
 	}
 }
 
+type semanticReplayPayload struct {
+	Query           string               `json:"query"`
+	Strictness      search.SetStrictness `json:"strictness"`
+	ProfileVersion  string               `json:"profile_version"`
+	ModelVersion    string               `json:"model_version"`
+	IndexVersion    string               `json:"index_version"`
+	LanguageVersion string               `json:"language_version"`
+}
+
+type textReplayPayload struct {
+	Query string `json:"query"`
+}
+
+type peopleReplayPayload struct {
+	PersonIDs []int32 `json:"person_ids"`
+}
+
+type filterReplayPayload struct {
+	DateFrom             string   `json:"date_from,omitempty"`
+	DateTo               string   `json:"date_to,omitempty"`
+	Type                 string   `json:"type,omitempty"`
+	Filename             string   `json:"filename,omitempty"`
+	Raw                  *bool    `json:"raw,omitempty"`
+	Rating               *int     `json:"rating,omitempty"`
+	Liked                *bool    `json:"liked,omitempty"`
+	Place                string   `json:"place,omitempty"`
+	Camera               string   `json:"camera,omitempty"`
+	Lens                 string   `json:"lens,omitempty"`
+	AlbumID              *int     `json:"album_id,omitempty"`
+	TagNames             []string `json:"tag_names,omitempty"`
+	MinQualityPercentile *float64 `json:"min_quality_percentile,omitempty"`
+}
+
 // replay re-executes a producer plan and returns fresh ids.
-func (s *Service) replay(ctx context.Context, plan ref.Plan) ([]uuid.UUID, error) {
+func (s *Service) replay(ctx context.Context, userID int32, plan ref.Plan) ([]uuid.UUID, error) {
+	library := s.libraries.ForUser(userID)
 	switch plan.Op {
 	case "filter_assets":
-		return s.replayFilter(ctx, plan.Params)
+		return s.replayFilter(ctx, library, plan.Payload)
 	case "search_semantic":
-		if s.search == nil {
-			return nil, errors.New("search unavailable")
+		var payload semanticReplayPayload
+		if err := json.Unmarshal(plan.Payload, &payload); err != nil || payload.Query == "" {
+			return nil, errors.New("invalid semantic replay payload")
 		}
-		ids, _, err := s.search.SearchAssetIDsSemantic(ctx, plan.Params["query"],
-			search.ParseStrictness(plan.Params["strictness"]), ref.MaxSnapshotSize)
-		return ids, err
+		if payload.IndexVersion == "" || plan.EmbeddingIndexVersion != payload.IndexVersion {
+			return nil, errors.New("semantic replay index version mismatch")
+		}
+		ids, meta, err := library.SearchSemantic(ctx, payload.Query, payload.Strictness, ref.MaxSnapshotSize)
+		if err != nil {
+			return nil, err
+		}
+		if meta.ProfileVersion != payload.ProfileVersion ||
+			meta.ModelVersion != payload.ModelVersion ||
+			meta.IndexVersion != payload.IndexVersion ||
+			meta.LanguageVersion != payload.LanguageVersion {
+			return nil, errors.New("semantic replay profile is no longer available")
+		}
+		return ids, nil
 	case "search_text":
-		if s.search == nil {
-			return nil, errors.New("search unavailable")
+		var payload textReplayPayload
+		if err := json.Unmarshal(plan.Payload, &payload); err != nil || payload.Query == "" {
+			return nil, errors.New("invalid OCR replay payload")
 		}
-		return s.search.SearchAssetIDsOCR(ctx, plan.Params["query"], ref.MaxSnapshotSize)
+		return library.SearchOCR(ctx, payload.Query, ref.MaxSnapshotSize)
 	case "search_people":
-		var personIDs []int32
-		for _, part := range strings.Split(plan.Params["person_ids"], ",") {
-			if id, err := strconv.Atoi(strings.TrimSpace(part)); err == nil {
-				personIDs = append(personIDs, int32(id))
-			}
+		var payload peopleReplayPayload
+		if err := json.Unmarshal(plan.Payload, &payload); err != nil || len(payload.PersonIDs) == 0 {
+			return nil, errors.New("invalid people replay payload")
 		}
-		if len(personIDs) == 0 {
-			return nil, errors.New("no person ids in plan")
-		}
-		rows, err := s.queries.GetAssetIDsByPersonIDs(ctx, repo.GetAssetIDsByPersonIDsParams{
-			PersonIds: personIDs,
-			Limit:     ref.MaxSnapshotSize,
-		})
+		rows, err := library.SearchPeople(ctx, payload.PersonIDs, ref.MaxSnapshotSize)
 		if err != nil {
 			return nil, err
 		}
@@ -245,72 +346,107 @@ func (s *Service) replay(ctx context.Context, plan ref.Plan) ([]uuid.UUID, error
 	}
 }
 
-func (s *Service) replayFilter(ctx context.Context, params map[string]string) ([]uuid.UUID, error) {
+func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibrary, raw json.RawMessage) ([]uuid.UUID, error) {
+	var payload filterReplayPayload
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, errors.New("invalid filter replay payload")
+	}
 	q := repo.GetAssetIDsUnifiedParams{Limit: ref.MaxSnapshotSize}
-	if v := params["date_from"]; v != "" {
+	if v := payload.DateFrom; v != "" {
 		if t, err := time.Parse("2006-01-02", v); err == nil {
 			q.DateFrom = pgtype.Timestamptz{Time: t, Valid: true}
 		}
 	}
-	if v := params["date_to"]; v != "" {
+	if v := payload.DateTo; v != "" {
 		if t, err := time.Parse("2006-01-02", v); err == nil {
 			q.DateTo = pgtype.Timestamptz{Time: t.Add(24*time.Hour - time.Nanosecond), Valid: true}
 		}
 	}
-	if v := params["type"]; v != "" {
+	if v := payload.Type; v != "" {
 		assetType := strings.ToUpper(v)
 		q.AssetType = &assetType
 	}
-	if v := params["filename"]; v != "" {
+	if v := payload.Filename; v != "" {
 		operator := "contains"
 		q.FilenameVal = &v
 		q.FilenameOperator = &operator
 	}
-	if v := params["raw"]; v != "" {
-		raw := v == "true"
-		q.IsRaw = &raw
+	if payload.Raw != nil {
+		q.IsRaw = payload.Raw
 	}
-	if v := params["rating"]; v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			rating := int32(n)
-			q.Rating = &rating
-		}
+	if payload.Rating != nil {
+		rating := int32(*payload.Rating)
+		q.Rating = &rating
 	}
-	if v := params["liked"]; v != "" {
-		liked := v == "true"
-		q.Liked = &liked
+	if payload.Liked != nil {
+		q.Liked = payload.Liked
 	}
-	if v := params["place"]; v != "" {
+	if v := payload.Place; v != "" {
 		q.Place = &v
 	}
-	if v := params["camera"]; v != "" {
+	if v := payload.Camera; v != "" {
 		q.CameraModel = &v
 	}
-	if v := params["lens"]; v != "" {
+	if v := payload.Lens; v != "" {
 		q.LensModel = &v
 	}
-	if v := params["album_id"]; v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			albumID := int32(n)
-			q.AlbumID = &albumID
-		}
+	if payload.AlbumID != nil {
+		albumID := int32(*payload.AlbumID)
+		q.AlbumID = &albumID
 	}
-	if v := params["tag_names"]; v != "" {
-		tagNames := make([]string, 0, strings.Count(v, ",")+1)
-		for _, part := range strings.Split(v, ",") {
-			if name := strings.TrimSpace(part); name != "" {
-				tagNames = append(tagNames, name)
-			}
-		}
-		if len(tagNames) > 0 {
-			q.TagNames = tagNames
-		}
+	if len(payload.TagNames) > 0 {
+		q.TagNames = payload.TagNames
 	}
-	rows, err := s.queries.GetAssetIDsUnified(ctx, q)
+	rows, err := library.FilterAssetIDs(ctx, q)
 	if err != nil {
 		return nil, err
 	}
-	return fromPg(rows), nil
+	ids := fromPg(rows)
+	if payload.MinQualityPercentile == nil {
+		return ids, nil
+	}
+	if *payload.MinQualityPercentile < 1 || *payload.MinQualityPercentile > 99 {
+		return nil, errors.New("invalid quality percentile")
+	}
+	scores, err := library.AestheticScores(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	scoreOf := make(map[uuid.UUID]float64, len(scores))
+	values := make([]float64, 0, len(scores))
+	for _, row := range scores {
+		id := uuid.UUID(row.AssetID.Bytes)
+		scoreOf[id] = float64(row.Score)
+		values = append(values, float64(row.Score))
+	}
+	if len(values) == 0 {
+		return nil, nil
+	}
+	sort.Float64s(values)
+	cut := percentileCont(values, *payload.MinQualityPercentile/100)
+	kept := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if score, ok := scoreOf[id]; ok && score >= cut {
+			kept = append(kept, id)
+		}
+	}
+	return kept, nil
+}
+
+func percentileCont(sorted []float64, fraction float64) float64 {
+	if len(sorted) == 1 || fraction <= 0 {
+		return sorted[0]
+	}
+	if fraction >= 1 {
+		return sorted[len(sorted)-1]
+	}
+	position := fraction * float64(len(sorted)-1)
+	low, high := int(math.Floor(position)), int(math.Ceil(position))
+	if low == high {
+		return sorted[low]
+	}
+	weight := position - float64(low)
+	return sorted[low]*(1-weight) + sorted[high]*weight
 }
 
 func fromPg(ids []pgtype.UUID) []uuid.UUID {

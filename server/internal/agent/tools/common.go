@@ -122,3 +122,10 @@ func RegisterAll() {
 	RegisterAddToAlbum()
 	RegisterTagAssets()
 }
+
+func committedReceiptMessage(receipt core.EffectReceipt) string {
+	if receipt.AlreadyCommitted {
+		return receipt.Message + " (already committed)"
+	}
+	return receipt.Message
+}

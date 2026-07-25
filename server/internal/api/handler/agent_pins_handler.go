@@ -4,8 +4,8 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"time"
 
-	"server/internal/agent/facets"
 	"server/internal/agent/pins"
 	"server/internal/agent/ref"
 	"server/internal/api"
@@ -111,15 +111,16 @@ func (h *AgentHandler) GetPin(c *gin.Context) {
 		return
 	}
 
-	pin, ids, err := h.pins.AssetIDs(c.Request.Context(), int32(user.UserID), pinID)
+	pin, ids, hydration, err := h.pins.AssetIDsWithMeta(c.Request.Context(), int32(user.UserID), pinID)
 	if err != nil {
 		api.GinNotFound(c, err, "Pin not found")
 		return
 	}
 
-	facetSummary, err := facets.Build(c.Request.Context(), h.queries, &ref.Ref{
+	facetSummary, err := h.libraries.ForUser(int32(user.UserID)).BuildFacets(c.Request.Context(), &ref.Ref{
 		ID:       pinID.String(),
 		AssetIDs: ids,
+		Scope:    ref.Scope{UserID: int32(user.UserID)},
 	})
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to compute pin facets")
@@ -129,6 +130,9 @@ func (h *AgentHandler) GetPin(c *gin.Context) {
 	out := toAgentPinDTO(pin)
 	out.Count = len(ids)
 	out.Facets = dto.ToAgentRefFacetsDTO(facetSummary)
+	out.HydrationSource = hydration.Source
+	out.FallbackReason = hydration.FallbackReason
+	out.LastSuccessfulRefreshAt = hydration.LastSuccessfulAt
 	api.JSONOK(c, out)
 }
 
@@ -173,22 +177,18 @@ func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 	if offset < len(ids) {
 		end := min(offset+limit, len(ids))
 		page := ids[offset:end]
-		pgIDs := make([]pgtype.UUID, len(page))
-		for i, id := range page {
-			pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-		}
-		rows, err := h.queries.GetAssetsByIDs(c.Request.Context(), pgIDs)
+		rows, err := h.libraries.ForUser(int32(user.UserID)).Assets(c.Request.Context(), page)
 		if err != nil {
-			api.GinInternalError(c, err, "Failed to load pin assets")
+			api.GinNotFound(c, err, "Pin not found")
 			return
 		}
-		byID := make(map[uuid.UUID]repo.Asset, len(rows))
+		byID := make(map[uuid.UUID]dto.AssetDTO, len(rows))
 		for _, row := range rows {
-			byID[uuid.UUID(row.AssetID.Bytes)] = row
+			byID[uuid.UUID(row.AssetID.Bytes)] = dto.ToAssetDTO(row)
 		}
 		for _, id := range page {
 			if row, found := byID[id]; found {
-				assets = append(assets, dto.ToAssetDTO(row))
+				assets = append(assets, row)
 			}
 		}
 	}
@@ -480,6 +480,15 @@ func toAgentPinDTO(pin repo.AgentPin) dto.AgentPinDTO {
 		Layout: dto.AgentPinLayoutDTO{
 			X: int(pin.LayoutX), Y: int(pin.LayoutY), W: int(pin.LayoutW), H: int(pin.LayoutH),
 		},
-		CreatedAt: pin.CreatedAt.Time,
+		CreatedAt:               pin.CreatedAt.Time,
+		LastSuccessfulRefreshAt: pgTimePointer(pin.LastSuccessfulRefreshAt),
 	}
+}
+
+func pgTimePointer(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	t := value.Time
+	return &t
 }
