@@ -62,7 +62,7 @@ func RestoreDump(ctx context.Context, conn Conn, toolsBinDir, dumpPath string, l
 		"--set", "ON_ERROR_STOP=on",
 		"--quiet",
 	)
-	cmd.Env = append(os.Environ(), "PGPASSWORD="+conn.Password)
+	cmd.Env = append(os.Environ(), "PGPASSWORD="+conn.ResolvedPassword())
 	cmd.Stdin = io.MultiReader(strings.NewReader(restorePreamble), dumpReader)
 	cmd.Stdout = io.Discard
 
@@ -92,6 +92,10 @@ type RestoreHooks struct {
 	Quiesce func(ctx context.Context) error
 	// Resume undoes Quiesce. Always attempted, even on failure.
 	Resume func(ctx context.Context) error
+	// Reconnect discards connections terminated by restorePreamble and proves a
+	// fresh application connection can be established before migrations and
+	// health checks run.
+	Reconnect func(ctx context.Context) error
 	// Migrate brings the restored schema up to the running binary's version
 	// (the dump may come from an older app release).
 	Migrate func(ctx context.Context) error
@@ -134,6 +138,11 @@ func RestoreWithRollback(ctx context.Context, conn Conn, toolsBinDir, backupsDir
 	applyAndCheck := func(ctx context.Context, path string) error {
 		if aerr := RestoreDump(ctx, conn, toolsBinDir, path, logf); aerr != nil {
 			return aerr
+		}
+		if hooks.Reconnect != nil {
+			if rerr := hooks.Reconnect(ctx); rerr != nil {
+				return fmt.Errorf("reconnect after restore: %w", rerr)
+			}
 		}
 		if hooks.Migrate != nil {
 			if merr := hooks.Migrate(ctx); merr != nil {
