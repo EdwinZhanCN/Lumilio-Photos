@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/pgvector/pgvector-go"
@@ -51,19 +53,63 @@ func ParseStrictness(raw string) SetStrictness {
 	}
 }
 
-// cosFloor is the minimum cosine similarity an asset must reach to belong to
-// the set. Tuned to siglip2-base's observed scale (present matches ≈0.12–0.15,
-// absent/near-miss ≈0.04–0.09); see the package doc. Loose favors recall,
-// strict favors precision.
-func (s SetStrictness) cosFloor() float64 {
-	switch s {
+// EmbeddingSpaceProfile versions the semantic membership policy separately
+// from tool code. The selected profile is bound to a model/index/language
+// tuple and recorded in SetMeta and replayable Plan IR.
+type EmbeddingSpaceProfile struct {
+	ProfileVersion  string
+	ModelVersion    string
+	IndexVersion    string
+	LanguageVersion string
+	LooseFloor      float64
+	NormalFloor     float64
+	StrictFloor     float64
+}
+
+func (p EmbeddingSpaceProfile) CosFloor(strictness SetStrictness) float64 {
+	switch strictness {
 	case StrictnessLoose:
-		return 0.080
+		return p.LooseFloor
 	case StrictnessStrict:
-		return 0.105
+		return p.StrictFloor
 	default:
-		return 0.090
+		return p.NormalFloor
 	}
+}
+
+func queryLanguageVersion(query string) string {
+	for _, r := range query {
+		if unicode.Is(unicode.Han, r) {
+			return "zh-hans-v1"
+		}
+	}
+	return "en-v1"
+}
+
+// SelectEmbeddingSpaceProfile is deterministic and intentionally explicit:
+// adding or relaxing a threshold requires a new profile version.
+func SelectEmbeddingSpaceProfile(modelVersion, indexVersion, query string) EmbeddingSpaceProfile {
+	language := queryLanguageVersion(query)
+	profile := EmbeddingSpaceProfile{
+		ProfileVersion: "generic-cosine-v1", ModelVersion: modelVersion,
+		IndexVersion: indexVersion, LanguageVersion: language,
+		LooseFloor: 0.080, NormalFloor: 0.090, StrictFloor: 0.105,
+	}
+	if strings.Contains(strings.ToLower(modelVersion), "siglip2") {
+		profile.ProfileVersion = "siglip2-set-v1"
+		if language == "zh-hans-v1" {
+			// SigLIP 2's observed Chinese-query cosine scale is slightly
+			// lower than English for the same image set.
+			profile.LooseFloor = 0.065
+			profile.NormalFloor = 0.075
+			profile.StrictFloor = 0.090
+		}
+	}
+	return profile
+}
+
+func (s SetStrictness) cosFloor() float64 {
+	return SelectEmbeddingSpaceProfile("siglip2-base", "test-index", "english").CosFloor(s)
 }
 
 // SetMeta reports how a set retrieval ran; the agent receipt surfaces it so
@@ -83,6 +129,11 @@ type SetMeta struct {
 	Complete bool
 	// Exact marks the strict full-scan path.
 	Exact bool
+	// Version coordinates make the membership cutoff reproducible.
+	ProfileVersion  string
+	ModelVersion    string
+	IndexVersion    string
+	LanguageVersion string
 }
 
 const setInitialPoolSize = 1000
@@ -103,10 +154,21 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 	}
 	queryVector := pgvector.NewVector(embedding.Vector)
 
+	indexVersion := fmt.Sprintf("embedding-space/%d", space.ID)
+	modelVersion := space.ModelID
+	if modelVersion == "" {
+		modelVersion = embedding.Model
+	}
+	profile := SelectEmbeddingSpaceProfile(modelVersion, indexVersion, req.Query)
+
 	// Membership cutoff: cos ≥ floor ⇔ d ≤ √(2·(1−floor)) for unit vectors.
-	cosFloor := strictness.cosFloor()
+	cosFloor := profile.CosFloor(strictness)
 	cutoff := math.Sqrt(math.Max(0, 2*(1-cosFloor)))
-	meta := SetMeta{Calibrated: true, CosFloor: cosFloor, Cutoff: cutoff}
+	meta := SetMeta{
+		Calibrated: true, CosFloor: cosFloor, Cutoff: cutoff,
+		ProfileVersion: profile.ProfileVersion, ModelVersion: profile.ModelVersion,
+		IndexVersion: profile.IndexVersion, LanguageVersion: profile.LanguageVersion,
+	}
 
 	// First pool fetch anchors the set in nearest-distance order.
 	k := setInitialPoolSize

@@ -9,6 +9,9 @@ export const worker = setupWorker(
   http.get("*/api/v1/auth/csrf", () =>
     HttpResponse.json({ message: "no refresh-cookie session" }, { status: 401 }),
   ),
+  // The authenticated application shell can request roots independently of a
+  // feature under test. Specs that exercise root selection override this.
+  http.get("*/api/v1/repository-roots", () => HttpResponse.json({ roots: [] })),
 );
 
 export { http, HttpResponse };

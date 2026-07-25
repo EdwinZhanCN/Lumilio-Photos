@@ -6,13 +6,14 @@
  * disclosure). Empty-state quick-asks serve the same function in chip form. */
 
 import { useI18n } from "@/lib/i18n";
+import type { AgentMode } from "../../model/chatTypes";
 
 export interface SlashMacro {
   id: string;
   label: string;
   description: string;
   template: string;
-  mode: string;
+  mode: Exclude<AgentMode, "free">;
 }
 
 export function useSlashMacros(): SlashMacro[] {

@@ -4,7 +4,7 @@ import {
   applyInterrupt,
   applySideEvent,
   assistantMessage,
-  finishStream,
+  cancelActiveBlocks,
   resolveConfirm,
   userMessage,
 } from "./blocks";
@@ -29,22 +29,6 @@ describe("applyChunk", () => {
     const blocks = messages[1].blocks;
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toMatchObject({ kind: "text", markdown: "Hello world" });
-  });
-
-  it("closes the reasoning block when output starts", () => {
-    let messages = conversation();
-    messages = applyChunk(messages, { reasoning: "thinking..." });
-    messages = applyChunk(messages, { reasoning: " more" });
-    messages = applyChunk(messages, { output: "Answer" });
-
-    const blocks = messages[1].blocks;
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0]).toMatchObject({
-      kind: "reasoning",
-      text: "thinking... more",
-    });
-    expect((blocks[0] as { durationS?: number }).durationS).toBeDefined();
-    expect(blocks[1]).toMatchObject({ kind: "text", markdown: "Answer" });
   });
 
   it("ignores chunks when the last message is not an assistant", () => {
@@ -129,13 +113,15 @@ describe("interrupts", () => {
   });
 });
 
-describe("finishStream", () => {
-  it("stamps duration on a dangling reasoning block", () => {
+describe("cancelActiveBlocks", () => {
+  it("preserves partial output and marks unfinished work stopped", () => {
     let messages = conversation();
-    messages = applyChunk(messages, { reasoning: "hmm" });
-    messages = finishStream(messages);
+    messages = applyChunk(messages, { output: "Partial answer" });
+    messages = applySideEvent(messages, toolEvent());
+    messages = cancelActiveBlocks(messages);
 
-    const block = messages[1].blocks[0] as { durationS?: number };
-    expect(block.durationS).toBeDefined();
+    expect(messages[1].status).toBe("stopped");
+    expect(messages[1].blocks[0]).toMatchObject({ kind: "text", markdown: "Partial answer" });
+    expect(messages[1].blocks[1]).toMatchObject({ kind: "tool", status: "cancelled" });
   });
 });

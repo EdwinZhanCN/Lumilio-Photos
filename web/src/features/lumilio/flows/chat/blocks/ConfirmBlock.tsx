@@ -1,10 +1,7 @@
 import { ShieldQuestion } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useLumilioChatStore } from "../../../state/chatStore";
-import type {
-  ConfirmationInfo,
-  ConfirmBlock as ConfirmBlockData,
-} from "../../../model/chatTypes";
+import type { ConfirmationInfo, ConfirmBlock as ConfirmBlockData } from "../../../model/chatTypes";
 
 interface ConfirmBlockProps {
   block: ConfirmBlockData;
@@ -53,7 +50,9 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
         <div className="text-xs text-base-content/50">
           {resolved === "approved"
             ? t("lumilio.chat.confirmation.approved", "Confirmed")
-            : t("lumilio.chat.confirmation.rejected", "Cancelled")}
+            : resolved === "cancelled"
+              ? t("lumilio.messages.stopped", "Stopped")
+              : t("lumilio.chat.confirmation.rejected", "Cancelled")}
         </div>
       ) : (
         <div className="flex gap-2 mt-2">

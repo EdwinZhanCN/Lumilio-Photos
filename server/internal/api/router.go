@@ -167,6 +167,7 @@ type StatsControllerInterface interface {
 type AgentControllerInterface interface {
 	Chat(c *gin.Context)            // POST /agent/chat - Chat with agent via SSE
 	ResumeChat(c *gin.Context)      // POST /agent/chat/resume - Resume an interrupted agent execution
+	CancelChat(c *gin.Context)      // POST /agent/chat/cancel - Cancel one exact run
 	GetTools(c *gin.Context)        // GET /agent/tools - Get available tools
 	GetRef(c *gin.Context)          // GET /agent/refs/:id - Get ref metadata with facets
 	GetRefAssets(c *gin.Context)    // GET /agent/refs/:id/assets - Hydrate a ref page in snapshot order
@@ -584,6 +585,7 @@ func NewRouter(
 		{
 			agent.POST("/chat", agentController.Chat)
 			agent.POST("/chat/resume", agentController.ResumeChat)
+			agent.POST("/chat/cancel", agentController.CancelChat)
 			agent.GET("/tools", agentController.GetTools)
 			agent.GET("/refs/:id", agentController.GetRef)
 			agent.GET("/refs/:id/assets", agentController.GetRefAssets)

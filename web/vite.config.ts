@@ -1,4 +1,4 @@
-import { defineConfig } from "vite-plus";
+import { defineConfig, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { docts } from "@edwinzhancn/docts/vite";
@@ -7,6 +7,31 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const entryChunkBudget = 1300 * 1024;
+const lazyChunkBudget = 650 * 1024;
+const lazyChunkExceptions = [{ prefix: "emacs-lisp-", budget: 800 * 1024 }];
+
+const enforceChunkBudgets: Plugin = {
+  name: "enforce-chunk-budgets",
+  generateBundle(_options, bundle) {
+    for (const output of Object.values(bundle)) {
+      if (output.type !== "chunk") continue;
+
+      const exception = lazyChunkExceptions.find(({ prefix }) =>
+        output.fileName.startsWith(`assets/${prefix}`),
+      );
+      const budget = output.isEntry ? entryChunkBudget : (exception?.budget ?? lazyChunkBudget);
+      const bytes = new TextEncoder().encode(output.code).byteLength;
+      if (bytes > budget) {
+        this.error(
+          `${output.fileName} is ${(bytes / 1024).toFixed(1)} KiB; ` +
+            `its reviewed chunk budget is ${(budget / 1024).toFixed(0)} KiB`,
+        );
+      }
+    }
+  },
+};
 
 const hashPerformanceEnabled = process.env.VITEST_HASH_PERF === "true";
 // Headless Chromium falls back to SwiftShader, whose WebGL is disabled on Apple
@@ -109,6 +134,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@test": path.resolve(__dirname, "./test"),
+      "node:fs/promises": path.resolve(__dirname, "./src/shims/nodeFsPromises.browser.ts"),
     },
   },
   server: {
@@ -124,10 +150,14 @@ export default defineConfig({
       "Cross-Origin-Embedder-Policy": "credentialless",
     },
   },
-  plugins: [react(), tailwindcss(), docts({ root: "src" })],
+  plugins: [react(), tailwindcss(), docts({ root: "src" }), enforceChunkBudgets],
 
   build: {
     target: "esnext",
+    // Generic Vite warnings use the reviewed entry ceiling; enforceChunkBudgets
+    // applies tighter limits to every lazy chunk and an explicit syntax-chunk
+    // exception, so raising this threshold does not hide future regressions.
+    chunkSizeWarningLimit: 1300,
   },
 
   worker: {

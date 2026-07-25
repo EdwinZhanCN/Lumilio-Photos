@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { Markdown } from "./markdown/Markdown";
-import { ReasoningBlock } from "./blocks/ReasoningBlock";
 import { ToolCallBlock } from "./blocks/ToolCallBlock";
 import { ConfirmBlock } from "./blocks/ConfirmBlock";
 import { InlineWidgetCard } from "../../modules/widgets/chrome/InlineWidgetCard";
@@ -23,8 +22,6 @@ function BlockView({ block, isAnimating = false }: { block: Block; isAnimating?:
           className="text-base leading-relaxed text-base-content"
         />
       );
-    case "reasoning":
-      return <ReasoningBlock block={block} />;
     case "tool":
       return <ToolCallBlock block={block} />;
     case "widget":
@@ -87,6 +84,11 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
             {message.blocks.map((block) => (
               <BlockView key={block.id} block={block} isAnimating={isGenerating && isLastMessage} />
             ))}
+            {message.status === "stopped" && (
+              <div className="mt-2 text-xs font-medium text-base-content/45">
+                {t("lumilio.messages.stopped", "Stopped")}
+              </div>
+            )}
           </div>
         );
       })}

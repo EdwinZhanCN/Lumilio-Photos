@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import init, { StreamingHasher } from "../wasm/blake3/blake3_wasm";
+import type { StreamingHasher } from "../wasm/blake3/blake3_wasm";
 
 // --- Constants (Matching Backend) ---
 const QUICK_HASH_THRESHOLD = 100 * 1024 * 1024; // 100 MB
@@ -21,14 +21,19 @@ export interface SingleHashPayload {
 
 // --- Initialization Control ---
 let initializationPromise: Promise<void> | null = null;
+let StreamingHasherClass: (new () => StreamingHasher) | null = null;
 
 async function initialize(): Promise<void> {
   if (initializationPromise) return initializationPromise;
 
   initializationPromise = (async () => {
     try {
+      const wasm = await import("../wasm/blake3/blake3_wasm");
       // Pass the URL to the WASM file explicitly to ensure it's loaded correctly in workers
-      await init(new URL("../wasm/blake3/blake3_wasm_bg.wasm", import.meta.url));
+      await wasm.default({
+        module_or_path: new URL("../wasm/blake3/blake3_wasm_bg.wasm", import.meta.url),
+      });
+      StreamingHasherClass = wasm.StreamingHasher;
       self.postMessage({ type: "WASM_READY" });
     } catch (error: unknown) {
       const errMsg = (error as Error).message ?? "Unknown worker error";
@@ -40,12 +45,17 @@ async function initialize(): Promise<void> {
   return initializationPromise;
 }
 
+function createStreamingHasher(): StreamingHasher {
+  if (!StreamingHasherClass) throw new Error("BLAKE3 WASM is not initialized");
+  return new StreamingHasherClass();
+}
+
 async function calculateQuickHash(
   file: File,
   signal: AbortSignal,
   chunkSize: number,
 ): Promise<string> {
-  const hasher = new StreamingHasher();
+  const hasher = createStreamingHasher();
   const sizeBuf = new ArrayBuffer(8);
   const sizeView = new DataView(sizeBuf);
   sizeView.setBigUint64(0, BigInt(file.size), true);
@@ -70,7 +80,7 @@ async function calculateFullHash(
   signal: AbortSignal,
   chunkSize: number,
 ): Promise<string> {
-  const hasher = new StreamingHasher();
+  const hasher = createStreamingHasher();
   let offset = 0;
   while (offset < file.size) {
     if (signal.aborted) throw new Error("Aborted");

@@ -1,4 +1,4 @@
-import { BadgeCheck, Hammer, Loader, TriangleAlert, X } from "lucide-react";
+import { BadgeCheck, Ban, Hammer, Loader, TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { ToolBlock } from "../../../model/chatTypes";
@@ -20,15 +20,19 @@ export function ToolCallBlock({ block }: ToolCallBlockProps) {
   const accent =
     block.status === "error"
       ? "border-error/30 text-error"
-      : isEmptyResult
-        ? "border-warning/40 text-warning"
-        : block.status === "success"
-          ? "border-success/30 text-success"
-          : "border-info/30 text-info";
+      : block.status === "cancelled"
+        ? "border-base-300 text-base-content/55"
+        : isEmptyResult
+          ? "border-warning/40 text-warning"
+          : block.status === "success"
+            ? "border-success/30 text-success"
+            : "border-info/30 text-info";
 
   const summary = isEmptyResult
     ? t("lumilio.tools.emptyResult", "No matching photos")
-    : (block.message ?? block.error?.message);
+    : block.status === "cancelled"
+      ? t("lumilio.tools.cancelled", "Stopped")
+      : (block.message ?? block.error?.message);
 
   return (
     <div className="my-2">
@@ -46,6 +50,7 @@ export function ToolCallBlock({ block }: ToolCallBlockProps) {
             <BadgeCheck className="flex-shrink-0" size={13} />
           ))}
         {block.status === "error" && <X className="flex-shrink-0" size={13} />}
+        {block.status === "cancelled" && <Ban className="flex-shrink-0" size={13} />}
         {summary && (
           <span className="min-w-0 truncate text-left text-base-content/50 ml-0.5">{summary}</span>
         )}

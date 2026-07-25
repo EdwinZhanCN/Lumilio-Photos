@@ -20,6 +20,7 @@ import { useLumilioChatStore } from "../../state/chatStore";
 import { useContextStore, useDockStore } from "@/lib/assistant";
 import { useSlashMacros } from "../../modules/slash/slashMacros";
 import type { MentionPayload } from "../../modules/mentions/mentionSources";
+import type { AgentMode } from "../../model/chatTypes";
 import { MentionInput } from "./MentionInput";
 import { ContextChips } from "./ContextChips";
 
@@ -54,7 +55,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   // Sticky agent mode: set once (empty-state chip, "/" menu, or Plus button),
   // kept across turns until the user clears it. Single source of truth for the
   // tool-subset constraint sent with every message.
-  const [activeMode, setActiveMode] = useState<string | null>(null);
+  const [activeMode, setActiveMode] = useState<Exclude<AgentMode, "free"> | null>(null);
   const collapsedOverride = useDockStore((s) => s.collapsedOverride);
   const setCollapsedOverride = useDockStore((s) => s.setCollapsed);
   const setGenerating = useDockStore((s) => s.setGenerating);
@@ -76,6 +77,8 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   const messages = useLumilioChatStore((s) => s.messages);
   const isGenerating = useLumilioChatStore((s) => s.isGenerating);
+  const isStopping = useLumilioChatStore((s) => s.isStopping);
+  const awaitingConfirmation = useLumilioChatStore((s) => s.awaitingConfirmation);
 
   useEffect(() => {
     setGenerating(isGenerating);
@@ -84,6 +87,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const usage = useLumilioChatStore((s) => s.usage);
   const sendMessage = useLumilioChatStore((s) => s.sendMessage);
   const newConversation = useLumilioChatStore((s) => s.newConversation);
+  const stopGeneration = useLumilioChatStore((s) => s.stopGeneration);
   const { capabilities } = useCapabilities(5000);
   const replyCount = messages.filter(
     (message) => message.role === "assistant" && message.blocks.length > 0,
@@ -117,7 +121,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
       void sendMessage(value, {
         context: snapshotForSend(),
         mentions,
-        mode: activeMode ?? undefined,
+        mode: activeMode ?? "free",
       });
       clearExclusions();
     },
@@ -193,7 +197,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           title={t("lumilio.chat.newConversation", "New conversation")}
           onClick={(event) => {
             event.stopPropagation();
-            newConversation();
+            void newConversation();
           }}
         >
           <RotateCcw size={18} strokeWidth={1.8} />
@@ -305,11 +309,14 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
       <ContextChips contributions={activeContributions} leading={modePill} />
       <MentionInput
         isGenerating={isGenerating}
+        awaitingConfirmation={awaitingConfirmation}
+        isStopping={isStopping}
         disabled={Boolean(agentDisabledReason)}
         placeholder={agentDisabledReason ?? undefined}
         activeMode={activeMode}
         onSetMode={setActiveMode}
         onSubmit={handleSubmit}
+        onStop={() => void stopGeneration()}
       />
     </>
   );

@@ -7,7 +7,6 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -50,11 +49,7 @@ func RegisterLookupAlbums() {
 			if input.TitleQuery != "" {
 				titleQuery = &input.TitleQuery
 			}
-			rows, err := deps.Queries.AgentLookupAlbums(ctx, repo.AgentLookupAlbumsParams{
-				UserID:     deps.UserID,
-				TitleQuery: titleQuery,
-				Limit:      maxLookupResults,
-			})
+			rows, err := deps.Library.LookupAlbums(ctx, titleQuery, maxLookupResults)
 			if err != nil {
 				refErr := ref.Internal("album lookup")
 				sendError(deps, info.Name, execID, start, refErr)

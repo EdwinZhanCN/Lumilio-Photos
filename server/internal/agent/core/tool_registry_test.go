@@ -15,6 +15,7 @@ func newTestRegistry() *ToolRegistry {
 	r := &ToolRegistry{
 		factories: make(map[string]ToolFactory),
 		infos:     make(map[string]*schema.ToolInfo),
+		effects:   make(map[string]EffectPolicy),
 	}
 	names := map[string]bool{
 		// free-mode-only tools (in no mode set) to prove they get filtered out
@@ -99,12 +100,12 @@ func TestModeHasTool(t *testing.T) {
 
 func TestBuildInstructionGatesToolMentions(t *testing.T) {
 	// curate excludes tag_assets → no ORGANIZING/tag_assets guidance.
-	curate := buildInstruction("Mon, 2026-01-01", nil, "curate")
+	curate := buildInstruction("Mon, 2026-01-01", false, "curate")
 	if strings.Contains(curate, "tag_assets") {
 		t.Error("curate instruction must not mention tag_assets")
 	}
 	// organize includes tag_assets → guidance present.
-	organize := buildInstruction("Mon, 2026-01-01", nil, "organize")
+	organize := buildInstruction("Mon, 2026-01-01", false, "organize")
 	if !strings.Contains(organize, "tag_assets") {
 		t.Error("organize instruction should mention tag_assets")
 	}
@@ -129,5 +130,21 @@ func TestModeInstruction(t *testing.T) {
 		if !strings.HasPrefix(got, "\n") {
 			t.Errorf("mode %q: instruction should be newline-prefixed for appending", mode)
 		}
+	}
+}
+
+func TestExplicitAgentModesAndCheckpointScope(t *testing.T) {
+	for _, mode := range []string{"free", "review", "organize", "analyze", "curate"} {
+		if !IsValidMode(mode) {
+			t.Errorf("mode %q should be valid", mode)
+		}
+	}
+	for _, mode := range []string{"", "unknown", "FREE"} {
+		if IsValidMode(mode) {
+			t.Errorf("mode %q should be rejected", mode)
+		}
+	}
+	if a, b := CheckpointKey(1, "same"), CheckpointKey(2, "same"); a == b {
+		t.Fatalf("checkpoint keys collide across users: %q", a)
 	}
 }

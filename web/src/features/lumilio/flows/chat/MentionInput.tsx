@@ -17,6 +17,7 @@ import {
   AtSign,
   Sparkles,
   ChevronRight,
+  Square,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -31,6 +32,7 @@ import {
   type MentionType,
 } from "../../modules/mentions/mentionSources";
 import { useSlashMacros, type SlashMacro } from "../../modules/slash/slashMacros";
+import type { AgentMode } from "../../model/chatTypes";
 
 const MAX_TEXTAREA_HEIGHT = 140;
 
@@ -84,22 +86,28 @@ function activeTrigger(
 
 type MentionInputProps = {
   isGenerating: boolean;
+  awaitingConfirmation: boolean;
+  isStopping: boolean;
   disabled?: boolean;
   placeholder?: string;
   /** Sticky agent mode owned by the parent (null = free mode). */
-  activeMode: string | null;
+  activeMode: Exclude<AgentMode, "free"> | null;
   /** Set/clear the sticky mode (e.g. picking a quick action). */
-  onSetMode: (mode: string | null) => void;
+  onSetMode: (mode: Exclude<AgentMode, "free"> | null) => void;
   onSubmit: (query: string, mentions: MentionPayload[]) => void;
+  onStop: () => void;
 };
 
 export function MentionInput({
   isGenerating,
+  awaitingConfirmation,
+  isStopping,
   disabled = false,
   placeholder,
   activeMode,
   onSetMode,
   onSubmit,
+  onStop,
 }: MentionInputProps) {
   const { t } = useI18n();
   const SLASH_MACROS = useSlashMacros();
@@ -267,13 +275,13 @@ export function MentionInput({
 
   const submit = useCallback(() => {
     const text = value.replace(/\s+/g, " ").trim();
-    if (!text || disabled || isGenerating) return;
+    if (!text || disabled || isGenerating || awaitingConfirmation) return;
     const kept = mentions.filter((m) => value.includes(`@${m.label}`));
     onSubmit(text, kept);
     setValue("");
     setMentions([]);
     setMenu({ kind: "idle" });
-  }, [value, mentions, disabled, isGenerating, onSubmit]);
+  }, [value, mentions, disabled, isGenerating, awaitingConfirmation, onSubmit]);
 
   const choose = useCallback(
     (item: MenuItem) => {
@@ -386,7 +394,8 @@ export function MentionInput({
         ? mentionTypes.find((m) => m.type === menu.activeType)?.label
         : t("lumilio.mention.mention", "Mention");
 
-  const canSend = !disabled && !isGenerating && value.trim().length > 0;
+  const canStop = isGenerating || awaitingConfirmation;
+  const canSend = !disabled && !canStop && value.trim().length > 0;
 
   return (
     <div className="relative">
@@ -520,13 +529,20 @@ export function MentionInput({
           </button>
           <button
             type="button"
-            className="btn btn-primary btn-sm btn-circle ml-auto"
-            aria-label={t("lumilio.input.send", "Send")}
-            disabled={!canSend}
-            onClick={submit}
+            className={`btn btn-sm btn-circle ml-auto ${canStop ? "" : "btn-primary"}`}
+            aria-label={
+              canStop ? t("lumilio.input.stop", "Stop generation") : t("lumilio.input.send", "Send")
+            }
+            title={
+              canStop ? t("lumilio.input.stop", "Stop generation") : t("lumilio.input.send", "Send")
+            }
+            disabled={canStop ? isStopping : !canSend}
+            onClick={canStop ? onStop : submit}
           >
-            {isGenerating ? (
+            {isStopping ? (
               <span className="loading loading-spinner loading-xs" />
+            ) : canStop ? (
+              <Square size={14} strokeWidth={2} fill="currentColor" />
             ) : (
               <Send size={16} strokeWidth={1.8} />
             )}

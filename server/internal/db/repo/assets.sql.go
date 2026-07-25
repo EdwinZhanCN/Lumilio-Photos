@@ -1417,6 +1417,68 @@ func (q *Queries) GetAssetsByIDsAny(ctx context.Context, assetIds []pgtype.UUID)
 	return items, nil
 }
 
+const getAssetsByIDsForOwner = `-- name: GetAssetsByIDsForOwner :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND owner_id = $2::integer
+  AND is_deleted = false
+`
+
+type GetAssetsByIDsForOwnerParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	OwnerID  int32         `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDsForOwnerParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByIDsForOwner, arg.AssetIds, arg.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.ContentHash,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
+			&i.ExifRaw,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetsByOwner = `-- name: GetAssetsByOwner :many
 SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE owner_id = $1 AND is_deleted = false
@@ -2683,6 +2745,38 @@ func (q *Queries) GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWa
 	return items, nil
 }
 
+const getAuthorizedAssetIDs = `-- name: GetAuthorizedAssetIDs :many
+SELECT asset_id FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND owner_id = $2::integer
+  AND is_deleted = false
+`
+
+type GetAuthorizedAssetIDsParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	OwnerID  int32         `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetAuthorizedAssetIDs(ctx context.Context, arg GetAuthorizedAssetIDsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, getAuthorizedAssetIDs, arg.AssetIds, arg.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var asset_id pgtype.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCollapsedBrowseItemsUnified = `-- name: GetCollapsedBrowseItemsUnified :many
 WITH filtered AS MATERIALIZED (
   SELECT
@@ -3615,6 +3709,39 @@ func (q *Queries) ListAssetsByRepositoryAny(ctx context.Context, repositoryID pg
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockAuthorizedAssetIDs = `-- name: LockAuthorizedAssetIDs :many
+SELECT asset_id FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND owner_id = $2::integer
+  AND is_deleted = false
+FOR UPDATE
+`
+
+type LockAuthorizedAssetIDsParams struct {
+	AssetIds []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	OwnerID  int32         `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) LockAuthorizedAssetIDs(ctx context.Context, arg LockAuthorizedAssetIDsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, lockAuthorizedAssetIDs, arg.AssetIds, arg.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var asset_id pgtype.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

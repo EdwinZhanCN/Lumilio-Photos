@@ -14,7 +14,7 @@ import (
 const createAgentPin = `-- name: CreateAgentPin :one
 INSERT INTO agent_pins (user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at
+RETURNING pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at
 `
 
 type CreateAgentPinParams struct {
@@ -64,6 +64,7 @@ func (q *Queries) CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) 
 		&i.LayoutH,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastSuccessfulRefreshAt,
 	)
 	return i, err
 }
@@ -84,7 +85,7 @@ func (q *Queries) DeleteAgentPin(ctx context.Context, arg DeleteAgentPinParams) 
 }
 
 const getAgentPin = `-- name: GetAgentPin :one
-SELECT pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at FROM agent_pins
+SELECT pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at FROM agent_pins
 WHERE pin_id = $1 AND user_id = $2
 `
 
@@ -112,12 +113,13 @@ func (q *Queries) GetAgentPin(ctx context.Context, arg GetAgentPinParams) (Agent
 		&i.LayoutH,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastSuccessfulRefreshAt,
 	)
 	return i, err
 }
 
 const listAgentPins = `-- name: ListAgentPins :many
-SELECT pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at FROM agent_pins
+SELECT pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at FROM agent_pins
 WHERE user_id = $1
 ORDER BY created_at ASC
 `
@@ -147,6 +149,7 @@ func (q *Queries) ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, 
 			&i.LayoutH,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastSuccessfulRefreshAt,
 		); err != nil {
 			return nil, err
 		}
@@ -156,6 +159,24 @@ func (q *Queries) ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, 
 		return nil, err
 	}
 	return items, nil
+}
+
+const touchAgentPinLiveRefresh = `-- name: TouchAgentPinLiveRefresh :exec
+UPDATE agent_pins
+SET last_successful_refresh_at = $3,
+    updated_at = NOW()
+WHERE pin_id = $1 AND user_id = $2
+`
+
+type TouchAgentPinLiveRefreshParams struct {
+	PinID                   pgtype.UUID        `db:"pin_id" json:"pin_id"`
+	UserID                  int32              `db:"user_id" json:"user_id"`
+	LastSuccessfulRefreshAt pgtype.Timestamptz `db:"last_successful_refresh_at" json:"last_successful_refresh_at"`
+}
+
+func (q *Queries) TouchAgentPinLiveRefresh(ctx context.Context, arg TouchAgentPinLiveRefreshParams) error {
+	_, err := q.db.Exec(ctx, touchAgentPinLiveRefresh, arg.PinID, arg.UserID, arg.LastSuccessfulRefreshAt)
+	return err
 }
 
 const updateAgentPinLayout = `-- name: UpdateAgentPinLayout :exec

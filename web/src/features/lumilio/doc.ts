@@ -12,10 +12,11 @@
  * Feature-local interactive state and the shared assistant surface use three
  * small Zustand stores with explicit ownership:
  *
- * - {@link useLumilioChatStore} owns the thread id, streamed message blocks,
- *   generation/error state, confirmation interrupts, token usage, and the
- *   send/resume/new-conversation commands. Its session reset aborts the active
- *   SSE request before clearing the conversation.
+ * - {@link useLumilioChatStore} owns the thread id, active run id, streamed
+ *   message blocks, generation/stopping/error state, confirmation interrupts,
+ *   token usage, and the send/resume/stop/new-conversation commands. Stop is a
+ *   server operation: it calls {@link cancelAgentRun} with the exact
+ *   `(thread_id, run_id)` before aborting the local SSE transport.
  * - The lower-level {@link useContextStore} is the cross-surface context bus. Contributors
  *   register current asset selections or carousel viewing context, and
  *   {@link ContextChips} lets the user exclude a contribution before send.
@@ -29,11 +30,21 @@
  * ## Data
  *
  * {@link streamAgent} opens authenticated SSE streams to `/api/v1/agent/chat`
- * and `/api/v1/agent/chat/resume`. The stream emits typed chat blocks:
- * {@link TextBlock}, {@link ReasoningBlock}, {@link ToolBlock},
- * {@link WidgetBlock}, and {@link ConfirmBlock}. Tool status, widgets, and
- * token usage arrive through {@link SideChannelEvent}; an interrupt becomes a
- * confirmation card and resumes through the same store.
+ * and `/api/v1/agent/chat/resume`. Every request sends an explicit mode
+ * (`free` for the unconstrained tool set). `session_info` binds the stream to a
+ * fresh run id and `run_status` carries {@link AgentRunStatus}. Product SSE
+ * contains assistant text only—provider reasoning is never accepted into the
+ * public stream contract. Assistant chunks become {@link TextBlock}; tool
+ * status and widgets arrive through {@link SideChannelEvent} and become
+ * {@link ToolBlock} / {@link WidgetBlock}. An interrupt becomes a
+ * {@link ConfirmBlock} and resumes through the same store.
+ *
+ * {@link cancelActiveBlocks} preserves partial assistant text after Stop,
+ * marks unfinished tools `cancelled`, disables an unresolved confirmation, and
+ * marks the turn as stopped. {@link MentionInput} reuses its primary action
+ * slot as a Stop button while a run is generating or awaiting confirmation.
+ * `newConversation` waits for that cancellation request before clearing local
+ * state; collapsing or closing the dock never cancels.
  *
  * The stream side channel passes handles, not full asset payloads:
  * {@link RefPayload} carries a ref id, count, widget hint, and params. Inline
@@ -59,6 +70,7 @@
  *     DOCK --> CHIPS["ContextChips"]
  *     DOCK --> MESSAGES["ChatMessages"]
  *     INPUT --> STORE["useLumilioChatStore"]
+ *     STORE --> CANCEL["cancelAgentRun"]
  *     CHIPS --> CTX["useContextStore"]
  *     GALLERY["useBrowseSelectionContext"] --> CTX
  *     CAROUSEL["useViewerContextContributor"] --> CTX
@@ -86,7 +98,8 @@
  * exclusions are cleared after sending so the next message starts from the
  * current page context rather than a hidden stale exclusion.
  * {@link resetLumilioSession} is the feature reset exposed to application
- * composition. It clears the chat store and shared context bus so conversation,
+ * composition. It starts a best-effort server cancellation before closing the
+ * transport, then clears the chat store and shared context bus so conversation,
  * contributions, and exclusions never cross a user boundary.
  *
  * Pins are the durability boundary. Chat widgets are session refs; pinning
@@ -108,17 +121,18 @@ import type { MentionInput } from "./flows/chat/MentionInput.tsx";
 import type { InlineWidgetCard } from "./modules/widgets/chrome/InlineWidgetCard.tsx";
 import type { BoardTile } from "./modules/widgets/chrome/BoardTile.tsx";
 import type { PinButton } from "./modules/widgets/PinButton.tsx";
-import type { streamAgent } from "./api/agentStream.ts";
+import type { cancelAgentRun, streamAgent } from "./api/agentStream.ts";
 import type { createMentionSources, MentionPayload } from "./modules/mentions/mentionSources.ts";
 import type { useSlashMacros } from "./modules/slash/slashMacros.ts";
 import type { useLumilioChatStore } from "./state/chatStore.ts";
+import type { cancelActiveBlocks } from "./state/blocks.ts";
 import type { useContextStore, useDockStore } from "@/lib/assistant/index.ts";
 import type { useBrowseSelectionContext } from "@/features/assets/flows/browse/useBrowseSelectionContext.ts";
 import type { useViewerContextContributor } from "@/features/assets/flows/viewer/useViewerContextContributor.ts";
 import type { resetLumilioSession } from "./state/resetSession.ts";
 import type {
   ConfirmBlock,
-  ReasoningBlock,
+  AgentRunStatus,
   RefPayload,
   SideChannelEvent,
   TextBlock,
