@@ -1,20 +1,20 @@
 // Package inject materializes ask-time context and mention bindings into the
-// session ref ledger and instruction extras. Asset data never crosses the LLM
-// boundary — only receipts and sanitized labels (INV-1, INV-7).
+// session ref ledger and a fixed-schema, explicitly untrusted data message.
+// Asset data never crosses the LLM boundary (INV-1, INV-7).
 package inject
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"server/internal/agent/core"
 	"server/internal/agent/pins"
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // ContextItem is one user-attached context chip from the frontend.
@@ -40,15 +40,28 @@ type DroppedMention struct {
 	Reason string `json:"reason"`
 }
 
-// PrepareResult holds instruction extras and metadata for the chat response.
+// PrepareResult holds the low-trust synthetic data and response metadata.
 type PrepareResult struct {
-	InstructionExtras string
-	DroppedMentions   []DroppedMention
+	SyntheticData   string
+	DroppedMentions []DroppedMention
+}
+
+type syntheticRefBinding struct {
+	RefID       string `json:"ref_id"`
+	ContextType string `json:"context_type"`
+	Label       string `json:"label"`
+	Count       int    `json:"count"`
+}
+
+type syntheticEntityBinding struct {
+	Type  string `json:"type"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
 }
 
 // Dependencies for ask-time injection.
 type Dependencies struct {
-	Queries  *repo.Queries
+	Library  *core.AuthorizedLibrary
 	RefStore ref.Store
 	Pins     *pins.Service
 	UserID   int32
@@ -59,52 +72,53 @@ type Dependencies struct {
 func Prepare(ctx context.Context, deps Dependencies, contextItems []ContextItem, mentionItems []MentionItem) (PrepareResult, error) {
 	scope := ref.Scope{UserID: deps.UserID, ThreadID: deps.ThreadID}
 
-	var contextLines []string
+	var refBindings []syntheticRefBinding
 	for _, item := range contextItems {
-		line, err := materializeContext(ctx, deps, scope, item)
+		binding, err := materializeContext(ctx, deps, scope, item)
 		if err != nil {
 			return PrepareResult{}, err
 		}
-		if line != "" {
-			contextLines = append(contextLines, line)
+		if binding.RefID != "" {
+			refBindings = append(refBindings, binding)
 		}
 	}
 
-	var boundLines []string
+	var entityBindings []syntheticEntityBinding
 	var dropped []DroppedMention
 	for _, m := range mentionItems {
 		switch strings.ToLower(strings.TrimSpace(m.Type)) {
 		case "person":
-			line, drop := materializePersonMention(ctx, deps, m)
-			if line != "" {
-				boundLines = append(boundLines, line)
+			binding, drop := materializePersonMention(ctx, deps, m)
+			if binding != nil {
+				entityBindings = append(entityBindings, *binding)
 			}
 			if drop != nil {
 				dropped = append(dropped, *drop)
 			}
 		case "album":
-			line, drop := materializeAlbumMention(ctx, deps, m)
-			if line != "" {
-				boundLines = append(boundLines, line)
+			binding, drop := materializeAlbumMention(ctx, deps, m)
+			if binding != nil {
+				entityBindings = append(entityBindings, *binding)
 			}
 			if drop != nil {
 				dropped = append(dropped, *drop)
 			}
 		case "pin":
-			if err := materializePinMention(ctx, deps, scope, m); err != nil {
+			binding, err := materializePinMention(ctx, deps, scope, m)
+			if err != nil {
 				dropped = append(dropped, DroppedMention{
 					Type: m.Type, ID: m.ID, Label: m.Label, Reason: "not_found",
 				})
+			} else if binding != nil {
+				refBindings = append(refBindings, *binding)
 			}
 		case "camera":
-			line := materializeStringMention("camera", m)
-			if line != "" {
-				boundLines = append(boundLines, line)
+			if binding := materializeStringMention("camera", m); binding != nil {
+				entityBindings = append(entityBindings, *binding)
 			}
 		case "lens":
-			line := materializeStringMention("lens", m)
-			if line != "" {
-				boundLines = append(boundLines, line)
+			if binding := materializeStringMention("lens", m); binding != nil {
+				entityBindings = append(entityBindings, *binding)
 			}
 		default:
 			dropped = append(dropped, DroppedMention{
@@ -113,23 +127,31 @@ func Prepare(ctx context.Context, deps Dependencies, contextItems []ContextItem,
 		}
 	}
 
+	synthetic, err := json.Marshal(map[string]any{
+		"schema":         "agent-context/v1",
+		"trust":          "untrusted_data",
+		"attached_refs":  refBindings,
+		"bound_entities": entityBindings,
+	})
+	if err != nil {
+		return PrepareResult{}, err
+	}
 	return PrepareResult{
-		InstructionExtras: FormatInstructionExtras(contextLines, boundLines),
-		DroppedMentions:   dropped,
+		SyntheticData: string(synthetic), DroppedMentions: dropped,
 	}, nil
 }
 
-func materializeContext(ctx context.Context, deps Dependencies, scope ref.Scope, item ContextItem) (string, error) {
+func materializeContext(ctx context.Context, deps Dependencies, scope ref.Scope, item ContextItem) (syntheticRefBinding, error) {
 	if len(item.AssetIDs) == 0 {
-		return "", nil
+		return syntheticRefBinding{}, nil
 	}
 
-	ids, err := parseAndValidateAssetIDs(ctx, deps.Queries, item.AssetIDs)
+	ids, err := parseAndValidateAssetIDs(ctx, deps.Library, item.AssetIDs)
 	if err != nil {
-		return "", err
+		return syntheticRefBinding{}, err
 	}
 	if len(ids) == 0 {
-		return "", nil
+		return syntheticRefBinding{}, nil
 	}
 
 	op, hint := contextOpAndHint(item.Type)
@@ -139,15 +161,20 @@ func materializeContext(ctx context.Context, deps Dependencies, scope ref.Scope,
 	}
 
 	summary := fmt.Sprintf("context(%s) → %d assets", hint, len(ids))
-	r := deps.RefStore.Create(
-		scope,
-		ref.Plan{Op: op, Params: map[string]string{"label": label}},
+	r, refErr := deps.RefStore.Create(
+		ctx, scope,
+		ref.Plan{Op: op, Payload: ref.TypedPayload(map[string]any{"label": label})},
 		hint,
 		summary,
 		ids,
 		false,
 	)
-	return fmt.Sprintf("%s — %s", r.ID, label), nil
+	if refErr != nil {
+		return syntheticRefBinding{}, refErr
+	}
+	return syntheticRefBinding{
+		RefID: r.ID, ContextType: hint, Label: label, Count: r.Count(),
+	}, nil
 }
 
 func contextOpAndHint(contextType string) (op, hint string) {
@@ -159,10 +186,9 @@ func contextOpAndHint(contextType string) (op, hint string) {
 	}
 }
 
-func parseAndValidateAssetIDs(ctx context.Context, queries *repo.Queries, raw []string) ([]uuid.UUID, error) {
+func parseAndValidateAssetIDs(ctx context.Context, library *core.AuthorizedLibrary, raw []string) ([]uuid.UUID, error) {
 	seen := make(map[uuid.UUID]struct{}, len(raw))
 	ordered := make([]uuid.UUID, 0, len(raw))
-	pgIDs := make([]pgtype.UUID, 0, len(raw))
 
 	for _, s := range raw {
 		id, err := uuid.Parse(strings.TrimSpace(s))
@@ -174,45 +200,22 @@ func parseAndValidateAssetIDs(ctx context.Context, queries *repo.Queries, raw []
 		}
 		seen[id] = struct{}{}
 		ordered = append(ordered, id)
-		pgIDs = append(pgIDs, pgtype.UUID{Bytes: id, Valid: true})
 	}
-	if len(pgIDs) == 0 {
+	if len(ordered) == 0 {
 		return nil, nil
 	}
-
-	rows, err := queries.GetAssetsByIDs(ctx, pgIDs)
-	if err != nil {
-		return nil, fmt.Errorf("validate context assets: %w", err)
-	}
-
-	existing := make(map[uuid.UUID]struct{}, len(rows))
-	for _, row := range rows {
-		if row.IsDeleted != nil && *row.IsDeleted {
-			continue
-		}
-		existing[uuid.UUID(row.AssetID.Bytes)] = struct{}{}
-	}
-
-	validated := make([]uuid.UUID, 0, len(ordered))
-	for _, id := range ordered {
-		if _, ok := existing[id]; ok {
-			validated = append(validated, id)
-		}
-	}
-	return validated, nil
+	return library.AuthorizeAssetIDs(ctx, library.UserID(), ordered)
 }
 
-func materializePersonMention(ctx context.Context, deps Dependencies, m MentionItem) (string, *DroppedMention) {
+func materializePersonMention(ctx context.Context, deps Dependencies, m MentionItem) (*syntheticEntityBinding, *DroppedMention) {
 	personID, err := strconv.Atoi(strings.TrimSpace(m.ID))
 	if err != nil || personID <= 0 {
-		return "", &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "invalid_id"}
+		return nil, &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "invalid_id"}
 	}
 
-	row, err := deps.Queries.GetPersonByIDScoped(ctx, repo.GetPersonByIDScopedParams{
-		ClusterID: int32(personID),
-	})
+	row, err := deps.Library.Person(ctx, int32(personID))
 	if err != nil {
-		return "", &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "not_found"}
+		return nil, &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "not_found"}
 	}
 
 	name := ""
@@ -222,50 +225,46 @@ func materializePersonMention(ctx context.Context, deps Dependencies, m MentionI
 	if name == "" {
 		name = ref.SanitizeUserText(m.Label, ref.MaxFacetValueLen)
 	}
-	return fmt.Sprintf("person: %s (person_id=%d)", name, personID), nil
+	return &syntheticEntityBinding{Type: "person", ID: strconv.Itoa(personID), Label: name}, nil
 }
 
-func materializeAlbumMention(ctx context.Context, deps Dependencies, m MentionItem) (string, *DroppedMention) {
+func materializeAlbumMention(ctx context.Context, deps Dependencies, m MentionItem) (*syntheticEntityBinding, *DroppedMention) {
 	albumID, err := strconv.Atoi(strings.TrimSpace(m.ID))
 	if err != nil || albumID <= 0 {
-		return "", &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "invalid_id"}
+		return nil, &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "invalid_id"}
 	}
 
-	album, err := deps.Queries.GetAlbumByID(ctx, int32(albumID))
+	album, err := deps.Library.Album(ctx, int32(albumID))
 	if err != nil {
-		return "", &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "not_found"}
+		return nil, &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "not_found"}
 	}
-	if album.UserID != deps.UserID {
-		return "", &DroppedMention{Type: m.Type, ID: m.ID, Label: m.Label, Reason: "not_found"}
-	}
-
 	title := ref.SanitizeUserText(album.AlbumName, ref.MaxFacetValueLen)
 	if title == "" {
 		title = ref.SanitizeUserText(m.Label, ref.MaxFacetValueLen)
 	}
-	return fmt.Sprintf("album: %s (album_id=%d)", title, albumID), nil
+	return &syntheticEntityBinding{Type: "album", ID: strconv.Itoa(albumID), Label: title}, nil
 }
 
-func materializeStringMention(kind string, m MentionItem) string {
+func materializeStringMention(kind string, m MentionItem) *syntheticEntityBinding {
 	label := ref.SanitizeUserText(m.Label, ref.MaxFacetValueLen)
 	if label == "" {
 		label = ref.SanitizeUserText(m.ID, ref.MaxFacetValueLen)
 	}
 	if label == "" {
-		return ""
+		return nil
 	}
-	return fmt.Sprintf("%s: %s (%s=%q)", kind, label, kind, label)
+	return &syntheticEntityBinding{Type: kind, ID: label, Label: label}
 }
 
-func materializePinMention(ctx context.Context, deps Dependencies, scope ref.Scope, m MentionItem) error {
+func materializePinMention(ctx context.Context, deps Dependencies, scope ref.Scope, m MentionItem) (*syntheticRefBinding, error) {
 	pinID, err := uuid.Parse(strings.TrimSpace(m.ID))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	pin, assetIDs, err := deps.Pins.AssetIDs(ctx, deps.UserID, pinID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var plan ref.Plan
@@ -283,33 +282,20 @@ func materializePinMention(ctx context.Context, deps Dependencies, scope ref.Sco
 	}
 
 	summary := fmt.Sprintf("pin(%s) → %d assets", label, len(assetIDs))
-	deps.RefStore.Create(
-		scope,
-		ref.Plan{Op: "context.pin", Params: map[string]string{"pin_id": pinID.String(), "label": label}},
+	r, refErr := deps.RefStore.Create(
+		ctx, scope,
+		ref.Plan{Op: "context.pin", Payload: ref.TypedPayload(map[string]any{"pin_id": pinID, "label": label})},
 		hint,
 		summary,
 		assetIDs,
 		pin.Truncated,
 	)
-	return nil
+	if refErr != nil {
+		return nil, refErr
+	}
+	return &syntheticRefBinding{
+		RefID: r.ID, ContextType: "pin", Label: label, Count: r.Count(),
+	}, nil
 }
 
 const maxHintLen = 12
-
-// FormatInstructionExtras builds the Attached context / Bound entities blocks.
-func FormatInstructionExtras(contextLines, boundLines []string) string {
-	var b strings.Builder
-	if len(contextLines) > 0 {
-		b.WriteString("\n\nAttached context:\n")
-		for _, line := range contextLines {
-			fmt.Fprintf(&b, "- %s\n", line)
-		}
-	}
-	if len(boundLines) > 0 {
-		b.WriteString("\n\nBound entities:\n")
-		for _, line := range boundLines {
-			fmt.Fprintf(&b, "- %s\n", line)
-		}
-	}
-	return b.String()
-}

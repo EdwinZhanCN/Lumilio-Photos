@@ -7,6 +7,7 @@
 SELECT a.asset_id
 FROM assets a
 WHERE a.is_deleted = false
+  AND a.owner_id = sqlc.arg('user_id')::integer
   AND EXISTS (
     SELECT 1
     FROM face_items fi
@@ -26,7 +27,11 @@ SELECT
 FROM face_clusters fc
 JOIN face_cluster_members fcm ON fcm.cluster_id = fc.cluster_id
 JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fc.cluster_name IS NOT NULL
+  AND fc.owner_id = sqlc.arg('user_id')::integer
+  AND a.owner_id = sqlc.arg('user_id')::integer
+  AND a.is_deleted = false
   AND fc.cluster_name <> ''
   AND (sqlc.narg('name_query')::text IS NULL OR fc.cluster_name ILIKE '%' || sqlc.narg('name_query') || '%')
 GROUP BY fc.cluster_id, fc.cluster_name
@@ -38,6 +43,14 @@ LIMIT sqlc.arg('limit');
 SELECT asset_id
 FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
+
+-- name: AgentRankAssetIDsByTime :many
+-- Owner-scoped rank(by=time) for Agent refs.
+SELECT asset_id
+FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND owner_id = sqlc.arg('user_id')::integer
   AND is_deleted = false
 ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
 
@@ -49,6 +62,7 @@ SELECT a.asset_id
 FROM assets a
 LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
 WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.owner_id = sqlc.arg('user_id')::integer
   AND a.is_deleted = false
 ORDER BY COALESCE(
     aqs.score,
@@ -62,10 +76,12 @@ ORDER BY COALESCE(
 SELECT
     al.album_id,
     al.album_name::text AS title,
-    COUNT(DISTINCT aa.asset_id) AS asset_count
+    COUNT(DISTINCT a.asset_id) AS asset_count
 FROM albums al
 LEFT JOIN album_assets aa ON aa.album_id = al.album_id
-LEFT JOIN assets a ON a.asset_id = aa.asset_id AND a.is_deleted = false
+LEFT JOIN assets a ON a.asset_id = aa.asset_id
+    AND a.owner_id = sqlc.arg('user_id')::integer
+    AND a.is_deleted = false
 WHERE al.user_id = sqlc.arg('user_id')
   AND (sqlc.narg('title_query')::text IS NULL OR al.album_name ILIKE '%' || sqlc.narg('title_query') || '%')
 GROUP BY al.album_id, al.album_name
@@ -77,6 +93,7 @@ LIMIT sqlc.arg('limit');
 SELECT asset_id, type, specific_metadata
 FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND owner_id = sqlc.arg('user_id')::integer
   AND is_deleted = false;
 
 -- name: AgentPeekAssets :many
@@ -104,11 +121,13 @@ SELECT
         JOIN face_cluster_members fcm ON fcm.face_id = fi.id
         JOIN face_clusters fc ON fc.cluster_id = fcm.cluster_id
         WHERE fi.asset_id = a.asset_id
+          AND fc.owner_id = sqlc.arg('user_id')::integer
           AND fc.cluster_name IS NOT NULL
           AND fc.cluster_name <> ''
     )::text[] AS people
 FROM assets a
 WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.owner_id = sqlc.arg('user_id')::integer
   AND a.is_deleted = false;
 
 -- name: AgentCapturedTimes :many
@@ -117,6 +136,7 @@ WHERE a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
 SELECT COALESCE(taken_time, upload_time)::timestamptz AS captured_at
 FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND owner_id = sqlc.arg('user_id')::integer
   AND is_deleted = false;
 
 -- name: RankAssetIDsByUploadTime :many
@@ -124,12 +144,23 @@ WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
 SELECT asset_id
 FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+ORDER BY upload_time ASC, asset_id ASC;
+
+-- name: AgentRankAssetIDsByUploadTime :many
+-- Owner-scoped "recently added" order for Agent refs.
+SELECT asset_id
+FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND owner_id = sqlc.arg('user_id')::integer
   AND is_deleted = false
 ORDER BY upload_time ASC, asset_id ASC;
 
 -- name: AgentAssetAestheticScores :many
 -- Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
 -- omitted; callers that filter by quality percentile drop them.
-SELECT asset_id, score
-FROM asset_quality_scores
-WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[]);
+SELECT aqs.asset_id, aqs.score
+FROM asset_quality_scores aqs
+JOIN assets a USING (asset_id)
+WHERE aqs.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.owner_id = sqlc.arg('user_id')::integer
+  AND a.is_deleted = false;

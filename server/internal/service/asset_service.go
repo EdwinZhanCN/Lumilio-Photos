@@ -116,6 +116,8 @@ type AssetService interface {
 	// by tsquery matching. Rankings are the retrievers' own orders.
 	SearchAssetIDsSemantic(ctx context.Context, query string, strictness aggregatesearch.SetStrictness, maxResults int) ([]uuid.UUID, aggregatesearch.SetMeta, error)
 	SearchAssetIDsOCR(ctx context.Context, query string, maxResults int) ([]uuid.UUID, error)
+	SearchAssetIDsSemanticForOwner(ctx context.Context, ownerID int32, query string, strictness aggregatesearch.SetStrictness, maxResults int) ([]uuid.UUID, aggregatesearch.SetMeta, error)
+	SearchAssetIDsOCRForOwner(ctx context.Context, ownerID int32, query string, maxResults int) ([]uuid.UUID, error)
 
 	// Folders and tags are derived/vocabulary collection views (no folder
 	// entity exists; "folders" come from assets.storage_path prefixes).
@@ -1937,6 +1939,38 @@ func (s *assetService) SearchAssetIDsOCR(ctx context.Context, query string, maxR
 		return nil, ErrSemanticSearchUnavailable
 	}
 	candidates, err := s.ocrRetriever.Retrieve(ctx, aggregatesearch.Request{Query: query, TopK: maxResults})
+	if err != nil {
+		return nil, err
+	}
+	return candidateIDs(candidates), nil
+}
+
+// SearchAssetIDsSemanticForOwner is the Agent-only data-plane entrypoint. The
+// owner filter is part of retrieval itself, so unauthorized candidates never
+// enter ranking, calibration, refs, or live-pin snapshots.
+func (s *assetService) SearchAssetIDsSemanticForOwner(ctx context.Context, ownerID int32, query string, strictness aggregatesearch.SetStrictness, maxResults int) ([]uuid.UUID, aggregatesearch.SetMeta, error) {
+	if s.semanticRetriever == nil {
+		return nil, aggregatesearch.SetMeta{}, ErrSemanticSearchUnavailable
+	}
+	candidates, meta, err := s.semanticRetriever.RetrieveSet(ctx, aggregatesearch.Request{
+		Query:  query,
+		Filter: aggregatesearch.Filter{OwnerID: &ownerID},
+	}, strictness, maxResults)
+	if err != nil {
+		return nil, meta, err
+	}
+	return candidateIDs(candidates), meta, nil
+}
+
+func (s *assetService) SearchAssetIDsOCRForOwner(ctx context.Context, ownerID int32, query string, maxResults int) ([]uuid.UUID, error) {
+	if s.ocrRetriever == nil {
+		return nil, ErrSemanticSearchUnavailable
+	}
+	candidates, err := s.ocrRetriever.Retrieve(ctx, aggregatesearch.Request{
+		Query:  query,
+		TopK:   maxResults,
+		Filter: aggregatesearch.Filter{OwnerID: &ownerID},
+	})
 	if err != nil {
 		return nil, err
 	}

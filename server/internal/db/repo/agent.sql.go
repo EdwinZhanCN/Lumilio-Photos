@@ -7,7 +7,468 @@ package repo
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const agentRunHasCommittedEffect = `-- name: AgentRunHasCommittedEffect :one
+SELECT EXISTS (
+    SELECT 1
+    FROM agent_pending_effects
+    WHERE user_id = $1
+      AND thread_id = $2
+      AND executing_run_id = $3
+      AND status = 'committed'
+)
+`
+
+type AgentRunHasCommittedEffectParams struct {
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+	RunID    pgtype.UUID `db:"run_id" json:"run_id"`
+}
+
+func (q *Queries) AgentRunHasCommittedEffect(ctx context.Context, arg AgentRunHasCommittedEffectParams) (bool, error) {
+	row := q.db.QueryRow(ctx, agentRunHasCommittedEffect, arg.UserID, arg.ThreadID, arg.RunID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const bindPendingAgentEffectExecutingRun = `-- name: BindPendingAgentEffectExecutingRun :one
+UPDATE agent_pending_effects e
+SET executing_run_id = $1,
+    updated_at = NOW()
+FROM agent_runs r
+WHERE e.effect_id = $2
+  AND e.user_id = $3
+  AND e.thread_id = $4
+  AND r.run_id = $1
+  AND r.user_id = e.user_id
+  AND r.thread_id = e.thread_id
+RETURNING e.effect_id
+`
+
+type BindPendingAgentEffectExecutingRunParams struct {
+	RunID    pgtype.UUID `db:"run_id" json:"run_id"`
+	EffectID pgtype.UUID `db:"effect_id" json:"effect_id"`
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) BindPendingAgentEffectExecutingRun(ctx context.Context, arg BindPendingAgentEffectExecutingRunParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, bindPendingAgentEffectExecutingRun,
+		arg.RunID,
+		arg.EffectID,
+		arg.UserID,
+		arg.ThreadID,
+	)
+	var effect_id pgtype.UUID
+	err := row.Scan(&effect_id)
+	return effect_id, err
+}
+
+const cancelPendingAgentEffects = `-- name: CancelPendingAgentEffects :exec
+UPDATE agent_pending_effects
+SET status = 'cancelled', updated_at = NOW()
+WHERE user_id = $1 AND thread_id = $2 AND status = 'pending'
+`
+
+type CancelPendingAgentEffectsParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) CancelPendingAgentEffects(ctx context.Context, arg CancelPendingAgentEffectsParams) error {
+	_, err := q.db.Exec(ctx, cancelPendingAgentEffects, arg.UserID, arg.ThreadID)
+	return err
+}
+
+const clearAwaitingAgentRun = `-- name: ClearAwaitingAgentRun :exec
+UPDATE agent_runs
+SET status = 'completed',
+    finished_at = COALESCE(finished_at, NOW()),
+    updated_at = NOW()
+WHERE run_id = $1
+  AND user_id = $2
+  AND thread_id = $3
+  AND status = 'awaiting_confirmation'
+`
+
+type ClearAwaitingAgentRunParams struct {
+	RunID    pgtype.UUID `db:"run_id" json:"run_id"`
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) ClearAwaitingAgentRun(ctx context.Context, arg ClearAwaitingAgentRunParams) error {
+	_, err := q.db.Exec(ctx, clearAwaitingAgentRun, arg.RunID, arg.UserID, arg.ThreadID)
+	return err
+}
+
+const createAgentRun = `-- name: CreateAgentRun :one
+WITH created AS (
+    INSERT INTO agent_runs (user_id, thread_id, status)
+    VALUES ($1, $2, 'running')
+    RETURNING run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at
+)
+UPDATE agent_threads t
+SET active_run_id = created.run_id,
+    status = 'active',
+    updated_at = NOW()
+FROM created
+WHERE t.user_id = created.user_id
+  AND t.thread_id = created.thread_id
+RETURNING created.run_id, created.user_id, created.thread_id, created.status, created.cancel_requested_at, created.started_at, created.finished_at, created.created_at, created.updated_at
+`
+
+type CreateAgentRunParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+}
+
+type CreateAgentRunRow struct {
+	RunID             pgtype.UUID        `db:"run_id" json:"run_id"`
+	UserID            int32              `db:"user_id" json:"user_id"`
+	ThreadID          string             `db:"thread_id" json:"thread_id"`
+	Status            string             `db:"status" json:"status"`
+	CancelRequestedAt pgtype.Timestamptz `db:"cancel_requested_at" json:"cancel_requested_at"`
+	StartedAt         pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	FinishedAt        pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) (CreateAgentRunRow, error) {
+	row := q.db.QueryRow(ctx, createAgentRun, arg.UserID, arg.ThreadID)
+	var i CreateAgentRunRow
+	err := row.Scan(
+		&i.RunID,
+		&i.UserID,
+		&i.ThreadID,
+		&i.Status,
+		&i.CancelRequestedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createPendingAgentEffect = `-- name: CreatePendingAgentEffect :one
+INSERT INTO agent_pending_effects (
+    effect_id, user_id, thread_id, initiating_run_id, tool_name,
+    effect_class, policy_version, membership_snapshot, payload, target,
+    idempotency_key
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (idempotency_key) DO UPDATE SET updated_at = NOW()
+RETURNING effect_id, user_id, thread_id, initiating_run_id, executing_run_id, tool_name, effect_class, policy_version, membership_snapshot, payload, target, idempotency_key, status, receipt, created_at, committed_at, updated_at
+`
+
+type CreatePendingAgentEffectParams struct {
+	EffectID           pgtype.UUID   `db:"effect_id" json:"effect_id"`
+	UserID             int32         `db:"user_id" json:"user_id"`
+	ThreadID           string        `db:"thread_id" json:"thread_id"`
+	InitiatingRunID    pgtype.UUID   `db:"initiating_run_id" json:"initiating_run_id"`
+	ToolName           string        `db:"tool_name" json:"tool_name"`
+	EffectClass        string        `db:"effect_class" json:"effect_class"`
+	PolicyVersion      int32         `db:"policy_version" json:"policy_version"`
+	MembershipSnapshot []pgtype.UUID `db:"membership_snapshot" json:"membership_snapshot"`
+	Payload            []byte        `db:"payload" json:"payload"`
+	Target             []byte        `db:"target" json:"target"`
+	IdempotencyKey     string        `db:"idempotency_key" json:"idempotency_key"`
+}
+
+func (q *Queries) CreatePendingAgentEffect(ctx context.Context, arg CreatePendingAgentEffectParams) (AgentPendingEffect, error) {
+	row := q.db.QueryRow(ctx, createPendingAgentEffect,
+		arg.EffectID,
+		arg.UserID,
+		arg.ThreadID,
+		arg.InitiatingRunID,
+		arg.ToolName,
+		arg.EffectClass,
+		arg.PolicyVersion,
+		arg.MembershipSnapshot,
+		arg.Payload,
+		arg.Target,
+		arg.IdempotencyKey,
+	)
+	var i AgentPendingEffect
+	err := row.Scan(
+		&i.EffectID,
+		&i.UserID,
+		&i.ThreadID,
+		&i.InitiatingRunID,
+		&i.ExecutingRunID,
+		&i.ToolName,
+		&i.EffectClass,
+		&i.PolicyVersion,
+		&i.MembershipSnapshot,
+		&i.Payload,
+		&i.Target,
+		&i.IdempotencyKey,
+		&i.Status,
+		&i.Receipt,
+		&i.CreatedAt,
+		&i.CommittedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteAgentThreadRefs = `-- name: DeleteAgentThreadRefs :exec
+DELETE FROM agent_refs
+WHERE user_id = $1 AND thread_id = $2
+`
+
+type DeleteAgentThreadRefsParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) DeleteAgentThreadRefs(ctx context.Context, arg DeleteAgentThreadRefsParams) error {
+	_, err := q.db.Exec(ctx, deleteAgentThreadRefs, arg.UserID, arg.ThreadID)
+	return err
+}
+
+const deleteCheckpoint = `-- name: DeleteCheckpoint :exec
+DELETE FROM agent_checkpoints
+WHERE id = $1
+`
+
+func (q *Queries) DeleteCheckpoint(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteCheckpoint, id)
+	return err
+}
+
+const deleteExpiredAgentRefs = `-- name: DeleteExpiredAgentRefs :exec
+DELETE FROM agent_refs r
+WHERE r.expires_at <= NOW()
+  AND NOT EXISTS (
+      SELECT 1
+      FROM agent_threads t
+      WHERE t.user_id = r.user_id
+        AND t.thread_id = r.thread_id
+        AND t.status = ANY (ARRAY['active', 'awaiting_confirmation'])
+  )
+`
+
+func (q *Queries) DeleteExpiredAgentRefs(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredAgentRefs)
+	return err
+}
+
+const deleteTerminalPendingAgentEffects = `-- name: DeleteTerminalPendingAgentEffects :exec
+DELETE FROM agent_pending_effects
+WHERE user_id = $1
+  AND thread_id = $2
+  AND status <> 'committed'
+`
+
+type DeleteTerminalPendingAgentEffectsParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) DeleteTerminalPendingAgentEffects(ctx context.Context, arg DeleteTerminalPendingAgentEffectsParams) error {
+	_, err := q.db.Exec(ctx, deleteTerminalPendingAgentEffects, arg.UserID, arg.ThreadID)
+	return err
+}
+
+const finishAgentRun = `-- name: FinishAgentRun :exec
+WITH updated AS (
+    UPDATE agent_runs r
+    SET status = $1,
+        finished_at = CASE
+            WHEN $1 = ANY (ARRAY['cancelled', 'completed', 'failed'])
+                THEN COALESCE(r.finished_at, NOW())
+            ELSE r.finished_at
+        END,
+        updated_at = NOW()
+    WHERE r.run_id = $2
+      AND r.user_id = $3
+      AND r.thread_id = $4
+      AND r.status <> ALL (ARRAY['cancelled', 'completed', 'failed'])
+    RETURNING r.user_id, r.thread_id, r.run_id, r.status
+)
+UPDATE agent_threads t
+SET status = CASE
+        WHEN updated.status = 'awaiting_confirmation' THEN 'awaiting_confirmation'
+        WHEN updated.status = 'cancelled' THEN 'cancelled'
+        WHEN updated.status = 'failed' THEN 'failed'
+        ELSE 'completed'
+    END,
+    active_run_id = CASE
+        WHEN updated.status = 'awaiting_confirmation' THEN updated.run_id
+        ELSE NULL
+    END,
+    updated_at = NOW()
+FROM updated
+WHERE t.user_id = updated.user_id
+  AND t.thread_id = updated.thread_id
+  AND t.active_run_id = updated.run_id
+`
+
+type FinishAgentRunParams struct {
+	Status   string      `db:"status" json:"status"`
+	RunID    pgtype.UUID `db:"run_id" json:"run_id"`
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) FinishAgentRun(ctx context.Context, arg FinishAgentRunParams) error {
+	_, err := q.db.Exec(ctx, finishAgentRun,
+		arg.Status,
+		arg.RunID,
+		arg.UserID,
+		arg.ThreadID,
+	)
+	return err
+}
+
+const getActiveAgentRun = `-- name: GetActiveAgentRun :one
+SELECT r.run_id, r.user_id, r.thread_id, r.status, r.cancel_requested_at, r.started_at, r.finished_at, r.created_at, r.updated_at
+FROM agent_runs r
+JOIN agent_threads t
+  ON t.user_id = r.user_id
+ AND t.thread_id = r.thread_id
+ AND t.active_run_id = r.run_id
+WHERE r.user_id = $1
+  AND r.thread_id = $2
+  AND r.status = ANY (ARRAY['running', 'cancel_requested', 'awaiting_confirmation'])
+`
+
+type GetActiveAgentRunParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) GetActiveAgentRun(ctx context.Context, arg GetActiveAgentRunParams) (AgentRun, error) {
+	row := q.db.QueryRow(ctx, getActiveAgentRun, arg.UserID, arg.ThreadID)
+	var i AgentRun
+	err := row.Scan(
+		&i.RunID,
+		&i.UserID,
+		&i.ThreadID,
+		&i.Status,
+		&i.CancelRequestedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAgentRef = `-- name: GetAgentRef :one
+UPDATE agent_refs r
+SET last_accessed_at = NOW(),
+    expires_at = $1
+WHERE r.user_id = $2
+  AND r.thread_id = $3
+  AND r.ref_id = $4
+  AND (
+      r.expires_at > NOW()
+      OR EXISTS (
+          SELECT 1
+          FROM agent_threads t
+          WHERE t.user_id = r.user_id
+            AND t.thread_id = r.thread_id
+            AND t.status = ANY (ARRAY['active', 'awaiting_confirmation'])
+      )
+  )
+RETURNING user_id, thread_id, ref_id, sequence, plan, asset_ids, summary, truncated, created_at, last_accessed_at, expires_at
+`
+
+type GetAgentRefParams struct {
+	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UserID    int32              `db:"user_id" json:"user_id"`
+	ThreadID  string             `db:"thread_id" json:"thread_id"`
+	RefID     string             `db:"ref_id" json:"ref_id"`
+}
+
+func (q *Queries) GetAgentRef(ctx context.Context, arg GetAgentRefParams) (AgentRef, error) {
+	row := q.db.QueryRow(ctx, getAgentRef,
+		arg.ExpiresAt,
+		arg.UserID,
+		arg.ThreadID,
+		arg.RefID,
+	)
+	var i AgentRef
+	err := row.Scan(
+		&i.UserID,
+		&i.ThreadID,
+		&i.RefID,
+		&i.Sequence,
+		&i.Plan,
+		&i.AssetIds,
+		&i.Summary,
+		&i.Truncated,
+		&i.CreatedAt,
+		&i.LastAccessedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
+const getAgentRun = `-- name: GetAgentRun :one
+SELECT run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at FROM agent_runs
+WHERE run_id = $1 AND user_id = $2 AND thread_id = $3
+`
+
+type GetAgentRunParams struct {
+	RunID    pgtype.UUID `db:"run_id" json:"run_id"`
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) GetAgentRun(ctx context.Context, arg GetAgentRunParams) (AgentRun, error) {
+	row := q.db.QueryRow(ctx, getAgentRun, arg.RunID, arg.UserID, arg.ThreadID)
+	var i AgentRun
+	err := row.Scan(
+		&i.RunID,
+		&i.UserID,
+		&i.ThreadID,
+		&i.Status,
+		&i.CancelRequestedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAgentThread = `-- name: GetAgentThread :one
+SELECT user_id, thread_id, checkpoint_key, mode, context_bindings, mention_bindings, policy_version, status, active_run_id, created_at, updated_at FROM agent_threads
+WHERE user_id = $1 AND thread_id = $2
+`
+
+type GetAgentThreadParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) GetAgentThread(ctx context.Context, arg GetAgentThreadParams) (AgentThread, error) {
+	row := q.db.QueryRow(ctx, getAgentThread, arg.UserID, arg.ThreadID)
+	var i AgentThread
+	err := row.Scan(
+		&i.UserID,
+		&i.ThreadID,
+		&i.CheckpointKey,
+		&i.Mode,
+		&i.ContextBindings,
+		&i.MentionBindings,
+		&i.PolicyVersion,
+		&i.Status,
+		&i.ActiveRunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
 
 const getCheckpoint = `-- name: GetCheckpoint :one
 SELECT data FROM agent_checkpoints
@@ -19,6 +480,322 @@ func (q *Queries) GetCheckpoint(ctx context.Context, id string) ([]byte, error) 
 	var data []byte
 	err := row.Scan(&data)
 	return data, err
+}
+
+const getPendingAgentEffectForUpdate = `-- name: GetPendingAgentEffectForUpdate :one
+SELECT effect_id, user_id, thread_id, initiating_run_id, executing_run_id, tool_name, effect_class, policy_version, membership_snapshot, payload, target, idempotency_key, status, receipt, created_at, committed_at, updated_at FROM agent_pending_effects
+WHERE effect_id = $1 AND user_id = $2 AND thread_id = $3
+FOR UPDATE
+`
+
+type GetPendingAgentEffectForUpdateParams struct {
+	EffectID pgtype.UUID `db:"effect_id" json:"effect_id"`
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) GetPendingAgentEffectForUpdate(ctx context.Context, arg GetPendingAgentEffectForUpdateParams) (AgentPendingEffect, error) {
+	row := q.db.QueryRow(ctx, getPendingAgentEffectForUpdate, arg.EffectID, arg.UserID, arg.ThreadID)
+	var i AgentPendingEffect
+	err := row.Scan(
+		&i.EffectID,
+		&i.UserID,
+		&i.ThreadID,
+		&i.InitiatingRunID,
+		&i.ExecutingRunID,
+		&i.ToolName,
+		&i.EffectClass,
+		&i.PolicyVersion,
+		&i.MembershipSnapshot,
+		&i.Payload,
+		&i.Target,
+		&i.IdempotencyKey,
+		&i.Status,
+		&i.Receipt,
+		&i.CreatedAt,
+		&i.CommittedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listAgentRefs = `-- name: ListAgentRefs :many
+SELECT r.user_id, r.thread_id, r.ref_id, r.sequence, r.plan, r.asset_ids, r.summary, r.truncated, r.created_at, r.last_accessed_at, r.expires_at FROM agent_refs r
+WHERE r.user_id = $1
+  AND r.thread_id = $2
+  AND (
+      r.expires_at > NOW()
+      OR EXISTS (
+          SELECT 1
+          FROM agent_threads t
+          WHERE t.user_id = r.user_id
+            AND t.thread_id = r.thread_id
+            AND t.status = ANY (ARRAY['active', 'awaiting_confirmation'])
+      )
+  )
+ORDER BY r.sequence
+`
+
+type ListAgentRefsParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) ListAgentRefs(ctx context.Context, arg ListAgentRefsParams) ([]AgentRef, error) {
+	rows, err := q.db.Query(ctx, listAgentRefs, arg.UserID, arg.ThreadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentRef
+	for rows.Next() {
+		var i AgentRef
+		if err := rows.Scan(
+			&i.UserID,
+			&i.ThreadID,
+			&i.RefID,
+			&i.Sequence,
+			&i.Plan,
+			&i.AssetIds,
+			&i.Summary,
+			&i.Truncated,
+			&i.CreatedAt,
+			&i.LastAccessedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const releaseAgentThreadRefs = `-- name: ReleaseAgentThreadRefs :exec
+UPDATE agent_refs
+SET last_accessed_at = NOW(),
+    expires_at = $1
+WHERE user_id = $2
+  AND thread_id = $3
+`
+
+type ReleaseAgentThreadRefsParams struct {
+	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UserID    int32              `db:"user_id" json:"user_id"`
+	ThreadID  string             `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) ReleaseAgentThreadRefs(ctx context.Context, arg ReleaseAgentThreadRefsParams) error {
+	_, err := q.db.Exec(ctx, releaseAgentThreadRefs, arg.ExpiresAt, arg.UserID, arg.ThreadID)
+	return err
+}
+
+const requestAgentRunCancel = `-- name: RequestAgentRunCancel :one
+UPDATE agent_runs
+SET status = CASE WHEN status = 'running' THEN 'cancel_requested' ELSE status END,
+    cancel_requested_at = COALESCE(cancel_requested_at, NOW()),
+    updated_at = NOW()
+WHERE run_id = $1
+  AND user_id = $2
+  AND thread_id = $3
+  AND status = ANY (ARRAY['running', 'cancel_requested', 'awaiting_confirmation'])
+RETURNING run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at
+`
+
+type RequestAgentRunCancelParams struct {
+	RunID    pgtype.UUID `db:"run_id" json:"run_id"`
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+}
+
+func (q *Queries) RequestAgentRunCancel(ctx context.Context, arg RequestAgentRunCancelParams) (AgentRun, error) {
+	row := q.db.QueryRow(ctx, requestAgentRunCancel, arg.RunID, arg.UserID, arg.ThreadID)
+	var i AgentRun
+	err := row.Scan(
+		&i.RunID,
+		&i.UserID,
+		&i.ThreadID,
+		&i.Status,
+		&i.CancelRequestedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const trimAgentThreadRefs = `-- name: TrimAgentThreadRefs :many
+WITH overflow AS (
+    SELECT ref_id
+    FROM agent_refs
+    WHERE user_id = $1
+      AND thread_id = $2
+    ORDER BY last_accessed_at DESC, sequence DESC
+    OFFSET $3
+)
+DELETE FROM agent_refs r
+USING overflow
+WHERE r.user_id = $1
+  AND r.thread_id = $2
+  AND r.ref_id = overflow.ref_id
+RETURNING r.ref_id
+`
+
+type TrimAgentThreadRefsParams struct {
+	UserID   int32  `db:"user_id" json:"user_id"`
+	ThreadID string `db:"thread_id" json:"thread_id"`
+	MaxRefs  int32  `db:"max_refs" json:"max_refs"`
+}
+
+func (q *Queries) TrimAgentThreadRefs(ctx context.Context, arg TrimAgentThreadRefsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, trimAgentThreadRefs, arg.UserID, arg.ThreadID, arg.MaxRefs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var ref_id string
+		if err := rows.Scan(&ref_id); err != nil {
+			return nil, err
+		}
+		items = append(items, ref_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updatePendingAgentEffect = `-- name: UpdatePendingAgentEffect :exec
+UPDATE agent_pending_effects
+SET status = $4,
+    receipt = $5,
+    committed_at = CASE WHEN $4 = 'committed' THEN COALESCE(committed_at, NOW()) ELSE committed_at END,
+    updated_at = NOW()
+WHERE effect_id = $1 AND user_id = $2 AND thread_id = $3
+`
+
+type UpdatePendingAgentEffectParams struct {
+	EffectID pgtype.UUID `db:"effect_id" json:"effect_id"`
+	UserID   int32       `db:"user_id" json:"user_id"`
+	ThreadID string      `db:"thread_id" json:"thread_id"`
+	Status   string      `db:"status" json:"status"`
+	Receipt  []byte      `db:"receipt" json:"receipt"`
+}
+
+func (q *Queries) UpdatePendingAgentEffect(ctx context.Context, arg UpdatePendingAgentEffectParams) error {
+	_, err := q.db.Exec(ctx, updatePendingAgentEffect,
+		arg.EffectID,
+		arg.UserID,
+		arg.ThreadID,
+		arg.Status,
+		arg.Receipt,
+	)
+	return err
+}
+
+const upsertAgentRef = `-- name: UpsertAgentRef :exec
+INSERT INTO agent_refs (
+    user_id, thread_id, ref_id, sequence, plan, asset_ids,
+    summary, truncated, created_at, last_accessed_at, expires_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (user_id, thread_id, ref_id) DO UPDATE SET
+    plan = EXCLUDED.plan,
+    asset_ids = EXCLUDED.asset_ids,
+    summary = EXCLUDED.summary,
+    truncated = EXCLUDED.truncated,
+    last_accessed_at = EXCLUDED.last_accessed_at,
+    expires_at = EXCLUDED.expires_at
+`
+
+type UpsertAgentRefParams struct {
+	UserID         int32              `db:"user_id" json:"user_id"`
+	ThreadID       string             `db:"thread_id" json:"thread_id"`
+	RefID          string             `db:"ref_id" json:"ref_id"`
+	Sequence       int32              `db:"sequence" json:"sequence"`
+	Plan           []byte             `db:"plan" json:"plan"`
+	AssetIds       []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
+	Summary        string             `db:"summary" json:"summary"`
+	Truncated      bool               `db:"truncated" json:"truncated"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastAccessedAt pgtype.Timestamptz `db:"last_accessed_at" json:"last_accessed_at"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+}
+
+func (q *Queries) UpsertAgentRef(ctx context.Context, arg UpsertAgentRefParams) error {
+	_, err := q.db.Exec(ctx, upsertAgentRef,
+		arg.UserID,
+		arg.ThreadID,
+		arg.RefID,
+		arg.Sequence,
+		arg.Plan,
+		arg.AssetIds,
+		arg.Summary,
+		arg.Truncated,
+		arg.CreatedAt,
+		arg.LastAccessedAt,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
+const upsertAgentThread = `-- name: UpsertAgentThread :one
+INSERT INTO agent_threads (
+    user_id, thread_id, checkpoint_key, mode, context_bindings,
+    mention_bindings, policy_version, status
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+ON CONFLICT (user_id, thread_id) DO UPDATE SET
+    mode = EXCLUDED.mode,
+    context_bindings = EXCLUDED.context_bindings,
+    mention_bindings = EXCLUDED.mention_bindings,
+    policy_version = EXCLUDED.policy_version,
+    checkpoint_key = EXCLUDED.checkpoint_key,
+    updated_at = NOW()
+WHERE agent_threads.active_run_id IS NULL
+RETURNING user_id, thread_id, checkpoint_key, mode, context_bindings, mention_bindings, policy_version, status, active_run_id, created_at, updated_at
+`
+
+type UpsertAgentThreadParams struct {
+	UserID          int32  `db:"user_id" json:"user_id"`
+	ThreadID        string `db:"thread_id" json:"thread_id"`
+	CheckpointKey   string `db:"checkpoint_key" json:"checkpoint_key"`
+	Mode            string `db:"mode" json:"mode"`
+	ContextBindings []byte `db:"context_bindings" json:"context_bindings"`
+	MentionBindings []byte `db:"mention_bindings" json:"mention_bindings"`
+	PolicyVersion   int32  `db:"policy_version" json:"policy_version"`
+}
+
+func (q *Queries) UpsertAgentThread(ctx context.Context, arg UpsertAgentThreadParams) (AgentThread, error) {
+	row := q.db.QueryRow(ctx, upsertAgentThread,
+		arg.UserID,
+		arg.ThreadID,
+		arg.CheckpointKey,
+		arg.Mode,
+		arg.ContextBindings,
+		arg.MentionBindings,
+		arg.PolicyVersion,
+	)
+	var i AgentThread
+	err := row.Scan(
+		&i.UserID,
+		&i.ThreadID,
+		&i.CheckpointKey,
+		&i.Mode,
+		&i.ContextBindings,
+		&i.MentionBindings,
+		&i.PolicyVersion,
+		&i.Status,
+		&i.ActiveRunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertCheckpoint = `-- name: UpsertCheckpoint :exec

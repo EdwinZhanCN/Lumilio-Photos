@@ -159,6 +159,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/chat/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Agent Chat */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Cancel request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["handler.AgentCancelRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["handler.AgentCancelResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/chat/resume": {
         parameters: {
             query?: never;
@@ -11518,6 +11586,10 @@ export interface components {
             count?: number;
             created_at?: string;
             facets?: components["schemas"]["dto.AgentRefFacetsDTO"];
+            fallback_reason?: string;
+            /** @enum {string} */
+            hydration_source?: "live_replay" | "frozen_snapshot" | "frozen_fallback";
+            last_successful_refresh_at?: string;
             layout?: components["schemas"]["dto.AgentPinLayoutDTO"];
             /**
              * @example frozen
@@ -13786,11 +13858,21 @@ export interface components {
             method: "totp" | "recovery_code";
             mfa_token: string;
         };
+        "handler.AgentCancelRequest": {
+            run_id: string;
+            thread_id: string;
+        };
+        "handler.AgentCancelResponse": {
+            run_id?: string;
+            /** @enum {string} */
+            status?: "cancel_requested" | "cancelled" | "completed" | "failed";
+            thread_id?: string;
+        };
         "handler.AgentChatRequest": {
             context?: components["schemas"]["inject.ContextItem"][];
             mentions?: components["schemas"]["inject.MentionItem"][];
             /** @enum {string} */
-            mode?: "review" | "organize" | "analyze" | "curate";
+            mode: "free" | "review" | "organize" | "analyze" | "curate";
             query: string;
             thread_id?: string;
         };

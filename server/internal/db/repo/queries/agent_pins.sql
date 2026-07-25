@@ -12,6 +12,12 @@ ORDER BY created_at ASC;
 SELECT * FROM agent_pins
 WHERE pin_id = $1 AND user_id = $2;
 
+-- name: TouchAgentPinLiveRefresh :exec
+UPDATE agent_pins
+SET last_successful_refresh_at = $3,
+    updated_at = NOW()
+WHERE pin_id = $1 AND user_id = $2;
+
 -- name: UpdateAgentPinLayout :exec
 UPDATE agent_pins
 SET layout_x = $3, layout_y = $4, layout_w = $5, layout_h = $6, updated_at = NOW()

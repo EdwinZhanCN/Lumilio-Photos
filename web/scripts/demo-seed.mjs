@@ -8,7 +8,7 @@ import { openAsBlob } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { parseLock, selectProfile, syncAssets } from "./assets-sync.mjs";
+import { selectProfile, syncAssets } from "./assets-sync.mjs";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(webRoot, "..");
@@ -27,7 +27,11 @@ function parseOptions(args) {
     else if (flag === "--timeout") options.timeoutMs = Number(value) * 1000;
     else throw new Error(`unknown argument: ${args[index]}`);
   }
-  if (!Number.isInteger(options.concurrency) || options.concurrency < 1 || options.concurrency > 8) {
+  if (
+    !Number.isInteger(options.concurrency) ||
+    options.concurrency < 1 ||
+    options.concurrency > 8
+  ) {
     throw new Error("--concurrency must be between 1 and 8");
   }
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0) {
@@ -37,14 +41,17 @@ function parseOptions(args) {
 }
 
 async function api(pathname, { method = "GET", body, token, form } = {}) {
-  const response = await fetch(`${baseURL}${pathname}`, {
+  /** @type {RequestInit} */
+  const request = {
     method,
-    body: form ?? body,
     headers: {
       ...(form ? {} : { "content-type": "application/json" }),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-  });
+  };
+  const requestBody = form ?? body;
+  if (requestBody !== undefined) request.body = requestBody;
+  const response = await fetch(`${baseURL}${pathname}`, request);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(`${method} ${pathname}: ${response.status} ${JSON.stringify(payload)}`);
@@ -148,7 +155,7 @@ async function uploadAll(assets, token, repositoryId, concurrency) {
       try {
         await api("/api/v1/assets", { method: "POST", token, form });
       } catch (error) {
-        failures.push(`${asset.id}: ${error instanceof Error ? error.message : error}`);
+        failures.push(`${asset.id}: ${error instanceof Error ? error.message : String(error)}`);
       }
       done += 1;
       if (done % 25 === 0 || done === assets.length) {
@@ -180,7 +187,6 @@ async function waitForIngestion(token, repositoryId, expected, timeoutMs) {
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   const lockPath = path.join(repositoryRoot, "assets.lock.json");
-  const lock = parseLock(await readFile(lockPath, "utf8"));
 
   const { target, cached } = await syncAssets({
     lockPath,

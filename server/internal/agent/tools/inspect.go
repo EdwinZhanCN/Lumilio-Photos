@@ -44,7 +44,7 @@ func RegisterInspect() {
 			start := time.Now()
 			execID := newExecutionID()
 
-			r, refErr := deps.RefStore.Get(deps.Scope(), input.RefID)
+			r, refErr := deps.ResolveRef(ctx, input.RefID)
 			if refErr != nil {
 				sendError(deps, info.Name, execID, start, refErr)
 				return &InspectOutput{Error: refErr}, nil
@@ -60,7 +60,7 @@ func RegisterInspect() {
 				return &InspectOutput{Error: refErr}, nil
 			}
 
-			rows, err := deps.Queries.AgentInspectAssets(ctx, toPgUUIDs(r.AssetIDs))
+			rows, err := deps.Library.InspectAssets(ctx, r.AssetIDs)
 			if err != nil {
 				refErr := ref.Internal("inspect query")
 				sendError(deps, info.Name, execID, start, refErr)

@@ -9,7 +9,6 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
 	"server/internal/search"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -63,14 +62,14 @@ func RegisterSearchSemantic() {
 				sendError(deps, info.Name, execID, start, refErr)
 				return errorOutput(refErr), nil
 			}
-			if deps.Search == nil {
+			if deps.Library == nil {
 				refErr := ref.FeatureUnavailable("search backend is not configured")
 				sendError(deps, info.Name, execID, start, refErr)
 				return errorOutput(refErr), nil
 			}
 
 			strictness := search.ParseStrictness(input.Strictness)
-			ids, meta, err := deps.Search.SearchAssetIDsSemantic(ctx, query, strictness, ref.MaxSnapshotSize)
+			ids, meta, err := deps.Library.SearchSemantic(ctx, query, strictness, ref.MaxSnapshotSize)
 			if err != nil {
 				refErr := ref.FeatureUnavailable("semantic search is currently unavailable")
 				sendError(deps, info.Name, execID, start, refErr)
@@ -78,14 +77,26 @@ func RegisterSearchSemantic() {
 			}
 
 			summary := semanticSetSummary(query, strictness, ids, meta)
-			r := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: map[string]string{"query": query, "strictness": string(strictness)}},
+			r, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{
+					Op: info.Name,
+					Payload: ref.TypedPayload(map[string]any{
+						"query": query, "strictness": strictness,
+						"profile_version": meta.ProfileVersion, "model_version": meta.ModelVersion,
+						"index_version": meta.IndexVersion, "language_version": meta.LanguageVersion,
+					}),
+					EmbeddingIndexVersion: meta.IndexVersion,
+				},
 				query,
 				summary,
 				ids,
 				!meta.Complete,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: r.ID, Count: r.Count()})
 			return receiptOutput(r, summary), nil
 		})
@@ -137,13 +148,13 @@ func RegisterSearchText() {
 				sendError(deps, info.Name, execID, start, refErr)
 				return errorOutput(refErr), nil
 			}
-			if deps.Search == nil {
+			if deps.Library == nil {
 				refErr := ref.FeatureUnavailable("search backend is not configured")
 				sendError(deps, info.Name, execID, start, refErr)
 				return errorOutput(refErr), nil
 			}
 
-			ids, err := deps.Search.SearchAssetIDsOCR(ctx, query, ref.MaxSnapshotSize+1)
+			ids, err := deps.Library.SearchOCR(ctx, query, ref.MaxSnapshotSize+1)
 			if err != nil {
 				refErr := ref.FeatureUnavailable("text search is currently unavailable")
 				sendError(deps, info.Name, execID, start, refErr)
@@ -161,14 +172,18 @@ func RegisterSearchText() {
 			if truncated {
 				summary += fmt.Sprintf(" (truncated at %d)", ref.MaxSnapshotSize)
 			}
-			r := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: map[string]string{"query": query}},
+			r, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{Op: info.Name, Payload: ref.TypedPayload(map[string]any{"query": query})},
 				query,
 				summary,
 				ids,
 				truncated,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: r.ID, Count: r.Count()})
 			return receiptOutput(r, summary), nil
 		})
@@ -202,10 +217,7 @@ func RegisterSearchPeople() {
 				idStrs[i] = strconv.Itoa(id)
 			}
 
-			rows, err := deps.Queries.GetAssetIDsByPersonIDs(ctx, repo.GetAssetIDsByPersonIDsParams{
-				PersonIds: personIDs,
-				Limit:     ref.MaxSnapshotSize + 1,
-			})
+			rows, err := deps.Library.SearchPeople(ctx, personIDs, ref.MaxSnapshotSize+1)
 			if err != nil {
 				refErr := ref.Internal("people search query")
 				sendError(deps, info.Name, execID, start, refErr)
@@ -226,14 +238,18 @@ func RegisterSearchPeople() {
 				summary += fmt.Sprintf(" (truncated at %d)", ref.MaxSnapshotSize)
 			}
 
-			r := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: map[string]string{"person_ids": strings.Join(idStrs, ",")}},
+			r, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{Op: info.Name, Payload: ref.TypedPayload(map[string]any{"person_ids": personIDs})},
 				"people",
 				summary,
 				snapshot,
 				truncated,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: r.ID, Count: r.Count()})
 			return receiptOutput(r, summary), nil
 		})

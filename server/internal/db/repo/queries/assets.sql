@@ -19,6 +19,25 @@ SELECT * FROM assets
 WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
   AND is_deleted = false;
 
+-- name: GetAssetsByIDsForOwner :many
+SELECT * FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND owner_id = sqlc.arg('owner_id')::integer
+  AND is_deleted = false;
+
+-- name: GetAuthorizedAssetIDs :many
+SELECT asset_id FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND owner_id = sqlc.arg('owner_id')::integer
+  AND is_deleted = false;
+
+-- name: LockAuthorizedAssetIDs :many
+SELECT asset_id FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND owner_id = sqlc.arg('owner_id')::integer
+  AND is_deleted = false
+FOR UPDATE;
+
 -- name: GetAssetExifRaw :one
 SELECT exif_raw FROM assets
 WHERE asset_id = $1;

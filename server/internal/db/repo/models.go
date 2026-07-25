@@ -109,22 +109,83 @@ type AgentCheckpoint struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type AgentPendingEffect struct {
+	EffectID           pgtype.UUID        `db:"effect_id" json:"effect_id"`
+	UserID             int32              `db:"user_id" json:"user_id"`
+	ThreadID           string             `db:"thread_id" json:"thread_id"`
+	InitiatingRunID    pgtype.UUID        `db:"initiating_run_id" json:"initiating_run_id"`
+	ExecutingRunID     pgtype.UUID        `db:"executing_run_id" json:"executing_run_id"`
+	ToolName           string             `db:"tool_name" json:"tool_name"`
+	EffectClass        string             `db:"effect_class" json:"effect_class"`
+	PolicyVersion      int32              `db:"policy_version" json:"policy_version"`
+	MembershipSnapshot []pgtype.UUID      `db:"membership_snapshot" json:"membership_snapshot"`
+	Payload            []byte             `db:"payload" json:"payload"`
+	Target             []byte             `db:"target" json:"target"`
+	IdempotencyKey     string             `db:"idempotency_key" json:"idempotency_key"`
+	Status             string             `db:"status" json:"status"`
+	Receipt            []byte             `db:"receipt" json:"receipt"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CommittedAt        pgtype.Timestamptz `db:"committed_at" json:"committed_at"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type AgentPin struct {
-	PinID     pgtype.UUID        `db:"pin_id" json:"pin_id"`
-	UserID    int32              `db:"user_id" json:"user_id"`
-	Title     string             `db:"title" json:"title"`
-	Widget    string             `db:"widget" json:"widget"`
-	Mode      string             `db:"mode" json:"mode"`
-	Plan      []byte             `db:"plan" json:"plan"`
-	Summary   string             `db:"summary" json:"summary"`
-	AssetIds  []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
-	Truncated bool               `db:"truncated" json:"truncated"`
-	LayoutX   int32              `db:"layout_x" json:"layout_x"`
-	LayoutY   int32              `db:"layout_y" json:"layout_y"`
-	LayoutW   int32              `db:"layout_w" json:"layout_w"`
-	LayoutH   int32              `db:"layout_h" json:"layout_h"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PinID                   pgtype.UUID        `db:"pin_id" json:"pin_id"`
+	UserID                  int32              `db:"user_id" json:"user_id"`
+	Title                   string             `db:"title" json:"title"`
+	Widget                  string             `db:"widget" json:"widget"`
+	Mode                    string             `db:"mode" json:"mode"`
+	Plan                    []byte             `db:"plan" json:"plan"`
+	Summary                 string             `db:"summary" json:"summary"`
+	AssetIds                []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
+	Truncated               bool               `db:"truncated" json:"truncated"`
+	LayoutX                 int32              `db:"layout_x" json:"layout_x"`
+	LayoutY                 int32              `db:"layout_y" json:"layout_y"`
+	LayoutW                 int32              `db:"layout_w" json:"layout_w"`
+	LayoutH                 int32              `db:"layout_h" json:"layout_h"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	LastSuccessfulRefreshAt pgtype.Timestamptz `db:"last_successful_refresh_at" json:"last_successful_refresh_at"`
+}
+
+type AgentRef struct {
+	UserID         int32              `db:"user_id" json:"user_id"`
+	ThreadID       string             `db:"thread_id" json:"thread_id"`
+	RefID          string             `db:"ref_id" json:"ref_id"`
+	Sequence       int32              `db:"sequence" json:"sequence"`
+	Plan           []byte             `db:"plan" json:"plan"`
+	AssetIds       []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
+	Summary        string             `db:"summary" json:"summary"`
+	Truncated      bool               `db:"truncated" json:"truncated"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastAccessedAt pgtype.Timestamptz `db:"last_accessed_at" json:"last_accessed_at"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+}
+
+type AgentRun struct {
+	RunID             pgtype.UUID        `db:"run_id" json:"run_id"`
+	UserID            int32              `db:"user_id" json:"user_id"`
+	ThreadID          string             `db:"thread_id" json:"thread_id"`
+	Status            string             `db:"status" json:"status"`
+	CancelRequestedAt pgtype.Timestamptz `db:"cancel_requested_at" json:"cancel_requested_at"`
+	StartedAt         pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	FinishedAt        pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type AgentThread struct {
+	UserID          int32              `db:"user_id" json:"user_id"`
+	ThreadID        string             `db:"thread_id" json:"thread_id"`
+	CheckpointKey   string             `db:"checkpoint_key" json:"checkpoint_key"`
+	Mode            string             `db:"mode" json:"mode"`
+	ContextBindings []byte             `db:"context_bindings" json:"context_bindings"`
+	MentionBindings []byte             `db:"mention_bindings" json:"mention_bindings"`
+	PolicyVersion   int32              `db:"policy_version" json:"policy_version"`
+	Status          string             `db:"status" json:"status"`
+	ActiveRunID     pgtype.UUID        `db:"active_run_id" json:"active_run_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Album struct {

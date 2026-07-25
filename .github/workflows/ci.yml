@@ -22,6 +22,12 @@ jobs:
         outputs:
             server: ${{ steps.filter.outputs.server }}
             web: ${{ steps.filter.outputs.web }}
+            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            browser_smoke: ${{ steps.filter.outputs.browser_smoke }}
+            auth_e2e: ${{ steps.filter.outputs.auth_e2e }}
+            video_e2e: ${{ steps.filter.outputs.video_e2e }}
+            recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
         steps:
@@ -38,6 +44,104 @@ jobs:
                           - 'web/**'
                           - 'Makefile'
                           - '.github/workflows/ci.yml'
+                      # Keep the required browser gate compact. This filter
+                      # follows only the low-cost first-party journeys; heavier
+                      # auth, video, and recovery suites have narrower filters
+                      # below and share the same one-time E2E environment.
+                      browser_smoke:
+                          - '.github/workflows/ci.yml'
+                          - 'Makefile'
+                          - 'docker-compose.e2e*.yml'
+                          - 'server/Dockerfile'
+                          - 'server/db.Dockerfile'
+                          - 'server/go.mod'
+                          - 'server/go.sum'
+                          - 'server/migrations/**'
+                          - 'server/internal/api/handler/album_handler.go'
+                          - 'server/internal/api/handler/asset_handler*.go'
+                          - 'server/internal/api/handler/repository_scan_handler*.go'
+                          - 'server/internal/processors/asset_*.go'
+                          - 'server/internal/processors/discover_task*.go'
+                          - 'server/internal/processors/ingest_task*.go'
+                          - 'server/internal/processors/metadata_task*.go'
+                          - 'server/internal/processors/photo_helpers*.go'
+                          - 'server/internal/processors/thumbnail_task*.go'
+                          - 'server/internal/processors/transcode_task*.go'
+                          - 'server/internal/queue/ingest_*.go'
+                          - 'server/internal/queue/media_*.go'
+                          - 'server/internal/queue/retry_asset_worker.go'
+                          - 'server/internal/queue/queue_setup*.go'
+                          - 'server/internal/queue/jobs/**'
+                          - 'server/internal/service/album_service*.go'
+                          - 'server/internal/service/asset_service*.go'
+                          - 'server/internal/sourcing/**'
+                          - 'server/internal/storage/**'
+                          - 'web/Dockerfile'
+                          - 'web/Caddyfile'
+                          - 'web/playwright.config.ts'
+                          - 'web/package.json'
+                          - 'web/pnpm-lock.yaml'
+                          - 'web/e2e/fixtures/**'
+                          - 'web/e2e/pages/**'
+                          - 'web/e2e/support/**'
+                          - 'web/e2e/specs/capabilities.spec.ts'
+                          - 'web/e2e/specs/login.spec.ts'
+                          - 'web/e2e/specs/scan.spec.ts'
+                          - 'web/e2e/specs/upload.spec.ts'
+                          - 'web/src/app/**'
+                          - 'web/src/contexts/WorkerProvider.tsx'
+                          - 'web/src/features/assets/**'
+                          - 'web/src/features/collections/**'
+                          - 'web/src/features/manage/**'
+                          - 'web/src/features/repositories/**'
+                          - 'web/src/features/upload/**'
+                          - 'web/src/lib/assets/**'
+                          - 'web/src/lib/http-commons/**'
+                      auth_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'Makefile'
+                          - 'docker-compose.e2e*.yml'
+                          - 'server/config/**'
+                          - 'server/internal/api/handler/auth*.go'
+                          - 'server/internal/api/ratelimit/**'
+                          - 'server/internal/api/security_test.go'
+                          - 'server/internal/service/auth*.go'
+                          - 'server/internal/service/totp.go'
+                          - 'server/internal/service/webauthn*.go'
+                          - 'web/e2e/specs/auth-session.spec.ts'
+                          - 'web/src/features/auth/**'
+                          - 'web/src/lib/http-commons/auth.ts'
+                          - 'web/src/lib/http-commons/client.ts'
+                      video_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'Makefile'
+                          - 'docker-compose.e2e*.yml'
+                          - 'server/internal/processors/video*.go'
+                          - 'server/internal/processors/*transcode*.go'
+                          - 'server/internal/search/**'
+                          - 'server/internal/service/indexing_service.go'
+                          - 'server/internal/queue/ml_config_provider.go'
+                          - 'server/internal/queue/jobs/types.go'
+                          - 'web/e2e/specs/video-semantic*.spec.ts'
+                          - 'web/e2e/support/fakelumen.Dockerfile'
+                          - 'web/src/features/assets/flows/viewer/media/**'
+                          - 'web/src/features/assets/model/browseItems.ts'
+                          - 'web/src/features/monitor/api/useAssetIndexing.ts'
+                          - 'web/src/features/settings/flows/ai/**'
+                      recovery_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'Makefile'
+                          - 'docker-compose.e2e*.yml'
+                          - 'server/Dockerfile'
+                          - 'server/db.Dockerfile'
+                          - 'server/internal/db/backup/**'
+                          - 'server/internal/queue/db_backup_worker.go'
+                          - 'server/internal/service/backup_service.go'
+                          - 'server/internal/api/handler/backup_handler.go'
+                          - 'server/internal/api/dto/backup_dto.go'
+                          - 'web/e2e/specs/backup-recovery.spec.ts'
+                          - 'web/src/features/settings/api/useBackups.ts'
+                          - 'web/src/features/settings/flows/server/BackupSection.tsx'
                       desktop:
                           - 'desktop/**'
                           - 'server/**'
@@ -74,7 +178,7 @@ jobs:
     web:
         name: web (make web-test)
         needs: changes
-        if: needs.changes.outputs.web == 'true'
+        if: needs.changes.outputs.web_job == 'true'
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -117,36 +221,47 @@ jobs:
                   fi
 
             - run: make web-test
+              if: needs.changes.outputs.web == 'true'
 
             # A docker-container builder plus the ACTIONS_* runtime env let the
             # E2E image builds read and write the GitHub Actions layer cache;
             # docker-compose.e2e.ci.yml wires the cache in per service.
             - uses: docker/setup-buildx-action@v3
+              if: needs.changes.outputs.e2e == 'true'
             - uses: crazy-max/ghaction-github-runtime@v3
+              if: needs.changes.outputs.e2e == 'true'
 
             - name: Start isolated E2E environment
+              if: needs.changes.outputs.e2e == 'true'
               run: cd web && vp run e2e:up
               env:
                   LUMILIO_E2E_COMPOSE_EXTRA: docker-compose.e2e.ci.yml
 
             - name: Run Chromium smoke
+              if: needs.changes.outputs.browser_smoke == 'true'
               run: make web-browser-test
 
             - name: Run authentication hardening regression
+              if: needs.changes.outputs.auth_e2e == 'true'
               run: make web-auth-hardening-test
 
             - name: Run video semantic regression
+              if: needs.changes.outputs.video_e2e == 'true'
               run: make web-video-semantic-test
 
+            - name: Run database backup and recovery regression
+              if: needs.changes.outputs.recovery_e2e == 'true'
+              run: make web-backup-recovery-test
+
             - name: Capture E2E service logs
-              if: failure()
+              if: ${{ failure() && needs.changes.outputs.e2e == 'true' }}
               run: |
                   mkdir -p web/test-results
                   cd web
                   vp run e2e:logs > test-results/services.log
 
             - name: Upload Playwright diagnostics
-              if: failure()
+              if: ${{ failure() && needs.changes.outputs.e2e == 'true' }}
               uses: actions/upload-artifact@v7
               with:
                   name: playwright-smoke-${{ github.run_id }}
@@ -157,7 +272,7 @@ jobs:
                   retention-days: 7
 
             - name: Stop isolated E2E environment
-              if: always()
+              if: ${{ always() && needs.changes.outputs.e2e == 'true' }}
               run: cd web && vp run e2e:down
 
     # macOS and Windows intentionally validate the same product surface:
@@ -310,7 +425,7 @@ jobs:
                   CHANGES_RESULT: ${{ needs.changes.result }}
                   SERVER_CHANGED: ${{ needs.changes.outputs.server }}
                   SERVER_RESULT: ${{ needs.server-linux.result }}
-                  WEB_CHANGED: ${{ needs.changes.outputs.web }}
+                  WEB_REQUIRED: ${{ needs.changes.outputs.web_job }}
                   WEB_RESULT: ${{ needs.web.result }}
                   DESKTOP_CHANGED: ${{ needs.changes.outputs.desktop }}
                   DESKTOP_MACOS_RESULT: ${{ needs.desktop-macos.result }}
@@ -342,7 +457,7 @@ jobs:
                   }
 
                   check_job "server linux" "$SERVER_CHANGED" "$SERVER_RESULT"
-                  check_job "web" "$WEB_CHANGED" "$WEB_RESULT"
+                  check_job "web" "$WEB_REQUIRED" "$WEB_RESULT"
                   check_job "desktop macos" "$DESKTOP_CHANGED" "$DESKTOP_MACOS_RESULT"
                   check_job "desktop windows" "$DESKTOP_CHANGED" "$DESKTOP_WINDOWS_RESULT"
                   check_job "site" "$SITE_CHANGED" "$SITE_RESULT"

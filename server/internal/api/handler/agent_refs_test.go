@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,7 +29,8 @@ func refTestContext(t *testing.T, userID int, url string) (*gin.Context, *httpte
 func TestResolveRefScopeIsolation(t *testing.T) {
 	store := ref.NewMemoryStore(0, 0)
 	owner := ref.Scope{UserID: 1, ThreadID: "thread-a"}
-	r := store.Create(owner, ref.Plan{Op: "filter_assets"}, "test", "", []uuid.UUID{uuid.New()}, false)
+	r, createErr := store.Create(context.Background(), owner, ref.Plan{Op: "filter_assets"}, "test", "", []uuid.UUID{uuid.New()}, false)
+	require.Nil(t, createErr)
 
 	h := NewAgentHandler(nil, store, nil, nil, nil)
 
@@ -56,7 +58,8 @@ func TestResolveRefScopeIsolation(t *testing.T) {
 func TestResolveRefHappyPathRefreshesScope(t *testing.T) {
 	store := ref.NewMemoryStore(0, 0)
 	owner := ref.Scope{UserID: 1, ThreadID: "thread-a"}
-	created := store.Create(owner, ref.Plan{Op: "filter_assets"}, "test", "", []uuid.UUID{uuid.New(), uuid.New()}, false)
+	created, createErr := store.Create(context.Background(), owner, ref.Plan{Op: "filter_assets"}, "test", "", []uuid.UUID{uuid.New(), uuid.New()}, false)
+	require.Nil(t, createErr)
 
 	h := NewAgentHandler(nil, store, nil, nil, nil)
 	c, _ := refTestContext(t, 1, "/api/v1/agent/refs/"+created.ID+"?thread_id=thread-a")

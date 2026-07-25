@@ -1,6 +1,6 @@
 // Package backup implements the app-driven PostgreSQL logical-backup engine
 // shared by the Docker server and the desktop supervisor (see
-// exec-plans/active/db-backup-upgrade.md). It shells out to a pg_dump whose
+// exec-plans/completed/db-backup-recovery.md). It shells out to a pg_dump whose
 // major version matches the connected server, writes gzip dumps atomically
 // (.tmp + rename) with provenance-carrying filenames, and prunes by count.
 package backup
@@ -26,14 +26,30 @@ import (
 )
 
 // Conn is the connection target for the dump tools. Host may be a Unix socket
-// directory (desktop) or a hostname (Docker); Password is the resolved
-// plaintext password (config loading already applies password_file).
+// directory (desktop) or a hostname (Docker). Password is the startup
+// credential; PasswordFile, when present and non-empty, is resolved immediately
+// before each tool invocation so first-run credential rotation does not leave
+// the long-lived backup runtime holding the bootstrap password.
 type Conn struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
+	Host         string
+	Port         string
+	User         string
+	Password     string
+	PasswordFile string
+	DBName       string
+}
+
+// ResolvedPassword returns the current rotated credential when available,
+// falling back to the startup credential before first-run setup has completed.
+func (c Conn) ResolvedPassword() string {
+	if secretPath := strings.TrimSpace(c.PasswordFile); secretPath != "" {
+		if data, err := os.ReadFile(secretPath); err == nil {
+			if password := strings.TrimSpace(string(data)); password != "" {
+				return password
+			}
+		}
+	}
+	return c.Password
 }
 
 // Logf matches the supervisor-style logging callback used across the app.
@@ -168,7 +184,7 @@ func DumpWithPrefix(ctx context.Context, conn Conn, toolsBinDir, destDir, prefix
 		"--username", conn.User,
 		"--dbname", conn.DBName,
 	)
-	cmd.Env = append(os.Environ(), "PGPASSWORD="+conn.Password)
+	cmd.Env = append(os.Environ(), "PGPASSWORD="+conn.ResolvedPassword())
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

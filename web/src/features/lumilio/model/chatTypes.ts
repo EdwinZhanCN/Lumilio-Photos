@@ -4,6 +4,9 @@ type Schemas = components["schemas"];
 
 export type AgentChatRequest = Schemas["handler.AgentChatRequest"];
 export type AgentResumeRequest = Schemas["handler.AgentResumeRequest"];
+export type AgentCancelRequest = Schemas["handler.AgentCancelRequest"];
+export type AgentCancelResponse = Schemas["handler.AgentCancelResponse"];
+export type AgentMode = AgentChatRequest["mode"];
 export type ToolInfoResponse = Schemas["handler.ToolInfoResponse"];
 export type AgentRefDTO = Schemas["dto.AgentRefDTO"];
 export type AgentRefAssetsDTO = Schemas["dto.AgentRefAssetsDTO"];
@@ -26,7 +29,14 @@ export interface SideChannelError {
   hint?: string;
 }
 
-export type ToolStatus = "running" | "success" | "error";
+export type ToolStatus = "running" | "success" | "error" | "cancelled";
+export type AgentRunStatus =
+  | "running"
+  | "cancel_requested"
+  | "awaiting_confirmation"
+  | "cancelled"
+  | "completed"
+  | "failed";
 
 /** Control-plane event emitted by tool executions through the side channel. */
 export interface SideChannelEvent {
@@ -52,11 +62,11 @@ export interface TokenUsageInfo {
   totalTokens: number;
 }
 
-/** Streamed agent message chunk (assistant text and/or reasoning). */
+/** Streamed public Agent message chunk. Provider reasoning is never part of
+ * the product SSE contract. */
 export interface AgentMessageEvent {
   agent_name?: string;
   output?: string;
-  reasoning?: string;
   action?: { interrupted?: InterruptInfo; Interrupted?: InterruptInfo };
   error?: string;
 }
@@ -91,21 +101,12 @@ export interface ConfirmationInfo {
 
 // --- Conversation model: messages are lists of typed blocks ---
 
-export type Block = TextBlock | ReasoningBlock | ToolBlock | WidgetBlock | ConfirmBlock;
+export type Block = TextBlock | ToolBlock | WidgetBlock | ConfirmBlock;
 
 export interface TextBlock {
   kind: "text";
   id: string;
   markdown: string;
-}
-
-export interface ReasoningBlock {
-  kind: "reasoning";
-  id: string;
-  text: string;
-  startedAt: number;
-  /** Seconds spent reasoning; set when the block closes. */
-  durationS?: number;
 }
 
 /** One tool execution, upserted by executionId as side events stream in. */
@@ -137,11 +138,12 @@ export interface ConfirmBlock {
   kind: "confirm";
   id: string;
   interrupt: InterruptInfo;
-  resolved?: "approved" | "rejected";
+  resolved?: "approved" | "rejected" | "cancelled";
 }
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   blocks: Block[];
+  status?: "stopped";
 }

@@ -60,7 +60,7 @@ func RegisterFilterAssets() {
 				return errorOutput(refErr), nil
 			}
 
-			rows, err := deps.Queries.GetAssetIDsUnified(ctx, *params)
+			rows, err := deps.Library.FilterAssetIDs(ctx, *params)
 			if err != nil {
 				refErr := ref.Internal("asset filter query")
 				sendError(deps, info.Name, execID, start, refErr)
@@ -88,14 +88,18 @@ func RegisterFilterAssets() {
 			if qualityNote != "" {
 				summary += qualityNote
 			}
-			r := deps.RefStore.Create(
-				deps.Scope(),
-				ref.Plan{Op: info.Name, Params: filterPlanParams(input)},
+			r, createErr := deps.CreateRef(
+				ctx,
+				ref.Plan{Op: info.Name, Payload: ref.TypedPayload(input)},
 				filterHint(input),
 				summary,
 				snapshot,
 				truncated,
 			)
+			if createErr != nil {
+				sendError(deps, info.Name, execID, start, createErr)
+				return errorOutput(createErr), nil
+			}
 			sendSuccess(deps, info.Name, execID, start, summary, &core.DataPayload{RefID: r.ID, Count: r.Count()})
 			return receiptOutput(r, summary), nil
 		})
@@ -116,7 +120,7 @@ func applyMinQualityPercentile(
 		return snapshot, "", nil
 	}
 
-	rows, err := deps.Queries.AgentAssetAestheticScores(ctx, toPgUUIDs(snapshot))
+	rows, err := deps.Library.AestheticScores(ctx, snapshot)
 	if err != nil {
 		return nil, "", ref.Internal("quality score query")
 	}

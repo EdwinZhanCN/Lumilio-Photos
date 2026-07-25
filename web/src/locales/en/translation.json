@@ -1035,13 +1035,8 @@
     "input": {
       "modePrompt": "Continue in {{mode}} mode…",
       "prompt": "Ask Lumilio Agent...",
-      "send": "Send"
-    },
-    "markdown": {
-      "think": {
-        "thinking": "Thinking...",
-        "thoughtFor": "Thought for {{time}}s"
-      }
+      "send": "Send",
+      "stop": "Stop generation"
     },
     "mention": {
       "album": "Album",
@@ -1056,6 +1051,7 @@
       "select": "Select"
     },
     "messages": {
+      "stopped": "Stopped",
       "thinking": "Thinking..."
     },
     "mode": {
@@ -1087,6 +1083,7 @@
       }
     },
     "tools": {
+      "cancelled": "Stopped",
       "emptyResult": "No matching photos",
       "resultSet": "Result set"
     },

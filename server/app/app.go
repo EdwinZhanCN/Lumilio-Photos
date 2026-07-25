@@ -56,10 +56,12 @@ const shutdownTimeout = 10 * time.Second
 // OperatorControls are explicit, single-run host controls. They do not modify
 // AppConfig and are never read from the environment inside the application.
 type OperatorControls struct {
-	PprofAddr          string
-	AgentAuditLogPath  string
-	BreakGlass         bool
-	BreakGlassUsername string
+	PprofAddr                    string
+	AgentAuditLogPath            string
+	AgentRefUserHotBudgetBytes   int64
+	AgentRefGlobalHotBudgetBytes int64
+	BreakGlass                   bool
+	BreakGlassUsername           string
 	// RepositoryManagerReady exposes the in-process repository control plane to
 	// the Desktop host. Standalone leaves it nil; no HTTP path or secret is
 	// created by this hook.
@@ -81,6 +83,18 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 }
 
 func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.DatabaseConfig, controls OperatorControls) error {
+	agentRefUserBudget := controls.AgentRefUserHotBudgetBytes
+	if agentRefUserBudget <= 0 {
+		agentRefUserBudget = ref.DefaultUserHotBudget
+	}
+	agentRefGlobalBudget := controls.AgentRefGlobalHotBudgetBytes
+	if agentRefGlobalBudget <= 0 {
+		agentRefGlobalBudget = ref.DefaultGlobalHotBudget
+	}
+	if agentRefGlobalBudget < agentRefUserBudget {
+		return errors.New("global Agent ref hot-memory budget must be greater than or equal to the per-user budget")
+	}
+
 	logRuntime, err := logging.NewLogger(logging.Config{
 		Level:         appConfig.LoggingConfig.Level,
 		LogDir:        appConfig.LoggingConfig.LogDir,
@@ -265,12 +279,20 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// Initialize Agent Service. The ref store is shared between the agent
 	// tool chain and the hydration API handler; its janitor bounds memory
 	// for abandoned sessions.
-	refStore := ref.NewMemoryStore(ref.DefaultTTL, ref.DefaultMaxRefsPerScope)
+	authorizedLibraries := core.NewAuthorizedLibraryFactory(queries, assetService)
+	refStore := ref.NewPersistentStore(
+		queries,
+		authorizedLibraries,
+		ref.DefaultTTL,
+		ref.DefaultMaxRefsPerScope,
+		agentRefUserBudget,
+		agentRefGlobalBudget,
+	)
 	go refStore.RunJanitor(ctx, 10*time.Minute)
 	conversations := core.NewConversationStore(core.DefaultConversationTTL)
 	go conversations.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, settingsService, refStore, assetService, conversations, controls.AgentAuditLogPath)
-	agentPins := pins.NewService(queries, refStore, assetService)
+	agentService := core.NewAgentService(queries, pgxPool, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
+	agentPins := pins.NewService(queries, refStore, authorizedLibraries)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
 	// Share links reuse the same asset-set-source query path pins use
@@ -314,16 +336,18 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	backupLogger := appLogger.Named("db_backup").Sugar()
 	backupScheduler := &dbbackup.Scheduler{
 		Conn: dbbackup.Conn{
-			Host:     dbConfig.Host,
-			Port:     dbConfig.Port,
-			User:     dbConfig.User,
-			Password: dbConfig.Password,
-			DBName:   dbConfig.DBName,
+			Host:         dbConfig.Host,
+			Port:         dbConfig.Port,
+			User:         dbConfig.User,
+			Password:     dbConfig.Password,
+			PasswordFile: dbConfig.RotatedPasswordFile,
+			DBName:       dbConfig.DBName,
 		},
 		Pool:        pgxPool,
 		ToolsBinDir: dbConfig.ToolsBinDir,
 		Dir:         appConfig.StorageConfig.BackupsDir(),
 		AppVersion:  version.Version,
+		Ready:       bootstrapService.IsReady,
 		Settings:    settingsService.GetBackupConfig,
 		Logf:        func(format string, args ...any) { backupLogger.Infof(format, args...) },
 	}
@@ -347,8 +371,17 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 			Resume: func(ctx context.Context) error {
 				return queueClient.QueueResume(ctx, "*", nil)
 			},
+			Reconnect: func(ctx context.Context) error {
+				pgxPool.Reset()
+				if err := pgxPool.Ping(ctx); err != nil {
+					return fmt.Errorf("database pool reconnect failed: %w", err)
+				}
+				return nil
+			},
 			Migrate: func(ctx context.Context) error {
-				return db.AutoMigrate(ctx, dbConfig)
+				migrationConfig := dbConfig
+				migrationConfig.Password = backupScheduler.Conn.ResolvedPassword()
+				return db.AutoMigrate(ctx, migrationConfig)
 			},
 			Verify: func(ctx context.Context) error {
 				if _, err := settingsService.GetSystemSettings(ctx); err != nil {
@@ -412,7 +445,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	userController := handler.NewUserHandler(userService, securityLogger)
 	queueController := handler.NewQueueHandler(pgxPool)
 	statsController := handler.NewStatsHandler(queries)
-	agentController := handler.NewAgentHandler(agentService, refStore, queries, agentPins, assetService)
+	agentController := handler.NewAgentHandler(agentService, refStore, authorizedLibraries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService, backupService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
