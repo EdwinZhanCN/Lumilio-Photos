@@ -101,6 +101,38 @@ func TestDesktopNetworkRestartRollback(t *testing.T) {
 	assertDesktopHTTP(t, &http.Client{Timeout: 5 * time.Second}, supervisor.ServerURL(), "ROLLBACK_OK")
 }
 
+func TestDesktopRuntimeRestart(t *testing.T) {
+	appData := t.TempDir()
+	webRoot := t.TempDir()
+	resources := t.TempDir()
+	const marker = "RESTART_OK"
+	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte(marker), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffmpeg")))
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffprobe")))
+	writeStubTool(t, filepath.Join(resources, "exiftool", toolExe("exiftool")))
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	t.Setenv("LUMILIO_WEB_ROOT", webRoot)
+	t.Setenv("LUMILIO_RESOURCES_DIR", resources)
+
+	supervisor := startDesktopRuntime(t)
+	if err := supervisor.Restart(context.Background()); err != nil {
+		t.Fatalf("Restart: %v", err)
+	}
+	snapshot := supervisor.RuntimeSnapshot()
+	if snapshot.Phase != RuntimeRunning || !snapshot.CanOpen ||
+		snapshot.BrowserURL != "http://localhost:6680" {
+		t.Fatalf("restart snapshot = %+v", snapshot)
+	}
+	assertDesktopHTTP(t, &http.Client{Timeout: 5 * time.Second}, snapshot.BrowserURL, marker)
+
+	other := New(Options{Logf: t.Logf})
+	if err := other.Prepare(); err != ErrAlreadyRunning {
+		t.Fatalf("host lock after restart = %v, want ErrAlreadyRunning", err)
+	}
+}
+
 func writeStubTool(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

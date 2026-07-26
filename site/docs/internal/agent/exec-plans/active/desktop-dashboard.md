@@ -1772,7 +1772,29 @@ rollback
   - Inventory：Dashboard 仍按 `PhotosCard → StorageLocationsPanel → HubCard → LogPanel →
     SettingsPanel → PathsPanel` 等权纵排；Hub 自有 `ConfigureDialog`；Panel state/API/mock
     仍暴露顶层 `ready/serverURL/stage/network`。
-- [ ] Phase 1：Runtime lifecycle
+- [x] Phase 1：Runtime lifecycle
+  - 新增 `RuntimePhase`、`RuntimeSnapshot`、strict-config-derived `NetworkSummary`；
+    panel、tray 和 Server actions 读取同一个 snapshot，Panel helper 不再依赖顶层 `ready`。
+  - `Prepare`/`Close` 明确拥有 host lock；`runtimeGeneration{cancel, done, err}` 只拥有一次
+    `server/app` generation；restart 和 legacy network apply 都不释放 host lock。
+  - `StopRuntime` 必须等待 generation `done`；timeout 返回
+    `ErrRuntimeStopTimeout`、保留 generation ownership，并让后续 `Start` 返回
+    `ErrRuntimeGenerationActive`，不会启动第二个 listener/River/SQLite generation。
+  - initial start、manual restart、network apply 和 shutdown 共用 `operationMu`；
+    panel `POST /__onb/runtime/restart` 在 claim gate 后返回 `202`，并发请求得到
+    `409 operation_in_progress`。
+  - stop/restart 在 cancel 前主动清空 `RepositoryControl`，新 generation ready 后仍由
+    `server/app` 的既有 hook 重新发布。
+  - 普通 manifest/listen/database/startup failure 进入 `RuntimeFailed`，保留 tray 并打开
+    Control Panel；只有 host-level `ErrAlreadyRunning` 仍退出第二个 Wails host。
+  - `/__onb/state` 已新增 typed `runtime` contract；旧顶层 compatibility fields 暂留到
+    Phase 6 清理。tray Open action 与 host launcher 只在 snapshot `CanOpen` 时使用
+    canonical `BrowserURL`。
+  - Focused tests：stop timeout/second generation、host lock failed lifetime、concurrent
+    restart、RepositoryControl clearing、strict-derived network summary、host fatal
+    classification、typed panel state、real restart E2E。
+  - 验证：`make desktop-test` 通过；Panel `vp check --fix` 后 lint/type/format 通过，
+    `vp test` 为 1 file / 6 tests passed，`vp build` 通过（682 modules）。
 - [ ] Phase 2：Dashboard layout
 - [ ] Phase 3：Unified Settings
 - [ ] Phase 4：Runtime intent/TOML
@@ -1792,6 +1814,10 @@ rollback
 | 2026-07-26 | raw/structured共享一个candidate | 防止两套设置漂移 | network patch由Go backend修改TOML |
 | 2026-07-26 | Lumen配置只抽取复用 | 现有配置流程成熟 | 不建立第二套form/backend |
 | 2026-07-26 | Diagnostics export为P1 | 核心目标是配置、生命周期和恢复 | 不阻塞主实现 |
+| 2026-07-26 | Host lock由`Prepare/Close`拥有，generation由`Start/StopRuntime`拥有 | failed Dashboard与restart不能释放单实例边界 | 只有Desktop Quit释放lock |
+| 2026-07-26 | generation completion使用close-only `done`，不消费一次性error channel | startup waiter与stop waiter都需要观察同一退出事实 | timeout后ownership可安全保留并在真实退出后reap |
+| 2026-07-26 | operation gate对panel mutation使用`TryLock`，shutdown使用阻塞`Lock` | panel需要确定的409，Quit必须等待当前安全操作收敛 | apply/restart并发拒绝，Close串行完成 |
+| 2026-07-26 | 只有`ErrAlreadyRunning`是host-fatal startup error | 其他错误都可由同一Wails host恢复 | port/config/database失败不再直接Quit |
 
 ## Surprises & Discoveries
 
@@ -1802,6 +1828,12 @@ rollback
   后续阶段必须添加 panel tests，使同一命令成为真正通过的质量门。
 - `make desktop-test` 的第一次失败是 sandbox 禁止 loopback listener (`bind: operation not
   permitted`)；提权重跑通过，说明现有 network E2E 本身为绿。
+- `server/app` 已在 Repository manager ready hook 的 defer 中发布 `nil`，但那发生在
+  generation shutdown 后段；Supervisor 仍需在发出 cancel 前主动清空，才能保证整个
+  restart 窗口不暴露旧 manager。
+- 原 `serverErr chan error` 同时承担 startup/stop waiter，消费后无法让另一个观察者可靠
+  判断同一 generation 是否退出；改为 `done` close + close 前写入 `err` 后，所有 waiter
+  共享同一个 happens-before 事实。
 
 ## Outcomes & Retrospective
 

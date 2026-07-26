@@ -1,8 +1,12 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"testing"
+
+	"desktop/supervisor"
 
 	"github.com/stretchr/testify/require"
 )
@@ -34,6 +38,13 @@ func TestParseDesktopCLI(t *testing.T) {
 			require.Equal(t, test.username, controls.BreakGlassUsername)
 		})
 	}
+}
+
+func TestOnlyHostLockConflictQuitsAfterRuntimeStartFailure(t *testing.T) {
+	require.True(t, runtimeStartFailureIsHostFatal(supervisor.ErrAlreadyRunning))
+	require.True(t, runtimeStartFailureIsHostFatal(fmt.Errorf("wrapped: %w", supervisor.ErrAlreadyRunning)))
+	require.False(t, runtimeStartFailureIsHostFatal(supervisor.ErrPortInUse))
+	require.False(t, runtimeStartFailureIsHostFatal(errors.New("strict manifest rejected")))
 }
 
 func TestParseDesktopCLIDoesNotReadStandaloneEnvironment(t *testing.T) {

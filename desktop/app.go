@@ -43,9 +43,7 @@ type desktopApp struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	lang   string // desktop-native chrome language ("en" or "zh")
-	ready  bool
-	status string
+	lang string // desktop-native chrome language ("en" or "zh")
 
 	// Update availability, populated by an async post-launch check.
 	updateVersion string
@@ -68,8 +66,6 @@ type desktopApp struct {
 	lumenError         string
 	lumenStatus        lumen.Status // latest control-plane snapshot (guarded by lumenMu)
 	lumenLatestVersion string
-
-	lastStage atomic.Value // string: most recent startup stage, for failure dialogs
 }
 
 func newDesktopApp(controls ...serverapp.OperatorControls) *desktopApp {
@@ -83,11 +79,13 @@ func newDesktopApp(controls ...serverapp.OperatorControls) *desktopApp {
 	if len(controls) > 0 {
 		operatorControls = controls[0]
 	}
-	d.sup = supervisor.New(supervisor.Options{OnStage: d.onStage, OperatorControls: operatorControls})
+	d.sup = supervisor.New(supervisor.Options{
+		OnSnapshot:       d.onRuntimeSnapshot,
+		OperatorControls: operatorControls,
+	})
 	// Resolve the native-chrome language up front so tray/dialogs are localized
 	// from the first frame; onboarding may refine it.
 	d.lang = d.onboardingLang()
-	d.status = d.tr("starting")
 	return d
 }
 
@@ -129,7 +127,6 @@ func (d *desktopApp) run() error {
 // UI thread internally.
 func (d *desktopApp) boot() {
 	if d.sup.NeedsOnboarding(tosVersion) {
-		d.status = d.tr("setup")
 		d.refreshMenu()
 		d.showOnboarding()
 		<-d.onboardCh // wait for /__onb/complete
@@ -151,27 +148,25 @@ func (d *desktopApp) markOnboardingDone() {
 // distinguish a completion-close from a user cancel).
 func (d *desktopApp) onboardingDone() bool { return d.onboardFlag.Load() }
 
-// onStage is the supervisor progress callback: it localizes the stage into the
-// tray status. Called from the startup goroutine.
-func (d *desktopApp) onStage(stage string) {
-	d.lastStage.Store(stage)
-	if stage == supervisor.StageReady {
-		return // the "Running — <url>" line replaces it in startRuntime
+// onRuntimeSnapshot keeps native tray state on the same typed source consumed
+// by the private control panel.
+func (d *desktopApp) onRuntimeSnapshot(supervisor.RuntimeSnapshot) {
+	if d.app != nil && d.tray != nil {
+		d.refreshMenu()
 	}
-	d.status = d.trStage(stage)
-	d.refreshMenu()
 }
 
 // refreshMenu rebuilds the tray menu from the current state and re-attaches it,
 // so status/enabled changes are reflected after startup.
 func (d *desktopApp) refreshMenu() {
 	menu := d.app.NewMenu()
+	runtime := d.sup.RuntimeSnapshot()
 
-	status := menu.Add(d.status)
+	status := menu.Add(d.runtimeStatusText(runtime))
 	status.SetEnabled(false)
 
 	open := menu.Add(d.tr("open"))
-	open.SetEnabled(d.ready)
+	open.SetEnabled(runtime.CanOpen)
 	open.OnClick(func(*application.Context) { d.openInBrowser() })
 
 	dashboard := menu.Add(d.tr("dashboard"))
@@ -196,6 +191,27 @@ func (d *desktopApp) refreshMenu() {
 	d.tray.SetMenu(menu)
 }
 
+func (d *desktopApp) runtimeStatusText(runtime supervisor.RuntimeSnapshot) string {
+	if !d.onboardingDone() {
+		return d.tr("setup")
+	}
+	switch runtime.Phase {
+	case supervisor.RuntimeRunning:
+		return fmt.Sprintf(d.tr("running"), strings.TrimPrefix(runtime.BrowserURL, "http://"))
+	case supervisor.RuntimeRestarting:
+		return d.tr("restarting")
+	case supervisor.RuntimeFailed:
+		return d.tr("runtimeFailed")
+	case supervisor.RuntimeStarting:
+		if runtime.Stage != "" {
+			return d.trStage(runtime.Stage)
+		}
+		return d.tr("starting")
+	default:
+		return d.tr("starting")
+	}
+}
+
 // startRuntime brings up the in-process SQLite/API runtime, then opens the browser.
 func (d *desktopApp) startRuntime() {
 	if err := d.sup.Start(d.ctx); err != nil {
@@ -208,15 +224,18 @@ func (d *desktopApp) startRuntime() {
 		}
 		log.Printf("desktop runtime failed to start: %v", err)
 		d.app.Dialog.Error().SetTitle(title).SetMessage(d.failureMessage(err)).Show()
-		d.app.Quit()
+		if runtimeStartFailureIsHostFatal(err) {
+			d.app.Quit()
+			return
+		}
+		d.showDashboard()
+		d.refreshMenu()
 		return
 	}
 	for _, w := range d.sup.Warnings() {
 		log.Printf("desktop startup warning: %s", w)
 	}
 
-	d.ready = true
-	d.status = fmt.Sprintf(d.tr("running"), strings.TrimPrefix(d.sup.ServerURL(), "http://"))
 	d.refreshMenu()
 
 	// Auto-open the app in the default browser on launch.
@@ -229,6 +248,10 @@ func (d *desktopApp) startRuntime() {
 
 	// Resume local AI if the user enabled it previously.
 	go d.autoStartLumen()
+}
+
+func runtimeStartFailureIsHostFatal(err error) bool {
+	return errors.Is(err, supervisor.ErrAlreadyRunning)
 }
 
 // checkUpdate queries GitHub for a newer release and, if one exists, shows it in
@@ -266,7 +289,7 @@ func (d *desktopApp) failureMessage(err error) string {
 		}
 		return b.String()
 	}
-	if stage, ok := d.lastStage.Load().(string); ok && stage != "" {
+	if stage := d.sup.RuntimeSnapshot().Stage; stage != "" {
 		fmt.Fprintf(&b, "%s\n\n", fmt.Sprintf(d.tr("failStage"), d.trStage(stage)))
 	}
 	b.WriteString(err.Error())
@@ -277,7 +300,11 @@ func (d *desktopApp) failureMessage(err error) string {
 }
 
 func (d *desktopApp) openInBrowser() {
-	if err := d.app.Browser.OpenURL(d.sup.ServerURL()); err != nil {
+	runtime := d.sup.RuntimeSnapshot()
+	if !runtime.CanOpen || runtime.BrowserURL == "" {
+		return
+	}
+	if err := d.app.Browser.OpenURL(runtime.BrowserURL); err != nil {
 		log.Printf("failed to open browser: %v", err)
 	}
 }
@@ -292,7 +319,7 @@ func (d *desktopApp) onShutdown() {
 		hub.Stop(10 * time.Second)
 	}
 	d.cancel()
-	if err := d.sup.Stop(); err != nil {
+	if err := d.sup.Close(); err != nil {
 		log.Printf("desktop shutdown error: %v", err)
 	}
 }

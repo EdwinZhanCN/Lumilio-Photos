@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os"
@@ -8,6 +9,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	serverapp "server/app"
 )
 
 func TestCheckPortAvailable(t *testing.T) {
@@ -106,6 +110,12 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	}
 	if cfg.ServerConfig.WebRoot != webRoot || cfg.DatabaseConfig.Path != databasePath || cfg.Tools.FFmpegPath != ffmpegPath {
 		t.Fatalf("unexpected generated config: db=%+v tools=%+v", cfg.DatabaseConfig, cfg.Tools)
+	}
+	network := networkSummaryFromConfig(cfg)
+	if network.Mode != NetworkLocal || network.PrimaryOrigin != "http://localhost:6680" ||
+		network.RPID != "localhost" || network.TLSMode != "off" ||
+		network.ProxyMode != "disabled" || !network.PasskeyEnabled {
+		t.Fatalf("runtime network summary was not derived from strict config: %+v", network)
 	}
 }
 
@@ -255,6 +265,125 @@ func TestInternalHealthURLIsIndependentFromPrimaryOrigin(t *testing.T) {
 	if got, want := internalHealthURL("[::1]:7780"), "http://[::1]:7780/api/v1/health/ready"; got != want {
 		t.Fatalf("IPv6 health URL = %q, want %q", got, want)
 	}
+}
+
+func TestStopTimeoutRetainsGenerationAndBlocksSecondStart(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", t.TempDir())
+	s := New(Options{Logf: func(string, ...any) {}})
+	s.stopTimeout = 10 * time.Millisecond
+	generationCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	generation := &runtimeGeneration{
+		cancel: cancel,
+		done:   make(chan struct{}),
+	}
+	s.generation = generation
+	s.setSnapshot(RuntimeSnapshot{
+		Phase:      RuntimeRunning,
+		BrowserURL: "http://localhost:6680",
+	})
+
+	err := s.StopRuntime()
+	if !errors.Is(err, ErrRuntimeStopTimeout) {
+		t.Fatalf("StopRuntime error = %v, want ErrRuntimeStopTimeout", err)
+	}
+	if s.generation != generation {
+		t.Fatal("timed-out generation ownership was cleared")
+	}
+	if snapshot := s.RuntimeSnapshot(); snapshot.Phase != RuntimeFailed || snapshot.ErrorCode != "stop_timeout" {
+		t.Fatalf("timeout snapshot = %+v", snapshot)
+	}
+
+	err = s.Start(generationCtx)
+	if !errors.Is(err, ErrRuntimeGenerationActive) {
+		t.Fatalf("Start after stop timeout = %v, want ErrRuntimeGenerationActive", err)
+	}
+	if s.generation != generation {
+		t.Fatal("second Start replaced the timed-out generation")
+	}
+
+	close(generation.done)
+	if err := s.StopRuntime(); err != nil {
+		t.Fatalf("StopRuntime after generation exit: %v", err)
+	}
+	if s.generation != nil {
+		t.Fatal("completed generation was not reaped")
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func TestHostLockSurvivesRuntimeFailure(t *testing.T) {
+	appData := t.TempDir()
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	first := New(Options{Logf: func(string, ...any) {}})
+	if err := first.Prepare(); err != nil {
+		t.Fatalf("first Prepare: %v", err)
+	}
+	first.failRuntime(errors.New("manifest rejected"))
+
+	second := New(Options{Logf: func(string, ...any) {}})
+	if err := second.Prepare(); !errors.Is(err, ErrAlreadyRunning) {
+		t.Fatalf("second Prepare = %v, want ErrAlreadyRunning", err)
+	}
+	if snapshot := first.RuntimeSnapshot(); snapshot.Phase != RuntimeFailed {
+		t.Fatalf("first snapshot = %+v, want failed", snapshot)
+	}
+
+	if err := first.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+	if err := second.Prepare(); err != nil {
+		t.Fatalf("second Prepare after host Close: %v", err)
+	}
+	if err := second.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+}
+
+func TestConcurrentRestartReturnsOperationInProgress(t *testing.T) {
+	s := New(Options{Logf: func(string, ...any) {}})
+	s.operationMu.Lock()
+	err := s.Restart(context.Background())
+	s.operationMu.Unlock()
+	if !errors.Is(err, ErrOperationInProgress) {
+		t.Fatalf("Restart = %v, want ErrOperationInProgress", err)
+	}
+}
+
+func TestStopRuntimeClearsRepositoryControl(t *testing.T) {
+	s := New(Options{Logf: func(string, ...any) {}})
+	s.repositoryManager = stubRepositoryControl{}
+	done := make(chan struct{})
+	close(done)
+	s.generation = &runtimeGeneration{cancel: func() {}, done: done}
+
+	if err := s.StopRuntime(); err != nil {
+		t.Fatalf("StopRuntime: %v", err)
+	}
+	if _, err := s.RepositoryControl(); err == nil {
+		t.Fatal("RepositoryControl remained available after generation stop")
+	}
+}
+
+type stubRepositoryControl struct{}
+
+func (stubRepositoryControl) ListStorageLocations(context.Context) ([]serverapp.StorageLocationInfo, error) {
+	return nil, nil
+}
+func (stubRepositoryControl) AddStorageLocation(context.Context, string, string) (serverapp.StorageLocationInfo, []string, error) {
+	return serverapp.StorageLocationInfo{}, nil, nil
+}
+func (stubRepositoryControl) ResolveStorageLocationConflict(context.Context, string, string) (serverapp.StorageLocationInfo, error) {
+	return serverapp.StorageLocationInfo{}, nil
+}
+func (stubRepositoryControl) RemoveStorageLocation(context.Context, string) error { return nil }
+func (stubRepositoryControl) AttachRepository(context.Context, string) (serverapp.RepositoryInfo, error) {
+	return serverapp.RepositoryInfo{}, nil
+}
+func (stubRepositoryControl) ResolveRepositoryConflict(context.Context, string, string, string) (serverapp.RepositoryInfo, error) {
+	return serverapp.RepositoryInfo{}, nil
 }
 
 func TestEnsureDirsArePrivate(t *testing.T) {

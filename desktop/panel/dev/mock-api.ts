@@ -117,6 +117,18 @@ const LOGS: Record<string, string> = {
 };
 
 function statePayload() {
+  const runtimePhase = mock.ready ? "running" : "starting";
+  const runtimeNetwork = {
+    mode: "local",
+    listen: "127.0.0.1:6680",
+    primaryOrigin: "http://localhost:6680",
+    tlsMode: "off",
+    proxyMode: "disabled",
+    passkeyOrigin: "http://localhost:6680",
+    rpID: "localhost",
+    passkeyEnabled: true,
+    remotePasskeyAvailable: false,
+  };
   return {
     ...mock,
     lang: "en",
@@ -125,6 +137,22 @@ function statePayload() {
     tosRev: "dev",
     serverURL: "http://localhost:6680",
     stage: mock.ready ? "running" : "starting",
+    runtime: {
+      phase: runtimePhase,
+      stage: mock.ready ? "ready" : "starting_server",
+      browserURL: "http://localhost:6680",
+      canOpen: mock.ready,
+      canRestart: mock.ready,
+      lastKnownGoodAvailable: true,
+      network: runtimeNetwork,
+      operationActive: !mock.ready,
+    },
+    network: {
+      ...runtimeNetwork,
+      lanWarningAcceptedVersion: 0,
+      lanAddresses: ["192.168.1.42"],
+      trustedProxyCIDRs: [],
+    },
     paths: {
       storage: mock.path,
       logs: `${HOME}/Library/Logs/Lumilio Photos`,
@@ -245,6 +273,10 @@ export function mockPanelApi(): Plugin {
             mock.region = body.region === "cn" ? "cn" : "other";
             return json(res, { ok: true, region: mock.region });
           }
+          case "/__onb/runtime/restart":
+            mock.ready = false;
+            setTimeout(() => (mock.ready = true), 1800);
+            return json(res, { accepted: true });
           case "/__onb/lumen-save": {
             const body = await readBody(req);
             if (mock.lumen.cacheDir !== body.cacheDir) {

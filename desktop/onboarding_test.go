@@ -134,10 +134,11 @@ func TestOnboardingStateEndpoint(t *testing.T) {
 		t.Fatalf("state status = %d", rec.Code)
 	}
 	var got struct {
-		Lang       string     `json:"lang"`
-		Path       string     `json:"path"`
-		Validation validation `json:"validation"`
-		Version    string     `json:"version"`
+		Lang       string                     `json:"lang"`
+		Path       string                     `json:"path"`
+		Validation validation                 `json:"validation"`
+		Version    string                     `json:"version"`
+		Runtime    supervisor.RuntimeSnapshot `json:"runtime"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode state: %v\n%s", err, rec.Body.String())
@@ -147,6 +148,9 @@ func TestOnboardingStateEndpoint(t *testing.T) {
 	}
 	if got.Path == "" {
 		t.Error("expected a default path")
+	}
+	if got.Runtime.Phase != supervisor.RuntimeStopped || !got.Runtime.CanRestart {
+		t.Errorf("typed runtime snapshot = %+v, want stopped/restartable", got.Runtime)
 	}
 }
 
