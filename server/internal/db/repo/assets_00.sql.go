@@ -728,7 +728,7 @@ const getAssetsByContentHashesAndRepository = `-- name: GetAssetsByContentHashes
 WITH filter_params AS (
   SELECT CAST(?2 AS TEXT) AS content_hashes_json
 )
-SELECT asset_id, content_hash, file_size, original_filename
+SELECT asset_id, content_hash, file_size, original_filename, storage_path
 FROM assets
 WHERE content_hash IN (
     SELECT CAST(value AS TEXT)
@@ -748,6 +748,7 @@ type GetAssetsByContentHashesAndRepositoryRow struct {
 	ContentHash      string    `db:"content_hash" json:"content_hash"`
 	FileSize         int64     `db:"file_size" json:"file_size"`
 	OriginalFilename string    `db:"original_filename" json:"original_filename"`
+	StoragePath      *string   `db:"storage_path" json:"storage_path"`
 }
 
 func (q *Queries) GetAssetsByContentHashesAndRepository(ctx context.Context, arg GetAssetsByContentHashesAndRepositoryParams) ([]GetAssetsByContentHashesAndRepositoryRow, error) {
@@ -764,6 +765,7 @@ func (q *Queries) GetAssetsByContentHashesAndRepository(ctx context.Context, arg
 			&i.ContentHash,
 			&i.FileSize,
 			&i.OriginalFilename,
+			&i.StoragePath,
 		); err != nil {
 			return nil, err
 		}

@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +17,7 @@ import (
 	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	migrations "server/migrations"
 
 	"github.com/google/uuid"
 )
@@ -84,6 +87,130 @@ func TestOpenMigrateAndReopenSQLiteCatalog(t *testing.T) {
 	}
 	if info.ApplicationMigration != 1 || info.RiverMigration == 0 || info.LibraryID == "" {
 		t.Fatalf("unexpected catalog identity: %+v", info)
+	}
+}
+
+func TestConnectionPolicySurvivesPhysicalConnectionReplacement(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "replacement.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+
+	connection, err := database.SQL.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawErr := connection.Raw(func(any) error {
+		return driver.ErrBadConn
+	})
+	if !errors.Is(rawErr, driver.ErrBadConn) {
+		_ = connection.Close()
+		t.Fatalf("discard physical connection: %v", rawErr)
+	}
+	if err := connection.Close(); err != nil && !errors.Is(err, sql.ErrConnDone) {
+		t.Fatal(err)
+	}
+
+	checks := []struct {
+		name string
+		want int
+	}{
+		{name: "foreign_keys", want: 1},
+		{name: "busy_timeout", want: 5000},
+		{name: "temp_store", want: 2},
+		{name: "wal_autocheckpoint", want: 1000},
+	}
+	for _, check := range checks {
+		var got int
+		if err := database.SQL.QueryRowContext(ctx, "PRAGMA "+check.name).Scan(&got); err != nil {
+			t.Fatalf("read replacement PRAGMA %s: %v", check.name, err)
+		}
+		if got != check.want {
+			t.Fatalf("replacement PRAGMA %s = %d, want %d", check.name, got, check.want)
+		}
+	}
+}
+
+func TestMigrationLedgerRejectsHistoricalChecksumChanges(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "migration-checksum.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.SQL.ExecContext(ctx, `
+		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 1
+	`, strings.Repeat("0", 64)); err != nil {
+		t.Fatal(err)
+	}
+	err = database.Migrate(ctx)
+	if err == nil || !strings.Contains(err.Error(), "historical migrations are immutable") {
+		t.Fatalf("tampered migration ledger error = %v", err)
+	}
+}
+
+func TestBioAlbumSchemaAndQueryLiteralsShareDomainValue(t *testing.T) {
+	baseline, err := migrations.FS.ReadFile("000001_sqlite_baseline.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkFragment := "'default', 'smart', '" + repo.AlbumTypeBio + "'"
+	if !strings.Contains(string(baseline), checkFragment) {
+		t.Fatalf("album_type CHECK does not include shared bio value %q", repo.AlbumTypeBio)
+	}
+	indexingSQL, err := os.ReadFile(filepath.Join("repo", "queries", "indexing.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	queryFragment := "album_type = '" + repo.AlbumTypeBio + "'"
+	if count := strings.Count(string(indexingSQL), queryFragment); count != 2 {
+		t.Fatalf("bio indexing query literal count = %d, want 2", count)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "bio-album.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	user, err := database.Queries.CreateUser(ctx, repo.CreateUserParams{
+		Username:           "bio-schema",
+		Password:           "not-used",
+		DisplayName:        "Bio Schema",
+		Role:               "admin",
+		WebauthnUserHandle: []byte("bio-schema-handle"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Queries.CreateAlbum(ctx, repo.CreateAlbumParams{
+		UserID:    user.UserID,
+		AlbumName: "Bio",
+		AlbumType: repo.AlbumTypeBio,
+	}); err != nil {
+		t.Fatalf("create bio album: %v", err)
+	}
+	if _, err := database.Queries.CountBioAlbumPhotoAssets(ctx, nil); err != nil {
+		t.Fatalf("execute bio album indexing query: %v", err)
 	}
 }
 

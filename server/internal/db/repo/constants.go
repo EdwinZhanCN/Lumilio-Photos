@@ -2,6 +2,7 @@ package repo
 
 const (
 	AlbumTypeDefault = "default"
+	AlbumTypeSmart   = "smart"
 	AlbumTypeBio     = "bio"
 )
 

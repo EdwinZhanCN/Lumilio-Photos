@@ -62,6 +62,26 @@ func TestStagingManager_BasicOperations(t *testing.T) {
 		assert.True(t, os.IsNotExist(err))
 	})
 
+	t.Run("commit never replaces an existing destination", func(t *testing.T) {
+		stagingFile, err := sm.CreateStagingFile(testDir, "conflict.jpg")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(stagingFile.Path, []byte("staging original"), 0o600))
+
+		finalPath := "user-content/photos/conflict.jpg"
+		finalFullPath := filepath.Join(testDir, finalPath)
+		require.NoError(t, os.MkdirAll(filepath.Dir(finalFullPath), 0o700))
+		require.NoError(t, os.WriteFile(finalFullPath, []byte("existing original"), 0o600))
+
+		err = sm.CommitStagingFile(stagingFile, finalPath)
+		require.Error(t, err)
+		finalContent, readErr := os.ReadFile(finalFullPath)
+		require.NoError(t, readErr)
+		assert.Equal(t, []byte("existing original"), finalContent)
+		stagingContent, readErr := os.ReadFile(stagingFile.Path)
+		require.NoError(t, readErr)
+		assert.Equal(t, []byte("staging original"), stagingContent)
+	})
+
 	t.Run("cleanup staging files", func(t *testing.T) {
 		// Create multiple staging files
 		staging1, err := sm.CreateStagingFile(testDir, "cleanup1.jpg")
@@ -96,6 +116,7 @@ func TestStagingManager_BasicOperations(t *testing.T) {
 	t.Run("move staging file to failed directory", func(t *testing.T) {
 		stagingFile, err := sm.CreateStagingFile(testDir, "failed-upload.jpg")
 		require.NoError(t, err)
+		incomingPath := stagingFile.Path
 
 		err = os.WriteFile(stagingFile.Path, []byte("broken data"), 0644)
 		require.NoError(t, err)
@@ -103,8 +124,10 @@ func TestStagingManager_BasicOperations(t *testing.T) {
 		err = sm.MoveStagingToFailed(stagingFile)
 		require.NoError(t, err)
 
-		_, err = os.Stat(stagingFile.Path)
+		_, err = os.Stat(incomingPath)
 		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat(stagingFile.Path)
+		assert.NoError(t, err)
 
 		failedDir := filepath.Join(testDir, DefaultStructure.FailedDir)
 		entries, err := os.ReadDir(failedDir)
