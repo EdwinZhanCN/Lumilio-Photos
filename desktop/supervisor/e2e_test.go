@@ -26,9 +26,9 @@ func TestDesktopRuntimeFirstAndSecondLaunch(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte(marker), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeStubTool(t, filepath.Join(resources, "ffmpeg", "ffmpeg"))
-	writeStubTool(t, filepath.Join(resources, "ffmpeg", "ffprobe"))
-	writeStubTool(t, filepath.Join(resources, "exiftool", "exiftool"))
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffmpeg")))
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffprobe")))
+	writeStubTool(t, filepath.Join(resources, "exiftool", toolExe("exiftool")))
 
 	t.Setenv("LUMILIO_APP_DATA", appData)
 	t.Setenv("LUMILIO_WEB_ROOT", webRoot)
