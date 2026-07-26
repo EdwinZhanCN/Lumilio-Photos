@@ -17,7 +17,7 @@
   );
 </script>
 
-<div class="flex flex-col gap-1 rounded-[10px] border border-line bg-raised px-4 py-3.5">
+<section class="flex min-w-0 flex-col gap-1 border-t border-line pt-3">
   <span class="pb-1.5 text-[13.5px] font-semibold">{t("localPaths")}</span>
   {#each rows as row (row.label)}
     <div class="flex items-center gap-2.5 border-t border-line py-2">
@@ -33,4 +33,4 @@
       </button>
     </div>
   {/each}
-</div>
+</section>

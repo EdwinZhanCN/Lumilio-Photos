@@ -3,6 +3,8 @@
   import { api } from "../../lib/api.ts";
   import { t } from "../../lib/i18n.svelte.ts";
 
+  let { source = $bindable("app") }: { source?: string } = $props();
+
   // Tab ids match the Go log sources (see handleDashboardLog).
   const sources = [
     { id: "app", label: () => t("logApp") },
@@ -10,7 +12,6 @@
     { id: "lumen", label: () => t("logLumen") },
   ];
 
-  let source = $state("app");
   let content = $state("");
   let path = $state("");
   let unreadable = $state(false);
@@ -38,7 +39,7 @@
   });
 </script>
 
-<div class="flex flex-col gap-2.5 rounded-[10px] border border-line bg-raised px-4 py-3.5">
+<section class="flex min-w-0 flex-col gap-2.5">
   <div class="flex items-center justify-between">
     <span class="text-[13.5px] font-semibold">{t("diagnostics")}</span>
     <button class="btn btn-ghost btn-sm text-muted" onclick={() => void load()}>
@@ -73,4 +74,4 @@
   </div>
 
   <div class="font-mono text-[11px] text-muted">{path || "—"}</div>
-</div>
+</section>

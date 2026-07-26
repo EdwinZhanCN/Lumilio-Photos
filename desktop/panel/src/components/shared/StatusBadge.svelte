@@ -9,6 +9,7 @@
       {
         running: t("statusRunning"),
         starting: t("statusStarting"),
+        restarting: t("statusRestarting"),
         off: t("statusOff"),
         failed: t("statusFailed"),
         disabled: t("statusDisabled"),
@@ -19,18 +20,17 @@
   const color = $derived(
     (
       {
-        running: "text-success",
-        starting: "text-warning",
-        off: "text-muted",
-        failed: "text-error",
-        disabled: "text-muted",
+        running: "badge-success",
+        starting: "badge-warning",
+        restarting: "badge-warning",
+        off: "badge-ghost",
+        failed: "badge-error",
+        disabled: "badge-ghost",
       } as const
     )[status],
   );
 </script>
 
-<span
-  class={`rounded-md bg-base-content/5 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap ${color}`}
->
+<span class={`badge badge-soft badge-sm text-[11px] font-bold whitespace-nowrap ${color}`}>
   {label}
 </span>

@@ -1795,7 +1795,30 @@ rollback
     classification、typed panel state、real restart E2E。
   - 验证：`make desktop-test` 通过；Panel `vp check --fix` 后 lint/type/format 通过，
     `vp test` 为 1 file / 6 tests passed，`vp build` 通过（682 modules）。
-- [ ] Phase 2：Dashboard layout
+- [x] Phase 2：Dashboard layout
+  - Dashboard header is now `Local Runtime / Desktop Control Panel` with Refresh, the single
+    forward-compatible Settings affordance, and canonical Open Lumilio gating from the typed
+    runtime snapshot.
+  - Added a responsive primary-service grid (`1` column at 640 px, `2` columns from 700 px) with
+    a new Server card and the existing Lumen behavior reorganized into a peer card. Storage
+    Locations remains the same business component and spans the full content width.
+  - Server displays only strict-config-derived runtime facts: lifecycle phase/stage, canonical
+    browser URL, network mode, TLS, proxy, and passkey availability. Failed startup presents the
+    real error, Retry, Edit configuration, LKG availability, and an error-log recovery path;
+    no health, uptime, or inferred service data was added.
+  - Existing App/Error/Lumen logs and local paths now live in one native-details Support
+    disclosure. It defaults closed and automatically opens when Server or Lumen enters failed.
+  - Preserved Lumen enable/disable/update/configure/log/reveal behavior and surfaced previously
+    silent action errors. The old presentation-only `PhotosCard` was removed.
+  - Dev mock accepts
+    `?mode=dashboard&runtime=stopped|starting|running|restarting|failed`, including a realistic
+    strict-manifest failure, so the complete runtime matrix is deterministic.
+  - Verification: `make desktop-test` passed; Panel `vp check --fix` passed for 28 files,
+    `vp test` passed (1 file / 7 tests), and `vp build` passed (683 modules).
+  - The in-app Browser skill could not execute the 760×720 / 640×620, theme, locale, and
+    long-value visual matrix because the connected runtime reported no available browser
+    (`agent.browsers.list() == []`). The deterministic mock states remain available and the
+    visual matrix stays a final DoD item rather than being claimed as observed.
 - [ ] Phase 3：Unified Settings
 - [ ] Phase 4：Runtime intent/TOML
 - [ ] Phase 5：Apply/Rollback
@@ -1818,6 +1841,8 @@ rollback
 | 2026-07-26 | generation completion使用close-only `done`，不消费一次性error channel | startup waiter与stop waiter都需要观察同一退出事实 | timeout后ownership可安全保留并在真实退出后reap |
 | 2026-07-26 | operation gate对panel mutation使用`TryLock`，shutdown使用阻塞`Lock` | panel需要确定的409，Quit必须等待当前安全操作收敛 | apply/restart并发拒绝，Close串行完成 |
 | 2026-07-26 | 只有`ErrAlreadyRunning`是host-fatal startup error | 其他错误都可由同一Wails host恢复 | port/config/database失败不再直接Quit |
+| 2026-07-26 | Dashboard cards use daisyUI semantic card/alert/button/status primitives and a single native-details collapse | Existing panel already uses daisyUI; these primitives preserve keyboard semantics and theme tokens without adding another design system | Runtime hierarchy is compact and responsive; Support stays one disclosure rather than nested panels |
+| 2026-07-26 | Phase 2 Settings scroll target and Lumen Configure dialog are temporary compatibility bridges | Phase 2 must preserve all actions while Phase 3 owns the unified modal extraction | No duplicated forms are introduced; both bridges are removed in Phase 3 |
 
 ## Surprises & Discoveries
 
@@ -1834,6 +1859,10 @@ rollback
 - 原 `serverErr chan error` 同时承担 startup/stop waiter，消费后无法让另一个观察者可靠
   判断同一 generation 是否退出；改为 `done` close + close 前写入 `err` 后，所有 waiter
   共享同一个 happens-before 事实。
+- Browser connector bootstrap succeeded far enough to inspect bindings, but the runtime exposed no
+  browser instance. Per the Browser skill, visual claims were not substituted with an unrelated
+  automation stack; the mock query matrix records the intended observable states for a later
+  connected-browser pass.
 
 ## Outcomes & Retrospective
 

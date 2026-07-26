@@ -61,7 +61,11 @@
   }
 </script>
 
-<div class="flex flex-col gap-2.5 rounded-[10px] border border-line bg-raised px-4 py-3.5">
+<section
+  id="desktop-settings"
+  tabindex="-1"
+  class="flex scroll-mt-4 flex-col gap-2.5 rounded-[10px] border border-line bg-raised px-4 py-3.5 focus:outline-none"
+>
   <span class="text-[13.5px] font-semibold">{t("settings")}</span>
   <div class="flex flex-wrap items-center gap-3.5">
     <span class="text-xs font-semibold tracking-wide text-muted uppercase">{t("regionLabel")}</span>
@@ -135,4 +139,4 @@
   >
     {t("networkSave")}
   </button>
-</div>
+</section>
