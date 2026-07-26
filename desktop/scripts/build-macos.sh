@@ -4,12 +4,11 @@
 #
 # This deliberately does NOT use `wails3 build` because the UI is served by the
 # in-process Go API server (not Wails' asset server — a WebAuthn requirement),
-# so the bundle is just: Go binary + bundled native runtime (PostgreSQL, ffmpeg,
-# exiftool) + the libvips dylib tree. Everything is ad-hoc signed (free, no Apple
+# so the bundle is just: Go binary + bundled media tools (ffmpeg, exiftool) +
+# the libvips dylib tree. Everything is ad-hoc signed (free, no Apple
 # Developer account) per the exec plan's signing strategy.
 #
 # Prerequisites (staged before running — see desktop/resources/README.md):
-#   desktop/resources/postgres/18/<darwin-arch>/bin   PostgreSQL + pgvector (+ contrib pg_trgm)
 #   desktop/resources/ffmpeg/{ffmpeg,ffprobe}         static ffmpeg build
 #   desktop/resources/exiftool/exiftool               exiftool standalone
 # Build tools:
@@ -128,30 +127,6 @@ fi
 cp "$APP_ICON" "$RES_DIR/$APP_ICON_NAME.icns"
 
 echo "==> Staging bundled runtime resources"
-PG_SRC="$RESOURCES_SRC/postgres/18/$PLATFORM"
-# GitHub artifact upload/download drops the executable bit (documented
-# limitation), so a CI-staged bundle arrives with plain-file binaries.
-# Restore it before the tool check; no-op for locally staged bundles.
-if [ -d "$PG_SRC/bin" ]; then
-  chmod +x "$PG_SRC"/bin/*
-fi
-for tool in postgres initdb pg_ctl pg_isready createdb pg_dump pg_restore psql; do
-  if [ ! -x "$PG_SRC/bin/$tool" ]; then
-    echo "    ERROR: missing required PostgreSQL tool: $PG_SRC/bin/$tool" >&2
-    echo "    Build/download the postgres-$PLATFORM artifact before packaging." >&2
-    exit 1
-  fi
-done
-PG_EXTENSION_DIR="$PG_SRC/share/extension"
-if [ -d "$PG_SRC/share/postgresql/extension" ]; then
-  PG_EXTENSION_DIR="$PG_SRC/share/postgresql/extension"
-fi
-for extension in vector pg_trgm; do
-  if [ ! -f "$PG_EXTENSION_DIR/$extension.control" ]; then
-    echo "    ERROR: missing required PostgreSQL extension: $extension" >&2
-    exit 1
-  fi
-done
 stage() { # src dest
   if [ ! -e "$1" ]; then
     echo "    WARNING: missing $1 — bundle will fall back to PATH at runtime" >&2
@@ -160,12 +135,6 @@ stage() { # src dest
   mkdir -p "$(dirname "$2")"
   cp -R "$1" "$2"
 }
-PG_BUNDLE_DIR="$RES_DIR/postgres/18/$PLATFORM"
-stage "$PG_SRC"                                "$PG_BUNDLE_DIR"
-# Artifacts produced before the relocation gate may still contain the GitHub
-# runner's absolute pg-dist prefix. Rewrite the staged copy so local packaging
-# remains safe without mutating the downloaded resource cache.
-"$SCRIPT_DIR/relocate-postgres.sh" "$PG_BUNDLE_DIR"
 stage "$RESOURCES_SRC/ffmpeg/ffmpeg"          "$RES_DIR/ffmpeg/ffmpeg"
 stage "$RESOURCES_SRC/ffmpeg/ffprobe"         "$RES_DIR/ffmpeg/ffprobe"
 stage "$RESOURCES_SRC/exiftool"               "$RES_DIR/exiftool"

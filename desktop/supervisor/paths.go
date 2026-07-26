@@ -7,40 +7,21 @@ import (
 	"runtime"
 )
 
-const (
-	// appDirName is the per-user app-data directory name. On macOS this lands
-	// under ~/Library/Application Support/Lumilio Photos.
-	appDirName = "Lumilio Photos"
-
-	// pgMajorVersion encodes the bundled PostgreSQL major version in the data
-	// directory layout (postgres/18/...) so a future major upgrade can detect a
-	// version mismatch and run a dump/restore. Bump alongside the bundled PG.
-	pgMajorVersion = "18"
-
-	// pgPort only affects the Unix socket filename (.s.PGSQL.<port>); no TCP
-	// port is opened (listen_addresses is empty). It must still be unique enough
-	// to avoid colliding with a system PostgreSQL socket in the fallback dir.
-	pgPort = "5487"
-
-	// maxUnixSocketPath is the conservative ceiling for a Unix domain socket
-	// path on macOS (sun_path is ~104 bytes). When the natural socket path would
-	// exceed this (very long usernames), the socket directory falls back to /tmp.
-	maxUnixSocketPath = 95
-)
+// appDirName is the per-user app-data directory name. On macOS this lands
+// under ~/Library/Application Support/Lumilio Photos.
+const appDirName = "Lumilio Photos"
 
 // Paths holds the resolved on-disk locations the desktop app uses. Everything
 // except the user-selectable media library lives under a single per-user
 // app-data directory so the database and secrets stay on local disk even when
 // the library is relocated to an external drive.
 type Paths struct {
-	AppData    string // root app-data directory
-	PGData     string // PostgreSQL data directory (initdb target)
-	PGRun      string // preferred Unix socket directory
-	PGLogs     string // PostgreSQL log directory
+	AppData    string // root machine-local app-state directory
+	Database   string // active SQLite catalog
 	Logs       string // API/application log directory
-	Secrets    string // db_password + lumilio_secret_key
+	Secrets    string // lumilio_secret_key and other private credentials
 	Config     string // authoritative generated manifest + desktop-settings.json
-	Backups    string // pg_dump auto-backups (upgrades)
+	Backups    string // consistent SQLite snapshots and manifests
 	Cloud      string // cloud provider sessions and credential artifacts
 	DefaultLib string // default media library location (<appdata>/storage)
 }
@@ -54,12 +35,9 @@ func NewPaths() (*Paths, error) {
 	if err != nil {
 		return nil, err
 	}
-	pgVersionDir := filepath.Join(root, "postgres", pgMajorVersion)
 	return &Paths{
 		AppData:    root,
-		PGData:     filepath.Join(pgVersionDir, "data"),
-		PGRun:      filepath.Join(pgVersionDir, "run"),
-		PGLogs:     filepath.Join(pgVersionDir, "logs"),
+		Database:   filepath.Join(root, "library.sqlite3"),
 		Logs:       filepath.Join(root, "logs"),
 		Secrets:    filepath.Join(root, "secrets"),
 		Config:     filepath.Join(root, "config"),
@@ -73,8 +51,8 @@ func resolveAppDataRoot() (string, error) {
 	if override := os.Getenv("LUMILIO_APP_DATA"); override != "" {
 		return override, nil
 	}
-	// On Windows os.UserConfigDir is %AppData% (Roaming); the PostgreSQL data
-	// directory must not roam between machines, so prefer %LocalAppData%.
+	// On Windows os.UserConfigDir is %AppData% (Roaming); the SQLite catalog and
+	// credentials must not roam between machines, so prefer %LocalAppData%.
 	if runtime.GOOS == "windows" {
 		if base := os.Getenv("LOCALAPPDATA"); base != "" {
 			return filepath.Join(base, appDirName), nil
@@ -90,7 +68,7 @@ func resolveAppDataRoot() (string, error) {
 // EnsureDirs creates the full app-data directory tree. The media library is
 // created separately once its (possibly user-chosen) location is resolved.
 func (p *Paths) EnsureDirs() error {
-	for _, dir := range []string{p.AppData, p.PGData, p.PGRun, p.PGLogs, p.Logs, p.Secrets, p.Config, p.Backups, p.Cloud} {
+	for _, dir := range []string{p.AppData, p.Logs, p.Secrets, p.Config, p.Backups, p.Cloud} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}
@@ -120,37 +98,5 @@ func (p *Paths) ServerConfigFile() string {
 	return filepath.Join(p.Config, "server.toml")
 }
 
-func (p *Paths) DBBootstrapPasswordFile() string {
-	return filepath.Join(p.Secrets, "db_bootstrap_password")
-}
-func (p *Paths) DBRotatedPasswordFile() string { return filepath.Join(p.Secrets, "db_password") }
-
 // SecretKeyFile holds the app root secret used to derive JWT/MFA/media keys.
 func (p *Paths) SecretKeyFile() string { return filepath.Join(p.Secrets, "lumilio_secret_key") }
-
-// SocketDir returns the directory PostgreSQL should place its Unix socket in.
-// It prefers PGRun but falls back to a short /tmp path when the natural socket
-// path would exceed the platform limit (long usernames). Only meaningful on
-// unix hosts; Windows PostgreSQL has no Unix sockets (see DBHost).
-func (p *Paths) SocketDir() string {
-	full := filepath.Join(p.PGRun, ".s.PGSQL."+pgPort)
-	if len(full) <= maxUnixSocketPath {
-		return p.PGRun
-	}
-	return filepath.Join(os.TempDir(), fmt.Sprintf("lumilio-%d", os.Getuid()))
-}
-
-// DBHost is what both PostgreSQL and the server config use to reach the
-// private cluster: the Unix socket directory on unix hosts, or the IPv4
-// loopback on Windows (whose PostgreSQL builds do not support Unix sockets;
-// the postmaster listens on 127.0.0.1:<pgPort> there).
-func (p *Paths) DBHost() string {
-	return dbHostForGOOS(runtime.GOOS, p)
-}
-
-func dbHostForGOOS(goos string, p *Paths) string {
-	if goos == "windows" {
-		return "127.0.0.1"
-	}
-	return p.SocketDir()
-}

@@ -1,8 +1,6 @@
 package supervisor
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -96,21 +94,4 @@ func SaveSettings(path string, s DesktopSettings) error {
 		return fmt.Errorf("replace desktop settings: %w", err)
 	}
 	return nil
-}
-
-// ensureSecret writes a fresh 32-byte cryptographically random hex secret to
-// path if the file is missing or empty. Existing secrets are preserved so keys
-// remain stable across launches.
-func ensureSecret(path string) error {
-	if info, err := os.Stat(path); err == nil && info.Size() > 0 {
-		return applyPrivateFileMode(path)
-	}
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return fmt.Errorf("generate secret: %w", err)
-	}
-	if err := os.WriteFile(path, []byte(hex.EncodeToString(buf)), 0o600); err != nil {
-		return fmt.Errorf("write secret %s: %w", path, err)
-	}
-	return applyPrivateFileMode(path)
 }

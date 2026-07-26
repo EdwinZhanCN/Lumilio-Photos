@@ -43,6 +43,11 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	if seededClassifiers != 3 {
 		t.Fatalf("classifier seed count = %d, want 3", seededClassifiers)
 	}
+	if _, err := database.ExecContext(ctx, `
+		UPDATE system_state SET bootstrap_phase = 'db_rotated' WHERE id = 1
+	`); err != nil {
+		t.Fatalf("persist pre-admin bootstrap phase: %v", err)
+	}
 
 	assertRejected(t, database, `
 		INSERT INTO registration_sessions (

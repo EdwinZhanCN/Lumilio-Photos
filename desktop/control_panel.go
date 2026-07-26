@@ -21,10 +21,9 @@ import (
 const dashboardLogTailLines = 240
 
 var dashboardLogFiles = map[string]string{
-	"app":      "app.log",
-	"error":    "error.log",
-	"postgres": "postgres.log",
-	"lumen":    "lumen-hub.log",
+	"app":   "app.log",
+	"error": "error.log",
+	"lumen": "lumen-hub.log",
 }
 
 func (d *desktopApp) handleStorageLocations(w http.ResponseWriter, r *http.Request) {

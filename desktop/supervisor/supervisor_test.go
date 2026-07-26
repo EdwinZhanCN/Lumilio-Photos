@@ -39,27 +39,21 @@ func TestCheckPortAvailable(t *testing.T) {
 func TestDesktopServerConfigInvariants(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "server.toml")
-	bootstrap := filepath.Join(dir, "bootstrap")
 	webRoot := filepath.Join(dir, "bundle", "web")
 	logDir := filepath.Join(dir, "appdata", "logs")
 	storagePath := filepath.Join(dir, "library")
-	dbHost := filepath.Join(dir, "postgres", "18", "run")
-	pgBinDir := filepath.Join(dir, "bundle", "postgres", "bin")
+	databasePath := filepath.Join(dir, "appdata", "library.sqlite3")
 	exifToolPath := filepath.Join(dir, "bundle", "exiftool")
 	ffmpegPath := filepath.Join(dir, "bundle", "ffmpeg")
 	ffprobePath := filepath.Join(dir, "bundle", "ffprobe")
 	secretKeyFile := filepath.Join(dir, "secrets", "lumilio_secret_key")
-	if err := os.WriteFile(bootstrap, []byte("bootstrap-secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 
 	cfg, err := compileAndLoadServerManifest(path, serverManifestBindings{
 		Port: "6680", BrowserOrigin: "http://localhost:6680", WebRoot: webRoot,
 		LogDir: logDir, StoragePath: storagePath,
 		CloudStatePath: filepath.Join(dir, "appdata", "cloud"), BackupsPath: filepath.Join(dir, "appdata", "backups"),
-		DBHost: dbHost, DBPort: "5487", DBUser: "lumilio", DBName: "lumiliophotos",
-		BootstrapPasswordFile: bootstrap, RotatedPasswordFile: filepath.Join(dir, "rotated"), SecretKeyFile: secretKeyFile,
-		PGBinDir: pgBinDir, ExifToolPath: exifToolPath, FFmpegPath: ffmpegPath, FFprobePath: ffprobePath,
+		DatabasePath: databasePath, SecretKeyFile: secretKeyFile,
+		ExifToolPath: exifToolPath, FFmpegPath: ffmpegPath, FFprobePath: ffprobePath,
 		LumenStaticNode: "127.0.0.1:50051",
 	})
 	if err != nil {
@@ -77,16 +71,26 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 			cfg.ServerConfig.CORSAllowedOrigins,
 		)
 	}
-	if cfg.DatabaseConfig.Host != dbHost {
-		t.Fatalf("database host = %q", cfg.DatabaseConfig.Host)
+	if cfg.DatabaseConfig.Path != databasePath {
+		t.Fatalf("database path = %q, want %q", cfg.DatabaseConfig.Path, databasePath)
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	if strings.Contains(string(data), "bootstrap-secret") {
-		t.Fatalf("generated manifest must contain no secret content:\n%s", data)
+	manifest := string(data)
+	for _, forbidden := range []string{"bootstrap_password", "rotated_password", "tools_bin", "host =", "port = \"5487\""} {
+		if strings.Contains(manifest, forbidden) {
+			t.Fatalf("generated SQLite manifest contains legacy database key %q:\n%s", forbidden, data)
+		}
+	}
+	databaseLiteral, err := tomlLiteral(databasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(manifest, "schema_version = 2") || !strings.Contains(manifest, "path = "+databaseLiteral) {
+		t.Fatalf("generated manifest is not schema v2 with the SQLite path:\n%s", data)
 	}
 	private, err := isPrivatePath(path)
 	if err != nil || !private {
@@ -98,7 +102,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if cfg.Auth.WebAuthnRPID != "localhost" || strings.Join(cfg.Auth.WebAuthnRPOrigins, ",") != "http://localhost:6680" {
 		t.Fatalf("unexpected auth config: %+v", cfg.Auth)
 	}
-	if cfg.ServerConfig.WebRoot != webRoot || cfg.DatabaseConfig.Host != dbHost || cfg.Tools.FFmpegPath != ffmpegPath {
+	if cfg.ServerConfig.WebRoot != webRoot || cfg.DatabaseConfig.Path != databasePath || cfg.Tools.FFmpegPath != ffmpegPath {
 		t.Fatalf("unexpected generated config: db=%+v tools=%+v", cfg.DatabaseConfig, cfg.Tools)
 	}
 }
@@ -157,38 +161,6 @@ func TestDesktopSettingsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestEnsureSecretIdempotent(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "secret")
-
-	if err := ensureSecret(path); err != nil {
-		t.Fatalf("ensureSecret: %v", err)
-	}
-	first, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read secret: %v", err)
-	}
-	if len(first) != 64 { // 32 random bytes hex-encoded
-		t.Errorf("secret length = %d, want 64 hex chars", len(first))
-	}
-
-	// A second call must not regenerate the secret.
-	if err := ensureSecret(path); err != nil {
-		t.Fatalf("ensureSecret (2nd): %v", err)
-	}
-	second, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read secret (2nd): %v", err)
-	}
-	if string(first) != string(second) {
-		t.Error("ensureSecret regenerated an existing secret; keys would change across launches")
-	}
-	private, err := isPrivatePath(path)
-	if err != nil || !private {
-		t.Fatalf("secret private = %v, err = %v", private, err)
-	}
-}
-
 func TestEnsureDirsArePrivate(t *testing.T) {
 	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
 	paths, err := NewPaths()
@@ -198,11 +170,33 @@ func TestEnsureDirsArePrivate(t *testing.T) {
 	if err := paths.EnsureDirs(); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{paths.AppData, paths.PGData, paths.PGRun, paths.PGLogs, paths.Logs, paths.Secrets, paths.Config, paths.Backups, paths.Cloud} {
+	for _, path := range []string{paths.AppData, paths.Logs, paths.Secrets, paths.Config, paths.Backups, paths.Cloud} {
 		private, err := isPrivatePath(path)
 		if err != nil || !private {
 			t.Errorf("%s private = %v, err = %v", path, private, err)
 		}
+	}
+	if paths.Database != filepath.Join(paths.AppData, "library.sqlite3") {
+		t.Fatalf("database path = %q, want machine-local app-data catalog", paths.Database)
+	}
+	if _, err := os.Stat(paths.Database); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("path initialization unexpectedly created the database: %v", err)
+	}
+}
+
+func TestDesktopDatabaseParentFailureIsDiagnostic(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "appdata-file")
+	if err := os.WriteFile(root, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LUMILIO_APP_DATA", root)
+	paths, err := NewPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = paths.EnsureDirs()
+	if err == nil || !strings.Contains(err.Error(), "create "+root) {
+		t.Fatalf("database parent failure = %v, want diagnostic path", err)
 	}
 }
 
@@ -272,81 +266,5 @@ func TestResolveStoragePathDoesNotRecreateUnavailableLegacyExternal(t *testing.T
 	}
 	if len(s.warnings) == 0 || !strings.Contains(s.warnings[len(s.warnings)-1], "remains offline") {
 		t.Fatalf("missing explicit offline warning: %v", s.warnings)
-	}
-}
-
-func TestSocketDirFallbackOnLongPath(t *testing.T) {
-	// A short app-data root keeps the socket under PGRun.
-	short := filepath.Join(string(os.PathSeparator), "tmp", "ld")
-	t.Setenv("LUMILIO_APP_DATA", short)
-	p, err := NewPaths()
-	if err != nil {
-		t.Fatalf("NewPaths: %v", err)
-	}
-	if p.SocketDir() != p.PGRun {
-		t.Errorf("short path: SocketDir() = %q, want PGRun %q", p.SocketDir(), p.PGRun)
-	}
-
-	// A very long app-data root forces the /tmp fallback to keep the socket path
-	// within the platform limit.
-	long := filepath.Join(short, strings.Repeat("verylongsegment/", 8))
-	t.Setenv("LUMILIO_APP_DATA", long)
-	p2, err := NewPaths()
-	if err != nil {
-		t.Fatalf("NewPaths: %v", err)
-	}
-	if p2.SocketDir() == p2.PGRun {
-		t.Errorf("long path: SocketDir() should fall back to /tmp, got PGRun %q", p2.SocketDir())
-	}
-	if !strings.HasPrefix(p2.SocketDir(), os.TempDir()) {
-		t.Errorf("long path: SocketDir() = %q, want a temp-dir fallback", p2.SocketDir())
-	}
-}
-
-func TestWindowsPGListenAndHBAConf(t *testing.T) {
-	// Windows PostgreSQL has no Unix sockets: loopback TCP + host hba rules.
-	winConf := pgListenConf("windows", "127.0.0.1")
-	if winConf != "listen_addresses = '127.0.0.1'" {
-		t.Errorf("windows listen conf = %q", winConf)
-	}
-	if hba := pgHBAConf("windows"); !strings.Contains(hba, "host   all   all   127.0.0.1/32   scram-sha-256") {
-		t.Errorf("windows hba must require scram on the loopback (reachable by every local user), got %q", hba)
-	}
-
-	// unix keeps the socket-only posture (no TCP listener at all).
-	unixConf := pgListenConf("darwin", "/run/pg")
-	if !strings.Contains(unixConf, "listen_addresses = ''") ||
-		!strings.Contains(unixConf, "unix_socket_directories = '/run/pg'") {
-		t.Errorf("unix listen conf = %q", unixConf)
-	}
-	if hba := pgHBAConf("darwin"); !strings.Contains(hba, "local   all   all   scram-sha-256") {
-		t.Errorf("unix hba should require scram over the local socket, got %q", hba)
-	}
-}
-
-func TestPGConfPathValueNormalizesBackslashes(t *testing.T) {
-	// PostgreSQL's config parser treats backslashes as escapes; a raw Windows
-	// path in postgresql.conf mangles the value and FATALs the postmaster. The
-	// generated conf must use forward slashes (accepted on every platform).
-	got := pgConfPathValue(`C:\Users\张三\AppData\Local\Lumilio Photos\logs`)
-	if strings.Contains(got, `\`) {
-		t.Errorf("conf path value still contains backslashes: %q", got)
-	}
-	if want := "C:/Users/张三/AppData/Local/Lumilio Photos/logs"; got != want {
-		t.Errorf("pgConfPathValue = %q, want %q", got, want)
-	}
-	// Single quotes are still doubled for conf-string safety.
-	if q := pgConfPathValue("/tmp/it's"); q != "/tmp/it''s" {
-		t.Errorf("pgConfPathValue quote-escape = %q", q)
-	}
-}
-
-func TestDBHostPerGOOS(t *testing.T) {
-	p := &Paths{PGRun: "/short/run"}
-	if got := dbHostForGOOS("windows", p); got != "127.0.0.1" {
-		t.Errorf("windows DBHost = %q, want loopback", got)
-	}
-	if got := dbHostForGOOS("darwin", p); got != p.SocketDir() {
-		t.Errorf("darwin DBHost = %q, want socket dir %q", got, p.SocketDir())
 	}
 }

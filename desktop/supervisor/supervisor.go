@@ -1,7 +1,7 @@
-// Package supervisor orchestrates the desktop runtime: it manages a private,
-// bundled PostgreSQL instance and runs the existing Go API server in-process,
-// reusing the same bootstrap (server/app) the CLI uses. The React UI continues
-// to talk to the server over HTTP at http://localhost:6680.
+// Package supervisor orchestrates the desktop runtime: it owns machine-local
+// paths and runs the existing Go API server in-process, reusing the same
+// bootstrap (server/app) the CLI uses. The React UI continues to talk to the
+// server over HTTP at http://localhost:6680.
 package supervisor
 
 import (
@@ -23,14 +23,10 @@ import (
 )
 
 const (
-	dbUser     = "lumilio"
-	dbName     = "lumiliophotos"
 	serverPort = "6680"
 
-	pgReadyTimeout     = 30 * time.Second
 	serverReadyTimeout = 60 * time.Second
 	serverStopTimeout  = 20 * time.Second
-	pgStopTimeout      = 35 * time.Second
 )
 
 // Startup stages reported through Options.OnStage so the tray can show what the
@@ -39,8 +35,6 @@ const (
 // maps them to localized labels.
 const (
 	StagePreparing      = "preparing"
-	StageInitDB         = "initializing_database"
-	StageStartingDB     = "starting_database"
 	StageStartingServer = "starting_server"
 	StageReady          = "ready"
 )
@@ -55,7 +49,7 @@ var ErrStorageUnreachable = errors.New("configured storage location is unreachab
 
 // ErrPortInUse indicates the fixed app port is already bound by another process
 // (a stale server, a dev instance, or an unrelated app). Without this pre-flight
-// the in-process server would fail to bind after a full PG startup, and the
+// the in-process server would fail to bind after initializing SQLite, and the
 // browser would silently reach the foreign process instead — showing a 404.
 var ErrPortInUse = errors.New("the app port is already in use")
 
@@ -67,7 +61,6 @@ type Supervisor struct {
 	operatorControls app.OperatorControls
 
 	paths *Paths
-	pg    *Postgres
 	lock  *InstanceLock
 
 	cancel    context.CancelFunc
@@ -266,12 +259,10 @@ func (s *Supervisor) ServerURL() string {
 // the default storage location). The UI may present these to the user.
 func (s *Supervisor) Warnings() []string { return s.warnings }
 
-// Start brings up PostgreSQL, generates runtime configuration, and launches the
-// API server in-process. It returns once the server is accepting requests so
-// the caller can show the UI window, or an error if any step fails. On failure
-// it tears down whatever it already started — most importantly PostgreSQL,
-// whose postmaster is a detached grandchild of pg_ctl and would otherwise keep
-// running in the background after the host shows its error dialog and quits.
+// Start generates runtime configuration and launches the API server in-process.
+// SQLite creation and migration happen inside app.Run through the same runtime
+// boundary as standalone. It returns once the server is accepting requests so
+// the caller can show the UI window, or an error if any step fails.
 func (s *Supervisor) Start(ctx context.Context) (err error) {
 	s.reportStage(StagePreparing)
 	if err := s.ensurePaths(); err != nil {
@@ -285,7 +276,6 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	}
 	s.lock = lock
 
-	pgStarted := false
 	defer func() {
 		if err == nil {
 			return
@@ -296,21 +286,13 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 			s.cancel()
 			s.cancel = nil
 		}
-		if pgStarted && s.pg != nil {
-			stopCtx, cancel := context.WithTimeout(context.Background(), pgStopTimeout)
-			if stopErr := s.pg.Stop(stopCtx); stopErr != nil {
-				s.logf("cleanup after failed start: postgres stop error: %v", stopErr)
-			}
-			cancel()
-			s.pg = nil
-		}
 		if s.lock != nil {
 			_ = s.lock.Release()
 			s.lock = nil
 		}
 	}()
 
-	// Fail fast (before the expensive PG startup) if the app port is taken. The
+	// Fail fast before starting the in-process runtime if the app port is taken. The
 	// single-instance lock already prevents a second desktop instance, so a busy
 	// port means a foreign process — otherwise the in-process server would boot,
 	// fail to bind, tear itself down, and leave the browser reaching the squatter.
@@ -328,9 +310,8 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 		}
 	}
 
-	// Strip Gatekeeper quarantine from bundled resources so exec of the PG
-	// binaries is not blocked. Done every launch (idempotent, non-fatal) so it
-	// also covers an app update that re-quarantines the binaries.
+	// Strip Gatekeeper quarantine from bundled media tools. Done every launch
+	// (idempotent, non-fatal) so updates cannot block ffmpeg/exiftool execution.
 	if err := stripQuarantine(resources); err != nil {
 		s.logf("quarantine cleanup (non-fatal): %v", err)
 	}
@@ -343,79 +324,12 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 		return fmt.Errorf("create storage path %s: %w", storagePath, err)
 	}
 
-	if err := ensureSecret(paths.DBBootstrapPasswordFile()); err != nil {
-		return err
-	}
-	pg := NewPostgres(PostgresOptions{
-		BinDir:       pgBinDir(resources),
-		DataDir:      paths.PGData,
-		Host:         paths.DBHost(),
-		LogsDir:      paths.PGLogs,
-		Port:         pgPort,
-		User:         dbUser,
-		DBName:       dbName,
-		PasswordFile: paths.DBBootstrapPasswordFile(),
-		Logf:         s.logf,
-	})
-	s.pg = pg
-
-	dataStatus, foundMajor := pg.DataDirStatus(pgMajorVersion)
-	// A valid existing cluster has already passed first-run rotation, so desktop
-	// tools authenticate with the rotated file. A fresh/reset cluster must be
-	// initialized from bootstrap even if a stale rotated file remains; the server
-	// self-heal state machine will then reapply that rotated credential.
-	if dataStatus == DataDirValid {
-		if info, statErr := os.Stat(paths.DBRotatedPasswordFile()); statErr == nil && info.Size() > 0 {
-			pg.passwordFile = paths.DBRotatedPasswordFile()
-		}
-	}
-	switch dataStatus {
-	case DataDirVersionMismatch:
-		// Never re-init over user data. The versioned layout (postgres/<major>/data)
-		// makes this unreachable in normal operation, but a restored backup or a
-		// hand-moved directory must fail loudly instead of FATALing in postgres.log.
-		return fmt.Errorf(
-			"database directory %s was initialized by PostgreSQL %s, but this build bundles PostgreSQL %s; automatic major-version upgrades are not implemented yet",
-			paths.PGData, foundMajor, pgMajorVersion)
-	case DataDirIncomplete:
-		s.logf("recovery: clearing leftovers of an interrupted initdb in %s", paths.PGData)
-		if err := pg.ResetDataDir(); err != nil {
-			return err
-		}
-	}
-	if dataStatus != DataDirValid {
-		s.reportStage(StageInitDB)
-		if err := pg.InitDB(ctx); err != nil {
-			return err
-		}
-	}
-
-	s.reportStage(StageStartingDB)
-	if err := pg.WriteConfigs(); err != nil {
-		return err
-	}
-	if err := pg.HandleStaleState(ctx); err != nil {
-		return err
-	}
-	if err := pg.Start(ctx); err != nil {
-		return err
-	}
-	pgStarted = true
-	if err := pg.WaitReady(ctx, pgReadyTimeout); err != nil {
-		return err
-	}
-	if err := pg.CreateDB(ctx); err != nil {
-		return err
-	}
-
 	s.reportStage(StageStartingServer)
 	appConfig, err := compileAndLoadServerManifest(paths.ServerConfigFile(), serverManifestBindings{
 		Port: serverPort, BrowserOrigin: "http://localhost:" + serverPort,
 		WebRoot: bundledWebRoot(resources), LogDir: paths.Logs, StoragePath: storagePath,
 		CloudStatePath: paths.Cloud, BackupsPath: paths.Backups,
-		DBHost: paths.DBHost(), DBPort: pgPort, DBUser: dbUser, DBName: dbName,
-		BootstrapPasswordFile: paths.DBBootstrapPasswordFile(), RotatedPasswordFile: paths.DBRotatedPasswordFile(),
-		SecretKeyFile: paths.SecretKeyFile(), PGBinDir: pgBinDir(resources),
+		DatabasePath: paths.Database, SecretKeyFile: paths.SecretKeyFile(),
 		ExifToolPath: bundledExifTool(resources), FFmpegPath: bundledFFmpeg(resources), FFprobePath: bundledFFprobe(resources),
 		LumenStaticNode: lumen.GRPCEndpoint,
 	})
@@ -438,8 +352,8 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	return nil
 }
 
-// Stop performs an ordered shutdown: drain the API server, stop PostgreSQL, then
-// release the single-instance lock. It is safe to call more than once.
+// Stop drains the API/SQLite runtime and releases the single-instance lock. It
+// is safe to call more than once.
 func (s *Supervisor) Stop() error {
 	var firstErr error
 	setErr := func(err error) {
@@ -460,16 +374,6 @@ func (s *Supervisor) Stop() error {
 			s.logf("api server shutdown timed out after %s", serverStopTimeout)
 		}
 		s.cancel = nil
-	}
-
-	if s.pg != nil {
-		stopCtx, cancel := context.WithTimeout(context.Background(), pgStopTimeout)
-		if err := s.pg.Stop(stopCtx); err != nil {
-			s.logf("postgres stop error: %v", err)
-			setErr(err)
-		}
-		cancel()
-		s.pg = nil
 	}
 
 	if s.lock != nil {

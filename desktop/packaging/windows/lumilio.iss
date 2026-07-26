@@ -8,7 +8,7 @@
 ;     bootstrapper and installing it silently if it is missing,
 ;   - creates Start Menu (and optional Desktop) shortcuts,
 ;   - registers an "Apps & features" entry with an uninstaller that stops the
-;     running app + its bundled PostgreSQL and can optionally remove the app data.
+;     running app and can optionally remove the app data.
 ;
 ; Storage-path selection is intentionally NOT done here: it belongs to the app's
 ; first-run onboarding window (per-user %LocalAppData%, with live writability
@@ -89,10 +89,10 @@ const
   WV2_CLIENT_WOW = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   WV2_BOOTSTRAPPER_URL = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
 
-{ Stop a running Lumilio Photos instance and its child PostgreSQL, so program
-  files are not locked during (re)install or uninstall. /T kills the process
-  tree, taking the bundled postmaster with it; PostgreSQL is crash-safe (WAL) and
-  the supervisor cleans up a stale postmaster.pid on next launch. }
+{ Stop a running Lumilio Photos instance and any supervised child processes so
+  program files are not locked during (re)install or uninstall. /T includes
+  optional local-AI children. SQLite recovers its WAL on the next launch if the
+  forced stop interrupts a write. }
 procedure StopRunningApp();
 var
   ResultCode: Integer;

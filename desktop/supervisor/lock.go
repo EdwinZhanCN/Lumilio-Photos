@@ -9,8 +9,7 @@ import (
 )
 
 // InstanceLock is an advisory single-instance guard backed by flock. Holding it
-// prevents a second app instance from starting a second PostgreSQL against the
-// same data directory (which would corrupt it).
+// prevents a second app instance from opening the same SQLite catalog.
 type InstanceLock struct {
 	file *os.File
 }

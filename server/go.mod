@@ -12,6 +12,10 @@ require (
 	github.com/edwinzhancn/lumen-sdk v1.3.2
 )
 
+replace github.com/riverqueue/river/rivershared => ../third_party/river-rivershared
+
+replace github.com/riverqueue/river => ./third_party/river
+
 require (
 	github.com/asg017/sqlite-vec-go-bindings v0.1.6
 	github.com/chyroc/gorequests v0.33.0
@@ -91,7 +95,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
@@ -115,10 +118,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.20.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.7.5 // indirect
-	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

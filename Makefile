@@ -7,12 +7,6 @@ DESKTOP_DIR := desktop
 SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/server.example.toml
 SERVER_CONFIG_LOCAL := $(SERVER_DIR)/config/server.local.toml
 
-# PostgreSQL bin directory used when running the desktop app in development. The
-# packaged app ships its own PostgreSQL; for local `make desktop-dev` point this
-# at a locally installed PostgreSQL (override on the command line as needed,
-# e.g. `make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@14/bin`).
-PG_BIN_DIR ?= /opt/homebrew/opt/postgresql@18/bin
-
 GO := go
 VP := vp
 DOCKER := docker
@@ -106,15 +100,14 @@ desktop-panel:
 	cd $(DESKTOP_DIR)/panel && $(VP) install && $(VP) run build
 
 desktop-dev: desktop-panel
-	@echo "==> Running desktop app (dev). PG_BIN_DIR=$(PG_BIN_DIR)"
+	@echo "==> Running desktop app (dev)"
 	@echo "    Serving the SPA from $(CURDIR)/$(WEB_DIR)/dist (run 'cd web && vp build' first)."
 	cd $(DESKTOP_DIR) && \
-		LUMILIO_PG_BIN_DIR=$(PG_BIN_DIR) \
 		LUMILIO_WEB_ROOT=$(CURDIR)/$(WEB_DIR)/dist \
 		$(GO) run $(GO_TAG_FLAGS) .
 
 desktop-test: desktop-panel
-	@echo "==> Testing desktop module (PostgreSQL lifecycle test skips if no PG)"
+	@echo "==> Testing desktop module (including SQLite first/second launch)"
 	cd $(DESKTOP_DIR) && $(GO) test $(GO_TAG_FLAGS) ./...
 
 desktop-build: desktop-panel

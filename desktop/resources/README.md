@@ -1,66 +1,44 @@
 # Bundled native runtime resources
 
-The desktop app ships its own copies of the native tools the server needs,
-because a packaged macOS app has no system `PATH` or package manager to rely on.
-These binaries are **large and platform-specific**, so they are not committed to
-git — they are staged here before `desktop/scripts/build-macos.sh` assembles the
-`.app` bundle.
+The desktop app ships the native media tools the server needs because a
+packaged app has no package-manager `PATH` to rely on. These binaries are large
+and platform-specific, so they are staged here before the packaging scripts
+assemble the app.
 
-**Quick start:** `desktop/scripts/fetch-resources.sh` downloads ffmpeg, ffprobe,
-and exiftool at pinned versions with SHA-256 verification (defaults to arm64).
-PostgreSQL is the one piece it does not fetch — see below.
+`desktop/scripts/fetch-resources.sh` downloads macOS ffmpeg, ffprobe, and
+exiftool at pinned versions with SHA-256 verification. Its PowerShell
+counterpart stages the Windows binaries.
 
-Expected layout (per architecture, `darwin-arm64` and/or `darwin-amd64`):
+Expected macOS layout:
 
-```
+```text
 resources/
-├── postgres/18/darwin-arm64/
-│   ├── bin/        postgres, initdb, pg_ctl, pg_isready, createdb, pg_dump, pg_restore
-│   ├── lib/        (incl. pgvector: vector.dylib under lib/postgresql)
-│   └── share/postgresql/
 ├── ffmpeg/
-│   ├── ffmpeg      native static build (arm64)
-│   └── ffprobe     native static build (arm64)
+│   ├── ffmpeg
+│   └── ffprobe
 └── exiftool/
-    ├── exiftool    Perl script (EXIFTOOL_PATH points here)
-    └── lib/        ExifTool's Perl modules — MUST sit next to the script
+    ├── exiftool
+    └── lib/
 ```
 
-> exiftool is a **Perl script**, not a self-contained binary: it runs on macOS's
-> system Perl (`/usr/bin/perl`, present but deprecated by Apple). The `lib/`
-> directory must stay beside the `exiftool` script — the script locates its
-> modules relative to itself. If Apple ever removes system Perl, a Perl
-> interpreter would need to be bundled too.
+ExifTool is a Perl script rather than a self-contained binary. Its `lib/`
+directory must remain beside the script so its modules can be resolved.
 
-The supervisor resolves these at runtime relative to the bundle's `Resources`
-directory (`ResourcesDir()` in `supervisor/resources.go`). When a tool is absent
-(e.g. local `make desktop-dev`), the server falls back to resolving it via
-`PATH`, so development works against Homebrew-installed tools.
+The supervisor resolves these tools relative to the packaged resources
+directory. In local development, an absent bundled tool falls back to `PATH`.
+SQLite and sqlite-vec are linked into the Go application; there is no separate
+database runtime to stage.
 
-## Where the binaries come from
+## Provenance
 
-`fetch-resources.sh` pins the exact URLs + SHA-256 for ffmpeg/ffprobe/exiftool;
-bump the pins (or override via env) when you update versions.
-
-- **PostgreSQL 18.4 + pgvector** (+ contrib pg_trgm): built from source — see
-  `.github/workflows/build-postgres.yml`. Not fetched by `fetch-resources.sh`,
-  because Homebrew/prebuilt PostgreSQL is not relocatable (absolute-path dylib
-  links + baked-in paths break when moved into the bundle).
-- **ffmpeg / ffprobe**: native static macOS builds. arm64 from
-  [osxexperts.net](https://www.osxexperts.net) (`ffmpeg<ver>arm.zip` /
-  `ffprobe<ver>arm.zip`); Intel from [evermeet.cx](https://evermeet.cx) (override
-  the URLs + checksums for an amd64 bundle). Each zip's payload is a single
-  self-contained binary (no dylibbundler needed). ~50MB each.
-- **exiftool**: the `Image-ExifTool-<ver>.tar.gz` Perl distribution from
-  [exiftool.org](https://exiftool.org) (the `exiftool` script + `lib/`), not the
-  `.pkg` installer. ~7MB.
-- **libvips + its dependency tree**: not staged here. `dylibbundler` collects it
-  from the build host into `Contents/Frameworks/` during `build-macos.sh`
-  (`brew install vips dylibbundler` first). libraw rides along as a libvips
-  delegate.
+- `ffmpeg` / `ffprobe`: pinned native static builds, with the exact URL and
+  SHA-256 recorded in the fetch script.
+- `exiftool`: the pinned Image-ExifTool Perl distribution, including its
+  adjacent module tree.
+- `libvips`: collected from the build host with `dylibbundler` on macOS or the
+  MinGW DLL-closure step on Windows.
 
 ## Local development
 
-`make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin` points the
-supervisor at a locally installed PostgreSQL via `LUMILIO_PG_BIN_DIR`, so you do
-not need to stage anything here to run the app in development.
+Run `make desktop-dev`. Staging resources is optional when the media tools and
+libvips are already installed on the development machine.

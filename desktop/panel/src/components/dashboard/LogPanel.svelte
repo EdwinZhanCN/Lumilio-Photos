@@ -7,7 +7,6 @@
   const sources = [
     { id: "app", label: () => t("logApp") },
     { id: "error", label: () => t("logErrors") },
-    { id: "postgres", label: () => t("logDatabase") },
     { id: "lumen", label: () => t("logLumen") },
   ];
 

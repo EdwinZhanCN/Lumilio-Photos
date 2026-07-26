@@ -2,6 +2,7 @@ package supervisor
 
 import (
 	"context"
+	"database/sql"
 	"io"
 	"net/http"
 	"os"
@@ -9,77 +10,125 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-// TestDesktopRuntimeE2E exercises the whole desktop pattern end to end: the
-// supervisor brings up the private PostgreSQL, runs migrations, starts the API
-// server in-process, and serves the SPA — then we hit http://localhost:6680 the
-// way a browser would. It is opt-in (LUMILIO_E2E=1) and needs a local
-// PostgreSQL with pgvector, so it is skipped in normal/CI runs.
-func TestDesktopRuntimeE2E(t *testing.T) {
-	if os.Getenv("LUMILIO_E2E") != "1" {
-		t.Skip("set LUMILIO_E2E=1 (and have PostgreSQL+pgvector) to run the end-to-end test")
-	}
-	binDir := pgBinDirForTest(t)
-
+// TestDesktopRuntimeFirstAndSecondLaunch exercises the complete desktop
+// boundary twice against the same machine-local SQLite catalog. The first
+// launch creates and migrates the catalog; the second proves it reopens with
+// the same durable library identity while the API and SPA remain reachable.
+func TestDesktopRuntimeFirstAndSecondLaunch(t *testing.T) {
 	appData := t.TempDir()
-	logDir := t.TempDir()
-
-	// A stand-in web bundle so we can assert the SPA is served at the root.
 	webRoot := t.TempDir()
+	resources := t.TempDir()
 	const marker = "E2E_SPA_OK"
 	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte(marker), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", "ffmpeg"))
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", "ffprobe"))
+	writeStubTool(t, filepath.Join(resources, "exiftool", "exiftool"))
 
 	t.Setenv("LUMILIO_APP_DATA", appData)
-	t.Setenv("LUMILIO_PG_BIN_DIR", binDir)
 	t.Setenv("LUMILIO_WEB_ROOT", webRoot)
-	t.Setenv("LOG_DIR", logDir)
-	// Leave ML/discovery at the desktop defaults (the generated config enables
-	// mDNS, which the Lumen client requires as a discovery backend). No ML nodes
-	// will be present, but discovery is best-effort and startup degrades cleanly.
+	t.Setenv("LUMILIO_RESOURCES_DIR", resources)
 
+	client := &http.Client{Timeout: 5 * time.Second}
+	first := startDesktopRuntime(t)
+	assertDesktopHTTP(t, client, first.ServerURL(), marker)
+	if err := first.Stop(); err != nil {
+		t.Fatalf("first supervisor.Stop: %v", err)
+	}
+
+	databasePath := filepath.Join(appData, "library.sqlite3")
+	firstLibraryID := readLibraryID(t, databasePath)
+	assertPrivateCatalog(t, databasePath)
+
+	second := startDesktopRuntime(t)
+	assertDesktopHTTP(t, client, second.ServerURL(), marker)
+	if err := second.Stop(); err != nil {
+		t.Fatalf("second supervisor.Stop: %v", err)
+	}
+	secondLibraryID := readLibraryID(t, databasePath)
+	if secondLibraryID != firstLibraryID {
+		t.Fatalf("library identity changed across launches: first=%q second=%q", firstLibraryID, secondLibraryID)
+	}
+
+	t.Logf("desktop SQLite first/second launch OK: library_id=%s", firstLibraryID)
+}
+
+func writeStubTool(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func startDesktopRuntime(t *testing.T) *Supervisor {
+	t.Helper()
 	sup := New(Options{Logf: t.Logf})
-
-	startCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
+	startCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	t.Cleanup(cancel)
 	if err := sup.Start(startCtx); err != nil {
 		t.Fatalf("supervisor.Start: %v", err)
 	}
 	t.Cleanup(func() {
 		if err := sup.Stop(); err != nil {
-			t.Errorf("supervisor.Stop: %v", err)
+			t.Errorf("supervisor.Stop cleanup: %v", err)
 		}
 	})
-
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	// 1. API reachable at localhost:6680 (the browser target).
-	if body, code := httpGet(t, client, sup.ServerURL()+"/api/v1/health"); code != 200 || !strings.Contains(body, "ok") {
-		t.Errorf("GET /api/v1/health = %d %q, want 200 containing ok", code, body)
-	}
-
-	// 2. The SPA is served at the root (the "open in browser" target).
-	if body, code := httpGet(t, client, sup.ServerURL()+"/"); code != 200 || !strings.Contains(body, marker) {
-		t.Errorf("GET / = %d %q, want 200 containing %q", code, body, marker)
-	}
-
-	// 3. A client-side route falls back to index.html, not 404.
-	if body, code := httpGet(t, client, sup.ServerURL()+"/photos/abc"); code != 200 || !strings.Contains(body, marker) {
-		t.Errorf("GET /photos/abc = %d %q, want SPA fallback (200, %q)", code, body, marker)
-	}
-
-	t.Logf("end-to-end OK: PostgreSQL + in-process API + SPA served at %s", sup.ServerURL())
+	return sup
 }
 
-func httpGet(t *testing.T, c *http.Client, url string) (string, int) {
+func assertDesktopHTTP(t *testing.T, client *http.Client, serverURL, marker string) {
 	t.Helper()
-	resp, err := c.Get(url)
+	if body, code := httpGet(t, client, serverURL+"/api/v1/health"); code != http.StatusOK || !strings.Contains(body, "ok") {
+		t.Errorf("GET /api/v1/health = %d %q, want 200 containing ok", code, body)
+	}
+	if body, code := httpGet(t, client, serverURL+"/"); code != http.StatusOK || !strings.Contains(body, marker) {
+		t.Errorf("GET / = %d %q, want 200 containing %q", code, body, marker)
+	}
+	if body, code := httpGet(t, client, serverURL+"/photos/abc"); code != http.StatusOK || !strings.Contains(body, marker) {
+		t.Errorf("GET /photos/abc = %d %q, want SPA fallback (200, %q)", code, body, marker)
+	}
+}
+
+func readLibraryID(t *testing.T, path string) string {
+	t.Helper()
+	database, err := sql.Open("sqlite3", "file:"+path+"?mode=ro")
+	if err != nil {
+		t.Fatalf("open SQLite catalog: %v", err)
+	}
+	defer database.Close()
+	var libraryID string
+	if err := database.QueryRow("SELECT library_id FROM system_state WHERE id = 1").Scan(&libraryID); err != nil {
+		t.Fatalf("read library identity: %v", err)
+	}
+	if len(libraryID) != 32 {
+		t.Fatalf("library identity = %q, want 32 lowercase hex characters", libraryID)
+	}
+	return libraryID
+}
+
+func assertPrivateCatalog(t *testing.T, path string) {
+	t.Helper()
+	private, err := isPrivatePath(path)
+	if err != nil || !private {
+		t.Fatalf("SQLite catalog private = %v, err = %v", private, err)
+	}
+}
+
+func httpGet(t *testing.T, client *http.Client, url string) (string, int) {
+	t.Helper()
+	resp, err := client.Get(url)
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	return string(b), resp.StatusCode
+	body, _ := io.ReadAll(resp.Body)
+	return string(body), resp.StatusCode
 }

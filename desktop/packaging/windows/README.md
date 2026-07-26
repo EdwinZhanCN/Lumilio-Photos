@@ -17,9 +17,8 @@
   uninstall.
 - **Shortcuts** — Start Menu always, Desktop optional (unchecked task).
 - **Uninstaller** (auto-registered in "Apps & features") —
-  - stops the running app and its bundled PostgreSQL first (force-kills the
-    process tree; PostgreSQL is WAL-crash-safe and the supervisor clears a stale
-    `postmaster.pid` on next launch),
+  - stops the running app and any supervised local-AI child process first;
+    SQLite reopens and recovers its WAL on the next launch if needed,
   - removes the program files,
   - offers to also delete the app data in `%LocalAppData%\Lumilio Photos`
     (default **No**),

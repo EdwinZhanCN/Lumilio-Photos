@@ -3,12 +3,13 @@ package supervisor
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 )
 
 // ResourcesDir resolves the directory that holds bundled runtime assets
-// (PostgreSQL, ffmpeg, exiftool). LUMILIO_RESOURCES_DIR overrides it for local
+// (ffmpeg, exiftool, and the SPA). LUMILIO_RESOURCES_DIR overrides it for local
 // development, where there is no bundle; otherwise it is derived from the
 // executable location: on macOS <App>.app/Contents/MacOS/<bin> → ../Resources,
 // on Windows a flat portable layout <dir>\lumilio-photos.exe → <dir>\resources.
@@ -37,40 +38,36 @@ func toolExe(name string) string {
 	return name
 }
 
-// pgBinDir returns the directory containing the PostgreSQL binaries for the
-// current platform. LUMILIO_PG_BIN_DIR overrides it (e.g. point at a Homebrew
-// PostgreSQL during development).
-func pgBinDir(resources string) string {
-	if v := os.Getenv("LUMILIO_PG_BIN_DIR"); v != "" {
-		return v
-	}
-	platform := runtime.GOOS + "-" + runtime.GOARCH
-	return filepath.Join(resources, "postgres", pgMajorVersion, platform, "bin")
-}
-
-// resolveToolPath returns candidate if it is an existing regular file, else "".
-// An empty result tells the server to resolve the tool via PATH (preserving the
-// web/docker default), which is what we want during development.
-func resolveToolPath(candidate string) string {
-	if candidate == "" {
-		return ""
-	}
+// resolveToolPath returns the bundled candidate when present, otherwise it
+// resolves the named development tool from PATH. The resolved absolute path is
+// compiled into the immutable runtime manifest; the server never performs an
+// implicit fallback.
+func resolveToolPath(candidate, developmentTool string) string {
 	if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 		return candidate
+	}
+	if path, err := exec.LookPath(developmentTool); err == nil {
+		if absolute, err := filepath.Abs(path); err == nil {
+			return absolute
+		}
+		return path
 	}
 	return ""
 }
 
 func bundledExifTool(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "exiftool", toolExe("exiftool")))
+	tool := toolExe("exiftool")
+	return resolveToolPath(filepath.Join(resources, "exiftool", tool), tool)
 }
 
 func bundledFFmpeg(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "ffmpeg", toolExe("ffmpeg")))
+	tool := toolExe("ffmpeg")
+	return resolveToolPath(filepath.Join(resources, "ffmpeg", tool), tool)
 }
 
 func bundledFFprobe(resources string) string {
-	return resolveToolPath(filepath.Join(resources, "ffmpeg", toolExe("ffprobe")))
+	tool := toolExe("ffprobe")
+	return resolveToolPath(filepath.Join(resources, "ffmpeg", tool), tool)
 }
 
 // bundledVipsHome returns the bundle-local libvips prefix if dynamic modules
