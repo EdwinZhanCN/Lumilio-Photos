@@ -9,18 +9,23 @@
   } from "../../lib/store.svelte.ts";
   import HubCard from "./HubCard.svelte";
   import ServerCard from "./ServerCard.svelte";
-  import SettingsPanel from "./SettingsPanel.svelte";
   import StorageLocationsPanel from "./StorageLocationsPanel.svelte";
   import SupportPanel from "./SupportPanel.svelte";
+  import SettingsDialog, {
+    type SettingsTab,
+  } from "../settings/SettingsDialog.svelte";
 
   const data = $derived(store.data!);
   let supportOpen = $state(false);
   let supportSource = $state("app");
+  let settingsOpen = $state(false);
+  let settingsTab = $state<SettingsTab>("general");
+  let settingsSession = $state(0);
 
-  function openSettings(): void {
-    const panel = document.getElementById("desktop-settings");
-    panel?.scrollIntoView({ behavior: "smooth", block: "start" });
-    panel?.focus({ preventScroll: true });
+  function openSettings(tab: SettingsTab = "general"): void {
+    settingsTab = tab;
+    settingsSession += 1;
+    settingsOpen = true;
   }
 
   function openErrorLog(): void {
@@ -45,7 +50,7 @@
     </div>
     <div class="flex shrink-0 flex-wrap justify-end gap-2">
       <button class="btn btn-sm" onclick={() => void refreshState()}>{t("refresh")}</button>
-      <button class="btn btn-sm" onclick={openSettings}>{t("settings")}</button>
+      <button class="btn btn-sm" onclick={() => openSettings()}>{t("settings")}</button>
       <button
         class="btn btn-primary btn-sm"
         disabled={!canOpenLumilio(data)}
@@ -60,10 +65,15 @@
     class="grid min-w-0 grid-cols-1 items-stretch gap-4 min-[700px]:grid-cols-2"
     aria-label={t("primaryRuntime")}
   >
-    <ServerCard onOpenSettings={openSettings} onOpenErrorLog={openErrorLog} />
-    <HubCard />
+    <ServerCard onOpenSettings={() => openSettings("server")} onOpenErrorLog={openErrorLog} />
+    <HubCard onOpenSettings={() => openSettings("lumen")} />
   </section>
   <StorageLocationsPanel />
-  <SettingsPanel />
   <SupportPanel bind:open={supportOpen} bind:source={supportSource} />
 </main>
+
+<SettingsDialog
+  bind:open={settingsOpen}
+  bind:tab={settingsTab}
+  session={settingsSession}
+/>
