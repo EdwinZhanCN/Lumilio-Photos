@@ -10,7 +10,7 @@ import (
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 )
 
@@ -77,18 +77,18 @@ type semanticWorkerEmbeddingStub struct {
 	savedVec   []float32
 }
 
-func (s *semanticWorkerEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.UUID, embeddingType service.EmbeddingType, model string, vector []float32, _ bool) error {
+func (s *semanticWorkerEmbeddingStub) SaveEmbedding(_ context.Context, _ uuid.UUID, embeddingType service.EmbeddingType, model string, vector []float32, _ bool) error {
 	s.savedType = embeddingType
 	s.savedModel = model
 	s.savedVec = vector
 	return nil
 }
 
-func (s *semanticWorkerEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, pgtype.UUID, string, []service.VideoFrameEmbedding) error {
+func (s *semanticWorkerEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, uuid.UUID, string, []service.VideoFrameEmbedding) error {
 	return nil
 }
 
-func (s *semanticWorkerEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
+func (s *semanticWorkerEmbeddingStub) SaveAestheticScore(context.Context, uuid.UUID, float32, string) error {
 	return nil
 }
 
@@ -96,19 +96,19 @@ func (s *semanticWorkerEmbeddingStub) ResolveDefaultSearchSpace(context.Context,
 	panic("not implemented")
 }
 
-func (s *semanticWorkerEmbeddingStub) GetEmbedding(context.Context, pgtype.UUID, service.EmbeddingType, string) (repo.Embedding, error) {
+func (s *semanticWorkerEmbeddingStub) GetEmbedding(context.Context, uuid.UUID, service.EmbeddingType, string) (repo.Embedding, error) {
 	panic("not implemented")
 }
 
-func (s *semanticWorkerEmbeddingStub) GetAssetEmbeddingInfo(context.Context, pgtype.UUID) (map[service.EmbeddingType]service.EmbeddingInfo, error) {
+func (s *semanticWorkerEmbeddingStub) GetAssetEmbeddingInfo(context.Context, uuid.UUID) (map[service.EmbeddingType]service.EmbeddingInfo, error) {
 	panic("not implemented")
 }
 
-func (s *semanticWorkerEmbeddingStub) DeleteEmbedding(context.Context, pgtype.UUID, service.EmbeddingType, string) error {
+func (s *semanticWorkerEmbeddingStub) DeleteEmbedding(context.Context, uuid.UUID, service.EmbeddingType, string) error {
 	panic("not implemented")
 }
 
-func (s *semanticWorkerEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, pgtype.UUID, service.EmbeddingType) (service.PrimaryEmbedding, error) {
+func (s *semanticWorkerEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, uuid.UUID, service.EmbeddingType) (service.PrimaryEmbedding, error) {
 	panic("not implemented")
 }
 
@@ -117,7 +117,7 @@ type semanticWorkerTagStub struct {
 	sources []string
 }
 
-func (s *semanticWorkerTagStub) ReplaceAssetAIGeneratedTags(_ context.Context, _ pgtype.UUID, tags []service.AIGeneratedTag, sources []string) error {
+func (s *semanticWorkerTagStub) ReplaceAssetAIGeneratedTags(_ context.Context, _ uuid.UUID, tags []service.AIGeneratedTag, sources []string) error {
 	s.tags = append([]service.AIGeneratedTag(nil), tags...)
 	s.sources = append([]string(nil), sources...)
 	return nil
@@ -131,7 +131,7 @@ type workerImageLoaderStub struct {
 	version       string
 }
 
-func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
+func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
 	s.called++
 	s.purpose = purpose
 	s.version = preprocessVersion
@@ -154,10 +154,7 @@ func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ pgtype.UUID, pu
 func TestProcessSemanticWorkerSavesImageEmbedding(t *testing.T) {
 	t.Parallel()
 
-	assetID := pgtype.UUID{}
-	if err := assetID.Scan("11111111-1111-1111-1111-111111111111"); err != nil {
-		t.Fatalf("scan asset id: %v", err)
-	}
+	assetID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 
 	embeddingSvc := &semanticWorkerEmbeddingStub{}
 	lumenSvc := &semanticWorkerLumenStub{
@@ -190,10 +187,7 @@ func TestProcessSemanticWorkerSavesImageEmbedding(t *testing.T) {
 func TestProcessSemanticWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	t.Parallel()
 
-	assetID := pgtype.UUID{}
-	if err := assetID.Scan("33333333-3333-3333-3333-333333333333"); err != nil {
-		t.Fatalf("scan asset id: %v", err)
-	}
+	assetID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
 
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
 	embeddingSvc := &semanticWorkerEmbeddingStub{}

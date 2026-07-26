@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"strconv"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 type RepositoryScanService interface {
@@ -146,7 +146,7 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 				errText := "invalid cloud_credential_id"
 				cloudImportError = &errText
 			} else {
-				repositoryID := uuid.UUID(dbRepo.RepoID.Bytes)
+				repositoryID := dbRepo.RepoID
 				access := cloud.CredentialAccess{IsAdmin: true}
 				if actorOwnerID != nil {
 					access.UserID = *actorOwnerID
@@ -245,7 +245,7 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 	scanRun, err := h.scanService.GetLatestScanRun(c.Request.Context(), strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "No repository scan run found")
 			return
 		}
@@ -323,12 +323,8 @@ func (h *RepositoryScanHandler) ListRepositoryRoots(c *gin.Context) {
 	}
 	items := make([]dto.RepositoryRootDTO, 0, len(roots))
 	for _, root := range roots {
-		id := ""
-		if root.RootID.Valid {
-			id = uuid.UUID(root.RootID.Bytes).String()
-		}
 		items = append(items, dto.RepositoryRootDTO{
-			ID: id, Name: root.Name, Path: root.Path,
+			ID: root.RootID.String(), Name: root.Name, Path: root.Path,
 			Kind: string(root.Kind), Status: string(root.Status),
 		})
 	}
@@ -457,13 +453,10 @@ func toRepositoryDTO(repository *repo.Repository) dto.RepositoryDTO {
 		return dto.RepositoryDTO{}
 	}
 
-	id := ""
-	if repository.RepoID.Valid {
-		id = uuid.UUID(repository.RepoID.Bytes).String()
-	}
+	id := repository.RepoID.String()
 	var rootID *string
 	if repository.RootID.Valid {
-		value := uuid.UUID(repository.RootID.Bytes).String()
+		value := repository.RootID.UUID.String()
 		rootID = &value
 	}
 

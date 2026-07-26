@@ -1,6 +1,7 @@
 package dbtypes
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"time"
@@ -29,6 +30,19 @@ func (at AssetType) Valid() bool {
 }
 
 type SpecificMetadata json.RawMessage
+
+func (s *SpecificMetadata) Scan(src any) error {
+	var value JSON
+	if err := value.Scan(src); err != nil {
+		return err
+	}
+	*s = SpecificMetadata(value)
+	return nil
+}
+
+func (s SpecificMetadata) Value() (driver.Value, error) {
+	return JSON(s).Value()
+}
 
 func (s *SpecificMetadata) UnmarshalJSON(b []byte) error {
 	if s == nil {

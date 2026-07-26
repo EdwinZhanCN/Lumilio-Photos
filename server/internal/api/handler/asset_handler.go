@@ -3,6 +3,7 @@ package handler
 import (
 	"archive/zip"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,8 +35,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
@@ -53,7 +52,7 @@ type AssetHandler struct {
 	queries         *repo.Queries
 	repoManager     storage.RepositoryManager
 	stagingManager  storage.StagingManager
-	queueClient     *river.Client[pgx.Tx]
+	queueClient     *river.Client[*sql.Tx]
 	settingsService service.SettingsService
 	runtimeChecker  service.LumenService
 	memoryMonitor   *memory.MemoryMonitor
@@ -71,7 +70,7 @@ func NewAssetHandler(
 	queries *repo.Queries,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
-	queueClient *river.Client[pgx.Tx],
+	queueClient *river.Client[*sql.Tx],
 	settingsService service.SettingsService,
 	runtimeChecker service.LumenService,
 ) *AssetHandler {
@@ -125,7 +124,7 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 	if err != nil {
 		return repo.Repository{}, errInvalidRepositoryID
 	}
-	repository, err := h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
+	repository, err := h.queries.GetRepository(ctx, repoUUID)
 	if err != nil {
 		return repo.Repository{}, errRepositoryNotFound
 	}
@@ -271,7 +270,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		Timestamp:        time.Now(),
 		ContentType:      validationResult.MimeType,
 		FileName:         header.Filename,
-		RepositoryID:     uuid.UUID(repository.RepoID.Bytes).String(),
+		RepositoryID:     repository.RepoID.String(),
 	}
 
 	jobInsetResult, err := h.queueClient.Insert(ctx, jobs.IngestAssetArgs{
@@ -651,13 +650,14 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 	}
 
 	contentHashes := make([]string, 0, len(req.Files))
-	quickFingerprints := make([]string, 0, len(req.Files))
+	quickFingerprints := make([]*string, 0, len(req.Files))
 	for _, file := range req.Files {
 		if file.IsQuick {
 			if file.FingerprintVersion == nil || *file.FingerprintVersion != hash.QuickFingerprintVersion {
 				continue
 			}
-			quickFingerprints = append(quickFingerprints, file.Hash)
+			fingerprint := file.Hash
+			quickFingerprints = append(quickFingerprints, &fingerprint)
 		} else {
 			contentHashes = append(contentHashes, file.Hash)
 		}
@@ -665,7 +665,7 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 
 	contentRows, err := h.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
 		ContentHashes: contentHashes,
-		RepositoryID:  repository.RepoID,
+		RepositoryID:  uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 	})
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to precheck uploads")
@@ -695,7 +695,7 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 	}
 	quickRows, err := h.queries.GetAssetsByQuickFingerprintsAndRepository(ctx, repo.GetAssetsByQuickFingerprintsAndRepositoryParams{
 		QuickFingerprints: quickFingerprints,
-		RepositoryID:      repository.RepoID,
+		RepositoryID:      uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 	})
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to precheck upload fingerprints")
@@ -1287,7 +1287,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	// Get thumbnail from service
 	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), assetID, size)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Thumbnail not found")
 			return
 		}
@@ -2088,7 +2088,7 @@ func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository, includ
 			continue
 		}
 		item := dto.IndexingRepositoryOptionDTO{
-			ID:        uuid.UUID(repository.RepoID.Bytes).String(),
+			ID:        repository.RepoID.String(),
 			Name:      repository.Name,
 			Role:      string(repository.Role),
 			Status:    string(repository.Status),
@@ -2869,14 +2869,10 @@ func parseIntQueryWithRange(
 func countUniqueAssets(assets []repo.Asset) int {
 	seen := make(map[string]struct{}, len(assets))
 	for _, asset := range assets {
-		if !asset.AssetID.Valid {
+		if asset.AssetID == uuid.Nil {
 			continue
 		}
-		id, err := uuid.FromBytes(asset.AssetID.Bytes[:])
-		if err != nil {
-			continue
-		}
-		seen[id.String()] = struct{}{}
+		seen[asset.AssetID.String()] = struct{}{}
 	}
 	return len(seen)
 }
@@ -3672,8 +3668,14 @@ func (h *AssetHandler) sidecarSourceForAsset(asset *repo.Asset) dto.LumilioSidec
 	source.MimeType = asset.MimeType
 	source.FileSize = asset.FileSize
 	source.Hash = stringPtr(asset.ContentHash)
-	source.Width = asset.Width
-	source.Height = asset.Height
+	if asset.Width != nil {
+		width := int32(*asset.Width)
+		source.Width = &width
+	}
+	if asset.Height != nil {
+		height := int32(*asset.Height)
+		source.Height = &height
+	}
 	if asset.StoragePath != nil {
 		source.StoragePath = *asset.StoragePath
 	}
@@ -4087,7 +4089,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		Timestamp:        time.Now(),
 		ContentType:      finalContentType,
 		FileName:         session.Filename,
-		RepositoryID:     uuid.UUID(repository.RepoID.Bytes).String(),
+		RepositoryID:     repository.RepoID.String(),
 	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
@@ -4127,14 +4129,14 @@ type duplicateAsset struct {
 
 // findDuplicateByHash reports an existing asset with the same authoritative
 // full content hash and file size.
-func (h *AssetHandler) findDuplicateByHash(ctx context.Context, contentHash string, size int64, repositoryID pgtype.UUID) (*duplicateAsset, error) {
+func (h *AssetHandler) findDuplicateByHash(ctx context.Context, contentHash string, size int64, repositoryID uuid.UUID) (*duplicateAsset, error) {
 	if contentHash == "" {
 		return nil, nil
 	}
 
 	rows, err := h.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
 		ContentHashes: []string{contentHash},
-		RepositoryID:  repositoryID,
+		RepositoryID:  uuid.NullUUID{UUID: repositoryID, Valid: true},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up existing content hash: %w", err)
@@ -4193,15 +4195,9 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	}
 
 	// Get the asset to check its current status
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID format")
-		return
-	}
-
-	asset, err := h.queries.GetAssetByID(ctx, pgUUID)
+	asset, err := h.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Asset not found")
 			return
 		}
@@ -4216,7 +4212,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	// Parse current status
 	var currentStatus status.AssetStatus
 	if len(asset.Status) > 0 {
-		currentStatus, err = status.FromJSONB(asset.Status)
+		currentStatus, err = status.FromJSON(asset.Status)
 		if err != nil {
 			api.GinInternalError(c, err, "Failed to parse asset status")
 			return
@@ -4232,14 +4228,18 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	// Determine retry strategy
 	if len(req.Tasks) == 0 || req.ForceFullRetry {
 		// Full retry - reset status and enqueue full processing job
-		updatedAsset, err := h.queries.ResetAssetStatusForRetry(ctx, pgUUID)
+		updatedAsset, err := h.queries.ResetAssetStatusForRetry(ctx, assetID)
 		if err != nil {
 			api.GinInternalError(c, err, "Failed to reset asset status")
 			return
 		}
 
 		// Get repository information
-		repository, err := h.queries.GetRepository(ctx, updatedAsset.RepositoryID)
+		if !updatedAsset.RepositoryID.Valid {
+			api.GinInternalError(c, errors.New("asset has no repository"), "Failed to get repository")
+			return
+		}
+		repository, err := h.queries.GetRepository(ctx, updatedAsset.RepositoryID.UUID)
 		if err != nil {
 			api.GinInternalError(c, err, "Failed to get repository")
 			return

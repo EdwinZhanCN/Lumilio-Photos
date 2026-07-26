@@ -1,54 +1,328 @@
 version: "2"
 sql:
-    - engine: "postgresql"
+    - engine: "sqlite"
       queries: "internal/db/repo/queries"
       schema: "migrations/*.up.sql"
       gen:
           go:
               package: "repo"
               out: "internal/db/repo"
-              sql_package: "pgx/v5"
+              sql_package: "database/sql"
               emit_interface: true
               emit_json_tags: true
               emit_db_tags: true
               emit_prepared_queries: false
               emit_pointers_for_null_types: true
               overrides:
-                  - column: "location_clusters.search_vector"
-                    go_type: "string"
-                  - column: "SearchNearestAssets.distance"
-                    go_type: "float64"
-                  - column: "GetAssetWithThumbnails.thumbnails"
-                    go_type: "encoding/json.RawMessage"
-                  - column: "GetAssetWithTags.tags"
-                    go_type: "encoding/json.RawMessage"
-                  - column: "GetAssetWithRelations.thumbnails"
-                    go_type: "encoding/json.RawMessage"
-                  - column: "GetAssetWithRelations.tags"
-                    go_type: "encoding/json.RawMessage"
+                  # Canonical UUID TEXT. Exact nullable overrides precede the
+                  # shared identifier-name mappings.
+                  - column: "users.avatar_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "albums.cover_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "assets.repository_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repositories.root_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "media_items.repository_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "media_items.primary_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "asset_stacks.repository_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "asset_stacks.cover_media_item_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "duplicate_groups.recommended_keeper_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "duplicate_groups.keeper_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "cloud_sync_files.asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_cloud_bindings.last_import_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "agent_threads.active_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "agent_pending_effects.executing_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "user_webauthn_credentials.credential_id"
+                    go_type: { type: "byte", slice: true }
+                  - column: "repositories.default_owner_id"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "assets.owner_id"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "media_items.owner_id"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "asset_stacks.owner_id"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "duplicate_groups.owner_id"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "settings.updated_by"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "location_clusters.owner_id"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "face_clusters.owner_id"
+                    go_type: { type: "int32", pointer: true }
+                  - column: "*.asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.repo_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.repository_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.root_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.scan_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.session_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.pin_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.credential_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.run_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.group_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.media_item_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.stack_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.share_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.effect_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.initiating_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.executing_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.primary_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.cover_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.cover_media_item_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.recommended_keeper_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.keeper_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.last_import_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.active_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.asset_id_a"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.asset_id_b"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "location_clusters.cluster_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "location_cluster_assets.cluster_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+
+                  # UTC Unix-microsecond INTEGER values.
+                  - column: "*.created_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.updated_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.expires_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.upload_time"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.taken_time"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.deleted_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.last_login"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.last_sync"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.last_used_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.used_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.enabled_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.added_time"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.started_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.finished_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.detected_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.resolved_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.geocoded_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.queried_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.synced_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.prototype_built_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.hidden_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.revoked_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.last_viewed_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.last_accessed_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.cancel_requested_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.committed_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.last_successful_refresh_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+
+                  # JSON TEXT and JSON-backed collections.
                   - column: "assets.specific_metadata"
-                    go_type:
-                        import: "server/internal/db/dbtypes"
-                        type: "SpecificMetadata"
-                  - column: "assets.exif_raw"
-                    go_type: "encoding/json.RawMessage"
+                    go_type: { import: "server/internal/db/dbtypes", type: "SpecificMetadata" }
                   - column: "repositories.config"
-                    go_type:
-                        import: "server/internal/storage/repocfg"
-                        type: "RepositoryConfig"
+                    go_type: { import: "server/internal/storage/repocfg", type: "RepositoryConfig" }
+                  - column: "*.asset_ids"
+                    go_type: { import: "server/internal/db/dbtypes", type: "UUIDs" }
+                  - column: "*.membership_snapshot"
+                    go_type: { import: "server/internal/db/dbtypes", type: "UUIDs" }
+                  - column: "classifier_definitions.positive_prompts"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Strings" }
+                  - column: "classifier_definitions.negative_prompts"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Strings" }
+                  - column: "user_webauthn_credentials.transports"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Strings" }
+                  - column: "assets.status"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "assets.exif_raw"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "face_items.bounding_box"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "face_items.pose_angles"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "ocr_text_items.bounding_box"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "reverse_geocode_cache.raw_response"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "agent_pins.plan"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "cloud_credentials.public_config"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "agent_threads.context_bindings"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "agent_threads.mention_bindings"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "agent_refs.plan"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "agent_pending_effects.payload"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "agent_pending_effects.target"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "agent_pending_effects.receipt"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+
+                  # Authoritative vector BLOBs.
+                  - column: "embeddings.vector"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                  - column: "search_embeddings.vector"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                  - column: "face_items.embedding"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                  - column: "classifier_definitions.positive_prototype"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                  - column: "classifier_definitions.negative_prototype"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+
+                  # Preserve existing domain and API-width types.
                   - column: "repositories.status"
-                    go_type:
-                        import: "server/internal/db/dbtypes"
-                        type: "RepoStatus"
+                    go_type: { import: "server/internal/db/dbtypes", type: "RepoStatus" }
                   - column: "repositories.role"
-                    go_type:
-                        import: "server/internal/db/dbtypes"
-                        type: "RepoRole"
+                    go_type: { import: "server/internal/db/dbtypes", type: "RepoRole" }
                   - column: "repository_roots.kind"
-                    go_type:
-                        import: "server/internal/db/dbtypes"
-                        type: "RepositoryRootKind"
+                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryRootKind" }
                   - column: "repository_roots.status"
-                    go_type:
-                        import: "server/internal/db/dbtypes"
-                        type: "RepositoryRootStatus"
+                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryRootStatus" }
+                  - column: "*.user_id"
+                    go_type: "int32"
+                  - column: "*.owner_id"
+                    go_type: "int32"
+                  - column: "*.default_owner_id"
+                    go_type: "int32"
+                  - column: "*.updated_by"
+                    go_type: "int32"
+                  - column: "*.album_id"
+                    go_type: "int32"
+                  - column: "*.tag_id"
+                    go_type: "int32"
+                  - column: "*.thumbnail_id"
+                    go_type: "int32"
+                  - column: "*.prediction_id"
+                    go_type: "int32"
+                  - column: "face_items.id"
+                    go_type: "int32"
+                  - column: "face_clusters.cluster_id"
+                    go_type: "int32"
+                  - column: "face_cluster_members.id"
+                    go_type: "int32"
+                  - column: "face_cluster_members.cluster_id"
+                    go_type: "int32"
+                  - column: "face_cluster_members.face_id"
+                    go_type: "int32"
+                  - column: "ocr_text_items.id"
+                    go_type: "int32"
+                  - column: "classifier_definitions.id"
+                    go_type: "int32"
+                  - column: "*.is_active"
+                    go_type: "bool"
+                  - column: "*.is_revoked"
+                    go_type: "bool"
+                  - column: "*.user_present"
+                    go_type: "bool"
+                  - column: "*.user_verified"
+                    go_type: "bool"
+                  - column: "*.backup_eligible"
+                    go_type: "bool"
+                  - column: "*.backup_state"
+                    go_type: "bool"
+                  - column: "*.password_change_required"
+                    go_type: "bool"
+                  - column: "*.llm_agent_enabled"
+                    go_type: "bool"
+                  - column: "*.llm_api_key_configured"
+                    go_type: "bool"
+                  - column: "*.ml_semantic_enabled"
+                    go_type: "bool"
+                  - column: "*.ml_ocr_enabled"
+                    go_type: "bool"
+                  - column: "*.ml_caption_enabled"
+                    go_type: "bool"
+                  - column: "*.ml_face_enabled"
+                    go_type: "bool"
+                  - column: "*.ml_bioclip_enabled"
+                    go_type: "bool"
+                  - column: "*.ml_video_semantic_enabled"
+                    go_type: "bool"
+                  - column: "*.backup_enabled"
+                    go_type: "bool"
+                  - column: "*.is_deleted"
+                    go_type: "bool"
+                  - column: "*.liked"
+                    go_type: "bool"
+                  - column: "*.is_ai_generated"
+                    go_type: "bool"
+                  - column: "*.search_enabled"
+                    go_type: "bool"
+                  - column: "*.is_default_search"
+                    go_type: "bool"
+                  - column: "*.is_primary"
+                    go_type: "bool"
+                  - column: "*.is_manual"
+                    go_type: "bool"
+                  - column: "*.is_confirmed"
+                    go_type: "bool"
+                  - column: "*.is_hidden"
+                    go_type: "bool"
+                  - column: "*.enabled"
+                    go_type: "bool"
+                  - column: "*.truncated"
+                    go_type: "bool"
+                  - column: "*.allow_download"
+                    go_type: "bool"
+                  - column: "*.include_originals"
+                    go_type: "bool"

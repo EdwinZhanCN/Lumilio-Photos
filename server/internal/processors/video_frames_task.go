@@ -12,7 +12,7 @@ import (
 	"server/internal/service"
 	"server/internal/utils/imagesource"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
@@ -23,7 +23,7 @@ func (ap *AssetProcessor) ProcessVideoFramesTask(ctx context.Context, args jobs.
 	if ap == nil {
 		return fmt.Errorf("asset processor is nil")
 	}
-	if !args.AssetID.Valid {
+	if args.AssetID == uuid.Nil {
 		return fmt.Errorf("invalid asset id")
 	}
 
@@ -119,7 +119,7 @@ func (ap *AssetProcessor) ProcessVideoFramesTask(ctx context.Context, args jobs.
 
 // enqueueVideoFramesJob inserts a process_video_frames job when video semantic
 // indexing is enabled. Best-effort: failures are logged by the caller.
-func (ap *AssetProcessor) enqueueVideoFramesJob(ctx context.Context, assetID pgtype.UUID) error {
+func (ap *AssetProcessor) enqueueVideoFramesJob(ctx context.Context, assetID uuid.UUID) error {
 	if ap == nil || ap.queueClient == nil {
 		return fmt.Errorf("queue client unavailable")
 	}

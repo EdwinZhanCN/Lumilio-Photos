@@ -10,7 +10,6 @@ import (
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -36,7 +35,7 @@ func writeRepositoryAt(t *testing.T, path string, id uuid.UUID) repo.Repository 
 		t.Fatalf("save config: %v", err)
 	}
 	return repo.Repository{
-		RepoID: pgtype.UUID{Bytes: id, Valid: true},
+		RepoID: id,
 		Path:   path,
 		Status: dbtypes.RepoStatusActive,
 	}
@@ -62,7 +61,7 @@ func TestInspectRepositoryOnDiskReportsOfflineWhenPathMissing(t *testing.T) {
 	manager := reconcileTestManager(t)
 	id := uuid.New()
 	row := repo.Repository{
-		RepoID: pgtype.UUID{Bytes: id, Valid: true},
+		RepoID: id,
 		Path:   filepath.Join(canonicalTempDir(t), "unplugged", "library"),
 		Status: dbtypes.RepoStatusActive,
 	}
@@ -82,7 +81,7 @@ func TestInspectRepositoryOnDiskReportsOfflineWhenPathMissing(t *testing.T) {
 func TestInspectRepositoryOnDiskReportsErrorWhenIDDiffers(t *testing.T) {
 	manager := reconcileTestManager(t)
 	row := writeRepositoryAt(t, filepath.Join(canonicalTempDir(t), "library"), uuid.New())
-	row.RepoID = pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	row.RepoID = uuid.New()
 
 	status, config := manager.inspectRepositoryOnDisk(row)
 
@@ -104,7 +103,7 @@ func TestInspectRepositoryOnDiskReportsErrorWhenConfigUnparseable(t *testing.T) 
 		t.Fatalf("write config: %v", err)
 	}
 	row := repo.Repository{
-		RepoID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RepoID: uuid.New(),
 		Path:   dir,
 		Status: dbtypes.RepoStatusActive,
 	}
@@ -122,7 +121,7 @@ func TestInspectRepositoryOnDiskRecoversFromOffline(t *testing.T) {
 	id := uuid.New()
 	path := filepath.Join(canonicalTempDir(t), "library")
 	row := repo.Repository{
-		RepoID: pgtype.UUID{Bytes: id, Valid: true},
+		RepoID: id,
 		Path:   path,
 		Status: dbtypes.RepoStatusOffline,
 	}
@@ -144,7 +143,7 @@ func TestInspectRepositoryOnDiskRecoversFromOffline(t *testing.T) {
 func TestReconcileRepositorySkipsScanning(t *testing.T) {
 	manager := reconcileTestManager(t)
 	row := repo.Repository{
-		RepoID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RepoID: uuid.New(),
 		Path:   filepath.Join(canonicalTempDir(t), "gone"),
 		Status: dbtypes.RepoStatusScanning,
 	}

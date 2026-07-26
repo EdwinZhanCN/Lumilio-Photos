@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 
@@ -74,7 +74,7 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 	if err := ap.savePHashEmbeddingFromReader(ctx, asset.AssetID, bytes.NewReader(smallBytes)); err != nil {
 		if ap.logger != nil {
 			ap.logger.Warn("inline pHash failed; falling back to process_phash",
-				zap.String("asset_id", fmt.Sprintf("%x", asset.AssetID.Bytes)),
+				zap.String("asset_id", asset.AssetID.String()),
 				zap.Error(err),
 			)
 		}
@@ -84,7 +84,7 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 	return false, nil
 }
 
-func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID pgtype.UUID) error {
+func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID uuid.UUID) error {
 	if _, err := ap.queueClient.Insert(ctx, jobs.ProcessPHashArgs{
 		AssetID: assetID,
 	}, &river.InsertOpts{Queue: "process_phash"}); err != nil {
@@ -94,7 +94,7 @@ func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID pgtype.UU
 	return nil
 }
 
-func (ap *AssetProcessor) savePHashEmbeddingFromReader(ctx context.Context, assetID pgtype.UUID, reader io.Reader) error {
+func (ap *AssetProcessor) savePHashEmbeddingFromReader(ctx context.Context, assetID uuid.UUID, reader io.Reader) error {
 	if ap.embeddingService == nil {
 		return fmt.Errorf("embedding service is not configured")
 	}

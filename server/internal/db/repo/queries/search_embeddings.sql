@@ -3,11 +3,11 @@
 
 -- name: InsertSearchEmbedding :exec
 INSERT INTO search_embeddings (asset_id, space_id, frame_ts_ms, vector, model_id)
-VALUES ($1, $2, $3, $4, $5);
+VALUES (?1, ?2, ?3, ?4, ?5);
 
 -- name: DeleteSearchEmbeddingsByAsset :exec
 DELETE FROM search_embeddings
-WHERE asset_id = $1;
+WHERE asset_id = ?1;
 
 -- name: DeleteAllSearchEmbeddings :exec
 DELETE FROM search_embeddings;
@@ -15,7 +15,7 @@ DELETE FROM search_embeddings;
 -- name: GetPrimarySearchEmbedding :one
 SELECT asset_id, space_id, vector, model_id
 FROM search_embeddings
-WHERE asset_id = $1 AND frame_ts_ms IS NULL;
+WHERE asset_id = ?1 AND frame_ts_ms IS NULL;
 
 -- name: CountAssetsWithSearchEmbedding :one
 SELECT COUNT(DISTINCT asset_id) AS count

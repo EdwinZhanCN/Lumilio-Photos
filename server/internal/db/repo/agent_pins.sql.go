@@ -8,13 +8,14 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const createAgentPin = `-- name: CreateAgentPin :one
 INSERT INTO agent_pins (user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+RETURNING pin_id, user_id, title, widget, mode, "plan", summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at
 `
 
 type CreateAgentPinParams struct {
@@ -22,18 +23,18 @@ type CreateAgentPinParams struct {
 	Title     string        `db:"title" json:"title"`
 	Widget    string        `db:"widget" json:"widget"`
 	Mode      string        `db:"mode" json:"mode"`
-	Plan      []byte        `db:"plan" json:"plan"`
+	Plan      dbtypes.JSON  `db:"plan" json:"plan"`
 	Summary   string        `db:"summary" json:"summary"`
-	AssetIds  []pgtype.UUID `db:"asset_ids" json:"asset_ids"`
+	AssetIds  dbtypes.UUIDs `db:"asset_ids" json:"asset_ids"`
 	Truncated bool          `db:"truncated" json:"truncated"`
-	LayoutX   int32         `db:"layout_x" json:"layout_x"`
-	LayoutY   int32         `db:"layout_y" json:"layout_y"`
-	LayoutW   int32         `db:"layout_w" json:"layout_w"`
-	LayoutH   int32         `db:"layout_h" json:"layout_h"`
+	LayoutX   int64         `db:"layout_x" json:"layout_x"`
+	LayoutY   int64         `db:"layout_y" json:"layout_y"`
+	LayoutW   int64         `db:"layout_w" json:"layout_w"`
+	LayoutH   int64         `db:"layout_h" json:"layout_h"`
 }
 
 func (q *Queries) CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) (AgentPin, error) {
-	row := q.db.QueryRow(ctx, createAgentPin,
+	row := q.db.QueryRowContext(ctx, createAgentPin,
 		arg.UserID,
 		arg.Title,
 		arg.Widget,
@@ -71,31 +72,31 @@ func (q *Queries) CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) 
 
 const deleteAgentPin = `-- name: DeleteAgentPin :exec
 DELETE FROM agent_pins
-WHERE pin_id = $1 AND user_id = $2
+WHERE pin_id = ?1 AND user_id = ?2
 `
 
 type DeleteAgentPinParams struct {
-	PinID  pgtype.UUID `db:"pin_id" json:"pin_id"`
-	UserID int32       `db:"user_id" json:"user_id"`
+	PinID  uuid.UUID `db:"pin_id" json:"pin_id"`
+	UserID int32     `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) DeleteAgentPin(ctx context.Context, arg DeleteAgentPinParams) error {
-	_, err := q.db.Exec(ctx, deleteAgentPin, arg.PinID, arg.UserID)
+	_, err := q.db.ExecContext(ctx, deleteAgentPin, arg.PinID, arg.UserID)
 	return err
 }
 
 const getAgentPin = `-- name: GetAgentPin :one
-SELECT pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at FROM agent_pins
-WHERE pin_id = $1 AND user_id = $2
+SELECT pin_id, user_id, title, widget, mode, "plan", summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at FROM agent_pins
+WHERE pin_id = ?1 AND user_id = ?2
 `
 
 type GetAgentPinParams struct {
-	PinID  pgtype.UUID `db:"pin_id" json:"pin_id"`
-	UserID int32       `db:"user_id" json:"user_id"`
+	PinID  uuid.UUID `db:"pin_id" json:"pin_id"`
+	UserID int32     `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) GetAgentPin(ctx context.Context, arg GetAgentPinParams) (AgentPin, error) {
-	row := q.db.QueryRow(ctx, getAgentPin, arg.PinID, arg.UserID)
+	row := q.db.QueryRowContext(ctx, getAgentPin, arg.PinID, arg.UserID)
 	var i AgentPin
 	err := row.Scan(
 		&i.PinID,
@@ -119,13 +120,13 @@ func (q *Queries) GetAgentPin(ctx context.Context, arg GetAgentPinParams) (Agent
 }
 
 const listAgentPins = `-- name: ListAgentPins :many
-SELECT pin_id, user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at FROM agent_pins
-WHERE user_id = $1
+SELECT pin_id, user_id, title, widget, mode, "plan", summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at FROM agent_pins
+WHERE user_id = ?1
 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, error) {
-	rows, err := q.db.Query(ctx, listAgentPins, userID)
+	rows, err := q.db.QueryContext(ctx, listAgentPins, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +156,9 @@ func (q *Queries) ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, 
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -163,39 +167,40 @@ func (q *Queries) ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, 
 
 const touchAgentPinLiveRefresh = `-- name: TouchAgentPinLiveRefresh :exec
 UPDATE agent_pins
-SET last_successful_refresh_at = $3,
-    updated_at = NOW()
-WHERE pin_id = $1 AND user_id = $2
+SET last_successful_refresh_at = ?3,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE pin_id = ?1 AND user_id = ?2
 `
 
 type TouchAgentPinLiveRefreshParams struct {
-	PinID                   pgtype.UUID        `db:"pin_id" json:"pin_id"`
-	UserID                  int32              `db:"user_id" json:"user_id"`
-	LastSuccessfulRefreshAt pgtype.Timestamptz `db:"last_successful_refresh_at" json:"last_successful_refresh_at"`
+	PinID                   uuid.UUID         `db:"pin_id" json:"pin_id"`
+	UserID                  int32             `db:"user_id" json:"user_id"`
+	LastSuccessfulRefreshAt dbtypes.Timestamp `db:"last_successful_refresh_at" json:"last_successful_refresh_at"`
 }
 
 func (q *Queries) TouchAgentPinLiveRefresh(ctx context.Context, arg TouchAgentPinLiveRefreshParams) error {
-	_, err := q.db.Exec(ctx, touchAgentPinLiveRefresh, arg.PinID, arg.UserID, arg.LastSuccessfulRefreshAt)
+	_, err := q.db.ExecContext(ctx, touchAgentPinLiveRefresh, arg.PinID, arg.UserID, arg.LastSuccessfulRefreshAt)
 	return err
 }
 
 const updateAgentPinLayout = `-- name: UpdateAgentPinLayout :exec
 UPDATE agent_pins
-SET layout_x = $3, layout_y = $4, layout_w = $5, layout_h = $6, updated_at = NOW()
-WHERE pin_id = $1 AND user_id = $2
+SET layout_x = ?3, layout_y = ?4, layout_w = ?5, layout_h = ?6,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE pin_id = ?1 AND user_id = ?2
 `
 
 type UpdateAgentPinLayoutParams struct {
-	PinID   pgtype.UUID `db:"pin_id" json:"pin_id"`
-	UserID  int32       `db:"user_id" json:"user_id"`
-	LayoutX int32       `db:"layout_x" json:"layout_x"`
-	LayoutY int32       `db:"layout_y" json:"layout_y"`
-	LayoutW int32       `db:"layout_w" json:"layout_w"`
-	LayoutH int32       `db:"layout_h" json:"layout_h"`
+	PinID   uuid.UUID `db:"pin_id" json:"pin_id"`
+	UserID  int32     `db:"user_id" json:"user_id"`
+	LayoutX int64     `db:"layout_x" json:"layout_x"`
+	LayoutY int64     `db:"layout_y" json:"layout_y"`
+	LayoutW int64     `db:"layout_w" json:"layout_w"`
+	LayoutH int64     `db:"layout_h" json:"layout_h"`
 }
 
 func (q *Queries) UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLayoutParams) error {
-	_, err := q.db.Exec(ctx, updateAgentPinLayout,
+	_, err := q.db.ExecContext(ctx, updateAgentPinLayout,
 		arg.PinID,
 		arg.UserID,
 		arg.LayoutX,
@@ -208,34 +213,34 @@ func (q *Queries) UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLa
 
 const updateAgentPinTitle = `-- name: UpdateAgentPinTitle :exec
 UPDATE agent_pins
-SET title = $3, updated_at = NOW()
-WHERE pin_id = $1 AND user_id = $2
+SET title = ?3, updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE pin_id = ?1 AND user_id = ?2
 `
 
 type UpdateAgentPinTitleParams struct {
-	PinID  pgtype.UUID `db:"pin_id" json:"pin_id"`
-	UserID int32       `db:"user_id" json:"user_id"`
-	Title  string      `db:"title" json:"title"`
+	PinID  uuid.UUID `db:"pin_id" json:"pin_id"`
+	UserID int32     `db:"user_id" json:"user_id"`
+	Title  string    `db:"title" json:"title"`
 }
 
 func (q *Queries) UpdateAgentPinTitle(ctx context.Context, arg UpdateAgentPinTitleParams) error {
-	_, err := q.db.Exec(ctx, updateAgentPinTitle, arg.PinID, arg.UserID, arg.Title)
+	_, err := q.db.ExecContext(ctx, updateAgentPinTitle, arg.PinID, arg.UserID, arg.Title)
 	return err
 }
 
 const updateAgentPinWidget = `-- name: UpdateAgentPinWidget :exec
 UPDATE agent_pins
-SET widget = $3, updated_at = NOW()
-WHERE pin_id = $1 AND user_id = $2
+SET widget = ?3, updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE pin_id = ?1 AND user_id = ?2
 `
 
 type UpdateAgentPinWidgetParams struct {
-	PinID  pgtype.UUID `db:"pin_id" json:"pin_id"`
-	UserID int32       `db:"user_id" json:"user_id"`
-	Widget string      `db:"widget" json:"widget"`
+	PinID  uuid.UUID `db:"pin_id" json:"pin_id"`
+	UserID int32     `db:"user_id" json:"user_id"`
+	Widget string    `db:"widget" json:"widget"`
 }
 
 func (q *Queries) UpdateAgentPinWidget(ctx context.Context, arg UpdateAgentPinWidgetParams) error {
-	_, err := q.db.Exec(ctx, updateAgentPinWidget, arg.PinID, arg.UserID, arg.Widget)
+	_, err := q.db.ExecContext(ctx, updateAgentPinWidget, arg.PinID, arg.UserID, arg.Widget)
 	return err
 }

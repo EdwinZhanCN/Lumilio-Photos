@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"server/internal/api/dto"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,12 +50,12 @@ func (s stubAssetService) QueryBrowseItems(ctx context.Context, params service.Q
 	}
 	items := make([]service.BrowseItem, 0, len(assets))
 	for _, asset := range assets {
-		if !asset.AssetID.Valid {
+		if asset.AssetID == uuid.Nil {
 			continue
 		}
 		items = append(items, service.BrowseItem{
 			Type:  "asset",
-			ID:    "asset:" + uuid.UUID(asset.AssetID.Bytes).String(),
+			ID:    "asset:" + asset.AssetID.String(),
 			Asset: asset,
 		})
 	}
@@ -79,12 +79,12 @@ func (s stubAssetService) SearchBrowseItems(ctx context.Context, params service.
 	toBrowseItems := func(assets []repo.Asset) []service.BrowseItem {
 		items := make([]service.BrowseItem, 0, len(assets))
 		for _, asset := range assets {
-			if !asset.AssetID.Valid {
+			if asset.AssetID == uuid.Nil {
 				continue
 			}
 			items = append(items, service.BrowseItem{
 				Type:  "asset",
-				ID:    "asset:" + uuid.UUID(asset.AssetID.Bytes).String(),
+				ID:    "asset:" + asset.AssetID.String(),
 				Asset: asset,
 			})
 		}
@@ -104,8 +104,8 @@ func (s stubAssetService) SearchBrowseItems(ctx context.Context, params service.
 func testHandlerAsset(t *testing.T, rawID string, filename string) repo.Asset {
 	t.Helper()
 
-	var assetID pgtype.UUID
-	require.NoError(t, assetID.Scan(rawID))
+	assetID, err := uuid.Parse(rawID)
+	require.NoError(t, err)
 
 	path := "/tmp/" + filename
 	return repo.Asset{
@@ -114,7 +114,7 @@ func testHandlerAsset(t *testing.T, rawID string, filename string) repo.Asset {
 		OriginalFilename: filename,
 		StoragePath:      &path,
 		MimeType:         "image/jpeg",
-		UploadTime:       pgtype.Timestamptz{Time: time.Unix(1700000000, 0), Valid: true},
+		UploadTime:       dbtypes.NewTimestamp(time.Unix(1700000000, 0)),
 	}
 }
 

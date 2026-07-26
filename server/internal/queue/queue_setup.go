@@ -1,13 +1,12 @@
 package queue
 
 import (
+	"database/sql"
 	"log/slog"
 	"runtime"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/riverdriver/riversqlite"
 )
 
 func clampWorkers(value, min, max int) int {
@@ -42,7 +41,7 @@ func queueWorkerCounts() (ingestWorkers int, thumbnailWorkers int, phashWorkers 
 	return queueWorkerCountsForCPU(runtime.NumCPU())
 }
 
-func New(dbpool *pgxpool.Pool, workers *river.Workers, logger *slog.Logger) (*river.Client[pgx.Tx], error) {
+func New(dbpool *sql.DB, workers *river.Workers, logger *slog.Logger) (*river.Client[*sql.Tx], error) {
 	ingestWorkers, thumbnailWorkers, phashWorkers := queueWorkerCounts()
 
 	queues := map[string]river.QueueConfig{
@@ -67,8 +66,7 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers, logger *slog.Logger) (*ri
 		"process_phash":             {MaxWorkers: phashWorkers},
 	}
 
-	client, err := river.NewClient(riverpgxv5.New(dbpool), &river.Config{
-		Schema:  "public",
+	client, err := river.NewClient(riversqlite.New(dbpool), &river.Config{
 		Queues:  queues,
 		Workers: workers,
 		Logger:  logger,

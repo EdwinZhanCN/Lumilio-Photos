@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"math"
@@ -18,10 +19,6 @@ import (
 	"github.com/davidbyttow/govips/v2/vips"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pgvector/pgvector-go"
 )
 
 const (
@@ -38,22 +35,22 @@ type faceRepositoryPathResolver interface {
 
 // FaceService defines face detection and recognition related operations interface.
 type FaceService interface {
-	SaveFaceResults(ctx context.Context, assetID pgtype.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error
-	GetFaceResults(ctx context.Context, assetID pgtype.UUID) (*FaceResultWithItems, error)
+	SaveFaceResults(ctx context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error
+	GetFaceResults(ctx context.Context, assetID uuid.UUID) (*FaceResultWithItems, error)
 	SearchAssetsByFaceID(ctx context.Context, faceID string, limit, offset int) ([]repo.Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, clusterID int32, limit, offset int) ([]repo.Asset, error)
-	DeleteFaceResults(ctx context.Context, assetID pgtype.UUID) error
+	DeleteFaceResults(ctx context.Context, assetID uuid.UUID) error
 	GetFaceStats(ctx context.Context) ([]dbtypes.FaceStats, error)
 	GetUnclusteredFaces(ctx context.Context, minConfidence float32, limit int) ([]repo.FaceItem, error)
 	FindSimilarFaces(ctx context.Context, embeddingVector []float32, faceID int32, minSimilarity float32, limit int) ([]SimilarFace, error)
 	UpdateFaceEmbedding(ctx context.Context, faceID int32, embedding []float32, modelID string) (*repo.FaceItem, error)
-	ConvertToJSONMetadata(ctx context.Context, assetID pgtype.UUID) (*dbtypes.FaceResultMeta, error)
-	ListPeople(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32, includeHidden bool, limit, offset int) ([]Person, int64, error)
-	GetPerson(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) (*Person, error)
+	ConvertToJSONMetadata(ctx context.Context, assetID uuid.UUID) (*dbtypes.FaceResultMeta, error)
+	ListPeople(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32, includeHidden bool, limit, offset int) ([]Person, int64, error)
+	GetPerson(ctx context.Context, clusterID int32, repositoryID uuid.NullUUID, ownerID *int32) (*Person, error)
 	RenamePerson(ctx context.Context, clusterID int32, name string) (*repo.FaceCluster, error)
-	RebuildFaceClusters(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32) (FaceClusterRebuildResult, error)
-	ListPersonFaces(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]PersonFace, int64, error)
-	GetPersonFaceCrop(ctx context.Context, clusterID, faceID int32, repositoryID pgtype.UUID, ownerID *int32) (*PersonFaceCrop, error)
+	RebuildFaceClusters(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) (FaceClusterRebuildResult, error)
+	ListPersonFaces(ctx context.Context, clusterID int32, repositoryID uuid.NullUUID, ownerID *int32, limit, offset int) ([]PersonFace, int64, error)
+	GetPersonFaceCrop(ctx context.Context, clusterID, faceID int32, repositoryID uuid.NullUUID, ownerID *int32) (*PersonFaceCrop, error)
 	// Person mutations take no repository filter: a person is not
 	// repository-scoped, and authorization is an equality check on the
 	// cluster's structural owner (nil ownerID = admin).
@@ -133,19 +130,19 @@ type FaceClusterRebuildResult struct {
 
 type faceService struct {
 	queries          *repo.Queries
-	pool             *pgxpool.Pool
+	pool             *sql.DB
 	repoPathResolver faceRepositoryPathResolver
 }
 
 // NewFaceService creates face service instance.
-func NewFaceService(queries *repo.Queries, repoPathResolver faceRepositoryPathResolver, pool ...*pgxpool.Pool) FaceService {
-	var pgPool *pgxpool.Pool
+func NewFaceService(queries *repo.Queries, repoPathResolver faceRepositoryPathResolver, pool ...*sql.DB) FaceService {
+	var database *sql.DB
 	if len(pool) > 0 {
-		pgPool = pool[0]
+		database = pool[0]
 	}
 	return &faceService{
 		queries:          queries,
-		pool:             pgPool,
+		pool:             database,
 		repoPathResolver: repoPathResolver,
 	}
 }
@@ -155,23 +152,23 @@ func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 		return fn(s.queries)
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin face clustering transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	if err := fn(s.queries.WithTx(tx)); err != nil {
 		return err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit face clustering transaction: %w", err)
 	}
 	return nil
 }
 
 // SaveFaceResults saves face detection results, persists crops, and updates recognition clusters.
-func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
+func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
 	if faceV1 == nil {
 		return fmt.Errorf("face result payload is required")
 	}
@@ -189,11 +186,11 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, 
 		return err
 	}
 
-	processingTimePtr := int32(processingTimeMs)
+	processingTimePtr := int64(processingTimeMs)
 	if _, err := s.queries.CreateFaceResult(ctx, repo.CreateFaceResultParams{
 		AssetID:          assetID,
 		ModelID:          faceV1.ModelID,
-		TotalFaces:       int32(faceV1.Count),
+		TotalFaces:       int64(faceV1.Count),
 		ProcessingTimeMs: &processingTimePtr,
 	}); err != nil {
 		return fmt.Errorf("failed to create face result: %w", err)
@@ -221,10 +218,9 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, 
 			}
 		}
 
-		var embeddingVector *pgvector.Vector
+		var embeddingVector dbtypes.Vector
 		if len(face.Embedding) > 0 {
-			vec := pgvector.NewVector(face.Embedding)
-			embeddingVector = &vec
+			embeddingVector = dbtypes.NewVector(face.Embedding)
 		}
 
 		isPrimary := i == primaryFaceIndex
@@ -237,20 +233,20 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, 
 		createdItem, err := s.queries.CreateFaceItem(ctx, repo.CreateFaceItemParams{
 			AssetID:        assetID,
 			FaceID:         nil,
-			BoundingBox:    boundingBoxJSON,
-			Confidence:     face.Confidence,
+			BoundingBox:    dbtypes.JSON(boundingBoxJSON),
+			Confidence:     float64(face.Confidence),
 			AgeGroup:       nil,
 			Gender:         nil,
 			Ethnicity:      nil,
 			Expression:     nil,
-			FaceSize:       &faceItemMeta.FaceSize,
+			FaceSize:       int64Ptr(int64(faceItemMeta.FaceSize)),
 			FaceImagePath:  faceImagePath,
 			Embedding:      embeddingVector,
 			EmbeddingModel: &faceV1.ModelID,
-			IsPrimary:      &isPrimary,
+			IsPrimary:      isPrimary,
 			QualityScore:   nil,
 			BlurScore:      nil,
-			PoseAngles:     landmarksJSON,
+			PoseAngles:     dbtypes.JSON(landmarksJSON),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create face item %d: %w", i, err)
@@ -311,28 +307,28 @@ func (s *faceService) convertLumenFaceToDBFace(lumenFace types.Face, index int) 
 	}, nil
 }
 
-func (s *faceService) resolveAssetRepository(ctx context.Context, assetID pgtype.UUID) (string, *repo.Asset, error) {
+func (s *faceService) resolveAssetRepository(ctx context.Context, assetID uuid.UUID) (string, *repo.Asset, error) {
 	asset, err := s.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load asset for face processing: %w", err)
 	}
 	if !asset.RepositoryID.Valid {
-		return "", nil, fmt.Errorf("asset %s does not have a repository", pgUUIDToString(assetID))
+		return "", nil, fmt.Errorf("asset %s does not have a repository", assetID)
 	}
 	if s.repoPathResolver == nil {
 		return "", nil, fmt.Errorf("face repository path resolver is unavailable")
 	}
 
-	repositoryID := pgUUIDToString(asset.RepositoryID)
+	repositoryID := asset.RepositoryID.UUID.String()
 	repoPath, err := s.repoPathResolver.GetRepositoryPath(repositoryID)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to resolve repository path for asset %s: %w", pgUUIDToString(assetID), err)
+		return "", nil, fmt.Errorf("failed to resolve repository path for asset %s: %w", assetID, err)
 	}
 
 	return repoPath, &asset, nil
 }
 
-func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID pgtype.UUID, repoPath string) ([]int32, error) {
+func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid.UUID, repoPath string) ([]int32, error) {
 	existingItems, err := s.queries.GetFaceItemsByAsset(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load existing face items: %w", err)
@@ -367,7 +363,7 @@ func (s *faceService) collectAffectedClusterIDs(ctx context.Context, items []rep
 	for _, item := range items {
 		cluster, err := s.queries.GetFaceClusterByFaceID(ctx, item.ID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
 			return nil, fmt.Errorf("failed to load cluster for face %d: %w", item.ID, err)
@@ -396,9 +392,9 @@ func (s *faceService) createClusterForFaceWithQueries(ctx context.Context, q *re
 	cluster, err := q.CreateFaceCluster(ctx, repo.CreateFaceClusterParams{
 		OwnerID:              cloneInt32Ptr(ownerID),
 		ClusterName:          normalizedName(name),
-		RepresentativeFaceID: &item.ID,
-		ConfidenceScore:      &item.Confidence,
-		IsConfirmed:          boolPtr(confirmed),
+		RepresentativeFaceID: int64Ptr(int64(item.ID)),
+		ConfidenceScore:      item.Confidence,
+		IsConfirmed:          confirmed,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create face cluster: %w", err)
@@ -409,7 +405,7 @@ func (s *faceService) createClusterForFaceWithQueries(ctx context.Context, q *re
 		FaceID:          item.ID,
 		SimilarityScore: 1.0,
 		Confidence:      1.0,
-		IsManual:        boolPtr(false),
+		IsManual:        false,
 	}); err != nil {
 		return nil, fmt.Errorf("create initial face cluster member: %w", err)
 	}
@@ -432,7 +428,7 @@ func (s *faceService) refreshClusterRepresentative(ctx context.Context, clusterI
 func (s *faceService) refreshClusterRepresentativeWithQueries(ctx context.Context, q *repo.Queries, clusterID int32) error {
 	members, err := q.GetFaceClusterMembers(ctx, clusterID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return fmt.Errorf("failed to load cluster members: %w", err)
@@ -446,8 +442,8 @@ func (s *faceService) refreshClusterRepresentativeWithQueries(ctx context.Contex
 	}
 
 	sort.SliceStable(members, func(i, j int) bool {
-		leftPrimary := members[i].IsPrimary != nil && *members[i].IsPrimary
-		rightPrimary := members[j].IsPrimary != nil && *members[j].IsPrimary
+		leftPrimary := members[i].IsPrimary
+		rightPrimary := members[j].IsPrimary
 		if leftPrimary != rightPrimary {
 			return leftPrimary
 		}
@@ -455,11 +451,11 @@ func (s *faceService) refreshClusterRepresentativeWithQueries(ctx context.Contex
 			return members[i].Confidence > members[j].Confidence
 		}
 
-		leftSize := int32(0)
+		leftSize := int64(0)
 		if members[i].FaceSize != nil {
 			leftSize = *members[i].FaceSize
 		}
-		rightSize := int32(0)
+		rightSize := int64(0)
 		if members[j].FaceSize != nil {
 			rightSize = *members[j].FaceSize
 		}
@@ -470,7 +466,7 @@ func (s *faceService) refreshClusterRepresentativeWithQueries(ctx context.Contex
 		return members[i].ID < members[j].ID
 	})
 
-	representativeID := members[0].ID
+	representativeID := int64(members[0].ID)
 	confidenceScore := members[0].Confidence
 	if _, err := q.UpdateFaceClusterRepresentative(ctx, repo.UpdateFaceClusterRepresentativeParams{
 		ClusterID:            clusterID,
@@ -487,13 +483,13 @@ func isClusterCandidate(item repo.FaceItem) bool {
 	if item.Embedding == nil || len(item.Embedding.Slice()) == 0 {
 		return false
 	}
-	if item.Confidence < faceRecognitionMinScore {
+	if item.Confidence < float64(faceRecognitionMinScore) {
 		return false
 	}
 	return true
 }
 
-func (s *faceService) persistFaceCrop(repoPath string, assetID pgtype.UUID, index int, imageData []byte, bbox *dbtypes.FaceBoundingBox) (*string, error) {
+func (s *faceService) persistFaceCrop(repoPath string, assetID uuid.UUID, index int, imageData []byte, bbox *dbtypes.FaceBoundingBox) (*string, error) {
 	if bbox == nil {
 		return nil, fmt.Errorf("bounding box is required")
 	}
@@ -530,7 +526,7 @@ func (s *faceService) persistFaceCrop(repoPath string, assetID pgtype.UUID, inde
 		return nil, fmt.Errorf("encode face crop: %w", err)
 	}
 
-	filename := fmt.Sprintf("%s_%d.webp", pgUUIDToString(assetID), index)
+	filename := fmt.Sprintf("%s_%d.webp", assetID, index)
 	relativePath := filepath.Join(storage.DefaultStructure.FacesDir, filename)
 	fullPath, err := resolveRepositoryFile(repoPath, relativePath)
 	if err != nil {
@@ -604,7 +600,7 @@ func removeRepositoryFile(repoPath, relativeOrAbsolutePath string) error {
 }
 
 // GetFaceResults gets face detection results for specified asset.
-func (s *faceService) GetFaceResults(ctx context.Context, assetID pgtype.UUID) (*FaceResultWithItems, error) {
+func (s *faceService) GetFaceResults(ctx context.Context, assetID uuid.UUID) (*FaceResultWithItems, error) {
 	result, err := s.queries.GetFaceResultByAsset(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get face result: %w", err)
@@ -622,7 +618,7 @@ func (s *faceService) GetFaceResults(ctx context.Context, assetID pgtype.UUID) (
 }
 
 // DeleteFaceResults deletes face results for specified asset, including crops and cluster memberships.
-func (s *faceService) DeleteFaceResults(ctx context.Context, assetID pgtype.UUID) error {
+func (s *faceService) DeleteFaceResults(ctx context.Context, assetID uuid.UUID) error {
 	repoPath, _, err := s.resolveAssetRepository(ctx, assetID)
 	if err != nil {
 		return err
@@ -664,11 +660,11 @@ func (s *faceService) GetFaceStats(ctx context.Context) ([]dbtypes.FaceStats, er
 		result[i] = dbtypes.FaceStats{
 			ModelID:           stat.ModelID,
 			TotalAssets:       int(stat.TotalAssets),
-			TotalFaces:        int(stat.TotalFaces),
-			AvgFacesPerAsset:  stat.AvgFacesPerAsset,
+			TotalFaces:        int(derefFloat64(stat.TotalFaces)),
+			AvgFacesPerAsset:  derefFloat64(stat.AvgFacesPerAsset),
 			MinProcessingTime: toSafeInt(stat.MinProcessingTime),
 			MaxProcessingTime: toSafeInt(stat.MaxProcessingTime),
-			AvgProcessingTime: stat.AvgProcessingTime,
+			AvgProcessingTime: derefFloat64(stat.AvgProcessingTime),
 		}
 	}
 
@@ -676,7 +672,7 @@ func (s *faceService) GetFaceStats(ctx context.Context) ([]dbtypes.FaceStats, er
 }
 
 // ConvertToJSONMetadata converts face results to JSON metadata format.
-func (s *faceService) ConvertToJSONMetadata(ctx context.Context, assetID pgtype.UUID) (*dbtypes.FaceResultMeta, error) {
+func (s *faceService) ConvertToJSONMetadata(ctx context.Context, assetID uuid.UUID) (*dbtypes.FaceResultMeta, error) {
 	result, err := s.queries.GetFaceResultByAsset(ctx, assetID)
 	if err != nil {
 		return nil, err
@@ -708,34 +704,32 @@ func (s *faceService) ConvertToJSONMetadata(ctx context.Context, assetID pgtype.
 func (s *faceService) SearchAssetsByFaceID(ctx context.Context, faceID string, limit, offset int) ([]repo.Asset, error) {
 	return s.queries.SearchAssetsByFaceID(ctx, repo.SearchAssetsByFaceIDParams{
 		FaceID: &faceID,
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		Limit:  int64(limit),
+		Offset: int64(offset),
 	})
 }
 
 func (s *faceService) SearchAssetsByFaceCluster(ctx context.Context, clusterID int32, limit, offset int) ([]repo.Asset, error) {
 	return s.queries.SearchAssetsByFaceCluster(ctx, repo.SearchAssetsByFaceClusterParams{
 		ClusterID: clusterID,
-		Limit:     int32(limit),
-		Offset:    int32(offset),
+		Limit:     int64(limit),
+		Offset:    int64(offset),
 	})
 }
 
 func (s *faceService) GetUnclusteredFaces(ctx context.Context, minConfidence float32, limit int) ([]repo.FaceItem, error) {
 	return s.queries.GetUnclusteredFaces(ctx, repo.GetUnclusteredFacesParams{
-		Confidence: minConfidence,
-		Limit:      int32(limit),
+		Confidence: float64(minConfidence),
+		Limit:      int64(limit),
 	})
 }
 
 func (s *faceService) FindSimilarFaces(ctx context.Context, embeddingVector []float32, faceID int32, minSimilarity float32, limit int) ([]SimilarFace, error) {
-	pgVector := pgvector.NewVector(embeddingVector)
-
 	rows, err := s.queries.GetSimilarFaces(ctx, repo.GetSimilarFacesParams{
-		EmbeddingQuery: &pgVector,
+		EmbeddingQuery: dbtypes.NewVector(embeddingVector),
 		ID:             faceID,
 		MinSimilarity:  float64(minSimilarity),
-		Limit:          int32(limit),
+		Limit:          int64(limit),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to find similar faces: %w", err)
@@ -772,10 +766,9 @@ func (s *faceService) FindSimilarFaces(ctx context.Context, embeddingVector []fl
 }
 
 func (s *faceService) UpdateFaceEmbedding(ctx context.Context, faceID int32, embedding []float32, modelID string) (*repo.FaceItem, error) {
-	var embeddingVector *pgvector.Vector
+	var embeddingVector dbtypes.Vector
 	if len(embedding) > 0 {
-		vec := pgvector.NewVector(embedding)
-		embeddingVector = &vec
+		embeddingVector = dbtypes.NewVector(embedding)
 	}
 
 	item, err := s.queries.UpdateFaceItemEmbedding(ctx, repo.UpdateFaceItemEmbeddingParams{
@@ -789,7 +782,7 @@ func (s *faceService) UpdateFaceEmbedding(ctx context.Context, faceID int32, emb
 	return &item, nil
 }
 
-func (s *faceService) ListPeople(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32, includeHidden bool, limit, offset int) ([]Person, int64, error) {
+func (s *faceService) ListPeople(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32, includeHidden bool, limit, offset int) ([]Person, int64, error) {
 	total, err := s.queries.CountPeopleScoped(ctx, repo.CountPeopleScopedParams{
 		RepositoryID:  repositoryID,
 		OwnerID:       ownerID,
@@ -803,8 +796,8 @@ func (s *faceService) ListPeople(ctx context.Context, repositoryID pgtype.UUID, 
 		RepositoryID:  repositoryID,
 		OwnerID:       ownerID,
 		IncludeHidden: includeHidden,
-		Offset:        int32(offset),
-		Limit:         int32(limit),
+		Offset:        int64(offset),
+		Limit:         int64(limit),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("list people: %w", err)
@@ -818,7 +811,7 @@ func (s *faceService) ListPeople(ctx context.Context, repositoryID pgtype.UUID, 
 	return people, total, nil
 }
 
-func (s *faceService) GetPerson(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) (*Person, error) {
+func (s *faceService) GetPerson(ctx context.Context, clusterID int32, repositoryID uuid.NullUUID, ownerID *int32) (*Person, error) {
 	row, err := s.queries.GetPersonByIDScoped(ctx, repo.GetPersonByIDScopedParams{
 		RepositoryID: repositoryID,
 		OwnerID:      ownerID,
@@ -852,7 +845,7 @@ func (s *faceService) RenamePerson(ctx context.Context, clusterID int32, name st
 // authorizePerson applies the whole-entity ownership rule: nil ownerID
 // (admin) passes everything; otherwise the cluster's structural owner must
 // match exactly, and NULL-owner clusters stay admin-only. Foreign clusters
-// surface as pgx.ErrNoRows so handlers translate them into 404s without
+// surface as sql.ErrNoRows so handlers translate them into 404s without
 // leaking existence.
 func (s *faceService) authorizePerson(ctx context.Context, clusterID int32, ownerID *int32) (*repo.FaceCluster, error) {
 	cluster, err := s.queries.GetFaceClusterByID(ctx, clusterID)
@@ -860,7 +853,7 @@ func (s *faceService) authorizePerson(ctx context.Context, clusterID int32, owne
 		return nil, err
 	}
 	if ownerID != nil && (cluster.OwnerID == nil || *cluster.OwnerID != *ownerID) {
-		return nil, pgx.ErrNoRows
+		return nil, sql.ErrNoRows
 	}
 	return &cluster, nil
 }
@@ -868,7 +861,7 @@ func (s *faceService) authorizePerson(ctx context.Context, clusterID int32, owne
 // ListPersonFaces returns UI-safe face crops for a person, scoped to the
 // caller. repositoryID only filters which faces are listed (display), not
 // who may see the person.
-func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]PersonFace, int64, error) {
+func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repositoryID uuid.NullUUID, ownerID *int32, limit, offset int) ([]PersonFace, int64, error) {
 	cluster, err := s.authorizePerson(ctx, clusterID, ownerID)
 	if err != nil {
 		return nil, 0, err
@@ -876,7 +869,7 @@ func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repo
 
 	var representativeFaceID int32
 	if cluster.RepresentativeFaceID != nil {
-		representativeFaceID = *cluster.RepresentativeFaceID
+		representativeFaceID = int32(*cluster.RepresentativeFaceID)
 	}
 
 	total, err := s.queries.CountPersonFacesScoped(ctx, repo.CountPersonFacesScopedParams{
@@ -892,8 +885,8 @@ func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repo
 		ClusterID:    clusterID,
 		RepositoryID: repositoryID,
 		OwnerID:      ownerID,
-		Offset:       int32(offset),
-		Limit:        int32(limit),
+		Offset:       int64(offset),
+		Limit:        int64(limit),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("list person faces: %w", err)
@@ -903,8 +896,8 @@ func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repo
 	for _, row := range rows {
 		faces = append(faces, PersonFace{
 			FaceID:           row.ID,
-			AssetID:          pgUUIDToString(row.AssetID),
-			Confidence:       row.Confidence,
+			AssetID:          row.AssetID.String(),
+			Confidence:       float32(row.Confidence),
 			IsRepresentative: row.ID == representativeFaceID,
 			IsManual:         row.IsManual,
 			HasCrop:          row.FaceImagePath != nil && strings.TrimSpace(*row.FaceImagePath) != "",
@@ -918,7 +911,7 @@ func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repo
 }
 
 // GetPersonFaceCrop locates a single face crop on disk so handlers can serve it.
-func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID int32, repositoryID pgtype.UUID, ownerID *int32) (*PersonFaceCrop, error) {
+func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID int32, repositoryID uuid.NullUUID, ownerID *int32) (*PersonFaceCrop, error) {
 	row, err := s.queries.GetPersonFaceScoped(ctx, repo.GetPersonFaceScopedParams{
 		ClusterID:    clusterID,
 		FaceID:       faceID,
@@ -929,7 +922,7 @@ func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID i
 		return nil, err
 	}
 	if row.FaceImagePath == nil || strings.TrimSpace(*row.FaceImagePath) == "" {
-		return nil, pgx.ErrNoRows
+		return nil, sql.ErrNoRows
 	}
 	if !row.RepositoryID.Valid {
 		return nil, fmt.Errorf("face %d has no repository", faceID)
@@ -937,7 +930,7 @@ func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID i
 
 	return &PersonFaceCrop{
 		FaceID:        row.ID,
-		RepositoryID:  pgUUIDToString(row.RepositoryID),
+		RepositoryID:  row.RepositoryID.UUID.String(),
 		FaceImagePath: *row.FaceImagePath,
 	}, nil
 }
@@ -1013,7 +1006,7 @@ func (s *faceService) MoveFace(ctx context.Context, faceID, targetClusterID int3
 	var sourceClusterID int32
 	if source, err := s.queries.GetFaceClusterByFaceID(ctx, faceID); err == nil {
 		sourceClusterID = source.ClusterID
-	} else if !errors.Is(err, pgx.ErrNoRows) {
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("load current cluster for face %d: %w", faceID, err)
 	}
 	if sourceClusterID == targetClusterID {
@@ -1026,7 +1019,7 @@ func (s *faceService) MoveFace(ctx context.Context, faceID, targetClusterID int3
 			FaceID:          faceID,
 			SimilarityScore: 1.0,
 			Confidence:      1.0,
-			IsManual:        boolPtr(true),
+			IsManual:        true,
 		}); err != nil {
 			return fmt.Errorf("assign moved face: %w", err)
 		}
@@ -1080,9 +1073,10 @@ func (s *faceService) SetPersonCover(ctx context.Context, clusterID, faceID int3
 	}
 
 	confidence := face.Confidence
+	representativeFaceID := int64(face.ID)
 	if _, err := s.queries.UpdateFaceClusterRepresentative(ctx, repo.UpdateFaceClusterRepresentativeParams{
 		ClusterID:            clusterID,
-		RepresentativeFaceID: &face.ID,
+		RepresentativeFaceID: &representativeFaceID,
 		ConfidenceScore:      &confidence,
 	}); err != nil {
 		return fmt.Errorf("set person cover: %w", err)
@@ -1102,20 +1096,20 @@ func (s *faceService) SetPersonHidden(ctx context.Context, clusterID int32, hidd
 	}); err != nil {
 		return nil, fmt.Errorf("set person hidden: %w", err)
 	}
-	return s.GetPerson(ctx, clusterID, pgtype.UUID{}, ownerID)
+	return s.GetPerson(ctx, clusterID, uuid.NullUUID{}, ownerID)
 }
 
 func personFromListRow(row repo.ListPeopleScopedRow) Person {
 	return Person{
 		PersonID:              row.ClusterID,
 		Name:                  normalizedName(row.ClusterName),
-		IsConfirmed:           row.IsConfirmed != nil && *row.IsConfirmed,
+		IsConfirmed:           row.IsConfirmed,
 		IsHidden:              row.IsHidden,
 		HiddenAt:              optionalTimestamp(row.HiddenAt),
 		MemberCount:           row.MemberCount,
 		AssetCount:            row.AssetCount,
 		CoverFaceImagePath:    row.CoverFaceImagePath,
-		RepresentativeAssetID: optionalUUIDToString(row.RepresentativeAssetID),
+		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}
@@ -1125,19 +1119,19 @@ func personFromDetailRow(row repo.GetPersonByIDScopedRow) Person {
 	return Person{
 		PersonID:              row.ClusterID,
 		Name:                  normalizedName(row.ClusterName),
-		IsConfirmed:           row.IsConfirmed != nil && *row.IsConfirmed,
+		IsConfirmed:           row.IsConfirmed,
 		IsHidden:              row.IsHidden,
 		HiddenAt:              optionalTimestamp(row.HiddenAt),
 		MemberCount:           row.MemberCount,
 		AssetCount:            row.AssetCount,
 		CoverFaceImagePath:    row.CoverFaceImagePath,
-		RepresentativeAssetID: optionalUUIDToString(row.RepresentativeAssetID),
+		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}
 }
 
-func optionalTimestamp(value pgtype.Timestamptz) *time.Time {
+func optionalTimestamp(value dbtypes.Timestamp) *time.Time {
 	if !value.Valid {
 		return nil
 	}
@@ -1156,23 +1150,31 @@ func normalizedName(name *string) *string {
 	return &trimmed
 }
 
-func optionalUUIDToString(value pgtype.UUID) *string {
+func optionalUUIDToString(value uuid.NullUUID) *string {
 	if !value.Valid {
 		return nil
 	}
-	id := uuid.UUID(value.Bytes).String()
+	id := value.UUID.String()
 	return &id
 }
 
-func pgUUIDToString(value pgtype.UUID) string {
-	if !value.Valid {
-		return ""
+func uuidToOptionalStringValue(value uuid.UUID) *string {
+	if value == uuid.Nil {
+		return nil
 	}
-	return uuid.UUID(value.Bytes).String()
+	id := value.String()
+	return &id
 }
 
-func boolPtr(value bool) *bool {
+func int64Ptr(value int64) *int64 {
 	return &value
+}
+
+func derefFloat64(value *float64) float64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 // int32PtrEqual treats two nil pointers as equal (NULL IS NOT DISTINCT FROM NULL).

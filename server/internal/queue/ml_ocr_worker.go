@@ -8,7 +8,6 @@ import (
 	"server/internal/utils/imagesource"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
@@ -41,12 +40,6 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 		return nil
 	}
 
-	// Convert UUID to pgtype.UUID for database operations
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	// If task temporarily unavailable, snooze
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
@@ -67,7 +60,7 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	}
 
 	// Save OCR results using OCRService
-	err = w.OCRService.SaveOCRResults(ctx, pgUUID, ocrResult, 0) // Processing time will be calculated inside SaveOCRResults
+	err = w.OCRService.SaveOCRResults(ctx, assetID, ocrResult, 0) // Processing time will be calculated inside SaveOCRResults
 	if err != nil {
 		return fmt.Errorf("failed to save OCR results: %w", err)
 	}

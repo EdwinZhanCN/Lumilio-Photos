@@ -1,29 +1,31 @@
 # Aggregate Search
 
-`server/internal/search` owns the PostgreSQL aggregate search path for non-empty user queries. It keeps retrieval in PostgreSQL and keeps Go responsible only for orchestration, Weighted Reciprocal Rank Fusion, pagination, hydration, logging, and optional debug metadata.
+`server/internal/search` owns the SQLite aggregate-search path for non-empty
+queries. SQLite performs candidate retrieval and filtering; Go orchestrates the
+retrievers, applies weighted reciprocal-rank fusion, paginates, hydrates assets,
+and emits optional debug metadata.
 
 ## Retrievers
 
-- `embedding`: resolves the default semantic search space, embeds the text query through Lumen, and retrieves nearest primary asset embeddings with pgvector.
-- `ocr`: searches `ocr_results.full_text` with pg_trgm `word_similarity` via a GIN trigram index. The `full_text` column stores CJK-bigram-tokenized text (see `tokenize.go`); queries are tokenized the same way so tokens align. Ranked by `word_similarity()` score.
-- `place`: searches `location_clusters.search_vector`, joins through `location_cluster_assets`, and ranks assets by `ts_rank_cd`.
+- `embedding`: resolves the default semantic-search space, embeds text through
+  Lumen, and queries the `search_embeddings_vec` sqlite-vec virtual table.
+- `ocr`: searches `ocr_search_fts` with FTS5 and ranks matches with `bm25`.
+- `place`: searches `location_search_fts` with FTS5, joins matches through
+  `location_cluster_assets`, and ranks matches with `bm25`.
 
-Every retriever receives the same `Filter`, which mirrors the non-query parts of `AssetFilter`: repository, owner, album, person, type, filename filter, date range, RAW, rating, liked, camera/lens, and GPS bounding box.
+Every retriever receives the same `Filter`, which mirrors the non-query parts of
+`AssetFilter`: repository, owner, album, person, type, filename filter, date
+range, RAW, rating, liked, camera/lens, and GPS bounding box.
 
-## CJK Bigram Tokenization
+## Text Tokenization and Indexes
 
-CJK character runs are split into overlapping 2-character pairs before storage and at query time. Non-CJK text is kept as whole words. This eliminates the need for external Chinese word segmentation libraries (zhparser/SCWS) while enabling substring matching for CJK text through trigram indexes.
+CJK character runs are split into overlapping two-character pairs before
+storage and at query time. Non-CJK text remains whole words. For example,
+`"听说你还在找白样"` becomes `"听说 说你 你还 还在 在找 找白 白样"`.
 
-Example: `"听说你还在找白样"` → `"听说 说你 你还 还在 在找 找白 白样"`
-
-## PostgreSQL Indexes
-
-- `ocr_results.full_text` GIN trigram index via pg_trgm (migration 005). Uses `word_similarity()` with a low threshold (0.15) for broad recall; RRF fusion handles precision.
-- `location_clusters.search_vector` stored generated `tsvector` over `label`, `country`, `region`, `city`, and `geohash` plus a GIN index (migration 026).
-
-Embedding search uses the existing per-space HNSW indexes created by `embedding_service.ensureSearchIndexForSpace`, for example `embeddings_space_<id>_primary_hnsw_l2_idx`, because embedding dimensions can differ by space.
-
-The OCR retriever uses `word_similarity(query, full_text)` with `%>` (pg_trgm), the place retriever uses `search_vector @@ plainto_tsquery(...)`, and embedding retrieval orders by pgvector distance.
+The baseline creates content-synchronized FTS5 indexes for OCR and location
+text. Semantic vectors use the sqlite-vec `vec0` table and a fixed canonical
+dimension; application rows retain their model and search-space metadata.
 
 ## Fusion
 
@@ -33,26 +35,25 @@ Weighted RRF uses:
 score(asset) = sum(source_weight / (60 + rank_in_source))
 ```
 
-Default weights:
+Default weights are embedding `1.0`, place `0.8`, and OCR `0.7`.
 
-- embedding: `1.0`
-- place: `0.8`
-- OCR: `0.7`
+## Pagination and Candidate Pool
 
-These weights favor visual semantic similarity while still allowing strong place/OCR hits to move assets upward when they agree with another retriever.
-
-## Pagination And Candidate Pool
-
-Each retriever receives a topK candidate pool sized from the requested page boundary:
+Each retriever receives a top-K candidate pool sized from the requested page:
 
 ```text
 topK = clamp((offset + limit) * 4, 50, 1000)
 ```
 
-Fusion happens over the combined candidate pool, then `offset + limit` pagination is applied to the fused ranking. This avoids asking PostgreSQL for only one page from each modality, which can drop cross-source winners before fusion.
+Fusion happens over the combined candidate pool before page slicing. When an
+exact total is requested, the successful retrievers contribute set queries
+that SQLite unions before counting distinct asset IDs.
 
-## Failure And Debug Metadata
+## Failure and Debug Metadata
 
-Retrievers run concurrently. A single retriever failure is logged and marked in `SearchTopResultsMeta.Sources`; the remaining retrievers still participate in fusion. If every retriever fails, aggregate search returns an error.
+Retrievers run concurrently. A single failure is logged and recorded in
+`SearchTopResultsMeta.Sources`; successful retrievers still participate. If all
+retrievers fail, aggregate search returns an error.
 
-When `debug: true` is passed to `/api/v1/assets/search`, the top-results meta includes per-asset fused scores and per-source contributions: rank, weight, raw PostgreSQL score, and RRF contribution.
+With `debug: true`, the response includes fused scores and per-source rank,
+weight, raw SQLite score, and RRF contribution for top results.

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 
 	"server/internal/db/dbtypes"
@@ -31,10 +30,8 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 		return fmt.Errorf("invalid asset ID: %w", err)
 	}
 
-	pgUUID := pgtype.UUID{Bytes: assetID, Valid: true}
-
 	// Get asset from database
-	asset, err := ap.queries.GetAssetByID(ctx, pgUUID)
+	asset, err := ap.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return fmt.Errorf("asset not found: %w", err)
 	}
@@ -42,14 +39,17 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	// Parse current status
 	var currentStatus status.AssetStatus
 	if len(asset.Status) > 0 {
-		currentStatus, err = status.FromJSONB(asset.Status)
+		currentStatus, err = status.FromJSON(asset.Status)
 		if err != nil {
 			return fmt.Errorf("failed to parse asset status: %w", err)
 		}
 	}
 
 	// Get repository information
-	repository, err := ap.queries.GetRepository(ctx, asset.RepositoryID)
+	if !asset.RepositoryID.Valid {
+		return fmt.Errorf("asset has no repository")
+	}
+	repository, err := ap.queries.GetRepository(ctx, asset.RepositoryID.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to get repository: %w", err)
 	}

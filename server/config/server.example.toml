@@ -1,20 +1,12 @@
-# Complete schema v1 runtime manifest. Copy to server.local.toml and edit it.
+# Complete schema v2 runtime manifest. Copy to server.local.toml and edit it.
 # There are no code defaults, file search, or environment-variable overrides.
 # Relative paths are resolved from this TOML file's directory.
-schema_version = 1
+schema_version = 2
 environment = "development"
 
 [database]
-host = "localhost"
-port = "5433"
-user = "postgres"
-name = "lumiliophotos"
-ssl = "disable"
-# Bootstrap must exist and be non-empty. Rotated may be absent before setup.
-bootstrap_password_file = ".secrets/db_bootstrap_password"
-rotated_password_file = "../data/app-state/secrets/db_password"
-# Empty means find version-matched PostgreSQL tools automatically.
-tools_bin_dir = ""
+# Library catalog. Relative paths are manifest-relative.
+path = "../.local/lumilio/library.sqlite3"
 
 [server]
 port = "6680"

@@ -18,11 +18,11 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/search"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -96,24 +96,19 @@ func (s *Service) CreateFromRef(ctx context.Context, params CreateParams) (repo.
 		layout.H = 4
 	}
 
-	assetIDs := make([]pgtype.UUID, len(r.AssetIDs))
-	for i, id := range r.AssetIDs {
-		assetIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
-
 	return s.queries.CreateAgentPin(ctx, repo.CreateAgentPinParams{
 		UserID:    params.UserID,
 		Title:     params.Title,
 		Widget:    widget,
 		Mode:      mode,
-		Plan:      planJSON,
+		Plan:      dbtypes.JSON(planJSON),
 		Summary:   r.Summary,
-		AssetIds:  assetIDs,
+		AssetIds:  dbtypes.UUIDs(r.AssetIDs),
 		Truncated: r.Truncated,
-		LayoutX:   int32(layout.X),
-		LayoutY:   int32(layout.Y),
-		LayoutW:   int32(layout.W),
-		LayoutH:   int32(layout.H),
+		LayoutX:   int64(layout.X),
+		LayoutY:   int64(layout.Y),
+		LayoutW:   int64(layout.W),
+		LayoutH:   int64(layout.H),
 	})
 }
 
@@ -125,7 +120,7 @@ func (s *Service) List(ctx context.Context, userID int32) ([]repo.AgentPin, erro
 // Delete removes a pin; missing/cross-user pins report ErrNotFound.
 func (s *Service) Delete(ctx context.Context, userID int32, pinID uuid.UUID) error {
 	return s.queries.DeleteAgentPin(ctx, repo.DeleteAgentPinParams{
-		PinID:  pgtype.UUID{Bytes: pinID, Valid: true},
+		PinID:  pinID,
 		UserID: userID,
 	})
 }
@@ -133,12 +128,12 @@ func (s *Service) Delete(ctx context.Context, userID int32, pinID uuid.UUID) err
 // UpdateLayout persists one pin's grid cell.
 func (s *Service) UpdateLayout(ctx context.Context, userID int32, pinID uuid.UUID, layout Layout) error {
 	return s.queries.UpdateAgentPinLayout(ctx, repo.UpdateAgentPinLayoutParams{
-		PinID:   pgtype.UUID{Bytes: pinID, Valid: true},
+		PinID:   pinID,
 		UserID:  userID,
-		LayoutX: int32(layout.X),
-		LayoutY: int32(layout.Y),
-		LayoutW: int32(layout.W),
-		LayoutH: int32(layout.H),
+		LayoutX: int64(layout.X),
+		LayoutY: int64(layout.Y),
+		LayoutW: int64(layout.W),
+		LayoutH: int64(layout.H),
 	})
 }
 
@@ -153,7 +148,7 @@ func (s *Service) UpdateWidget(ctx context.Context, userID int32, pinID uuid.UUI
 		return ErrUnknownWidget
 	}
 	return s.queries.UpdateAgentPinWidget(ctx, repo.UpdateAgentPinWidgetParams{
-		PinID:  pgtype.UUID{Bytes: pinID, Valid: true},
+		PinID:  pinID,
 		UserID: userID,
 		Widget: widget,
 	})
@@ -162,7 +157,7 @@ func (s *Service) UpdateWidget(ctx context.Context, userID int32, pinID uuid.UUI
 // UpdateTitle renames one pin.
 func (s *Service) UpdateTitle(ctx context.Context, userID int32, pinID uuid.UUID, title string) error {
 	return s.queries.UpdateAgentPinTitle(ctx, repo.UpdateAgentPinTitleParams{
-		PinID:  pgtype.UUID{Bytes: pinID, Valid: true},
+		PinID:  pinID,
 		UserID: userID,
 		Title:  title,
 	})
@@ -184,7 +179,7 @@ type HydrationMeta struct {
 
 func (s *Service) AssetIDsWithMeta(ctx context.Context, userID int32, pinID uuid.UUID) (repo.AgentPin, []uuid.UUID, HydrationMeta, error) {
 	pin, err := s.queries.GetAgentPin(ctx, repo.GetAgentPinParams{
-		PinID:  pgtype.UUID{Bytes: pinID, Valid: true},
+		PinID:  pinID,
 		UserID: userID,
 	})
 	if err != nil {
@@ -205,7 +200,7 @@ func (s *Service) AssetIDsWithMeta(ctx context.Context, userID int32, pinID uuid
 				now := time.Now().UTC()
 				_ = s.queries.TouchAgentPinLiveRefresh(ctx, repo.TouchAgentPinLiveRefreshParams{
 					PinID: pin.PinID, UserID: userID,
-					LastSuccessfulRefreshAt: pgtype.Timestamptz{Time: now, Valid: true},
+					LastSuccessfulRefreshAt: dbtypes.NewTimestamp(now),
 				})
 				return pin, ids, HydrationMeta{Source: "live_replay", LastSuccessfulAt: &now}, nil
 			}
@@ -216,7 +211,7 @@ func (s *Service) AssetIDsWithMeta(ctx context.Context, userID int32, pinID uuid
 		}
 		return pin, ids, HydrationMeta{
 			Source: "frozen_fallback", FallbackReason: fallbackReason,
-			LastSuccessfulAt: pgTimePointer(pin.LastSuccessfulRefreshAt),
+			LastSuccessfulAt: dbTimePointer(pin.LastSuccessfulRefreshAt),
 		}, nil
 	}
 
@@ -225,24 +220,19 @@ func (s *Service) AssetIDsWithMeta(ctx context.Context, userID int32, pinID uuid
 		return repo.AgentPin{}, nil, HydrationMeta{}, err
 	}
 	return pin, ids, HydrationMeta{
-		Source: "frozen_snapshot", LastSuccessfulAt: pgTimePointer(pin.LastSuccessfulRefreshAt),
+		Source: "frozen_snapshot", LastSuccessfulAt: dbTimePointer(pin.LastSuccessfulRefreshAt),
 	}, nil
 }
 
 func (s *Service) authorizedFrozenIDs(ctx context.Context, userID int32, pin repo.AgentPin) ([]uuid.UUID, error) {
-	ids := make([]uuid.UUID, 0, len(pin.AssetIds))
-	for _, id := range pin.AssetIds {
-		if id.Valid {
-			ids = append(ids, uuid.UUID(id.Bytes))
-		}
-	}
+	ids := append([]uuid.UUID(nil), pin.AssetIds...)
 	if _, err := s.libraries.ForUser(userID).AuthorizeAssetIDs(ctx, userID, ids); err != nil {
 		return nil, ErrNotFound
 	}
 	return ids, nil
 }
 
-func pgTimePointer(value pgtype.Timestamptz) *time.Time {
+func dbTimePointer(value dbtypes.Timestamp) *time.Time {
 	if !value.Valid {
 		return nil
 	}
@@ -340,7 +330,7 @@ func (s *Service) replay(ctx context.Context, userID int32, plan ref.Plan) ([]uu
 		if err != nil {
 			return nil, err
 		}
-		return fromPg(rows), nil
+		return append([]uuid.UUID(nil), rows...), nil
 	default:
 		return nil, fmt.Errorf("plan op %q is not replayable", plan.Op)
 	}
@@ -354,12 +344,12 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 	q := repo.GetAssetIDsUnifiedParams{Limit: ref.MaxSnapshotSize}
 	if v := payload.DateFrom; v != "" {
 		if t, err := time.Parse("2006-01-02", v); err == nil {
-			q.DateFrom = pgtype.Timestamptz{Time: t, Valid: true}
+			q.DateFrom = dbtypes.NewTimestamp(t)
 		}
 	}
 	if v := payload.DateTo; v != "" {
 		if t, err := time.Parse("2006-01-02", v); err == nil {
-			q.DateTo = pgtype.Timestamptz{Time: t.Add(24*time.Hour - time.Nanosecond), Valid: true}
+			q.DateTo = dbtypes.NewTimestamp(t.Add(24*time.Hour - time.Nanosecond))
 		}
 	}
 	if v := payload.Type; v != "" {
@@ -401,7 +391,7 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 	if err != nil {
 		return nil, err
 	}
-	ids := fromPg(rows)
+	ids := append([]uuid.UUID(nil), rows...)
 	if payload.MinQualityPercentile == nil {
 		return ids, nil
 	}
@@ -415,7 +405,7 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 	scoreOf := make(map[uuid.UUID]float64, len(scores))
 	values := make([]float64, 0, len(scores))
 	for _, row := range scores {
-		id := uuid.UUID(row.AssetID.Bytes)
+		id := row.AssetID
 		scoreOf[id] = float64(row.Score)
 		values = append(values, float64(row.Score))
 	}
@@ -423,7 +413,7 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 		return nil, nil
 	}
 	sort.Float64s(values)
-	cut := percentileCont(values, *payload.MinQualityPercentile/100)
+	cut := interpolatedPercentile(values, *payload.MinQualityPercentile/100)
 	kept := make([]uuid.UUID, 0, len(ids))
 	for _, id := range ids {
 		if score, ok := scoreOf[id]; ok && score >= cut {
@@ -433,7 +423,7 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 	return kept, nil
 }
 
-func percentileCont(sorted []float64, fraction float64) float64 {
+func interpolatedPercentile(sorted []float64, fraction float64) float64 {
 	if len(sorted) == 1 || fraction <= 0 {
 		return sorted[0]
 	}
@@ -447,14 +437,4 @@ func percentileCont(sorted []float64, fraction float64) float64 {
 	}
 	weight := position - float64(low)
 	return sorted[low]*(1-weight) + sorted[high]*weight
-}
-
-func fromPg(ids []pgtype.UUID) []uuid.UUID {
-	out := make([]uuid.UUID, 0, len(ids))
-	for _, id := range ids {
-		if id.Valid {
-			out = append(out, uuid.UUID(id.Bytes))
-		}
-	}
-	return out
 }

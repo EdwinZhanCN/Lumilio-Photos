@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -13,12 +14,11 @@ import (
 	"time"
 
 	"server/internal/agent/pins"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -217,7 +217,7 @@ func (s *shareLinkService) resolveByQuery(ctx context.Context, params QueryAsset
 	}
 	ids := make([]uuid.UUID, 0, len(assets))
 	for _, a := range assets {
-		ids = append(ids, uuid.UUID(a.AssetID.Bytes))
+		ids = append(ids, a.AssetID)
 	}
 	return ids, nil
 }
@@ -231,16 +231,16 @@ func (s *shareLinkService) resolveExplicitAssetIDs(ctx context.Context, ownerSco
 	}
 
 	seen := make(map[uuid.UUID]struct{}, len(explicitIDs))
-	pgIDs := make([]pgtype.UUID, 0, len(explicitIDs))
+	assetIDs := make([]uuid.UUID, 0, len(explicitIDs))
 	for _, id := range explicitIDs {
 		if _, dup := seen[id]; dup {
 			continue
 		}
 		seen[id] = struct{}{}
-		pgIDs = append(pgIDs, pgtype.UUID{Bytes: id, Valid: true})
+		assetIDs = append(assetIDs, id)
 	}
 
-	rows, err := s.queries.GetAssetsByIDs(ctx, pgIDs)
+	rows, err := s.queries.GetAssetsByIDs(ctx, assetIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (s *shareLinkService) resolveExplicitAssetIDs(ctx context.Context, ownerSco
 		if ownerScope != nil && (a.OwnerID == nil || *a.OwnerID != *ownerScope) {
 			continue
 		}
-		ids = append(ids, uuid.UUID(a.AssetID.Bytes))
+		ids = append(ids, a.AssetID)
 	}
 	if len(ids) == 0 {
 		return nil, ErrShareLinkSourceEmpty
@@ -281,11 +281,6 @@ func (s *shareLinkService) Create(ctx context.Context, params ShareLinkCreatePar
 
 	expiresAt := time.Now().Add(time.Duration(clampExpiryDays(params.ExpiresInDays)) * 24 * time.Hour)
 
-	pgIDs := make([]pgtype.UUID, len(assetIDs))
-	for i, id := range assetIDs {
-		pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
-
 	link, err := s.queries.CreateShareLink(ctx, repo.CreateShareLinkParams{
 		OwnerID:          params.OwnerID,
 		TokenHash:        s.hashToken(rawToken),
@@ -293,11 +288,11 @@ func (s *shareLinkService) Create(ctx context.Context, params ShareLinkCreatePar
 		Description:      params.Description,
 		SourceKind:       params.SourceKind,
 		SourceRef:        params.SourceRef,
-		AssetIds:         pgIDs,
-		AssetCount:       int32(len(pgIDs)),
+		AssetIds:         dbtypes.UUIDs(assetIDs),
+		AssetCount:       int64(len(assetIDs)),
 		AllowDownload:    params.AllowDownload,
 		IncludeOriginals: params.IncludeOriginals,
-		ExpiresAt:        pgtype.Timestamptz{Time: expiresAt, Valid: true},
+		ExpiresAt:        dbtypes.NewTimestamp(expiresAt),
 	})
 	if err != nil {
 		return repo.ShareLink{}, "", err
@@ -311,11 +306,11 @@ func (s *shareLinkService) List(ctx context.Context, ownerID int32) ([]repo.Shar
 
 func (s *shareLinkService) Get(ctx context.Context, ownerID int32, shareID uuid.UUID) (repo.ShareLink, error) {
 	link, err := s.queries.GetShareLinkByID(ctx, repo.GetShareLinkByIDParams{
-		ShareID: pgtype.UUID{Bytes: shareID, Valid: true},
+		ShareID: shareID,
 		OwnerID: ownerID,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.ShareLink{}, ErrShareLinkNotFound
 		}
 		return repo.ShareLink{}, err
@@ -347,7 +342,7 @@ func (s *shareLinkService) UpdateSettings(ctx context.Context, ownerID int32, sh
 	}
 
 	updated, err := s.queries.UpdateShareLinkSettings(ctx, repo.UpdateShareLinkSettingsParams{
-		ShareID:          pgtype.UUID{Bytes: shareID, Valid: true},
+		ShareID:          shareID,
 		OwnerID:          ownerID,
 		Title:            title,
 		Description:      description,
@@ -355,7 +350,7 @@ func (s *shareLinkService) UpdateSettings(ctx context.Context, ownerID int32, sh
 		IncludeOriginals: includeOriginals,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.ShareLink{}, ErrShareLinkNotFound
 		}
 		return repo.ShareLink{}, err
@@ -378,12 +373,12 @@ func (s *shareLinkService) extend(ctx context.Context, ownerID int32, shareID uu
 	newExpiry := base.Add(time.Duration(clampExpiryDays(days)) * 24 * time.Hour)
 
 	updated, err := s.queries.ExtendShareLinkExpiry(ctx, repo.ExtendShareLinkExpiryParams{
-		ShareID:   pgtype.UUID{Bytes: shareID, Valid: true},
+		ShareID:   shareID,
 		OwnerID:   ownerID,
-		ExpiresAt: pgtype.Timestamptz{Time: newExpiry, Valid: true},
+		ExpiresAt: dbtypes.NewTimestamp(newExpiry),
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.ShareLink{}, ErrShareLinkNotFound
 		}
 		return repo.ShareLink{}, err
@@ -393,11 +388,11 @@ func (s *shareLinkService) extend(ctx context.Context, ownerID int32, shareID uu
 
 func (s *shareLinkService) Revoke(ctx context.Context, ownerID int32, shareID uuid.UUID) (repo.ShareLink, error) {
 	updated, err := s.queries.RevokeShareLink(ctx, repo.RevokeShareLinkParams{
-		ShareID: pgtype.UUID{Bytes: shareID, Valid: true},
+		ShareID: shareID,
 		OwnerID: ownerID,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.ShareLink{}, ErrShareLinkNotFound
 		}
 		return repo.ShareLink{}, err
@@ -407,7 +402,7 @@ func (s *shareLinkService) Revoke(ctx context.Context, ownerID int32, shareID uu
 
 func (s *shareLinkService) Delete(ctx context.Context, ownerID int32, shareID uuid.UUID) error {
 	rows, err := s.queries.DeleteShareLink(ctx, repo.DeleteShareLinkParams{
-		ShareID: pgtype.UUID{Bytes: shareID, Valid: true},
+		ShareID: shareID,
 		OwnerID: ownerID,
 	})
 	if err != nil {
@@ -427,7 +422,7 @@ func (s *shareLinkService) Delete(ctx context.Context, ownerID int32, shareID uu
 func (s *shareLinkService) ResolvePublic(ctx context.Context, rawToken string) (repo.ShareLink, error) {
 	link, err := s.queries.GetActiveShareLinkByTokenHash(ctx, s.hashToken(rawToken))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.ShareLink{}, ErrShareLinkNotFound
 		}
 		return repo.ShareLink{}, err
@@ -436,24 +431,20 @@ func (s *shareLinkService) ResolvePublic(ctx context.Context, rawToken string) (
 }
 
 func (s *shareLinkService) RecordView(ctx context.Context, shareID uuid.UUID) error {
-	return s.queries.IncrementShareLinkView(ctx, pgtype.UUID{Bytes: shareID, Valid: true})
+	return s.queries.IncrementShareLinkView(ctx, shareID)
 }
 
 func (s *shareLinkService) PublicAssetSource(link repo.ShareLink) *AssetSetSource {
-	ids := make([]uuid.UUID, len(link.AssetIds))
-	for i, id := range link.AssetIds {
-		ids[i] = uuid.UUID(id.Bytes)
-	}
 	return &AssetSetSource{
 		Kind:                  AssetSetSourceShareLink,
-		AssetIDs:              ids,
+		AssetIDs:              append([]uuid.UUID(nil), link.AssetIds...),
 		PreserveSnapshotOrder: true,
 	}
 }
 
 func (s *shareLinkService) AssetInShare(link repo.ShareLink, assetID uuid.UUID) bool {
 	for _, id := range link.AssetIds {
-		if uuid.UUID(id.Bytes) == assetID {
+		if id == assetID {
 			return true
 		}
 	}

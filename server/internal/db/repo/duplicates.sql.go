@@ -7,48 +7,49 @@ package repo
 
 import (
 	"context"
+	"strings"
 
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const applyMergedKeeperPreferences = `-- name: ApplyMergedKeeperPreferences :exec
 UPDATE assets
 SET
     rating = CASE
-        WHEN $1::integer IS NULL THEN rating
-        WHEN rating IS NULL THEN $1::integer
-        ELSE GREATEST(rating, $1::integer)
+        WHEN ?1 IS NULL THEN rating
+        WHEN rating IS NULL THEN ?1
+        ELSE max(rating, ?1)
     END,
     liked = CASE
-        WHEN $2::boolean IS NULL THEN liked
-        WHEN liked IS NULL THEN $2::boolean
-        ELSE liked OR $2::boolean
+        WHEN ?2 IS NULL THEN liked
+        WHEN liked IS NULL THEN ?2
+        ELSE liked OR ?2
     END,
     specific_metadata = CASE
-        WHEN $3::text IS NULL THEN specific_metadata
+        WHEN ?3 IS NULL THEN specific_metadata
         WHEN COALESCE(specific_metadata->>'description', '') <> '' THEN specific_metadata
-        ELSE jsonb_set(
-            COALESCE(specific_metadata, '{}'::jsonb),
-            '{description}',
-            to_jsonb($3::text)
+        ELSE json_set(
+            COALESCE(specific_metadata, '{}'),
+            char(36) || '.description',
+            ?3
         )
     END
-WHERE asset_id = $4
+WHERE asset_id = ?4
 `
 
 type ApplyMergedKeeperPreferencesParams struct {
-	MergedRating      *int32      `db:"merged_rating" json:"merged_rating"`
-	MergedLiked       *bool       `db:"merged_liked" json:"merged_liked"`
-	MergedDescription *string     `db:"merged_description" json:"merged_description"`
-	KeeperAssetID     pgtype.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
+	MergedRating      interface{} `db:"merged_rating" json:"merged_rating"`
+	MergedLiked       interface{} `db:"merged_liked" json:"merged_liked"`
+	MergedDescription interface{} `db:"merged_description" json:"merged_description"`
+	KeeperAssetID     uuid.UUID   `db:"keeper_asset_id" json:"keeper_asset_id"`
 }
 
 // Applies merged rating/liked/description on top of the existing keeper values.
 // Rating uses MAX, liked is OR'd, description is set only when keeper currently
 // has no description (or the field is empty).
 func (q *Queries) ApplyMergedKeeperPreferences(ctx context.Context, arg ApplyMergedKeeperPreferencesParams) error {
-	_, err := q.db.Exec(ctx, applyMergedKeeperPreferences,
+	_, err := q.db.ExecContext(ctx, applyMergedKeeperPreferences,
 		arg.MergedRating,
 		arg.MergedLiked,
 		arg.MergedDescription,
@@ -60,19 +61,19 @@ func (q *Queries) ApplyMergedKeeperPreferences(ctx context.Context, arg ApplyMer
 const countDuplicateGroups = `-- name: CountDuplicateGroups :one
 SELECT COUNT(*) AS count
 FROM duplicate_groups g
-WHERE ($1::uuid IS NULL OR g.repository_id = $1)
-  AND ($2::integer IS NULL OR g.owner_id = $2)
-  AND ($3::text IS NULL OR g.status = $3)
+WHERE (?1 IS NULL OR g.repository_id = ?1)
+  AND (?2 IS NULL OR g.owner_id = ?2)
+  AND (?3 IS NULL OR g.status = ?3)
 `
 
 type CountDuplicateGroupsParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	Status       *string     `db:"status" json:"status"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	Status       interface{} `db:"status" json:"status"`
 }
 
 func (q *Queries) CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countDuplicateGroups, arg.RepositoryID, arg.OwnerID, arg.Status)
+	row := q.db.QueryRowContext(ctx, countDuplicateGroups, arg.RepositoryID, arg.OwnerID, arg.Status)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -83,30 +84,30 @@ INSERT INTO duplicate_groups (
     repository_id, owner_id, method, status, asset_count, total_size,
     recommended_keeper_asset_id, detection_version
 ) VALUES (
-    $1,
-    $2,
-    $3,
+    ?1,
+    ?2,
+    ?3,
     'pending',
-    $4,
-    $5,
-    $6,
-    $7
+    ?4,
+    ?5,
+    ?6,
+    ?7
 )
 RETURNING group_id
 `
 
 type CreateDuplicateGroupParams struct {
-	RepositoryID             pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID                  *int32      `db:"owner_id" json:"owner_id"`
-	Method                   string      `db:"method" json:"method"`
-	AssetCount               int32       `db:"asset_count" json:"asset_count"`
-	TotalSize                int64       `db:"total_size" json:"total_size"`
-	RecommendedKeeperAssetID pgtype.UUID `db:"recommended_keeper_asset_id" json:"recommended_keeper_asset_id"`
-	DetectionVersion         string      `db:"detection_version" json:"detection_version"`
+	RepositoryID             uuid.UUID     `db:"repository_id" json:"repository_id"`
+	OwnerID                  *int32        `db:"owner_id" json:"owner_id"`
+	Method                   string        `db:"method" json:"method"`
+	AssetCount               int64         `db:"asset_count" json:"asset_count"`
+	TotalSize                int64         `db:"total_size" json:"total_size"`
+	RecommendedKeeperAssetID uuid.NullUUID `db:"recommended_keeper_asset_id" json:"recommended_keeper_asset_id"`
+	DetectionVersion         string        `db:"detection_version" json:"detection_version"`
 }
 
-func (q *Queries) CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, createDuplicateGroup,
+func (q *Queries) CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, createDuplicateGroup,
 		arg.RepositoryID,
 		arg.OwnerID,
 		arg.Method,
@@ -115,7 +116,7 @@ func (q *Queries) CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateG
 		arg.RecommendedKeeperAssetID,
 		arg.DetectionVersion,
 	)
-	var group_id pgtype.UUID
+	var group_id uuid.UUID
 	err := row.Scan(&group_id)
 	return group_id, err
 }
@@ -123,7 +124,7 @@ func (q *Queries) CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateG
 const deletePendingDuplicateGroupsByRepository = `-- name: DeletePendingDuplicateGroupsByRepository :exec
 
 DELETE FROM duplicate_groups
-WHERE repository_id = $1
+WHERE repository_id = ?1
   AND status = 'pending'
 `
 
@@ -132,8 +133,8 @@ WHERE repository_id = $1
 // ============================================================================
 // Removes the pending detection state for a repository. Merged and dismissed
 // groups are preserved so the user retains an audit trail of resolved sets.
-func (q *Queries) DeletePendingDuplicateGroupsByRepository(ctx context.Context, repositoryID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deletePendingDuplicateGroupsByRepository, repositoryID)
+func (q *Queries) DeletePendingDuplicateGroupsByRepository(ctx context.Context, repositoryID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deletePendingDuplicateGroupsByRepository, repositoryID)
 	return err
 }
 
@@ -144,12 +145,12 @@ SELECT
     dga.role,
     dga.file_size
 FROM duplicate_group_assets dga
-WHERE dga.group_id = $1
+WHERE dga.group_id = ?1
 ORDER BY dga.file_size DESC, dga.asset_id ASC
 `
 
-func (q *Queries) GetDuplicateGroupAssets(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupAsset, error) {
-	rows, err := q.db.Query(ctx, getDuplicateGroupAssets, groupID)
+func (q *Queries) GetDuplicateGroupAssets(ctx context.Context, groupID uuid.UUID) ([]DuplicateGroupAsset, error) {
+	rows, err := q.db.QueryContext(ctx, getDuplicateGroupAssets, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +167,9 @@ func (q *Queries) GetDuplicateGroupAssets(ctx context.Context, groupID pgtype.UU
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -180,13 +184,23 @@ SELECT
     dga.role,
     dga.file_size
 FROM duplicate_group_assets dga
-WHERE dga.group_id = ANY($1::uuid[])
+WHERE dga.group_id IN (/*SLICE:group_ids*/?)
 ORDER BY dga.group_id, dga.file_size DESC, dga.asset_id ASC
 `
 
 // Bulk variant used for the list endpoint to enrich many groups in one query.
-func (q *Queries) GetDuplicateGroupAssetsBatch(ctx context.Context, groupIds []pgtype.UUID) ([]DuplicateGroupAsset, error) {
-	rows, err := q.db.Query(ctx, getDuplicateGroupAssetsBatch, groupIds)
+func (q *Queries) GetDuplicateGroupAssetsBatch(ctx context.Context, groupIds []uuid.UUID) ([]DuplicateGroupAsset, error) {
+	query := getDuplicateGroupAssetsBatch
+	var queryParams []interface{}
+	if len(groupIds) > 0 {
+		for _, v := range groupIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:group_ids*/?", strings.Repeat(",?", len(groupIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:group_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +217,9 @@ func (q *Queries) GetDuplicateGroupAssetsBatch(ctx context.Context, groupIds []p
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -227,11 +244,11 @@ SELECT
     g.created_at,
     g.updated_at
 FROM duplicate_groups g
-WHERE g.group_id = $1
+WHERE g.group_id = ?1
 `
 
-func (q *Queries) GetDuplicateGroupByID(ctx context.Context, groupID pgtype.UUID) (DuplicateGroup, error) {
-	row := q.db.QueryRow(ctx, getDuplicateGroupByID, groupID)
+func (q *Queries) GetDuplicateGroupByID(ctx context.Context, groupID uuid.UUID) (DuplicateGroup, error) {
+	row := q.db.QueryRowContext(ctx, getDuplicateGroupByID, groupID)
 	var i DuplicateGroup
 	err := row.Scan(
 		&i.GroupID,
@@ -261,12 +278,12 @@ SELECT
     dge.distance,
     dge.confidence
 FROM duplicate_group_edges dge
-WHERE dge.group_id = $1
+WHERE dge.group_id = ?1
 ORDER BY dge.method, dge.asset_id_a, dge.asset_id_b
 `
 
-func (q *Queries) GetDuplicateGroupEdges(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupEdge, error) {
-	rows, err := q.db.Query(ctx, getDuplicateGroupEdges, groupID)
+func (q *Queries) GetDuplicateGroupEdges(ctx context.Context, groupID uuid.UUID) ([]DuplicateGroupEdge, error) {
+	rows, err := q.db.QueryContext(ctx, getDuplicateGroupEdges, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -286,6 +303,9 @@ func (q *Queries) GetDuplicateGroupEdges(ctx context.Context, groupID pgtype.UUI
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -297,13 +317,13 @@ SELECT
     COUNT(*) FILTER (WHERE g.status = 'pending')   AS pending_groups,
     COUNT(*) FILTER (WHERE g.status = 'merged')    AS merged_groups,
     COUNT(*) FILTER (WHERE g.status = 'dismissed') AS dismissed_groups,
-    COALESCE(SUM(g.asset_count) FILTER (WHERE g.status = 'pending'), 0)::bigint AS pending_assets,
-    COALESCE(SUM(GREATEST(g.asset_count - 1, 0)) FILTER (WHERE g.status = 'pending'), 0)::bigint AS recoverable_assets,
+    COALESCE(SUM(g.asset_count) FILTER (WHERE g.status = 'pending'), 0) AS pending_assets,
+    COALESCE(SUM(max(g.asset_count - 1, 0)) FILTER (WHERE g.status = 'pending'), 0) AS recoverable_assets,
     COALESCE(
         SUM(
             CASE
                 WHEN g.status = 'pending'
-                THEN GREATEST(g.total_size - COALESCE((
+                THEN max(g.total_size - COALESCE((
                     SELECT MAX(dga.file_size)
                     FROM duplicate_group_assets dga
                     WHERE dga.group_id = g.group_id
@@ -312,31 +332,31 @@ SELECT
             END
         ),
         0
-    )::bigint AS recoverable_bytes,
-    MAX(g.detected_at)::timestamptz AS last_detected_at
+    ) AS recoverable_bytes,
+    MAX(g.detected_at) AS last_detected_at
 FROM duplicate_groups g
-WHERE ($1::uuid IS NULL OR g.repository_id = $1)
-  AND ($2::integer IS NULL OR g.owner_id = $2)
+WHERE (?1 IS NULL OR g.repository_id = ?1)
+  AND (?2 IS NULL OR g.owner_id = ?2)
 `
 
 type GetDuplicateSummaryParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
 }
 
 type GetDuplicateSummaryRow struct {
-	PendingGroups     int64              `db:"pending_groups" json:"pending_groups"`
-	MergedGroups      int64              `db:"merged_groups" json:"merged_groups"`
-	DismissedGroups   int64              `db:"dismissed_groups" json:"dismissed_groups"`
-	PendingAssets     int64              `db:"pending_assets" json:"pending_assets"`
-	RecoverableAssets int64              `db:"recoverable_assets" json:"recoverable_assets"`
-	RecoverableBytes  int64              `db:"recoverable_bytes" json:"recoverable_bytes"`
-	LastDetectedAt    pgtype.Timestamptz `db:"last_detected_at" json:"last_detected_at"`
+	PendingGroups     int64       `db:"pending_groups" json:"pending_groups"`
+	MergedGroups      int64       `db:"merged_groups" json:"merged_groups"`
+	DismissedGroups   int64       `db:"dismissed_groups" json:"dismissed_groups"`
+	PendingAssets     interface{} `db:"pending_assets" json:"pending_assets"`
+	RecoverableAssets interface{} `db:"recoverable_assets" json:"recoverable_assets"`
+	RecoverableBytes  interface{} `db:"recoverable_bytes" json:"recoverable_bytes"`
+	LastDetectedAt    interface{} `db:"last_detected_at" json:"last_detected_at"`
 }
 
 // Top-level metrics for the Utilities rail card.
 func (q *Queries) GetDuplicateSummary(ctx context.Context, arg GetDuplicateSummaryParams) (GetDuplicateSummaryRow, error) {
-	row := q.db.QueryRow(ctx, getDuplicateSummary, arg.RepositoryID, arg.OwnerID)
+	row := q.db.QueryRowContext(ctx, getDuplicateSummary, arg.RepositoryID, arg.OwnerID)
 	var i GetDuplicateSummaryRow
 	err := row.Scan(
 		&i.PendingGroups,
@@ -355,13 +375,13 @@ SELECT a.asset_id, a.owner_id, a.content_hash, a.file_size, a.original_filename,
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.repository_id = $1
+  AND a.repository_id = ?1
   AND EXISTS (
     SELECT 1 FROM assets b
     WHERE b.is_deleted = false
       AND b.type = 'PHOTO'
       AND b.repository_id = a.repository_id
-      AND b.owner_id IS NOT DISTINCT FROM a.owner_id
+      AND b.owner_id IS a.owner_id
       AND b.content_hash = a.content_hash
       AND b.file_size = a.file_size
       AND b.asset_id <> a.asset_id
@@ -370,22 +390,22 @@ ORDER BY a.owner_id, a.content_hash, a.file_size, a.asset_id
 `
 
 type GetExactDuplicateCandidatesRow struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	ContentHash      string             `db:"content_hash" json:"content_hash"`
-	FileSize         int64              `db:"file_size" json:"file_size"`
-	OriginalFilename string             `db:"original_filename" json:"original_filename"`
-	TakenTime        pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
-	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	Rating           *int32             `db:"rating" json:"rating"`
+	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32            `db:"owner_id" json:"owner_id"`
+	ContentHash      string            `db:"content_hash" json:"content_hash"`
+	FileSize         int64             `db:"file_size" json:"file_size"`
+	OriginalFilename string            `db:"original_filename" json:"original_filename"`
+	TakenTime        dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
+	UploadTime       dbtypes.Timestamp `db:"upload_time" json:"upload_time"`
+	Rating           *int64            `db:"rating" json:"rating"`
 }
 
 // Returns assets in a repository that share the exact same (content_hash, file_size)
 // with at least one other asset of the same owner. Only photos are considered,
 // and only non-deleted assets. Results are ordered so members of the same
 // duplicate set (owner included in the grouping key) are adjacent.
-func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID pgtype.UUID) ([]GetExactDuplicateCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, getExactDuplicateCandidates, repositoryID)
+func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID uuid.NullUUID) ([]GetExactDuplicateCandidatesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getExactDuplicateCandidates, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -407,6 +427,9 @@ func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID 
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -419,24 +442,34 @@ FROM assets a
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.asset_id = ANY($1::uuid[])
+  AND a.asset_id IN (/*SLICE:asset_ids*/?)
   AND e.embedding_type = 'phash'
   AND e.is_primary = true
 `
 
 type GetPHashEmbeddingsByAssetIDsRow struct {
-	AssetID    pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	FileSize   int64              `db:"file_size" json:"file_size"`
-	TakenTime  pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
-	UploadTime pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	Rating     *int32             `db:"rating" json:"rating"`
-	Vector     *pgvector.Vector   `db:"vector" json:"vector"`
+	AssetID    uuid.UUID         `db:"asset_id" json:"asset_id"`
+	FileSize   int64             `db:"file_size" json:"file_size"`
+	TakenTime  dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
+	UploadTime dbtypes.Timestamp `db:"upload_time" json:"upload_time"`
+	Rating     *int64            `db:"rating" json:"rating"`
+	Vector     dbtypes.Vector    `db:"vector" json:"vector"`
 }
 
 // Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
 // a specific asset set, for the agent dedupe tool's in-memory similarity graph.
-func (q *Queries) GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []pgtype.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error) {
-	rows, err := q.db.Query(ctx, getPHashEmbeddingsByAssetIDs, assetIds)
+func (q *Queries) GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error) {
+	query := getPHashEmbeddingsByAssetIDs
+	var queryParams []interface{}
+	if len(assetIds) > 0 {
+		for _, v := range assetIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(assetIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -456,6 +489,9 @@ func (q *Queries) GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []p
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -468,13 +504,13 @@ SELECT mia.asset_id, COALESCE(asm.stack_id, mia.media_item_id) AS stack_id
 FROM media_item_assets mia
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
 INNER JOIN assets a ON a.asset_id = mia.asset_id
-WHERE a.repository_id = $1
+WHERE a.repository_id = ?1
   AND a.is_deleted = false
 `
 
 type GetStackMembershipForRepositoryRow struct {
-	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
-	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
+	AssetID uuid.UUID `db:"asset_id" json:"asset_id"`
+	StackID uuid.UUID `db:"stack_id" json:"stack_id"`
 }
 
 // ============================================================================
@@ -483,8 +519,8 @@ type GetStackMembershipForRepositoryRow struct {
 // Each asset is mapped to its presentation stack when present, otherwise to
 // its logical media item. This skips duplicate edges both within RAW/JPEG or
 // Live Photo components and within intentional burst/manual stacks.
-func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]GetStackMembershipForRepositoryRow, error) {
-	rows, err := q.db.Query(ctx, getStackMembershipForRepository, repositoryID)
+func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositoryID uuid.NullUUID) ([]GetStackMembershipForRepositoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getStackMembershipForRepository, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -497,6 +533,9 @@ func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositor
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -505,21 +544,21 @@ func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositor
 
 const insertDuplicateGroupAsset = `-- name: InsertDuplicateGroupAsset :exec
 INSERT INTO duplicate_group_assets (group_id, asset_id, role, file_size)
-VALUES ($1, $2, $3, $4)
+VALUES (?1, ?2, ?3, ?4)
 ON CONFLICT (group_id, asset_id) DO UPDATE
 SET role = EXCLUDED.role,
     file_size = EXCLUDED.file_size
 `
 
 type InsertDuplicateGroupAssetParams struct {
-	GroupID  pgtype.UUID `db:"group_id" json:"group_id"`
-	AssetID  pgtype.UUID `db:"asset_id" json:"asset_id"`
-	Role     string      `db:"role" json:"role"`
-	FileSize int64       `db:"file_size" json:"file_size"`
+	GroupID  uuid.UUID `db:"group_id" json:"group_id"`
+	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
+	Role     string    `db:"role" json:"role"`
+	FileSize int64     `db:"file_size" json:"file_size"`
 }
 
 func (q *Queries) InsertDuplicateGroupAsset(ctx context.Context, arg InsertDuplicateGroupAssetParams) error {
-	_, err := q.db.Exec(ctx, insertDuplicateGroupAsset,
+	_, err := q.db.ExecContext(ctx, insertDuplicateGroupAsset,
 		arg.GroupID,
 		arg.AssetID,
 		arg.Role,
@@ -530,24 +569,24 @@ func (q *Queries) InsertDuplicateGroupAsset(ctx context.Context, arg InsertDupli
 
 const insertDuplicateGroupEdge = `-- name: InsertDuplicateGroupEdge :exec
 INSERT INTO duplicate_group_edges (group_id, asset_id_a, asset_id_b, method, distance, confidence)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 ON CONFLICT (group_id, asset_id_a, asset_id_b, method) DO UPDATE
 SET distance = EXCLUDED.distance,
     confidence = EXCLUDED.confidence
 `
 
 type InsertDuplicateGroupEdgeParams struct {
-	GroupID    pgtype.UUID `db:"group_id" json:"group_id"`
-	AssetIDA   pgtype.UUID `db:"asset_id_a" json:"asset_id_a"`
-	AssetIDB   pgtype.UUID `db:"asset_id_b" json:"asset_id_b"`
-	Method     string      `db:"method" json:"method"`
-	Distance   float64     `db:"distance" json:"distance"`
-	Confidence float64     `db:"confidence" json:"confidence"`
+	GroupID    uuid.UUID `db:"group_id" json:"group_id"`
+	AssetIDA   uuid.UUID `db:"asset_id_a" json:"asset_id_a"`
+	AssetIDB   uuid.UUID `db:"asset_id_b" json:"asset_id_b"`
+	Method     string    `db:"method" json:"method"`
+	Distance   float64   `db:"distance" json:"distance"`
+	Confidence float64   `db:"confidence" json:"confidence"`
 }
 
 // Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 func (q *Queries) InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error {
-	_, err := q.db.Exec(ctx, insertDuplicateGroupEdge,
+	_, err := q.db.ExecContext(ctx, insertDuplicateGroupEdge,
 		arg.GroupID,
 		arg.AssetIDA,
 		arg.AssetIDB,
@@ -575,21 +614,21 @@ SELECT
     g.created_at,
     g.updated_at
 FROM duplicate_groups g
-WHERE ($1::uuid IS NULL OR g.repository_id = $1)
-  AND ($2::integer IS NULL OR g.owner_id = $2)
-  AND ($3::text IS NULL OR g.status = $3)
+WHERE (?1 IS NULL OR g.repository_id = ?1)
+  AND (?2 IS NULL OR g.owner_id = ?2)
+  AND (?3 IS NULL OR g.status = ?3)
 ORDER BY
     CASE WHEN g.status = 'pending' THEN g.detected_at ELSE g.resolved_at END DESC NULLS LAST,
     g.group_id DESC
-LIMIT $5 OFFSET $4
+LIMIT ?5 OFFSET ?4
 `
 
 type ListDuplicateGroupsParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	Status       *string     `db:"status" json:"status"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	Status       interface{} `db:"status" json:"status"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 // Paginated list of duplicate groups for the given repository, owner, and
@@ -597,7 +636,7 @@ type ListDuplicateGroupsParams struct {
 // their own ID and never see NULL-owner or foreign groups.
 // Pending groups are returned newest-first; resolved groups by resolution time.
 func (q *Queries) ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error) {
-	rows, err := q.db.Query(ctx, listDuplicateGroups,
+	rows, err := q.db.QueryContext(ctx, listDuplicateGroups,
 		arg.RepositoryID,
 		arg.OwnerID,
 		arg.Status,
@@ -631,6 +670,9 @@ func (q *Queries) ListDuplicateGroups(ctx context.Context, arg ListDuplicateGrou
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -643,26 +685,26 @@ FROM assets a
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.repository_id = $1
+  AND a.repository_id = ?1
   AND e.embedding_type = 'phash'
   AND e.is_primary = true
 `
 
 type ListPHashEmbeddingsForRepositoryRow struct {
-	AssetID    pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	OwnerID    *int32             `db:"owner_id" json:"owner_id"`
-	FileSize   int64              `db:"file_size" json:"file_size"`
-	TakenTime  pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
-	UploadTime pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	Rating     *int32             `db:"rating" json:"rating"`
-	Vector     *pgvector.Vector   `db:"vector" json:"vector"`
+	AssetID    uuid.UUID         `db:"asset_id" json:"asset_id"`
+	OwnerID    *int32            `db:"owner_id" json:"owner_id"`
+	FileSize   int64             `db:"file_size" json:"file_size"`
+	TakenTime  dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
+	UploadTime dbtypes.Timestamp `db:"upload_time" json:"upload_time"`
+	Rating     *int64            `db:"rating" json:"rating"`
+	Vector     dbtypes.Vector    `db:"vector" json:"vector"`
 }
 
 // Loads pHash embeddings for every non-deleted photo in a repository so the
 // service layer can build a similarity graph in-memory. owner_id is included
 // because duplicate edges never cross owners.
-func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]ListPHashEmbeddingsForRepositoryRow, error) {
-	rows, err := q.db.Query(ctx, listPHashEmbeddingsForRepository, repositoryID)
+func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID uuid.NullUUID) ([]ListPHashEmbeddingsForRepositoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPHashEmbeddingsForRepository, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -683,6 +725,9 @@ func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, reposito
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -692,47 +737,47 @@ func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, reposito
 const markDuplicateGroupDismissed = `-- name: MarkDuplicateGroupDismissed :exec
 UPDATE duplicate_groups
 SET status = 'dismissed',
-    resolved_at = CURRENT_TIMESTAMP,
-    updated_at = CURRENT_TIMESTAMP
-WHERE group_id = $1
+    resolved_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE group_id = ?1
 `
 
-func (q *Queries) MarkDuplicateGroupDismissed(ctx context.Context, groupID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, markDuplicateGroupDismissed, groupID)
+func (q *Queries) MarkDuplicateGroupDismissed(ctx context.Context, groupID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, markDuplicateGroupDismissed, groupID)
 	return err
 }
 
 const markDuplicateGroupMerged = `-- name: MarkDuplicateGroupMerged :exec
 UPDATE duplicate_groups
 SET status = 'merged',
-    keeper_asset_id = $1,
-    resolved_at = CURRENT_TIMESTAMP,
-    updated_at = CURRENT_TIMESTAMP
-WHERE group_id = $2
+    keeper_asset_id = ?1,
+    resolved_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE group_id = ?2
 `
 
 type MarkDuplicateGroupMergedParams struct {
-	KeeperAssetID pgtype.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
-	GroupID       pgtype.UUID `db:"group_id" json:"group_id"`
+	KeeperAssetID uuid.NullUUID `db:"keeper_asset_id" json:"keeper_asset_id"`
+	GroupID       uuid.UUID     `db:"group_id" json:"group_id"`
 }
 
 func (q *Queries) MarkDuplicateGroupMerged(ctx context.Context, arg MarkDuplicateGroupMergedParams) error {
-	_, err := q.db.Exec(ctx, markDuplicateGroupMerged, arg.KeeperAssetID, arg.GroupID)
+	_, err := q.db.ExecContext(ctx, markDuplicateGroupMerged, arg.KeeperAssetID, arg.GroupID)
 	return err
 }
 
 const mergeAlbumAssetsForDuplicate = `-- name: MergeAlbumAssetsForDuplicate :exec
 
 INSERT INTO album_assets (album_id, asset_id, position, added_time)
-SELECT aa.album_id, $1, aa.position, aa.added_time
+SELECT aa.album_id, ?1, aa.position, aa.added_time
 FROM album_assets aa
-WHERE aa.asset_id = $2
+WHERE aa.asset_id = ?2
 ON CONFLICT (album_id, asset_id) DO NOTHING
 `
 
 type MergeAlbumAssetsForDuplicateParams struct {
-	KeeperAssetID    pgtype.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
-	DuplicateAssetID pgtype.UUID `db:"duplicate_asset_id" json:"duplicate_asset_id"`
+	KeeperAssetID    uuid.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
+	DuplicateAssetID uuid.UUID `db:"duplicate_asset_id" json:"duplicate_asset_id"`
 }
 
 // ============================================================================
@@ -741,21 +786,21 @@ type MergeAlbumAssetsForDuplicateParams struct {
 // Copies a duplicate asset's album memberships onto the keeper asset.
 // Existing keeper memberships are preserved (the conflict clause is a no-op).
 func (q *Queries) MergeAlbumAssetsForDuplicate(ctx context.Context, arg MergeAlbumAssetsForDuplicateParams) error {
-	_, err := q.db.Exec(ctx, mergeAlbumAssetsForDuplicate, arg.KeeperAssetID, arg.DuplicateAssetID)
+	_, err := q.db.ExecContext(ctx, mergeAlbumAssetsForDuplicate, arg.KeeperAssetID, arg.DuplicateAssetID)
 	return err
 }
 
 const mergeAssetTagsForDuplicate = `-- name: MergeAssetTagsForDuplicate :exec
 INSERT INTO asset_tags (asset_id, tag_id, confidence, source)
 SELECT
-    $1,
+    ?1,
     t.tag_id,
     t.confidence,
     t.source
 FROM asset_tags t
-WHERE t.asset_id = $2
+WHERE t.asset_id = ?2
 ON CONFLICT (asset_id, tag_id) DO UPDATE
-SET confidence = GREATEST(asset_tags.confidence, EXCLUDED.confidence),
+SET confidence = max(asset_tags.confidence, EXCLUDED.confidence),
     source = CASE
         WHEN EXCLUDED.source = 'user' THEN 'user'
         WHEN asset_tags.source = 'user' THEN asset_tags.source
@@ -764,52 +809,52 @@ SET confidence = GREATEST(asset_tags.confidence, EXCLUDED.confidence),
 `
 
 type MergeAssetTagsForDuplicateParams struct {
-	KeeperAssetID    pgtype.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
-	DuplicateAssetID pgtype.UUID `db:"duplicate_asset_id" json:"duplicate_asset_id"`
+	KeeperAssetID    uuid.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
+	DuplicateAssetID uuid.UUID `db:"duplicate_asset_id" json:"duplicate_asset_id"`
 }
 
 // Copies duplicate tags onto the keeper, choosing the higher confidence and
 // preferring user-provided tags over AI-generated ones on conflict.
 func (q *Queries) MergeAssetTagsForDuplicate(ctx context.Context, arg MergeAssetTagsForDuplicateParams) error {
-	_, err := q.db.Exec(ctx, mergeAssetTagsForDuplicate, arg.KeeperAssetID, arg.DuplicateAssetID)
+	_, err := q.db.ExecContext(ctx, mergeAssetTagsForDuplicate, arg.KeeperAssetID, arg.DuplicateAssetID)
 	return err
 }
 
 const mergeFaceClustersForDuplicate = `-- name: MergeFaceClustersForDuplicate :exec
 UPDATE face_items
-SET asset_id = $1
-WHERE asset_id = $2
+SET asset_id = ?1
+WHERE asset_id = ?2
 `
 
 type MergeFaceClustersForDuplicateParams struct {
-	KeeperAssetID    pgtype.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
-	DuplicateAssetID pgtype.UUID `db:"duplicate_asset_id" json:"duplicate_asset_id"`
+	KeeperAssetID    uuid.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
+	DuplicateAssetID uuid.UUID `db:"duplicate_asset_id" json:"duplicate_asset_id"`
 }
 
 // Re-parents the duplicate asset's face_items onto the keeper so cluster
 // memberships (and thus person assignments) follow the keeper after merge.
 // Used only for exact duplicates where bounding boxes match by construction.
 func (q *Queries) MergeFaceClustersForDuplicate(ctx context.Context, arg MergeFaceClustersForDuplicateParams) error {
-	_, err := q.db.Exec(ctx, mergeFaceClustersForDuplicate, arg.KeeperAssetID, arg.DuplicateAssetID)
+	_, err := q.db.ExecContext(ctx, mergeFaceClustersForDuplicate, arg.KeeperAssetID, arg.DuplicateAssetID)
 	return err
 }
 
 const updateDuplicateGroupKeeperRole = `-- name: UpdateDuplicateGroupKeeperRole :exec
 UPDATE duplicate_group_assets
 SET role = CASE
-    WHEN asset_id = $1 THEN 'keeper'
+    WHEN asset_id = ?1 THEN 'keeper'
     ELSE 'duplicate'
 END
-WHERE group_id = $2
+WHERE group_id = ?2
 `
 
 type UpdateDuplicateGroupKeeperRoleParams struct {
-	KeeperAssetID pgtype.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
-	GroupID       pgtype.UUID `db:"group_id" json:"group_id"`
+	KeeperAssetID uuid.UUID `db:"keeper_asset_id" json:"keeper_asset_id"`
+	GroupID       uuid.UUID `db:"group_id" json:"group_id"`
 }
 
 // Resets all asset roles in a group, then flags the chosen keeper.
 func (q *Queries) UpdateDuplicateGroupKeeperRole(ctx context.Context, arg UpdateDuplicateGroupKeeperRoleParams) error {
-	_, err := q.db.Exec(ctx, updateDuplicateGroupKeeperRole, arg.KeeperAssetID, arg.GroupID)
+	_, err := q.db.ExecContext(ctx, updateDuplicateGroupKeeperRole, arg.KeeperAssetID, arg.GroupID)
 	return err
 }

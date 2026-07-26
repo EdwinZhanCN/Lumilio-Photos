@@ -28,7 +28,7 @@ WHERE a.is_deleted = false
     WHERE b.is_deleted = false
       AND b.type = 'PHOTO'
       AND b.repository_id = a.repository_id
-      AND b.owner_id IS NOT DISTINCT FROM a.owner_id
+      AND b.owner_id IS a.owner_id
       AND b.content_hash = a.content_hash
       AND b.file_size = a.file_size
       AND b.asset_id <> a.asset_id
@@ -56,7 +56,7 @@ FROM assets a
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND a.asset_id IN (sqlc.slice('asset_ids'))
   AND e.embedding_type = 'phash'
   AND e.is_primary = true;
 
@@ -89,7 +89,7 @@ RETURNING group_id;
 
 -- name: InsertDuplicateGroupAsset :exec
 INSERT INTO duplicate_group_assets (group_id, asset_id, role, file_size)
-VALUES ($1, $2, $3, $4)
+VALUES (?1, ?2, ?3, ?4)
 ON CONFLICT (group_id, asset_id) DO UPDATE
 SET role = EXCLUDED.role,
     file_size = EXCLUDED.file_size;
@@ -97,7 +97,7 @@ SET role = EXCLUDED.role,
 -- name: InsertDuplicateGroupEdge :exec
 -- Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 INSERT INTO duplicate_group_edges (group_id, asset_id_a, asset_id_b, method, distance, confidence)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 ON CONFLICT (group_id, asset_id_a, asset_id_b, method) DO UPDATE
 SET distance = EXCLUDED.distance,
     confidence = EXCLUDED.confidence;
@@ -142,9 +142,9 @@ SELECT
     g.created_at,
     g.updated_at
 FROM duplicate_groups g
-WHERE (sqlc.narg('repository_id')::uuid IS NULL OR g.repository_id = sqlc.narg('repository_id'))
-  AND (sqlc.narg('owner_id')::integer IS NULL OR g.owner_id = sqlc.narg('owner_id'))
-  AND (sqlc.narg('status')::text IS NULL OR g.status = sqlc.narg('status'))
+WHERE (sqlc.narg('repository_id') IS NULL OR g.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id') IS NULL OR g.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('status') IS NULL OR g.status = sqlc.narg('status'))
 ORDER BY
     CASE WHEN g.status = 'pending' THEN g.detected_at ELSE g.resolved_at END DESC NULLS LAST,
     g.group_id DESC
@@ -153,9 +153,9 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 -- name: CountDuplicateGroups :one
 SELECT COUNT(*) AS count
 FROM duplicate_groups g
-WHERE (sqlc.narg('repository_id')::uuid IS NULL OR g.repository_id = sqlc.narg('repository_id'))
-  AND (sqlc.narg('owner_id')::integer IS NULL OR g.owner_id = sqlc.narg('owner_id'))
-  AND (sqlc.narg('status')::text IS NULL OR g.status = sqlc.narg('status'));
+WHERE (sqlc.narg('repository_id') IS NULL OR g.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id') IS NULL OR g.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('status') IS NULL OR g.status = sqlc.narg('status'));
 
 -- name: GetDuplicateGroupAssets :many
 SELECT
@@ -175,7 +175,7 @@ SELECT
     dga.role,
     dga.file_size
 FROM duplicate_group_assets dga
-WHERE dga.group_id = ANY(sqlc.arg('group_ids')::uuid[])
+WHERE dga.group_id IN (sqlc.slice('group_ids'))
 ORDER BY dga.group_id, dga.file_size DESC, dga.asset_id ASC;
 
 -- name: GetDuplicateGroupEdges :many
@@ -203,15 +203,15 @@ WHERE group_id = sqlc.arg('group_id');
 UPDATE duplicate_groups
 SET status = 'merged',
     keeper_asset_id = sqlc.arg('keeper_asset_id'),
-    resolved_at = CURRENT_TIMESTAMP,
-    updated_at = CURRENT_TIMESTAMP
+    resolved_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE group_id = sqlc.arg('group_id');
 
 -- name: MarkDuplicateGroupDismissed :exec
 UPDATE duplicate_groups
 SET status = 'dismissed',
-    resolved_at = CURRENT_TIMESTAMP,
-    updated_at = CURRENT_TIMESTAMP
+    resolved_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE group_id = sqlc.arg('group_id');
 
 -- name: GetDuplicateSummary :one
@@ -220,13 +220,13 @@ SELECT
     COUNT(*) FILTER (WHERE g.status = 'pending')   AS pending_groups,
     COUNT(*) FILTER (WHERE g.status = 'merged')    AS merged_groups,
     COUNT(*) FILTER (WHERE g.status = 'dismissed') AS dismissed_groups,
-    COALESCE(SUM(g.asset_count) FILTER (WHERE g.status = 'pending'), 0)::bigint AS pending_assets,
-    COALESCE(SUM(GREATEST(g.asset_count - 1, 0)) FILTER (WHERE g.status = 'pending'), 0)::bigint AS recoverable_assets,
+    COALESCE(SUM(g.asset_count) FILTER (WHERE g.status = 'pending'), 0) AS pending_assets,
+    COALESCE(SUM(max(g.asset_count - 1, 0)) FILTER (WHERE g.status = 'pending'), 0) AS recoverable_assets,
     COALESCE(
         SUM(
             CASE
                 WHEN g.status = 'pending'
-                THEN GREATEST(g.total_size - COALESCE((
+                THEN max(g.total_size - COALESCE((
                     SELECT MAX(dga.file_size)
                     FROM duplicate_group_assets dga
                     WHERE dga.group_id = g.group_id
@@ -235,11 +235,11 @@ SELECT
             END
         ),
         0
-    )::bigint AS recoverable_bytes,
-    MAX(g.detected_at)::timestamptz AS last_detected_at
+    ) AS recoverable_bytes,
+    MAX(g.detected_at) AS last_detected_at
 FROM duplicate_groups g
-WHERE (sqlc.narg('repository_id')::uuid IS NULL OR g.repository_id = sqlc.narg('repository_id'))
-  AND (sqlc.narg('owner_id')::integer IS NULL OR g.owner_id = sqlc.narg('owner_id'));
+WHERE (sqlc.narg('repository_id') IS NULL OR g.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id') IS NULL OR g.owner_id = sqlc.narg('owner_id'));
 
 -- ============================================================================
 -- Metadata merge helpers (used inside merge transactions)
@@ -266,7 +266,7 @@ SELECT
 FROM asset_tags t
 WHERE t.asset_id = sqlc.arg('duplicate_asset_id')
 ON CONFLICT (asset_id, tag_id) DO UPDATE
-SET confidence = GREATEST(asset_tags.confidence, EXCLUDED.confidence),
+SET confidence = max(asset_tags.confidence, EXCLUDED.confidence),
     source = CASE
         WHEN EXCLUDED.source = 'user' THEN 'user'
         WHEN asset_tags.source = 'user' THEN asset_tags.source
@@ -288,22 +288,22 @@ WHERE asset_id = sqlc.arg('duplicate_asset_id');
 UPDATE assets
 SET
     rating = CASE
-        WHEN sqlc.narg('merged_rating')::integer IS NULL THEN rating
-        WHEN rating IS NULL THEN sqlc.narg('merged_rating')::integer
-        ELSE GREATEST(rating, sqlc.narg('merged_rating')::integer)
+        WHEN sqlc.narg('merged_rating') IS NULL THEN rating
+        WHEN rating IS NULL THEN sqlc.narg('merged_rating')
+        ELSE max(rating, sqlc.narg('merged_rating'))
     END,
     liked = CASE
-        WHEN sqlc.narg('merged_liked')::boolean IS NULL THEN liked
-        WHEN liked IS NULL THEN sqlc.narg('merged_liked')::boolean
-        ELSE liked OR sqlc.narg('merged_liked')::boolean
+        WHEN sqlc.narg('merged_liked') IS NULL THEN liked
+        WHEN liked IS NULL THEN sqlc.narg('merged_liked')
+        ELSE liked OR sqlc.narg('merged_liked')
     END,
     specific_metadata = CASE
-        WHEN sqlc.narg('merged_description')::text IS NULL THEN specific_metadata
+        WHEN sqlc.narg('merged_description') IS NULL THEN specific_metadata
         WHEN COALESCE(specific_metadata->>'description', '') <> '' THEN specific_metadata
-        ELSE jsonb_set(
-            COALESCE(specific_metadata, '{}'::jsonb),
-            '{description}',
-            to_jsonb(sqlc.narg('merged_description')::text)
+        ELSE json_set(
+            COALESCE(specific_metadata, '{}'),
+            char(36) || '.description',
+            sqlc.narg('merged_description')
         )
     END
 WHERE asset_id = sqlc.arg('keeper_asset_id');

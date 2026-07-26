@@ -1,6 +1,7 @@
 package search
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -11,7 +12,15 @@ type sqlBuilder struct {
 
 func (b *sqlBuilder) addArg(value any) string {
 	b.args = append(b.args, value)
-	return fmt.Sprintf("$%d", len(b.args))
+	return fmt.Sprintf("?%d", len(b.args))
+}
+
+func (b *sqlBuilder) addJSONArg(value any) (string, error) {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("encode SQLite JSON argument: %w", err)
+	}
+	return b.addArg(string(encoded)), nil
 }
 
 func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias string) ([]string, error) {
@@ -23,13 +32,21 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 	conditions := []string{fmt.Sprintf("%s.is_deleted = %s", a, builder.addArg(isDeleted))}
 
 	if filter.AssetIDs != nil {
-		conditions = append(conditions, fmt.Sprintf("%s.asset_id = ANY(%s::uuid[])", a, builder.addArg(filter.AssetIDs)))
+		placeholder, err := builder.addJSONArg(filter.AssetIDs)
+		if err != nil {
+			return nil, err
+		}
+		conditions = append(conditions, fmt.Sprintf("%s.asset_id IN (SELECT value FROM json_each(%s))", a, placeholder))
 	}
 	if filter.AssetType != nil {
 		conditions = append(conditions, fmt.Sprintf("%s.type = %s", a, builder.addArg(*filter.AssetType)))
 	}
 	if len(filter.AssetTypes) > 0 {
-		conditions = append(conditions, fmt.Sprintf("%s.type = ANY(%s::text[])", a, builder.addArg(filter.AssetTypes)))
+		placeholder, err := builder.addJSONArg(filter.AssetTypes)
+		if err != nil {
+			return nil, err
+		}
+		conditions = append(conditions, fmt.Sprintf("%s.type IN (SELECT value FROM json_each(%s))", a, placeholder))
 	}
 	if filter.OwnerID != nil {
 		conditions = append(conditions, fmt.Sprintf("%s.owner_id = %s", a, builder.addArg(*filter.OwnerID)))
@@ -72,40 +89,43 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 		)`, a, tagNamePlaceholder, tagSourceCondition))
 	}
 	if len(filter.TagNames) > 0 {
-		tagNamesPlaceholder := builder.addArg(filter.TagNames)
+		tagNamesPlaceholder, err := builder.addJSONArg(filter.TagNames)
+		if err != nil {
+			return nil, err
+		}
 		// Match assets carrying every requested tag (AND semantics).
 		conditions = append(conditions, fmt.Sprintf(`(
 			SELECT COUNT(DISTINCT t.tag_name)
 			FROM asset_tags at
 			JOIN tags t ON t.tag_id = at.tag_id
 			WHERE at.asset_id = %s.asset_id
-			  AND t.tag_name = ANY(%s::text[])
-		) = cardinality(%s::text[])`, a, tagNamesPlaceholder, tagNamesPlaceholder))
+			  AND t.tag_name IN (SELECT value FROM json_each(%s))
+		) = json_array_length(%s)`, a, tagNamesPlaceholder, tagNamesPlaceholder))
 	}
 	if filter.FilenameValue != nil {
 		filenamePlaceholder := builder.addArg(*filter.FilenameValue)
 		switch {
 		case filter.FilenameOperator != nil && *filter.FilenameOperator == "matches":
-			conditions = append(conditions, fmt.Sprintf("%s.original_filename ILIKE %s", a, filenamePlaceholder))
+			conditions = append(conditions, fmt.Sprintf("%s.original_filename LIKE %s", a, filenamePlaceholder))
 		case filter.FilenameOperator != nil && *filter.FilenameOperator == "starts_with":
-			conditions = append(conditions, fmt.Sprintf("%s.original_filename ILIKE %s || '%%'", a, filenamePlaceholder))
+			conditions = append(conditions, fmt.Sprintf("%s.original_filename LIKE %s || '%%'", a, filenamePlaceholder))
 		case filter.FilenameOperator != nil && *filter.FilenameOperator == "ends_with":
-			conditions = append(conditions, fmt.Sprintf("%s.original_filename ILIKE '%%' || %s", a, filenamePlaceholder))
+			conditions = append(conditions, fmt.Sprintf("%s.original_filename LIKE '%%' || %s", a, filenamePlaceholder))
 		default:
-			conditions = append(conditions, fmt.Sprintf("%s.original_filename ILIKE '%%' || %s || '%%'", a, filenamePlaceholder))
+			conditions = append(conditions, fmt.Sprintf("%s.original_filename LIKE '%%' || %s || '%%'", a, filenamePlaceholder))
 		}
 	}
 	if filter.DateFrom != nil {
-		conditions = append(conditions, fmt.Sprintf("COALESCE(%s.taken_time, %s.upload_time) >= %s", a, a, builder.addArg(*filter.DateFrom)))
+		conditions = append(conditions, fmt.Sprintf("COALESCE(%s.taken_time, %s.upload_time) >= %s", a, a, builder.addArg(filter.DateFrom.UTC().UnixMicro())))
 	}
 	if filter.DateTo != nil {
-		conditions = append(conditions, fmt.Sprintf("COALESCE(%s.taken_time, %s.upload_time) <= %s", a, a, builder.addArg(*filter.DateTo)))
+		conditions = append(conditions, fmt.Sprintf("COALESCE(%s.taken_time, %s.upload_time) <= %s", a, a, builder.addArg(filter.DateTo.UTC().UnixMicro())))
 	}
 	if filter.IsRaw != nil {
 		if *filter.IsRaw {
-			conditions = append(conditions, fmt.Sprintf("%s.specific_metadata->>'is_raw' = 'true'", a))
+			conditions = append(conditions, fmt.Sprintf("json_extract(%s.specific_metadata, char(36) || '.is_raw') = 1", a))
 		} else {
-			conditions = append(conditions, fmt.Sprintf("(%s.specific_metadata->>'is_raw' = 'false' OR %s.specific_metadata->>'is_raw' IS NULL)", a, a))
+			conditions = append(conditions, fmt.Sprintf("COALESCE(json_extract(%s.specific_metadata, char(36) || '.is_raw'), 0) = 0", a))
 		}
 	}
 	if filter.Rating != nil {
@@ -123,10 +143,10 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 		}
 	}
 	if filter.CameraModel != nil {
-		conditions = append(conditions, fmt.Sprintf("%s.specific_metadata->>'camera_model' = %s", a, builder.addArg(*filter.CameraModel)))
+		conditions = append(conditions, fmt.Sprintf("json_extract(%s.specific_metadata, char(36) || '.camera_model') = %s", a, builder.addArg(*filter.CameraModel)))
 	}
 	if filter.LensModel != nil {
-		conditions = append(conditions, fmt.Sprintf("%s.specific_metadata->>'lens_model' = %s", a, builder.addArg(*filter.LensModel)))
+		conditions = append(conditions, fmt.Sprintf("json_extract(%s.specific_metadata, char(36) || '.lens_model') = %s", a, builder.addArg(*filter.LensModel)))
 	}
 	if filter.LocationNorth != nil && filter.LocationSouth != nil && filter.LocationEast != nil && filter.LocationWest != nil {
 		northPlaceholder := builder.addArg(*filter.LocationNorth)
@@ -135,11 +155,11 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 		westPlaceholder := builder.addArg(*filter.LocationWest)
 		conditions = append(conditions, fmt.Sprintf(`%s.gps_latitude IS NOT NULL
   AND %s.gps_longitude IS NOT NULL
-  AND %s.gps_latitude BETWEEN LEAST(%s::float8, %s::float8) AND GREATEST(%s::float8, %s::float8)
+  AND %s.gps_latitude BETWEEN min(%s, %s) AND max(%s, %s)
   AND (
     CASE
-      WHEN %s::float8 <= %s::float8 THEN %s.gps_longitude BETWEEN %s::float8 AND %s::float8
-      ELSE %s.gps_longitude >= %s::float8 OR %s.gps_longitude <= %s::float8
+      WHEN %s <= %s THEN %s.gps_longitude BETWEEN %s AND %s
+      ELSE %s.gps_longitude >= %s OR %s.gps_longitude <= %s
     END
   )`, a, a, a, southPlaceholder, northPlaceholder, southPlaceholder, northPlaceholder, westPlaceholder, eastPlaceholder, a, westPlaceholder, eastPlaceholder, a, westPlaceholder, a, eastPlaceholder))
 	}

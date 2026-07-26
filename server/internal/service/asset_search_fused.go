@@ -7,7 +7,6 @@ import (
 	aggregatesearch "server/internal/search"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // The unified search pipeline: every channel is self-thresholded (calibrated
@@ -138,14 +137,12 @@ func (s *assetService) searchAssetsFusedSet(ctx context.Context, params SearchAs
 			set.Sources = append(set.Sources, SourceFilename)
 			rank := 1
 			for _, row := range rows {
-				if row.Valid {
-					all = append(all, aggregatesearch.Candidate{
-						AssetID: uuid.UUID(row.Bytes),
-						Source:  SourceFilename,
-						Rank:    rank,
-					})
-					rank++
-				}
+				all = append(all, aggregatesearch.Candidate{
+					AssetID: row,
+					Source:  SourceFilename,
+					Rank:    rank,
+				})
+				rank++
 			}
 		}
 	}
@@ -173,23 +170,19 @@ func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID
 	if len(ids) == 0 {
 		return []repo.Asset{}, nil
 	}
-	pgIDs := make([]pgtype.UUID, len(ids))
-	for i, id := range ids {
-		pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
 	var rows []repo.Asset
 	var err error
 	if queryIncludesDeletedAssets(isDeleted) {
-		rows, err = s.queries.GetAssetsByIDsAny(ctx, pgIDs)
+		rows, err = s.queries.GetAssetsByIDsAny(ctx, ids)
 	} else {
-		rows, err = s.queries.GetAssetsByIDs(ctx, pgIDs)
+		rows, err = s.queries.GetAssetsByIDs(ctx, ids)
 	}
 	if err != nil {
 		return nil, err
 	}
 	byID := make(map[uuid.UUID]repo.Asset, len(rows))
 	for _, row := range rows {
-		byID[uuid.UUID(row.AssetID.Bytes)] = row
+		byID[row.AssetID] = row
 	}
 	out := make([]repo.Asset, 0, len(ids))
 	for _, id := range ids {
@@ -217,17 +210,12 @@ func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, so
 		return []repo.Asset{}, nil
 	}
 
-	pgIDs := make([]pgtype.UUID, len(ids))
-	for i, id := range ids {
-		pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
-
-	var orderedAsc []pgtype.UUID
+	var orderedAsc []uuid.UUID
 	var err error
 	if sortBy == "recently_added" {
-		orderedAsc, err = s.queries.RankAssetIDsByUploadTime(ctx, pgIDs)
+		orderedAsc, err = s.queries.RankAssetIDsByUploadTime(ctx, ids)
 	} else {
-		orderedAsc, err = s.queries.RankAssetIDsByTime(ctx, pgIDs)
+		orderedAsc, err = s.queries.RankAssetIDsByTime(ctx, ids)
 	}
 	if err != nil {
 		return nil, err
@@ -235,9 +223,7 @@ func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, so
 
 	ordered := make([]uuid.UUID, 0, len(orderedAsc))
 	for i := len(orderedAsc) - 1; i >= 0; i-- {
-		if orderedAsc[i].Valid {
-			ordered = append(ordered, uuid.UUID(orderedAsc[i].Bytes))
-		}
+		ordered = append(ordered, orderedAsc[i])
 	}
 
 	end := offset + limit

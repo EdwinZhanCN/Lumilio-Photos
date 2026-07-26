@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 	"server/internal/db/repo"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -88,7 +88,7 @@ func (s *AuthService) CompleteRequiredPasswordChange(ctx context.Context, tokenS
 			Password:    passwordHash,
 		})
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				return ErrInvalidPasswordChangeToken
 			}
 			return fmt.Errorf("complete required password change: %w", err)

@@ -1,12 +1,9 @@
 -- name: CountPeopleScoped :one
--- owner_id filters on the cluster's structural owner (NULL-owner clusters are
--- admin-only); repository_id stays a member-asset display filter because
--- people legitimately span repositories.
 SELECT COUNT(*)
 FROM face_clusters fc
-WHERE (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = false)
+WHERE (sqlc.arg('include_hidden') OR COALESCE(fc.is_hidden, false) = false)
   AND (
-    sqlc.narg('owner_id')::integer IS NULL
+    sqlc.narg('owner_id') IS NULL
     OR fc.owner_id = sqlc.narg('owner_id')
   )
   AND EXISTS (
@@ -17,33 +14,33 @@ WHERE (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = fa
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
       AND (
-        sqlc.narg('owner_id')::integer IS NULL
+        sqlc.narg('owner_id') IS NULL
         OR a.owner_id = sqlc.narg('owner_id')
       )
       AND (
-        sqlc.narg('repository_id')::uuid IS NULL
+        sqlc.narg('repository_id') IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
 );
 
 -- name: ListPeopleScoped :many
-WITH page_people AS MATERIALIZED (
+WITH page_people AS (
     SELECT
         fc.cluster_id,
-        COUNT(DISTINCT fcm.face_id)::bigint AS member_count,
-        COUNT(DISTINCT fi.asset_id)::bigint AS asset_count
+        COUNT(DISTINCT fcm.face_id) AS member_count,
+        COUNT(DISTINCT fi.asset_id) AS asset_count
     FROM face_clusters fc
     JOIN face_cluster_members fcm ON fcm.cluster_id = fc.cluster_id
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
-      AND (sqlc.arg('include_hidden')::boolean OR COALESCE(fc.is_hidden, false) = false)
+      AND (sqlc.arg('include_hidden') OR COALESCE(fc.is_hidden, false) = false)
       AND (
-        sqlc.narg('owner_id')::integer IS NULL
+        sqlc.narg('owner_id') IS NULL
         OR fc.owner_id = sqlc.narg('owner_id')
       )
       AND (
-        sqlc.narg('repository_id')::uuid IS NULL
+        sqlc.narg('repository_id') IS NULL
         OR a.repository_id = sqlc.narg('repository_id')
       )
     GROUP BY fc.cluster_id, fc.is_confirmed, fc.updated_at
@@ -53,6 +50,33 @@ WITH page_people AS MATERIALIZED (
         fc.updated_at DESC,
         fc.cluster_id DESC
     LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
+),
+representative_faces AS (
+    SELECT fi.id, fi.face_image_path, fi.asset_id
+    FROM face_items fi
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+),
+ranked_faces AS (
+    SELECT
+        fcm.cluster_id,
+        fi.face_image_path,
+        fi.asset_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY fcm.cluster_id
+            ORDER BY COALESCE(fi.is_primary, false) DESC,
+                     fi.confidence DESC,
+                     COALESCE(fi.face_size, 0) DESC,
+                     fi.id
+        ) AS face_rank
+    FROM face_cluster_members fcm
+    JOIN face_items fi ON fi.id = fcm.face_id
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
 )
 SELECT
     fc.cluster_id,
@@ -63,45 +87,13 @@ SELECT
     pp.member_count,
     pp.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
-    COALESCE(rep.asset_id, best.asset_id)::uuid AS representative_asset_id,
+    COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
     fc.created_at,
     fc.updated_at
 FROM page_people pp
 JOIN face_clusters fc ON fc.cluster_id = pp.cluster_id
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_items fi
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fi.id = fc.representative_face_id
-      AND a.is_deleted = false
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
-      )
-      AND (
-        sqlc.narg('repository_id')::uuid IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
-      )
-    LIMIT 1
-) rep ON true
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_cluster_members fcm
-    JOIN face_items fi ON fi.id = fcm.face_id
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fcm.cluster_id = fc.cluster_id
-      AND a.is_deleted = false
-      AND (
-        sqlc.narg('owner_id')::integer IS NULL
-        OR a.owner_id = sqlc.narg('owner_id')
-      )
-      AND (
-        sqlc.narg('repository_id')::uuid IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
-      )
-    ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
-    LIMIT 1
-) best ON true
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
 ORDER BY
     COALESCE(fc.is_confirmed, false) DESC,
     pp.member_count DESC,
@@ -109,8 +101,43 @@ ORDER BY
     fc.cluster_id DESC;
 
 -- name: GetPersonByIDScoped :one
--- Authorization is an equality check on the cluster's structural owner;
--- repository_id remains a read-time display filter on member counts/covers.
+WITH scoped AS (
+    SELECT
+        fcm.cluster_id,
+        COUNT(DISTINCT fcm.face_id) AS member_count,
+        COUNT(DISTINCT fi.asset_id) AS asset_count
+    FROM face_cluster_members fcm
+    JOIN face_items fi ON fi.id = fcm.face_id
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    GROUP BY fcm.cluster_id
+),
+representative_faces AS (
+    SELECT fi.id, fi.face_image_path, fi.asset_id
+    FROM face_items fi
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+),
+ranked_faces AS (
+    SELECT
+        fcm.cluster_id,
+        fi.face_image_path,
+        fi.asset_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY fcm.cluster_id
+            ORDER BY COALESCE(fi.is_primary, false) DESC,
+                     fi.confidence DESC,
+                     COALESCE(fi.face_size, 0) DESC,
+                     fi.id
+        ) AS face_rank
+    FROM face_cluster_members fcm
+    JOIN face_items fi ON fi.id = fcm.face_id
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+)
 SELECT
     fc.cluster_id,
     fc.cluster_name,
@@ -120,53 +147,16 @@ SELECT
     scoped.member_count,
     scoped.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
-    COALESCE(rep.asset_id, best.asset_id)::uuid AS representative_asset_id,
+    COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
     fc.created_at,
     fc.updated_at
 FROM face_clusters fc
-JOIN LATERAL (
-    SELECT
-        COUNT(DISTINCT fcm.face_id)::bigint AS member_count,
-        COUNT(DISTINCT fi.asset_id)::bigint AS asset_count
-    FROM face_cluster_members fcm
-    JOIN face_items fi ON fi.id = fcm.face_id
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fcm.cluster_id = fc.cluster_id
-      AND a.is_deleted = false
-      AND (
-        sqlc.narg('repository_id')::uuid IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
-      )
-) scoped ON scoped.member_count > 0
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_items fi
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fi.id = fc.representative_face_id
-      AND a.is_deleted = false
-      AND (
-        sqlc.narg('repository_id')::uuid IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
-      )
-    LIMIT 1
-) rep ON true
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_cluster_members fcm
-    JOIN face_items fi ON fi.id = fcm.face_id
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fcm.cluster_id = fc.cluster_id
-      AND a.is_deleted = false
-      AND (
-        sqlc.narg('repository_id')::uuid IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
-      )
-    ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
-    LIMIT 1
-) best ON true
+JOIN scoped ON scoped.cluster_id = fc.cluster_id AND scoped.member_count > 0
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
 WHERE fc.cluster_id = sqlc.arg('cluster_id')
   AND (
-    sqlc.narg('owner_id')::integer IS NULL
+    sqlc.narg('owner_id') IS NULL
     OR fc.owner_id = sqlc.narg('owner_id')
   );
 
@@ -175,7 +165,7 @@ UPDATE face_clusters
 SET
     cluster_name = sqlc.arg('cluster_name'),
     is_confirmed = true,
-    updated_at = CURRENT_TIMESTAMP
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE cluster_id = sqlc.arg('cluster_id')
 RETURNING *;
 
@@ -184,7 +174,7 @@ UPDATE face_clusters
 SET
     representative_face_id = sqlc.narg('representative_face_id'),
     confidence_score = sqlc.narg('confidence_score'),
-    updated_at = CURRENT_TIMESTAMP
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE cluster_id = sqlc.arg('cluster_id')
 RETURNING *;
 
@@ -192,7 +182,10 @@ RETURNING *;
 UPDATE face_clusters
 SET
     is_hidden = sqlc.arg('is_hidden'),
-    hidden_at = CASE WHEN sqlc.arg('is_hidden') THEN CURRENT_TIMESTAMP ELSE NULL END,
-    updated_at = CURRENT_TIMESTAMP
+    hidden_at = CASE
+        WHEN sqlc.arg('is_hidden') THEN CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+        ELSE NULL
+    END,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE cluster_id = sqlc.arg('cluster_id')
 RETURNING *;

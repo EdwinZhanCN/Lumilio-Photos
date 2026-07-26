@@ -3,10 +3,10 @@ package service
 import (
 	"testing"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,10 +23,7 @@ func TestDecidePendingFaceRecognition(t *testing.T) {
 func TestCollectPendingFaceRecognitionScopesDeduplicatesByModel(t *testing.T) {
 	t.Parallel()
 
-	repositoryID := pgtype.UUID{
-		Bytes: [16]byte{1, 2, 3, 4},
-		Valid: true,
-	}
+	repositoryID := uuid.NullUUID{UUID: uuid.UUID{1, 2, 3, 4}, Valid: true}
 	ownerID := int32(42)
 	modelA := "model-a"
 	modelB := "model-b"
@@ -51,10 +48,7 @@ func TestCollectPendingFaceRecognitionScopesDeduplicatesByModel(t *testing.T) {
 func TestCollectFaceClusteringScopesDeduplicatesByScope(t *testing.T) {
 	t.Parallel()
 
-	repositoryID := pgtype.UUID{
-		Bytes: [16]byte{9, 8, 7, 6},
-		Valid: true,
-	}
+	repositoryID := uuid.NullUUID{UUID: uuid.UUID{9, 8, 7, 6}, Valid: true}
 	ownerID := int32(7)
 	modelA := "model-a"
 	modelB := "model-b"
@@ -70,7 +64,6 @@ func TestCollectFaceClusteringScopesDeduplicatesByScope(t *testing.T) {
 	require.Equal(t, normalizedName(&modelB), scopes[1].EmbeddingModel)
 }
 
-func testVectorPtr(values []float32) *pgvector.Vector {
-	vector := pgvector.NewVector(values)
-	return &vector
+func testVectorPtr(values []float32) dbtypes.Vector {
+	return dbtypes.NewVector(values)
 }

@@ -27,25 +27,25 @@ INSERT INTO settings (
 )
 VALUES (
     1,
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9,
-    $10,
-    $11,
-    $12,
-    $13,
-    $14,
-    $15,
-    $16,
-    $17,
-    $18,
-    $19
+    ?1,
+    ?2,
+    ?3,
+    ?4,
+    ?5,
+    ?6,
+    ?7,
+    ?8,
+    ?9,
+    ?10,
+    ?11,
+    ?12,
+    ?13,
+    ?14,
+    ?15,
+    ?16,
+    ?17,
+    ?18,
+    ?19
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -66,6 +66,6 @@ ON CONFLICT (id) DO UPDATE SET
     backup_enabled = EXCLUDED.backup_enabled,
     backup_interval_hours = EXCLUDED.backup_interval_hours,
     backup_keep_last = EXCLUDED.backup_keep_last,
-    updated_at = NOW(),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_by = EXCLUDED.updated_by
 RETURNING *;

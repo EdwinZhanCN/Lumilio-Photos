@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -111,7 +110,7 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 	if matches := re.FindStringSubmatch(meta.Dimensions); len(matches) == 3 {
 		width, _ := strconv.ParseInt(matches[1], 10, 32)
 		height, _ := strconv.ParseInt(matches[2], 10, 32)
-		if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID.Bytes, int32(width), int32(height)); err != nil {
+		if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID, int32(width), int32(height)); err != nil {
 			return fmt.Errorf("update asset dimensions: %w", err)
 		}
 	}
@@ -120,7 +119,7 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 	if err != nil {
 		return fmt.Errorf("marshal photo metadata: %w", err)
 	}
-	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, res.Raw); err != nil {
+	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID, sm, res.Raw); err != nil {
 		return fmt.Errorf("update asset metadata: %w", err)
 	}
 
@@ -137,7 +136,7 @@ func (ap *AssetProcessor) enqueueLocationClusterRebuild(ctx context.Context, ass
 	if ap == nil || ap.queueClient == nil || asset == nil || !asset.RepositoryID.Valid {
 		return
 	}
-	repositoryID := asset.RepositoryID.String()
+	repositoryID := asset.RepositoryID.UUID.String()
 	args := jobs.RebuildLocationClustersArgs{
 		RepositoryID: &repositoryID,
 		OwnerID:      asset.OwnerID,
@@ -154,7 +153,7 @@ func (ap *AssetProcessor) enqueueDetectStacks(ctx context.Context, asset *repo.A
 		return
 	}
 
-	repositoryID := uuid.UUID(asset.RepositoryID.Bytes).String()
+	repositoryID := asset.RepositoryID.UUID.String()
 	args := jobs.DetectStacksArgs{
 		RepositoryID: repositoryID,
 	}
@@ -170,7 +169,7 @@ func (ap *AssetProcessor) enqueueDetectStacks(ctx context.Context, asset *repo.A
 }
 
 func (ap *AssetProcessor) enqueueLivePhotoMatcher(ctx context.Context, asset *repo.Asset, contentIdentifier string) {
-	if ap == nil || ap.queueClient == nil || asset == nil || !asset.AssetID.Valid {
+	if ap == nil || ap.queueClient == nil || asset == nil || asset.AssetID == uuid.Nil {
 		return
 	}
 	if strings.TrimSpace(contentIdentifier) == "" {
@@ -183,7 +182,7 @@ func (ap *AssetProcessor) enqueueLivePhotoMatcher(ctx context.Context, asset *re
 
 	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
 		ap.logger.Warn("failed to enqueue live photo matcher after metadata extraction",
-			zap.String("asset_id", uuid.UUID(asset.AssetID.Bytes).String()),
+			zap.String("asset_id", asset.AssetID.String()),
 			zap.Error(err),
 		)
 	}
@@ -204,12 +203,15 @@ func hasValidLocationGPS(latitude, longitude *float64) bool {
 }
 
 // loadAssetAndRepo loads asset and repository by asset ID.
-func (ap *AssetProcessor) loadAssetAndRepo(ctx context.Context, assetID pgtype.UUID) (*repo.Asset, repo.Repository, error) {
+func (ap *AssetProcessor) loadAssetAndRepo(ctx context.Context, assetID uuid.UUID) (*repo.Asset, repo.Repository, error) {
 	asset, err := ap.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return nil, repo.Repository{}, fmt.Errorf("get asset: %w", err)
 	}
-	repository, err := ap.queries.GetRepository(ctx, asset.RepositoryID)
+	if !asset.RepositoryID.Valid {
+		return nil, repo.Repository{}, fmt.Errorf("asset has no repository")
+	}
+	repository, err := ap.queries.GetRepository(ctx, asset.RepositoryID.UUID)
 	if err != nil {
 		return nil, repo.Repository{}, fmt.Errorf("get repository: %w", err)
 	}

@@ -8,7 +8,6 @@ import (
 	"server/internal/agent/ref"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // RefToolOutput is the uniform output of every ref-producing tool (INV-3):
@@ -77,22 +76,8 @@ func sendError(deps *core.ToolDependencies, tool, execID string, start time.Time
 	})
 }
 
-func toPgUUIDs(ids []uuid.UUID) []pgtype.UUID {
-	out := make([]pgtype.UUID, len(ids))
-	for i, id := range ids {
-		out[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
-	return out
-}
-
-func fromPgUUIDs(ids []pgtype.UUID) []uuid.UUID {
-	out := make([]uuid.UUID, 0, len(ids))
-	for _, id := range ids {
-		if id.Valid {
-			out = append(out, uuid.UUID(id.Bytes))
-		}
-	}
-	return out
+func copyUUIDs(ids []uuid.UUID) []uuid.UUID {
+	return append([]uuid.UUID(nil), ids...)
 }
 
 // RegisterAll registers the full toolset. Call once at bootstrap.

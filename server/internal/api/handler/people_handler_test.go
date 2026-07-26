@@ -15,23 +15,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
 type stubPeopleFaceService struct {
 	service.FaceService
-	listFn    func(context.Context, pgtype.UUID, *int32, bool, int, int) ([]service.Person, int64, error)
-	getFn     func(context.Context, int32, pgtype.UUID, *int32) (*service.Person, error)
+	listFn    func(context.Context, uuid.NullUUID, *int32, bool, int, int) ([]service.Person, int64, error)
+	getFn     func(context.Context, int32, uuid.NullUUID, *int32) (*service.Person, error)
 	renameFn  func(context.Context, int32, string) (*repo.FaceCluster, error)
-	rebuildFn func(context.Context, pgtype.UUID, *int32) (service.FaceClusterRebuildResult, error)
+	rebuildFn func(context.Context, uuid.NullUUID, *int32) (service.FaceClusterRebuildResult, error)
 }
 
-func (s stubPeopleFaceService) ListPeople(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32, includeHidden bool, limit, offset int) ([]service.Person, int64, error) {
+func (s stubPeopleFaceService) ListPeople(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32, includeHidden bool, limit, offset int) ([]service.Person, int64, error) {
 	return s.listFn(ctx, repositoryID, ownerID, includeHidden, limit, offset)
 }
 
-func (s stubPeopleFaceService) GetPerson(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) (*service.Person, error) {
+func (s stubPeopleFaceService) GetPerson(ctx context.Context, clusterID int32, repositoryID uuid.NullUUID, ownerID *int32) (*service.Person, error) {
 	return s.getFn(ctx, clusterID, repositoryID, ownerID)
 }
 
@@ -39,18 +38,18 @@ func (s stubPeopleFaceService) RenamePerson(ctx context.Context, clusterID int32
 	return s.renameFn(ctx, clusterID, name)
 }
 
-func (s stubPeopleFaceService) RebuildFaceClusters(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32) (service.FaceClusterRebuildResult, error) {
+func (s stubPeopleFaceService) RebuildFaceClusters(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) (service.FaceClusterRebuildResult, error) {
 	return s.rebuildFn(ctx, repositoryID, ownerID)
 }
 
 func TestPeopleHandlerListPeople(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	var capturedRepo pgtype.UUID
+	var capturedRepo uuid.NullUUID
 	handler := NewPeopleHandler(
 		stubAssetService{},
 		stubPeopleFaceService{
-			listFn: func(_ context.Context, repositoryID pgtype.UUID, ownerID *int32, _ bool, limit, offset int) ([]service.Person, int64, error) {
+			listFn: func(_ context.Context, repositoryID uuid.NullUUID, ownerID *int32, _ bool, limit, offset int) ([]service.Person, int64, error) {
 				capturedRepo = repositoryID
 				require.Nil(t, ownerID)
 				require.Equal(t, 24, limit)
@@ -92,11 +91,11 @@ func TestPeopleHandlerListPeople(t *testing.T) {
 func TestPeopleHandlerRebuildPeople(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	var capturedRepo pgtype.UUID
+	var capturedRepo uuid.NullUUID
 	handler := NewPeopleHandler(
 		stubAssetService{},
 		stubPeopleFaceService{
-			rebuildFn: func(_ context.Context, repositoryID pgtype.UUID, ownerID *int32) (service.FaceClusterRebuildResult, error) {
+			rebuildFn: func(_ context.Context, repositoryID uuid.NullUUID, ownerID *int32) (service.FaceClusterRebuildResult, error) {
 				capturedRepo = repositoryID
 				require.Nil(t, ownerID)
 				return service.FaceClusterRebuildResult{
@@ -148,7 +147,7 @@ func TestPeopleHandlerUpdatePerson(t *testing.T) {
 	handler := NewPeopleHandler(
 		stubAssetService{},
 		stubPeopleFaceService{
-			getFn: func(_ context.Context, clusterID int32, _ pgtype.UUID, ownerID *int32) (*service.Person, error) {
+			getFn: func(_ context.Context, clusterID int32, _ uuid.NullUUID, ownerID *int32) (*service.Person, error) {
 				require.Equal(t, int32(9), clusterID)
 				require.Nil(t, ownerID)
 				copy := current
@@ -200,7 +199,7 @@ func TestPeopleHandlerListPersonAssetsInjectsPersonScope(t *testing.T) {
 			},
 		},
 		stubPeopleFaceService{
-			getFn: func(_ context.Context, clusterID int32, repositoryID pgtype.UUID, _ *int32) (*service.Person, error) {
+			getFn: func(_ context.Context, clusterID int32, repositoryID uuid.NullUUID, _ *int32) (*service.Person, error) {
 				require.Equal(t, int32(12), clusterID)
 				require.True(t, repositoryID.Valid)
 				return &service.Person{
@@ -278,7 +277,7 @@ func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(
 			},
 		},
 		stubPeopleFaceService{
-			getFn: func(_ context.Context, clusterID int32, repositoryID pgtype.UUID, _ *int32) (*service.Person, error) {
+			getFn: func(_ context.Context, clusterID int32, repositoryID uuid.NullUUID, _ *int32) (*service.Person, error) {
 				require.Equal(t, int32(12), clusterID)
 				require.True(t, repositoryID.Valid)
 				return &service.Person{
@@ -334,7 +333,7 @@ func TestPeopleHandlerListPersonAssets_InvalidStackModeReturnsBadRequest(t *test
 	handler := NewPeopleHandler(
 		stubAssetService{},
 		stubPeopleFaceService{
-			getFn: func(_ context.Context, clusterID int32, repositoryID pgtype.UUID, _ *int32) (*service.Person, error) {
+			getFn: func(_ context.Context, clusterID int32, repositoryID uuid.NullUUID, _ *int32) (*service.Person, error) {
 				require.Equal(t, int32(12), clusterID)
 				require.True(t, repositoryID.Valid)
 				return &service.Person{

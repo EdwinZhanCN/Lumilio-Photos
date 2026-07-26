@@ -8,24 +8,25 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const createOCRResult = `-- name: CreateOCRResult :one
 INSERT INTO ocr_results (asset_id, model_id, total_count, processing_time_ms)
-VALUES ($1, $2, $3, $4)
+VALUES (?1, ?2, ?3, ?4)
 RETURNING asset_id, model_id, total_count, processing_time_ms, created_at, updated_at, full_text
 `
 
 type CreateOCRResultParams struct {
-	AssetID          pgtype.UUID `db:"asset_id" json:"asset_id"`
-	ModelID          string      `db:"model_id" json:"model_id"`
-	TotalCount       int32       `db:"total_count" json:"total_count"`
-	ProcessingTimeMs *int32      `db:"processing_time_ms" json:"processing_time_ms"`
+	AssetID          uuid.UUID `db:"asset_id" json:"asset_id"`
+	ModelID          string    `db:"model_id" json:"model_id"`
+	TotalCount       int64     `db:"total_count" json:"total_count"`
+	ProcessingTimeMs *int64    `db:"processing_time_ms" json:"processing_time_ms"`
 }
 
 func (q *Queries) CreateOCRResult(ctx context.Context, arg CreateOCRResultParams) (OcrResult, error) {
-	row := q.db.QueryRow(ctx, createOCRResult,
+	row := q.db.QueryRowContext(ctx, createOCRResult,
 		arg.AssetID,
 		arg.ModelID,
 		arg.TotalCount,
@@ -46,21 +47,21 @@ func (q *Queries) CreateOCRResult(ctx context.Context, arg CreateOCRResultParams
 
 const createOCRTextItem = `-- name: CreateOCRTextItem :one
 INSERT INTO ocr_text_items (asset_id, text_content, confidence, bounding_box, text_length, area_pixels)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 RETURNING id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at
 `
 
 type CreateOCRTextItemParams struct {
-	AssetID     pgtype.UUID `db:"asset_id" json:"asset_id"`
-	TextContent string      `db:"text_content" json:"text_content"`
-	Confidence  float32     `db:"confidence" json:"confidence"`
-	BoundingBox []byte      `db:"bounding_box" json:"bounding_box"`
-	TextLength  int32       `db:"text_length" json:"text_length"`
-	AreaPixels  *float32    `db:"area_pixels" json:"area_pixels"`
+	AssetID     uuid.UUID    `db:"asset_id" json:"asset_id"`
+	TextContent string       `db:"text_content" json:"text_content"`
+	Confidence  float64      `db:"confidence" json:"confidence"`
+	BoundingBox dbtypes.JSON `db:"bounding_box" json:"bounding_box"`
+	TextLength  int64        `db:"text_length" json:"text_length"`
+	AreaPixels  *float64     `db:"area_pixels" json:"area_pixels"`
 }
 
 func (q *Queries) CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemParams) (OcrTextItem, error) {
-	row := q.db.QueryRow(ctx, createOCRTextItem,
+	row := q.db.QueryRowContext(ctx, createOCRTextItem,
 		arg.AssetID,
 		arg.TextContent,
 		arg.Confidence,
@@ -83,37 +84,37 @@ func (q *Queries) CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemPa
 }
 
 const deleteOCRResultByAsset = `-- name: DeleteOCRResultByAsset :exec
-DELETE FROM ocr_results WHERE asset_id = $1
+DELETE FROM ocr_results WHERE asset_id = ?1
 `
 
-func (q *Queries) DeleteOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteOCRResultByAsset, assetID)
+func (q *Queries) DeleteOCRResultByAsset(ctx context.Context, assetID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteOCRResultByAsset, assetID)
 	return err
 }
 
 const deleteOCRTextItemsByAsset = `-- name: DeleteOCRTextItemsByAsset :exec
-DELETE FROM ocr_text_items WHERE asset_id = $1
+DELETE FROM ocr_text_items WHERE asset_id = ?1
 `
 
-func (q *Queries) DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteOCRTextItemsByAsset, assetID)
+func (q *Queries) DeleteOCRTextItemsByAsset(ctx context.Context, assetID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteOCRTextItemsByAsset, assetID)
 	return err
 }
 
 const getHighConfidenceTextItems = `-- name: GetHighConfidenceTextItems :many
 SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
-WHERE confidence >= $1
+WHERE confidence >= ?1
 ORDER BY confidence DESC, text_length DESC
-LIMIT $2
+LIMIT ?2
 `
 
 type GetHighConfidenceTextItemsParams struct {
-	Confidence float32 `db:"confidence" json:"confidence"`
-	Limit      int32   `db:"limit" json:"limit"`
+	Confidence float64 `db:"confidence" json:"confidence"`
+	Limit      int64   `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error) {
-	rows, err := q.db.Query(ctx, getHighConfidenceTextItems, arg.Confidence, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, getHighConfidenceTextItems, arg.Confidence, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -135,6 +136,9 @@ func (q *Queries) GetHighConfidenceTextItems(ctx context.Context, arg GetHighCon
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -143,11 +147,11 @@ func (q *Queries) GetHighConfidenceTextItems(ctx context.Context, arg GetHighCon
 
 const getOCRResultByAsset = `-- name: GetOCRResultByAsset :one
 SELECT asset_id, model_id, total_count, processing_time_ms, created_at, updated_at, full_text FROM ocr_results
-WHERE asset_id = $1
+WHERE asset_id = ?1
 `
 
-func (q *Queries) GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error) {
-	row := q.db.QueryRow(ctx, getOCRResultByAsset, assetID)
+func (q *Queries) GetOCRResultByAsset(ctx context.Context, assetID uuid.UUID) (OcrResult, error) {
+	row := q.db.QueryRowContext(ctx, getOCRResultByAsset, assetID)
 	var i OcrResult
 	err := row.Scan(
 		&i.AssetID,
@@ -178,15 +182,15 @@ ORDER BY total_assets DESC
 type GetOCRStatsByModelRow struct {
 	ModelID           string      `db:"model_id" json:"model_id"`
 	TotalAssets       int64       `db:"total_assets" json:"total_assets"`
-	TotalTextItems    int64       `db:"total_text_items" json:"total_text_items"`
-	AvgItemsPerAsset  float64     `db:"avg_items_per_asset" json:"avg_items_per_asset"`
+	TotalTextItems    *float64    `db:"total_text_items" json:"total_text_items"`
+	AvgItemsPerAsset  *float64    `db:"avg_items_per_asset" json:"avg_items_per_asset"`
 	MinProcessingTime interface{} `db:"min_processing_time" json:"min_processing_time"`
 	MaxProcessingTime interface{} `db:"max_processing_time" json:"max_processing_time"`
-	AvgProcessingTime float64     `db:"avg_processing_time" json:"avg_processing_time"`
+	AvgProcessingTime *float64    `db:"avg_processing_time" json:"avg_processing_time"`
 }
 
 func (q *Queries) GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error) {
-	rows, err := q.db.Query(ctx, getOCRStatsByModel)
+	rows, err := q.db.QueryContext(ctx, getOCRStatsByModel)
 	if err != nil {
 		return nil, err
 	}
@@ -207,6 +211,9 @@ func (q *Queries) GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelR
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -222,20 +229,20 @@ SELECT
     SUM(text_length) as total_text_length,
     AVG(text_length) as avg_text_length
 FROM ocr_text_items
-WHERE asset_id = $1
+WHERE asset_id = ?1
 `
 
 type GetOCRTextItemStatsByAssetRow struct {
 	TotalItems      int64       `db:"total_items" json:"total_items"`
-	AvgConfidence   float64     `db:"avg_confidence" json:"avg_confidence"`
+	AvgConfidence   *float64    `db:"avg_confidence" json:"avg_confidence"`
 	MinConfidence   interface{} `db:"min_confidence" json:"min_confidence"`
 	MaxConfidence   interface{} `db:"max_confidence" json:"max_confidence"`
-	TotalTextLength int64       `db:"total_text_length" json:"total_text_length"`
-	AvgTextLength   float64     `db:"avg_text_length" json:"avg_text_length"`
+	TotalTextLength *float64    `db:"total_text_length" json:"total_text_length"`
+	AvgTextLength   *float64    `db:"avg_text_length" json:"avg_text_length"`
 }
 
-func (q *Queries) GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error) {
-	row := q.db.QueryRow(ctx, getOCRTextItemStatsByAsset, assetID)
+func (q *Queries) GetOCRTextItemStatsByAsset(ctx context.Context, assetID uuid.UUID) (GetOCRTextItemStatsByAssetRow, error) {
+	row := q.db.QueryRowContext(ctx, getOCRTextItemStatsByAsset, assetID)
 	var i GetOCRTextItemStatsByAssetRow
 	err := row.Scan(
 		&i.TotalItems,
@@ -250,12 +257,12 @@ func (q *Queries) GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype
 
 const getOCRTextItemsByAsset = `-- name: GetOCRTextItemsByAsset :many
 SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
-WHERE asset_id = $1
+WHERE asset_id = ?1
 ORDER BY confidence DESC, text_length DESC
 `
 
-func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]OcrTextItem, error) {
-	rows, err := q.db.Query(ctx, getOCRTextItemsByAsset, assetID)
+func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID uuid.UUID) ([]OcrTextItem, error) {
+	rows, err := q.db.QueryContext(ctx, getOCRTextItemsByAsset, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -276,6 +283,9 @@ func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUI
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -285,18 +295,18 @@ func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUI
 
 const getOCRTextItemsByAssetWithLimit = `-- name: GetOCRTextItemsByAssetWithLimit :many
 SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
-WHERE asset_id = $1
+WHERE asset_id = ?1
 ORDER BY confidence DESC, text_length DESC
-LIMIT $2
+LIMIT ?2
 `
 
 type GetOCRTextItemsByAssetWithLimitParams struct {
-	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
-	Limit   int32       `db:"limit" json:"limit"`
+	AssetID uuid.UUID `db:"asset_id" json:"asset_id"`
+	Limit   int64     `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOCRTextItemsByAssetWithLimitParams) ([]OcrTextItem, error) {
-	rows, err := q.db.Query(ctx, getOCRTextItemsByAssetWithLimit, arg.AssetID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, getOCRTextItemsByAssetWithLimit, arg.AssetID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -318,6 +328,79 @@ func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOC
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchAssetsByOCRText = `-- name: SearchAssetsByOCRText :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+FROM ocr_search_fts
+JOIN ocr_results r ON r.rowid = ocr_search_fts.rowid
+JOIN assets a ON a.asset_id = r.asset_id
+WHERE ocr_search_fts.full_text MATCH ?1
+  AND a.is_deleted = false
+ORDER BY ocr_search_fts.rank, a.asset_id DESC
+LIMIT ?3 OFFSET ?2
+`
+
+type SearchAssetsByOCRTextParams struct {
+	Query  string `db:"query" json:"query"`
+	Offset int64  `db:"offset" json:"offset"`
+	Limit  int64  `db:"limit" json:"limit"`
+}
+
+func (q *Queries) SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error) {
+	rows, err := q.db.QueryContext(ctx, searchAssetsByOCRText, arg.Query, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.ContentHash,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
+			&i.ExifRaw,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -325,29 +408,29 @@ func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOC
 }
 
 const updateOCRFullText = `-- name: UpdateOCRFullText :exec
-UPDATE ocr_results SET full_text = $2 WHERE asset_id = $1
+UPDATE ocr_results SET full_text = ?2 WHERE asset_id = ?1
 `
 
 type UpdateOCRFullTextParams struct {
-	AssetID  pgtype.UUID `db:"asset_id" json:"asset_id"`
-	FullText string      `db:"full_text" json:"full_text"`
+	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
+	FullText string    `db:"full_text" json:"full_text"`
 }
 
 func (q *Queries) UpdateOCRFullText(ctx context.Context, arg UpdateOCRFullTextParams) error {
-	_, err := q.db.Exec(ctx, updateOCRFullText, arg.AssetID, arg.FullText)
+	_, err := q.db.ExecContext(ctx, updateOCRFullText, arg.AssetID, arg.FullText)
 	return err
 }
 
 const updateOCRResultStats = `-- name: UpdateOCRResultStats :exec
 UPDATE ocr_results
 SET total_count = (
-    SELECT COUNT(*) FROM ocr_text_items ti WHERE ti.asset_id = $1
+    SELECT COUNT(*) FROM ocr_text_items ti WHERE ti.asset_id = ?1
 ),
-updated_at = CURRENT_TIMESTAMP
-WHERE asset_id = $1
+updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE asset_id = ?1
 `
 
-func (q *Queries) UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, updateOCRResultStats, assetID)
+func (q *Queries) UpdateOCRResultStats(ctx context.Context, assetID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, updateOCRResultStats, assetID)
 	return err
 }

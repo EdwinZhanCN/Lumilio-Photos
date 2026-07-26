@@ -75,7 +75,7 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 		// remote keys are never recorded and get re-downloaded on every run.
 		var assetUUID uuid.UUID
 		if asset != nil {
-			assetUUID = uuid.UUID(asset.AssetID.Bytes)
+			assetUUID = asset.AssetID
 		}
 		if err := c.state.MarkFileSynced(ctx, candidate.RepositoryID, provider, remoteKey, etag, assetUUID); err != nil {
 			c.logger.Warn("failed to mark cloud file as synced",

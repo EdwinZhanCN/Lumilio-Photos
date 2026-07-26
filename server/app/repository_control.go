@@ -8,8 +8,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-
-	"github.com/google/uuid"
 )
 
 // RepositoryControl is the narrow in-process storage control plane exposed to
@@ -160,20 +158,12 @@ func (c *repositoryControl) requireHostOwnerID(ctx context.Context) (*int32, err
 }
 
 func storageLocationInfo(root repo.RepositoryRoot) StorageLocationInfo {
-	id := ""
-	if root.RootID.Valid {
-		id = uuid.UUID(root.RootID.Bytes).String()
-	}
-	return StorageLocationInfo{ID: id, Name: root.Name, Path: root.Path, Kind: string(root.Kind), Status: string(root.Status)}
+	return StorageLocationInfo{ID: root.RootID.String(), Name: root.Name, Path: root.Path, Kind: string(root.Kind), Status: string(root.Status)}
 }
 
 func repositoryInfo(repository *repo.Repository) RepositoryInfo {
 	if repository == nil {
 		return RepositoryInfo{}
 	}
-	id := ""
-	if repository.RepoID.Valid {
-		id = uuid.UUID(repository.RepoID.Bytes).String()
-	}
-	return RepositoryInfo{ID: id, Name: repository.Name, Path: repository.Path, Status: string(repository.Status)}
+	return RepositoryInfo{ID: repository.RepoID.String(), Name: repository.Name, Path: repository.Path, Status: string(repository.Status)}
 }

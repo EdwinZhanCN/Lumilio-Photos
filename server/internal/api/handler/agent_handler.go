@@ -318,7 +318,7 @@ func (h *AgentHandler) GetRefAssets(c *gin.Context) {
 		// GetAssetsByIDs has no order guarantee; restore snapshot order.
 		byID := make(map[uuid.UUID]dto.AssetDTO, len(rows))
 		for _, row := range rows {
-			byID[uuid.UUID(row.AssetID.Bytes)] = dto.ToAssetDTO(row)
+			byID[row.AssetID] = dto.ToAssetDTO(row)
 		}
 		for _, id := range page {
 			if row, found := byID[id]; found {

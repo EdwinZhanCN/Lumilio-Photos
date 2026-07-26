@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -14,8 +15,6 @@ import (
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -37,14 +36,14 @@ type RepositoryManager interface {
 	// directory structure, writes the .lumiliorepo config, and inserts the
 	// database record. It fails if a repository already exists at path or path
 	// is nested inside one, and removes any partially created files on failure.
-	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error)
 
 	// AddRepository registers an already-initialized on-disk repository (one
 	// that has a valid .lumiliorepo). It fails if the path is not a valid
 	// repository or is already registered. If the repository's ID is registered
 	// at a different path it returns a *RepositoryConflictError, which the caller
 	// resolves with RelocateRepository or RegisterRepositoryCopy.
-	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error)
+	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error)
 
 	// Storage Locations are host-authorized repository containers. The default
 	// location comes from immutable config; external locations come only from a
@@ -158,7 +157,7 @@ var _ RepositoryManager = (*DefaultRepositoryManager)(nil)
 func (rm *DefaultRepositoryManager) HostOwnerID(ctx context.Context) (*int32, error) {
 	ownerID, err := rm.queries.GetHostOwnerID(ctx)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("resolve host owner: %w", err)
@@ -167,7 +166,7 @@ func (rm *DefaultRepositoryManager) HostOwnerID(ctx context.Context) (*int32, er
 }
 
 // AddRepository registers an existing repository with the system
-func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
@@ -224,15 +223,15 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(context.Background(), repo.CreateRepositoryParams{
-		RepoID:         pgtype.UUID{Bytes: repoUUID, Valid: true},
+		RepoID:         repoUUID,
 		Name:           config.Name,
 		Path:           cleanPath,
 		Config:         *config,
 		Role:           normalizeRepoRole(role),
 		Status:         dbtypes.RepoStatusActive,
 		DefaultOwnerID: defaultOwnerID,
-		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
-		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+		CreatedAt:      dbtypes.NewTimestamp(config.CreatedAt),
+		UpdatedAt:      dbtypes.NewTimestamp(now),
 		RootID:         associatedRootID,
 	})
 	if err != nil {
@@ -416,7 +415,7 @@ func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error
 }
 
 // InitializeRepository creates a new repository with full directory structure
-func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...pgtype.UUID) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
@@ -467,15 +466,15 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(context.Background(), repo.CreateRepositoryParams{
-		RepoID:         pgtype.UUID{Bytes: repoUUID, Valid: true},
+		RepoID:         repoUUID,
 		Name:           config.Name,
 		Path:           cleanPath,
 		Config:         config,
 		Role:           normalizeRepoRole(role),
 		Status:         dbtypes.RepoStatusActive,
 		DefaultOwnerID: defaultOwnerID,
-		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
-		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+		CreatedAt:      dbtypes.NewTimestamp(config.CreatedAt),
+		UpdatedAt:      dbtypes.NewTimestamp(now),
 		RootID:         firstRootID(rootID),
 	})
 	if err != nil {
@@ -498,11 +497,11 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	return &dbRepo, nil
 }
 
-func firstRootID(ids []pgtype.UUID) pgtype.UUID {
+func firstRootID(ids []uuid.UUID) uuid.NullUUID {
 	if len(ids) == 0 {
-		return pgtype.UUID{}
+		return uuid.NullUUID{}
 	}
-	return ids[0]
+	return uuid.NullUUID{UUID: ids[0], Valid: true}
 }
 
 func (rm *DefaultRepositoryManager) GetRepository(id string) (*repo.Repository, error) {
@@ -511,7 +510,7 @@ func (rm *DefaultRepositoryManager) GetRepository(id string) (*repo.Repository, 
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
 
-	dbRepo, err := rm.queries.GetRepository(context.Background(), pgtype.UUID{Bytes: repoUUID, Valid: true})
+	dbRepo, err := rm.queries.GetRepository(context.Background(), repoUUID)
 	if err != nil {
 		return nil, fmt.Errorf("repository not found: %w", err)
 	}
@@ -556,13 +555,13 @@ func (rm *DefaultRepositoryManager) RemoveRepository(id string) error {
 
 	var repoPath string
 	if rm.queries != nil {
-		existing, getErr := rm.queries.GetRepository(context.Background(), pgtype.UUID{Bytes: repoUUID, Valid: true})
+		existing, getErr := rm.queries.GetRepository(context.Background(), repoUUID)
 		if getErr == nil {
 			repoPath = existing.Path
 		}
 	}
 
-	err = rm.queries.DeleteRepository(context.Background(), pgtype.UUID{Bytes: repoUUID, Valid: true})
+	err = rm.queries.DeleteRepository(context.Background(), repoUUID)
 	if err != nil {
 		rm.repoAudit(repoPath).Error("repository.remove", err, zap.String("repository_id", id))
 		return fmt.Errorf("failed to remove repository: %w", err)
@@ -610,11 +609,11 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 	// Update database record
 	now := time.Now()
 	dbRepo, err := rm.queries.UpdateRepository(context.Background(), repo.UpdateRepositoryParams{
-		RepoID:         pgtype.UUID{Bytes: repoUUID, Valid: true},
+		RepoID:         repoUUID,
 		Name:           config.Name,
 		Config:         config,
 		DefaultOwnerID: defaultOwnerID,
-		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+		UpdatedAt:      dbtypes.NewTimestamp(now),
 	})
 	if err != nil {
 		rm.repoAudit("").Error("repository.update", err, zap.String("repository_id", id))

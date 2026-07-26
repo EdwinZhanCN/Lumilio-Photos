@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -16,8 +17,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type PeopleHandler struct {
@@ -138,7 +137,7 @@ func (h *PeopleHandler) GetPerson(c *gin.Context) {
 
 	person, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
 			return
 		}
@@ -182,9 +181,9 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 		return
 	}
 
-	_, err := h.faceService.GetPerson(c.Request.Context(), personID, pgtype.UUID{}, scopedOwnerIDFromContext(c))
+	_, err := h.faceService.GetPerson(c.Request.Context(), personID, uuid.NullUUID{}, scopedOwnerIDFromContext(c))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
 			return
 		}
@@ -199,7 +198,7 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 		return
 	}
 
-	person, err := h.faceService.GetPerson(c.Request.Context(), personID, pgtype.UUID{}, scopedOwnerIDFromContext(c))
+	person, err := h.faceService.GetPerson(c.Request.Context(), personID, uuid.NullUUID{}, scopedOwnerIDFromContext(c))
 	if err != nil {
 		log.Printf("Failed to reload person %d after rename: %v", personID, err)
 		api.GinInternalError(c, err, "Failed to reload person")
@@ -259,7 +258,7 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 	}
 
 	if _, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c)); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
 			return
 		}
@@ -316,7 +315,7 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 
 	person, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, ownerID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
 			return
 		}
@@ -349,7 +348,7 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 		return
 	}
 
-	repoPath, err := h.repoPathResolver.GetRepositoryPath(uuid.UUID(asset.RepositoryID.Bytes).String())
+	repoPath, err := h.repoPathResolver.GetRepositoryPath(asset.RepositoryID.UUID.String())
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to resolve person cover repository")
 		return
@@ -411,7 +410,7 @@ func (h *PeopleHandler) ListPersonFaces(c *gin.Context) {
 
 	faces, total, err := h.faceService.ListPersonFaces(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c), limit, offset)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
 			return
 		}
@@ -467,7 +466,7 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 
 	crop, err := h.faceService.GetPersonFaceCrop(c.Request.Context(), personID, faceID, repositoryID, ownerID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Face crop not found")
 			return
 		}
@@ -547,7 +546,7 @@ func (h *PeopleHandler) MergePeople(c *gin.Context) {
 
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.MergePeople(c.Request.Context(), personID, req.SourcePersonIDs, ownerID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
 			return
 		}
@@ -600,7 +599,7 @@ func (h *PeopleHandler) MoveFace(c *gin.Context) {
 
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.MoveFace(c.Request.Context(), faceID, req.TargetPersonID, ownerID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person or face not found")
 			return
 		}
@@ -641,7 +640,7 @@ func (h *PeopleHandler) RemoveFace(c *gin.Context) {
 
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.RemoveFaceFromPerson(c.Request.Context(), faceID, personID, ownerID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person or face not found")
 			return
 		}
@@ -681,7 +680,7 @@ func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
 
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.SetPersonCover(c.Request.Context(), personID, req.FaceID, ownerID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person or face not found")
 			return
 		}
@@ -722,7 +721,7 @@ func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
 	ownerID := scopedOwnerIDFromContext(c)
 	person, err := h.faceService.SetPersonHidden(c.Request.Context(), personID, req.Hidden, ownerID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Person not found")
 			return
 		}
@@ -740,9 +739,9 @@ func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
 // by the correction yields a null person, which the frontend treats as a
 // navigate-away signal.
 func (h *PeopleHandler) respondWithCorrectedPerson(c *gin.Context, personID int32, ownerID *int32) {
-	person, err := h.faceService.GetPerson(c.Request.Context(), personID, pgtype.UUID{}, ownerID)
+	person, err := h.faceService.GetPerson(c.Request.Context(), personID, uuid.NullUUID{}, ownerID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.JSONOK(c, dto.PersonCorrectionResponseDTO{})
 			return
 		}
@@ -818,17 +817,17 @@ func scopedOwnerIDFromContext(c *gin.Context) *int32 {
 	return &ownerID
 }
 
-func parseRepositoryUUIDFromAssetFilter(filter dto.AssetFilterDTO) (pgtype.UUID, error) {
+func parseRepositoryUUIDFromAssetFilter(filter dto.AssetFilterDTO) (uuid.NullUUID, error) {
 	if filter.RepositoryID == nil || strings.TrimSpace(*filter.RepositoryID) == "" {
-		return pgtype.UUID{}, nil
+		return uuid.NullUUID{}, nil
 	}
 
 	repositoryID, err := uuid.Parse(strings.TrimSpace(*filter.RepositoryID))
 	if err != nil {
-		return pgtype.UUID{}, err
+		return uuid.NullUUID{}, err
 	}
 
-	return pgtype.UUID{Bytes: repositoryID, Valid: true}, nil
+	return uuid.NullUUID{UUID: repositoryID, Valid: true}, nil
 }
 
 func (h *PeopleHandler) resolveMediaOwnerScope(c *gin.Context) (*int32, bool) {

@@ -8,8 +8,8 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const countAssetsWithSearchEmbedding = `-- name: CountAssetsWithSearchEmbedding :one
@@ -18,7 +18,7 @@ FROM search_embeddings
 `
 
 func (q *Queries) CountAssetsWithSearchEmbedding(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countAssetsWithSearchEmbedding)
+	row := q.db.QueryRowContext(ctx, countAssetsWithSearchEmbedding)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -29,35 +29,35 @@ DELETE FROM search_embeddings
 `
 
 func (q *Queries) DeleteAllSearchEmbeddings(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteAllSearchEmbeddings)
+	_, err := q.db.ExecContext(ctx, deleteAllSearchEmbeddings)
 	return err
 }
 
 const deleteSearchEmbeddingsByAsset = `-- name: DeleteSearchEmbeddingsByAsset :exec
 DELETE FROM search_embeddings
-WHERE asset_id = $1
+WHERE asset_id = ?1
 `
 
-func (q *Queries) DeleteSearchEmbeddingsByAsset(ctx context.Context, assetID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteSearchEmbeddingsByAsset, assetID)
+func (q *Queries) DeleteSearchEmbeddingsByAsset(ctx context.Context, assetID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteSearchEmbeddingsByAsset, assetID)
 	return err
 }
 
 const getPrimarySearchEmbedding = `-- name: GetPrimarySearchEmbedding :one
 SELECT asset_id, space_id, vector, model_id
 FROM search_embeddings
-WHERE asset_id = $1 AND frame_ts_ms IS NULL
+WHERE asset_id = ?1 AND frame_ts_ms IS NULL
 `
 
 type GetPrimarySearchEmbeddingRow struct {
-	AssetID pgtype.UUID      `db:"asset_id" json:"asset_id"`
-	SpaceID int64            `db:"space_id" json:"space_id"`
-	Vector  *pgvector.Vector `db:"vector" json:"vector"`
-	ModelID string           `db:"model_id" json:"model_id"`
+	AssetID uuid.UUID      `db:"asset_id" json:"asset_id"`
+	SpaceID int64          `db:"space_id" json:"space_id"`
+	Vector  dbtypes.Vector `db:"vector" json:"vector"`
+	ModelID string         `db:"model_id" json:"model_id"`
 }
 
-func (q *Queries) GetPrimarySearchEmbedding(ctx context.Context, assetID pgtype.UUID) (GetPrimarySearchEmbeddingRow, error) {
-	row := q.db.QueryRow(ctx, getPrimarySearchEmbedding, assetID)
+func (q *Queries) GetPrimarySearchEmbedding(ctx context.Context, assetID uuid.UUID) (GetPrimarySearchEmbeddingRow, error) {
+	row := q.db.QueryRowContext(ctx, getPrimarySearchEmbedding, assetID)
 	var i GetPrimarySearchEmbeddingRow
 	err := row.Scan(
 		&i.AssetID,
@@ -71,21 +71,21 @@ func (q *Queries) GetPrimarySearchEmbedding(ctx context.Context, assetID pgtype.
 const insertSearchEmbedding = `-- name: InsertSearchEmbedding :exec
 
 INSERT INTO search_embeddings (asset_id, space_id, frame_ts_ms, vector, model_id)
-VALUES ($1, $2, $3, $4, $5)
+VALUES (?1, ?2, ?3, ?4, ?5)
 `
 
 type InsertSearchEmbeddingParams struct {
-	AssetID   pgtype.UUID      `db:"asset_id" json:"asset_id"`
-	SpaceID   int64            `db:"space_id" json:"space_id"`
-	FrameTsMs *int32           `db:"frame_ts_ms" json:"frame_ts_ms"`
-	Vector    *pgvector.Vector `db:"vector" json:"vector"`
-	ModelID   string           `db:"model_id" json:"model_id"`
+	AssetID   uuid.UUID      `db:"asset_id" json:"asset_id"`
+	SpaceID   int64          `db:"space_id" json:"space_id"`
+	FrameTsMs *int64         `db:"frame_ts_ms" json:"frame_ts_ms"`
+	Vector    dbtypes.Vector `db:"vector" json:"vector"`
+	ModelID   string         `db:"model_id" json:"model_id"`
 }
 
 // Dedicated fixed-dimension semantic search vectors (see migration 000012).
 // Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 func (q *Queries) InsertSearchEmbedding(ctx context.Context, arg InsertSearchEmbeddingParams) error {
-	_, err := q.db.Exec(ctx, insertSearchEmbedding,
+	_, err := q.db.ExecContext(ctx, insertSearchEmbedding,
 		arg.AssetID,
 		arg.SpaceID,
 		arg.FrameTsMs,

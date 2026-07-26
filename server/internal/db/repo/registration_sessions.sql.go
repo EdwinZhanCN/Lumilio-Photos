@@ -8,7 +8,8 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const createRegistrationSession = `-- name: CreateRegistrationSession :one
@@ -19,20 +20,20 @@ INSERT INTO registration_sessions (
   webauthn_user_handle,
   expires_at
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES (?1, ?2, ?3, ?4, ?5)
 RETURNING session_id, username, password_hash, role, webauthn_user_handle, totp_secret_ciphertext, created_at, expires_at
 `
 
 type CreateRegistrationSessionParams struct {
-	Username           string             `db:"username" json:"username"`
-	PasswordHash       string             `db:"password_hash" json:"password_hash"`
-	Role               string             `db:"role" json:"role"`
-	WebauthnUserHandle []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
-	ExpiresAt          pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	Username           string            `db:"username" json:"username"`
+	PasswordHash       string            `db:"password_hash" json:"password_hash"`
+	Role               string            `db:"role" json:"role"`
+	WebauthnUserHandle []byte            `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	ExpiresAt          dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) CreateRegistrationSession(ctx context.Context, arg CreateRegistrationSessionParams) (RegistrationSession, error) {
-	row := q.db.QueryRow(ctx, createRegistrationSession,
+	row := q.db.QueryRowContext(ctx, createRegistrationSession,
 		arg.Username,
 		arg.PasswordHash,
 		arg.Role,
@@ -55,42 +56,42 @@ func (q *Queries) CreateRegistrationSession(ctx context.Context, arg CreateRegis
 
 const deleteExpiredRegistrationSessions = `-- name: DeleteExpiredRegistrationSessions :exec
 DELETE FROM registration_sessions
-WHERE expires_at <= CURRENT_TIMESTAMP
+WHERE expires_at <= CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 `
 
 func (q *Queries) DeleteExpiredRegistrationSessions(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteExpiredRegistrationSessions)
+	_, err := q.db.ExecContext(ctx, deleteExpiredRegistrationSessions)
 	return err
 }
 
 const deleteRegistrationSession = `-- name: DeleteRegistrationSession :exec
 DELETE FROM registration_sessions
-WHERE session_id = $1
+WHERE session_id = ?1
 `
 
-func (q *Queries) DeleteRegistrationSession(ctx context.Context, sessionID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteRegistrationSession, sessionID)
+func (q *Queries) DeleteRegistrationSession(ctx context.Context, sessionID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteRegistrationSession, sessionID)
 	return err
 }
 
 const deleteRegistrationSessionsByUsername = `-- name: DeleteRegistrationSessionsByUsername :exec
 DELETE FROM registration_sessions
-WHERE username = $1
+WHERE username = ?1
 `
 
 func (q *Queries) DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error {
-	_, err := q.db.Exec(ctx, deleteRegistrationSessionsByUsername, username)
+	_, err := q.db.ExecContext(ctx, deleteRegistrationSessionsByUsername, username)
 	return err
 }
 
 const getRegistrationSessionByID = `-- name: GetRegistrationSessionByID :one
 SELECT session_id, username, password_hash, role, webauthn_user_handle, totp_secret_ciphertext, created_at, expires_at
 FROM registration_sessions
-WHERE session_id = $1
+WHERE session_id = ?1
 `
 
-func (q *Queries) GetRegistrationSessionByID(ctx context.Context, sessionID pgtype.UUID) (RegistrationSession, error) {
-	row := q.db.QueryRow(ctx, getRegistrationSessionByID, sessionID)
+func (q *Queries) GetRegistrationSessionByID(ctx context.Context, sessionID uuid.UUID) (RegistrationSession, error) {
+	row := q.db.QueryRowContext(ctx, getRegistrationSessionByID, sessionID)
 	var i RegistrationSession
 	err := row.Scan(
 		&i.SessionID,
@@ -107,18 +108,18 @@ func (q *Queries) GetRegistrationSessionByID(ctx context.Context, sessionID pgty
 
 const updateRegistrationSessionTOTPSecret = `-- name: UpdateRegistrationSessionTOTPSecret :one
 UPDATE registration_sessions
-SET totp_secret_ciphertext = $2
-WHERE session_id = $1
+SET totp_secret_ciphertext = ?2
+WHERE session_id = ?1
 RETURNING session_id, username, password_hash, role, webauthn_user_handle, totp_secret_ciphertext, created_at, expires_at
 `
 
 type UpdateRegistrationSessionTOTPSecretParams struct {
-	SessionID            pgtype.UUID `db:"session_id" json:"session_id"`
-	TotpSecretCiphertext []byte      `db:"totp_secret_ciphertext" json:"totp_secret_ciphertext"`
+	SessionID            uuid.UUID `db:"session_id" json:"session_id"`
+	TotpSecretCiphertext []byte    `db:"totp_secret_ciphertext" json:"totp_secret_ciphertext"`
 }
 
 func (q *Queries) UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error) {
-	row := q.db.QueryRow(ctx, updateRegistrationSessionTOTPSecret, arg.SessionID, arg.TotpSecretCiphertext)
+	row := q.db.QueryRowContext(ctx, updateRegistrationSessionTOTPSecret, arg.SessionID, arg.TotpSecretCiphertext)
 	var i RegistrationSession
 	err := row.Scan(
 		&i.SessionID,

@@ -6,28 +6,28 @@ INSERT INTO registration_sessions (
   webauthn_user_handle,
   expires_at
 )
-VALUES ($1, $2, $3, $4, $5)
+VALUES (?1, ?2, ?3, ?4, ?5)
 RETURNING *;
 
 -- name: GetRegistrationSessionByID :one
 SELECT *
 FROM registration_sessions
-WHERE session_id = $1;
+WHERE session_id = ?1;
 
 -- name: DeleteRegistrationSession :exec
 DELETE FROM registration_sessions
-WHERE session_id = $1;
+WHERE session_id = ?1;
 
 -- name: DeleteRegistrationSessionsByUsername :exec
 DELETE FROM registration_sessions
-WHERE username = $1;
+WHERE username = ?1;
 
 -- name: DeleteExpiredRegistrationSessions :exec
 DELETE FROM registration_sessions
-WHERE expires_at <= CURRENT_TIMESTAMP;
+WHERE expires_at <= CAST(unixepoch('subsec') * 1000000 AS INTEGER);
 
 -- name: UpdateRegistrationSessionTOTPSecret :one
 UPDATE registration_sessions
-SET totp_secret_ciphertext = $2
-WHERE session_id = $1
+SET totp_secret_ciphertext = ?2
+WHERE session_id = ?1
 RETURNING *;

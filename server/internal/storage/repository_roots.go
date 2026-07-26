@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -15,8 +16,6 @@ import (
 	"server/internal/storage/rootcfg"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var (
@@ -56,7 +55,7 @@ func (rm *DefaultRepositoryManager) EnsureDefaultRepositoryRoot(ctx context.Cont
 	}
 
 	existingDefault, defaultErr := rm.queries.GetDefaultRepositoryRoot(ctx)
-	if defaultErr != nil && !errors.Is(defaultErr, pgx.ErrNoRows) {
+	if defaultErr != nil && !errors.Is(defaultErr, sql.ErrNoRows) {
 		return nil, fmt.Errorf("load default storage location: %w", defaultErr)
 	}
 	if defaultErr == nil && existingDefault.Path != cleanPath {
@@ -64,10 +63,10 @@ func (rm *DefaultRepositoryManager) EnsureDefaultRepositoryRoot(ctx context.Cont
 	}
 
 	config, createdMarker, err := loadOrCreateRootConfig(cleanPath, "Default storage", func() *rootcfg.RootConfig {
-		if defaultErr == nil && existingDefault.RootID.Valid {
+		if defaultErr == nil {
 			return &rootcfg.RootConfig{
 				Version:   rootcfg.CurrentVersion,
-				ID:        uuid.UUID(existingDefault.RootID.Bytes).String(),
+				ID:        existingDefault.RootID.String(),
 				Name:      existingDefault.Name,
 				CreatedAt: existingDefault.CreatedAt.Time,
 			}
@@ -77,7 +76,7 @@ func (rm *DefaultRepositoryManager) EnsureDefaultRepositoryRoot(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	if defaultErr == nil && existingDefault.RootID.Valid && config.ID != uuid.UUID(existingDefault.RootID.Bytes).String() {
+	if defaultErr == nil && config.ID != existingDefault.RootID.String() {
 		return nil, fmt.Errorf("%w: configured default path contains a different .lumilioroot identity", ErrRepositoryRootInvalid)
 	}
 
@@ -108,14 +107,14 @@ func (rm *DefaultRepositoryManager) AddRepositoryRoot(ctx context.Context, path,
 		if loadErr != nil {
 			return nil, loadErr
 		}
-		if existing.RootID.Valid && config.ID != uuid.UUID(existing.RootID.Bytes).String() {
+		if config.ID != existing.RootID.String() {
 			return nil, fmt.Errorf("%w: database and .lumilioroot identities differ", ErrRepositoryRootInvalid)
 		}
 		if err := rm.associateRepositoriesUnderRoot(ctx, existing); err != nil {
 			return nil, err
 		}
 		return &existing, nil
-	} else if !errors.Is(err, pgx.ErrNoRows) {
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("find storage location by path: %w", err)
 	}
 
@@ -153,7 +152,7 @@ func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, 
 	if err != nil {
 		return nil, fmt.Errorf("invalid storage location id: %w", err)
 	}
-	registered, err := rm.queries.GetRepositoryRoot(ctx, pgtype.UUID{Bytes: rootID, Valid: true})
+	registered, err := rm.queries.GetRepositoryRoot(ctx, rootID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +185,7 @@ func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, 
 	}
 	moves := make([]repositoryMove, 0)
 	for _, repository := range repositories {
-		if !repository.RootID.Valid || uuid.UUID(repository.RootID.Bytes) != rootID {
+		if !repository.RootID.Valid || repository.RootID.UUID != rootID {
 			continue
 		}
 		requestedRepositoryPath, moveErr := relocatedRepositoryPath(registered.Path, cleanPath, repository.Path)
@@ -197,12 +196,12 @@ func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, 
 		if loadErr != nil {
 			return nil, fmt.Errorf("validate repository after Storage Location move: %w", loadErr)
 		}
-		if !repository.RepoID.Valid || repositoryConfig.ID != uuid.UUID(repository.RepoID.Bytes).String() {
+		if repositoryConfig.ID != repository.RepoID.String() {
 			return nil, fmt.Errorf("%w: repository identity differs at %s", ErrRepositoryRootInvalid, requestedRepositoryPath)
 		}
 		if occupying, findErr := rm.queries.GetRepositoryByPath(ctx, requestedRepositoryPath); findErr == nil && occupying.RepoID != repository.RepoID {
 			return nil, fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, requestedRepositoryPath)
-		} else if findErr != nil && !errors.Is(findErr, pgx.ErrNoRows) {
+		} else if findErr != nil && !errors.Is(findErr, sql.ErrNoRows) {
 			return nil, fmt.Errorf("check repository destination: %w", findErr)
 		}
 		moves = append(moves, repositoryMove{id: repositoryConfig.ID, path: requestedRepositoryPath})
@@ -282,7 +281,7 @@ func (rm *DefaultRepositoryManager) registerRepositoryRoot(
 	if err != nil {
 		return nil, fmt.Errorf("parse storage location id: %w", err)
 	}
-	if registered, err := rm.queries.GetRepositoryRoot(ctx, pgtype.UUID{Bytes: rootID, Valid: true}); err == nil {
+	if registered, err := rm.queries.GetRepositoryRoot(ctx, rootID); err == nil {
 		if registered.Path != path && !allowMove {
 			return nil, &RepositoryRootConflictError{
 				RootID:         config.ID,
@@ -290,7 +289,7 @@ func (rm *DefaultRepositoryManager) registerRepositoryRoot(
 				RequestedPath:  path,
 			}
 		}
-	} else if !errors.Is(err, pgx.ErrNoRows) {
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("find storage location by id: %w", err)
 	}
 
@@ -300,13 +299,13 @@ func (rm *DefaultRepositoryManager) registerRepositoryRoot(
 		createdAt = now
 	}
 	registered, err := rm.queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID:    pgtype.UUID{Bytes: rootID, Valid: true},
+		RootID:    rootID,
 		Name:      config.Name,
 		Path:      path,
 		Kind:      kind,
 		Status:    dbtypes.RepositoryRootStatusActive,
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
-		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		CreatedAt: dbtypes.NewTimestamp(createdAt),
+		UpdatedAt: dbtypes.NewTimestamp(now),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register storage location: %w", err)
@@ -339,7 +338,7 @@ func (rm *DefaultRepositoryManager) ReconcileRepositoryRoots(ctx context.Context
 			status = dbtypes.RepositoryRootStatusOffline
 		} else if config, loadErr := rootcfg.Load(root.Path); loadErr != nil {
 			status = dbtypes.RepositoryRootStatusError
-		} else if !root.RootID.Valid || config.ID != uuid.UUID(root.RootID.Bytes).String() {
+		} else if config.ID != root.RootID.String() {
 			status = dbtypes.RepositoryRootStatusError
 		} else {
 			name = config.Name
@@ -348,7 +347,7 @@ func (rm *DefaultRepositoryManager) ReconcileRepositoryRoots(ctx context.Context
 			RootID:    root.RootID,
 			Name:      name,
 			Status:    status,
-			UpdatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			UpdatedAt: dbtypes.NewTimestamp(time.Now()),
 		})
 		if updateErr != nil {
 			return fmt.Errorf("update storage location status: %w", updateErr)
@@ -362,7 +361,7 @@ func (rm *DefaultRepositoryManager) GetRepositoryRoot(ctx context.Context, id st
 	if err != nil {
 		return nil, fmt.Errorf("invalid storage location id: %w", err)
 	}
-	root, err := rm.queries.GetRepositoryRoot(ctx, pgtype.UUID{Bytes: rootID, Valid: true})
+	root, err := rm.queries.GetRepositoryRoot(ctx, rootID)
 	if err != nil {
 		return nil, err
 	}
@@ -374,15 +373,14 @@ func (rm *DefaultRepositoryManager) DeleteRepositoryRoot(ctx context.Context, id
 	if err != nil {
 		return fmt.Errorf("invalid storage location id: %w", err)
 	}
-	rootUUID := pgtype.UUID{Bytes: rootID, Valid: true}
-	root, err := rm.queries.GetRepositoryRoot(ctx, rootUUID)
+	root, err := rm.queries.GetRepositoryRoot(ctx, rootID)
 	if err != nil {
 		return err
 	}
 	if root.Kind != dbtypes.RepositoryRootKindExternal {
 		return ErrRepositoryRootNotRemovable
 	}
-	deleted, err := rm.queries.DeleteExternalRepositoryRoot(ctx, rootUUID)
+	deleted, err := rm.queries.DeleteExternalRepositoryRoot(ctx, rootID)
 	if err != nil {
 		return fmt.Errorf("remove storage location: %w", err)
 	}
@@ -402,7 +400,7 @@ func (rm *DefaultRepositoryManager) resolveRepositoryRootForCreate(ctx context.C
 		if parseErr != nil {
 			return nil, fmt.Errorf("invalid storage location id: %w", parseErr)
 		}
-		root, err = rm.queries.GetRepositoryRoot(ctx, pgtype.UUID{Bytes: rootID, Valid: true})
+		root, err = rm.queries.GetRepositoryRoot(ctx, rootID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("load storage location: %w", err)
@@ -414,7 +412,7 @@ func (rm *DefaultRepositoryManager) resolveRepositoryRootForCreate(ctx context.C
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryRootOffline, root.Path)
 	}
 	config, err := rootcfg.Load(root.Path)
-	if err != nil || !root.RootID.Valid || config.ID != uuid.UUID(root.RootID.Bytes).String() {
+	if err != nil || config.ID != root.RootID.String() {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryRootInvalid, root.Path)
 	}
 	return &root, nil
@@ -431,8 +429,8 @@ func (rm *DefaultRepositoryManager) associateRepositoriesUnderRoot(ctx context.C
 		}
 		if _, err := rm.queries.SetRepositoryRoot(ctx, repo.SetRepositoryRootParams{
 			RepoID:    repository.RepoID,
-			RootID:    root.RootID,
-			UpdatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			RootID:    uuid.NullUUID{UUID: root.RootID, Valid: true},
+			UpdatedAt: dbtypes.NewTimestamp(time.Now()),
 		}); err != nil {
 			return fmt.Errorf("associate repository %s with storage location: %w", repository.Path, err)
 		}
@@ -440,17 +438,17 @@ func (rm *DefaultRepositoryManager) associateRepositoriesUnderRoot(ctx context.C
 	return nil
 }
 
-func (rm *DefaultRepositoryManager) repositoryRootIDForPath(ctx context.Context, path string) (pgtype.UUID, error) {
+func (rm *DefaultRepositoryManager) repositoryRootIDForPath(ctx context.Context, path string) (uuid.NullUUID, error) {
 	roots, err := rm.queries.ListRepositoryRoots(ctx)
 	if err != nil {
-		return pgtype.UUID{}, fmt.Errorf("list storage locations for repository association: %w", err)
+		return uuid.NullUUID{}, fmt.Errorf("list storage locations for repository association: %w", err)
 	}
 	for _, root := range roots {
-		if root.Status == dbtypes.RepositoryRootStatusActive && root.RootID.Valid && pathIsStrictlyInside(root.Path, path) {
-			return root.RootID, nil
+		if root.Status == dbtypes.RepositoryRootStatusActive && pathIsStrictlyInside(root.Path, path) {
+			return uuid.NullUUID{UUID: root.RootID, Valid: true}, nil
 		}
 	}
-	return pgtype.UUID{}, nil
+	return uuid.NullUUID{}, nil
 }
 
 func (rm *DefaultRepositoryManager) rejectOverlappingRepositoryRoot(ctx context.Context, requested string) error {
@@ -463,7 +461,7 @@ func (rm *DefaultRepositoryManager) rejectOverlappingRepositoryRootExcept(ctx co
 		return fmt.Errorf("list storage locations for overlap check: %w", err)
 	}
 	for _, root := range roots {
-		if except != uuid.Nil && root.RootID.Valid && root.RootID.Bytes == except {
+		if except != uuid.Nil && root.RootID == except {
 			continue
 		}
 		if root.Path == requested || pathIsStrictlyInside(root.Path, requested) || pathIsStrictlyInside(requested, root.Path) {

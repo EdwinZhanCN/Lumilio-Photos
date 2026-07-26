@@ -37,7 +37,7 @@ type instantResult struct {
 type runContext struct {
 	cfg      config
 	cli      *client
-	db       *dbClient // non-nil when -db is set (exact river_job timing)
+	db       *dbClient // non-nil when -sqlite is set (exact River timing)
 	mf       *manifest
 	repo     repositoryDTO
 	byName   map[string]*fileRec
@@ -74,10 +74,10 @@ func run(ctx context.Context, cfg config) error {
 	}
 
 	// Optional DB connection for exact per-asset timing.
-	if cfg.db != "" {
-		db, err := newDBClient(ctx, cfg.db)
+	if cfg.sqlitePath != "" {
+		db, err := newDBClient(ctx, cfg.sqlitePath)
 		if err != nil {
-			return fmt.Errorf("connect -db: %w", err)
+			return fmt.Errorf("connect -sqlite: %w", err)
 		}
 		defer db.close()
 		rc.db = db
@@ -428,7 +428,7 @@ const (
 	taskAnyFailed
 )
 
-// coreTaskState parses the asset status JSONB and reports whether both core
+// coreTaskState parses the asset status JSON and reports whether both core
 // tasks are complete, any core task failed, or neither yet.
 func coreTaskState(raw []byte) (coreState, bool) {
 	if len(raw) == 0 {
@@ -474,9 +474,6 @@ func startSampler(ctx context.Context, cfg config) func() {
 		return func() {}
 	}
 	args := []string{cfg.sampler, cfg.outDir, fmt.Sprintf("%d", int(cfg.pollEvery.Seconds()))}
-	if cfg.pgContainer != "" {
-		args = append(args, cfg.pgContainer)
-	}
 	cmd := exec.Command("bash", args...)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr

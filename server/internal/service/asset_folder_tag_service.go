@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // FolderSummary describes one repository-relative folder derived from
@@ -63,34 +63,58 @@ func joinFolderPath(parentPath, childName string) string {
 	return parentPath + "/" + childName
 }
 
-func optionalTimeFromPg(ts pgtype.Timestamptz) *time.Time {
-	if !ts.Valid {
+func optionalTimeFromSQLite(value any) *time.Time {
+	var timestamp dbtypes.Timestamp
+	if err := timestamp.Scan(value); err != nil || !timestamp.Valid {
 		return nil
 	}
-	t := ts.Time
+	t := timestamp.Time
 	return &t
 }
 
-func optionalStringFromPgUUID(id pgtype.UUID) *string {
-	parsed, ok := uuidFromPgUUID(id)
-	if !ok {
+func optionalStringFromSQLiteUUID(value any) *string {
+	var id uuid.UUID
+	switch typed := value.(type) {
+	case uuid.UUID:
+		id = typed
+	case uuid.NullUUID:
+		if !typed.Valid {
+			return nil
+		}
+		id = typed.UUID
+	case string:
+		parsed, err := uuid.Parse(typed)
+		if err != nil {
+			return nil
+		}
+		id = parsed
+	case []byte:
+		parsed, err := uuid.ParseBytes(typed)
+		if err != nil {
+			return nil
+		}
+		id = parsed
+	default:
 		return nil
 	}
-	s := parsed.String()
-	return &s
+	if id == uuid.Nil {
+		return nil
+	}
+	text := id.String()
+	return &text
 }
 
 // ListFolderSummaries lists immediate child folders of parentPath, scoped by
 // owner and optionally by repository. When repositoryID is nil, folders from
 // every repository the owner can see are returned.
 func (s *assetService) ListFolderSummaries(ctx context.Context, ownerID *int32, repositoryID *string, parentPath string) ([]FolderSummary, error) {
-	var repoUUID pgtype.UUID
+	var repoUUID uuid.NullUUID
 	if repositoryID != nil && strings.TrimSpace(*repositoryID) != "" {
 		parsed, err := uuid.Parse(strings.TrimSpace(*repositoryID))
 		if err != nil {
 			return nil, fmt.Errorf("invalid repository ID: %w", err)
 		}
-		repoUUID = pgtype.UUID{Bytes: parsed, Valid: true}
+		repoUUID = uuid.NullUUID{UUID: parsed, Valid: true}
 	}
 
 	rows, err := s.queries.GetFolderChildSummaries(ctx, repo.GetFolderChildSummariesParams{
@@ -112,8 +136,8 @@ func (s *assetService) ListFolderSummaries(ctx context.Context, ownerID *int32, 
 
 	summaries := make([]FolderSummary, 0, len(rows))
 	for _, row := range rows {
-		repoID, ok := uuidFromPgUUID(row.RepositoryID)
-		if !ok {
+		repoID := row.RepositoryID
+		if repoID == uuid.Nil {
 			continue
 		}
 		folderPath := joinFolderPath(parentPath, row.ChildName)
@@ -127,9 +151,9 @@ func (s *assetService) ListFolderSummaries(ctx context.Context, ownerID *int32, 
 			PhotoCount:     row.PhotoCount,
 			VideoCount:     row.VideoCount,
 			AudioCount:     row.AudioCount,
-			DateStart:      optionalTimeFromPg(row.DateStart),
-			DateEnd:        optionalTimeFromPg(row.DateEnd),
-			CoverAssetID:   optionalStringFromPgUUID(row.CoverAssetID),
+			DateStart:      optionalTimeFromSQLite(row.DateStart),
+			DateEnd:        optionalTimeFromSQLite(row.DateEnd),
+			CoverAssetID:   optionalStringFromSQLiteUUID(row.CoverAssetID),
 		})
 	}
 	return summaries, nil
@@ -142,7 +166,7 @@ func (s *assetService) GetFolderSummary(ctx context.Context, ownerID *int32, rep
 	if err != nil {
 		return FolderSummary{}, fmt.Errorf("invalid repository ID: %w", err)
 	}
-	repoUUID := pgtype.UUID{Bytes: parsed, Valid: true}
+	repoUUID := uuid.NullUUID{UUID: parsed, Valid: true}
 
 	row, err := s.queries.GetFolderSummary(ctx, repo.GetFolderSummaryParams{
 		OwnerID:      ownerID,
@@ -168,9 +192,9 @@ func (s *assetService) GetFolderSummary(ctx context.Context, ownerID *int32, rep
 		PhotoCount:     row.PhotoCount,
 		VideoCount:     row.VideoCount,
 		AudioCount:     row.AudioCount,
-		DateStart:      optionalTimeFromPg(row.DateStart),
-		DateEnd:        optionalTimeFromPg(row.DateEnd),
-		CoverAssetID:   optionalStringFromPgUUID(row.CoverAssetID),
+		DateStart:      optionalTimeFromSQLite(row.DateStart),
+		DateEnd:        optionalTimeFromSQLite(row.DateEnd),
+		CoverAssetID:   optionalStringFromSQLiteUUID(row.CoverAssetID),
 	}, nil
 }
 
@@ -178,13 +202,13 @@ func (s *assetService) GetFolderSummary(ctx context.Context, ownerID *int32, rep
 // the owner, with usage counts and covers, optionally filtered by source or
 // name substring.
 func (s *assetService) ListTagSummaries(ctx context.Context, ownerID *int32, repositoryID *string, source *string, query *string, limit, offset int) ([]TagSummary, error) {
-	var repoUUID pgtype.UUID
+	var repoUUID uuid.NullUUID
 	if repositoryID != nil && strings.TrimSpace(*repositoryID) != "" {
 		parsed, err := uuid.Parse(strings.TrimSpace(*repositoryID))
 		if err != nil {
 			return nil, fmt.Errorf("invalid repository ID: %w", err)
 		}
-		repoUUID = pgtype.UUID{Bytes: parsed, Valid: true}
+		repoUUID = uuid.NullUUID{UUID: parsed, Valid: true}
 	}
 
 	rows, err := s.queries.GetTagSummaries(ctx, repo.GetTagSummariesParams{
@@ -192,8 +216,8 @@ func (s *assetService) ListTagSummaries(ctx context.Context, ownerID *int32, rep
 		RepositoryID: repoUUID,
 		Source:       source,
 		Query:        query,
-		Offset:       int32(offset),
-		Limit:        int32(limit),
+		Offset:       int64(offset),
+		Limit:        int64(limit),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list tag summaries: %w", err)
@@ -206,8 +230,8 @@ func (s *assetService) ListTagSummaries(ctx context.Context, ownerID *int32, rep
 			TagName:      row.TagName,
 			Source:       row.Source,
 			AssetCount:   row.AssetCount,
-			CoverAssetID: optionalStringFromPgUUID(row.CoverAssetID),
-			LastUsedAt:   optionalTimeFromPg(row.LastUsedAt),
+			CoverAssetID: optionalStringFromSQLiteUUID(row.CoverAssetID),
+			LastUsedAt:   optionalTimeFromSQLite(row.LastUsedAt),
 		})
 	}
 	return summaries, nil
@@ -222,8 +246,8 @@ func (s *assetService) repositoryNamesByID(ctx context.Context) (map[string]stri
 	}
 	names := make(map[string]string, len(repos))
 	for _, r := range repos {
-		if id, ok := uuidFromPgUUID(r.RepoID); ok {
-			names[id.String()] = r.Name
+		if r.RepoID != uuid.Nil {
+			names[r.RepoID.String()] = r.Name
 		}
 	}
 	return names, nil

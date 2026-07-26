@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"server/internal/api"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"strconv"
 	"strings"
@@ -11,16 +12,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type statsQuerier interface {
-	GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]repo.GetFocalLengthDistributionRow, error)
+	GetFocalLengthDistribution(ctx context.Context, repositoryID interface{}) ([]repo.GetFocalLengthDistributionRow, error)
 	GetCameraLensStats(ctx context.Context, arg repo.GetCameraLensStatsParams) ([]repo.GetCameraLensStatsRow, error)
-	GetTimeDistributionHourly(ctx context.Context, repositoryID pgtype.UUID) ([]repo.GetTimeDistributionHourlyRow, error)
-	GetTimeDistributionMonthly(ctx context.Context, repositoryID pgtype.UUID) ([]repo.GetTimeDistributionMonthlyRow, error)
+	GetTimeDistributionHourly(ctx context.Context, repositoryID interface{}) ([]repo.GetTimeDistributionHourlyRow, error)
+	GetTimeDistributionMonthly(ctx context.Context, repositoryID interface{}) ([]repo.GetTimeDistributionMonthlyRow, error)
 	GetDailyActivityHeatmap(ctx context.Context, arg repo.GetDailyActivityHeatmapParams) ([]repo.GetDailyActivityHeatmapRow, error)
-	GetAvailableYears(ctx context.Context, repositoryID pgtype.UUID) ([]int32, error)
+	GetAvailableYears(ctx context.Context, repositoryID interface{}) ([]int64, error)
 }
 
 // StatsHandler handles HTTP requests for photo statistics
@@ -119,15 +119,8 @@ func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 	var total int64
 
 	for _, row := range rows {
-		// Convert pgtype.Numeric to float64
-		var focalLength float64
-		if row.FocalLength.Valid {
-			f, _ := row.FocalLength.Float64Value()
-			focalLength = f.Float64
-		}
-
 		data = append(data, FocalLengthBucket{
-			FocalLength: focalLength,
+			FocalLength: numericValue(row.FocalLength),
 			Count:       row.Count,
 		})
 		total += row.Count
@@ -168,7 +161,7 @@ func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 
 	rows, err := h.queries.GetCameraLensStats(c.Request.Context(), repo.GetCameraLensStatsParams{
 		RepositoryID: repositoryID,
-		Limit:        int32(limit),
+		Limit:        limit,
 	})
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to fetch camera lens stats")
@@ -252,7 +245,7 @@ func (h *StatsHandler) GetTimeDistribution(c *gin.Context) {
 }
 
 // getHourlyDistribution fetches hourly time distribution
-func (h *StatsHandler) getHourlyDistribution(c *gin.Context, repositoryID pgtype.UUID) ([]TimeBucket, error) {
+func (h *StatsHandler) getHourlyDistribution(c *gin.Context, repositoryID interface{}) ([]TimeBucket, error) {
 	rows, err := h.queries.GetTimeDistributionHourly(c.Request.Context(), repositoryID)
 	if err != nil {
 		return nil, err
@@ -272,7 +265,7 @@ func (h *StatsHandler) getHourlyDistribution(c *gin.Context, repositoryID pgtype
 }
 
 // getMonthlyDistribution fetches monthly time distribution
-func (h *StatsHandler) getMonthlyDistribution(c *gin.Context, repositoryID pgtype.UUID) ([]TimeBucket, error) {
+func (h *StatsHandler) getMonthlyDistribution(c *gin.Context, repositoryID interface{}) ([]TimeBucket, error) {
 	rows, err := h.queries.GetTimeDistributionMonthly(c.Request.Context(), repositoryID)
 	if err != nil {
 		return nil, err
@@ -280,13 +273,14 @@ func (h *StatsHandler) getMonthlyDistribution(c *gin.Context, repositoryID pgtyp
 
 	data := make([]TimeBucket, 0, len(rows))
 	for _, row := range rows {
-		if row.Month.Valid {
-			monthTime := row.Month.Time
-			label := monthTime.Format("2006-01")
-			value := int(monthTime.Unix())
+		if label := stringValue(row.Month); label != "" {
+			monthTime, parseErr := time.Parse("2006-01", label)
+			if parseErr != nil {
+				continue
+			}
 			data = append(data, TimeBucket{
 				Label: label,
-				Value: value,
+				Value: int(monthTime.Unix()),
 				Count: row.Count,
 			})
 		}
@@ -321,17 +315,10 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 		return
 	}
 
-	// Convert to pgtype.Timestamptz
 	params := repo.GetDailyActivityHeatmapParams{
 		RepositoryID: repositoryID,
-		StartTime: pgtype.Timestamptz{
-			Time:  startDate,
-			Valid: true,
-		},
-		EndTime: pgtype.Timestamptz{
-			Time:  endDate,
-			Valid: true,
-		},
+		StartTime:    dbtypes.NewTimestamp(startDate),
+		EndTime:      dbtypes.NewTimestamp(endDate),
 	}
 
 	rows, err := h.queries.GetDailyActivityHeatmap(c.Request.Context(), params)
@@ -342,9 +329,9 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 
 	data := make([]HeatmapValue, 0, len(rows))
 	for _, row := range rows {
-		if row.Date.Valid {
+		if date := stringValue(row.Date); date != "" {
 			data = append(data, HeatmapValue{
-				Date:  row.Date.Time.Format("2006-01-02"),
+				Date:  date,
 				Count: row.Count,
 			})
 		}
@@ -450,17 +437,45 @@ func (h *StatsHandler) GetAvailableYears(c *gin.Context) {
 	api.JSONOK(c, response)
 }
 
-func parseOptionalRepositoryUUID(c *gin.Context) (pgtype.UUID, bool) {
+func parseOptionalRepositoryUUID(c *gin.Context) (uuid.NullUUID, bool) {
 	rawRepositoryID := strings.TrimSpace(c.Query("repository_id"))
 	if rawRepositoryID == "" {
-		return pgtype.UUID{}, true
+		return uuid.NullUUID{}, true
 	}
 
 	repositoryID, err := uuid.Parse(rawRepositoryID)
 	if err != nil {
 		api.GinBadRequest(c, err, "Invalid repository_id parameter")
-		return pgtype.UUID{}, false
+		return uuid.NullUUID{}, false
 	}
 
-	return pgtype.UUID{Bytes: repositoryID, Valid: true}, true
+	return uuid.NullUUID{UUID: repositoryID, Valid: true}, true
+}
+
+func stringValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []byte:
+		return string(typed)
+	default:
+		return ""
+	}
+}
+
+func numericValue(value any) float64 {
+	switch typed := value.(type) {
+	case float64:
+		return typed
+	case int64:
+		return float64(typed)
+	case string:
+		parsed, _ := strconv.ParseFloat(typed, 64)
+		return parsed
+	case []byte:
+		parsed, _ := strconv.ParseFloat(string(typed), 64)
+		return parsed
+	default:
+		return 0
+	}
 }

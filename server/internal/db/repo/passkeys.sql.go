@@ -8,7 +8,7 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"server/internal/db/dbtypes"
 )
 
 const createUserWebAuthnCredential = `-- name: CreateUserWebAuthnCredential :one
@@ -25,26 +25,26 @@ INSERT INTO user_webauthn_credentials (
   backup_eligible,
   backup_state
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
 RETURNING user_webauthn_credential_id, credential_id, user_id, public_key, sign_count, transports, attestation_type, aaguid, user_present, user_verified, backup_eligible, backup_state, created_at, last_used_at
 `
 
 type CreateUserWebAuthnCredentialParams struct {
-	CredentialID    []byte `db:"credential_id" json:"credential_id"`
-	UserID          int32  `db:"user_id" json:"user_id"`
-	PublicKey       []byte `db:"public_key" json:"public_key"`
-	SignCount       int64  `db:"sign_count" json:"sign_count"`
-	Transports      []byte `db:"transports" json:"transports"`
-	AttestationType string `db:"attestation_type" json:"attestation_type"`
-	Aaguid          []byte `db:"aaguid" json:"aaguid"`
-	UserPresent     bool   `db:"user_present" json:"user_present"`
-	UserVerified    bool   `db:"user_verified" json:"user_verified"`
-	BackupEligible  bool   `db:"backup_eligible" json:"backup_eligible"`
-	BackupState     bool   `db:"backup_state" json:"backup_state"`
+	CredentialID    []byte          `db:"credential_id" json:"credential_id"`
+	UserID          int32           `db:"user_id" json:"user_id"`
+	PublicKey       []byte          `db:"public_key" json:"public_key"`
+	SignCount       int64           `db:"sign_count" json:"sign_count"`
+	Transports      dbtypes.Strings `db:"transports" json:"transports"`
+	AttestationType string          `db:"attestation_type" json:"attestation_type"`
+	Aaguid          []byte          `db:"aaguid" json:"aaguid"`
+	UserPresent     bool            `db:"user_present" json:"user_present"`
+	UserVerified    bool            `db:"user_verified" json:"user_verified"`
+	BackupEligible  bool            `db:"backup_eligible" json:"backup_eligible"`
+	BackupState     bool            `db:"backup_state" json:"backup_state"`
 }
 
 func (q *Queries) CreateUserWebAuthnCredential(ctx context.Context, arg CreateUserWebAuthnCredentialParams) (UserWebauthnCredential, error) {
-	row := q.db.QueryRow(ctx, createUserWebAuthnCredential,
+	row := q.db.QueryRowContext(ctx, createUserWebAuthnCredential,
 		arg.CredentialID,
 		arg.UserID,
 		arg.PublicKey,
@@ -79,30 +79,30 @@ func (q *Queries) CreateUserWebAuthnCredential(ctx context.Context, arg CreateUs
 
 const deleteUserWebAuthnCredential = `-- name: DeleteUserWebAuthnCredential :execrows
 DELETE FROM user_webauthn_credentials
-WHERE user_id = $1
-  AND user_webauthn_credential_id = $2
+WHERE user_id = ?1
+  AND user_webauthn_credential_id = ?2
 `
 
 type DeleteUserWebAuthnCredentialParams struct {
 	UserID                   int32 `db:"user_id" json:"user_id"`
-	UserWebauthnCredentialID int32 `db:"user_webauthn_credential_id" json:"user_webauthn_credential_id"`
+	UserWebauthnCredentialID int64 `db:"user_webauthn_credential_id" json:"user_webauthn_credential_id"`
 }
 
 func (q *Queries) DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteUserWebAuthnCredential, arg.UserID, arg.UserWebauthnCredentialID)
+	result, err := q.db.ExecContext(ctx, deleteUserWebAuthnCredential, arg.UserID, arg.UserWebauthnCredentialID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected(), nil
+	return result.RowsAffected()
 }
 
 const deleteUserWebAuthnCredentials = `-- name: DeleteUserWebAuthnCredentials :exec
 DELETE FROM user_webauthn_credentials
-WHERE user_id = $1
+WHERE user_id = ?1
 `
 
 func (q *Queries) DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error {
-	_, err := q.db.Exec(ctx, deleteUserWebAuthnCredentials, userID)
+	_, err := q.db.ExecContext(ctx, deleteUserWebAuthnCredentials, userID)
 	return err
 }
 
@@ -114,20 +114,20 @@ SELECT
   created_at,
   last_used_at
 FROM user_webauthn_credentials
-WHERE user_id = $1
+WHERE user_id = ?1
 ORDER BY created_at ASC, user_webauthn_credential_id ASC
 `
 
 type ListUserWebAuthnCredentialSummariesRow struct {
-	UserWebauthnCredentialID int32              `db:"user_webauthn_credential_id" json:"user_webauthn_credential_id"`
-	UserID                   int32              `db:"user_id" json:"user_id"`
-	Transports               []byte             `db:"transports" json:"transports"`
-	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	LastUsedAt               pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+	UserWebauthnCredentialID int64             `db:"user_webauthn_credential_id" json:"user_webauthn_credential_id"`
+	UserID                   int32             `db:"user_id" json:"user_id"`
+	Transports               dbtypes.Strings   `db:"transports" json:"transports"`
+	CreatedAt                dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	LastUsedAt               dbtypes.Timestamp `db:"last_used_at" json:"last_used_at"`
 }
 
 func (q *Queries) ListUserWebAuthnCredentialSummaries(ctx context.Context, userID int32) ([]ListUserWebAuthnCredentialSummariesRow, error) {
-	rows, err := q.db.Query(ctx, listUserWebAuthnCredentialSummaries, userID)
+	rows, err := q.db.QueryContext(ctx, listUserWebAuthnCredentialSummaries, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +146,9 @@ func (q *Queries) ListUserWebAuthnCredentialSummaries(ctx context.Context, userI
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -155,12 +158,12 @@ func (q *Queries) ListUserWebAuthnCredentialSummaries(ctx context.Context, userI
 const listUserWebAuthnCredentials = `-- name: ListUserWebAuthnCredentials :many
 SELECT user_webauthn_credential_id, credential_id, user_id, public_key, sign_count, transports, attestation_type, aaguid, user_present, user_verified, backup_eligible, backup_state, created_at, last_used_at
 FROM user_webauthn_credentials
-WHERE user_id = $1
+WHERE user_id = ?1
 ORDER BY created_at ASC, user_webauthn_credential_id ASC
 `
 
 func (q *Queries) ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error) {
-	rows, err := q.db.Query(ctx, listUserWebAuthnCredentials, userID)
+	rows, err := q.db.QueryContext(ctx, listUserWebAuthnCredentials, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +191,9 @@ func (q *Queries) ListUserWebAuthnCredentials(ctx context.Context, userID int32)
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -196,31 +202,31 @@ func (q *Queries) ListUserWebAuthnCredentials(ctx context.Context, userID int32)
 
 const updateUserWebAuthnCredentialUsage = `-- name: UpdateUserWebAuthnCredentialUsage :one
 UPDATE user_webauthn_credentials
-SET sign_count = $3,
-    transports = $4,
-    user_present = $5,
-    user_verified = $6,
-    backup_eligible = $7,
-    backup_state = $8,
-    last_used_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
-  AND credential_id = $2
+SET sign_count = ?3,
+    transports = ?4,
+    user_present = ?5,
+    user_verified = ?6,
+    backup_eligible = ?7,
+    backup_state = ?8,
+    last_used_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
+  AND credential_id = ?2
 RETURNING user_webauthn_credential_id, credential_id, user_id, public_key, sign_count, transports, attestation_type, aaguid, user_present, user_verified, backup_eligible, backup_state, created_at, last_used_at
 `
 
 type UpdateUserWebAuthnCredentialUsageParams struct {
-	UserID         int32  `db:"user_id" json:"user_id"`
-	CredentialID   []byte `db:"credential_id" json:"credential_id"`
-	SignCount      int64  `db:"sign_count" json:"sign_count"`
-	Transports     []byte `db:"transports" json:"transports"`
-	UserPresent    bool   `db:"user_present" json:"user_present"`
-	UserVerified   bool   `db:"user_verified" json:"user_verified"`
-	BackupEligible bool   `db:"backup_eligible" json:"backup_eligible"`
-	BackupState    bool   `db:"backup_state" json:"backup_state"`
+	UserID         int32           `db:"user_id" json:"user_id"`
+	CredentialID   []byte          `db:"credential_id" json:"credential_id"`
+	SignCount      int64           `db:"sign_count" json:"sign_count"`
+	Transports     dbtypes.Strings `db:"transports" json:"transports"`
+	UserPresent    bool            `db:"user_present" json:"user_present"`
+	UserVerified   bool            `db:"user_verified" json:"user_verified"`
+	BackupEligible bool            `db:"backup_eligible" json:"backup_eligible"`
+	BackupState    bool            `db:"backup_state" json:"backup_state"`
 }
 
 func (q *Queries) UpdateUserWebAuthnCredentialUsage(ctx context.Context, arg UpdateUserWebAuthnCredentialUsageParams) (UserWebauthnCredential, error) {
-	row := q.db.QueryRow(ctx, updateUserWebAuthnCredentialUsage,
+	row := q.db.QueryRowContext(ctx, updateUserWebAuthnCredentialUsage,
 		arg.UserID,
 		arg.CredentialID,
 		arg.SignCount,

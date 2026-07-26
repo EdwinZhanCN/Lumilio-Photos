@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -11,9 +12,6 @@ import (
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -74,10 +72,10 @@ type UserService interface {
 
 type userService struct {
 	queries *repo.Queries
-	db      *pgxpool.Pool
+	db      *sql.DB
 }
 
-func NewUserService(queries *repo.Queries, db *pgxpool.Pool) UserService {
+func NewUserService(queries *repo.Queries, db *sql.DB) UserService {
 	return &userService{
 		queries: queries,
 		db:      db,
@@ -87,7 +85,7 @@ func NewUserService(queries *repo.Queries, db *pgxpool.Pool) UserService {
 func (s *userService) GetUserByID(ctx context.Context, userID int) (UserResponse, error) {
 	user, err := s.queries.GetUserByID(ctx, int32(userID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return UserResponse{}, ErrUserNotFound
 		}
 		return UserResponse{}, fmt.Errorf("get user by id: %w", err)
@@ -103,8 +101,8 @@ func (s *userService) ListUsers(ctx context.Context, limit, offset int) (UserLis
 	}
 
 	rows, err := s.queries.ListUsersWithStats(ctx, repo.ListUsersWithStatsParams{
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		Limit:  int64(limit),
+		Offset: int64(offset),
 	})
 	if err != nil {
 		return UserListResult{}, fmt.Errorf("list users: %w", err)
@@ -144,7 +142,7 @@ func (s *userService) ListUsers(ctx context.Context, limit, offset int) (UserLis
 func (s *userService) UpdateOwnProfile(ctx context.Context, userID int, input UpdateOwnProfileInput) (UserResponse, error) {
 	user, err := s.queries.GetUserByID(ctx, int32(userID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return UserResponse{}, ErrUserNotFound
 		}
 		return UserResponse{}, fmt.Errorf("get user profile: %w", err)
@@ -188,7 +186,7 @@ func (s *userService) UpdateOwnProfile(ctx context.Context, userID int, input Up
 func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUserID int, input AdminUpdateUserInput) (UserResponse, error) {
 	actor, err := s.queries.GetUserByID(ctx, int32(actorUserID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return UserResponse{}, ErrUserNotFound
 		}
 		return UserResponse{}, fmt.Errorf("get actor user: %w", err)
@@ -199,7 +197,7 @@ func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUs
 
 	target, err := s.queries.GetUserByID(ctx, int32(targetUserID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return UserResponse{}, ErrUserNotFound
 		}
 		return UserResponse{}, fmt.Errorf("get target user: %w", err)
@@ -237,7 +235,7 @@ func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUs
 	if input.Role != nil {
 		role = *input.Role
 	}
-	isActive := target.IsActive != nil && *target.IsActive
+	isActive := target.IsActive
 	if input.IsActive != nil {
 		isActive = *input.IsActive
 	}
@@ -247,7 +245,7 @@ func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUs
 		if err == nil && existing.UserID != target.UserID {
 			return UserResponse{}, ErrUserAlreadyExists
 		}
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return UserResponse{}, fmt.Errorf("check username availability: %w", err)
 		}
 	}
@@ -257,7 +255,7 @@ func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUs
 		if err != nil {
 			return UserResponse{}, fmt.Errorf("count active admins: %w", err)
 		}
-		if activeAdmins <= 1 && target.IsActive != nil && *target.IsActive {
+		if activeAdmins <= 1 && target.IsActive {
 			return UserResponse{}, ErrCannotDisableLastAdmin
 		}
 	}
@@ -268,7 +266,7 @@ func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUs
 		DisplayName:   displayName,
 		AvatarAssetID: avatarAssetUUID,
 		Role:          string(role),
-		IsActive:      &isActive,
+		IsActive:      isActive,
 	})
 	if err != nil {
 		return UserResponse{}, fmt.Errorf("admin update user: %w", err)
@@ -288,14 +286,9 @@ func (s *userService) normalizeAvatarAssetID(ctx context.Context, raw string) (*
 		return nil, ErrInvalidAvatarAsset
 	}
 
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(parsed.String()); err != nil {
-		return nil, ErrInvalidAvatarAsset
-	}
-
-	asset, err := s.queries.GetAssetByID(ctx, pgUUID)
+	asset, err := s.queries.GetAssetByID(ctx, parsed)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrInvalidAvatarAsset
 		}
 		return nil, fmt.Errorf("load avatar asset: %w", err)
@@ -312,7 +305,7 @@ func (s *userService) normalizeAvatarAssetID(ctx context.Context, raw string) (*
 func (s *userService) ChangePassword(ctx context.Context, userID int, input ChangePasswordInput) error {
 	user, err := s.queries.GetUserByID(ctx, int32(userID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ErrUserNotFound
 		}
 		return fmt.Errorf("get user for password change: %w", err)
@@ -344,7 +337,7 @@ func (s *userService) ChangePassword(ctx context.Context, userID int, input Chan
 func (s *userService) AdminResetAccess(ctx context.Context, actorUserID, targetUserID int) (ResetAccessResult, error) {
 	actor, err := s.queries.GetUserByID(ctx, int32(actorUserID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ResetAccessResult{}, ErrUserNotFound
 		}
 		return ResetAccessResult{}, fmt.Errorf("get actor: %w", err)
@@ -355,7 +348,7 @@ func (s *userService) AdminResetAccess(ctx context.Context, actorUserID, targetU
 
 	target, err := s.queries.GetUserByID(ctx, int32(targetUserID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ResetAccessResult{}, ErrUserNotFound
 		}
 		return ResetAccessResult{}, fmt.Errorf("get target: %w", err)
@@ -373,12 +366,12 @@ func (s *userService) BreakGlassReset(ctx context.Context, username string) (Res
 	if trimmed := strings.TrimSpace(username); trimmed != "" {
 		found, err := s.queries.GetUserByUsername(ctx, strings.ToLower(trimmed))
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				return ResetAccessResult{}, repo.User{}, ErrUserNotFound
 			}
 			return ResetAccessResult{}, repo.User{}, fmt.Errorf("get user: %w", err)
 		}
-		if !IsAdminRole(found.Role) || found.IsActive == nil || !*found.IsActive {
+		if !IsAdminRole(found.Role) || !found.IsActive {
 			return ResetAccessResult{}, repo.User{}, ErrBreakGlassTargetInvalid
 		}
 		target = found
@@ -442,7 +435,7 @@ func (s *userService) resetUserAccess(ctx context.Context, target repo.User) (Re
 func (s *userService) oldestActiveAdmin(ctx context.Context) (repo.User, error) {
 	admin, err := s.queries.GetOldestActiveAdmin(ctx)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.User{}, ErrUserNotFound
 		}
 		return repo.User{}, fmt.Errorf("get oldest active admin: %w", err)
@@ -471,17 +464,17 @@ func (s *userService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 		return fn(s.queries)
 	}
 
-	tx, err := s.db.Begin(ctx)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	if err := fn(s.queries.WithTx(tx)); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
 

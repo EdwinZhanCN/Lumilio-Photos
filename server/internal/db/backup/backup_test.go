@@ -2,286 +2,287 @@ package backup
 
 import (
 	"context"
-	"errors"
+	"database/sql"
+	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"server/config"
+	"server/internal/db"
 	"server/internal/settings"
 )
 
-func touch(t *testing.T, dir, name string, mtime time.Time) {
+func openTestCatalog(t *testing.T, path string) *db.DB {
 	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+	catalog, err := db.Open(context.Background(), config.DatabaseConfig{Path: path})
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	if err := catalog.Migrate(context.Background()); err != nil {
+		_ = catalog.Close(context.Background())
+		t.Fatalf("db.Migrate: %v", err)
+	}
+	return catalog
+}
+
+func closeTestCatalog(t *testing.T, catalog *db.DB) {
+	t.Helper()
+	if err := catalog.Close(context.Background()); err != nil {
+		t.Fatalf("db.Close: %v", err)
+	}
+}
+
+func compatibilityFor(t *testing.T, catalog *db.DB, schemaVersion int) Compatibility {
+	t.Helper()
+	info, err := db.InspectCatalog(context.Background(), catalog.Path)
+	if err != nil {
+		t.Fatalf("db.InspectCatalog: %v", err)
+	}
+	return Compatibility{
+		LibraryID:               info.LibraryID,
+		ConfigSchemaVersion:     schemaVersion,
+		MaxApplicationMigration: info.ApplicationMigration,
+		MaxRiverMigration:       info.RiverMigration,
+	}
+}
+
+func TestCreateSnapshotIsStandaloneAndChecksumProtected(t *testing.T) {
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+
+	if _, err := catalog.SQL.ExecContext(context.Background(), `
+		UPDATE system_state
+		SET bootstrap_phase = 'admin_created', updated_at = ?
+		WHERE id = 1
+	`, time.Now().UTC().UnixMicro()); err != nil {
 		t.Fatal(err)
 	}
-	if !mtime.IsZero() {
-		if err := os.Chtimes(path, mtime, mtime); err != nil {
+
+	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
+	snapshot, err := CreateSnapshot(
+		context.Background(),
+		catalog.SQL,
+		filepath.Join(root, "backups"),
+		"",
+		metadata,
+		t.Logf,
+	)
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	compatibility := compatibilityFor(t, catalog, metadata.ConfigSchemaVersion)
+	manifest, info, err := ValidateSnapshot(context.Background(), snapshot.Path, compatibility)
+	if err != nil {
+		t.Fatalf("ValidateSnapshot: %v", err)
+	}
+	if info.LibraryID != compatibility.LibraryID || manifest.QuickCheck != "ok" {
+		t.Fatalf("snapshot identity/check = %q/%q", info.LibraryID, manifest.QuickCheck)
+	}
+
+	location := &url.URL{Scheme: "file", Path: snapshot.Path}
+	query := location.Query()
+	query.Set("mode", "ro")
+	location.RawQuery = query.Encode()
+	snapshotDB, err := sql.Open("sqlite3", location.String())
+	if err != nil {
+		t.Fatalf("open standalone snapshot: %v", err)
+	}
+	var phase string
+	if err := snapshotDB.QueryRowContext(context.Background(), "SELECT bootstrap_phase FROM system_state WHERE id = 1").Scan(&phase); err != nil {
+		t.Fatal(err)
+	}
+	if phase != "admin_created" {
+		t.Fatalf("snapshot phase = %q", phase)
+	}
+	if err := snapshotDB.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	file, err := os.OpenFile(snapshot.Path, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value := []byte{0}
+	if _, err := file.ReadAt(value, 100); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	value[0] ^= 0xff
+	if _, err := file.WriteAt(value, 100); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ValidateSnapshot(context.Background(), snapshot.Path, compatibility); err == nil || !strings.Contains(err.Error(), "checksum") {
+		t.Fatalf("corrupt snapshot error = %v, want checksum rejection", err)
+	}
+}
+
+func TestStagedRestoreReplacesOnlyBetweenGenerations(t *testing.T) {
+	root := t.TempDir()
+	activePath := filepath.Join(root, "app-state", "library.sqlite3")
+	backupsDir := filepath.Join(root, "backups")
+	catalog := openTestCatalog(t, activePath)
+
+	setPhase := func(database *db.DB, phase string) {
+		t.Helper()
+		if _, err := database.SQL.ExecContext(context.Background(), `
+			UPDATE system_state SET bootstrap_phase = ?, updated_at = ? WHERE id = 1
+		`, phase, time.Now().UTC().UnixMicro()); err != nil {
 			t.Fatal(err)
+		}
+	}
+	setPhase(catalog, "admin_created")
+	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
+	snapshot, err := CreateSnapshot(context.Background(), catalog.SQL, backupsDir, "", metadata, t.Logf)
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	compatibility := compatibilityFor(t, catalog, metadata.ConfigSchemaVersion)
+	setPhase(catalog, "ready")
+
+	if err := StageRestore(context.Background(), activePath, snapshot.Path, metadata, compatibility); err != nil {
+		t.Fatalf("StageRestore: %v", err)
+	}
+	var livePhase string
+	if err := catalog.SQL.QueryRowContext(context.Background(), "SELECT bootstrap_phase FROM system_state WHERE id = 1").Scan(&livePhase); err != nil {
+		t.Fatal(err)
+	}
+	if livePhase != "ready" {
+		t.Fatalf("staging changed live database: phase = %q", livePhase)
+	}
+
+	closeTestCatalog(t, catalog)
+	applied, err := ApplyPendingRestore(context.Background(), activePath, t.Logf)
+	if err != nil || !applied {
+		t.Fatalf("ApplyPendingRestore = %v/%v", applied, err)
+	}
+	marker, err := readPendingRestore(PendingRestorePath(activePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if marker.State != pendingStateApplied || marker.RestorePoint == "" || marker.PreviousPath == "" {
+		t.Fatalf("applied marker = %+v", marker)
+	}
+
+	restored := openTestCatalog(t, activePath)
+	if err := restored.SQL.QueryRowContext(context.Background(), "SELECT bootstrap_phase FROM system_state WHERE id = 1").Scan(&livePhase); err != nil {
+		t.Fatal(err)
+	}
+	if livePhase != "admin_created" {
+		t.Fatalf("restored phase = %q", livePhase)
+	}
+	if err := CompletePendingRestore(context.Background(), activePath); err != nil {
+		t.Fatalf("CompletePendingRestore: %v", err)
+	}
+	if _, err := os.Stat(PendingRestorePath(activePath)); !os.IsNotExist(err) {
+		t.Fatalf("pending marker still exists: %v", err)
+	}
+	if _, err := os.Stat(marker.PreviousPath); !os.IsNotExist(err) {
+		t.Fatalf("previous active catalog still exists: %v", err)
+	}
+	if _, err := os.Stat(marker.RestorePoint); err != nil {
+		t.Fatalf("restore point was not retained: %v", err)
+	}
+	closeTestCatalog(t, restored)
+}
+
+func TestCorruptSnapshotRejectedBeforeMarker(t *testing.T) {
+	root := t.TempDir()
+	activePath := filepath.Join(root, "app-state", "library.sqlite3")
+	catalog := openTestCatalog(t, activePath)
+	defer closeTestCatalog(t, catalog)
+	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
+	snapshot, err := CreateSnapshot(context.Background(), catalog.SQL, filepath.Join(root, "backups"), "", metadata, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Truncate(snapshot.Path, 128); err != nil {
+		t.Fatal(err)
+	}
+	err = StageRestore(context.Background(), activePath, snapshot.Path, metadata, compatibilityFor(t, catalog, 2))
+	if err == nil {
+		t.Fatal("StageRestore accepted corrupt snapshot")
+	}
+	if _, statErr := os.Stat(PendingRestorePath(activePath)); !os.IsNotExist(statErr) {
+		t.Fatalf("corrupt snapshot wrote pending marker: %v", statErr)
+	}
+}
+
+func touchPair(t *testing.T, dir, name string, modTime time.Time) {
+	t.Helper()
+	for _, artifact := range []string{name, ManifestName(name)} {
+		path := filepath.Join(dir, artifact)
+		if err := os.WriteFile(path, []byte("fixture"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if !modTime.IsZero() {
+			if err := os.Chtimes(path, modTime, modTime); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 }
 
-func names(t *testing.T, dir string) map[string]bool {
-	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := map[string]bool{}
-	for _, e := range entries {
-		out[e.Name()] = true
-	}
-	return out
-}
-
-func TestPruneKeepsNewestAndRestorePoints(t *testing.T) {
+func TestPruneKeepsNewestSnapshotPairsAndRestorePoints(t *testing.T) {
 	dir := t.TempDir()
-	oldest := FileName(time.Date(2026, 7, 8, 2, 0, 0, 0, time.Local), "v1", "17.5")
-	middle := FileName(time.Date(2026, 7, 9, 2, 0, 0, 0, time.Local), "v1", "17.5")
-	newest := FileName(time.Date(2026, 7, 10, 2, 0, 0, 0, time.Local), "v1", "17.5")
+	oldest := FileName(time.Date(2026, 7, 8, 2, 0, 0, 0, time.UTC))
+	middle := FileName(time.Date(2026, 7, 9, 2, 0, 0, 0, time.UTC))
+	newest := FileName(time.Date(2026, 7, 10, 2, 0, 0, 0, time.UTC))
 	restorePoint := RestorePointPrefix + newest
-
-	for _, n := range []string{oldest, middle, newest, restorePoint} {
-		touch(t, dir, n, time.Time{})
+	for _, name := range []string{oldest, middle, newest, restorePoint} {
+		touchPair(t, dir, name, time.Time{})
 	}
 
 	removed, err := Prune(dir, 2, t.Logf)
 	if err != nil {
-		t.Fatalf("Prune: %v", err)
+		t.Fatal(err)
 	}
 	if len(removed) != 1 || removed[0] != oldest {
-		t.Fatalf("removed = %v, want only %q", removed, oldest)
+		t.Fatalf("removed = %v", removed)
 	}
-	left := names(t, dir)
-	for _, want := range []string{middle, newest, restorePoint} {
-		if !left[want] {
-			t.Errorf("%q should have been kept", want)
+	for _, name := range []string{middle, newest, restorePoint} {
+		for _, artifact := range []string{name, ManifestName(name)} {
+			if _, err := os.Stat(filepath.Join(dir, artifact)); err != nil {
+				t.Errorf("%s should remain: %v", artifact, err)
+			}
 		}
 	}
 }
 
-func TestPruneRemovesStaleTmpOnly(t *testing.T) {
-	dir := t.TempDir()
-	staleTmp := FileName(time.Date(2026, 7, 9, 2, 0, 0, 0, time.Local), "v1", "17.5") + TmpSuffix
-	freshTmp := FileName(time.Date(2026, 7, 11, 2, 0, 0, 0, time.Local), "v1", "17.5") + TmpSuffix
-	touch(t, dir, staleTmp, time.Now().Add(-2*time.Hour))
-	touch(t, dir, freshTmp, time.Now())
-
-	if _, err := Prune(dir, 5, t.Logf); err != nil {
-		t.Fatalf("Prune: %v", err)
+func TestSchedulerPolicyAndForcedSnapshot(t *testing.T) {
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+	dir := filepath.Join(root, "backups")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
 	}
-	left := names(t, dir)
-	if left[staleTmp] {
-		t.Error("stale .tmp from a failed run should be removed")
+	cfg := settings.Backup{Enabled: false, IntervalHours: 24, KeepLast: 2}
+	scheduler := &Scheduler{
+		Source:   catalog.SQL,
+		Dir:      dir,
+		Metadata: SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
+		Ready:    func(context.Context) (bool, error) { return true, nil },
+		Settings: func(context.Context) (settings.Backup, error) { return cfg, nil },
+		Logf:     t.Logf,
 	}
-	if !left[freshTmp] {
-		t.Error("fresh .tmp (possibly in-progress) must be kept")
+	if err := scheduler.Run(context.Background(), false); err != nil {
+		t.Fatalf("disabled periodic run: %v", err)
 	}
-}
-
-func TestPruneMissingDirIsNoop(t *testing.T) {
-	if _, err := Prune(filepath.Join(t.TempDir(), "absent"), 3, t.Logf); err != nil {
-		t.Fatalf("Prune on missing dir: %v", err)
-	}
-}
-
-func TestLatestRoutine(t *testing.T) {
-	dir := t.TempDir()
 	if _, ok := LatestRoutine(dir); ok {
-		t.Fatal("empty dir should report no latest backup")
+		t.Fatal("disabled periodic run created a snapshot")
 	}
-	newest := time.Date(2026, 7, 10, 2, 0, 0, 0, time.Local)
-	touch(t, dir, FileName(newest.Add(-24*time.Hour), "v1", "17.5"), time.Time{})
-	touch(t, dir, FileName(newest, "v1", "17.5"), time.Time{})
-	touch(t, dir, RestorePointPrefix+FileName(newest.Add(24*time.Hour), "v1", "17.5"), time.Time{})
-
-	got, ok := LatestRoutine(dir)
-	if !ok || !got.Equal(newest) {
-		t.Fatalf("LatestRoutine = %v/%v, want %v/true (restore points must not count)", got, ok, newest)
+	if err := scheduler.Run(context.Background(), true); err != nil {
+		t.Fatalf("forced run: %v", err)
 	}
-}
-
-func TestLocateToolsPrefersOverride(t *testing.T) {
-	dir := t.TempDir()
-	tool := clientToolName("pg_dump", runtime.GOOS)
-	if err := os.WriteFile(filepath.Join(dir, tool), []byte("test fixture"), 0o755); err != nil {
-		t.Fatal(err)
+	if _, ok := LatestRoutine(dir); !ok {
+		t.Fatal("forced run did not create a snapshot")
 	}
-	got, err := LocateTools(dir, 17)
-	if err != nil || got != dir {
-		t.Fatalf("LocateTools = %q/%v, want %q", got, err, dir)
-	}
-}
-
-func TestClientToolName(t *testing.T) {
-	if got := clientToolName("pg_dump", "windows"); got != "pg_dump.exe" {
-		t.Fatalf("windows pg_dump = %q", got)
-	}
-	if got := clientToolName("psql", "windows"); got != "psql.exe" {
-		t.Fatalf("windows psql = %q", got)
-	}
-	if got := clientToolName("pg_dump", "darwin"); got != "pg_dump" {
-		t.Fatalf("darwin pg_dump = %q", got)
-	}
-}
-
-func TestConnResolvedPasswordTracksRotatedSecret(t *testing.T) {
-	secretPath := filepath.Join(t.TempDir(), "db_password")
-	conn := Conn{Password: "bootstrap", PasswordFile: secretPath}
-
-	if got := conn.ResolvedPassword(); got != "bootstrap" {
-		t.Fatalf("ResolvedPassword before rotation = %q, want bootstrap", got)
-	}
-	if err := os.WriteFile(secretPath, []byte("rotated\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got := conn.ResolvedPassword(); got != "rotated" {
-		t.Fatalf("ResolvedPassword after rotation = %q, want rotated", got)
-	}
-}
-
-func TestPlatformToolDirs(t *testing.T) {
-	tests := []struct {
-		name  string
-		goos  string
-		major int
-		want  []string
-	}{
-		{
-			name:  "Apple Silicon Homebrew",
-			goos:  "darwin",
-			major: 18,
-			want: []string{
-				"/opt/homebrew/opt/postgresql@18/bin",
-				"/usr/local/opt/postgresql@18/bin",
-			},
-		},
-		{
-			name:  "Debian PGDG",
-			goos:  "linux",
-			major: 18,
-			want:  []string{"/usr/lib/postgresql/18/bin"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := platformToolDirs(tt.major, tt.goos)
-			if len(got) != len(tt.want) {
-				t.Fatalf("platformToolDirs() = %v, want %v", got, tt.want)
-			}
-			for i := range tt.want {
-				if got[i] != tt.want[i] {
-					t.Fatalf("platformToolDirs()[%d] = %q, want %q", i, got[i], tt.want[i])
-				}
-			}
-		})
-	}
-}
-
-func TestLocateToolsFailsLoudlyWhenNothingMatches(t *testing.T) {
-	t.Setenv("PATH", t.TempDir()) // hide any real pg_dump
-	_, err := LocateTools("", 99)
-	var unsupported *ErrUnsupportedTools
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("want ErrUnsupportedTools, got %v", err)
-	}
-}
-
-// schedulerFixture wires a Scheduler whose settings and clock are test-local.
-func schedulerFixture(t *testing.T, cfg settings.Backup, now time.Time) (*Scheduler, string) {
-	t.Helper()
-	storage := t.TempDir()
-	s := &Scheduler{
-		Dir:        filepath.Join(storage, "backups"),
-		AppVersion: "test",
-		Settings:   func(context.Context) (settings.Backup, error) { return cfg, nil },
-		Logf:       t.Logf,
-		now:        func() time.Time { return now },
-	}
-	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	return s, storage
-}
-
-func TestSchedulerSkipsWhenDisabled(t *testing.T) {
-	s, _ := schedulerFixture(t, settings.Backup{Enabled: false}, time.Now())
-	// Pool is nil: reaching the version probe would panic, proving the skip.
-	if err := s.Run(context.Background(), false); err != nil {
-		t.Fatalf("disabled scheduler should be a silent no-op, got %v", err)
-	}
-}
-
-func TestSchedulerSkipsBeforeFirstRunSetupIsReady(t *testing.T) {
-	s, _ := schedulerFixture(t, settings.Backup{Enabled: true}, time.Now())
-	s.Ready = func(context.Context) (bool, error) { return false, nil }
-	s.Settings = func(context.Context) (settings.Backup, error) {
-		t.Fatal("settings must not be loaded before backup readiness")
-		return settings.Backup{}, nil
-	}
-
-	// Pool is nil: reaching the version probe would panic, proving the skip.
-	if err := s.Run(context.Background(), false); err != nil {
-		t.Fatalf("pre-setup scheduler should be a silent no-op, got %v", err)
-	}
-}
-
-func TestSchedulerSkipsWhenNotDue(t *testing.T) {
-	now := time.Date(2026, 7, 11, 3, 0, 0, 0, time.Local)
-	s, _ := schedulerFixture(t, settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 3}, now)
-	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	touch(t, s.Dir, FileName(now.Add(-2*time.Hour), "v1", "17.5"), time.Time{})
-
-	if err := s.Run(context.Background(), false); err != nil {
-		t.Fatalf("not-due scheduler should be a silent no-op, got %v", err)
-	}
-}
-
-func TestSchedulerSkipsWhenBackupDestinationUnreachable(t *testing.T) {
-	now := time.Now()
-	s, storage := schedulerFixture(t, settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 3}, now)
-	if err := os.RemoveAll(storage); err != nil {
-		t.Fatal(err)
-	}
-	// Unreachable storage skips before the version probe (nil Pool would panic).
-	if err := s.Run(context.Background(), false); err != nil {
-		t.Fatalf("unreachable storage must skip with a warning, got %v", err)
-	}
-}
-
-func TestSchedulerForcedRunErrorsOnUnreachableBackupDestination(t *testing.T) {
-	s, storage := schedulerFixture(t, settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 3}, time.Now())
-	if err := os.RemoveAll(storage); err != nil {
-		t.Fatal(err)
-	}
-	// A forced run is an explicit admin action: surface the problem instead of
-	// silently skipping.
-	if err := s.Run(context.Background(), true); err == nil {
-		t.Fatal("forced run with unreachable storage must return an error")
-	}
-}
-
-func TestSchedulerForcedRunBypassesDisabledAndDue(t *testing.T) {
-	now := time.Date(2026, 7, 11, 3, 0, 0, 0, time.Local)
-	s, _ := schedulerFixture(t, settings.Backup{Enabled: false, IntervalHours: 24, KeepLast: 3}, now)
-	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	touch(t, s.Dir, FileName(now.Add(-time.Minute), "v1", "17.5"), time.Time{})
-
-	// Force proceeds past enabled/due into the version probe; the nil Pool
-	// panic proves the checks were bypassed (recovered into a pass).
-	defer func() {
-		if recover() == nil {
-			t.Fatal("forced run should have reached the version probe (nil Pool panic)")
-		}
-	}()
-	_ = s.Run(context.Background(), true)
 }

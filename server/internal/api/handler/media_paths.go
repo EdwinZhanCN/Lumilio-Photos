@@ -39,7 +39,7 @@ func getRepositoryForAsset(ctx context.Context, queries *repo.Queries, asset *re
 		return nil, fmt.Errorf("asset repository id is invalid")
 	}
 
-	repository, err := queries.GetRepository(ctx, asset.RepositoryID)
+	repository, err := queries.GetRepository(ctx, asset.RepositoryID.UUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository by id: %w", err)
 	}

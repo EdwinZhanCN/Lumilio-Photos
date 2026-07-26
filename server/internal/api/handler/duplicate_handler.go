@@ -14,7 +14,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DuplicateHandler exposes the Utilities Rail "Duplicates" feature: detection,
@@ -333,7 +332,7 @@ func (h *DuplicateHandler) materializeGroups(
 	idSet := make(map[uuid.UUID]struct{})
 	for _, d := range details {
 		for _, a := range d.Assets {
-			idSet[pgUUID(a.AssetID)] = struct{}{}
+			idSet[a.AssetID] = struct{}{}
 		}
 	}
 
@@ -343,7 +342,7 @@ func (h *DuplicateHandler) materializeGroups(
 		// in which case we still want to render it for resolved groups. We use
 		// the unfiltered "by id" query when available; if the canonical query
 		// filters deleted, the resolved view will just omit them.
-		asset, err := h.queries.GetAssetByID(ctx, pgtype.UUID{Bytes: id, Valid: true})
+		asset, err := h.queries.GetAssetByID(ctx, id)
 		if err != nil {
 			// Asset not present (cascade delete elsewhere); skip.
 			continue
@@ -378,11 +377,11 @@ func toDuplicateGroupDTO(
 ) dto.DuplicateGroupDTO {
 	g := d.Group
 	groupDTO := dto.DuplicateGroupDTO{
-		GroupID:          uuid.UUID(g.GroupID.Bytes).String(),
-		RepositoryID:     uuid.UUID(g.RepositoryID.Bytes).String(),
+		GroupID:          g.GroupID.String(),
+		RepositoryID:     g.RepositoryID.String(),
 		Method:           g.Method,
 		Status:           g.Status,
-		AssetCount:       g.AssetCount,
+		AssetCount:       int32(g.AssetCount),
 		TotalSize:        g.TotalSize,
 		DetectionVersion: g.DetectionVersion,
 	}
@@ -394,11 +393,11 @@ func toDuplicateGroupDTO(
 		groupDTO.ResolvedAt = &t
 	}
 	if g.RecommendedKeeperAssetID.Valid {
-		id := uuid.UUID(g.RecommendedKeeperAssetID.Bytes).String()
+		id := g.RecommendedKeeperAssetID.UUID.String()
 		groupDTO.RecommendedKeeperAssetID = &id
 	}
 	if g.KeeperAssetID.Valid {
-		id := uuid.UUID(g.KeeperAssetID.Bytes).String()
+		id := g.KeeperAssetID.UUID.String()
 		groupDTO.KeeperAssetID = &id
 	}
 
@@ -416,7 +415,7 @@ func toDuplicateGroupDTO(
 
 	groupDTO.Assets = make([]dto.DuplicateAssetDTO, 0, len(d.Assets))
 	for _, a := range d.Assets {
-		id := pgUUID(a.AssetID)
+		id := a.AssetID
 		asset, ok := assets[id]
 		if !ok {
 			continue
@@ -432,8 +431,8 @@ func toDuplicateGroupDTO(
 		groupDTO.Edges = make([]dto.DuplicateEdgeDTO, 0, len(d.Edges))
 		for _, e := range d.Edges {
 			groupDTO.Edges = append(groupDTO.Edges, dto.DuplicateEdgeDTO{
-				AssetIDA:   uuid.UUID(e.AssetIDA.Bytes).String(),
-				AssetIDB:   uuid.UUID(e.AssetIDB.Bytes).String(),
+				AssetIDA:   e.AssetIDA.String(),
+				AssetIDB:   e.AssetIDB.String(),
 				Method:     e.Method,
 				Distance:   e.Distance,
 				Confidence: e.Confidence,
@@ -488,11 +487,4 @@ func applyPolicyFlag(dst *bool, src *bool) {
 		return
 	}
 	*dst = *src
-}
-
-func pgUUID(id pgtype.UUID) uuid.UUID {
-	if !id.Valid {
-		return uuid.Nil
-	}
-	return uuid.UUID(id.Bytes)
 }

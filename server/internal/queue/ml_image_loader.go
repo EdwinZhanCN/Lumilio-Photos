@@ -11,11 +11,11 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/utils/imagesource"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 type MLImageLoader interface {
-	LoadMLImage(ctx context.Context, assetID pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error)
+	LoadMLImage(ctx context.Context, assetID uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error)
 }
 
 type DBMLImageLoader struct {
@@ -40,7 +40,7 @@ func mlThumbnailSize(purpose imagesource.Purpose) string {
 	}
 }
 
-func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
+func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
 	if l == nil || l.Queries == nil {
 		return nil, fmt.Errorf("ml image loader unavailable")
 	}
@@ -59,7 +59,7 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, 
 		return nil, fmt.Errorf("asset %s has no repository", asset.AssetID.String())
 	}
 
-	repository, err := l.Queries.GetRepository(ctx, asset.RepositoryID)
+	repository, err := l.Queries.GetRepository(ctx, asset.RepositoryID.UUID)
 	if err != nil {
 		return nil, fmt.Errorf("get repository: %w", err)
 	}

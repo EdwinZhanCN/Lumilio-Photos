@@ -9,8 +9,6 @@ import (
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 )
 
 // BrowseStack is stack metadata attached to a collapsed browse row. MemberAssetIDs is the full
@@ -229,50 +227,6 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 	return result, nil
 }
 
-func (s *assetService) queryCollapsedSemanticBrowseItems(ctx context.Context, params QueryAssetsParams) (BrowseQueryResult, error) {
-	embeddingResult, err := s.resolveSemanticQueryEmbedding(ctx, params.Query, false)
-	if err != nil {
-		return BrowseQueryResult{}, err
-	}
-
-	space, err := s.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, embeddingResult.ModelID, len(embeddingResult.Vector))
-	if err != nil {
-		return BrowseQueryResult{}, err
-	}
-
-	queryVector := pgvector.NewVector(embeddingResult.Vector)
-	totalAssets, err := s.countAssetsBySemanticSpace(ctx, params, space, &queryVector)
-	if err != nil {
-		return BrowseQueryResult{}, err
-	}
-	if totalAssets == 0 {
-		return browseQueryResultFromItems(
-			[]BrowseItem{},
-			0,
-			params.StackMode,
-			params.Limit,
-			params.Offset,
-		), nil
-	}
-
-	assets, err := s.searchAssetsBySemanticSpace(ctx, params, space, &queryVector, int(totalAssets), 0)
-	if err != nil {
-		return BrowseQueryResult{}, err
-	}
-	items, err := s.collapseAssetsToBrowseItems(ctx, assets, params.OwnerID)
-	if err != nil {
-		return BrowseQueryResult{}, err
-	}
-
-	return browseQueryResultFromItems(
-		items,
-		totalAssets,
-		params.StackMode,
-		params.Limit,
-		params.Offset,
-	), nil
-}
-
 func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, params QueryAssetsParams) (BrowseQueryResult, error) {
 	assets, totalAssets, err := s.queryAssetsAggregate(ctx, QueryAssetsParams{
 		Query:            params.Query,
@@ -342,10 +296,7 @@ func assetsToBrowseItems(assets []repo.Asset) []BrowseItem {
 func assetsToBrowseItemsWithBestTs(assets []repo.Asset, bestTsByID map[uuid.UUID]*int32) []BrowseItem {
 	items := make([]BrowseItem, 0, len(assets))
 	for _, asset := range assets {
-		assetID, ok := uuidFromPgUUID(asset.AssetID)
-		if !ok {
-			continue
-		}
+		assetID := asset.AssetID
 		item := BrowseItem{
 			Type:  "asset",
 			ID:    "asset:" + assetID.String(),
@@ -363,10 +314,7 @@ func assetsToBrowseItemsWithBestTs(assets []repo.Asset, bestTsByID map[uuid.UUID
 func browseItemsFromCollapsedRows(rows []repo.GetCollapsedBrowseItemsUnifiedRow) ([]BrowseItem, error) {
 	items := make([]BrowseItem, 0, len(rows))
 	for _, row := range rows {
-		coverAssetID, ok := uuidFromPgUUID(row.Asset.AssetID)
-		if !ok {
-			continue
-		}
+		coverAssetID := row.Asset.AssetID
 
 		if row.ItemType == "asset" {
 			items = append(items, BrowseItem{
@@ -377,8 +325,8 @@ func browseItemsFromCollapsedRows(rows []repo.GetCollapsedBrowseItemsUnifiedRow)
 			continue
 		}
 
-		stackID, ok := uuidFromPgUUID(row.StackID)
-		if !ok {
+		stackID := row.StackID
+		if stackID == uuid.Nil {
 			return nil, fmt.Errorf("collapsed browse row missing stack id for cover %s", coverAssetID.String())
 		}
 
@@ -389,8 +337,8 @@ func browseItemsFromCollapsedRows(rows []repo.GetCollapsedBrowseItemsUnifiedRow)
 			Stack: &BrowseStack{
 				StackID:          stackID,
 				CoverAssetID:     coverAssetID,
-				MemberAssetIDs:   uuidSliceFromPgUUIDs(row.MemberAssetIds),
-				MatchedMemberIDs: uuidSliceFromPgUUIDs(row.MatchedAssetIds),
+				MemberAssetIDs:   uuidSliceFromSQLiteJSON(row.MemberAssetIds),
+				MatchedMemberIDs: uuidSliceFromSQLiteJSON(row.MatchedAssetIds),
 			},
 		})
 	}
@@ -435,9 +383,9 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 		return []BrowseItem{}, nil
 	}
 
-	assetIDs := make([]pgtype.UUID, 0, len(assets))
+	assetIDs := make([]uuid.UUID, 0, len(assets))
 	for _, asset := range assets {
-		if asset.AssetID.Valid {
+		if asset.AssetID != uuid.Nil {
 			assetIDs = append(assetIDs, asset.AssetID)
 		}
 	}
@@ -456,11 +404,10 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 	}
 	mediaByAssetID := make(map[uuid.UUID]mediaMembership, len(mediaRows))
 	for _, row := range mediaRows {
-		assetID, okAsset := uuidFromPgUUID(row.AssetID)
-		itemID, okItem := uuidFromPgUUID(row.MediaItemID)
-		primaryID, okPrimary := uuidFromPgUUID(row.PrimaryAssetID)
-		if okAsset && okItem && okPrimary {
-			mediaByAssetID[assetID] = mediaMembership{itemID: itemID, primaryAssetID: primaryID}
+		if row.AssetID != uuid.Nil && row.MediaItemID != uuid.Nil && row.PrimaryAssetID.Valid {
+			mediaByAssetID[row.AssetID] = mediaMembership{
+				itemID: row.MediaItemID, primaryAssetID: row.PrimaryAssetID.UUID,
+			}
 		}
 	}
 
@@ -473,15 +420,12 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 	stackSeen := make(map[uuid.UUID]struct{})
 	stackOrder := make([]uuid.UUID, 0, len(stackRows))
 	for _, row := range stackRows {
-		assetID, okAsset := uuidFromPgUUID(row.AssetID)
-		stackID, okStack := uuidFromPgUUID(row.StackID)
-		if !okAsset || !okStack {
+		assetID := row.AssetID
+		stackID := row.StackID
+		if assetID == uuid.Nil || stackID == uuid.Nil {
 			continue
 		}
-		position := int32(0)
-		if row.Position != nil {
-			position = *row.Position
-		}
+		position := int32(row.Position)
 		membershipByAssetID[assetID] = membership{stackID: stackID, position: position}
 		if _, exists := stackSeen[stackID]; !exists {
 			stackSeen[stackID] = struct{}{}
@@ -495,7 +439,7 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 
 	for _, stackID := range stackOrder {
 		members, err := s.queries.GetStackMembers(ctx, repo.GetStackMembersParams{
-			StackID: pgtype.UUID{Bytes: stackID, Valid: true},
+			StackID: stackID,
 			OwnerID: ownerID,
 		})
 		if err != nil {
@@ -505,15 +449,12 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 		coverID := uuid.Nil
 		coverPosition := int32(0)
 		for index, member := range members {
-			memberID, ok := uuidFromPgUUID(member.AssetID)
-			if !ok {
+			if !member.AssetID.Valid {
 				continue
 			}
+			memberID := member.AssetID.UUID
 			memberIDs = append(memberIDs, memberID)
-			position := int32(0)
-			if member.Position != nil {
-				position = *member.Position
-			}
+			position := int32(member.Position)
 			if index == 0 || position < coverPosition {
 				coverID = memberID
 				coverPosition = position
@@ -524,10 +465,7 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 	}
 
 	for _, asset := range assets {
-		assetID, ok := uuidFromPgUUID(asset.AssetID)
-		if !ok {
-			continue
-		}
+		assetID := asset.AssetID
 		membershipInfo, isStacked := membershipByAssetID[assetID]
 		if !isStacked {
 			continue
@@ -539,13 +477,9 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 	}
 
 	assetByID := make(map[uuid.UUID]repo.Asset, len(assets))
-	missingCoverIDs := make([]pgtype.UUID, 0)
+	missingCoverIDs := make([]uuid.UUID, 0)
 	for _, asset := range assets {
-		assetID, ok := uuidFromPgUUID(asset.AssetID)
-		if !ok {
-			continue
-		}
-		assetByID[assetID] = asset
+		assetByID[asset.AssetID] = asset
 	}
 	for _, coverID := range coverIDsByStack {
 		if coverID == uuid.Nil {
@@ -554,14 +488,14 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 		if _, ok := assetByID[coverID]; ok {
 			continue
 		}
-		missingCoverIDs = append(missingCoverIDs, pgtype.UUID{Bytes: coverID, Valid: true})
+		missingCoverIDs = append(missingCoverIDs, coverID)
 	}
 	for _, membership := range mediaByAssetID {
 		if membership.primaryAssetID == uuid.Nil {
 			continue
 		}
 		if _, ok := assetByID[membership.primaryAssetID]; !ok {
-			missingCoverIDs = append(missingCoverIDs, pgtype.UUID{Bytes: membership.primaryAssetID, Valid: true})
+			missingCoverIDs = append(missingCoverIDs, membership.primaryAssetID)
 		}
 	}
 	if len(missingCoverIDs) > 0 {
@@ -570,11 +504,7 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 			return nil, fmt.Errorf("get cover assets: %w", err)
 		}
 		for _, asset := range coverAssets {
-			assetID, ok := uuidFromPgUUID(asset.AssetID)
-			if !ok {
-				continue
-			}
-			assetByID[assetID] = asset
+			assetByID[asset.AssetID] = asset
 		}
 	}
 
@@ -582,10 +512,7 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 	seenStacks := make(map[uuid.UUID]struct{}, len(stackOrder))
 	seenMediaItems := make(map[uuid.UUID]struct{}, len(mediaRows))
 	for _, asset := range assets {
-		assetID, ok := uuidFromPgUUID(asset.AssetID)
-		if !ok {
-			continue
-		}
+		assetID := asset.AssetID
 
 		membershipInfo, isStacked := membershipByAssetID[assetID]
 		if !isStacked {
@@ -645,7 +572,7 @@ func (s *assetService) attachBrowseStackKinds(ctx context.Context, items []Brows
 		return nil
 	}
 
-	stackIDs := make([]pgtype.UUID, 0)
+	stackIDs := make([]uuid.UUID, 0)
 	seen := make(map[uuid.UUID]struct{})
 	for _, item := range items {
 		if item.Stack == nil || item.Type != "stack" {
@@ -659,32 +586,21 @@ func (s *assetService) attachBrowseStackKinds(ctx context.Context, items []Brows
 			continue
 		}
 		seen[stackID] = struct{}{}
-		stackIDs = append(stackIDs, pgtype.UUID{Bytes: stackID, Valid: true})
+		stackIDs = append(stackIDs, stackID)
 	}
 
 	if len(stackIDs) == 0 {
 		return nil
 	}
 
-	rows, err := s.pool.Query(ctx, `SELECT stack_id, stack_kind FROM asset_stacks WHERE stack_id = ANY($1::uuid[])`, stackIDs)
+	rows, err := s.queries.GetStackKindsByIDs(ctx, stackIDs)
 	if err != nil {
 		return fmt.Errorf("get browse stack kinds: %w", err)
 	}
-	defer rows.Close()
 
 	kindByStackID := make(map[uuid.UUID]dbtypes.StackKind, len(stackIDs))
-	for rows.Next() {
-		var stackID pgtype.UUID
-		var stackKind dbtypes.StackKind
-		if err := rows.Scan(&stackID, &stackKind); err != nil {
-			return fmt.Errorf("scan browse stack kinds: %w", err)
-		}
-		if parsed, ok := uuidFromPgUUID(stackID); ok {
-			kindByStackID[parsed] = stackKind
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate browse stack kinds: %w", err)
+	for _, row := range rows {
+		kindByStackID[row.StackID] = dbtypes.StackKind(row.StackKind)
 	}
 
 	for i := range items {
@@ -706,7 +622,7 @@ func (s *assetService) countAssetsUnified(ctx context.Context, params QueryAsset
 		return 0, err
 	}
 	return s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
-		AssetIds:         assetSetSourcePgUUIDs(params.Source),
+		AssetIds:         assetSetSourceSQLiteUUIDs(params.Source),
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,
 		RepositoryID:     repoUUID,
@@ -732,7 +648,7 @@ func (s *assetService) countAssetsUnified(ctx context.Context, params QueryAsset
 		LocationWest:     params.LocationWest,
 		DateFrom:         fromTime,
 		DateTo:           toTime,
-		IsDeleted:        params.IsDeleted,
+		IsDeleted:        params.IsDeleted != nil && *params.IsDeleted,
 	})
 }
 
@@ -743,7 +659,7 @@ func (s *assetService) countCollapsedBrowseItemsUnified(ctx context.Context, par
 		return 0, err
 	}
 	return s.queries.CountCollapsedBrowseItemsUnified(ctx, repo.CountCollapsedBrowseItemsUnifiedParams{
-		AssetIds:         assetSetSourcePgUUIDs(params.Source),
+		AssetIds:         assetSetSourceSQLiteUUIDs(params.Source),
 		Query:            queryPtr,
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,
@@ -769,7 +685,7 @@ func (s *assetService) countCollapsedBrowseItemsUnified(ctx context.Context, par
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
 		LocationWest:     params.LocationWest,
-		IsDeleted:        params.IsDeleted,
+		IsDeleted:        params.IsDeleted != nil && *params.IsDeleted,
 	})
 }
 
@@ -781,7 +697,7 @@ func (s *assetService) getCollapsedBrowseItemsUnified(ctx context.Context, param
 	}
 	sortByPtr := normalizeSortByPointer(params.SortBy)
 	return s.queries.GetCollapsedBrowseItemsUnified(ctx, repo.GetCollapsedBrowseItemsUnifiedParams{
-		AssetIds:         assetSetSourcePgUUIDs(params.Source),
+		AssetIds:         assetSetSourceSQLiteUUIDs(params.Source),
 		Query:            queryPtr,
 		AssetType:        params.AssetType,
 		AssetTypes:       params.AssetTypes,
@@ -808,21 +724,22 @@ func (s *assetService) getCollapsedBrowseItemsUnified(ctx context.Context, param
 		LocationEast:     params.LocationEast,
 		LocationWest:     params.LocationWest,
 		SortBy:           sortByPtr,
-		IsDeleted:        params.IsDeleted,
-		Offset:           int32(params.Offset),
-		Limit:            int32(params.Limit),
+		IsDeleted:        params.IsDeleted != nil && *params.IsDeleted,
+		Offset:           int64(params.Offset),
+		Limit:            int64(params.Limit),
 	})
 }
 
-// normalizeBrowseRepoParams translates API QueryAssetsParams into pgx/repo types shared by unified browse queries.
-func normalizeBrowseRepoParams(params QueryAssetsParams) (pgtype.UUID, *int32, pgtype.Timestamptz, pgtype.Timestamptz, *string, error) {
-	var repoUUID pgtype.UUID
+// normalizeBrowseRepoParams translates API filters into SQLite driver values
+// shared by the unified browse queries.
+func normalizeBrowseRepoParams(params QueryAssetsParams) (uuid.NullUUID, *int32, dbtypes.Timestamp, dbtypes.Timestamp, *string, error) {
+	var repoUUID uuid.NullUUID
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
 		parsedUUID, err := uuid.Parse(*params.RepositoryID)
 		if err != nil {
-			return pgtype.UUID{}, nil, pgtype.Timestamptz{}, pgtype.Timestamptz{}, nil, fmt.Errorf("invalid repository ID: %w", err)
+			return uuid.NullUUID{}, nil, dbtypes.Timestamp{}, dbtypes.Timestamp{}, nil, fmt.Errorf("invalid repository ID: %w", err)
 		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+		repoUUID = uuid.NullUUID{UUID: parsedUUID, Valid: true}
 	}
 
 	var ratingPtr *int32
@@ -831,12 +748,12 @@ func normalizeBrowseRepoParams(params QueryAssetsParams) (pgtype.UUID, *int32, p
 		ratingPtr = &rating
 	}
 
-	var fromTime, toTime pgtype.Timestamptz
+	var fromTime, toTime dbtypes.Timestamp
 	if params.DateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
+		fromTime = dbtypes.NewTimestamp(*params.DateFrom)
 	}
 	if params.DateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
+		toTime = dbtypes.NewTimestamp(*params.DateTo)
 	}
 
 	var queryPtr *string
@@ -862,26 +779,10 @@ func normalizeSortByPointer(sortBy string) *string {
 	}
 }
 
-// uuidFromPgUUID converts pgtype.UUID to google/uuid when Valid.
-func uuidFromPgUUID(value pgtype.UUID) (uuid.UUID, bool) {
-	if !value.Valid {
-		return uuid.Nil, false
-	}
-	return value.Bytes, true
-}
-
-// uuidSliceFromPgUUIDs filters invalid pgtype.UUID entries and returns a dense []uuid.UUID.
-func uuidSliceFromPgUUIDs(values []pgtype.UUID) []uuid.UUID {
-	if len(values) == 0 {
+func uuidSliceFromSQLiteJSON(value any) []uuid.UUID {
+	var ids dbtypes.UUIDs
+	if ids.Scan(value) != nil {
 		return nil
 	}
-	result := make([]uuid.UUID, 0, len(values))
-	for _, value := range values {
-		converted, ok := uuidFromPgUUID(value)
-		if !ok {
-			continue
-		}
-		result = append(result, converted)
-	}
-	return result
+	return append([]uuid.UUID(nil), ids...)
 }

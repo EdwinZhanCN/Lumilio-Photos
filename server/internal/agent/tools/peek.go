@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -87,16 +88,16 @@ func RegisterPeek() {
 				if row.Rating != nil && *row.Rating > 0 {
 					parts = append(parts, fmt.Sprintf("%d★", *row.Rating))
 				}
-				if row.Liked != nil && *row.Liked {
+				if row.Liked {
 					parts = append(parts, "liked")
 				}
-				if row.Place != "" {
-					parts = append(parts, "@"+ref.SanitizeUserText(row.Place, ref.MaxFacetValueLen))
+				if place := sqliteText(row.Place); place != "" {
+					parts = append(parts, "@"+ref.SanitizeUserText(place, ref.MaxFacetValueLen))
 				}
-				if people := sanitizePeople(row.People); people != "" {
+				if people := sanitizePeople(sqliteStringSlice(row.People)); people != "" {
 					parts = append(parts, people)
 				}
-				byID[uuid.UUID(row.AssetID.Bytes)] = peekRow{line: strings.Join(parts, " · ")}
+				byID[row.AssetID] = peekRow{line: strings.Join(parts, " · ")}
 			}
 
 			lines := make([]string, 0, len(page))
@@ -142,4 +143,36 @@ func sanitizePeople(names []string) string {
 		out += " +"
 	}
 	return out
+}
+
+func sqliteText(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []byte:
+		return string(typed)
+	case *string:
+		if typed != nil {
+			return *typed
+		}
+	}
+	return ""
+}
+
+func sqliteStringSlice(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		return typed
+	case string:
+		var values []string
+		if json.Unmarshal([]byte(typed), &values) == nil {
+			return values
+		}
+	case []byte:
+		var values []string
+		if json.Unmarshal(typed, &values) == nil {
+			return values
+		}
+	}
+	return nil
 }

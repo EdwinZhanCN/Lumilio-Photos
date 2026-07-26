@@ -70,17 +70,17 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 		return fmt.Errorf("unexpected metadata type for video: %T", result.Metadata)
 	}
 
-	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID.Bytes, videoInfo.Duration); err != nil {
+	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID, videoInfo.Duration); err != nil {
 		return fmt.Errorf("update duration: %w", err)
 	}
-	if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID.Bytes, int32(videoInfo.Width), int32(videoInfo.Height)); err != nil {
+	if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID, int32(videoInfo.Width), int32(videoInfo.Height)); err != nil {
 		return fmt.Errorf("update dimensions: %w", err)
 	}
 	sm, err := dbtypes.MarshalMeta(meta)
 	if err != nil {
 		return fmt.Errorf("marshal metadata: %w", err)
 	}
-	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
+	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID, sm, result.Raw); err != nil {
 		return fmt.Errorf("save metadata: %w", err)
 	}
 	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)

@@ -1,6 +1,8 @@
 package repocfg
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +22,36 @@ type RepositoryConfig struct {
 	// Storage configuration
 	StorageStrategy string        `yaml:"storage_strategy" json:"storage_strategy"` // "date", "cas", "flat" date -> yyyy/mm/IMG_001.jpg (month based)
 	LocalSettings   LocalSettings `yaml:"local_settings" json:"local_settings"`
+}
+
+func (rc *RepositoryConfig) Scan(src any) error {
+	if rc == nil {
+		return fmt.Errorf("repocfg.RepositoryConfig: nil receiver")
+	}
+	var value []byte
+	switch source := src.(type) {
+	case string:
+		value = []byte(source)
+	case []byte:
+		value = source
+	case nil:
+		*rc = RepositoryConfig{}
+		return nil
+	default:
+		return fmt.Errorf("repocfg.RepositoryConfig: unsupported source %T", src)
+	}
+	if err := json.Unmarshal(value, rc); err != nil {
+		return fmt.Errorf("repocfg.RepositoryConfig: decode: %w", err)
+	}
+	return nil
+}
+
+func (rc RepositoryConfig) Value() (driver.Value, error) {
+	value, err := json.Marshal(rc)
+	if err != nil {
+		return nil, fmt.Errorf("repocfg.RepositoryConfig: encode: %w", err)
+	}
+	return string(value), nil
 }
 
 // LocalSettings configures repository-specific behavior

@@ -10,16 +10,15 @@ import (
 	"server/internal/api"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // QueueHandler handles River queue monitoring endpoints (read-only)
 type QueueHandler struct {
-	dbpool *pgxpool.Pool
+	dbpool *sql.DB
 }
 
 // NewQueueHandler creates a new queue handler
-func NewQueueHandler(dbpool *pgxpool.Pool) *QueueHandler {
+func NewQueueHandler(dbpool *sql.DB) *QueueHandler {
 	return &QueueHandler{
 		dbpool: dbpool,
 	}
@@ -131,8 +130,8 @@ func (h *QueueHandler) GetJobStats(c *gin.Context) {
 	}
 
 	for state, countPtr := range stateQueries {
-		query := `SELECT COUNT(*) FROM river_job WHERE state = $1`
-		err := h.dbpool.QueryRow(ctx, query, state).Scan(countPtr)
+		query := `SELECT COUNT(*) FROM river_job WHERE state = ?`
+		err := h.dbpool.QueryRowContext(ctx, query, state).Scan(countPtr)
 		if err != nil {
 			api.GinError(c, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to fetch job stats")
 			return
@@ -167,17 +166,17 @@ SELECT
   COUNT(j.id) FILTER (WHERE j.state IN ('available', 'scheduled', 'running', 'retryable')) AS remaining_jobs,
   COUNT(j.id) FILTER (WHERE j.state = 'running') AS running_jobs,
   COUNT(j.id) FILTER (WHERE j.state IN ('retryable', 'cancelled', 'discarded')) AS attention_jobs,
-  AVG((EXTRACT(EPOCH FROM (j.finalized_at - j.created_at)) * 1000)::double precision)
+  AVG((julianday(j.finalized_at) - julianday(j.created_at)) * 86400000.0)
     FILTER (WHERE j.finalized_at IS NOT NULL) AS average_latency_ms,
-  AVG((EXTRACT(EPOCH FROM (j.finalized_at - j.attempted_at)) * 1000)::double precision)
+  AVG((julianday(j.finalized_at) - julianday(j.attempted_at)) * 86400000.0)
     FILTER (WHERE j.finalized_at IS NOT NULL AND j.attempted_at IS NOT NULL) AS average_runtime_ms,
   MIN(j.created_at) FILTER (WHERE j.state IN ('available', 'scheduled', 'running', 'retryable')) AS oldest_remaining_at,
   COALESCE(
-    MAX(GREATEST(
+    MAX(max(
       j.created_at,
       j.scheduled_at,
-      COALESCE(j.attempted_at, j.created_at),
-      COALESCE(j.finalized_at, j.created_at)
+      coalesce(j.attempted_at, j.created_at),
+      coalesce(j.finalized_at, j.created_at)
     )),
     MAX(rq.updated_at)
   ) AS latest_activity_at
@@ -185,10 +184,15 @@ FROM queue_names qn
 LEFT JOIN river_queue rq ON rq.name = qn.name
 LEFT JOIN river_job j ON j.queue = qn.name
 GROUP BY qn.name
-ORDER BY attention_jobs DESC, remaining_jobs DESC, latest_activity_at DESC NULLS LAST, qn.name
+ORDER BY
+  attention_jobs DESC,
+  remaining_jobs DESC,
+  latest_activity_at IS NULL,
+  latest_activity_at DESC,
+  qn.name
 `
 
-	rows, err := h.dbpool.Query(ctx, query)
+	rows, err := h.dbpool.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -237,14 +241,14 @@ WITH ranked_errors AS (
     queue,
     id,
     kind,
-    state::text AS state,
+    state,
     attempt,
     max_attempts,
     created_at,
     scheduled_at,
     attempted_at,
     finalized_at,
-    COALESCE(errors[array_length(errors, 1)]->>'error', '') AS last_error,
+    COALESCE(json_extract(errors, '$[#-1].error'), '') AS last_error,
     row_number() OVER (
       PARTITION BY queue
       ORDER BY COALESCE(attempted_at, finalized_at, created_at) DESC, id DESC
@@ -265,11 +269,11 @@ SELECT
   finalized_at,
   last_error
 FROM ranked_errors
-WHERE rn <= $1
+WHERE rn <= ?
 ORDER BY queue, rn
 `
 
-	rows, err := h.dbpool.Query(ctx, query, limit)
+	rows, err := h.dbpool.QueryContext(ctx, query, limit)
 	if err != nil {
 		return err
 	}

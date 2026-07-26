@@ -1,19 +1,19 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 
 	"server/internal/api"
 	"server/internal/db/repo"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 )
 
 func (h *AlbumHandler) getAuthorizedAlbum(c *gin.Context, albumID int32, unauthorizedMessage, forbiddenMessage string) (*repo.Album, bool) {
 	album, err := h.queries.GetAlbumByID(c.Request.Context(), albumID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Album not found")
 			return nil, false
 		}

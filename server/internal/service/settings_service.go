@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,8 +14,6 @@ import (
 	"server/internal/llm"
 	"server/internal/secretbox"
 	"server/internal/settings"
-
-	"github.com/jackc/pgx/v5"
 )
 
 type SystemSettings struct {
@@ -136,7 +135,7 @@ func (s *settingsService) EnsureInitialized(ctx context.Context) error {
 	if err == nil {
 		return nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("get settings: %w", err)
 	}
 
@@ -226,10 +225,10 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 			params.MlVideoSemanticEnabled = *input.ML.VideoSemanticEnabled
 		}
 		if input.ML.VideoMaxFrames != nil {
-			params.MlVideoMaxFrames = clampInt32(*input.ML.VideoMaxFrames, 1, 32)
+			params.MlVideoMaxFrames = int64(clampInt32(*input.ML.VideoMaxFrames, 1, 32))
 		}
 		if input.ML.VideoLongThresholdSeconds != nil {
-			params.MlVideoLongThresholdSeconds = clampInt32(*input.ML.VideoLongThresholdSeconds, 30, 3600)
+			params.MlVideoLongThresholdSeconds = int64(clampInt32(*input.ML.VideoLongThresholdSeconds, 30, 3600))
 		}
 		if input.ML.VideoSceneThreshold != nil {
 			params.MlVideoSceneThreshold = clampFloat64(*input.ML.VideoSceneThreshold, 0.05, 0.95)
@@ -241,10 +240,10 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 			params.BackupEnabled = *input.Backup.Enabled
 		}
 		if input.Backup.IntervalHours != nil {
-			params.BackupIntervalHours = clampInt32(*input.Backup.IntervalHours, 1, 24*30)
+			params.BackupIntervalHours = int64(clampInt32(*input.Backup.IntervalHours, 1, 24*30))
 		}
 		if input.Backup.KeepLast != nil {
-			params.BackupKeepLast = clampInt32(*input.Backup.KeepLast, 1, 365)
+			params.BackupKeepLast = int64(clampInt32(*input.Backup.KeepLast, 1, 365))
 		}
 	}
 
@@ -346,8 +345,8 @@ func (s *settingsService) seedFromDefaults(ctx context.Context) error {
 		MlOcrEnabled:                mlCfg.OCREnabled,
 		MlFaceEnabled:               mlCfg.FaceEnabled,
 		MlVideoSemanticEnabled:      mlCfg.VideoSemanticEnabled,
-		MlVideoMaxFrames:            int32(mlCfg.EffectiveVideoMaxFrames()),
-		MlVideoLongThresholdSeconds: int32(mlCfg.EffectiveVideoLongThresholdSeconds()),
+		MlVideoMaxFrames:            int64(mlCfg.EffectiveVideoMaxFrames()),
+		MlVideoLongThresholdSeconds: int64(mlCfg.EffectiveVideoLongThresholdSeconds()),
 		MlVideoSceneThreshold:       mlCfg.EffectiveVideoSceneThreshold(),
 		// Mirror the migration's column defaults: this INSERT names the backup
 		// columns explicitly, so zero values here would override them.
@@ -404,14 +403,14 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 			OCREnabled:                row.MlOcrEnabled,
 			FaceEnabled:               row.MlFaceEnabled,
 			VideoSemanticEnabled:      row.MlVideoSemanticEnabled,
-			VideoMaxFrames:            row.MlVideoMaxFrames,
-			VideoLongThresholdSeconds: row.MlVideoLongThresholdSeconds,
+			VideoMaxFrames:            int32(row.MlVideoMaxFrames),
+			VideoLongThresholdSeconds: int32(row.MlVideoLongThresholdSeconds),
 			VideoSceneThreshold:       row.MlVideoSceneThreshold,
 		},
 		Backup: BackupSettings{
 			Enabled:       row.BackupEnabled,
-			IntervalHours: row.BackupIntervalHours,
-			KeepLast:      row.BackupKeepLast,
+			IntervalHours: int32(row.BackupIntervalHours),
+			KeepLast:      int32(row.BackupKeepLast),
 		},
 		UpdatedAt: updatedAt,
 		UpdatedBy: row.UpdatedBy,

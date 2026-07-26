@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
 	"server/internal/queue/jobs"
@@ -24,10 +23,7 @@ func (w *LivePhotoMatchWorker) Work(ctx context.Context, job *river.Job[LivePhot
 		return fmt.Errorf("live photo matcher worker not configured")
 	}
 
-	assetID, err := uuid.FromBytes(job.Args.AssetID.Bytes[:])
-	if err != nil {
-		return fmt.Errorf("parse asset ID: %w", err)
-	}
+	assetID := job.Args.AssetID
 
 	if err := w.StackService.MatchLivePhotoStack(ctx, assetID); err != nil {
 		return fmt.Errorf("match live photo stack for asset %s: %w", assetID, err)

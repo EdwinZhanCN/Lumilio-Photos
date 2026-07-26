@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -43,7 +43,7 @@ type scopeRefs struct {
 
 // MemoryStore is a bounded hot cache backed by agent_refs when queries is
 // configured. Every production ref is persisted before becoming visible; LRU
-// eviction therefore spills to PostgreSQL instead of losing checkpoint state.
+// eviction therefore spills to SQLite instead of losing checkpoint state.
 type MemoryStore struct {
 	mu           sync.Mutex
 	scopes       map[scopeKey]*scopeRefs
@@ -126,22 +126,18 @@ func (s *MemoryStore) Create(ctx context.Context, scope Scope, plan Plan, hint, 
 		if marshalErr != nil {
 			return nil, Internal("ref persistence")
 		}
-		pgIDs := make([]pgtype.UUID, len(assetIDs))
-		for i, id := range assetIDs {
-			pgIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-		}
 		if err := s.queries.UpsertAgentRef(ctx, repo.UpsertAgentRefParams{
 			UserID: scope.UserID, ThreadID: scope.ThreadID, RefID: r.ID,
-			Sequence: int32(r.seq), Plan: planJSON, AssetIds: pgIDs,
+			Sequence: int64(r.seq), Plan: dbtypes.JSON(planJSON), AssetIds: dbtypes.UUIDs(assetIDs),
 			Summary: summary, Truncated: truncated,
-			CreatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
-			LastAccessedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			ExpiresAt:      pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+			CreatedAt:      dbtypes.NewTimestamp(now),
+			LastAccessedAt: dbtypes.NewTimestamp(now),
+			ExpiresAt:      dbtypes.NewTimestamp(now.Add(s.ttl)),
 		}); err != nil {
 			return nil, ResourceExhausted("ref persistence is unavailable and the hot-memory budget cannot safely accept unspillable state")
 		}
 		trimmed, err := s.queries.TrimAgentThreadRefs(ctx, repo.TrimAgentThreadRefsParams{
-			UserID: scope.UserID, ThreadID: scope.ThreadID, MaxRefs: int32(s.maxPerScope),
+			UserID: scope.UserID, ThreadID: scope.ThreadID, MaxRefs: int64(s.maxPerScope),
 		})
 		if err != nil {
 			return nil, ResourceExhausted("ref persistence is unavailable and the per-thread limit cannot be enforced")
@@ -179,7 +175,8 @@ func (s *MemoryStore) Get(ctx context.Context, scope Scope, id string) (*Ref, *E
 				}
 				if s.queries != nil {
 					if _, err := s.queries.GetAgentRef(ctx, repo.GetAgentRefParams{
-						ExpiresAt: pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+						Now:       dbtypes.NewTimestamp(now),
+						ExpiresAt: dbtypes.NewTimestamp(now.Add(s.ttl)),
 						UserID:    scope.UserID,
 						ThreadID:  scope.ThreadID,
 						RefID:     id,
@@ -197,7 +194,8 @@ func (s *MemoryStore) Get(ctx context.Context, scope Scope, id string) (*Ref, *E
 		return nil, NotFound(id)
 	}
 	row, err := s.queries.GetAgentRef(ctx, repo.GetAgentRefParams{
-		ExpiresAt: pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+		Now:       dbtypes.NewTimestamp(now),
+		ExpiresAt: dbtypes.NewTimestamp(now.Add(s.ttl)),
 		UserID:    scope.UserID, ThreadID: scope.ThreadID, RefID: id,
 	})
 	if err != nil {
@@ -265,7 +263,8 @@ func (s *MemoryStore) ReleaseScope(ctx context.Context, scope Scope) error {
 	s.mu.Unlock()
 	if s.queries != nil {
 		return s.queries.ReleaseAgentThreadRefs(ctx, repo.ReleaseAgentThreadRefsParams{
-			ExpiresAt: pgtype.Timestamptz{Time: now.Add(s.ttl), Valid: true},
+			Now:       dbtypes.NewTimestamp(now),
+			ExpiresAt: dbtypes.NewTimestamp(now.Add(s.ttl)),
 			UserID:    scope.UserID,
 			ThreadID:  scope.ThreadID,
 		})
@@ -293,7 +292,9 @@ func (s *MemoryStore) DeleteScope(ctx context.Context, scope Scope) error {
 }
 
 func (s *MemoryStore) loadScopeLocked(ctx context.Context, scope Scope, sc *scopeRefs) {
-	rows, err := s.queries.ListAgentRefs(ctx, repo.ListAgentRefsParams{UserID: scope.UserID, ThreadID: scope.ThreadID})
+	rows, err := s.queries.ListAgentRefs(ctx, repo.ListAgentRefsParams{
+		UserID: scope.UserID, ThreadID: scope.ThreadID, Now: dbtypes.NewTimestamp(s.now()),
+	})
 	if err != nil {
 		return
 	}
@@ -315,12 +316,7 @@ func refFromRow(row repo.AgentRef) (*Ref, error) {
 	if err := json.Unmarshal(row.Plan, &plan); err != nil {
 		return nil, err
 	}
-	ids := make([]uuid.UUID, 0, len(row.AssetIds))
-	for _, id := range row.AssetIds {
-		if id.Valid {
-			ids = append(ids, uuid.UUID(id.Bytes))
-		}
-	}
+	ids := append([]uuid.UUID(nil), row.AssetIds...)
 	return &Ref{
 		ID: row.RefID, Scope: Scope{UserID: row.UserID, ThreadID: row.ThreadID},
 		Plan: plan, AssetIDs: ids, Summary: row.Summary, Truncated: row.Truncated,
@@ -423,6 +419,6 @@ func (s *MemoryStore) sweep(ctx context.Context) {
 	}
 	s.mu.Unlock()
 	if s.queries != nil {
-		_ = s.queries.DeleteExpiredAgentRefs(ctx)
+		_ = s.queries.DeleteExpiredAgentRefs(ctx, dbtypes.NewTimestamp(now))
 	}
 }

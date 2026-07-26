@@ -30,6 +30,11 @@ type StagingManager interface {
 	// relative path it was written to.
 	CommitStagingFileToInbox(stagingFile *StagingFile, hash string) (string, error)
 
+	// ResolveInboxPath computes the repository-relative target without moving
+	// the staged file. Materialization records this target before the rename so
+	// a retry can reconcile either side of the filesystem/transaction boundary.
+	ResolveInboxPath(repoPath string, originalFilename, hash string) (string, error)
+
 	// MoveStagingToFailed moves a staged file into .lumilio/staging/failed.
 	MoveStagingToFailed(stagingFile *StagingFile) error
 
@@ -169,10 +174,9 @@ func (sm *DefaultStagingManager) resolveFailedPath(repoPath string, originalFile
 	return filepath.Join(DefaultStructure.FailedDir, failedFilename), nil
 }
 
-// ResolveInboxPath computes (without moving) the inbox-relative target path for a
-// file under the repository's storage strategy. Kept off the interface; used for
-// inspection and tests. Note: cas/date strategies create the target directory as
-// a side effect.
+// ResolveInboxPath computes (without moving) the inbox-relative target path for
+// a file under the repository's storage strategy. Note: cas/date strategies
+// create the target directory as a side effect.
 func (sm *DefaultStagingManager) ResolveInboxPath(repoPath string, originalFilename, hash string) (string, error) {
 	cfg, err := repocfg.LoadConfigFromFile(repoPath)
 	if err != nil {

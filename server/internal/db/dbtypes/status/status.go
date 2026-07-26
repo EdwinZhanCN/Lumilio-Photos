@@ -111,13 +111,13 @@ func (s *AssetStatus) AddError(task, errorMsg string) {
 	})
 }
 
-// ToJSONB converts AssetStatus to JSONB format for database storage
-func (s AssetStatus) ToJSONB() ([]byte, error) {
+// ToJSON encodes AssetStatus for database storage.
+func (s AssetStatus) ToJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// FromJSONB parses JSONB data into AssetStatus
-func FromJSONB(data []byte) (AssetStatus, error) {
+// FromJSON decodes an AssetStatus from database storage.
+func FromJSON(data []byte) (AssetStatus, error) {
 	var status AssetStatus
 	if err := json.Unmarshal(data, &status); err != nil {
 		return AssetStatus{}, fmt.Errorf("failed to unmarshal asset status: %w", err)

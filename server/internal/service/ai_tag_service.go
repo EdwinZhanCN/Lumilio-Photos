@@ -7,7 +7,7 @@ import (
 
 	"server/internal/db/repo"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 // AssetTagSourceZeroshot is the asset_tags.source value for tags written
@@ -26,7 +26,7 @@ type AIGeneratedTag struct {
 }
 
 type AIGeneratedTagService interface {
-	ReplaceAssetAIGeneratedTags(ctx context.Context, assetID pgtype.UUID, tags []AIGeneratedTag, sources []string) error
+	ReplaceAssetAIGeneratedTags(ctx context.Context, assetID uuid.UUID, tags []AIGeneratedTag, sources []string) error
 }
 
 type aiGeneratedTagService struct {
@@ -37,7 +37,7 @@ func NewAIGeneratedTagService(queries *repo.Queries) AIGeneratedTagService {
 	return &aiGeneratedTagService{queries: queries}
 }
 
-func (s *aiGeneratedTagService) ReplaceAssetAIGeneratedTags(ctx context.Context, assetID pgtype.UUID, tags []AIGeneratedTag, sources []string) error {
+func (s *aiGeneratedTagService) ReplaceAssetAIGeneratedTags(ctx context.Context, assetID uuid.UUID, tags []AIGeneratedTag, sources []string) error {
 	normalizedSources := normalizeAssetTagSources(sources)
 	if len(normalizedSources) > 0 {
 		if err := s.queries.RemoveAssetTagsBySources(ctx, repo.RemoveAssetTagsBySourcesParams{
@@ -55,15 +55,10 @@ func (s *aiGeneratedTagService) ReplaceAssetAIGeneratedTags(ctx context.Context,
 			return err
 		}
 
-		confidenceNumeric := pgtype.Numeric{}
-		if err := confidenceNumeric.Scan(fmt.Sprintf("%.3f", tag.Confidence)); err != nil {
-			return fmt.Errorf("convert confidence for tag %q: %w", tag.Name, err)
-		}
-
 		if err := s.queries.AddTagToAsset(ctx, repo.AddTagToAssetParams{
 			AssetID:    assetID,
 			TagID:      dbTag.TagID,
-			Confidence: confidenceNumeric,
+			Confidence: float64(tag.Confidence),
 			Source:     normalizeAssetTagSource(tag.Source),
 		}); err != nil {
 			return fmt.Errorf("attach tag %q to asset: %w", tag.Name, err)
@@ -79,10 +74,9 @@ func (s *aiGeneratedTagService) getOrCreateTagByName(ctx context.Context, name, 
 		return &tag, nil
 	}
 
-	isAIGenerated := true
 	params := repo.CreateTagParams{
 		TagName:       name,
-		IsAiGenerated: &isAIGenerated,
+		IsAiGenerated: true,
 	}
 	if category != "" {
 		params.Category = &category

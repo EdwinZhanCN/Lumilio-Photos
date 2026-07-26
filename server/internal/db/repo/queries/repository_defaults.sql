@@ -8,10 +8,10 @@ INSERT INTO repository_defaults (
     strategy,
     duplicate_handling
 ) VALUES (
-    1, $1, $2
+    1, ?1, ?2
 )
 ON CONFLICT (id) DO UPDATE SET
     strategy = EXCLUDED.strategy,
     duplicate_handling = EXCLUDED.duplicate_handling,
-    updated_at = NOW()
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 RETURNING *;

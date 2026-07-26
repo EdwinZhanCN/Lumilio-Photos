@@ -69,7 +69,7 @@ func RegisterInspect() {
 
 			byID := make(map[uuid.UUID]string, len(rows))
 			for _, row := range rows {
-				byID[uuid.UUID(row.AssetID.Bytes)] = formatInspectLine(row.Type, []byte(row.SpecificMetadata))
+				byID[row.AssetID] = formatInspectLine(row.Type, []byte(row.SpecificMetadata))
 			}
 
 			lines := make([]string, 0, len(r.AssetIDs))

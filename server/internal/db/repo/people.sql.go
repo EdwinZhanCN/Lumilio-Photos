@@ -8,16 +8,17 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const countPeopleScoped = `-- name: CountPeopleScoped :one
 SELECT COUNT(*)
 FROM face_clusters fc
-WHERE ($1::boolean OR COALESCE(fc.is_hidden, false) = false)
+WHERE (?1 OR COALESCE(fc.is_hidden, false) = false)
   AND (
-    $2::integer IS NULL
-    OR fc.owner_id = $2
+    ?2 IS NULL
+    OR fc.owner_id = ?2
   )
   AND EXISTS (
     SELECT 1
@@ -27,33 +28,67 @@ WHERE ($1::boolean OR COALESCE(fc.is_hidden, false) = false)
     WHERE fcm.cluster_id = fc.cluster_id
       AND a.is_deleted = false
       AND (
-        $2::integer IS NULL
-        OR a.owner_id = $2
+        ?2 IS NULL
+        OR a.owner_id = ?2
       )
       AND (
-        $3::uuid IS NULL
-        OR a.repository_id = $3
+        ?3 IS NULL
+        OR a.repository_id = ?3
       )
 )
 `
 
 type CountPeopleScopedParams struct {
-	IncludeHidden bool        `db:"include_hidden" json:"include_hidden"`
-	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
-	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
+	IncludeHidden interface{} `db:"include_hidden" json:"include_hidden"`
+	OwnerID       interface{} `db:"owner_id" json:"owner_id"`
+	RepositoryID  interface{} `db:"repository_id" json:"repository_id"`
 }
 
-// owner_id filters on the cluster's structural owner (NULL-owner clusters are
-// admin-only); repository_id stays a member-asset display filter because
-// people legitimately span repositories.
 func (q *Queries) CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPeopleScoped, arg.IncludeHidden, arg.OwnerID, arg.RepositoryID)
+	row := q.db.QueryRowContext(ctx, countPeopleScoped, arg.IncludeHidden, arg.OwnerID, arg.RepositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const getPersonByIDScoped = `-- name: GetPersonByIDScoped :one
+WITH scoped AS (
+    SELECT
+        fcm.cluster_id,
+        COUNT(DISTINCT fcm.face_id) AS member_count,
+        COUNT(DISTINCT fi.asset_id) AS asset_count
+    FROM face_cluster_members fcm
+    JOIN face_items fi ON fi.id = fcm.face_id
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (?3 IS NULL OR a.repository_id = ?3)
+    GROUP BY fcm.cluster_id
+),
+representative_faces AS (
+    SELECT fi.id, fi.face_image_path, fi.asset_id
+    FROM face_items fi
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (?3 IS NULL OR a.repository_id = ?3)
+),
+ranked_faces AS (
+    SELECT
+        fcm.cluster_id,
+        fi.face_image_path,
+        fi.asset_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY fcm.cluster_id
+            ORDER BY COALESCE(fi.is_primary, false) DESC,
+                     fi.confidence DESC,
+                     COALESCE(fi.face_size, 0) DESC,
+                     fi.id
+        ) AS face_rank
+    FROM face_cluster_members fcm
+    JOIN face_items fi ON fi.id = fcm.face_id
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (?3 IS NULL OR a.repository_id = ?3)
+)
 SELECT
     fc.cluster_id,
     fc.cluster_name,
@@ -63,81 +98,42 @@ SELECT
     scoped.member_count,
     scoped.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
-    COALESCE(rep.asset_id, best.asset_id)::uuid AS representative_asset_id,
+    COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
     fc.created_at,
     fc.updated_at
 FROM face_clusters fc
-JOIN LATERAL (
-    SELECT
-        COUNT(DISTINCT fcm.face_id)::bigint AS member_count,
-        COUNT(DISTINCT fi.asset_id)::bigint AS asset_count
-    FROM face_cluster_members fcm
-    JOIN face_items fi ON fi.id = fcm.face_id
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fcm.cluster_id = fc.cluster_id
-      AND a.is_deleted = false
-      AND (
-        $1::uuid IS NULL
-        OR a.repository_id = $1
-      )
-) scoped ON scoped.member_count > 0
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_items fi
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fi.id = fc.representative_face_id
-      AND a.is_deleted = false
-      AND (
-        $1::uuid IS NULL
-        OR a.repository_id = $1
-      )
-    LIMIT 1
-) rep ON true
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_cluster_members fcm
-    JOIN face_items fi ON fi.id = fcm.face_id
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fcm.cluster_id = fc.cluster_id
-      AND a.is_deleted = false
-      AND (
-        $1::uuid IS NULL
-        OR a.repository_id = $1
-      )
-    ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
-    LIMIT 1
-) best ON true
-WHERE fc.cluster_id = $2
+JOIN scoped ON scoped.cluster_id = fc.cluster_id AND scoped.member_count > 0
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
+WHERE fc.cluster_id = ?1
   AND (
-    $3::integer IS NULL
-    OR fc.owner_id = $3
+    ?2 IS NULL
+    OR fc.owner_id = ?2
   )
 `
 
 type GetPersonByIDScopedParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
 	ClusterID    int32       `db:"cluster_id" json:"cluster_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
 }
 
 type GetPersonByIDScopedRow struct {
-	ClusterID             int32              `db:"cluster_id" json:"cluster_id"`
-	ClusterName           *string            `db:"cluster_name" json:"cluster_name"`
-	IsConfirmed           *bool              `db:"is_confirmed" json:"is_confirmed"`
-	IsHidden              bool               `db:"is_hidden" json:"is_hidden"`
-	HiddenAt              pgtype.Timestamptz `db:"hidden_at" json:"hidden_at"`
-	MemberCount           int64              `db:"member_count" json:"member_count"`
-	AssetCount            int64              `db:"asset_count" json:"asset_count"`
-	CoverFaceImagePath    *string            `db:"cover_face_image_path" json:"cover_face_image_path"`
-	RepresentativeAssetID pgtype.UUID        `db:"representative_asset_id" json:"representative_asset_id"`
-	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ClusterID             int32             `db:"cluster_id" json:"cluster_id"`
+	ClusterName           *string           `db:"cluster_name" json:"cluster_name"`
+	IsConfirmed           bool              `db:"is_confirmed" json:"is_confirmed"`
+	IsHidden              bool              `db:"is_hidden" json:"is_hidden"`
+	HiddenAt              dbtypes.Timestamp `db:"hidden_at" json:"hidden_at"`
+	MemberCount           int64             `db:"member_count" json:"member_count"`
+	AssetCount            int64             `db:"asset_count" json:"asset_count"`
+	CoverFaceImagePath    *string           `db:"cover_face_image_path" json:"cover_face_image_path"`
+	RepresentativeAssetID uuid.UUID         `db:"representative_asset_id" json:"representative_asset_id"`
+	CreatedAt             dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt             dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-// Authorization is an equality check on the cluster's structural owner;
-// repository_id remains a read-time display filter on member counts/covers.
 func (q *Queries) GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error) {
-	row := q.db.QueryRow(ctx, getPersonByIDScoped, arg.RepositoryID, arg.ClusterID, arg.OwnerID)
+	row := q.db.QueryRowContext(ctx, getPersonByIDScoped, arg.ClusterID, arg.OwnerID, arg.RepositoryID)
 	var i GetPersonByIDScopedRow
 	err := row.Scan(
 		&i.ClusterID,
@@ -156,24 +152,24 @@ func (q *Queries) GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScop
 }
 
 const listPeopleScoped = `-- name: ListPeopleScoped :many
-WITH page_people AS MATERIALIZED (
+WITH page_people AS (
     SELECT
         fc.cluster_id,
-        COUNT(DISTINCT fcm.face_id)::bigint AS member_count,
-        COUNT(DISTINCT fi.asset_id)::bigint AS asset_count
+        COUNT(DISTINCT fcm.face_id) AS member_count,
+        COUNT(DISTINCT fi.asset_id) AS asset_count
     FROM face_clusters fc
     JOIN face_cluster_members fcm ON fcm.cluster_id = fc.cluster_id
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
-      AND ($3::boolean OR COALESCE(fc.is_hidden, false) = false)
+      AND (?1 OR COALESCE(fc.is_hidden, false) = false)
       AND (
-        $1::integer IS NULL
-        OR fc.owner_id = $1
+        ?2 IS NULL
+        OR fc.owner_id = ?2
       )
       AND (
-        $2::uuid IS NULL
-        OR a.repository_id = $2
+        ?3 IS NULL
+        OR a.repository_id = ?3
       )
     GROUP BY fc.cluster_id, fc.is_confirmed, fc.updated_at
     ORDER BY
@@ -181,7 +177,34 @@ WITH page_people AS MATERIALIZED (
         COUNT(DISTINCT fcm.face_id) DESC,
         fc.updated_at DESC,
         fc.cluster_id DESC
-    LIMIT $5 OFFSET $4
+    LIMIT ?5 OFFSET ?4
+),
+representative_faces AS (
+    SELECT fi.id, fi.face_image_path, fi.asset_id
+    FROM face_items fi
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (?2 IS NULL OR a.owner_id = ?2)
+      AND (?3 IS NULL OR a.repository_id = ?3)
+),
+ranked_faces AS (
+    SELECT
+        fcm.cluster_id,
+        fi.face_image_path,
+        fi.asset_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY fcm.cluster_id
+            ORDER BY COALESCE(fi.is_primary, false) DESC,
+                     fi.confidence DESC,
+                     COALESCE(fi.face_size, 0) DESC,
+                     fi.id
+        ) AS face_rank
+    FROM face_cluster_members fcm
+    JOIN face_items fi ON fi.id = fcm.face_id
+    JOIN assets a ON a.asset_id = fi.asset_id
+    WHERE a.is_deleted = false
+      AND (?2 IS NULL OR a.owner_id = ?2)
+      AND (?3 IS NULL OR a.repository_id = ?3)
 )
 SELECT
     fc.cluster_id,
@@ -192,45 +215,13 @@ SELECT
     pp.member_count,
     pp.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
-    COALESCE(rep.asset_id, best.asset_id)::uuid AS representative_asset_id,
+    COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
     fc.created_at,
     fc.updated_at
 FROM page_people pp
 JOIN face_clusters fc ON fc.cluster_id = pp.cluster_id
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_items fi
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fi.id = fc.representative_face_id
-      AND a.is_deleted = false
-      AND (
-        $1::integer IS NULL
-        OR a.owner_id = $1
-      )
-      AND (
-        $2::uuid IS NULL
-        OR a.repository_id = $2
-      )
-    LIMIT 1
-) rep ON true
-LEFT JOIN LATERAL (
-    SELECT fi.face_image_path, fi.asset_id
-    FROM face_cluster_members fcm
-    JOIN face_items fi ON fi.id = fcm.face_id
-    JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE fcm.cluster_id = fc.cluster_id
-      AND a.is_deleted = false
-      AND (
-        $1::integer IS NULL
-        OR a.owner_id = $1
-      )
-      AND (
-        $2::uuid IS NULL
-        OR a.repository_id = $2
-      )
-    ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
-    LIMIT 1
-) best ON true
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
 ORDER BY
     COALESCE(fc.is_confirmed, false) DESC,
     pp.member_count DESC,
@@ -239,32 +230,32 @@ ORDER BY
 `
 
 type ListPeopleScopedParams struct {
-	OwnerID       *int32      `db:"owner_id" json:"owner_id"`
-	RepositoryID  pgtype.UUID `db:"repository_id" json:"repository_id"`
-	IncludeHidden bool        `db:"include_hidden" json:"include_hidden"`
-	Offset        int32       `db:"offset" json:"offset"`
-	Limit         int32       `db:"limit" json:"limit"`
+	IncludeHidden interface{} `db:"include_hidden" json:"include_hidden"`
+	OwnerID       interface{} `db:"owner_id" json:"owner_id"`
+	RepositoryID  interface{} `db:"repository_id" json:"repository_id"`
+	Offset        int64       `db:"offset" json:"offset"`
+	Limit         int64       `db:"limit" json:"limit"`
 }
 
 type ListPeopleScopedRow struct {
-	ClusterID             int32              `db:"cluster_id" json:"cluster_id"`
-	ClusterName           *string            `db:"cluster_name" json:"cluster_name"`
-	IsConfirmed           *bool              `db:"is_confirmed" json:"is_confirmed"`
-	IsHidden              bool               `db:"is_hidden" json:"is_hidden"`
-	HiddenAt              pgtype.Timestamptz `db:"hidden_at" json:"hidden_at"`
-	MemberCount           int64              `db:"member_count" json:"member_count"`
-	AssetCount            int64              `db:"asset_count" json:"asset_count"`
-	CoverFaceImagePath    *string            `db:"cover_face_image_path" json:"cover_face_image_path"`
-	RepresentativeAssetID pgtype.UUID        `db:"representative_asset_id" json:"representative_asset_id"`
-	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ClusterID             int32             `db:"cluster_id" json:"cluster_id"`
+	ClusterName           *string           `db:"cluster_name" json:"cluster_name"`
+	IsConfirmed           bool              `db:"is_confirmed" json:"is_confirmed"`
+	IsHidden              bool              `db:"is_hidden" json:"is_hidden"`
+	HiddenAt              dbtypes.Timestamp `db:"hidden_at" json:"hidden_at"`
+	MemberCount           int64             `db:"member_count" json:"member_count"`
+	AssetCount            int64             `db:"asset_count" json:"asset_count"`
+	CoverFaceImagePath    *string           `db:"cover_face_image_path" json:"cover_face_image_path"`
+	RepresentativeAssetID uuid.UUID         `db:"representative_asset_id" json:"representative_asset_id"`
+	CreatedAt             dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt             dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error) {
-	rows, err := q.db.Query(ctx, listPeopleScoped,
+	rows, err := q.db.QueryContext(ctx, listPeopleScoped,
+		arg.IncludeHidden,
 		arg.OwnerID,
 		arg.RepositoryID,
-		arg.IncludeHidden,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -292,6 +283,9 @@ func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedPara
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -301,10 +295,10 @@ func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedPara
 const renameFaceCluster = `-- name: RenameFaceCluster :one
 UPDATE face_clusters
 SET
-    cluster_name = $1,
+    cluster_name = ?1,
     is_confirmed = true,
-    updated_at = CURRENT_TIMESTAMP
-WHERE cluster_id = $2
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE cluster_id = ?2
 RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
@@ -314,7 +308,7 @@ type RenameFaceClusterParams struct {
 }
 
 func (q *Queries) RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error) {
-	row := q.db.QueryRow(ctx, renameFaceCluster, arg.ClusterName, arg.ClusterID)
+	row := q.db.QueryRowContext(ctx, renameFaceCluster, arg.ClusterName, arg.ClusterID)
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
@@ -335,10 +329,13 @@ func (q *Queries) RenameFaceCluster(ctx context.Context, arg RenameFaceClusterPa
 const setFaceClusterHidden = `-- name: SetFaceClusterHidden :one
 UPDATE face_clusters
 SET
-    is_hidden = $1,
-    hidden_at = CASE WHEN $1 THEN CURRENT_TIMESTAMP ELSE NULL END,
-    updated_at = CURRENT_TIMESTAMP
-WHERE cluster_id = $2
+    is_hidden = ?1,
+    hidden_at = CASE
+        WHEN ?1 THEN CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+        ELSE NULL
+    END,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE cluster_id = ?2
 RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
@@ -348,7 +345,7 @@ type SetFaceClusterHiddenParams struct {
 }
 
 func (q *Queries) SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error) {
-	row := q.db.QueryRow(ctx, setFaceClusterHidden, arg.IsHidden, arg.ClusterID)
+	row := q.db.QueryRowContext(ctx, setFaceClusterHidden, arg.IsHidden, arg.ClusterID)
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,
@@ -369,21 +366,21 @@ func (q *Queries) SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHi
 const updateFaceClusterRepresentative = `-- name: UpdateFaceClusterRepresentative :one
 UPDATE face_clusters
 SET
-    representative_face_id = $1,
-    confidence_score = $2,
-    updated_at = CURRENT_TIMESTAMP
-WHERE cluster_id = $3
+    representative_face_id = ?1,
+    confidence_score = ?2,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE cluster_id = ?3
 RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
 type UpdateFaceClusterRepresentativeParams struct {
-	RepresentativeFaceID *int32   `db:"representative_face_id" json:"representative_face_id"`
-	ConfidenceScore      *float32 `db:"confidence_score" json:"confidence_score"`
+	RepresentativeFaceID *int64   `db:"representative_face_id" json:"representative_face_id"`
+	ConfidenceScore      *float64 `db:"confidence_score" json:"confidence_score"`
 	ClusterID            int32    `db:"cluster_id" json:"cluster_id"`
 }
 
 func (q *Queries) UpdateFaceClusterRepresentative(ctx context.Context, arg UpdateFaceClusterRepresentativeParams) (FaceCluster, error) {
-	row := q.db.QueryRow(ctx, updateFaceClusterRepresentative, arg.RepresentativeFaceID, arg.ConfidenceScore, arg.ClusterID)
+	row := q.db.QueryRowContext(ctx, updateFaceClusterRepresentative, arg.RepresentativeFaceID, arg.ConfidenceScore, arg.ClusterID)
 	var i FaceCluster
 	err := row.Scan(
 		&i.ClusterID,

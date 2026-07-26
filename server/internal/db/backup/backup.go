@@ -1,259 +1,360 @@
-// Package backup implements the app-driven PostgreSQL logical-backup engine
-// shared by the Docker server and the desktop supervisor (see
-// exec-plans/completed/db-backup-recovery.md). It shells out to a pg_dump whose
-// major version matches the connected server, writes gzip dumps atomically
-// (.tmp + rename) with provenance-carrying filenames, and prunes by count.
+// Package backup creates, validates, retains, and stages consistent SQLite
+// library snapshots. It never copies a live WAL database directly.
 package backup
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"server/internal/db"
+
+	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
-// Conn is the connection target for the dump tools. Host may be a Unix socket
-// directory (desktop) or a hostname (Docker). Password is the startup
-// credential; PasswordFile, when present and non-empty, is resolved immediately
-// before each tool invocation so first-run credential rotation does not leave
-// the long-lived backup runtime holding the bootstrap password.
-type Conn struct {
-	Host         string
-	Port         string
-	User         string
-	Password     string
-	PasswordFile string
-	DBName       string
-}
-
-// ResolvedPassword returns the current rotated credential when available,
-// falling back to the startup credential before first-run setup has completed.
-func (c Conn) ResolvedPassword() string {
-	if secretPath := strings.TrimSpace(c.PasswordFile); secretPath != "" {
-		if data, err := os.ReadFile(secretPath); err == nil {
-			if password := strings.TrimSpace(string(data)); password != "" {
-				return password
-			}
-		}
-	}
-	return c.Password
-}
+const manifestFormatVersion = 1
 
 // Logf matches the supervisor-style logging callback used across the app.
 type Logf func(format string, args ...any)
 
-// ErrUnsupportedTools means no pg_dump matching the server's major version
-// could be located; dumping with a mismatched client is never attempted.
-type ErrUnsupportedTools struct {
-	Major int
-	Tried []string
+// SnapshotMetadata is supplied by the runtime for provenance that is not
+// stored inside the database itself.
+type SnapshotMetadata struct {
+	AppVersion          string
+	ConfigSchemaVersion int
 }
 
-func (e *ErrUnsupportedTools) Error() string {
-	return fmt.Sprintf("no PostgreSQL %d client tools found (tried: %s)", e.Major, strings.Join(e.Tried, ", "))
+// Manifest is the checksum and compatibility contract paired with every
+// SQLite snapshot.
+type Manifest struct {
+	FormatVersion        int       `json:"format_version"`
+	AppVersion           string    `json:"app_version"`
+	ConfigSchemaVersion  int       `json:"config_schema_version"`
+	ApplicationMigration int64     `json:"application_migration_version"`
+	RiverMigration       int64     `json:"river_migration_version"`
+	SQLiteVersion        string    `json:"sqlite_version"`
+	VectorVersion        string    `json:"sqlite_vec_version"`
+	CreatedAt            time.Time `json:"created_at"`
+	DatabaseSize         int64     `json:"database_size"`
+	SHA256               string    `json:"sha256"`
+	QuickCheck           string    `json:"quick_check"`
+	ForeignKeyViolations int       `json:"foreign_key_violations"`
+	LibraryID            string    `json:"library_id"`
 }
 
-// RowQuerier is the slice of pgxpool.Pool the version probe needs.
-type RowQuerier interface {
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+// Snapshot is a finalized database and manifest pair.
+type Snapshot struct {
+	Path         string
+	ManifestPath string
+	Manifest     Manifest
 }
 
-// ServerVersion asks the connected server for its version ("17.5") and major
-// (17). Always ask the server, never the binaries: the tools are chosen to
-// match the server, not the other way around.
-func ServerVersion(ctx context.Context, q RowQuerier) (string, int, error) {
-	var v string
-	if err := q.QueryRow(ctx, "SHOW server_version").Scan(&v); err != nil {
-		return "", 0, fmt.Errorf("query server_version: %w", err)
+// Compatibility constrains which snapshot may be staged over the active
+// runtime. Older schemas are allowed because the next generation migrates
+// them; future schemas are rejected.
+type Compatibility struct {
+	LibraryID               string
+	ConfigSchemaVersion     int
+	MaxApplicationMigration int64
+	MaxRiverMigration       int64
+}
+
+// CreateSnapshot uses SQLite's Online Backup API to create a transactionally
+// consistent standalone database, validates it through an independent
+// connection, writes a checksum manifest, and atomically finalizes both files.
+func CreateSnapshot(
+	ctx context.Context,
+	source *sql.DB,
+	destDir string,
+	prefix string,
+	metadata SnapshotMetadata,
+	logf Logf,
+) (Snapshot, error) {
+	if source == nil {
+		return Snapshot{}, errors.New("SQLite backup source is nil")
 	}
-	major, err := majorOf(v)
-	if err != nil {
-		return "", 0, err
-	}
-	return v, major, nil
-}
-
-var majorRe = regexp.MustCompile(`^(\d+)`)
-
-func majorOf(version string) (int, error) {
-	m := majorRe.FindStringSubmatch(strings.TrimSpace(version))
-	if m == nil {
-		return 0, fmt.Errorf("unparseable PostgreSQL version %q", version)
-	}
-	return strconv.Atoi(m[1])
-}
-
-// LocateTools resolves the directory holding pg_dump/psql for the given server
-// major version. Resolution order:
-//
-//  1. binDirOverride (desktop: the bundled bin dir) — trusted, only checked
-//     for the binary's existence;
-//  2. versioned platform layouts (PGDG on Linux, Homebrew on macOS);
-//  3. pg_dump on PATH, accepted only when `pg_dump --version` reports the
-//     same major (dev machines).
-func LocateTools(binDirOverride string, major int) (string, error) {
-	tried := make([]string, 0, 5)
-
-	if dir := strings.TrimSpace(binDirOverride); dir != "" {
-		if _, err := os.Stat(filepath.Join(dir, clientToolName("pg_dump", runtime.GOOS))); err == nil {
-			return dir, nil
-		}
-		tried = append(tried, dir)
-	}
-
-	for _, dir := range platformToolDirs(major, runtime.GOOS) {
-		if _, err := os.Stat(filepath.Join(dir, clientToolName("pg_dump", runtime.GOOS))); err == nil {
-			return dir, nil
-		}
-		tried = append(tried, dir)
-	}
-
-	if pathBin, err := exec.LookPath("pg_dump"); err == nil {
-		out, verr := exec.Command(pathBin, "--version").Output()
-		if verr == nil {
-			// "pg_dump (PostgreSQL) 17.5"
-			fields := strings.Fields(strings.TrimSpace(string(out)))
-			if len(fields) > 0 {
-				if clientMajor, merr := majorOf(fields[len(fields)-1]); merr == nil && clientMajor == major {
-					return filepath.Dir(pathBin), nil
-				}
-			}
-		}
-		tried = append(tried, pathBin)
-	} else {
-		tried = append(tried, "$PATH")
-	}
-
-	return "", &ErrUnsupportedTools{Major: major, Tried: tried}
-}
-
-func platformToolDirs(major int, goos string) []string {
-	switch goos {
-	case "darwin":
-		formula := fmt.Sprintf("postgresql@%d", major)
-		return []string{
-			path.Join("/opt/homebrew/opt", formula, "bin"),
-			path.Join("/usr/local/opt", formula, "bin"),
-		}
-	case "linux":
-		return []string{fmt.Sprintf("/usr/lib/postgresql/%d/bin", major)}
-	default:
-		return nil
-	}
-}
-
-// Dump runs pg_dump --clean --if-exists against conn and writes a gzip dump
-// into destDir, returning the final path. The dump is written to a .tmp file
-// and renamed only after pg_dump exits cleanly, so a completed filename always
-// means a complete dump.
-func Dump(ctx context.Context, conn Conn, toolsBinDir, destDir, appVersion, pgVersion string, logf Logf) (string, error) {
-	return DumpWithPrefix(ctx, conn, toolsBinDir, destDir, "", appVersion, pgVersion, logf)
-}
-
-// DumpWithPrefix is Dump with a filename prefix; RestorePointPrefix keeps
-// pre-restore safety dumps out of routine retention.
-func DumpWithPrefix(ctx context.Context, conn Conn, toolsBinDir, destDir, prefix, appVersion, pgVersion string, logf Logf) (string, error) {
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return "", fmt.Errorf("create backup dir %s: %w", destDir, err)
+	if err := os.MkdirAll(destDir, 0o700); err != nil {
+		return Snapshot{}, fmt.Errorf("create backup directory %s: %w", destDir, err)
 	}
 
-	finalPath := filepath.Join(destDir, prefix+FileName(time.Now(), appVersion, pgVersion))
+	createdAt := time.Now().UTC()
+	name := prefix + FileName(createdAt)
+	finalPath := filepath.Join(destDir, name)
+	finalManifestPath := ManifestPath(finalPath)
 	tmpPath := finalPath + TmpSuffix
+	tmpManifestPath := finalManifestPath + TmpSuffix
 
-	cmd := exec.CommandContext(ctx, filepath.Join(toolsBinDir, clientToolName("pg_dump", runtime.GOOS)),
-		"--clean",
-		"--if-exists",
-		"--host", conn.Host,
-		"--port", conn.Port,
-		"--username", conn.User,
-		"--dbname", conn.DBName,
-	)
-	cmd.Env = append(os.Environ(), "PGPASSWORD="+conn.ResolvedPassword())
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", fmt.Errorf("pg_dump stdout pipe: %w", err)
-	}
-
-	file, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return "", fmt.Errorf("create %s: %w", tmpPath, err)
-	}
-
-	fail := func(cause error) (string, error) {
-		file.Close()
-		os.Remove(tmpPath)
-		msg := strings.TrimSpace(stderr.String())
-		if len(msg) > 4096 {
-			msg = msg[len(msg)-4096:]
+	for _, path := range []string{finalPath, finalManifestPath, tmpPath, tmpManifestPath} {
+		if _, err := os.Stat(path); err == nil {
+			return Snapshot{}, fmt.Errorf("backup artifact already exists: %s", filepath.Base(path))
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return Snapshot{}, fmt.Errorf("inspect backup artifact %s: %w", filepath.Base(path), err)
 		}
-		if msg != "" {
-			return "", fmt.Errorf("pg_dump: %w\n%s", cause, msg)
+	}
+
+	cleanup := func() {
+		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpManifestPath)
+	}
+	defer cleanup()
+
+	logf("backup: creating SQLite snapshot %s", name)
+	if err := onlineBackup(ctx, source, tmpPath); err != nil {
+		return Snapshot{}, err
+	}
+	if err := os.Chmod(tmpPath, 0o600); err != nil {
+		return Snapshot{}, fmt.Errorf("secure SQLite snapshot: %w", err)
+	}
+	if err := syncFile(tmpPath); err != nil {
+		return Snapshot{}, err
+	}
+
+	info, err := db.InspectCatalog(ctx, tmpPath)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("validate SQLite snapshot: %w", err)
+	}
+	checksum, err := fileSHA256(tmpPath)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	manifest := Manifest{
+		FormatVersion:        manifestFormatVersion,
+		AppVersion:           metadata.AppVersion,
+		ConfigSchemaVersion:  metadata.ConfigSchemaVersion,
+		ApplicationMigration: info.ApplicationMigration,
+		RiverMigration:       info.RiverMigration,
+		SQLiteVersion:        info.SQLiteVersion,
+		VectorVersion:        info.VectorVersion,
+		CreatedAt:            createdAt,
+		DatabaseSize:         info.SizeBytes,
+		SHA256:               checksum,
+		QuickCheck:           info.QuickCheck,
+		ForeignKeyViolations: info.ForeignKeyViolationCount,
+		LibraryID:            info.LibraryID,
+	}
+	if err := writeManifest(tmpManifestPath, manifest); err != nil {
+		return Snapshot{}, err
+	}
+
+	if err := os.Rename(tmpPath, finalPath); err != nil {
+		return Snapshot{}, fmt.Errorf("finalize SQLite snapshot: %w", err)
+	}
+	if err := os.Rename(tmpManifestPath, finalManifestPath); err != nil {
+		_ = os.Remove(finalPath)
+		return Snapshot{}, fmt.Errorf("finalize SQLite snapshot manifest: %w", err)
+	}
+	if err := syncDirectory(destDir); err != nil {
+		return Snapshot{}, err
+	}
+
+	logf("backup: wrote %s and %s", finalPath, finalManifestPath)
+	return Snapshot{Path: finalPath, ManifestPath: finalManifestPath, Manifest: manifest}, nil
+}
+
+func onlineBackup(ctx context.Context, source *sql.DB, destinationPath string) error {
+	destination, err := sql.Open("sqlite3", destinationPath)
+	if err != nil {
+		return fmt.Errorf("open SQLite snapshot destination: %w", err)
+	}
+	destination.SetMaxOpenConns(1)
+	destination.SetMaxIdleConns(1)
+	defer destination.Close()
+
+	sourceConn, err := source.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite snapshot source connection: %w", err)
+	}
+	defer sourceConn.Close()
+	destinationConn, err := destination.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite snapshot destination connection: %w", err)
+	}
+	defer destinationConn.Close()
+
+	err = sourceConn.Raw(func(sourceDriverConn any) error {
+		sourceSQLite, ok := sourceDriverConn.(*sqlite3.SQLiteConn)
+		if !ok {
+			return fmt.Errorf("backup source driver is %T, want *sqlite3.SQLiteConn", sourceDriverConn)
 		}
-		return "", fmt.Errorf("pg_dump: %w", cause)
+		return destinationConn.Raw(func(destinationDriverConn any) error {
+			destinationSQLite, ok := destinationDriverConn.(*sqlite3.SQLiteConn)
+			if !ok {
+				return fmt.Errorf("backup destination driver is %T, want *sqlite3.SQLiteConn", destinationDriverConn)
+			}
+			backup, err := destinationSQLite.Backup("main", sourceSQLite, "main")
+			if err != nil {
+				return fmt.Errorf("initialize SQLite online backup: %w", err)
+			}
+			for {
+				done, stepErr := backup.Step(256)
+				if stepErr != nil {
+					_ = backup.Close()
+					return fmt.Errorf("copy SQLite snapshot pages: %w", stepErr)
+				}
+				if done {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					_ = backup.Close()
+					return ctx.Err()
+				case <-time.After(10 * time.Millisecond):
+				}
+			}
+			if err := backup.Close(); err != nil {
+				return fmt.Errorf("finalize SQLite online backup: %w", err)
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// ValidateSnapshot verifies the manifest, checksum, SQLite identity, integrity,
+// and schema compatibility before a restore marker can be written.
+func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Compatibility) (Manifest, db.CatalogInfo, error) {
+	manifest, err := ReadManifest(ManifestPath(snapshotPath))
+	if err != nil {
+		return Manifest{}, db.CatalogInfo{}, err
+	}
+	if manifest.FormatVersion != manifestFormatVersion {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot manifest format %d is unsupported", manifest.FormatVersion)
+	}
+	fileInfo, err := os.Stat(snapshotPath)
+	if err != nil {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("stat SQLite snapshot: %w", err)
+	}
+	if fileInfo.Size() != manifest.DatabaseSize {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("SQLite snapshot size = %d, manifest = %d", fileInfo.Size(), manifest.DatabaseSize)
+	}
+	checksum, err := fileSHA256(snapshotPath)
+	if err != nil {
+		return Manifest{}, db.CatalogInfo{}, err
+	}
+	if checksum != manifest.SHA256 {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("SQLite snapshot checksum mismatch")
 	}
 
-	gz := gzip.NewWriter(file)
-	logf("backup: dumping %s to %s", conn.DBName, filepath.Base(finalPath))
+	info, err := db.InspectCatalog(ctx, snapshotPath)
+	if err != nil {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("inspect SQLite snapshot: %w", err)
+	}
+	if info.LibraryID != manifest.LibraryID ||
+		info.ApplicationMigration != manifest.ApplicationMigration ||
+		info.RiverMigration != manifest.RiverMigration ||
+		info.SizeBytes != manifest.DatabaseSize {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("SQLite snapshot does not match its manifest")
+	}
+	if compatibility.LibraryID != "" && info.LibraryID != compatibility.LibraryID {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot belongs to library %s, active library is %s", info.LibraryID, compatibility.LibraryID)
+	}
+	if compatibility.ConfigSchemaVersion != 0 && manifest.ConfigSchemaVersion != compatibility.ConfigSchemaVersion {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf(
+			"snapshot config schema %d is incompatible with runtime schema %d",
+			manifest.ConfigSchemaVersion,
+			compatibility.ConfigSchemaVersion,
+		)
+	}
+	if compatibility.MaxApplicationMigration != 0 && info.ApplicationMigration > compatibility.MaxApplicationMigration {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot application migration %d is newer than runtime %d", info.ApplicationMigration, compatibility.MaxApplicationMigration)
+	}
+	if compatibility.MaxRiverMigration != 0 && info.RiverMigration > compatibility.MaxRiverMigration {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot River migration %d is newer than runtime %d", info.RiverMigration, compatibility.MaxRiverMigration)
+	}
+	return manifest, info, nil
+}
 
-	if err := cmd.Start(); err != nil {
-		return fail(err)
+// ReadManifest loads a snapshot sidecar.
+func ReadManifest(path string) (Manifest, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("read SQLite snapshot manifest: %w", err)
 	}
-	if _, err := io.Copy(gz, stdout); err != nil {
-		_ = cmd.Wait()
-		return fail(err)
+	var manifest Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return Manifest{}, fmt.Errorf("decode SQLite snapshot manifest: %w", err)
 	}
-	if err := cmd.Wait(); err != nil {
-		return fail(err)
+	return manifest, nil
+}
+
+func writeManifest(path string, manifest Manifest) error {
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode SQLite snapshot manifest: %w", err)
 	}
-	if err := gz.Close(); err != nil {
-		return fail(err)
+	data = append(data, '\n')
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("create SQLite snapshot manifest: %w", err)
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write SQLite snapshot manifest: %w", err)
 	}
 	if err := file.Sync(); err != nil {
-		return fail(err)
+		_ = file.Close()
+		return fmt.Errorf("sync SQLite snapshot manifest: %w", err)
 	}
 	if err := file.Close(); err != nil {
-		os.Remove(tmpPath)
-		return "", fmt.Errorf("close %s: %w", tmpPath, err)
+		return fmt.Errorf("close SQLite snapshot manifest: %w", err)
 	}
-	if err := os.Rename(tmpPath, finalPath); err != nil {
-		os.Remove(tmpPath)
-		return "", fmt.Errorf("finalize backup: %w", err)
-	}
-
-	logf("backup: wrote %s", finalPath)
-	return finalPath, nil
+	return nil
 }
 
-func clientToolName(name, goos string) string {
-	if goos == "windows" {
-		return name + ".exe"
+func fileSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("open SQLite snapshot for checksum: %w", err)
 	}
-	return name
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", fmt.Errorf("checksum SQLite snapshot: %w", err)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-// Prune enforces count-based retention on routine backups in dir (newest kept
-// first, ordered by the filename timestamp) and removes stale .tmp leftovers
-// from failed runs. Restore points are never pruned here.
+func syncFile(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open SQLite snapshot for sync: %w", err)
+	}
+	defer file.Close()
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("sync SQLite snapshot: %w", err)
+	}
+	return nil
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open directory for sync: %w", err)
+	}
+	defer directory.Close()
+	if err := directory.Sync(); err != nil {
+		return fmt.Errorf("sync directory: %w", err)
+	}
+	return nil
+}
+
+// Prune enforces count-based retention on routine snapshot pairs and removes
+// stale temporary artifacts. Restore points are never pruned here.
 func Prune(dir string, keep int, logf Logf) ([]string, error) {
 	if logf == nil {
 		logf = func(string, ...any) {}
@@ -261,67 +362,67 @@ func Prune(dir string, keep int, logf Logf) ([]string, error) {
 	if keep < 1 {
 		keep = 1
 	}
-
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("read backup dir %s: %w", dir, err)
+		return nil, fmt.Errorf("read backup directory %s: %w", dir, err)
 	}
 
 	var routine []string
 	var removed []string
-	for _, e := range entries {
-		if e.IsDir() {
+	for _, entry := range entries {
+		if entry.IsDir() {
 			continue
 		}
-		name := e.Name()
+		name := entry.Name()
 		switch {
 		case IsRoutineName(name):
 			routine = append(routine, name)
-		case strings.HasSuffix(name, suffix+TmpSuffix):
-			// A .tmp is a failed run — unless it is the one currently being
-			// written. The db_backup queue runs one worker, so anything older
-			// than a generous dump window is safely dead.
-			if info, err := e.Info(); err == nil && time.Since(info.ModTime()) > time.Hour {
-				if err := os.Remove(filepath.Join(dir, name)); err == nil {
+		case filepath.Ext(name) == TmpSuffix:
+			if info, infoErr := entry.Info(); infoErr == nil && time.Since(info.ModTime()) > time.Hour {
+				if removeErr := os.Remove(filepath.Join(dir, name)); removeErr == nil {
 					removed = append(removed, name)
 				}
 			}
 		}
 	}
 
-	// Filename timestamps sort lexicographically; newest first.
 	sort.Sort(sort.Reverse(sort.StringSlice(routine)))
 	for _, name := range routine[min(keep, len(routine)):] {
-		if err := os.Remove(filepath.Join(dir, name)); err != nil {
-			return removed, fmt.Errorf("prune %s: %w", name, err)
+		for _, artifact := range []string{name, ManifestName(name)} {
+			if err := os.Remove(filepath.Join(dir, artifact)); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return removed, fmt.Errorf("prune %s: %w", artifact, err)
+			}
 		}
 		removed = append(removed, name)
-	}
-
-	if len(removed) > 0 {
-		logf("backup: pruned %d file(s): %s", len(removed), strings.Join(removed, ", "))
+		logf("backup: pruned %s", name)
 	}
 	return removed, nil
 }
 
-// LatestRoutine returns the creation time of the newest routine backup in dir,
-// or zero when none exists. It trusts filename timestamps, so due-ness survives
-// restarts without any database state.
+// LatestRoutine returns the newest completed routine snapshot time.
 func LatestRoutine(dir string) (time.Time, bool) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return time.Time{}, false
 	}
 	var latest time.Time
-	found := false
-	for _, e := range entries {
-		if info, ok := ParseName(e.Name()); ok && info.CreatedAt.After(latest) {
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		info, ok := ParseName(entry.Name())
+		if !ok {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(dir, ManifestName(entry.Name()))); err != nil {
+			continue
+		}
+		if info.CreatedAt.After(latest) {
 			latest = info.CreatedAt
-			found = true
 		}
 	}
-	return latest, found
+	return latest, !latest.IsZero()
 }

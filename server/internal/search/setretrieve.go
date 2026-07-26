@@ -7,8 +7,9 @@ import (
 	"strings"
 	"unicode"
 
+	"server/internal/db/dbtypes"
+
 	"github.com/google/uuid"
-	"github.com/pgvector/pgvector-go"
 )
 
 // Set retrieval turns the dense embedding channel into a membership test:
@@ -152,7 +153,7 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 	if err != nil {
 		return nil, SetMeta{}, err
 	}
-	queryVector := pgvector.NewVector(embedding.Vector)
+	queryVector := dbtypes.NewVector(embedding.Vector)
 
 	indexVersion := fmt.Sprintf("embedding-space/%d", space.ID)
 	modelVersion := space.ModelID
@@ -189,7 +190,7 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 	}
 
 	if strictness == StrictnessStrict {
-		candidates, truncated, err := r.retrieveExactWithinCutoff(ctx, req, &queryVector, space.ID, space.Dimensions, cutoff, maxResults)
+		candidates, truncated, err := r.retrieveExactWithinCutoff(ctx, req, queryVector, space.ID, space.Dimensions, cutoff, maxResults)
 		if err != nil {
 			return nil, meta, err
 		}
@@ -236,11 +237,12 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 	}
 }
 
-// retrieveExactWithinCutoff runs the strict path: a sequential scan with the
-// cutoff as a hard predicate, immune to ANN recall loss. Index scans are
-// disabled for the transaction so the planner cannot fall back to an
-// approximate HNSW traversal.
-func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req Request, queryVector *pgvector.Vector, spaceID int64, dimensions int32, cutoff float64, maxResults int) ([]Candidate, bool, error) {
+// retrieveExactWithinCutoff runs the strict path over authoritative vector
+// BLOBs with sqlite-vec's exact scalar distance function.
+func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req Request, queryVector dbtypes.Vector, spaceID int64, dimensions int64, cutoff float64, maxResults int) ([]Candidate, bool, error) {
+	if int64(len(queryVector.Slice())) != dimensions {
+		return nil, false, fmt.Errorf("query vector dimension mismatch")
+	}
 	builder := &sqlBuilder{}
 	vectorPlaceholder := builder.addArg(queryVector)
 	spacePlaceholder := builder.addArg(spaceID)
@@ -248,39 +250,46 @@ func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req 
 	if err != nil {
 		return nil, false, err
 	}
-	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", dimensions, vectorPlaceholder, dimensions)
+	distanceExpr := fmt.Sprintf("vec_distance_L2(e.vector, %s)", vectorPlaceholder)
 	// The cutoff is a per-frame predicate: an asset qualifies if any of its frames
 	// falls within the cutoff, then it is ranked by its best (nearest) frame.
 	conditions = append(conditions,
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
-		fmt.Sprintf("%s <= %s", distanceExpr, builder.addArg(cutoff)),
 	)
+	cutoffPlaceholder := builder.addArg(cutoff)
 	limitPlaceholder := builder.addArg(maxResults + 1)
 
 	query := fmt.Sprintf(`
+WITH scored AS (
+  SELECT
+    a.asset_id,
+    e.frame_ts_ms,
+    %s AS distance
+  FROM search_embeddings e
+  JOIN assets a ON a.asset_id = e.asset_id
+  WHERE %s
+),
+ranked AS (
+  SELECT
+    scored.*,
+    ROW_NUMBER() OVER (
+      PARTITION BY asset_id
+      ORDER BY distance, frame_ts_ms IS NULL, frame_ts_ms
+    ) AS distance_rank
+  FROM scored
+  WHERE distance <= %s
+)
 SELECT
-  a.asset_id,
-  MIN(%s)::float8 AS raw_score,
-  (array_agg(e.frame_ts_ms ORDER BY %s ASC NULLS LAST))[1] AS best_ts
-FROM search_embeddings e
-JOIN assets a ON a.asset_id = e.asset_id
-WHERE %s
-GROUP BY a.asset_id
-ORDER BY raw_score, a.asset_id DESC
+  asset_id,
+  MIN(distance) AS raw_score,
+  MAX(CASE WHEN distance_rank = 1 THEN frame_ts_ms END) AS best_ts
+FROM ranked
+GROUP BY asset_id
+ORDER BY raw_score, asset_id DESC
 LIMIT %s
-`, distanceExpr, distanceExpr, joinConditions(conditions), limitPlaceholder)
+`, distanceExpr, joinConditions(conditions), cutoffPlaceholder, limitPlaceholder)
 
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return nil, false, fmt.Errorf("exact retrieve begin: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	if _, err := tx.Exec(ctx, "SET LOCAL enable_indexscan = off"); err != nil {
-		return nil, false, fmt.Errorf("exact retrieve disable index scan: %w", err)
-	}
-
-	rows, err := tx.Query(ctx, query, builder.args...)
+	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, false, fmt.Errorf("exact embedding retrieve: %w", err)
 	}
@@ -290,10 +299,6 @@ LIMIT %s
 	if err != nil {
 		return nil, false, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, false, fmt.Errorf("exact retrieve commit: %w", err)
-	}
-
 	truncated := len(candidates) > maxResults
 	if truncated {
 		candidates = candidates[:maxResults]
@@ -303,7 +308,7 @@ LIMIT %s
 
 // filterWithinCutoff keeps candidates whose distance passes the cutoff,
 // preserving relevance order. RawScore for the embedding channel is the
-// pgvector distance (smaller = closer).
+// sqlite-vec L2 distance (smaller = closer).
 func filterWithinCutoff(candidates []Candidate, cutoff float64) []Candidate {
 	kept := make([]Candidate, 0, len(candidates))
 	for _, candidate := range candidates {

@@ -11,8 +11,7 @@ import (
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 )
 
@@ -90,11 +89,11 @@ func (rm *DefaultRepositoryManager) RelocateRepository(ctx context.Context, id s
 		return nil, err
 	}
 	dbRepo, err := rm.queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
+		RepoID:    repoUUID,
 		Path:      cleanPath,
 		RootID:    rootID,
 		Status:    dbtypes.RepoStatusActive,
-		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		UpdatedAt: dbtypes.NewTimestamp(now),
 	})
 	if err != nil {
 		if isUniquePathViolation(err) {
@@ -182,7 +181,7 @@ func (rm *DefaultRepositoryManager) refreshRepositoryConfigCache(ctx context.Con
 		Name:           config.Name,
 		Config:         *config,
 		DefaultOwnerID: current.DefaultOwnerID,
-		UpdatedAt:      pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		UpdatedAt:      dbtypes.NewTimestamp(time.Now()),
 	})
 	if err != nil {
 		return nil, err
@@ -191,9 +190,10 @@ func (rm *DefaultRepositoryManager) refreshRepositoryConfigCache(ctx context.Con
 }
 
 func isUniquePathViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
+	var sqliteErr sqlite3.Error
+	if !errors.As(err, &sqliteErr) {
 		return false
 	}
-	return pgErr.Code == "23505" && pgErr.ConstraintName == "repositories_path_key"
+	return sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique ||
+		sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey
 }

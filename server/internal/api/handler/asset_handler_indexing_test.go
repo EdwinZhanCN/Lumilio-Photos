@@ -15,7 +15,7 @@ import (
 	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,8 +47,8 @@ func (s stubRepositoryManager) ReconcileAll(context.Context) error { return nil 
 func testRepository(t *testing.T, rawID string, name string, path string) *repo.Repository {
 	t.Helper()
 
-	var repositoryID pgtype.UUID
-	require.NoError(t, repositoryID.Scan(rawID))
+	repositoryID, err := uuid.Parse(rawID)
+	require.NoError(t, err)
 
 	return &repo.Repository{
 		RepoID: repositoryID,

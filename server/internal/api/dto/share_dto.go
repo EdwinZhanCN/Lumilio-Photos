@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"server/internal/db/repo"
-
-	"github.com/google/uuid"
 )
 
 // CreateShareLinkRequestDTO represents the request to create a share link.
@@ -58,7 +56,7 @@ type ShareLinkDTO struct {
 // ToShareLinkDTO converts a repo.ShareLink row into its owner-facing DTO.
 func ToShareLinkDTO(l repo.ShareLink) ShareLinkDTO {
 	out := ShareLinkDTO{
-		ShareID:          uuid.UUID(l.ShareID.Bytes).String(),
+		ShareID:          l.ShareID.String(),
 		Title:            l.Title,
 		Description:      l.Description,
 		SourceKind:       l.SourceKind,
@@ -148,11 +146,21 @@ type PublicAssetDTO struct {
 
 // ToPublicAssetDTO converts a repo.Asset row into its de-sensitized public shape.
 func ToPublicAssetDTO(a repo.Asset) PublicAssetDTO {
+	var width *int32
+	if a.Width != nil {
+		value := int32(*a.Width)
+		width = &value
+	}
+	var height *int32
+	if a.Height != nil {
+		value := int32(*a.Height)
+		height = &value
+	}
 	out := PublicAssetDTO{
-		AssetID:  uuid.UUID(a.AssetID.Bytes).String(),
+		AssetID:  a.AssetID.String(),
 		Type:     a.Type,
-		Width:    a.Width,
-		Height:   a.Height,
+		Width:    width,
+		Height:   height,
 		Duration: a.Duration,
 	}
 	if a.TakenTime.Valid {

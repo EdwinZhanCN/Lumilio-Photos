@@ -59,13 +59,13 @@ func TestKeepAtOrAboveQualityPercentileNoScores(t *testing.T) {
 
 func TestPercentileCont(t *testing.T) {
 	vals := []float64{1, 2, 3, 4}
-	if got := percentileCont(vals, 0.5); math.Abs(got-2.5) > 1e-9 {
+	if got := interpolatedPercentile(vals, 0.5); math.Abs(got-2.5) > 1e-9 {
 		t.Errorf("p50 = %v, want 2.5", got)
 	}
-	if got := percentileCont(vals, 0); got != 1 {
+	if got := interpolatedPercentile(vals, 0); got != 1 {
 		t.Errorf("p0 = %v, want 1", got)
 	}
-	if got := percentileCont(vals, 1); got != 4 {
+	if got := interpolatedPercentile(vals, 1); got != 4 {
 		t.Errorf("p100 = %v, want 4", got)
 	}
 }

@@ -12,7 +12,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 // Provisioning errors. Callers (HTTP handlers) map these to status codes.
@@ -60,7 +60,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		return nil, ErrPrimaryRepositoryRequired
 	}
 
-	var rootIDs []pgtype.UUID
+	var rootIDs []uuid.UUID
 	if strings.TrimSpace(spec.RootID) != "" && strings.TrimSpace(spec.Root) != "" {
 		return nil, fmt.Errorf("%w: root_id and root path cannot both be supplied", ErrPathNotAllowed)
 	}

@@ -8,17 +8,17 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const getAssetQualityScore = `-- name: GetAssetQualityScore :one
 SELECT asset_id, score, model_version, created_at, updated_at
 FROM asset_quality_scores
-WHERE asset_id = $1
+WHERE asset_id = ?1
 `
 
-func (q *Queries) GetAssetQualityScore(ctx context.Context, assetID pgtype.UUID) (AssetQualityScore, error) {
-	row := q.db.QueryRow(ctx, getAssetQualityScore, assetID)
+func (q *Queries) GetAssetQualityScore(ctx context.Context, assetID uuid.UUID) (AssetQualityScore, error) {
+	row := q.db.QueryRowContext(ctx, getAssetQualityScore, assetID)
 	var i AssetQualityScore
 	err := row.Scan(
 		&i.AssetID,
@@ -33,24 +33,24 @@ func (q *Queries) GetAssetQualityScore(ctx context.Context, assetID pgtype.UUID)
 const upsertAssetQualityScore = `-- name: UpsertAssetQualityScore :one
 
 INSERT INTO asset_quality_scores (asset_id, score, model_version)
-VALUES ($1, $2, $3)
+VALUES (?1, ?2, ?3)
 ON CONFLICT (asset_id)
 DO UPDATE SET
     score = EXCLUDED.score,
     model_version = EXCLUDED.model_version,
-    updated_at = NOW()
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 RETURNING asset_id, score, model_version, created_at, updated_at
 `
 
 type UpsertAssetQualityScoreParams struct {
-	AssetID      pgtype.UUID `db:"asset_id" json:"asset_id"`
-	Score        float32     `db:"score" json:"score"`
-	ModelVersion string      `db:"model_version" json:"model_version"`
+	AssetID      uuid.UUID `db:"asset_id" json:"asset_id"`
+	Score        float64   `db:"score" json:"score"`
+	ModelVersion string    `db:"model_version" json:"model_version"`
 }
 
 // Asset quality scores: per-asset aesthetic score from MLP head on SigLIP.
 func (q *Queries) UpsertAssetQualityScore(ctx context.Context, arg UpsertAssetQualityScoreParams) (AssetQualityScore, error) {
-	row := q.db.QueryRow(ctx, upsertAssetQualityScore, arg.AssetID, arg.Score, arg.ModelVersion)
+	row := q.db.QueryRowContext(ctx, upsertAssetQualityScore, arg.AssetID, arg.Score, arg.ModelVersion)
 	var i AssetQualityScore
 	err := row.Scan(
 		&i.AssetID,

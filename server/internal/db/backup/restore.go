@@ -1,171 +1,377 @@
 package backup
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
+	"time"
+
+	"server/internal/db"
 )
 
-// restorePreamble runs at the head of the psql stream, inside the same single
-// transaction as the dump itself: kick every other connection off the database
-// (their transactions would block the schema drop), then reset the schema so
-// --clean dumps restore into a predictable empty state regardless of drift.
-// The owning role is a superuser on both shapes, so no OWNER rewriting is
-// needed (unlike Immich's streaming transform).
-const restorePreamble = `
-SELECT pg_terminate_backend(pid)
-FROM pg_stat_activity
-WHERE datname = current_database() AND pid <> pg_backend_pid();
+const (
+	pendingStateStaged  = "staged"
+	pendingStateApplied = "applied"
+)
 
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO public;
-`
+// PendingRestore is the durable handoff between the API generation that
+// validates a restore request and the next generation that opens the restored
+// database. Paths are absolute and written only by this package.
+type PendingRestore struct {
+	State         string           `json:"state"`
+	ActivePath    string           `json:"active_path"`
+	SnapshotPath  string           `json:"snapshot_path"`
+	RestorePoint  string           `json:"restore_point,omitempty"`
+	PreviousPath  string           `json:"previous_path,omitempty"`
+	StagedAt      time.Time        `json:"staged_at"`
+	Metadata      SnapshotMetadata `json:"metadata"`
+	Compatibility Compatibility    `json:"compatibility"`
+}
 
-// RestoreDump streams the dump at dumpPath (plain or gzip SQL) into psql as
-// one transaction with ON_ERROR_STOP, preceded by restorePreamble. Either the
-// whole dump applies or the database is left untouched.
-func RestoreDump(ctx context.Context, conn Conn, toolsBinDir, dumpPath string, logf Logf) error {
+// PendingRestorePath returns the fixed marker adjacent to the active database.
+func PendingRestorePath(activePath string) string {
+	return activePath + ".pending-restore.json"
+}
+
+// StageRestore validates a selected snapshot through an independent read-only
+// connection, then writes the durable marker that requests a runtime restart.
+// The active database is not touched while handlers still hold its *sql.DB.
+func StageRestore(
+	ctx context.Context,
+	activePath string,
+	snapshotPath string,
+	metadata SnapshotMetadata,
+	compatibility Compatibility,
+) error {
+	activePath, err := filepath.Abs(activePath)
+	if err != nil {
+		return fmt.Errorf("resolve active SQLite path: %w", err)
+	}
+	snapshotPath, err = filepath.Abs(snapshotPath)
+	if err != nil {
+		return fmt.Errorf("resolve SQLite snapshot path: %w", err)
+	}
+	if _, _, err := ValidateSnapshot(ctx, snapshotPath, compatibility); err != nil {
+		return fmt.Errorf("reject restore snapshot: %w", err)
+	}
+
+	markerPath := PendingRestorePath(activePath)
+	if _, err := os.Stat(markerPath); err == nil {
+		return errors.New("another restore is already in progress")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect pending restore marker: %w", err)
+	}
+	marker := PendingRestore{
+		State:         pendingStateStaged,
+		ActivePath:    filepath.Clean(activePath),
+		SnapshotPath:  filepath.Clean(snapshotPath),
+		StagedAt:      time.Now().UTC(),
+		Metadata:      metadata,
+		Compatibility: compatibility,
+	}
+	if err := writePendingRestore(markerPath, marker, true); err != nil {
+		return err
+	}
+	return syncDirectory(filepath.Dir(markerPath))
+}
+
+// ApplyPendingRestore runs only between runtime generations, after HTTP and
+// River have drained and the old database handle has closed. It creates the
+// restore point at that boundary, atomically swaps the main file, and retains
+// the previous main file until the new generation declares itself healthy.
+func ApplyPendingRestore(ctx context.Context, activePath string, logf Logf) (bool, error) {
+	marker, err := readPendingRestore(PendingRestorePath(activePath))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if marker.ActivePath != filepath.Clean(activePath) {
+		return false, fmt.Errorf("pending restore active path %q does not match %q", marker.ActivePath, activePath)
+	}
+	if marker.State == pendingStateApplied {
+		return true, nil
+	}
+	if marker.State != pendingStateStaged {
+		return false, fmt.Errorf("unknown pending restore state %q", marker.State)
+	}
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
 
-	file, err := os.Open(dumpPath)
+	if _, _, err := ValidateSnapshot(ctx, marker.SnapshotPath, marker.Compatibility); err != nil {
+		return false, fmt.Errorf("revalidate staged restore snapshot: %w", err)
+	}
+	activeInfo, err := db.InspectCatalog(ctx, activePath)
 	if err != nil {
-		return fmt.Errorf("open dump: %w", err)
+		return false, fmt.Errorf("inspect drained active SQLite catalog: %w", err)
 	}
-	defer file.Close()
-
-	var dumpReader io.Reader = file
-	if strings.HasSuffix(dumpPath, ".gz") {
-		gz, err := gzip.NewReader(file)
-		if err != nil {
-			return fmt.Errorf("dump is not valid gzip: %w", err)
-		}
-		defer gz.Close()
-		dumpReader = gz
+	if activeInfo.LibraryID != marker.Compatibility.LibraryID {
+		return false, fmt.Errorf("active library identity changed while restore was staged")
 	}
 
-	cmd := exec.CommandContext(ctx, filepath.Join(toolsBinDir, clientToolName("psql", runtime.GOOS)),
-		"--host", conn.Host,
-		"--port", conn.Port,
-		"--username", conn.User,
-		"--dbname", conn.DBName,
-		"--single-transaction",
-		"--set", "ON_ERROR_STOP=on",
-		"--quiet",
+	source, err := sql.Open("sqlite3", activePath)
+	if err != nil {
+		return false, fmt.Errorf("open drained SQLite catalog for restore point: %w", err)
+	}
+	source.SetMaxOpenConns(1)
+	source.SetMaxIdleConns(1)
+	restorePoint, snapshotErr := CreateSnapshot(
+		ctx,
+		source,
+		filepath.Dir(marker.SnapshotPath),
+		RestorePointPrefix,
+		marker.Metadata,
+		logf,
 	)
-	cmd.Env = append(os.Environ(), "PGPASSWORD="+conn.ResolvedPassword())
-	cmd.Stdin = io.MultiReader(strings.NewReader(restorePreamble), dumpReader)
-	cmd.Stdout = io.Discard
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	logf("restore: applying %s", filepath.Base(dumpPath))
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if len(msg) > 4096 {
-			msg = msg[len(msg)-4096:]
-		}
-		if msg != "" {
-			return fmt.Errorf("psql restore: %w\n%s", err, msg)
-		}
-		return fmt.Errorf("psql restore: %w", err)
+	closeErr := source.Close()
+	if snapshotErr != nil {
+		return false, fmt.Errorf("create pre-restore snapshot: %w", snapshotErr)
 	}
-	logf("restore: %s applied", filepath.Base(dumpPath))
+	if closeErr != nil {
+		return false, fmt.Errorf("close pre-restore snapshot source: %w", closeErr)
+	}
+
+	stagedPath := activePath + ".restore-staged"
+	previousPath := activePath + ".restore-previous"
+	if err := rejectExistingRestoreArtifact(stagedPath); err != nil {
+		return false, err
+	}
+	if err := rejectExistingRestoreArtifact(previousPath); err != nil {
+		return false, err
+	}
+	if err := copyFile(marker.SnapshotPath, stagedPath, 0o600); err != nil {
+		return false, err
+	}
+	cleanupStaged := true
+	defer func() {
+		if cleanupStaged {
+			_ = os.Remove(stagedPath)
+		}
+	}()
+	stagedInfo, err := db.InspectCatalog(ctx, stagedPath)
+	if err != nil {
+		return false, fmt.Errorf("validate staged active SQLite catalog: %w", err)
+	}
+	if stagedInfo.LibraryID != marker.Compatibility.LibraryID {
+		return false, fmt.Errorf("staged active SQLite catalog has wrong library identity")
+	}
+
+	if err := removeSQLiteSidecars(activePath); err != nil {
+		return false, err
+	}
+	if err := os.Rename(activePath, previousPath); err != nil {
+		return false, fmt.Errorf("preserve previous SQLite catalog: %w", err)
+	}
+	if err := os.Rename(stagedPath, activePath); err != nil {
+		rollbackErr := os.Rename(previousPath, activePath)
+		return false, errors.Join(fmt.Errorf("activate restored SQLite catalog: %w", err), rollbackErr)
+	}
+	cleanupStaged = false
+	if err := syncDirectory(filepath.Dir(activePath)); err != nil {
+		return false, err
+	}
+
+	marker.State = pendingStateApplied
+	marker.RestorePoint = restorePoint.Path
+	marker.PreviousPath = previousPath
+	if err := writePendingRestore(PendingRestorePath(activePath), marker, false); err != nil {
+		return false, err
+	}
+	logf("restore: activated %s; previous catalog retained until health verification", filepath.Base(marker.SnapshotPath))
+	return true, nil
+}
+
+// CompletePendingRestore is called only after the new runtime has migrated and
+// passed its health checks. It removes the retained previous main file and the
+// marker, while keeping the restore-point snapshot in the backups directory.
+func CompletePendingRestore(ctx context.Context, activePath string) error {
+	marker, err := readPendingRestore(PendingRestorePath(activePath))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if marker.State != pendingStateApplied {
+		return fmt.Errorf("cannot complete pending restore in state %q", marker.State)
+	}
+	if _, err := db.InspectCatalog(ctx, activePath); err != nil {
+		return fmt.Errorf("verify restored SQLite catalog before completion: %w", err)
+	}
+	if marker.PreviousPath != "" {
+		if err := os.Remove(marker.PreviousPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove previous SQLite catalog: %w", err)
+		}
+	}
+	if err := removeSQLiteSidecars(marker.PreviousPath); err != nil {
+		return err
+	}
+	if err := os.Remove(PendingRestorePath(activePath)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove pending restore marker: %w", err)
+	}
+	return syncDirectory(filepath.Dir(activePath))
+}
+
+// RollbackPendingRestore restores the retained previous main file after the
+// restored generation fails startup. It is safe to call when no applied marker
+// exists.
+func RollbackPendingRestore(ctx context.Context, activePath string, logf Logf) error {
+	marker, err := readPendingRestore(PendingRestorePath(activePath))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if marker.State != pendingStateApplied {
+		return fmt.Errorf("cannot roll back pending restore in state %q", marker.State)
+	}
+	if marker.PreviousPath == "" {
+		return errors.New("pending restore has no retained previous catalog")
+	}
+	if logf == nil {
+		logf = func(string, ...any) {}
+	}
+
+	failedPath := activePath + ".failed-restore"
+	if err := rejectExistingRestoreArtifact(failedPath); err != nil {
+		return err
+	}
+	if err := removeSQLiteSidecars(activePath); err != nil {
+		return err
+	}
+	if err := os.Rename(activePath, failedPath); err != nil {
+		return fmt.Errorf("preserve failed restored SQLite catalog: %w", err)
+	}
+	if err := os.Rename(marker.PreviousPath, activePath); err != nil {
+		_ = os.Rename(failedPath, activePath)
+		return fmt.Errorf("roll back previous SQLite catalog: %w", err)
+	}
+	if _, err := db.InspectCatalog(ctx, activePath); err != nil {
+		_ = os.Rename(activePath, marker.PreviousPath)
+		_ = os.Rename(failedPath, activePath)
+		return fmt.Errorf("verify rolled-back SQLite catalog: %w", err)
+	}
+	_ = os.Remove(failedPath)
+	if err := os.Remove(PendingRestorePath(activePath)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove pending restore marker after rollback: %w", err)
+	}
+	if err := syncDirectory(filepath.Dir(activePath)); err != nil {
+		return err
+	}
+	logf("restore: rolled back to previous SQLite catalog; restore point kept at %s", marker.RestorePoint)
 	return nil
 }
 
-// RestoreHooks are the app-level steps around the raw dump application. All
-// hooks are optional; nil hooks are skipped.
-type RestoreHooks struct {
-	// Quiesce runs before the restore point is taken: pause queues so job
-	// churn stops mutating the database mid-dump.
-	Quiesce func(ctx context.Context) error
-	// Resume undoes Quiesce. Always attempted, even on failure.
-	Resume func(ctx context.Context) error
-	// Reconnect discards connections terminated by restorePreamble and proves a
-	// fresh application connection can be established before migrations and
-	// health checks run.
-	Reconnect func(ctx context.Context) error
-	// Migrate brings the restored schema up to the running binary's version
-	// (the dump may come from an older app release).
-	Migrate func(ctx context.Context) error
-	// Verify is the post-restore health check (e.g. settings row readable,
-	// users present). A Verify failure triggers rollback.
-	Verify func(ctx context.Context) error
+// HasAppliedRestore reports whether startup is currently validating a restored
+// generation and therefore should roll back on failure.
+func HasAppliedRestore(activePath string) bool {
+	marker, err := readPendingRestore(PendingRestorePath(activePath))
+	return err == nil && marker.State == pendingStateApplied
 }
 
-// RestoreWithRollback restores dumpPath with a safety net: a restore-point
-// dump of the current database is taken first, and if the restore, migration,
-// or verification fails, the restore point is applied back so the database
-// never stays in a broken state. The returned error is the original failure;
-// rollback problems are appended to it.
-func RestoreWithRollback(ctx context.Context, conn Conn, toolsBinDir, backupsDir, dumpPath, appVersion, pgVersion string, hooks RestoreHooks, logf Logf) (err error) {
-	if logf == nil {
-		logf = func(string, ...any) {}
-	}
-
-	if hooks.Quiesce != nil {
-		if qerr := hooks.Quiesce(ctx); qerr != nil {
-			return fmt.Errorf("quiesce before restore: %w", qerr)
-		}
-	}
-	if hooks.Resume != nil {
-		defer func() {
-			if rerr := hooks.Resume(context.WithoutCancel(ctx)); rerr != nil {
-				logf("restore: resume after restore failed: %v", rerr)
-				if err == nil {
-					err = fmt.Errorf("resume after restore: %w", rerr)
-				}
-			}
-		}()
-	}
-
-	restorePoint, err := DumpWithPrefix(ctx, conn, toolsBinDir, backupsDir, RestorePointPrefix, appVersion, pgVersion, logf)
+func readPendingRestore(path string) (PendingRestore, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("create restore point: %w", err)
+		return PendingRestore{}, err
 	}
+	var marker PendingRestore
+	if err := json.Unmarshal(data, &marker); err != nil {
+		return PendingRestore{}, fmt.Errorf("decode pending restore marker: %w", err)
+	}
+	return marker, nil
+}
 
-	applyAndCheck := func(ctx context.Context, path string) error {
-		if aerr := RestoreDump(ctx, conn, toolsBinDir, path, logf); aerr != nil {
-			return aerr
+func writePendingRestore(path string, marker PendingRestore, exclusive bool) error {
+	data, err := json.MarshalIndent(marker, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode pending restore marker: %w", err)
+	}
+	data = append(data, '\n')
+	tmpPath := path + TmpSuffix
+	flag := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	if exclusive {
+		if _, err := os.Stat(path); err == nil {
+			return errors.New("another restore is already in progress")
 		}
-		if hooks.Reconnect != nil {
-			if rerr := hooks.Reconnect(ctx); rerr != nil {
-				return fmt.Errorf("reconnect after restore: %w", rerr)
-			}
-		}
-		if hooks.Migrate != nil {
-			if merr := hooks.Migrate(ctx); merr != nil {
-				return fmt.Errorf("run migrations: %w", merr)
-			}
-		}
-		if hooks.Verify != nil {
-			if verr := hooks.Verify(ctx); verr != nil {
-				return fmt.Errorf("post-restore verification: %w", verr)
-			}
-		}
+	}
+	file, err := os.OpenFile(tmpPath, flag, 0o600)
+	if err != nil {
+		return fmt.Errorf("create pending restore marker: %w", err)
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("write pending restore marker: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("sync pending restore marker: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("close pending restore marker: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("finalize pending restore marker: %w", err)
+	}
+	return nil
+}
+
+func rejectExistingRestoreArtifact(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("restore artifact already exists: %s", path)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect restore artifact %s: %w", path, err)
+	}
+	return nil
+}
+
+func copyFile(sourcePath, destinationPath string, mode os.FileMode) error {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("open staged restore source: %w", err)
+	}
+	defer source.Close()
+	destination, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	if err != nil {
+		return fmt.Errorf("create staged restore file: %w", err)
+	}
+	if _, err := io.Copy(destination, source); err != nil {
+		_ = destination.Close()
+		_ = os.Remove(destinationPath)
+		return fmt.Errorf("copy staged restore file: %w", err)
+	}
+	if err := destination.Sync(); err != nil {
+		_ = destination.Close()
+		_ = os.Remove(destinationPath)
+		return fmt.Errorf("sync staged restore file: %w", err)
+	}
+	if err := destination.Close(); err != nil {
+		_ = os.Remove(destinationPath)
+		return fmt.Errorf("close staged restore file: %w", err)
+	}
+	return nil
+}
+
+func removeSQLiteSidecars(databasePath string) error {
+	if databasePath == "" {
 		return nil
 	}
-
-	if ferr := applyAndCheck(ctx, dumpPath); ferr != nil {
-		logf("restore: failed (%v), rolling back to %s", ferr, filepath.Base(restorePoint))
-		// The original ctx may be cancelled/expired — the rollback must still run.
-		if rberr := applyAndCheck(context.WithoutCancel(ctx), restorePoint); rberr != nil {
-			return fmt.Errorf("restore failed: %w; ROLLBACK ALSO FAILED (restore point kept at %s): %v", ferr, restorePoint, rberr)
+	for _, suffix := range []string{"-wal", "-shm"} {
+		path := databasePath + suffix
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove SQLite sidecar %s: %w", filepath.Base(path), err)
 		}
-		return fmt.Errorf("restore failed, database rolled back to its previous state: %w", ferr)
 	}
-
-	logf("restore: success (restore point kept at %s)", filepath.Base(restorePoint))
 	return nil
 }

@@ -15,7 +15,7 @@ WHERE id = 1
 `
 
 func (q *Queries) GetRepositoryDefaults(ctx context.Context) (RepositoryDefault, error) {
-	row := q.db.QueryRow(ctx, getRepositoryDefaults)
+	row := q.db.QueryRowContext(ctx, getRepositoryDefaults)
 	var i RepositoryDefault
 	err := row.Scan(
 		&i.ID,
@@ -32,12 +32,12 @@ INSERT INTO repository_defaults (
     strategy,
     duplicate_handling
 ) VALUES (
-    1, $1, $2
+    1, ?1, ?2
 )
 ON CONFLICT (id) DO UPDATE SET
     strategy = EXCLUDED.strategy,
     duplicate_handling = EXCLUDED.duplicate_handling,
-    updated_at = NOW()
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 RETURNING id, strategy, duplicate_handling, updated_at
 `
 
@@ -47,7 +47,7 @@ type UpsertRepositoryDefaultsParams struct {
 }
 
 func (q *Queries) UpsertRepositoryDefaults(ctx context.Context, arg UpsertRepositoryDefaultsParams) (RepositoryDefault, error) {
-	row := q.db.QueryRow(ctx, upsertRepositoryDefaults, arg.Strategy, arg.DuplicateHandling)
+	row := q.db.QueryRowContext(ctx, upsertRepositoryDefaults, arg.Strategy, arg.DuplicateHandling)
 	var i RepositoryDefault
 	err := row.Scan(
 		&i.ID,

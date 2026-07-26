@@ -33,7 +33,7 @@ func keepAtOrAboveQualityPercentile(
 	}
 
 	sort.Float64s(vals)
-	cut = float32(percentileCont(vals, percentile/100.0))
+	cut = float32(interpolatedPercentile(vals, percentile/100.0))
 
 	kept = make([]uuid.UUID, 0, scoredCount)
 	for _, id := range ordered {
@@ -44,9 +44,9 @@ func keepAtOrAboveQualityPercentile(
 	return kept, cut, scoredCount
 }
 
-// percentileCont mirrors PostgreSQL percentile_cont: linear interpolation at
-// fraction f in [0, 1] over a sorted sample.
-func percentileCont(sorted []float64, f float64) float64 {
+// interpolatedPercentile linearly interpolates fraction f in [0, 1] over a
+// sorted sample.
+func interpolatedPercentile(sorted []float64, f float64) float64 {
 	n := len(sorted)
 	if n == 0 {
 		return 0

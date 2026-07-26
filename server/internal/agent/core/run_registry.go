@@ -13,8 +13,8 @@ type runRegistryKey struct {
 	runID    uuid.UUID
 }
 
-// RunRegistry contains process-local cancel handles only. PostgreSQL remains
-// authoritative for run identity and status.
+// RunRegistry contains process-local cancel handles only. The library catalog
+// remains authoritative for run identity and status.
 type RunRegistry struct {
 	mu      sync.Mutex
 	entries map[runRegistryKey]*runRegistryEntry

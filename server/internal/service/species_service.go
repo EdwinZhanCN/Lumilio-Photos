@@ -3,20 +3,21 @@ package service
 import (
 	"context"
 	"fmt"
+
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 // SpeciesService defines species prediction related operations interface
 type SpeciesService interface {
-	SaveSpeciesPredictions(ctx context.Context, assetID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
-	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]repo.SpeciesPrediction, error)
-	GetTopSpeciesForAsset(ctx context.Context, assetID pgtype.UUID, minScore float32, limit int) ([]repo.SpeciesPrediction, error)
+	SaveSpeciesPredictions(ctx context.Context, assetID uuid.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
+	GetSpeciesPredictionsByAsset(ctx context.Context, assetID uuid.UUID) ([]repo.SpeciesPrediction, error)
+	GetTopSpeciesForAsset(ctx context.Context, assetID uuid.UUID, minScore float32, limit int) ([]repo.SpeciesPrediction, error)
 	SearchAssetsBySpecies(ctx context.Context, query string, limit, offset int) ([]repo.Asset, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, label string, limit, offset int) ([]repo.SpeciesPrediction, error)
-	DeleteSpeciesPredictions(ctx context.Context, assetID pgtype.UUID) error
+	DeleteSpeciesPredictions(ctx context.Context, assetID uuid.UUID) error
 	GetSpeciesStats(ctx context.Context) (*repo.GetSpeciesStatsRow, error)
 	GetTopSpeciesLabels(ctx context.Context, limit int) ([]repo.GetTopSpeciesLabelsRow, error)
 }
@@ -33,7 +34,7 @@ func NewSpeciesService(queries *repo.Queries) SpeciesService {
 }
 
 // SaveSpeciesPredictions saves species predictions to database
-func (s *speciesService) SaveSpeciesPredictions(ctx context.Context, assetID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
+func (s *speciesService) SaveSpeciesPredictions(ctx context.Context, assetID uuid.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
 	// Delete existing predictions first
 	if err := s.queries.DeleteSpeciesPredictionsByAsset(ctx, assetID); err != nil {
 		return fmt.Errorf("failed to delete existing species predictions: %w", err)
@@ -44,7 +45,7 @@ func (s *speciesService) SaveSpeciesPredictions(ctx context.Context, assetID pgt
 		params := repo.CreateSpeciesPredictionParams{
 			AssetID: assetID,
 			Label:   pred.Label,
-			Score:   pred.Score,
+			Score:   float64(pred.Score),
 		}
 		if _, err := s.queries.CreateSpeciesPrediction(ctx, params); err != nil {
 			return fmt.Errorf("failed to create species prediction: %w", err)
@@ -55,7 +56,7 @@ func (s *speciesService) SaveSpeciesPredictions(ctx context.Context, assetID pgt
 }
 
 // GetSpeciesPredictionsByAsset retrieves all species predictions for an asset
-func (s *speciesService) GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]repo.SpeciesPrediction, error) {
+func (s *speciesService) GetSpeciesPredictionsByAsset(ctx context.Context, assetID uuid.UUID) ([]repo.SpeciesPrediction, error) {
 	predictions, err := s.queries.GetSpeciesPredictionsByAsset(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get species predictions: %w", err)
@@ -64,11 +65,11 @@ func (s *speciesService) GetSpeciesPredictionsByAsset(ctx context.Context, asset
 }
 
 // GetTopSpeciesForAsset retrieves top species predictions with minimum confidence
-func (s *speciesService) GetTopSpeciesForAsset(ctx context.Context, assetID pgtype.UUID, minScore float32, limit int) ([]repo.SpeciesPrediction, error) {
+func (s *speciesService) GetTopSpeciesForAsset(ctx context.Context, assetID uuid.UUID, minScore float32, limit int) ([]repo.SpeciesPrediction, error) {
 	params := repo.GetTopSpeciesForAssetParams{
 		AssetID: assetID,
-		Score:   minScore,
-		Limit:   int32(limit),
+		Score:   float64(minScore),
+		Limit:   int64(limit),
 	}
 
 	predictions, err := s.queries.GetTopSpeciesForAsset(ctx, params)
@@ -81,9 +82,9 @@ func (s *speciesService) GetTopSpeciesForAsset(ctx context.Context, assetID pgty
 // SearchAssetsBySpecies searches assets by species label
 func (s *speciesService) SearchAssetsBySpecies(ctx context.Context, query string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.SearchAssetsBySpeciesParams{
-		Query:  query,
-		Offset: int32(offset),
-		Limit:  int32(limit),
+		Query:  &query,
+		Offset: int64(offset),
+		Limit:  int64(limit),
 	}
 
 	assets, err := s.queries.SearchAssetsBySpecies(ctx, params)
@@ -97,8 +98,8 @@ func (s *speciesService) SearchAssetsBySpecies(ctx context.Context, query string
 func (s *speciesService) GetSpeciesPredictionsByLabel(ctx context.Context, label string, limit, offset int) ([]repo.SpeciesPrediction, error) {
 	params := repo.GetSpeciesPredictionsByLabelParams{
 		Label:  label,
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		Limit:  int64(limit),
+		Offset: int64(offset),
 	}
 
 	predictions, err := s.queries.GetSpeciesPredictionsByLabel(ctx, params)
@@ -109,7 +110,7 @@ func (s *speciesService) GetSpeciesPredictionsByLabel(ctx context.Context, label
 }
 
 // DeleteSpeciesPredictions deletes all species predictions for an asset
-func (s *speciesService) DeleteSpeciesPredictions(ctx context.Context, assetID pgtype.UUID) error {
+func (s *speciesService) DeleteSpeciesPredictions(ctx context.Context, assetID uuid.UUID) error {
 	if err := s.queries.DeleteSpeciesPredictionsByAsset(ctx, assetID); err != nil {
 		return fmt.Errorf("failed to delete species predictions: %w", err)
 	}
@@ -127,7 +128,7 @@ func (s *speciesService) GetSpeciesStats(ctx context.Context) (*repo.GetSpeciesS
 
 // GetTopSpeciesLabels retrieves the most common species labels
 func (s *speciesService) GetTopSpeciesLabels(ctx context.Context, limit int) ([]repo.GetTopSpeciesLabelsRow, error) {
-	labels, err := s.queries.GetTopSpeciesLabels(ctx, int32(limit))
+	labels, err := s.queries.GetTopSpeciesLabels(ctx, int64(limit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get top species labels: %w", err)
 	}

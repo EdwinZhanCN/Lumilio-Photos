@@ -8,9 +8,10 @@
 // upload acceptance is never treated as completion.
 //
 // The tool is a host-side client: it drives a running server (native or the
-// docker-compose.release.yml stack) over HTTP only, so it needs no direct
-// database access. See README.md for the full runbook and the push/pull flow
-// for the Docker release environment.
+// docker-compose.release.yml stack) over HTTP. It can optionally read the
+// SQLite library catalog for exact River completion timestamps. See README.md
+// for the full runbook and the push/pull flow for the Docker release
+// environment.
 //
 // Usage:
 //
@@ -52,8 +53,7 @@ type config struct {
 	timeout     time.Duration
 	limit       int    // cap number of files (0 = all)
 	sampler     string // path to sample.sh; empty = do not spawn
-	pgContainer string // docker container name for PostgreSQL sampling
-	db          string // optional Postgres DSN for exact river_job timing
+	sqlitePath  string // optional SQLite catalog path for exact river_job timing
 }
 
 func main() {
@@ -94,8 +94,7 @@ func parseFlags() config {
 	flag.StringVar(&toRaw, "timeout", "60m", "overall completion timeout")
 	flag.IntVar(&cfg.limit, "limit", 0, "cap number of files uploaded (0 = all; useful for smoke tests)")
 	flag.StringVar(&cfg.sampler, "sampler", "", "path to sample.sh to spawn for resource sampling (empty = skip)")
-	flag.StringVar(&cfg.pgContainer, "pg-container", "", "docker container name for PostgreSQL (passed to sampler)")
-	flag.StringVar(&cfg.db, "db", "", "optional Postgres DSN for exact river_job timing (removes the poll-cadence bound on completion latency)")
+	flag.StringVar(&cfg.sqlitePath, "sqlite", "", "optional SQLite catalog path for exact river_job timing (removes the poll-cadence bound on completion latency)")
 	flag.Parse()
 
 	fail := func(msg string) {

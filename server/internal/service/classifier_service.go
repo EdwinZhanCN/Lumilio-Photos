@@ -2,16 +2,15 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"time"
 
 	"server/internal/classify"
+	"server/internal/db/dbtypes"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pgvector/pgvector-go"
 	"go.uber.org/zap"
 )
 
@@ -80,7 +79,7 @@ type ClassifierService interface {
 }
 
 type classifierService struct {
-	pool       *pgxpool.Pool
+	pool       *sql.DB
 	lumen      LumenService
 	embeddings EmbeddingService
 	logger     *zap.Logger
@@ -92,7 +91,7 @@ type classifierService struct {
 	backgroundDim int
 }
 
-func NewClassifierService(pool *pgxpool.Pool, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
+func NewClassifierService(pool *sql.DB, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -288,29 +287,31 @@ func (s *classifierService) Preview(ctx context.Context, positivePrompts, negati
 		return nil, err
 	}
 
-	// Embeddings are unit vectors, so cosine = 1 - d^2/2. The score is the
-	// contrastive margin: cos(positive) - cos(negative); membership is margin >= threshold.
-	posVec := pgvector.NewVector(positive)
-	negVec := pgvector.NewVector(negative)
-	marginExpr := fmt.Sprintf(
-		"((1 - power(e.vector::vector(%d) <-> $1::vector(%d), 2) / 2) - (1 - power(e.vector::vector(%d) <-> $2::vector(%d), 2) / 2))",
-		space.Dimensions, space.Dimensions, space.Dimensions, space.Dimensions,
-	)
+	// sqlite-vec returns cosine distance, so the contrastive similarity margin
+	// is distance(negative) - distance(positive).
+	posVec := dbtypes.NewVector(positive)
+	negVec := dbtypes.NewVector(negative)
 	// Assets may carry multiple vectors (video frames); represent each asset by
 	// its best-matching frame via MAX over the contrastive margin.
-	query := fmt.Sprintf(`
-SELECT a.asset_id, MAX(%s)::float8 AS score
-FROM search_embeddings e
-JOIN assets a ON a.asset_id = e.asset_id
-WHERE e.space_id = $3
-  AND a.is_deleted = false
-  AND %s >= $4
-GROUP BY a.asset_id
-ORDER BY score DESC, a.asset_id DESC
-LIMIT $5
-`, marginExpr, marginExpr)
+	const query = `
+WITH scored AS (
+  SELECT
+    a.asset_id,
+    MAX(vec_distance_cosine(e.vector, ?) - vec_distance_cosine(e.vector, ?)) AS score
+  FROM search_embeddings e
+  JOIN assets a ON a.asset_id = e.asset_id
+  WHERE e.space_id = ?
+    AND a.is_deleted = 0
+  GROUP BY a.asset_id
+)
+SELECT asset_id, score
+FROM scored
+WHERE score >= ?
+ORDER BY score DESC, asset_id DESC
+LIMIT ?
+`
 
-	rows, err := s.pool.Query(ctx, query, &posVec, &negVec, space.ID, threshold, limit)
+	rows, err := s.pool.QueryContext(ctx, query, negVec, posVec, space.ID, threshold, limit)
 	if err != nil {
 		return nil, fmt.Errorf("preview query: %w", err)
 	}
@@ -318,15 +319,15 @@ LIMIT $5
 
 	matches := make([]ClassifierPreviewMatch, 0, limit)
 	for rows.Next() {
-		var assetID pgtype.UUID
+		var assetID uuid.UUID
 		var score float64
 		if err := rows.Scan(&assetID, &score); err != nil {
 			return nil, fmt.Errorf("scan preview row: %w", err)
 		}
-		if !assetID.Valid {
+		if assetID == uuid.Nil {
 			continue
 		}
-		matches = append(matches, ClassifierPreviewMatch{AssetID: uuid.UUID(assetID.Bytes), Score: score})
+		matches = append(matches, ClassifierPreviewMatch{AssetID: assetID, Score: score})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate preview rows: %w", err)
@@ -365,20 +366,20 @@ func (s *classifierService) enabledWithPrototypes(ctx context.Context) ([]Classi
 // loadDefinitions reads classifier rows. When requirePrototype is true only rows
 // with a built positive prototype are returned (the set the worker scores).
 func (s *classifierService) loadDefinitions(ctx context.Context, requirePrototype bool) ([]ClassifierDefinition, error) {
-	where := "enabled = true"
+	where := "enabled = 1"
 	if requirePrototype {
 		where += " AND positive_prototype IS NOT NULL"
 	}
 	query := fmt.Sprintf(`
 SELECT id, slug, display_name, tag_name, category, positive_prompts, negative_prompts,
-       threshold::float8, enabled, positive_prototype, negative_prototype,
+       threshold, enabled, positive_prototype, negative_prototype,
        prototype_model, prototype_dimensions
 FROM classifier_definitions
 WHERE %s
 ORDER BY id
 `, where)
 
-	rows, err := s.pool.Query(ctx, query)
+	rows, err := s.pool.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("load classifier definitions: %w", err)
 	}
@@ -388,34 +389,30 @@ ORDER BY id
 	for rows.Next() {
 		var (
 			def       ClassifierDefinition
-			pos       *pgvector.Vector
-			neg       *pgvector.Vector
-			model     *string
-			dims      *int32
+			pos       dbtypes.Vector
+			neg       dbtypes.Vector
+			model     sql.NullString
+			dims      sql.NullInt64
 			threshold float64
 			category  string
+			positive  dbtypes.Strings
+			negative  dbtypes.Strings
 		)
 		if err := rows.Scan(
 			&def.ID, &def.Slug, &def.DisplayName, &def.TagName, &category,
-			&def.PositivePrompts, &def.NegativePrompts, &threshold, &def.Enabled,
+			&positive, &negative, &threshold, &def.Enabled,
 			&pos, &neg, &model, &dims,
 		); err != nil {
 			return nil, fmt.Errorf("scan classifier definition: %w", err)
 		}
 		def.Category = category
 		def.Threshold = threshold
-		if pos != nil {
-			def.PositivePrototype = pos.Slice()
-		}
-		if neg != nil {
-			def.NegativePrototype = neg.Slice()
-		}
-		if model != nil {
-			def.PrototypeModel = *model
-		}
-		if dims != nil {
-			def.PrototypeDimensions = int(*dims)
-		}
+		def.PositivePrompts = append([]string(nil), positive...)
+		def.NegativePrompts = append([]string(nil), negative...)
+		def.PositivePrototype = pos.Slice()
+		def.NegativePrototype = neg.Slice()
+		def.PrototypeModel = model.String
+		def.PrototypeDimensions = int(dims.Int64)
 		defs = append(defs, def)
 	}
 	if err := rows.Err(); err != nil {
@@ -425,22 +422,22 @@ ORDER BY id
 }
 
 func (s *classifierService) savePrototypes(ctx context.Context, id int32, positive, negative []float32, model string) error {
-	posVec := pgvector.NewVector(positive)
+	posVec := dbtypes.NewVector(positive)
 	var negArg any
 	if len(negative) > 0 {
-		negVec := pgvector.NewVector(negative)
-		negArg = &negVec
+		negArg = dbtypes.NewVector(negative)
 	}
-	_, err := s.pool.Exec(ctx, `
+	now := dbtypes.NewTimestamp(time.Now())
+	_, err := s.pool.ExecContext(ctx, `
 UPDATE classifier_definitions
-SET positive_prototype = $2,
-    negative_prototype = $3,
-    prototype_model = $4,
-    prototype_dimensions = $5,
-    prototype_built_at = NOW(),
-    updated_at = NOW()
-WHERE id = $1
-`, id, &posVec, negArg, model, int32(len(positive)))
+SET positive_prototype = ?,
+    negative_prototype = ?,
+    prototype_model = ?,
+    prototype_dimensions = ?,
+    prototype_built_at = ?,
+    updated_at = ?
+WHERE id = ?
+`, posVec, negArg, model, int32(len(positive)), now, now, id)
 	if err != nil {
 		return fmt.Errorf("save prototypes: %w", err)
 	}

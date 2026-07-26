@@ -7,12 +7,13 @@ package facets
 import (
 	"context"
 	"math"
+	"strconv"
 	"time"
 
 	"server/internal/agent/ref"
 	"server/internal/db/repo"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const (
@@ -33,10 +34,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		return summary, nil
 	}
 
-	assetIDs := make([]pgtype.UUID, len(r.AssetIDs))
-	for i, id := range r.AssetIDs {
-		assetIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
+	assetIDs := append([]uuid.UUID(nil), r.AssetIDs...)
 
 	overview, err := queries.AgentFacetOverview(ctx, assetIDs)
 	if err != nil {
@@ -45,16 +43,18 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	summary.LikedCount = int(overview.LikedCount)
 
 	granularity := "month"
-	if overview.DateFrom.Valid && overview.DateTo.Valid {
+	dateFrom, fromOK := sqliteTime(overview.DateFrom)
+	dateTo, toOK := sqliteTime(overview.DateTo)
+	if fromOK && toOK {
 		summary.DateRange = &ref.DateRange{
-			From: overview.DateFrom.Time.UTC(),
-			To:   overview.DateTo.Time.UTC(),
+			From: dateFrom,
+			To:   dateTo,
 		}
-		if cm := overview.CaptureOffsetMinutes; cm != 0 {
+		if cm := sqliteInt64(overview.CaptureOffsetMinutes); cm != 0 {
 			offset := int16(cm)
 			summary.DateRange.OffsetMinutes = &offset
 		}
-		granularity = chooseHistogramGranularity(overview.DateFrom.Time, overview.DateTo.Time)
+		granularity = chooseHistogramGranularity(dateFrom, dateTo)
 	}
 	summary.HistogramGranularity = granularity
 
@@ -64,7 +64,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	}); err == nil {
 		summary.Histogram = make([]ref.Bucket, 0, len(buckets))
 		for _, b := range buckets {
-			summary.Histogram = append(summary.Histogram, ref.Bucket{Bucket: b.Bucket, Count: int(b.Count)})
+			summary.Histogram = append(summary.Histogram, ref.Bucket{Bucket: sqliteString(b.Bucket), Count: int(b.Count)})
 		}
 	}
 
@@ -80,7 +80,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		TopN:     topPlaces,
 	}); err == nil {
 		summary.TopPlaces = toNameCounts(places, func(row repo.AgentFacetTopPlacesRow) (string, int64) {
-			return row.Name, row.Count
+			return sqliteString(row.Name), row.Count
 		})
 	}
 
@@ -89,7 +89,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		TopN:     topPeople,
 	}); err == nil {
 		summary.TopPeople = toNameCounts(people, func(row repo.AgentFacetTopPeopleRow) (string, int64) {
-			return row.Name, row.Count
+			return sqliteString(row.Name), row.Count
 		})
 	}
 
@@ -98,7 +98,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		TopN:     topCameras,
 	}); err == nil {
 		summary.Cameras = toNameCounts(cameras, func(row repo.AgentFacetCameraCountsRow) (string, int64) {
-			return row.Name, row.Count
+			return sqliteString(row.Name), row.Count
 		})
 	}
 
@@ -107,7 +107,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		TopN:     topGear,
 	}); err == nil {
 		summary.FocalLengths = toNameCounts(focals, func(row repo.AgentFacetTopFocalLengthsRow) (string, int64) {
-			return row.Name, row.Count
+			return sqliteString(row.Name), row.Count
 		})
 	}
 
@@ -116,7 +116,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 		TopN:     topGear,
 	}); err == nil {
 		summary.Lenses = toNameCounts(lenses, func(row repo.AgentFacetTopLensesRow) (string, int64) {
-			return row.Name, row.Count
+			return sqliteString(row.Name), row.Count
 		})
 	}
 
@@ -152,8 +152,70 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 
 // round1 rounds a score to one decimal place — the percentiles are presented
 // to the model as distribution shape, so sub-decimal precision is just noise.
-func round1(v float32) float64 {
-	return math.Round(float64(v)*10) / 10
+func round1(v any) float64 {
+	return math.Round(sqliteFloat64(v)*10) / 10
+}
+
+func sqliteString(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	case []byte:
+		return string(typed)
+	case *string:
+		if typed != nil {
+			return *typed
+		}
+	}
+	return ""
+}
+
+func sqliteInt64(value any) int64 {
+	switch typed := value.(type) {
+	case int64:
+		return typed
+	case int:
+		return int64(typed)
+	case float64:
+		return int64(typed)
+	case []byte:
+		parsed, _ := strconv.ParseInt(string(typed), 10, 64)
+		return parsed
+	case string:
+		parsed, _ := strconv.ParseInt(typed, 10, 64)
+		return parsed
+	}
+	return 0
+}
+
+func sqliteFloat64(value any) float64 {
+	switch typed := value.(type) {
+	case float64:
+		return typed
+	case float32:
+		return float64(typed)
+	case int64:
+		return float64(typed)
+	case int:
+		return float64(typed)
+	case []byte:
+		parsed, _ := strconv.ParseFloat(string(typed), 64)
+		return parsed
+	case string:
+		parsed, _ := strconv.ParseFloat(typed, 64)
+		return parsed
+	}
+	return 0
+}
+
+func sqliteTime(value any) (time.Time, bool) {
+	micros := sqliteInt64(value)
+	if micros == 0 {
+		return time.Time{}, false
+	}
+	return time.UnixMicro(micros).UTC(), true
 }
 
 func chooseHistogramGranularity(from, to time.Time) string {

@@ -95,7 +95,7 @@ func RegisterRank() {
 					sendError(deps, info.Name, execID, start, refErr)
 					return errorOutput(refErr), nil
 				}
-				ranked = fromPgUUIDs(rows)
+				ranked = copyUUIDs(rows)
 			case "quality":
 				rows, err := deps.Library.RankByQuality(ctx, r.AssetIDs)
 				if err != nil {
@@ -103,7 +103,7 @@ func RegisterRank() {
 					sendError(deps, info.Name, execID, start, refErr)
 					return errorOutput(refErr), nil
 				}
-				ranked = fromPgUUIDs(rows)
+				ranked = copyUUIDs(rows)
 			case "relevance":
 				if !isSearchPlan(r.Plan.Op) {
 					refErr := ref.InvalidArgument(
@@ -244,7 +244,7 @@ func RegisterSample() {
 					sendError(deps, info.Name, execID, start, refErr)
 					return &SampleOutput{Error: refErr}, nil
 				}
-				sampled = sampleSpread(fromPgUUIDs(rows), input.N)
+				sampled = sampleSpread(copyUUIDs(rows), input.N)
 			default:
 				refErr := ref.InvalidArgument(fmt.Sprintf("strategy %q is not one of random, spread_over_time", input.Strategy))
 				sendError(deps, info.Name, execID, start, refErr)

@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"server/config"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/storage"
@@ -20,9 +22,7 @@ import (
 	"server/internal/utils/hash"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/mattn/go-sqlite3"
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
@@ -44,7 +44,7 @@ type EnqueueResult struct {
 
 type Scanner struct {
 	queries *repo.Queries
-	queue   *river.Client[pgx.Tx]
+	queue   *river.Client[*sql.Tx]
 	cfg     config.RepositoryScanConfig
 	logger  *zap.Logger
 }
@@ -76,7 +76,7 @@ type assetFingerprint struct {
 	size int64
 }
 
-func NewScanner(queries *repo.Queries, queue *river.Client[pgx.Tx], cfg config.RepositoryScanConfig, logger *zap.Logger) *Scanner {
+func NewScanner(queries *repo.Queries, queue *river.Client[*sql.Tx], cfg config.RepositoryScanConfig, logger *zap.Logger) *Scanner {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -132,9 +132,6 @@ func (s *Scanner) EnqueueAllPeriodicScans(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, repository := range repositories {
 		repository := repository
-		if !repository.RepoID.Valid {
-			continue
-		}
 		select {
 		case sem <- struct{}{}:
 		case <-ctx.Done():
@@ -201,7 +198,7 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		return fmt.Errorf("repository path is not a scannable repository root: %s", repository.Path)
 	}
 
-	scanID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	scanID := uuid.New()
 	now := time.Now().UTC()
 	requestedBy := strings.TrimSpace(args.RequestedBy)
 	var requestedByPtr *string
@@ -218,7 +215,7 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		Mode:         normalizeMode(args.Mode),
 		RequestedBy:  requestedByPtr,
 		Status:       ScanStatusRunning,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    dbtypes.NewTimestamp(now),
 	})
 	if err != nil {
 		if isUniqueConstraintViolation(err) {
@@ -232,7 +229,7 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 	}
 
 	counters, scanErr := s.scanRepository(ctx, repository, normalizeMode(args.Mode), args.Force)
-	finishedAt := pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}
+	finishedAt := dbtypes.NewTimestamp(time.Now())
 	if scanErr != nil {
 		_, failErr := s.queries.FailRepositoryScanRun(ctx, repo.FailRepositoryScanRunParams{
 			ScanID:          scanID,
@@ -316,8 +313,8 @@ func (s *Scanner) ListScanRuns(ctx context.Context, repositoryID string, limit, 
 	}
 	return s.queries.ListRepositoryScanRuns(ctx, repo.ListRepositoryScanRunsParams{
 		RepositoryID: repoID,
-		Limit:        limit,
-		Offset:       offset,
+		Limit:        int64(limit),
+		Offset:       int64(offset),
 	})
 }
 
@@ -333,7 +330,8 @@ func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository
 		return counters, err
 	}
 
-	dbAssets, err := s.queries.ListAssetsByRepositoryAny(ctx, repository.RepoID)
+	repositoryID := uuid.NullUUID{UUID: repository.RepoID, Valid: true}
+	dbAssets, err := s.queries.ListAssetsByRepositoryAny(ctx, repositoryID)
 	if err != nil {
 		return counters, fmt.Errorf("list repository assets: %w", err)
 	}
@@ -483,7 +481,7 @@ func (s *Scanner) reconcileMovedEntries(
 
 		if _, err := s.queries.MoveAssetWithinRepository(ctx, repo.MoveAssetWithinRepositoryParams{
 			AssetID:          asset.AssetID,
-			RepositoryID:     repository.RepoID,
+			RepositoryID:     uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 			StoragePath:      &entry.StoragePath,
 			OriginalFilename: entry.Filename,
 		}); err != nil {
@@ -509,7 +507,7 @@ func (s *Scanner) reconcileMovedEntries(
 // discoverBatcher accumulates discover_asset jobs and inserts them in batches of
 // cfg.BatchSize via River's InsertMany, instead of one insert per file.
 type discoverBatcher struct {
-	queue     *river.Client[pgx.Tx]
+	queue     *river.Client[*sql.Tx]
 	ctx       context.Context
 	batchSize int
 	pending   []river.InsertManyParams
@@ -519,7 +517,7 @@ func (s *Scanner) newDiscoverBatcher(ctx context.Context) *discoverBatcher {
 	return &discoverBatcher{queue: s.queue, ctx: ctx, batchSize: s.cfg.BatchSize}
 }
 
-func (b *discoverBatcher) add(repositoryID pgtype.UUID, entry diskEntry, operation string) error {
+func (b *discoverBatcher) add(repositoryID uuid.UUID, entry diskEntry, operation string) error {
 	args := jobs.DiscoverAssetArgs{
 		RepositoryID: repositoryID.String(),
 		RelativePath: filepath.ToSlash(entry.StoragePath),
@@ -556,9 +554,10 @@ func (b *discoverBatcher) flush() error {
 }
 
 func isUniqueConstraintViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
+	var sqliteErr sqlite3.Error
+	if errors.As(err, &sqliteErr) {
+		return sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique ||
+			sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey
 	}
 	return false
 }
@@ -686,7 +685,7 @@ func fileMTimeIsNewerThanAsset(mtime time.Time, asset repo.Asset) bool {
 }
 
 func isSoftDeleted(asset repo.Asset) bool {
-	return asset.IsDeleted != nil && *asset.IsDeleted
+	return asset.IsDeleted
 }
 
 func isScannableRepositoryRoot(repoPath string) bool {
@@ -701,12 +700,12 @@ func isScannableRepositoryRoot(repoPath string) bool {
 	return repocfg.IsRepositoryRoot(cleaned)
 }
 
-func parseRepositoryID(repositoryID string) (pgtype.UUID, error) {
+func parseRepositoryID(repositoryID string) (uuid.UUID, error) {
 	parsed, err := uuid.Parse(strings.TrimSpace(repositoryID))
 	if err != nil {
-		return pgtype.UUID{}, fmt.Errorf("invalid repository id: %w", err)
+		return uuid.Nil, fmt.Errorf("invalid repository id: %w", err)
 	}
-	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
+	return parsed, nil
 }
 
 func normalizeMode(mode string) string {

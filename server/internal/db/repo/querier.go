@@ -6,9 +6,8 @@ package repo
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
 )
 
@@ -22,28 +21,22 @@ type Querier interface {
 	AgentAssetAestheticScores(ctx context.Context, arg AgentAssetAestheticScoresParams) ([]AgentAssetAestheticScoresRow, error)
 	// Capture times for a set of assets, for the sample tool's distribution
 	// summary. Order is irrelevant; bucketing happens in Go.
-	AgentCapturedTimes(ctx context.Context, arg AgentCapturedTimesParams) ([]pgtype.Timestamptz, error)
+	AgentCapturedTimes(ctx context.Context, arg AgentCapturedTimesParams) ([]dbtypes.Timestamp, error)
 	AgentFacetCameraCounts(ctx context.Context, arg AgentFacetCameraCountsParams) ([]AgentFacetCameraCountsRow, error)
-	// Facet aggregates over a ref snapshot (agent describe tool / hydration API).
-	// Every query takes the materialized asset id array; results feed
-	// ref.FacetSummary. User-content strings (labels, names, camera models) are
-	// sanitized in Go before reaching the LLM — never here.
-	AgentFacetOverview(ctx context.Context, assetIds []pgtype.UUID) (AgentFacetOverviewRow, error)
-	// Aesthetic-score distribution (percentiles) over a ref snapshot, for the
-	// describe tool. Unscored assets are excluded from the percentiles;
-	// scored_count lets callers report how many of the ref's assets carry a score.
-	// Percentiles are NULL when nothing in the set is scored.
-	AgentFacetQualityStats(ctx context.Context, assetIds []pgtype.UUID) (AgentFacetQualityStatsRow, error)
-	AgentFacetRatingDist(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetRatingDistRow, error)
+	AgentFacetOverview(ctx context.Context, assetIds []uuid.UUID) (AgentFacetOverviewRow, error)
+	// Aesthetic-score distribution over a ref snapshot. SQLite does not ship a
+	// percentile aggregate, so choose the first value at each discrete rank.
+	AgentFacetQualityStats(ctx context.Context, assetIds []uuid.UUID) (AgentFacetQualityStatsRow, error)
+	AgentFacetRatingDist(ctx context.Context, assetIds []uuid.UUID) ([]AgentFacetRatingDistRow, error)
 	// granularity is 'hour', 'day', 'month' or 'year'.
 	AgentFacetTimeHistogram(ctx context.Context, arg AgentFacetTimeHistogramParams) ([]AgentFacetTimeHistogramRow, error)
 	// Most-used focal lengths over a ref snapshot, rounded to whole millimetres so
-	// 34.9mm and 35mm collapse into one bucket. The regex guards the numeric cast.
+	// 34.9mm and 35mm collapse into one bucket. JSON type checks guard the value.
 	AgentFacetTopFocalLengths(ctx context.Context, arg AgentFacetTopFocalLengthsParams) ([]AgentFacetTopFocalLengthsRow, error)
 	AgentFacetTopLenses(ctx context.Context, arg AgentFacetTopLensesParams) ([]AgentFacetTopLensesRow, error)
 	AgentFacetTopPeople(ctx context.Context, arg AgentFacetTopPeopleParams) ([]AgentFacetTopPeopleRow, error)
 	AgentFacetTopPlaces(ctx context.Context, arg AgentFacetTopPlacesParams) ([]AgentFacetTopPlacesRow, error)
-	AgentFacetTypeCounts(ctx context.Context, assetIds []pgtype.UUID) ([]AgentFacetTypeCountsRow, error)
+	AgentFacetTypeCounts(ctx context.Context, assetIds []uuid.UUID) ([]AgentFacetTypeCountsRow, error)
 	// inspect observer: per-asset EXIF facets for small refs.
 	AgentInspectAssets(ctx context.Context, arg AgentInspectAssetsParams) ([]AgentInspectAssetsRow, error)
 	// lookup_albums entity resolver: albums matching a title query.
@@ -55,17 +48,18 @@ type Querier interface {
 	// single row (no fan-out from the cluster joins).
 	AgentPeekAssets(ctx context.Context, arg AgentPeekAssetsParams) ([]AgentPeekAssetsRow, error)
 	// Owner-scoped rank(by=time) for Agent refs.
-	AgentRankAssetIDsByTime(ctx context.Context, arg AgentRankAssetIDsByTimeParams) ([]pgtype.UUID, error)
+	AgentRankAssetIDsByTime(ctx context.Context, arg AgentRankAssetIDsByTimeParams) ([]uuid.UUID, error)
 	// Owner-scoped "recently added" order for Agent refs.
-	AgentRankAssetIDsByUploadTime(ctx context.Context, arg AgentRankAssetIDsByUploadTimeParams) ([]pgtype.UUID, error)
-	AgentRunHasCommittedEffect(ctx context.Context, arg AgentRunHasCommittedEffectParams) (bool, error)
+	AgentRankAssetIDsByUploadTime(ctx context.Context, arg AgentRankAssetIDsByUploadTimeParams) ([]uuid.UUID, error)
+	AgentRunHasCommittedEffect(ctx context.Context, arg AgentRunHasCommittedEffectParams) (int64, error)
 	// Applies merged rating/liked/description on top of the existing keeper values.
 	// Rating uses MAX, liked is OR'd, description is set only when keeper currently
 	// has no description (or the field is empty).
 	ApplyMergedKeeperPreferences(ctx context.Context, arg ApplyMergedKeeperPreferencesParams) error
 	AssignFaceClusterMemberExclusive(ctx context.Context, arg AssignFaceClusterMemberExclusiveParams) (FaceClusterMember, error)
-	BindPendingAgentEffectExecutingRun(ctx context.Context, arg BindPendingAgentEffectExecutingRunParams) (pgtype.UUID, error)
-	BulkToggleAssetLiked(ctx context.Context, assetIds []pgtype.UUID) error
+	AttachOriginalAssetToMediaItem(ctx context.Context, arg AttachOriginalAssetToMediaItemParams) error
+	BindPendingAgentEffectExecutingRun(ctx context.Context, arg BindPendingAgentEffectExecutingRunParams) (uuid.UUID, error)
+	BulkToggleAssetLiked(ctx context.Context, assetIds []uuid.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
@@ -78,55 +72,55 @@ type Querier interface {
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
-	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
-	CountAssetsByStatus(ctx context.Context, status []byte) (int64, error)
+	CountAssetsByRating(ctx context.Context, ownerID interface{}) ([]CountAssetsByRatingRow, error)
+	CountAssetsByStatus(ctx context.Context, status dbtypes.JSON) (int64, error)
 	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
 	CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error)
 	// Count query matching GetAssetsUnified WHERE clause
 	// Returns total count of assets matching the filters (for pagination)
 	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
 	CountAssetsWithSearchEmbedding(ctx context.Context) (int64, error)
-	CountBioAlbumPhotoAssets(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountBioAlbumPhotoAssets(ctx context.Context, repositoryID interface{}) (int64, error)
+	CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID interface{}) (int64, error)
 	CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error)
 	CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	// DBSCAN core check runs over the whole owner scope: clusters span
 	// repositories, so neighbors are never repository-filtered.
 	CountIncrementalFaceNeighbors(ctx context.Context, arg CountIncrementalFaceNeighborsParams) (int64, error)
-	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
+	CountLikedAssets(ctx context.Context, ownerID interface{}) (int64, error)
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
-	// owner_id filters on the cluster's structural owner (NULL-owner clusters are
-	// admin-only); repository_id stays a member-asset display filter because
-	// people legitimately span repositories.
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPersonFacesScoped(ctx context.Context, arg CountPersonFacesScopedParams) (int64, error)
-	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountPhotoAssetsWithSemanticEmbedding(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error)
+	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID interface{}) (int64, error)
+	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID interface{}) (int64, error)
+	CountPhotoAssetsWithSemanticEmbedding(ctx context.Context, repositoryID interface{}) (int64, error)
 	// Count query matching GetPhotoMapPoints.
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
 	CountPrimaryRepositories(ctx context.Context) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
-	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) (int64, error)
+	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) (int64, error)
+	CountStackedMediaItems(ctx context.Context, mediaItemIds []uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
-	CountVideoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountVideoAssetsWithSemanticFrames(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountVideoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error)
+	CountVideoAssetsWithSemanticFrames(ctx context.Context, repositoryID interface{}) (int64, error)
 	CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) (AgentPin, error)
-	CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) (CreateAgentRunRow, error)
+	CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) (AgentRun, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
+	CreateAssetStack(ctx context.Context, arg CreateAssetStackParams) (AssetStack, error)
 	CreateCloudCredential(ctx context.Context, arg CreateCloudCredentialParams) (CloudCredential, error)
 	CreateCloudImportRun(ctx context.Context, arg CreateCloudImportRunParams) (CloudImportRun, error)
-	CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (pgtype.UUID, error)
+	CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (uuid.UUID, error)
 	// owner_id is the cluster's structural owner (rule: a cluster never spans
 	// owners). NULL means the cluster groups ownerless assets and is admin-only.
 	CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error)
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
 	CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error)
 	CreateFaceResult(ctx context.Context, arg CreateFaceResultParams) (FaceResult, error)
+	CreateMediaItemForAsset(ctx context.Context, arg CreateMediaItemForAssetParams) error
 	CreateOCRResult(ctx context.Context, arg CreateOCRResultParams) (OcrResult, error)
 	CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemParams) (OcrTextItem, error)
 	CreatePendingAgentEffect(ctx context.Context, arg CreatePendingAgentEffectParams) (AgentPendingEffect, error)
@@ -144,42 +138,42 @@ type Querier interface {
 	DeleteAgentPin(ctx context.Context, arg DeleteAgentPinParams) error
 	DeleteAgentThreadRefs(ctx context.Context, arg DeleteAgentThreadRefsParams) error
 	DeleteAlbum(ctx context.Context, albumID int32) error
-	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteAllSearchEmbeddings(ctx context.Context) error
-	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteCheckpoint(ctx context.Context, id string) error
-	DeleteCloudCredential(ctx context.Context, credentialID pgtype.UUID) error
+	DeleteCloudCredential(ctx context.Context, credentialID uuid.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
 	DeleteEmptyFaceClusters(ctx context.Context) error
 	DeleteEmptyUnconfirmedFaceClusters(ctx context.Context) error
-	DeleteExpiredAgentRefs(ctx context.Context) error
+	DeleteExpiredAgentRefs(ctx context.Context, now dbtypes.Timestamp) error
 	DeleteExpiredRegistrationSessions(ctx context.Context) error
-	DeleteExternalRepositoryRoot(ctx context.Context, rootID pgtype.UUID) (int64, error)
+	DeleteExternalRepositoryRoot(ctx context.Context, rootID uuid.UUID) (int64, error)
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
 	DeleteFaceClusterMembersByCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMembersForScope(ctx context.Context, arg DeleteFaceClusterMembersForScopeParams) error
-	DeleteFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
-	DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteFaceItemsByAsset(ctx context.Context, assetID uuid.UUID) error
+	DeleteFaceResultByAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteLocationClustersForScope(ctx context.Context, arg DeleteLocationClustersForScopeParams) error
-	DeleteMediaItem(ctx context.Context, mediaItemID pgtype.UUID) error
-	DeleteOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) error
-	DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteMediaItem(ctx context.Context, mediaItemID uuid.UUID) error
+	DeleteOCRResultByAsset(ctx context.Context, assetID uuid.UUID) error
+	DeleteOCRTextItemsByAsset(ctx context.Context, assetID uuid.UUID) error
 	// ============================================================================
 	// Duplicate group lifecycle
 	// ============================================================================
 	// Removes the pending detection state for a repository. Merged and dismissed
 	// groups are preserved so the user retains an audit trail of resolved sets.
-	DeletePendingDuplicateGroupsByRepository(ctx context.Context, repositoryID pgtype.UUID) error
-	DeleteRegistrationSession(ctx context.Context, sessionID pgtype.UUID) error
+	DeletePendingDuplicateGroupsByRepository(ctx context.Context, repositoryID uuid.UUID) error
+	DeleteRegistrationSession(ctx context.Context, sessionID uuid.UUID) error
 	DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error
-	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
-	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
-	DeleteSearchEmbeddingsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteRepositories(ctx context.Context, repoIds []uuid.UUID) error
+	DeleteRepository(ctx context.Context, repoID uuid.UUID) error
+	DeleteSearchEmbeddingsByAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteShareLink(ctx context.Context, arg DeleteShareLinkParams) (int64, error)
-	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID uuid.UUID) error
 	// Presentation stacks ------------------------------------------------------
-	DeleteStack(ctx context.Context, stackID pgtype.UUID) error
+	DeleteStack(ctx context.Context, stackID uuid.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteTerminalPendingAgentEffects(ctx context.Context, arg DeleteTerminalPendingAgentEffectsParams) error
 	DeleteUser(ctx context.Context, userID int32) error
@@ -187,16 +181,18 @@ type Querier interface {
 	DeleteUserTOTPCredential(ctx context.Context, userID int32) error
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
-	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) error
+	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) error
 	ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLinkExpiryParams) (ShareLink, error)
 	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
 	// Structural and burst detection ------------------------------------------
-	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
-	FindMediaItemsForBurstDetection(ctx context.Context, repositoryID pgtype.UUID) ([]FindMediaItemsForBurstDetectionRow, error)
+	FindCandidatesForStackingByName(ctx context.Context, repositoryID uuid.NullUUID) ([]FindCandidatesForStackingByNameRow, error)
+	FindLivePhotoPair(ctx context.Context, arg FindLivePhotoPairParams) ([]FindLivePhotoPairRow, error)
+	FindMediaItemsForBurstDetection(ctx context.Context, repositoryID uuid.NullUUID) ([]FindMediaItemsForBurstDetectionRow, error)
 	FinishAgentRun(ctx context.Context, arg FinishAgentRunParams) error
+	FinishAgentThread(ctx context.Context, arg FinishAgentThreadParams) error
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
 	GetActiveAgentRun(ctx context.Context, arg GetActiveAgentRunParams) (AgentRun, error)
-	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID pgtype.UUID) (RepositoryCloudBinding, error)
+	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID uuid.UUID) (RepositoryCloudBinding, error)
 	GetActiveShareLinkByTokenHash(ctx context.Context, tokenHash []byte) (ShareLink, error)
 	GetAgentPin(ctx context.Context, arg GetAgentPinParams) (AgentPin, error)
 	GetAgentRef(ctx context.Context, arg GetAgentRefParams) (AgentRef, error)
@@ -210,36 +206,32 @@ type Querier interface {
 	GetAlbumByIDScoped(ctx context.Context, arg GetAlbumByIDScopedParams) (GetAlbumByIDScopedRow, error)
 	GetAlbumsByUser(ctx context.Context, arg GetAlbumsByUserParams) ([]Album, error)
 	GetAlbumsByUserScoped(ctx context.Context, arg GetAlbumsByUserScopedParams) ([]GetAlbumsByUserScopedRow, error)
-	GetAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) ([]GetAllEmbeddingsForAssetRow, error)
+	GetAllEmbeddingsForAsset(ctx context.Context, assetID uuid.UUID) ([]GetAllEmbeddingsForAssetRow, error)
 	GetAllFaceClusters(ctx context.Context) ([]FaceCluster, error)
-	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]GetAssetAlbumsRow, error)
+	GetAssetAlbums(ctx context.Context, assetID uuid.UUID) ([]GetAssetAlbumsRow, error)
 	GetAssetByContentHashAndRepository(ctx context.Context, arg GetAssetByContentHashAndRepositoryParams) (Asset, error)
-	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
-	GetAssetByIDAny(ctx context.Context, assetID pgtype.UUID) (Asset, error)
+	GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error)
+	GetAssetByIDAny(ctx context.Context, assetID uuid.UUID) (Asset, error)
 	GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error)
-	GetAssetExifRaw(ctx context.Context, assetID pgtype.UUID) (json.RawMessage, error)
+	GetAssetExifRaw(ctx context.Context, assetID uuid.UUID) (dbtypes.JSON, error)
 	// Queries backing the Phase 2 agent tools (producers, transformers,
 	// observers). All ANY(asset_ids) queries operate on ref snapshots.
 	// search_people producer: assets containing at least one of the given people
 	// (union semantics; the agent intersects refs for "both people" requests).
-	GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByPersonIDsParams) ([]pgtype.UUID, error)
-	// ============================================================================
-	// UNIFIED QUERY API
-	// These queries consolidate List, Filter, and Search operations with shared WHERE logic
-	// ============================================================================
+	GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByPersonIDsParams) ([]uuid.UUID, error)
 	// Agent ref materialization: same filter semantics as GetAssetsUnified but
 	// returns ordered asset ids only (capture time desc). The limit is the ref
 	// snapshot cap; callers detect truncation by requesting cap+1.
-	GetAssetIDsUnified(ctx context.Context, arg GetAssetIDsUnifiedParams) ([]pgtype.UUID, error)
-	GetAssetQualityScore(ctx context.Context, assetID pgtype.UUID) (AssetQualityScore, error)
-	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
-	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
-	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
-	GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error)
+	GetAssetIDsUnified(ctx context.Context, arg GetAssetIDsUnifiedParams) ([]uuid.UUID, error)
+	GetAssetQualityScore(ctx context.Context, assetID uuid.UUID) (AssetQualityScore, error)
+	GetAssetStatsForOwner(ctx context.Context, ownerID *int32) (GetAssetStatsForOwnerRow, error)
+	GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) (GetAssetWithRelationsRow, error)
+	GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetAssetWithTagsRow, error)
+	GetAssetWithThumbnails(ctx context.Context, assetID uuid.UUID) (GetAssetWithThumbnailsRow, error)
 	GetAssetsByContentHash(ctx context.Context, contentHash string) ([]Asset, error)
 	GetAssetsByContentHashesAndRepository(ctx context.Context, arg GetAssetsByContentHashesAndRepositoryParams) ([]GetAssetsByContentHashesAndRepositoryRow, error)
-	GetAssetsByIDs(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error)
-	GetAssetsByIDsAny(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error)
+	GetAssetsByIDs(ctx context.Context, assetIds []uuid.UUID) ([]Asset, error)
+	GetAssetsByIDsAny(ctx context.Context, assetIds []uuid.UUID) ([]Asset, error)
 	GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDsForOwnerParams) ([]Asset, error)
 	GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerParams) ([]Asset, error)
 	GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAssetsByOwnerAndTypesSortedParams) ([]Asset, error)
@@ -259,15 +251,14 @@ type Querier interface {
 	GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error)
 	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
 	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
-	GetAuthorizedAssetIDs(ctx context.Context, arg GetAuthorizedAssetIDsParams) ([]pgtype.UUID, error)
-	// 获取所有有照片的年份列表
-	GetAvailableYears(ctx context.Context, repositoryID pgtype.UUID) ([]int32, error)
-	// 获取相机+镜头组合统计
+	GetAuthorizedAssetIDs(ctx context.Context, arg GetAuthorizedAssetIDsParams) ([]uuid.UUID, error)
+	GetAvailableYears(ctx context.Context, repositoryID interface{}) ([]int64, error)
+	GetBurstStackByGroupKey(ctx context.Context, groupKey *string) (AssetStack, error)
 	GetCameraLensStats(ctx context.Context, arg GetCameraLensStatsParams) ([]GetCameraLensStatsRow, error)
 	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
-	GetCloudCredential(ctx context.Context, credentialID pgtype.UUID) (CloudCredential, error)
+	GetCloudCredential(ctx context.Context, credentialID uuid.UUID) (CloudCredential, error)
 	GetCloudCredentialByIdentity(ctx context.Context, arg GetCloudCredentialByIdentityParams) (CloudCredential, error)
-	GetCloudImportRun(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error)
+	GetCloudImportRun(ctx context.Context, runID uuid.UUID) (CloudImportRun, error)
 	GetCloudSyncCursor(ctx context.Context, arg GetCloudSyncCursorParams) (string, error)
 	GetCloudSyncFile(ctx context.Context, arg GetCloudSyncFileParams) (GetCloudSyncFileRow, error)
 	// Merge suggestions never pair clusters of different owners; owner_id
@@ -275,17 +266,16 @@ type Querier interface {
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
-	// 获取每日拍摄活跃度热力图数据
 	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)
 	GetDefaultEmbeddingSpaceByType(ctx context.Context, embeddingType string) (EmbeddingSpace, error)
 	GetDefaultRepositoryRoot(ctx context.Context) (RepositoryRoot, error)
 	GetDistinctCameraModels(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
-	GetDuplicateGroupAssets(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupAsset, error)
+	GetDuplicateGroupAssets(ctx context.Context, groupID uuid.UUID) ([]DuplicateGroupAsset, error)
 	// Bulk variant used for the list endpoint to enrich many groups in one query.
-	GetDuplicateGroupAssetsBatch(ctx context.Context, groupIds []pgtype.UUID) ([]DuplicateGroupAsset, error)
-	GetDuplicateGroupByID(ctx context.Context, groupID pgtype.UUID) (DuplicateGroup, error)
-	GetDuplicateGroupEdges(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupEdge, error)
+	GetDuplicateGroupAssetsBatch(ctx context.Context, groupIds []uuid.UUID) ([]DuplicateGroupAsset, error)
+	GetDuplicateGroupByID(ctx context.Context, groupID uuid.UUID) (DuplicateGroup, error)
+	GetDuplicateGroupEdges(ctx context.Context, groupID uuid.UUID) ([]DuplicateGroupEdge, error)
 	// Top-level metrics for the Utilities rail card.
 	GetDuplicateSummary(ctx context.Context, arg GetDuplicateSummaryParams) (GetDuplicateSummaryRow, error)
 	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (GetEmbeddingRow, error)
@@ -296,26 +286,25 @@ type Querier interface {
 	// with at least one other asset of the same owner. Only photos are considered,
 	// and only non-deleted assets. Results are ordered so members of the same
 	// duplicate set (owner included in the grouping key) are adjacent.
-	GetExactDuplicateCandidates(ctx context.Context, repositoryID pgtype.UUID) ([]GetExactDuplicateCandidatesRow, error)
+	GetExactDuplicateCandidates(ctx context.Context, repositoryID uuid.NullUUID) ([]GetExactDuplicateCandidatesRow, error)
 	GetFaceClusterAssignmentsForScope(ctx context.Context, arg GetFaceClusterAssignmentsForScopeParams) ([]GetFaceClusterAssignmentsForScopeRow, error)
 	GetFaceClusterByFaceID(ctx context.Context, faceID int32) (FaceCluster, error)
 	GetFaceClusterByID(ctx context.Context, clusterID int32) (FaceCluster, error)
-	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID *int32) (FaceCluster, error)
+	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID *int64) (FaceCluster, error)
 	GetFaceClusterMembers(ctx context.Context, clusterID int32) ([]GetFaceClusterMembersRow, error)
 	GetFaceClusterMembershipsByFaceIDs(ctx context.Context, faceIds []int32) ([]GetFaceClusterMembershipsByFaceIDsRow, error)
 	GetFaceClusteringCandidates(ctx context.Context, arg GetFaceClusteringCandidatesParams) ([]GetFaceClusteringCandidatesRow, error)
-	GetFaceDemographics(ctx context.Context, confidence float32) ([]GetFaceDemographicsRow, error)
+	GetFaceDemographics(ctx context.Context, confidence float64) ([]GetFaceDemographicsRow, error)
 	GetFaceEmbeddingsForClustering(ctx context.Context, arg GetFaceEmbeddingsForClusteringParams) ([]GetFaceEmbeddingsForClusteringRow, error)
 	GetFaceForCorrectionScoped(ctx context.Context, arg GetFaceForCorrectionScopedParams) (GetFaceForCorrectionScopedRow, error)
 	GetFaceItemByID(ctx context.Context, id int32) (FaceItem, error)
-	GetFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]FaceItem, error)
+	GetFaceItemsByAsset(ctx context.Context, assetID uuid.UUID) ([]FaceItem, error)
 	GetFaceItemsByAssetWithLimit(ctx context.Context, arg GetFaceItemsByAssetWithLimitParams) ([]FaceItem, error)
-	GetFaceResultByAsset(ctx context.Context, assetID pgtype.UUID) (FaceResult, error)
-	GetFaceStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetFaceStatsByAssetRow, error)
+	GetFaceResultByAsset(ctx context.Context, assetID uuid.UUID) (FaceResult, error)
+	GetFaceStatsByAsset(ctx context.Context, assetID uuid.UUID) (GetFaceStatsByAssetRow, error)
 	GetFaceStatsByModel(ctx context.Context) ([]GetFaceStatsByModelRow, error)
 	GetFacesByExpression(ctx context.Context, arg GetFacesByExpressionParams) ([]FaceItem, error)
-	// 获取焦距分布统计
-	GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]GetFocalLengthDistributionRow, error)
+	GetFocalLengthDistribution(ctx context.Context, repositoryID interface{}) ([]GetFocalLengthDistributionRow, error)
 	// Folder browsing has no dedicated table: "folders" are derived from the
 	// repository-relative prefix of assets.storage_path. All queries here treat
 	// storage_path as relative (see assets_repository_id_storage_path_key) and
@@ -325,38 +314,36 @@ type Querier interface {
 	// uploads, and any asset that sits directly in parent_path (files, not
 	// folders).
 	GetFolderChildSummaries(ctx context.Context, arg GetFolderChildSummariesParams) ([]GetFolderChildSummariesRow, error)
-	// Aggregate stats for one folder path (recursive descendants), used for the
-	// folder detail header/hero.
+	// Aggregate stats for one folder path (recursive descendants).
 	GetFolderSummary(ctx context.Context, arg GetFolderSummaryParams) (GetFolderSummaryRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
 	// The primary repository pins the Host Owner after bootstrap. Before the
 	// primary exists, the first account is the initial administrator and therefore
 	// the Host Owner.
 	GetHostOwnerID(ctx context.Context) (int32, error)
-	GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error)
+	GetLatestRepositoryScanRun(ctx context.Context, repositoryID uuid.UUID) (RepositoryScanRun, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
 	GetManualFaceClusterMembershipsForScope(ctx context.Context, arg GetManualFaceClusterMembershipsForScopeParams) ([]GetManualFaceClusterMembershipsForScopeRow, error)
 	// Logical media items -------------------------------------------------------
-	GetMediaItemByAssetID(ctx context.Context, assetID pgtype.UUID) (MediaItem, error)
+	GetMediaItemByAssetID(ctx context.Context, assetID uuid.UUID) (MediaItem, error)
 	GetMediaItemComponents(ctx context.Context, arg GetMediaItemComponentsParams) ([]MediaItemAsset, error)
-	GetMediaItemsByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetMediaItemsByAssetIDsRow, error)
+	GetMediaItemsByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetMediaItemsByAssetIDsRow, error)
 	// Cluster attachment is owner-scoped only: a face may join a cluster whose
 	// members live in a different repository, same owner.
 	GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error)
-	GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error)
+	GetNextStackPosition(ctx context.Context, stackID uuid.UUID) (int64, error)
+	GetOCRResultByAsset(ctx context.Context, assetID uuid.UUID) (OcrResult, error)
 	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
-	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
-	GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]OcrTextItem, error)
+	GetOCRTextItemStatsByAsset(ctx context.Context, assetID uuid.UUID) (GetOCRTextItemStatsByAssetRow, error)
+	GetOCRTextItemsByAsset(ctx context.Context, assetID uuid.UUID) ([]OcrTextItem, error)
 	GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOCRTextItemsByAssetWithLimitParams) ([]OcrTextItem, error)
 	GetOldestActiveAdmin(ctx context.Context) (User, error)
 	// Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
 	// a specific asset set, for the agent dedupe tool's in-memory similarity graph.
-	GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []pgtype.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error)
+	GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error)
 	GetPendingAgentEffectForUpdate(ctx context.Context, arg GetPendingAgentEffectForUpdateParams) (AgentPendingEffect, error)
-	// Authorization is an equality check on the cluster's structural owner;
-	// repository_id remains a read-time display filter on member counts/covers.
 	GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error)
 	GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScopedParams) (GetPersonFaceScopedRow, error)
 	// Lightweight photo locations for map clustering/rendering.
@@ -364,27 +351,28 @@ type Querier interface {
 	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (GetPrimaryEmbeddingRow, error)
 	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
 	GetPrimaryRepository(ctx context.Context) (Repository, error)
-	GetPrimarySearchEmbedding(ctx context.Context, assetID pgtype.UUID) (GetPrimarySearchEmbeddingRow, error)
+	GetPrimarySearchEmbedding(ctx context.Context, assetID uuid.UUID) (GetPrimarySearchEmbeddingRow, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRefreshTokenRecordByToken(ctx context.Context, token string) (RefreshToken, error)
-	GetRegistrationSessionByID(ctx context.Context, sessionID pgtype.UUID) (RegistrationSession, error)
-	GetRepository(ctx context.Context, repoID pgtype.UUID) (Repository, error)
+	GetRegistrationSessionByID(ctx context.Context, sessionID uuid.UUID) (RegistrationSession, error)
+	GetRepository(ctx context.Context, repoID uuid.UUID) (Repository, error)
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
 	GetRepositoryCloudBinding(ctx context.Context, arg GetRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	GetRepositoryDefaults(ctx context.Context) (RepositoryDefault, error)
-	GetRepositoryRoot(ctx context.Context, rootID pgtype.UUID) (RepositoryRoot, error)
+	GetRepositoryRoot(ctx context.Context, rootID uuid.UUID) (RepositoryRoot, error)
 	GetRepositoryRootByPath(ctx context.Context, path string) (RepositoryRoot, error)
-	GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) (RepositoryScanRun, error)
+	GetRepositoryScanRun(ctx context.Context, scanID uuid.UUID) (RepositoryScanRun, error)
 	GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	GetSettings(ctx context.Context) (Setting, error)
 	GetShareLinkByID(ctx context.Context, arg GetShareLinkByIDParams) (ShareLink, error)
 	GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams) ([]GetSimilarFacesRow, error)
-	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
+	GetSpeciesPredictionsByAsset(ctx context.Context, assetID uuid.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
 	GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, error)
-	GetStackByAssetID(ctx context.Context, assetID pgtype.UUID) (GetStackByAssetIDRow, error)
+	GetStackByAssetID(ctx context.Context, assetID uuid.UUID) (GetStackByAssetIDRow, error)
+	GetStackKindsByIDs(ctx context.Context, stackIds []uuid.UUID) ([]GetStackKindsByIDsRow, error)
 	GetStackMemberCount(ctx context.Context, arg GetStackMemberCountParams) (int64, error)
 	GetStackMemberCountAny(ctx context.Context, arg GetStackMemberCountAnyParams) (int64, error)
 	GetStackMembers(ctx context.Context, arg GetStackMembersParams) ([]GetStackMembersRow, error)
@@ -395,8 +383,9 @@ type Querier interface {
 	// Each asset is mapped to its presentation stack when present, otherwise to
 	// its logical media item. This skips duplicate edges both within RAW/JPEG or
 	// Live Photo components and within intentional burst/manual stacks.
-	GetStackMembershipForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]GetStackMembershipForRepositoryRow, error)
-	GetStacksByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetStacksByAssetIDsRow, error)
+	GetStackMembershipForRepository(ctx context.Context, repositoryID uuid.NullUUID) ([]GetStackMembershipForRepositoryRow, error)
+	GetStackMembershipsByMediaItemIDs(ctx context.Context, mediaItemIds []uuid.UUID) ([]GetStackMembershipsByMediaItemIDsRow, error)
+	GetStacksByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetStacksByAssetIDsRow, error)
 	GetSystemState(ctx context.Context) (SystemState, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
@@ -408,25 +397,21 @@ type Querier interface {
 	GetTagsByCategory(ctx context.Context, category *string) ([]Tag, error)
 	GetThumbnailByAssetAndSize(ctx context.Context, arg GetThumbnailByAssetAndSizeParams) (Thumbnail, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error)
-	GetThumbnailsByAsset(ctx context.Context, assetID pgtype.UUID) ([]Thumbnail, error)
-	// 获取按小时的拍摄时间分布
-	GetTimeDistributionHourly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionHourlyRow, error)
-	// 获取按月的拍摄时间分布
-	GetTimeDistributionMonthly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionMonthlyRow, error)
+	GetThumbnailsByAsset(ctx context.Context, assetID uuid.UUID) ([]Thumbnail, error)
+	GetTimeDistributionHourly(ctx context.Context, repositoryID interface{}) ([]GetTimeDistributionHourlyRow, error)
+	GetTimeDistributionMonthly(ctx context.Context, repositoryID interface{}) ([]GetTimeDistributionMonthlyRow, error)
 	GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQualityParams) ([]FaceItem, error)
 	GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsParams) ([]Asset, error)
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
-	GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTopSpeciesLabelsRow, error)
+	GetTopSpeciesLabels(ctx context.Context, limit int64) ([]GetTopSpeciesLabelsRow, error)
 	GetUnclusteredFaces(ctx context.Context, arg GetUnclusteredFacesParams) ([]FaceItem, error)
-	// repository_id is a face *selection* filter (which faces get processed),
-	// not part of cluster identity — clusters span repositories, never owners.
 	GetUnclusteredFacesInScope(ctx context.Context, arg GetUnclusteredFacesInScopeParams) ([]FaceItem, error)
 	GetUserByID(ctx context.Context, userID int32) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error)
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
 	IncrementCloudImportRunCounts(ctx context.Context, arg IncrementCloudImportRunCountsParams) (CloudImportRun, error)
-	IncrementShareLinkView(ctx context.Context, shareID pgtype.UUID) error
+	IncrementShareLinkView(ctx context.Context, shareID uuid.UUID) error
 	InsertDuplicateGroupAsset(ctx context.Context, arg InsertDuplicateGroupAssetParams) error
 	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
@@ -438,8 +423,8 @@ type Querier interface {
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, error)
 	ListAgentRefs(ctx context.Context, arg ListAgentRefsParams) ([]AgentRef, error)
-	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
-	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
+	ListAssetEmbeddings(ctx context.Context, assetIds []uuid.UUID) ([]ListAssetEmbeddingsRow, error)
+	ListAssetsByRepositoryAny(ctx context.Context, repositoryID uuid.NullUUID) ([]Asset, error)
 	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
 	ListCloudCredentials(ctx context.Context) ([]CloudCredential, error)
 	ListCloudCredentialsForOwner(ctx context.Context, ownerID int32) ([]CloudCredential, error)
@@ -453,7 +438,7 @@ type Querier interface {
 	// Loads pHash embeddings for every non-deleted photo in a repository so the
 	// service layer can build a similarity graph in-memory. owner_id is included
 	// because duplicate edges never cross owners.
-	ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]ListPHashEmbeddingsForRepositoryRow, error)
+	ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID uuid.NullUUID) ([]ListPHashEmbeddingsForRepositoryRow, error)
 	ListPendingLocationClusters(ctx context.Context, arg ListPendingLocationClustersParams) ([]LocationCluster, error)
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
 	ListPersonFacesScoped(ctx context.Context, arg ListPersonFacesScopedParams) ([]ListPersonFacesScopedRow, error)
@@ -462,7 +447,7 @@ type Querier interface {
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, arg ListPhotoAssetsMissingSemanticEmbeddingParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
-	ListRepositoryCloudBindings(ctx context.Context, repositoryID pgtype.UUID) ([]RepositoryCloudBinding, error)
+	ListRepositoryCloudBindings(ctx context.Context, repositoryID uuid.UUID) ([]RepositoryCloudBinding, error)
 	ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
 	ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error)
@@ -473,10 +458,10 @@ type Querier interface {
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
 	ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListVideoAssetsForIndexingBatchParams) ([]Asset, error)
 	ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg ListVideoAssetsMissingSemanticFramesParams) ([]Asset, error)
-	LockAuthorizedAssetIDs(ctx context.Context, arg LockAuthorizedAssetIDsParams) ([]pgtype.UUID, error)
-	MarkCloudImportRunStarted(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error)
+	LockAuthorizedAssetIDs(ctx context.Context, arg LockAuthorizedAssetIDsParams) ([]uuid.UUID, error)
+	MarkCloudImportRunStarted(ctx context.Context, runID uuid.UUID) (CloudImportRun, error)
 	MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFileParams) error
-	MarkDuplicateGroupDismissed(ctx context.Context, groupID pgtype.UUID) error
+	MarkDuplicateGroupDismissed(ctx context.Context, groupID uuid.UUID) error
 	MarkDuplicateGroupMerged(ctx context.Context, arg MarkDuplicateGroupMergedParams) error
 	MarkLocationClustersGeocodeDisabled(ctx context.Context, arg MarkLocationClustersGeocodeDisabledParams) error
 	MarkStaleCloudImportRunsInterrupted(ctx context.Context) error
@@ -494,6 +479,7 @@ type Querier interface {
 	// memberships (and thus person assignments) follow the keeper after merge.
 	// Used only for exact duplicates where bounding boxes match by construction.
 	MergeFaceClustersForDuplicate(ctx context.Context, arg MergeFaceClustersForDuplicateParams) error
+	MoveAllMediaItemComponents(ctx context.Context, arg MoveAllMediaItemComponentsParams) error
 	MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error)
 	MoveClusterMembersToClusterManual(ctx context.Context, arg MoveClusterMembersToClusterManualParams) error
 	MoveMediaItemComponent(ctx context.Context, arg MoveMediaItemComponentParams) error
@@ -501,31 +487,34 @@ type Querier interface {
 	// rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
 	// head when available, falling back to the legacy heuristic (rating, liked,
 	// resolution) for unscored assets. Callers reverse for descending order.
-	RankAssetIDsByQuality(ctx context.Context, arg RankAssetIDsByQualityParams) ([]pgtype.UUID, error)
+	RankAssetIDsByQuality(ctx context.Context, arg RankAssetIDsByQualityParams) ([]uuid.UUID, error)
 	// rank(by=time) ascending; callers reverse for descending order.
-	RankAssetIDsByTime(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
+	RankAssetIDsByTime(ctx context.Context, assetIds []uuid.UUID) ([]uuid.UUID, error)
 	// "recently added" presentation order, ascending; callers reverse for newest first.
-	RankAssetIDsByUploadTime(ctx context.Context, assetIds []pgtype.UUID) ([]pgtype.UUID, error)
+	RankAssetIDsByUploadTime(ctx context.Context, assetIds []uuid.UUID) ([]uuid.UUID, error)
 	ReclaimInterruptedRepositoryScanRuns(ctx context.Context) (int64, error)
 	ReleaseAgentThreadRefs(ctx context.Context, arg ReleaseAgentThreadRefsParams) error
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
-	RemoveStackMemberByAssetID(ctx context.Context, assetID pgtype.UUID) error
+	RemoveStackMemberByAssetID(ctx context.Context, assetID uuid.UUID) error
+	RemoveStackMembershipsByMediaItemIDs(ctx context.Context, mediaItemIds []uuid.UUID) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
-	RepositoryExists(ctx context.Context, path string) (bool, error)
+	RepositoryExists(ctx context.Context, path string) (int64, error)
 	RequestAgentRunCancel(ctx context.Context, arg RequestAgentRunCancelParams) (AgentRun, error)
-	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
+	ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error)
 	ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error)
-	RestoreAsset(ctx context.Context, assetID pgtype.UUID) error
-	RevokeRefreshToken(ctx context.Context, tokenID int32) error
+	RestoreAsset(ctx context.Context, assetID uuid.UUID) error
+	RevokeRefreshToken(ctx context.Context, tokenID int64) error
 	RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams) (ShareLink, error)
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
+	SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error)
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SearchTagsByName(ctx context.Context, arg SearchTagsByNameParams) ([]Tag, error)
+	SetAgentThreadActiveRun(ctx context.Context, arg SetAgentThreadActiveRunParams) error
 	SetBootstrapPhase(ctx context.Context, bootstrapPhase string) (SystemState, error)
 	SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
@@ -560,10 +549,12 @@ type Querier interface {
 	UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterParams) (FaceCluster, error)
 	UpdateFaceClusterRepresentative(ctx context.Context, arg UpdateFaceClusterRepresentativeParams) (FaceCluster, error)
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
-	UpdateFaceResultStats(ctx context.Context, assetID pgtype.UUID) error
+	UpdateFaceResultStats(ctx context.Context, assetID uuid.UUID) error
 	UpdateLocationClusterGeocode(ctx context.Context, arg UpdateLocationClusterGeocodeParams) error
+	UpdateMediaItemAfterStructuralMerge(ctx context.Context, arg UpdateMediaItemAfterStructuralMergeParams) error
+	UpdateMediaItemAsLivePhoto(ctx context.Context, arg UpdateMediaItemAsLivePhotoParams) error
 	UpdateOCRFullText(ctx context.Context, arg UpdateOCRFullTextParams) error
-	UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error
+	UpdateOCRResultStats(ctx context.Context, assetID uuid.UUID) error
 	UpdatePendingAgentEffect(ctx context.Context, arg UpdatePendingAgentEffectParams) error
 	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
 	// Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
@@ -599,7 +590,7 @@ type Querier interface {
 	UpsertReverseGeocodeCache(ctx context.Context, arg UpsertReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
 	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)
-	UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int32, error)
+	UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

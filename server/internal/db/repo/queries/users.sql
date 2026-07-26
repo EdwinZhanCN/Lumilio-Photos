@@ -1,6 +1,22 @@
 -- name: CreateUser :one
-INSERT INTO users (username, password, display_name, role, webauthn_user_handle)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO users (
+    username,
+    password,
+    display_name,
+    role,
+    webauthn_user_handle,
+    created_at,
+    updated_at
+)
+VALUES (
+    ?1,
+    ?2,
+    ?3,
+    ?4,
+    ?5,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING *;
 
 -- name: CountUsers :one
@@ -9,14 +25,14 @@ SELECT COUNT(*) FROM users;
 -- name: CountActiveUsersByRole :one
 SELECT COUNT(*)
 FROM users
-WHERE role = $1
+WHERE role = ?1
   AND is_active = true;
 
 -- name: GetUserByID :one
-SELECT * FROM users WHERE user_id = $1;
+SELECT * FROM users WHERE user_id = ?1;
 
 -- name: GetUserByUsername :one
-SELECT * FROM users WHERE username = $1;
+SELECT * FROM users WHERE username = ?1;
 
 -- name: GetOldestActiveAdmin :one
 SELECT *
@@ -28,75 +44,78 @@ LIMIT 1;
 
 -- name: UpdateUser :one
 UPDATE users
-SET username = $2, updated_at = CURRENT_TIMESTAMP, last_login = $3
-WHERE user_id = $1
+SET username = ?2,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    last_login = ?3
+WHERE user_id = ?1
 RETURNING *;
 
 -- name: UpdateUserLastLogin :exec
 UPDATE users
-SET last_login = $2, updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1;
+SET last_login = ?2,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1;
 
 -- name: UpdateUserProfile :one
 UPDATE users
-SET display_name = $2,
-    avatar_asset_id = $3,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+SET display_name = ?2,
+    avatar_asset_id = ?3,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 RETURNING *;
 
 -- name: AdminUpdateUser :one
 UPDATE users
-SET username = $2,
-    display_name = $3,
-    avatar_asset_id = $4,
-    role = $5,
-    is_active = $6,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+SET username = ?2,
+    display_name = ?3,
+    avatar_asset_id = ?4,
+    role = ?5,
+    is_active = ?6,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 RETURNING *;
 
 -- name: UpdateUserPassword :exec
 UPDATE users
-SET password = $2,
+SET password = ?2,
     password_change_required = false,
     auth_version = auth_version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1;
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1;
 
 -- name: ResetUserAccessPassword :one
 UPDATE users
-SET password = $2,
+SET password = ?2,
     password_change_required = true,
     auth_version = auth_version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 RETURNING *;
 
 -- name: CompleteRequiredPasswordChange :one
 UPDATE users
-SET password = $3,
+SET password = ?3,
     password_change_required = false,
     auth_version = auth_version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
-  AND auth_version = $2
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
+  AND auth_version = ?2
   AND password_change_required = true
 RETURNING *;
 
 -- name: DeleteUser :exec
-DELETE FROM users WHERE user_id = $1;
+DELETE FROM users WHERE user_id = ?1;
 
 -- name: ListUsers :many
 SELECT * FROM users
 ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
+LIMIT ?1 OFFSET ?2;
 
 -- name: ListUsersWithStats :many
 SELECT
   u.*,
-  COALESCE(asset_counts.asset_count, 0)::bigint AS asset_count,
-  COALESCE(album_counts.album_count, 0)::bigint AS album_count
+  COALESCE(asset_counts.asset_count, 0) AS asset_count,
+  COALESCE(album_counts.album_count, 0) AS album_count
 FROM users u
 LEFT JOIN (
   SELECT owner_id AS user_id, COUNT(*) AS asset_count
@@ -111,26 +130,26 @@ LEFT JOIN (
   GROUP BY user_id
 ) album_counts ON album_counts.user_id = u.user_id
 ORDER BY u.created_at DESC, u.user_id DESC
-LIMIT $1 OFFSET $2;
+LIMIT ?1 OFFSET ?2;
 
 -- name: CreateRefreshToken :one
-INSERT INTO refresh_tokens (user_id, token, expires_at)
-VALUES ($1, $2, $3)
+INSERT INTO refresh_tokens (user_id, token, expires_at, created_at)
+VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 RETURNING *;
 
 -- name: GetRefreshTokenByToken :one
 SELECT * FROM refresh_tokens
-WHERE token = $1 AND is_revoked = false;
+WHERE token = ?1 AND is_revoked = false;
 
 -- name: GetRefreshTokenRecordByToken :one
 SELECT * FROM refresh_tokens
-WHERE token = $1;
+WHERE token = ?1;
 
 -- name: RevokeRefreshToken :exec
-UPDATE refresh_tokens SET is_revoked = true WHERE token_id = $1;
+UPDATE refresh_tokens SET is_revoked = true WHERE token_id = ?1;
 
 -- name: RevokeUserRefreshTokens :exec
 UPDATE refresh_tokens
 SET is_revoked = true
-WHERE user_id = $1
+WHERE user_id = ?1
   AND is_revoked = false;

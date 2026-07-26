@@ -10,7 +10,7 @@ import (
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 )
 
@@ -73,12 +73,12 @@ func (s *faceWorkerLumenStub) GetNodes() []*discovery.NodeInfo {
 
 type faceWorkerFaceServiceStub struct {
 	service.FaceService
-	savedAssetID pgtype.UUID
+	savedAssetID uuid.UUID
 	savedImage   []byte
 	savedFaces   *types.FaceV1
 }
 
-func (s *faceWorkerFaceServiceStub) SaveFaceResults(_ context.Context, assetID pgtype.UUID, faceV1 *types.FaceV1, imageData []byte, _ int) error {
+func (s *faceWorkerFaceServiceStub) SaveFaceResults(_ context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, _ int) error {
 	s.savedAssetID = assetID
 	s.savedFaces = faceV1
 	s.savedImage = append([]byte(nil), imageData...)
@@ -96,10 +96,7 @@ func (faceWorkerConfigStub) GetEffectiveMLConfig(context.Context) (settings.ML, 
 func TestProcessFaceWorkerPassesImageDataToFaceService(t *testing.T) {
 	t.Parallel()
 
-	assetID := pgtype.UUID{}
-	if err := assetID.Scan("44444444-4444-4444-4444-444444444444"); err != nil {
-		t.Fatalf("scan asset id: %v", err)
-	}
+	assetID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
 
 	faceService := &faceWorkerFaceServiceStub{}
 	worker := &ProcessFaceWorker{
@@ -142,10 +139,7 @@ func TestProcessFaceWorkerPassesImageDataToFaceService(t *testing.T) {
 func TestProcessFaceWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	t.Parallel()
 
-	assetID := pgtype.UUID{}
-	if err := assetID.Scan("55555555-5555-5555-5555-555555555555"); err != nil {
-		t.Fatalf("scan asset id: %v", err)
-	}
+	assetID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
 
 	faceService := &faceWorkerFaceServiceStub{}
 	worker := &ProcessFaceWorker{

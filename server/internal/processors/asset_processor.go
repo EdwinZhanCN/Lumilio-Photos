@@ -1,6 +1,7 @@
 package processors
 
 import (
+	"database/sql"
 	"time"
 
 	"server/config"
@@ -10,7 +11,6 @@ import (
 	"server/internal/sourcing"
 	"server/internal/storage"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
@@ -34,7 +34,7 @@ type AssetProcessor struct {
 	repoManager      storage.RepositoryManager
 	stagingManager   storage.StagingManager
 	materializer     *sourcing.SourceMaterializer
-	queueClient      *river.Client[pgx.Tx]
+	queueClient      *river.Client[*sql.Tx]
 	settingsService  service.SettingsService
 	embeddingService service.EmbeddingService
 	lumenService     service.LumenService
@@ -51,7 +51,7 @@ func NewAssetProcessor(
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
 	materializer *sourcing.SourceMaterializer,
-	queueClient *river.Client[pgx.Tx],
+	queueClient *river.Client[*sql.Tx],
 	settingsService service.SettingsService,
 	embeddingService service.EmbeddingService,
 	lumenService service.LumenService,

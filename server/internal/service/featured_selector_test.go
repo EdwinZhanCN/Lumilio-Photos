@@ -9,7 +9,6 @@ import (
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestSelectFeaturedPhotos_DeterministicWithSameSeed(t *testing.T) {
@@ -178,27 +177,20 @@ func testPhotoAsset(in testPhotoAssetInput) repo.Asset {
 	}
 	meta, _ := dbtypes.MarshalMeta(photoMeta)
 
-	rating := int32(in.Rating)
-	liked := in.Liked
-	width := in.Width
-	height := in.Height
+	rating := int64(in.Rating)
+	width := int64(in.Width)
+	height := int64(in.Height)
 
 	return repo.Asset{
-		AssetID:          pgtype.UUID{Bytes: id, Valid: true},
+		AssetID:          id,
 		Type:             string(dbtypes.AssetTypePhoto),
 		Width:            &width,
 		Height:           &height,
 		Rating:           &rating,
-		Liked:            &liked,
+		Liked:            in.Liked,
 		SpecificMetadata: meta,
-		TakenTime: pgtype.Timestamptz{
-			Time:  in.TakenTime,
-			Valid: true,
-		},
-		UploadTime: pgtype.Timestamptz{
-			Time:  in.TakenTime.Add(2 * time.Hour),
-			Valid: true,
-		},
+		TakenTime:        dbtypes.NewTimestamp(in.TakenTime),
+		UploadTime:       dbtypes.NewTimestamp(in.TakenTime.Add(2 * time.Hour)),
 	}
 }
 

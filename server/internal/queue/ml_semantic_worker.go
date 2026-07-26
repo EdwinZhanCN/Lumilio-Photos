@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
@@ -9,8 +10,6 @@ import (
 	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
@@ -42,12 +41,6 @@ func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[Process
 		return nil
 	}
 
-	// Convert UUID to pgtype.UUID for database operations
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	// If tasks are temporarily unavailable, snooze for a short period
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
@@ -66,14 +59,14 @@ func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[Process
 		return fmt.Errorf("failed to generate semantic embedding: %w", err)
 	}
 
-	err = w.EmbeddingService.SaveEmbedding(ctx, pgUUID,
+	err = w.EmbeddingService.SaveEmbedding(ctx, assetID,
 		service.EmbeddingTypeSemantic, embedding.ModelID, embedding.Vector, true)
 	if err != nil {
 		return fmt.Errorf("failed to save embedding: %w", err)
 	}
 
 	if score, ok := embedding.AestheticScoreValue(); ok {
-		if err := w.EmbeddingService.SaveAestheticScore(ctx, pgUUID, score, embedding.ModelID); err != nil {
+		if err := w.EmbeddingService.SaveAestheticScore(ctx, assetID, score, embedding.ModelID); err != nil {
 			// Best-effort: log but don't fail the job — the embedding itself
 			// was saved successfully and the score can be backfilled later.
 			return fmt.Errorf("failed to save aesthetic score: %w", err)
@@ -85,8 +78,8 @@ func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[Process
 	// reclassifies every asset. Best-effort: a failed enqueue must not force a
 	// costly re-embed, and the next reindex will recover it.
 	if classifyEnabled, cfgErr := isMLTaskEnabled(ctx, w.ConfigProvider, "classify_zeroshot"); cfgErr == nil && classifyEnabled {
-		if client, clientErr := river.ClientFromContextSafely[pgx.Tx](ctx); clientErr == nil {
-			_, _ = client.Insert(ctx, jobs.ZeroshotClassifyArgs{AssetID: pgUUID}, &river.InsertOpts{Queue: "classify_zeroshot"})
+		if client, clientErr := river.ClientFromContextSafely[*sql.Tx](ctx); clientErr == nil {
+			_, _ = client.Insert(ctx, jobs.ZeroshotClassifyArgs{AssetID: assetID}, &river.InsertOpts{Queue: "classify_zeroshot"})
 		}
 	}
 

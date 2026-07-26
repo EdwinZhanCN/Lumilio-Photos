@@ -10,7 +10,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 
 	"server/internal/db/repo"
 	"server/internal/service"
@@ -25,7 +25,7 @@ type pHashEmbeddingStub struct {
 	savedVec   []float32
 }
 
-func (s *pHashEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.UUID, embeddingType service.EmbeddingType, model string, vector []float32, _ bool) error {
+func (s *pHashEmbeddingStub) SaveEmbedding(_ context.Context, _ uuid.UUID, embeddingType service.EmbeddingType, model string, vector []float32, _ bool) error {
 	if s.err != nil {
 		return s.err
 	}
@@ -35,23 +35,23 @@ func (s *pHashEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.UUID, emb
 	return nil
 }
 
-func (s *pHashEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, pgtype.UUID, string, []service.VideoFrameEmbedding) error {
+func (s *pHashEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, uuid.UUID, string, []service.VideoFrameEmbedding) error {
 	return nil
 }
 
-func (s *pHashEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
+func (s *pHashEmbeddingStub) SaveAestheticScore(context.Context, uuid.UUID, float32, string) error {
 	return nil
 }
 
-func (s *pHashEmbeddingStub) GetEmbedding(context.Context, pgtype.UUID, service.EmbeddingType, string) (repo.Embedding, error) {
+func (s *pHashEmbeddingStub) GetEmbedding(context.Context, uuid.UUID, service.EmbeddingType, string) (repo.Embedding, error) {
 	panic("not implemented")
 }
 
-func (s *pHashEmbeddingStub) GetAssetEmbeddingInfo(context.Context, pgtype.UUID) (map[service.EmbeddingType]service.EmbeddingInfo, error) {
+func (s *pHashEmbeddingStub) GetAssetEmbeddingInfo(context.Context, uuid.UUID) (map[service.EmbeddingType]service.EmbeddingInfo, error) {
 	panic("not implemented")
 }
 
-func (s *pHashEmbeddingStub) DeleteEmbedding(context.Context, pgtype.UUID, service.EmbeddingType, string) error {
+func (s *pHashEmbeddingStub) DeleteEmbedding(context.Context, uuid.UUID, service.EmbeddingType, string) error {
 	panic("not implemented")
 }
 
@@ -59,7 +59,7 @@ func (s *pHashEmbeddingStub) ResolveDefaultSearchSpace(context.Context, service.
 	panic("not implemented")
 }
 
-func (s *pHashEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, pgtype.UUID, service.EmbeddingType) (service.PrimaryEmbedding, error) {
+func (s *pHashEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, uuid.UUID, service.EmbeddingType) (service.PrimaryEmbedding, error) {
 	panic("not implemented")
 }
 
@@ -85,7 +85,7 @@ func TestGenerateThumbnailsStoresInlinePHashAndKeepsLarge(t *testing.T) {
 	imaging.StartVips()
 
 	asset := &repo.Asset{
-		AssetID:     pgtype.UUID{Valid: true},
+		AssetID:     uuid.New(),
 		ContentHash: "asset-hash",
 	}
 	assetSvc := &thumbnailAssetServiceStub{}
@@ -117,7 +117,7 @@ func TestGenerateThumbnailsFallsBackWhenInlinePHashSaveFails(t *testing.T) {
 	imaging.StartVips()
 
 	asset := &repo.Asset{
-		AssetID:     pgtype.UUID{Valid: true},
+		AssetID:     uuid.New(),
 		ContentHash: "asset-hash",
 	}
 	ap := &AssetProcessor{
@@ -141,7 +141,7 @@ func TestSavePHashEmbeddingFromReaderStoresPHashVector(t *testing.T) {
 	embedding := &pHashEmbeddingStub{}
 	ap := &AssetProcessor{embeddingService: embedding}
 
-	if err := ap.savePHashEmbeddingFromReader(context.Background(), pgtype.UUID{}, bytes.NewReader(webp)); err != nil {
+	if err := ap.savePHashEmbeddingFromReader(context.Background(), uuid.New(), bytes.NewReader(webp)); err != nil {
 		t.Fatalf("savePHashEmbeddingFromReader: %v", err)
 	}
 
@@ -162,7 +162,7 @@ func TestSavePHashEmbeddingFromReaderReturnsSaveError(t *testing.T) {
 	embedding := &pHashEmbeddingStub{err: fmt.Errorf("boom")}
 	ap := &AssetProcessor{embeddingService: embedding}
 
-	if err := ap.savePHashEmbeddingFromReader(context.Background(), pgtype.UUID{}, bytes.NewReader(testSmallWebP(t))); err == nil {
+	if err := ap.savePHashEmbeddingFromReader(context.Background(), uuid.New(), bytes.NewReader(testSmallWebP(t))); err == nil {
 		t.Fatal("expected save error")
 	}
 }
