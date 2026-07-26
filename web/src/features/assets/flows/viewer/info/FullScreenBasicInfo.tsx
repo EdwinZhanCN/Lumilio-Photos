@@ -119,7 +119,7 @@ export default function FullScreenBasicInfo({ asset, onAssetUpdate }: FullScreen
 
   // Fallback: Generic view for unknown types
   return (
-    <div className="absolute top-5 right-5 z-10 max-w-[calc(100vw-2.5rem)] font-mono">
+    <div className="absolute top-5 right-5 z-20 max-w-[calc(100vw-2.5rem)] font-mono">
       <div className="card bg-base-100 w-max max-w-full shadow-sm">
         <div className="card-body">
           <div className="card-actions justify-end">
