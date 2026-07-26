@@ -15,7 +15,6 @@ Provenance: canonical SPDX texts, fetched with
 
 ```sh
 base=https://raw.githubusercontent.com/spdx/license-list-data/main/text
-curl -fsSL -o PostgreSQL.txt        $base/PostgreSQL.txt
 curl -fsSL -o LGPL-2.1.txt          $base/LGPL-2.1-only.txt
 curl -fsSL -o GPL-2.0.txt           $base/GPL-2.0-only.txt
 curl -fsSL -o Artistic-1.0-Perl.txt $base/Artistic-1.0-Perl.txt

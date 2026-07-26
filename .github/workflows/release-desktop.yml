@@ -4,11 +4,11 @@ name: Release Desktop
 # GitHub Release:
 #   - macOS (Apple Silicon): ad-hoc-signed DMG via build-macos.sh
 #   - Windows (amd64): portable zip via build-windows.sh (MSYS2/mingw64 CGo)
-# A fresh relocatable PostgreSQL is built per platform by the called
-# build-postgres workflow, and one shared web SPA artifact feeds both bundles.
+# One shared web SPA artifact feeds both bundles. SQLite, FTS5, and sqlite-vec
+# are linked into the desktop executable.
 #
 # macOS amd64 is deferred until fetch-resources.sh gains Intel ffmpeg pins
-# (then: matrix entry runner macos-15-intel, artifact postgres-darwin-amd64).
+# (then: add a matrix entry using runner macos-15-intel).
 
 on:
     push:
@@ -20,9 +20,6 @@ permissions:
     contents: read
 
 jobs:
-    postgres:
-        uses: ./.github/workflows/build-postgres.yml
-
     spa:
         name: web SPA
         runs-on: ubuntu-24.04
@@ -92,7 +89,7 @@ jobs:
 
     dmg:
         name: dmg (${{ matrix.arch }})
-        needs: [postgres, spa]
+        needs: spa
         runs-on: ${{ matrix.runner }}
         strategy:
             fail-fast: false
@@ -144,12 +141,6 @@ jobs:
                   name: third-party-notices
                   path: desktop/licenses
 
-            - name: Stage PostgreSQL bundle
-              uses: actions/download-artifact@v8
-              with:
-                  name: postgres-darwin-${{ matrix.arch }}
-                  path: desktop/resources/postgres
-
             - name: Stage media tools (ffmpeg/ffprobe/exiftool)
               run: desktop/scripts/fetch-resources.sh
 
@@ -178,7 +169,7 @@ jobs:
 
     windows:
         name: windows (amd64)
-        needs: [postgres, spa]
+        needs: spa
         runs-on: windows-2025
         steps:
             - uses: actions/checkout@v7
@@ -214,12 +205,6 @@ jobs:
               with:
                   name: third-party-notices
                   path: desktop/licenses
-
-            - name: Stage PostgreSQL bundle
-              uses: actions/download-artifact@v8
-              with:
-                  name: postgres-windows-amd64
-                  path: desktop/resources/postgres
 
             - name: Stage media tools (ffmpeg/ffprobe/exiftool)
               shell: pwsh

@@ -304,8 +304,8 @@ jobs:
                   cache: true
 
             # CGO deps: both the complete Server suite and the Desktop module
-            # compile govips/libraw. PostgreSQL lifecycle tests auto-skip
-            # because no PostgreSQL distribution is staged on PR runners.
+            # compile govips/libraw. SQLite, FTS5, and sqlite-vec are linked
+            # into the test binary, so no database service is staged.
             - name: Install libvips and libraw
               run: brew install vips libraw
 

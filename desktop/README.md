@@ -1,215 +1,135 @@
 # Lumilio Photos — Desktop (Wails v3)
 
-A macOS desktop build that bundles a private PostgreSQL 18 runtime and runs the
-existing Go API server **in-process**, reusing the same bootstrap (`server/app`)
-and the same React UI over HTTP. See the full design in
-`site/docs/internal/agent/exec-plans/active/desktop-wails-v3.md`.
+The desktop app links the SQLite catalog runtime into the Go executable and
+runs the existing API service in-process through `server/app`. The React product
+UI is served over HTTP and opens in the user's browser at
+`http://localhost:6680`.
 
 ## Architecture
 
-```
+```text
 Wails v3 system tray + private native control-panel webview
-  → "Open Lumilio Photos" opens the default browser at http://localhost:6680
+  → "Open Lumilio Photos" opens http://localhost:6680
 desktop/supervisor
-  → manages a private PostgreSQL 18 (initdb / pg_ctl / pg_isready / createdb)
-  → generates/references secrets under the app-data dir
-  → compiles the versioned supervisor/server.template.toml
-  → atomically writes config/server.toml (0600)
+  → owns the machine-local app-state paths and single-instance lock
+  → compiles supervisor/server.template.toml (schema v2)
+  → atomically writes config/server.toml with mode 0600
   → reloads it through server/config.LoadAppConfig(...)
   → runs server/app.Run(ctx, cfg, controls) in-process
-  → the Go API server also serves the React SPA at localhost:6680 (server.web_root)
+server/app
+  → opens/migrates <app-data>/library.sqlite3
+  → serves the API and React SPA at localhost:6680
 ```
 
-The React product UI runs in the user's real browser. This is deliberate — a
-real browser surfaces platform passkeys (Touch ID / iCloud Keychain) at the
-`localhost` RP. Wails embeds only the private first-run/supervisor Control Panel;
-it is also the trusted native surface for granting external Storage Locations
-and attaching existing repositories. The React bundle is served by the Go
-server (`server.web_root`); the tray opens the browser on launch and on demand.
+The product UI deliberately runs in a real browser so platform passkeys use the
+`localhost` relying-party origin. Wails embeds only the trusted first-run and
+supervisor control panel, including native Storage Location grants.
 
-## Module wiring
+`desktop` is a separate Go module with `replace server => ../server`. That
+committed replace is the load-bearing wiring for local builds and CI.
 
-`desktop` is a separate Go module that depends on the sibling `server` module via
-a `replace server => ../server` directive (committed). `go.work` is gitignored in
-this repo, so the replace directive is the load-bearing wiring for local builds
-and CI.
-
-## Develop
+## Develop and test
 
 ```sh
-# Run the app against a locally installed PostgreSQL (no bundling required):
-make desktop-dev PG_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin
-# (or any local PostgreSQL, e.g. .../postgresql@14/bin — version-agnostic for dev)
-
-# Run the Go tests (the PostgreSQL lifecycle test auto-skips when no PG is found):
+cd web && vp build
+cd ..
+make desktop-dev
 make desktop-test
 ```
 
-### Control panel UI (`desktop/panel`)
+`make desktop-test` includes a first-launch/relaunch integration test. It creates
+and migrates a real SQLite catalog, exercises the health endpoint and SPA
+fallback, stops the runtime, reopens the same catalog, and verifies its durable
+library identity.
 
-The first-run wizard + supervisor dashboard is a Svelte 5 + Tailwind v4 +
-Bits UI app in `desktop/panel`, served by the Wails asset handler and embedded
-into the Go binary via `//go:embed all:panel/dist` (`onboarding.go`). The
-`desktop-dev` / `desktop-test` / `desktop-build` Make targets build it first
-(`make desktop-panel`); a plain `go build` fails until `panel/dist` exists.
+### Control panel UI
 
-Theme tokens are the web frontend's `lumilio` / `lumilio-dark` daisyUI themes
-(mirrored from `web/src/styles/App.css`, light/dark follows the OS). To iterate
-on the UI without the desktop app:
+`desktop/panel` is a Svelte 5 + Tailwind v4 + Bits UI app embedded into the Go
+binary via `//go:embed all:panel/dist`. The desktop Make targets build it first.
+To iterate independently:
 
 ```sh
-cd desktop/panel && vp dev          # serves against a built-in /__onb mock API
-LUMILIO_PANEL_API=http://host:port vp dev   # proxy /__onb to a live app instead
+cd desktop/panel && vp dev
+LUMILIO_PANEL_API=http://host:port vp dev
 ```
 
-The private cluster requires `scram-sha-256` auth everywhere (never trust); the
-bootstrap password is generated into `secrets/db_bootstrap_password` and set at initdb time via
-`--pwfile`. Data directories initialized before the scram switch have no
-password set and will fail auth on launch — delete `postgres/` under the
-app-data root to re-init (pre-production installs only).
+The first command uses the built-in `/__onb` mock API; the second proxies to a
+live app.
 
-App data (always local, never on the user's relocatable media drive):
-`~/Library/Application Support/Lumilio Photos/` — `postgres/`, `secrets/`,
-`config/`, `cloud/`, `logs/`, `backups/`, `storage/` (the default media Storage
-Location), and `lumen/` (optional local AI: the supervised Lumen Hub
-build, generated config, and model cache — installed from the tray, see
-`desktop/lumen`), `lumilio.lock`. Override the root with `LUMILIO_APP_DATA`.
-`config/server.toml` is regenerated on launch and is the authoritative immutable
-input actually consumed by the in-process server. Stable policy comes from the
-tracked template; persisted user choices remain in `desktop-settings.json`.
+## App data
 
-Desktop host/build-harness inputs (development; they are compiled into the
-generated manifest before the server starts):
+On macOS, machine-local state lives under:
 
-| Env | Purpose |
+```text
+~/Library/Application Support/Lumilio Photos/
+├── library.sqlite3
+├── backups/
+├── cloud/
+├── config/
+├── logs/
+├── lumen/
+├── secrets/
+├── storage/
+└── lumilio.lock
+```
+
+Windows uses `%LocalAppData%\Lumilio Photos`. The SQLite catalog, credentials,
+configuration, and optional AI runtime always stay in app data; only explicitly
+authorized media repositories may live on external Storage Locations.
+
+`config/server.toml` is regenerated on every launch from the tracked schema-v2
+template and is the authoritative immutable input for that run. Persisted user
+choices live separately in `desktop-settings.json`.
+
+Development and test overrides:
+
+| Environment variable | Purpose |
 |---|---|
-| `LUMILIO_APP_DATA` | App-data root (isolate instances / tests) |
-| `LUMILIO_PG_BIN_DIR` | PostgreSQL bin dir (dev, no bundle) |
-| `LUMILIO_WEB_ROOT` | Web SPA dir to serve at `/` (dev points at `web/dist`) |
-| `LUMILIO_RESOURCES_DIR` | Bundled-resources root (dev, no `.app`) |
+| `LUMILIO_APP_DATA` | Isolated app-data root |
+| `LUMILIO_WEB_ROOT` | React SPA directory served at `/` |
+| `LUMILIO_RESOURCES_DIR` | Unpackaged resource root |
 
-`make desktop-dev` sets `LUMILIO_WEB_ROOT` to `web/dist`; run `cd web && vp build`
-first so the browser shows the UI (otherwise the server runs API-only).
-
-The full stack (PG → migrations → in-process API → SPA at `localhost:6680`) has an
-opt-in end-to-end test:
+## Build: macOS
 
 ```sh
-LUMILIO_E2E=1 LUMILIO_PG_BIN_DIR=/opt/homebrew/opt/postgresql@14/bin \
-  go test ./supervisor/ -run TestDesktopRuntimeE2E -v
+brew install vips libraw dylibbundler create-dmg
+desktop/scripts/fetch-resources.sh
+make desktop-build
+desktop/scripts/build-macos.sh arm64 --dmg
 ```
 
-## Build (.app + DMG)
+SQLite, FTS5, and sqlite-vec are linked into the application. The bundle stages
+only the media tools, web assets, licenses, and libvips dependency tree.
+
+The macOS bundle declares purpose strings for user-selected folders and network
+or removable Storage Locations. Distribution is an ad-hoc-signed DMG. Because
+it is not Developer-ID signed or notarized, the first launch requires approval
+through **System Settings → Privacy & Security → Open Anyway**.
+
+## Build: Windows
+
+The Windows build runs natively in an MSYS2 MINGW64 shell with the toolchain
+listed in `.github/workflows/release-desktop.yml`.
 
 ```sh
-brew install vips dylibbundler create-dmg      # build-time deps
-desktop/scripts/fetch-resources.sh             # ffmpeg/ffprobe/exiftool (pinned + sha256)
-# also stage PostgreSQL 18.4 + pgvector into resources/postgres/18/<platform>/ (from source), then:
-make desktop-build                             # → desktop/build/Lumilio Photos.app
-desktop/scripts/build-macos.sh arm64 --dmg     # also produce a DMG
+desktop/scripts/fetch-resources.ps1
+LUMILIO_VERSION=1.2.3 desktop/scripts/build-windows.sh
 ```
 
-The macOS bundle declares purpose strings for user-selected Desktop,
-Documents, Downloads, removable-volume, network-volume, and File Provider
-Storage Locations. The native directory picker supplies the user grant; a
-stable Bundle ID and signing identity are still required for TCC decisions to
-survive rebuilds and upgrades reliably.
+The output is `desktop/build/windows/Lumilio Photos/`. The release workflow
+produces both a portable zip and an Inno Setup per-user installer. The installer
+ensures WebView2 is available, adds shortcuts, and registers an uninstaller with
+an optional, separately confirmed app-data removal step. See
+[packaging/windows/README.md](packaging/windows/README.md).
 
-The `--dmg` step builds the classic "drag the app onto Applications" window via
-`create-dmg` (Applications symlink + positioned icons; optional background art at
-`packaging/dmg/background.png` — see that dir's README). It needs a GUI session
-for the window styling and falls back to a plain DMG (still with an Applications
-symlink) when run headless.
+Windows artifacts are currently unsigned, so SmartScreen may require
+**More info → Run anyway** on first launch.
 
-Distribution is a single **ad-hoc-signed DMG** from GitHub Releases (no Apple
-Developer account). Ad-hoc signing is still required: Apple Silicon won't run
-unsigned binaries, and `dylibbundler`'s install-name rewrites invalidate the
-bundled dylib signatures, so they are re-signed. The DMG container is unsigned.
+## Updates and compatibility
 
-First launch on the user's machine: drag the app to Applications, then (because
-the download is quarantined and the app isn't notarized) approve it once via
-**System Settings → Privacy & Security → Open Anyway**. This persists afterward.
-Removing that prompt entirely requires Developer-ID signing + notarization, which
-needs a paid Apple Developer account — a clean future upgrade to the same DMG.
+The tray checks GitHub Releases once per launch and offers the matching DMG or
+Windows installer. Installation remains manual; app data is preserved and the
+embedded SQLite migrations run on the next launch.
 
-## App updates
-
-On launch the tray checks GitHub Releases (including prereleases), picks a
-platform installer (macOS `.dmg` / Windows `setup.exe`), and surfaces **Update
-available** in the menu. Click opens the download URL — install is still manual.
-**Download region** (`cn` | `other`) is chosen in onboarding / the control
-panel and is independent of in-browser map region; `cn` rewrites installer URLs
-through `https://gh-proxy.com/`.
-
-> Homebrew Cask was intentionally not used: Homebrew quarantines casks by default,
-> so a cask install of an ad-hoc app hits the same Gatekeeper prompt as the DMG —
-> all maintenance, no UX benefit.
-
-## Build (Windows: portable + installer)
-
-The Windows build is native — CGo via MSYS2/MINGW64, not a cross-compile from
-macOS (libvips + libraw would need the whole imaging stack cross-built). Run
-inside an MSYS2 MINGW64 shell with the toolchain from the `windows` job in
-`.github/workflows/release-desktop.yml` (`mingw-w64-x86_64-{go,gcc,pkgconf,libvips,libraw,ntldd}`):
-
-```sh
-# stage resources first: desktop/resources/postgres/18/windows-amd64,
-# ffmpeg/exiftool via desktop/scripts/fetch-resources.ps1, and web/dist (vp build)
-LUMILIO_VERSION=1.2.3 desktop/scripts/build-windows.sh   # → desktop/build/windows/Lumilio Photos/
-```
-
-Two distribution forms, both from GitHub Releases:
-
-- **Installer (recommended)** — `Lumilio-Photos-<ver>-windows-amd64-setup.exe`,
-  built from `packaging/windows/lumilio.iss` with Inno Setup 6.1+
-  (`ISCC.exe /DAppVersion=1.2.3 desktop\packaging\windows\lumilio.iss`). It
-  installs per-user to `%LocalAppData%\Programs\Lumilio Photos` (no UAC), ensures
-  the Edge **WebView2 Runtime** the first-run onboarding window needs, adds Start
-  Menu shortcuts, and registers an uninstaller (stops the app + bundled Postgres,
-  optional data removal with a photo-library safety prompt). See
-  [packaging/windows/README.md](packaging/windows/README.md).
-- **Portable** — zip the `Lumilio Photos` directory; the user extracts and runs
-  `lumilio-photos.exe`. Requires the WebView2 Runtime to already be present for
-  the setup window.
-
-Both are unsigned, so SmartScreen shows **More info → Run anyway** on first run —
-the same posture as the unsigned macOS DMG. Authenticode (ideally EV) signing
-removes it, tracked in `release-cicd.md`.
-
-There is **no Windows uninstaller script to maintain by hand**: the installer
-generates it. macOS deliberately has no uninstaller — drag the app to the Trash
-(the app data under `~/Library/Application Support/Lumilio Photos` can be removed
-manually).
-
-## Updates
-
-The tray checks GitHub Releases once per launch (async, best-effort, silent on
-failure — `update.go`). If a newer semver release exists it adds an "Update
-available: vX.Y.Z" tray item that opens the release page; the user installs it
-manually (Windows: run the new setup.exe, which upgrades in place; macOS: drag
-the new app over the old). App data under the per-user data dir is untouched, and
-the server runs its embedded migrations on next launch.
-
-> Because installed builds carry real user data, **released schema changes must
-> be additive forward migrations** — the "edit the original migration in place"
-> habit only holds pre-release; once users have data, editing a shipped migration
-> desyncs their database on update.
-
-Full silent auto-update is deferred: it needs code-signing (Sparkle/Authenticode)
-we don't have yet, so today an "update" is a signed-out manual reinstall that
-preserves data.
-
-## Status / remaining work
-
-Implemented: supervisor (PG lifecycle, typed config/secrets generation,
-single-instance lock, Storage Location migration, quarantine cleanup), embedded
-migrations, in-process server boot, the Go server serving the SPA, the Wails
-system-tray controller with auto-open browser, and dev/build tooling. Verified end to end
-against a real PostgreSQL (`TestDesktopRuntimeE2E`): PG → migrations → API → SPA
-at `localhost:6680`.
-
-Remaining (ops / requires a build host with the staged binaries):
-bundling PostgreSQL+pgvector / ffmpeg / exiftool / libvips, building+staging the
-web SPA, ad-hoc signing, and the DMG release. (The WKWebView passkey risk is moot
-now that the UI runs in a real browser.) Tracked in the exec plan's Validation
-checklist.
+Released schema changes must be additive forward migrations. Editing a migration
+already shipped to users would desynchronize existing catalogs.

@@ -112,8 +112,6 @@ const validation = {
 const LOGS: Record<string, string> = {
   app: "2026-07-17 09:12:03 INFO  server listening on 127.0.0.1:6680\n2026-07-17 09:12:04 INFO  library scan complete: 4,213 items\n2026-07-17 09:14:41 INFO  thumbnail cache warmed (812MB)",
   error: "2026-07-16 22:03:11 WARN  slow query: 1.4s (media_search)",
-  postgres:
-    "2026-07-17 09:11:58 INFO  postgres ready, 213ms startup\n2026-07-17 09:12:00 INFO  migrations up to date (v42)",
   lumen:
     "2026-07-17 09:13:20 INFO  lumen-hub booting, backend=metal\n2026-07-17 09:13:26 INFO  model loaded: bioclip-v2 (1.2GB)",
 };
@@ -293,7 +291,7 @@ export function mockPanelApi(): Plugin {
             res.end("GNU GENERAL PUBLIC LICENSE\nVersion 3 (mock)\n\n…");
             return;
           case "/__onb/legal/third-party":
-            res.end("THIRD-PARTY NOTICES (mock)\n\npostgres — PostgreSQL License\n…");
+            res.end("THIRD-PARTY NOTICES (mock)\n\nthird-party components\n…");
             return;
           case "/__onb/legal/terms":
             res.end("TERMS OF USE (mock)\n\nLumilio Photos runs entirely on your machine.\n…");

@@ -42,14 +42,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libraw-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /app/server
 
 # Go module files first for better caching
 COPY server/go.mod server/go.sum ./
+COPY server/third_party/river/go.mod ./third_party/river/go.mod
+COPY third_party/river-rivershared/go.mod ../third_party/river-rivershared/go.mod
 RUN go mod download
 
 # Copy source
 COPY server/. .
+COPY third_party/river-rivershared ../third_party/river-rivershared
 
 # Product version stamped into the binary (surfaced via /api/v1/health).
 ARG VERSION=dev

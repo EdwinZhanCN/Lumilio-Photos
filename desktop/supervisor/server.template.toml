@@ -1,17 +1,10 @@
-# Generated from the version-controlled desktop schema v1 template.
+# Generated from the version-controlled desktop schema v2 template.
 # This file is the authoritative runtime input for the in-process server.
-schema_version = 1
+schema_version = 2
 environment = "production"
 
 [database]
-host = {{toml .DBHost}}
-port = {{toml .DBPort}}
-user = {{toml .DBUser}}
-name = {{toml .DBName}}
-ssl = "disable"
-bootstrap_password_file = {{toml .BootstrapPasswordFile}}
-rotated_password_file = {{toml .RotatedPasswordFile}}
-tools_bin_dir = {{toml .PGBinDir}}
+path = {{toml .DatabasePath}}
 
 [server]
 port = {{toml .Port}}

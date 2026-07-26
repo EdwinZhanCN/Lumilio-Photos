@@ -56,15 +56,11 @@ var nativeStrings = map[string]map[string]string{
 var stageStrings = map[string]map[string]string{
 	"en": {
 		supervisor.StagePreparing:      "Preparing…",
-		supervisor.StageInitDB:         "Initializing database…",
-		supervisor.StageStartingDB:     "Starting database…",
 		supervisor.StageStartingServer: "Starting server…",
 		supervisor.StageReady:          "Ready",
 	},
 	"zh": {
 		supervisor.StagePreparing:      "正在准备…",
-		supervisor.StageInitDB:         "正在初始化数据库…",
-		supervisor.StageStartingDB:     "正在启动数据库…",
 		supervisor.StageStartingServer: "正在启动服务…",
 		supervisor.StageReady:          "就绪",
 	},

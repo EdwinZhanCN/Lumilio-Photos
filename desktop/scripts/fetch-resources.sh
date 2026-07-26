@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 #
 # Download the bundled media tools (ffmpeg, ffprobe, exiftool) into
-# desktop/resources/ with pinned versions and SHA-256 verification. PostgreSQL is
-# NOT fetched here — it must be a relocatable from-source build (see
-# .github/workflows/build-postgres.yml and desktop/resources/README.md).
+# desktop/resources/ with pinned versions and SHA-256 verification.
 #
 # Defaults target Apple Silicon (arm64). For Intel, override the URLs and
 # checksums via env, e.g.:
@@ -108,5 +106,4 @@ fetch_static_binary ffmpeg "$FFMPEG_URL" "$FFMPEG_SHA256"
 fetch_static_binary ffprobe "$FFPROBE_URL" "$FFPROBE_SHA256"
 fetch_exiftool
 
-echo "==> Done. PostgreSQL+pgvector is not fetched here — build it from source"
-echo "    (.github/workflows/build-postgres.yml) into resources/postgres/18/<platform>/."
+echo "==> Done."

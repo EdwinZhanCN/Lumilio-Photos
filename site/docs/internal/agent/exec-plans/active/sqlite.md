@@ -1087,7 +1087,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - [x] Phase 6：FTS与vector
 - [x] Phase 7：backup/restore与runtime generation
 - [x] Phase 8：Docker
-- [ ] Phase 9：Desktop
+- [x] Phase 9：Desktop
 - [ ] Phase 10：dev/CI/docs/cleanup
 - [ ] Core Definition of Done
 - [ ] Hardening backlog已记录（不阻塞）
@@ -1213,7 +1213,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 
 - `server/app`、`server/internal`、handler、service、worker、Agent、cloud、storage 和 benchmark tooling 已移除直接 pgx/pgtype/pgconn/pgvector 使用，统一为 `*db.DB`、`*sql.DB`、`*sql.Tx`、`*repo.Queries`、`google/uuid` 与 `dbtypes`。
 - setup/bootstrap gate 现在只检查应用设置、owner、primary repository 和 secret；queue admin、auth、asset、people、stats、repository scan 等 raw SQL 均已改为 SQLite 语义。
-- `go mod tidy` 删除 direct pgx、pgvector、riverpgxv5、Postgres migrate driver 和 lib/pq。River v0.24 自身的 production `testsignal → riversharedtest` import 仍会把 pgx 作为不可调用的 upstream transitive code 拉入 compiled graph；Phase 10 architecture guard 前必须通过窄的 upstream patch/replacement 或升级消除，不能把它误报为已完成的 runtime guard。
+- `go mod tidy` 删除 direct pgx、pgvector、riverpgxv5、Postgres migrate driver 和 lib/pq。River v0.24 自身的 production `testsignal → riversharedtest` import 曾把 pgx 作为不可调用的 upstream transitive code 拉入 compiled graph；Phase 9 package gate 已用只保留生产 package 的窄本地 fork/replacement 消除，Phase 10 architecture guard 将防止回归。
 
 #### Phase 5：River SQLite 与事务性 ingest
 
@@ -1253,6 +1253,24 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - 同一容器 restart 与删除/recreate application container 后都恢复 healthy；`system_state.library_id=dde4a8e1fd47c74b13beb121ca63c1af` 三次保持一致。root `docker compose up -d --build --wait` 的隔离 smoke 只创建一个 healthy `lumilio` container，并从同一公开端口返回 UI + API。
 - public Docker configurator 与双语文档通过 `vitepress build docs` production build；依赖安装与 source build 分为 networked manifest-only container和 `--network none` read-only source container，未把 host Corepack signing-key故障绕进仓库配置。
 
+### Phase 9 执行记录（2026-07-26）
+
+#### Desktop lifecycle 与本地数据布局
+
+- Desktop supervisor 不再发现、初始化、启动、等待或终止数据库子进程。manifest 固定为 schema v2，active catalog 为 `<application-data>/Lumilio Photos/library.sqlite3`；supervisor 写出完整资源路径后直接调用 in-process `app.Run`，stop 顺序由应用 drain HTTP、River 与 SQLite。
+- machine-local parent、catalog、config、logs、secrets、backups、cloud 与 media storage 的边界显式保留；数据库 parent 诊断、目录权限和 database `0600` 等价权限由测试覆盖。媒体工具仍是显式解析的外部/打包资源，不允许 Server 在 immutable config 之后偷偷 fallback。
+- 删除 Desktop PostgreSQL supervisor/process/smoke、resource relocation、license、release artifact workflow和控制面板 DB phase/log；macOS/Windows packaging、installer、resource fetch 与 release workflow 只交付应用、SPA、media libraries/tools 和 notices。
+- `make desktop-test` 全量通过。真实 first/second launch integration test 在独立 application-data 上启动 API + SPA、创建 catalog、停止并重新打开，证明 `system_state.library_id` 稳定且 catalog mode 为 `0600`；这条 close/reopen path 是本 Phase 对 abnormal/reopen 风险的聚焦门槛，完整 kill matrix 留在 Hardening。
+- 首次真实 Desktop launch 暴露 baseline `system_state.bootstrap_phase` CHECK 漏掉运行时合法值 `db_rotated`；baseline 与 schema test 已同步修复，而不是在 bootstrap 代码中绕过约束。
+
+#### 依赖图与 package guard
+
+- 最终 bundle audit 发现 River v0.24 的生产 `testsignal` package 通过 `riversharedtest` 把 pgx 实际链接进 Desktop binary。仓库现在包含基于上游 MPL-2.0 v0.24、只保留 reachable production packages 的 `server/third_party/river` 与 `third_party/river-rivershared`；唯一行为调整是缺失 driver 的 backend-neutral diagnostic，以及 `testsignal` 直接使用上游 10 秒默认 timeout。Server 与 Desktop 用显式 local replacements，`go mod tidy` 后 module graph 不再含 pgx/pgvector/riverpgx/libpq/GORM PostgreSQL driver。
+- Server Docker builder 显式复制两个 local replacement module，避免 Desktop cleanup 破坏 Linux delivery build cache/source边界。第三方 notices 通过 `node desktop/scripts/generate-third-party-notices.mjs` 重新生成，共 200 项；generator统一 CRLF、尾空白与单一文件末换行。
+- `make server-test`、`make desktop-test` 与 `make desktop-build` 均通过。最终 ad-hoc signed macOS app 通过 deep/strict `codesign`；bundle 为 321,476 KiB，main binary 为 80,890,048 bytes。文件名、`otool`、Go build metadata、binary strings、module graph 与 shipped notices 的 package guard 都没有 PostgreSQL/pgx/pgvector/riverpgx/libpq。
+- Windows release configuration完成静态审查：workflow、PowerShell resource fetch、build script、installer source与文档均不再引用数据库 distribution/path/artifact。Windows runtime smoke仍属于Hardening。
+- 本机缺少 web依赖时，普通 locked install 在 sharp optional native postinstall 上失败；`vp install --ignore-scripts` 完成依赖恢复，随后生产 SPA build 与 Desktop bundle build通过。现有 Homebrew media library deployment-target warnings仍是独立 packaging hardening，不是 SQLite blocker。
+
 ## Decision Log
 
 | Date | Decision | Reason | Consequence |
@@ -1267,6 +1285,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 | 2026-07-25 | vector 固定为 `sqlite-vec` CGo binding v0.1.6 的 exact `vec0` | 768D/512D insert/delete/top-k 与静态注册均通过；正确性风险低于迁移期引入 ANN sidecar | authoritative embedding 仍存普通表；规模 benchmark 与 ANN 决策保留为 Hardening |
 | 2026-07-25 | sqlc JSON 字段使用 `dbtypes.JSON`，时间使用 Unix microseconds `dbtypes.Timestamp` | `STRICT TEXT` 会拒绝 `json.RawMessage` 产生的 BLOB，且时间需要跨 driver 的唯一语义 | Phase 3 overrides 复用集中 Scanner/Valuer，不允许 query-local cast/fallback |
 | 2026-07-26 | Docker release 固定为一个同时服务 SPA + API 的 application image 与两个显式 bind mounts | 删除 DB/Caddy 必需 service，并让 catalog ownership、备份与恢复边界可见 | `/data/storage` 只放媒体；`/data/app-state` 放 SQLite catalog 与 private state；TLS 变为外部可选 proxy |
+| 2026-07-26 | River v0.24 使用只保留 reachable production packages 的本地 MPL-2.0 fork | 上游 production `testsignal` 经 test helper 将 pgx 链接进最终 binary；升级会扩大本次迁移风险 | fork 保持窄差异、携带上游 license/说明并由 package/architecture guard约束；后续升级应优先删除 fork |
 
 ## Surprises & Discoveries
 
@@ -1280,6 +1299,9 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - root commit hook 当前从 repository root 执行 `vp staged`，但 `staged` config 只存在于 `web/vite.config.ts`，因此任何 root commit 都会在检查文件前失败。Phase 1 已手工通过 `gofmt -d`、`git diff --check`、`go mod tidy -diff` 和对应完整 gates，并以 `--no-verify` checkpoint；Phase 10 必须修正 hook 安装/working directory。
 - `node:24-trixie-slim` 没有 system CA bundle，Vite+ 即使本地 build 也会初始化 HTTP client并 panic；web builder显式安装 `ca-certificates` 后生产 bundle通过。
 - fresh host bind directory通常是 `0755`；DB runtime正确拒绝 group/world-readable SQLite parent。Docker entrypoint因此必须在降权前把 app-state收紧为 `0700`，不能只检查“UID 10001可写”。
+- Desktop first-launch smoke 发现 SQLite baseline 的 `bootstrap_phase` CHECK 少了应用实际写入的 `db_rotated`；旧单元测试未覆盖真实 bootstrap sequence，现由真实 first/second launch 与 baseline test共同守护。
+- `go mod tidy` 不足以证明最终 package 不含旧后端：River v0.24 的 production helper把 pgx拉进实际 Desktop binary。最终 bundle的 Go metadata/string/linked-library audit促成了窄 production fork，并要求 Phase 10 增加 repository architecture guard。
+- host web依赖恢复时 sharp optional native postinstall失败，但跳过 install scripts 后同一 lockfile 的 production SPA build成功；这暴露的是本机依赖安装路径差异，未通过修改 lockfile 或降低 build gate隐藏。
 
 ## Outcomes & Retrospective
 
@@ -1290,7 +1312,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - 最终vector方案：
 - schema/table/query数量：
 - 删除的PostgreSQL组件：
-- Desktop package体积变化：
+- Desktop package体积变化：当前 ad-hoc signed macOS app 321,476 KiB，main binary 80,890,048 bytes；迁移前同条件 bundle未留存，因此只记录绝对值。
 - Docker image体积变化：当前 Linux/arm64 单体 runtime image 319,084,043 bytes；迁移前同条件 image未留存，因此只记录绝对值，不虚构百分比。
 - idle memory变化：
 - startup变化：

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
 const output = join(root, "desktop/licenses/THIRD_PARTY_NOTICES.txt");
@@ -12,7 +12,15 @@ function licenseFiles(dir) {
   return readdirSync(dir)
     .filter((name) => licenseNames.test(name) && statSync(join(dir, name)).isFile())
     .sort()
-    .map((name) => ({ name, text: readFileSync(join(dir, name), "utf8").trim() }));
+    .map((name) => ({
+      name,
+      text: readFileSync(join(dir, name), "utf8")
+        .replace(/\r\n?/g, "\n")
+        .split("\n")
+        .map((line) => line.trimEnd())
+        .join("\n")
+        .trim(),
+    }));
 }
 
 function add(key, title, source, files, declared = "") {
@@ -62,5 +70,5 @@ for (const entry of [...entries.values()].sort((a, b) => a.title.localeCompare(b
   if (!entry.files.length) lines.push("No license text was present in the distributed package metadata; consult the source link above.", "");
   for (const file of entry.files) lines.push(`[${basename(file.name)}]`, file.text, "");
 }
-writeFileSync(output, `${lines.filter((line) => line !== undefined).join("\n")}\n`);
+writeFileSync(output, `${lines.filter((line) => line !== undefined).join("\n").trimEnd()}\n`);
 console.log(`Wrote ${output} with ${entries.size} dependency entries.`);

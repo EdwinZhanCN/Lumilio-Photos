@@ -1,6 +1,5 @@
 // Package lumen installs and supervises a local Lumen Hub — the optional ML
-// inference server — the same way the supervisor package owns the private
-// PostgreSQL: download once into the app-data dir, then run it as a child
+// inference server: download once into the app-data dir, then run it as a child
 // process for the lifetime of the app.
 //
 // This launcher deliberately lives in the desktop host (not Lumen-SDK): the

@@ -196,7 +196,7 @@ func (d *desktopApp) refreshMenu() {
 	d.tray.SetMenu(menu)
 }
 
-// startRuntime brings up PostgreSQL + the API server, then opens the browser.
+// startRuntime brings up the in-process SQLite/API runtime, then opens the browser.
 func (d *desktopApp) startRuntime() {
 	if err := d.sup.Start(d.ctx); err != nil {
 		title := d.tr("failTitle")
@@ -282,8 +282,8 @@ func (d *desktopApp) openInBrowser() {
 	}
 }
 
-// onShutdown stops the local AI hub, drains the API server, and stops
-// PostgreSQL. Wails blocks termination until this returns. The hub is stopped
+// onShutdown stops the local AI hub and drains the in-process API/SQLite
+// runtime. Wails blocks termination until this returns. The hub is stopped
 // before the context is cancelled so it gets a graceful signal rather than the
 // CommandContext kill.
 func (d *desktopApp) onShutdown() {

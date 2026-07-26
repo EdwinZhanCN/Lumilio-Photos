@@ -1,7 +1,6 @@
 # Fetches the Windows media-tool binaries (ffmpeg/ffprobe/exiftool) into
 # desktop/resources/ with pinned versions and SHA-256 verification — the
-# Windows counterpart of fetch-resources.sh. PostgreSQL is staged separately
-# (see .github/workflows/build-postgres.yml, artifact postgres-windows-amd64).
+# Windows counterpart of fetch-resources.sh.
 #
 # Override any pin via env: FFMPEG_URL/FFMPEG_SHA256, EXIFTOOL_URL/EXIFTOOL_SHA256.
 
