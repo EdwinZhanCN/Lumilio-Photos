@@ -166,11 +166,11 @@ func ApplyPendingRestore(ctx context.Context, activePath string, logf Logf) (boo
 	if err := removeSQLiteSidecars(activePath); err != nil {
 		return false, err
 	}
-	if err := os.Rename(activePath, previousPath); err != nil {
+	if err := renameFile(activePath, previousPath); err != nil {
 		return false, fmt.Errorf("preserve previous SQLite catalog: %w", err)
 	}
-	if err := os.Rename(stagedPath, activePath); err != nil {
-		rollbackErr := os.Rename(previousPath, activePath)
+	if err := renameFile(stagedPath, activePath); err != nil {
+		rollbackErr := renameFile(previousPath, activePath)
 		return false, errors.Join(fmt.Errorf("activate restored SQLite catalog: %w", err), rollbackErr)
 	}
 	cleanupStaged = false
@@ -247,16 +247,16 @@ func RollbackPendingRestore(ctx context.Context, activePath string, logf Logf) e
 	if err := removeSQLiteSidecars(activePath); err != nil {
 		return err
 	}
-	if err := os.Rename(activePath, failedPath); err != nil {
+	if err := renameFile(activePath, failedPath); err != nil {
 		return fmt.Errorf("preserve failed restored SQLite catalog: %w", err)
 	}
-	if err := os.Rename(marker.PreviousPath, activePath); err != nil {
-		_ = os.Rename(failedPath, activePath)
+	if err := renameFile(marker.PreviousPath, activePath); err != nil {
+		_ = renameFile(failedPath, activePath)
 		return fmt.Errorf("roll back previous SQLite catalog: %w", err)
 	}
 	if _, err := db.InspectCatalog(ctx, activePath); err != nil {
-		_ = os.Rename(activePath, marker.PreviousPath)
-		_ = os.Rename(failedPath, activePath)
+		_ = renameFile(activePath, marker.PreviousPath)
+		_ = renameFile(failedPath, activePath)
 		return fmt.Errorf("verify rolled-back SQLite catalog: %w", err)
 	}
 	_ = os.Remove(failedPath)
@@ -320,7 +320,7 @@ func writePendingRestore(path string, marker PendingRestore, exclusive bool) err
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("close pending restore marker: %w", err)
 	}
-	if err := os.Rename(tmpPath, path); err != nil {
+	if err := renameFile(tmpPath, path); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("finalize pending restore marker: %w", err)
 	}

@@ -1289,7 +1289,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - final ad-hoc signed macOS app 为 321,456 KiB，main binary 为 80,874,016 bytes，通过 deep/strict codesign；linked libraries、Go build metadata、strings、module graph、notices 与 bundle filenames 不含 PostgreSQL/pgx/pgvector/riverpgx/libpq。
 - release image 的 fresh、restart 与 container remove/recreate 均保持同一 `system_state.library_id`；每次 graceful stop 后由同一 container runtime 执行的离线 `PRAGMA quick_check` 均返回 `ok`。不能用 host SQLite tool 打开仍在 container mount 上运行的 catalog。
 - 小型 E2E fixture 的 browser 首屏观察约 523 ms，三个 video case 约 3.5–5.6 s 并正确定位 semantic frame。它们只证明交互路径和 seek 行为；没有测量 representative library 性能或严格 idle memory，不能据此宣称规模或内存改善。
-- draft PR 首次远端 CI 将本机无法执行的 Windows CGo path 纳入完整 Server/Desktop tests。它暴露 drive-letter path 被编码成无效 URI authority，以及 Unix mode bits 被误用于 Windows privacy validation；最终实现集中 `file:///D:/...` URI builder，并让 Windows catalog parent/file 使用 protected DACL。后续 Windows CI 必须通过才视为远端验证完成。
+- draft PR 远端 CI 将本机无法执行的 Windows CGo path 纳入完整 Server/Desktop tests。它暴露 drive-letter path 被编码成无效 URI authority、Unix mode bits 被误用于 Windows privacy validation，以及 read-only handle `Sync()`/directory fsync 与 rename durability 的平台差异；最终实现集中 `file:///D:/...` URI builder，让 Windows catalog/backup 使用 protected DACL，并用 read-write file flush 与 `MOVEFILE_WRITE_THROUGH` 完成 snapshot/restore 原子 finalization。后续 Windows CI 必须通过才视为远端验证完成。
 
 #### Consolidated Hardening backlog
 
@@ -1336,7 +1336,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - SQLite baseline required-column contract 在 broaden 后发现 registration session、duplicate group、Agent pin、share link 与 location cluster 的 UUID insert 都依赖了 PostgreSQL 时代的隐式/default 行为。统一改成 Go UUID 后，guard 同时排除了数据库侧 `randomblob()` fallback。
 - sqlc 对同一 statement 中 slice expansion 与固定 numbered parameters 的组合会生成位置错误但能编译的代码；JSON collection/typed CTE 与 generation guard 把这类问题从 runtime 移到 CI。
 - 在 macOS host 上直接用 `sqlite3` 打开 OrbStack/Linux bind mount 中仍活动的 catalog 会跨 VFS/WAL boundary 干扰数据库，并曾导致下一次启动报告 malformed。隔离目录重做后，所有检查只在 graceful stop 后由 container runtime执行，三次 quick check 与 identity persistence 均通过；文档现在明确禁止该诊断方式。
-- 首次 Windows CI 证明 macOS/Linux 的绝对路径测试不能代表 drive-letter URI 或 DACL：`url.URL` 直接接收反斜杠 path 会生成 SQLite 拒绝的 authority，而 `os.FileMode` 在 Windows 不表达 ACL privacy。跨平台 URI helper 与已有 `fsprivacy` protected-DACL path 现在由 Windows Server/Desktop job 实测。
+- Windows CI 证明 macOS/Linux 的绝对路径和 fsync 测试不能代表 drive-letter URI、DACL 或 Windows handle semantics：`url.URL` 直接接收反斜杠 path 会生成 SQLite 拒绝的 authority，`os.FileMode` 在 Windows 不表达 ACL privacy，read-only handle 不能 `Sync()`，且 directory fsync 没有 Windows 等价物。跨平台 URI helper、已有 `fsprivacy` protected-DACL path、read-write file flush 与 write-through rename 现在由 Windows Server/Desktop job 实测。
 
 ## Outcomes & Retrospective
 

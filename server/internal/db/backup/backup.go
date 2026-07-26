@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"server/internal/db"
+	"server/platform/fsprivacy"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 )
@@ -88,6 +89,9 @@ func CreateSnapshot(
 	if err := os.MkdirAll(destDir, 0o700); err != nil {
 		return Snapshot{}, fmt.Errorf("create backup directory %s: %w", destDir, err)
 	}
+	if err := fsprivacy.ApplyDirectoryMode(destDir, 0o700); err != nil {
+		return Snapshot{}, fmt.Errorf("secure backup directory %s: %w", destDir, err)
+	}
 
 	createdAt := time.Now().UTC()
 	name := prefix + FileName(createdAt)
@@ -114,7 +118,7 @@ func CreateSnapshot(
 	if err := onlineBackup(ctx, source, tmpPath); err != nil {
 		return Snapshot{}, err
 	}
-	if err := os.Chmod(tmpPath, 0o600); err != nil {
+	if err := fsprivacy.ApplyFileMode(tmpPath, 0o600); err != nil {
 		return Snapshot{}, fmt.Errorf("secure SQLite snapshot: %w", err)
 	}
 	if err := syncFile(tmpPath); err != nil {
@@ -148,10 +152,10 @@ func CreateSnapshot(
 		return Snapshot{}, err
 	}
 
-	if err := os.Rename(tmpPath, finalPath); err != nil {
+	if err := renameFile(tmpPath, finalPath); err != nil {
 		return Snapshot{}, fmt.Errorf("finalize SQLite snapshot: %w", err)
 	}
-	if err := os.Rename(tmpManifestPath, finalManifestPath); err != nil {
+	if err := renameFile(tmpManifestPath, finalManifestPath); err != nil {
 		_ = os.Remove(finalPath)
 		return Snapshot{}, fmt.Errorf("finalize SQLite snapshot manifest: %w", err)
 	}
@@ -364,25 +368,13 @@ func fileSHA256(path string) (string, error) {
 }
 
 func syncFile(path string) error {
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_RDWR, 0)
 	if err != nil {
 		return fmt.Errorf("open SQLite snapshot for sync: %w", err)
 	}
 	defer file.Close()
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("sync SQLite snapshot: %w", err)
-	}
-	return nil
-}
-
-func syncDirectory(path string) error {
-	directory, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("open directory for sync: %w", err)
-	}
-	defer directory.Close()
-	if err := directory.Sync(); err != nil {
-		return fmt.Errorf("sync directory: %w", err)
 	}
 	return nil
 }
