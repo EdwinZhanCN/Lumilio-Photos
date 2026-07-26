@@ -72,8 +72,8 @@ Removing an unused external Storage Location only removes its registration. It d
 
 A Storage Location is not a complete workspace. These remain private to the machine running Lumilio:
 
-- the PostgreSQL database;
-- login keys and database credentials;
+- the SQLite catalog;
+- login keys and application credentials;
 - cloud sessions and credential state;
 - service logs, Lumen models, and database backups.
 

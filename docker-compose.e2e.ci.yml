@@ -1,9 +1,9 @@
 # CI-only overlay: caches each image's build layers in the GitHub Actions cache
-# backend so a warm run skips rebuilding server, web, db, and the deterministic
-# Lumen fixture from scratch. Applied
+# backend so a warm run skips rebuilding the unified Lumilio image and the
+# deterministic Lumen fixture from scratch. Applied
 # through LUMILIO_E2E_COMPOSE_EXTRA; local runs never load it. Requires a
 # docker-container buildx builder (docker/setup-buildx-action) and the ACTIONS_*
-# runtime env (crazy-max/ghaction-github-runtime). Distinct scopes keep the three
+# runtime env (crazy-max/ghaction-github-runtime). Distinct scopes keep the two
 # images from evicting each other.
 services:
     lumen-fixture:
@@ -12,21 +12,9 @@ services:
                 - type=gha,scope=e2e-lumen-fixture
             cache_to:
                 - type=gha,scope=e2e-lumen-fixture,mode=max
-    db:
+    lumilio:
         build:
             cache_from:
-                - type=gha,scope=e2e-db
+                - type=gha,scope=e2e-lumilio
             cache_to:
-                - type=gha,scope=e2e-db,mode=max
-    server:
-        build:
-            cache_from:
-                - type=gha,scope=e2e-server
-            cache_to:
-                - type=gha,scope=e2e-server,mode=max
-    web:
-        build:
-            cache_from:
-                - type=gha,scope=e2e-web
-            cache_to:
-                - type=gha,scope=e2e-web,mode=max
+                - type=gha,scope=e2e-lumilio,mode=max

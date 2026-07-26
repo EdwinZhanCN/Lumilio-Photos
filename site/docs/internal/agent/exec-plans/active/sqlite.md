@@ -1086,7 +1086,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - [x] Phase 5：River与事务性ingest
 - [x] Phase 6：FTS与vector
 - [x] Phase 7：backup/restore与runtime generation
-- [ ] Phase 8：Docker
+- [x] Phase 8：Docker
 - [ ] Phase 9：Desktop
 - [ ] Phase 10：dev/CI/docs/cleanup
 - [ ] Core Definition of Done
@@ -1235,6 +1235,24 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - 原 catalog 保留为 restore point；新 listener、wiring、settings/users health 成功后才完成 marker，启动失败会 rollback 原 catalog。测试覆盖 standalone snapshot、checksum拒绝、staged apply、restore point、rollback/retention和forced scheduler。
 - `go test -tags=sqlite_fts5 ./...` 在上述 Phase 2–7 完成后全量通过。
 
+### Phase 8 执行记录（2026-07-26）
+
+#### 单容器交付与数据边界
+
+- 删除 `server/db.Dockerfile`、`docker-compose.release.dbport.yml`、所有 `db` service/volume/bootstrap password secret、独立 `web` service 和数据库依赖关系。root、release、E2E、CI overlay 与 host-mDNS compose 现在只把 `lumilio` 作为应用 service；E2E 另保留独立 Lumen fixture。
+- release Server image 在独立 Node stage 构建 SPA，并与 Go Server 一起交付；`server.web_root=/app/web`，同一 `6680` listener 同时提供 SPA 与 API。release compose 保持外部默认端口 `6657`，TLS 由部署者的可选可信反向代理提供。
+- active catalog 固定为 `/data/app-state/library.sqlite3`。媒体挂载 `/data/storage` 与 machine-local state 挂载 `/data/app-state` 明确分离；日志、backup 与私有状态也在 app-state。
+- root entrypoint 只在启动边界创建/检查两个挂载，给不可写挂载提供明确诊断，将 app-state 收紧到 `0700`，再通过 `gosu` 降为 UID 10001。Server binary、媒体处理和请求处理仍以非 root 身份运行。
+- runtime image 删除 PostgreSQL apt repository/client 与 `secretinit`，不包含 PostgreSQL binary、client 或 libpq package。public Docker configurator、README、双语安装/BreakGlass 与 backup guidance 已改为单镜像、双挂载、schema v2 和应用 snapshot 语义。
+
+#### Compose、image 与持久化验证
+
+- `docker compose config` 对 root、release、E2E、CI overlay 与 host-mDNS 组合均通过；resolved root/release service 只有 `lumilio`，E2E 只有 `lumilio` 与 `lumen-fixture`。
+- `docker build --secret id=npmrc,src=/Users/zhanzihao/.npmrc --build-arg VERSION=sqlite-phase8 -f server/Dockerfile -t lumilio-sqlite:phase8 .` 在当前 Linux/arm64 OrbStack builder 通过。最终 image 为 319,084,043 bytes；`command -v psql/postgres/pg_dump` 与 `dpkg-query` PostgreSQL/libpq package guard 均为空，SPA index 与 Server binary 均存在。
+- fresh bind-mount smoke 在 API ready 后返回 `{"status":"ok","version":"sqlite-phase8"}`，`/` 返回 Lumilio SPA。catalog mode 为 `0600`，位于 state mount；media mount中不存在 active database。
+- 同一容器 restart 与删除/recreate application container 后都恢复 healthy；`system_state.library_id=dde4a8e1fd47c74b13beb121ca63c1af` 三次保持一致。root `docker compose up -d --build --wait` 的隔离 smoke 只创建一个 healthy `lumilio` container，并从同一公开端口返回 UI + API。
+- public Docker configurator 与双语文档通过 `vitepress build docs` production build；依赖安装与 source build 分为 networked manifest-only container和 `--network none` read-only source container，未把 host Corepack signing-key故障绕进仓库配置。
+
 ## Decision Log
 
 | Date | Decision | Reason | Consequence |
@@ -1248,6 +1266,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 | 2026-07-25 | 唯一 driver 固定为 `mattn/go-sqlite3 v1.14.48`，FTS5 使用统一 build tag | CGo 路径同时通过当前 macOS 与 Linux/arm64，且满足 River `database/sql`、FTS5 与静态 vector extension | build/package/CI 必须保持 CGo 和 `sqlite_fts5`；禁止引入第二 driver fallback |
 | 2026-07-25 | vector 固定为 `sqlite-vec` CGo binding v0.1.6 的 exact `vec0` | 768D/512D insert/delete/top-k 与静态注册均通过；正确性风险低于迁移期引入 ANN sidecar | authoritative embedding 仍存普通表；规模 benchmark 与 ANN 决策保留为 Hardening |
 | 2026-07-25 | sqlc JSON 字段使用 `dbtypes.JSON`，时间使用 Unix microseconds `dbtypes.Timestamp` | `STRICT TEXT` 会拒绝 `json.RawMessage` 产生的 BLOB，且时间需要跨 driver 的唯一语义 | Phase 3 overrides 复用集中 Scanner/Valuer，不允许 query-local cast/fallback |
+| 2026-07-26 | Docker release 固定为一个同时服务 SPA + API 的 application image 与两个显式 bind mounts | 删除 DB/Caddy 必需 service，并让 catalog ownership、备份与恢复边界可见 | `/data/storage` 只放媒体；`/data/app-state` 放 SQLite catalog 与 private state；TLS 变为外部可选 proxy |
 
 ## Surprises & Discoveries
 
@@ -1259,6 +1278,8 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - OrbStack 一度报告 running 但 Docker socket `_ping` 无响应；重启 OrbStack 后恢复，Lumen Hub 进程未退出。这是本机 container runtime 状态，不是 SQLite 失败。
 - macOS SDK 会对 sqlite-vec 使用的 `sqlite3_auto_extension` 发出 deprecated warning；实际 `vec_version()`、多 database open 和 exact KNN 在当前平台通过，风险已进入 Hardening backlog。
 - root commit hook 当前从 repository root 执行 `vp staged`，但 `staged` config 只存在于 `web/vite.config.ts`，因此任何 root commit 都会在检查文件前失败。Phase 1 已手工通过 `gofmt -d`、`git diff --check`、`go mod tidy -diff` 和对应完整 gates，并以 `--no-verify` checkpoint；Phase 10 必须修正 hook 安装/working directory。
+- `node:24-trixie-slim` 没有 system CA bundle，Vite+ 即使本地 build 也会初始化 HTTP client并 panic；web builder显式安装 `ca-certificates` 后生产 bundle通过。
+- fresh host bind directory通常是 `0755`；DB runtime正确拒绝 group/world-readable SQLite parent。Docker entrypoint因此必须在降权前把 app-state收紧为 `0700`，不能只检查“UID 10001可写”。
 
 ## Outcomes & Retrospective
 
@@ -1270,7 +1291,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - schema/table/query数量：
 - 删除的PostgreSQL组件：
 - Desktop package体积变化：
-- Docker image体积变化：
+- Docker image体积变化：当前 Linux/arm64 单体 runtime image 319,084,043 bytes；迁移前同条件 image未留存，因此只记录绝对值，不虚构百分比。
 - idle memory变化：
 - startup变化：
 - 可获得的startup/browse/vector/体积观察：

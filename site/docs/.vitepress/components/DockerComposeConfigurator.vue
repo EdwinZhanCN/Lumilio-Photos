@@ -2,27 +2,19 @@
 import { computed, onMounted, ref } from 'vue'
 import { Check, Clipboard, Download, RefreshCw, ServerCog } from '@lucide/vue'
 
-type NetworkMode = 'disabled' | 'host' | 'broker' | 'static'
-type TranscodeMode = 'cpu' | 'vaapi' | 'nvenc'
-
 const releaseTag = ref('')
 const releaseState = ref<'loading' | 'ready' | 'error'>('loading')
-const storagePath = ref('/srv/lumilio')
+const storagePath = ref('/srv/lumilio/media')
+const statePath = ref('/srv/lumilio/state')
 const httpPort = ref(6657)
-const httpsPort = ref(6658)
-const exposeAPI = ref(false)
-const apiPort = ref(6680)
-const networkMode = ref<NetworkMode>('disabled')
-const brokerURL = ref('http://host.docker.internal:5866')
-const staticNodes = ref('')
-const transcodeMode = ref<TranscodeMode>('cpu')
 const copied = ref(false)
 
 const imageTag = computed(() => releaseTag.value.trim().replace(/^v/, ''))
-const pathValid = computed(() => storagePath.value.trim().startsWith('/'))
+const storagePathValid = computed(() => storagePath.value.trim().startsWith('/'))
+const statePathValid = computed(() => statePath.value.trim().startsWith('/'))
 const portValid = (port: number) => Number.isInteger(port) && port > 0 && port <= 65535
 const canDownload = computed(
-  () => imageTag.value !== '' && pathValid.value && portValid(httpPort.value) && portValid(httpsPort.value) && (!exposeAPI.value || portValid(apiPort.value)),
+  () => imageTag.value !== '' && storagePathValid.value && statePathValid.value && portValid(httpPort.value),
 )
 
 async function loadLatestRelease() {
@@ -40,96 +32,28 @@ async function loadLatestRelease() {
   }
 }
 
-function yamlQuote(value: string) {
-  return JSON.stringify(value)
-}
-
 const composeYAML = computed(() => {
   const tag = imageTag.value || '<release-version>'
-  const hostNetwork = networkMode.value === 'host'
-  const serverPorts = exposeAPI.value && !hostNetwork ? `\n    ports:\n      - "${apiPort.value}:6680"` : ''
-  const serverNetwork = hostNetwork ? '\n    network_mode: host' : ''
-  const dbPorts = hostNetwork ? '\n    ports:\n      - "127.0.0.1:5433:5432"' : ''
-  const dbHost = hostNetwork ? '127.0.0.1' : 'db'
-  const dbPort = hostNetwork ? '5433' : '5432'
-  const mdns = networkMode.value === 'host' ? 'true' : 'false'
-  const broker = networkMode.value === 'broker' ? brokerURL.value.trim() : ''
-  const nodes = networkMode.value === 'static' ? staticNodes.value.trim() : ''
-  const apiUpstream = hostNetwork ? 'http://host.docker.internal:6680' : 'http://server:6680'
-  const extraHosts = networkMode.value === 'broker'
-    ? '\n    extra_hosts:\n      - "host.docker.internal:host-gateway"'
-    : ''
-  const transcodeAccel = transcodeMode.value === 'vaapi' ? 'vaapi' : transcodeMode.value === 'nvenc' ? 'nvenc' : 'none'
-  const devices = transcodeMode.value === 'vaapi' ? '\n    devices:\n      - /dev/dri:/dev/dri' : ''
-  const nvidia = transcodeMode.value === 'nvenc'
-    ? '\n    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: 1\n              capabilities: [gpu]'
-    : ''
 
   return `name: lumilio-photos
 
 services:
-  db:
-    image: ghcr.io/edwinzhancn/lumilio-db:${tag}
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: lumiliophotos
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - db_data:/var/lib/postgresql/data${dbPorts}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  server:
+  lumilio:
     image: ghcr.io/edwinzhancn/lumilio-server:${tag}
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy${serverNetwork}
-    environment:
-      SERVER_PORT: 6680
-      SERVER_ENV: production
-      DB_HOST: ${dbHost}
-      DB_PORT: ${dbPort}
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: lumiliophotos
-      DB_SSL: disable
-      STORAGE_PATH: /data/storage
-      LUMILIO_DB_PASSWORD_FILE: /data/storage/.secrets/db_password
-      LUMILIO_SECRET_KEY: /data/storage/.secrets/lumilio_secret_key
-      TRANSCODE_HW_ACCEL: ${transcodeAccel}
-      LUMEN_DISCOVERY_MDNS_ENABLED: "${mdns}"
-      LUMEN_DISCOVERY_HUB_URL: ${yamlQuote(broker)}
-      LUMEN_DISCOVERY_STATIC_NODES: ${yamlQuote(nodes)}
     volumes:
-      - ${storagePath.value.trim() || '/srv/lumilio'}:/data/storage${serverPorts}${extraHosts}${devices}${nvidia}
+      - ${storagePath.value.trim() || '/srv/lumilio/media'}:/data/storage
+      - ${statePath.value.trim() || '/srv/lumilio/state'}:/data/app-state
+    ports:
+      - "${httpPort.value}:6680"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
-
-  web:
-    image: ghcr.io/edwinzhancn/lumilio-web:${tag}
-    restart: unless-stopped
-    depends_on:
-      server:
-        condition: service_healthy
-    environment:
-      LUMILIO_SITE_ADDRESS: ":80"
-      LUMILIO_API_UPSTREAM: ${apiUpstream}
-    ports:
-      - "${httpPort.value}:80"
-      - "${httpsPort.value}:443"
-      - "${httpsPort.value}:443/udp"${hostNetwork ? '\n    extra_hosts:\n      - "host.docker.internal:host-gateway"' : ''}
-
-volumes:
-  db_data:
 `
 })
 
@@ -178,52 +102,23 @@ onMounted(loadLatestRelease)
         </label>
 
         <label>
-          <span>宿主机 storage root</span>
-          <input v-model="storagePath" placeholder="/srv/lumilio" />
-          <small v-if="!pathValid" class="field-error">请输入 Linux 宿主机绝对路径。</small>
+          <span>宿主机媒体目录</span>
+          <input v-model="storagePath" placeholder="/srv/lumilio/media" />
+          <small v-if="!storagePathValid" class="field-error">请输入 Linux 宿主机绝对路径。</small>
+          <small v-else>保存原始媒体和可重建衍生文件。</small>
         </label>
-
-        <div class="field-pair">
-          <label><span>HTTP 端口</span><input v-model.number="httpPort" type="number" min="1" max="65535" /></label>
-          <label><span>HTTPS 端口</span><input v-model.number="httpsPort" type="number" min="1" max="65535" /></label>
-        </div>
 
         <label>
-          <span>Lumen 发现方式</span>
-          <select v-model="networkMode">
-            <option value="disabled">暂不启用</option>
-            <option value="host">Linux Host network + mDNS</option>
-            <option value="broker">Lumen Host Broker</option>
-            <option value="static">静态节点地址</option>
-          </select>
+          <span>宿主机应用状态目录</span>
+          <input v-model="statePath" placeholder="/srv/lumilio/state" />
+          <small v-if="!statePathValid" class="field-error">请输入 Linux 宿主机绝对路径。</small>
+          <small v-else>保存 SQLite catalog、备份、凭据和日志；应位于本机可靠磁盘。</small>
         </label>
-
-        <label v-if="networkMode === 'broker'">
-          <span>Host Broker URL</span>
-          <input v-model="brokerURL" placeholder="http://host.docker.internal:5866" />
-        </label>
-
-        <label v-if="networkMode === 'static'">
-          <span>节点地址</span>
-          <input v-model="staticNodes" placeholder="192.168.1.10:50051,192.168.1.11:50051" />
-        </label>
-
-        <label class="check-row">
-          <input v-model="exposeAPI" type="checkbox" />
-          <span>向宿主机公开 API 端口</span>
-        </label>
-        <label v-if="exposeAPI"><span>API 端口</span><input v-model.number="apiPort" type="number" min="1" max="65535" /></label>
 
         <label>
-          <span>视频转码方式</span>
-          <select v-model="transcodeMode">
-            <option value="cpu">CPU（兼容性优先）</option>
-            <option value="vaapi">Intel / AMD GPU（Linux VAAPI）</option>
-            <option value="nvenc">NVIDIA GPU（NVENC）</option>
-          </select>
-          <small v-if="transcodeMode === 'vaapi'">需要宿主机提供 <code>/dev/dri/renderD128</code> 并允许容器访问。</small>
-          <small v-else-if="transcodeMode === 'nvenc'">需要 NVIDIA Container Toolkit，且当前镜像中的 FFmpeg 必须包含 <code>h264_nvenc</code>。</small>
-          <small v-else>使用 libx264，不需要向容器开放 GPU 设备。</small>
+          <span>HTTP 端口</span>
+          <input v-model.number="httpPort" type="number" min="1" max="65535" />
+          <small>同一端口提供 Web 界面和 API。互联网访问请在前方配置可信 HTTPS 反向代理。</small>
         </label>
       </form>
 

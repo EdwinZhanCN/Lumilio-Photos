@@ -15,7 +15,7 @@ Run these commands from the directory containing the Lumilio Photos Compose file
 1. Stop the normal server so two queue and API instances cannot run together:
 
    ```bash
-   docker compose stop server
+   docker compose stop lumilio
    ```
 
 2. Start a one-time recovery container. Omit the username option to recover the oldest active administrator:
@@ -24,20 +24,20 @@ Run these commands from the directory containing the Lumilio Photos Compose file
    docker compose run -d --name lumilio-breakglass \
      -e LUMILIO_BREAK_GLASS=true \
      -e LUMILIO_BREAK_GLASS_USERNAME=admin \
-     server
+     lumilio
    ```
 
 3. Read the successful `auth.break_glass` event and copy its `temporary_password`:
 
    ```bash
-   docker exec lumilio-breakglass cat /app/logs/security.log
+   docker exec lumilio-breakglass cat /data/app-state/logs/security.log
    ```
 
 4. Remove the one-time container and restart the normal server without BreakGlass:
 
    ```bash
    docker rm -f lumilio-breakglass
-   docker compose up -d server
+   docker compose up -d lumilio
    ```
 
 5. Sign in with the temporary password and choose a permanent password when prompted.
@@ -81,4 +81,4 @@ Omit `--break-glass-username admin` to recover the oldest active administrator. 
 - The named account must exist, have the administrator role, and be active.
 - On Desktop, verify that the existing tray application was fully closed.
 - For Docker, check `docker logs lumilio-breakglass` for startup failures and wait for `security.log` to be created.
-- If configuration loading, PostgreSQL, migrations, or security-log initialization fails, repair that startup problem first; BreakGlass runs only after those dependencies are ready.
+- If configuration loading, SQLite integrity/migrations, or security-log initialization fails, repair that startup problem first; BreakGlass runs only after those dependencies are ready.

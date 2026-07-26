@@ -6,29 +6,15 @@
 #
 # Requires Docker Compose v2.24+ (uses `!reset`). Docker Desktop on
 # macOS/Windows does not support host networking. The supplied manifest must be
-# a complete schema v1 file with database.host=127.0.0.1,
-# database.port=5433, and lumen.discovery_mdns_enabled=true.
+# complete schema v2 with database.path=/data/app-state/library.sqlite3 and
+# lumen.discovery_mdns_enabled=true.
 
 services:
-    db:
-        # The host-networked server reaches the database through the host
-        # loopback instead of the compose network.
-        ports:
-            - "127.0.0.1:5433:5432"
-
-    server:
+    lumilio:
         network_mode: host
         # network_mode: host conflicts with port mappings and per-service
         # networks; the API listens on host port 6680 directly.
         ports: !reset []
         extra_hosts: !reset []
         volumes:
-            - ${LUMILIO_HOST_MDNS_CONFIG:?set LUMILIO_HOST_MDNS_CONFIG to a complete schema v1 manifest}:/app/config/server.toml:ro
-
-    web:
-        environment:
-            # The server is no longer reachable by service name from the
-            # compose network; proxy through the host gateway instead.
-            LUMILIO_API_UPSTREAM: http://host.docker.internal:6680
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
+            - ${LUMILIO_HOST_MDNS_CONFIG:?set LUMILIO_HOST_MDNS_CONFIG to a complete schema v2 manifest}:/app/config/server.toml:ro

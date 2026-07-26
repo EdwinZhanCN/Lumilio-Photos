@@ -45,30 +45,27 @@ Lumilio Photos 将原始文件和应用数据保存在你所控制的基础设�
 
 ### Docker Compose
 
-运行前需要安装 Docker 及 Compose 插件。请将 `LUMILIO_STORAGE` 设置为媒体目录，并将 `LUMILIO_BOOTSTRAP_PASSWORD_FILE` 指向一个非空私有文件；PostgreSQL 初始化与服务端 manifest 会共同引用它。
+运行前需要安装 Docker 及 Compose 插件。单个应用镜像同时提供 Web 界面和 API。请将 `LUMILIO_STORAGE` 设置为媒体目录，并将 `LUMILIO_STATE` 设置为独立的本机应用状态目录，用于保存 SQLite catalog、快照、凭据和日志。
 
 ```bash
 curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
-export LUMILIO_STORAGE=/srv/photos
-export LUMILIO_BOOTSTRAP_PASSWORD_FILE=/srv/lumilio-secrets/db_bootstrap_password
-mkdir -p "$(dirname "$LUMILIO_BOOTSTRAP_PASSWORD_FILE")"
-docker run --rm --entrypoint secretinit \
-  -v "$(dirname "$LUMILIO_BOOTSTRAP_PASSWORD_FILE"):/secrets" \
-  ghcr.io/edwinzhancn/lumilio-server:latest /secrets/db_bootstrap_password
+export LUMILIO_STORAGE=/srv/lumilio/media
+export LUMILIO_STATE=/srv/lumilio/state
+mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
 docker compose -f docker-compose.release.yml up -d
 ```
 
-启动后打开 `http://localhost:6657`，按照首次运行向导完成初始化。Web 界面使用 `6657`（HTTP）和 `6658`（HTTPS）端口，API 使用 `6680` 端口。
+启动后打开 `http://localhost:6657`，按照首次运行向导完成初始化。`6657` 端口同时提供 Web 界面和 API；如需通过互联网访问，请在前方配置可信的 HTTPS 反向代理。
 
 如需固定版本而不是跟随 `latest`：
 
 ```bash
-LUMILIO_VERSION=v1.0.0 LUMILIO_STORAGE=/srv/photos \
+LUMILIO_VERSION=v1.0.0 \
   docker compose -f docker-compose.release.yml up -d
 ```
 
 > [!IMPORTANT]
-> 完整 runtime manifest 固定在镜像的 `/app/config/server.toml`；普通环境变量不会覆盖它。该 manifest 引用 Compose bootstrap secret，并在 `LUMILIO_STORAGE` 下创建应用根密钥。如需改变不可变策略，请在此路径挂载另一份完整 schema v1 manifest。
+> 完整 schema v2 runtime manifest 固定在镜像的 `/app/config/server.toml`；普通环境变量不会覆盖不可变策略。容器运行时不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`。请在“设置 → 服务器”中创建一致性快照，并单独备份媒体目录。
 
 ## 本地开发
 

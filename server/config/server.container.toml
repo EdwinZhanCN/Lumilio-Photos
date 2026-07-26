@@ -8,14 +8,14 @@ path = "/data/app-state/library.sqlite3"
 
 [server]
 port = "6680"
-# The bundled web container proxies /api on the same public origin.
+# The server image contains the SPA and serves it on the API origin.
 # Add only separately hosted browser frontends that need cookie sessions.
 cors_allowed_origins = []
-web_root = ""
+web_root = "/app/web"
 
 [logging]
 level = "info"
-dir = "/app/logs"
+dir = "/data/app-state/logs"
 console_format = "console"
 file_format = "json"
 repository_audit_verbose = false
