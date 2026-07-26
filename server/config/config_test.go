@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -148,6 +149,34 @@ func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
 		cfg.Auth.RateLimit.Lockout != 5*time.Minute ||
 		cfg.Auth.RateLimit.MaxEntries != 10_000 {
 		t.Fatalf("auth rate limit = %+v", cfg.Auth.RateLimit)
+	}
+}
+
+func TestLoadAppConfigBytesPreservesStrictLoaderAndManifestBase(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runtime.candidate.toml")
+	contents := strings.ReplaceAll(
+		completeManifest,
+		`"/opt/ffprobe"`,
+		strconv.Quote(filepath.ToSlash(absoluteToolFixturePath())),
+	)
+	data := []byte(contents)
+
+	cfg, err := LoadAppConfigBytes(path, data)
+	if err != nil {
+		t.Fatalf("LoadAppConfigBytes: %v", err)
+	}
+	sum := sha256.Sum256(data)
+	if cfg.ManifestPath != path || cfg.ManifestSHA256 != fmt.Sprintf("%x", sum) {
+		t.Fatalf("manifest provenance = %q %q", cfg.ManifestPath, cfg.ManifestSHA256)
+	}
+	if cfg.DatabaseConfig.Path != filepath.Join(dir, "data/app-state/library.sqlite3") ||
+		cfg.Tools.FFmpegPath != filepath.Join(dir, "bin/ffmpeg") {
+		t.Fatalf("relative paths did not use candidate base: %+v", cfg)
+	}
+
+	if _, err := LoadAppConfigBytes(path, []byte(contents+"\nunknown_field = true\n")); err == nil {
+		t.Fatal("LoadAppConfigBytes accepted an unknown field")
 	}
 }
 

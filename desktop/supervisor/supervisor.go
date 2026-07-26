@@ -18,8 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"desktop/lumen"
-
 	"server/app"
 )
 
@@ -210,7 +208,29 @@ func (s *Supervisor) Settings() (DesktopSettings, error) {
 	if err := s.ensurePaths(); err != nil {
 		return DesktopSettings{}, err
 	}
-	return LoadSettings(s.paths.DesktopSettingsFile())
+	settings, err := LoadSettings(s.paths.DesktopSettingsFile())
+	if err != nil {
+		return DesktopSettings{}, err
+	}
+	if err := s.ensureRuntimeIntent(settings); err != nil {
+		return DesktopSettings{}, err
+	}
+	data, err := os.ReadFile(s.paths.RuntimeConfigFile())
+	if err != nil {
+		return DesktopSettings{}, fmt.Errorf("read runtime settings: %w", err)
+	}
+	_, cfg, err := s.materializeRuntimeBytes(data)
+	if err != nil {
+		return DesktopSettings{}, fmt.Errorf("load runtime settings: %w", err)
+	}
+	network := runtimeNetworkSettings(cfg, settings.LANHTTPWarningAcceptedVersion)
+	settings.Version = desktopSettingsVersion
+	settings.NetworkMode = network.NetworkMode
+	settings.PrimaryOrigin = network.PrimaryOrigin
+	settings.Listen = network.Listen
+	settings.TrustedProxyCIDRs = network.TrustedProxyCIDRs
+	settings.legacyNetwork = false
+	return settings, nil
 }
 
 // SaveSettings persists the full desktop settings. Safe to call before Start.
@@ -253,6 +273,7 @@ func (s *Supervisor) DashboardPaths() (map[string]string, error) {
 	return map[string]string{
 		"appData": s.paths.AppData, "storage": s.paths.DefaultLib, "logs": s.paths.Logs,
 		"backups": s.paths.Backups, "lumen": s.paths.LumenDir(),
+		"serverConfig": s.paths.ServerConfigFile(),
 	}, nil
 }
 
@@ -336,6 +357,10 @@ func (s *Supervisor) prepareLocked() error {
 	if err := s.ensurePaths(); err != nil {
 		return err
 	}
+	_, lkgErr := os.Stat(s.paths.RuntimeLastKnownGoodFile())
+	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
+		snapshot.LastKnownGoodAvailable = lkgErr == nil
+	})
 	if s.lock != nil {
 		return nil
 	}
@@ -378,13 +403,6 @@ func (s *Supervisor) startRuntimeLocked(ctx context.Context, phase RuntimePhase)
 	s.setSnapshot(snapshot)
 	s.reportStage(StagePreparing)
 
-	paths := s.paths
-	networkSettings, err := s.Settings()
-	if err != nil {
-		err = fmt.Errorf("load desktop network settings: %w", err)
-		s.failRuntime(err)
-		return err
-	}
 	resources, err := ResourcesDir()
 	if err != nil {
 		err = fmt.Errorf("resolve resources dir: %w", err)
@@ -414,21 +432,7 @@ func (s *Supervisor) startRuntimeLocked(ctx context.Context, phase RuntimePhase)
 	}
 
 	s.reportStage(StageStartingServer)
-	tlsMode := "off"
-	proxyMode := "disabled"
-	if networkSettings.NetworkMode == NetworkExternalHTTPS {
-		tlsMode = "external"
-		proxyMode = "required"
-	}
-	appConfig, err := compileAndLoadServerManifest(paths.ServerConfigFile(), serverManifestBindings{
-		Listen: networkSettings.Listen, PrimaryOrigin: networkSettings.PrimaryOrigin,
-		TLSMode: tlsMode, ProxyMode: proxyMode, TrustedProxyCIDRs: networkSettings.TrustedProxyCIDRs,
-		WebRoot: bundledWebRoot(resources), LogDir: paths.Logs, StoragePath: storagePath,
-		CloudStatePath: paths.Cloud, BackupsPath: paths.Backups,
-		DatabasePath: paths.Database, SecretKeyFile: paths.SecretKeyFile(),
-		ExifToolPath: bundledExifTool(resources), FFmpegPath: bundledFFmpeg(resources), FFprobePath: bundledFFprobe(resources),
-		LumenStaticNode: lumen.GRPCEndpoint,
-	})
+	appConfig, err := s.materializeRuntimeConfig()
 	if err != nil {
 		err = fmt.Errorf("compile desktop server manifest: %w", err)
 		s.failRuntime(err)
@@ -438,6 +442,8 @@ func (s *Supervisor) startRuntimeLocked(ctx context.Context, phase RuntimePhase)
 	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
 		snapshot.BrowserURL = appConfig.ServerConfig.PrimaryOrigin
 		snapshot.Network = network
+		_, lkgErr := os.Stat(s.paths.RuntimeLastKnownGoodFile())
+		snapshot.LastKnownGoodAvailable = lkgErr == nil
 	})
 
 	// Check the resolved listener immediately before generation creation. A
@@ -732,20 +738,49 @@ func (s *Supervisor) ApplyNetworkSettings(ctx context.Context, candidate Desktop
 	}
 	defer s.operationMu.Unlock()
 
-	current, err := s.Settings()
+	if err := s.ensurePaths(); err != nil {
+		return err
+	}
+	currentSettings, err := LoadSettings(s.paths.DesktopSettingsFile())
 	if err != nil {
 		return err
 	}
-	candidate, err = normalizeNetworkSettings(candidate)
+	view, err := s.ReadRuntimeConfig()
 	if err != nil {
 		return err
 	}
-	if err := s.SaveSettings(candidate); err != nil {
+	proxyLocation := "same_host"
+	for _, cidr := range candidate.TrustedProxyCIDRs {
+		if cidr != "127.0.0.1/32" && cidr != "::1/128" {
+			proxyLocation = "remote"
+			break
+		}
+	}
+	validation, err := s.PatchRuntimeNetwork(view.BaseFingerprint, view.CandidateTOML, NetworkCandidatePatch{
+		Mode: candidate.NetworkMode, PrimaryOrigin: candidate.PrimaryOrigin, Listen: candidate.Listen,
+		ProxyLocation: proxyLocation, TrustedProxyCIDRs: candidate.TrustedProxyCIDRs,
+		AcceptLANWarning: candidate.LANHTTPWarningAcceptedVersion >= lanHTTPWarningCurrentVersion,
+	})
+	if err != nil {
 		return err
+	}
+	if !validation.Valid {
+		messages := make([]string, 0, len(validation.Issues))
+		for _, issue := range validation.Issues {
+			messages = append(messages, issue.Message)
+		}
+		return errors.New(strings.Join(messages, "; "))
 	}
 
 	wasRunning := s.generation != nil
 	if !wasRunning {
+		if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(validation.CandidateTOML)); err != nil {
+			return err
+		}
+		if err := SaveSettings(s.paths.DesktopSettingsFile(), candidate); err != nil {
+			_ = writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(view.CurrentTOML))
+			return err
+		}
 		return nil
 	}
 	snapshot := s.RuntimeSnapshot()
@@ -753,16 +788,30 @@ func (s *Supervisor) ApplyNetworkSettings(ctx context.Context, candidate Desktop
 	snapshot.OperationActive = true
 	s.setSnapshot(snapshot)
 	if err := s.stopGenerationLocked(); err != nil {
-		_ = s.SaveSettings(current)
 		s.failRuntime(err)
 		return fmt.Errorf("stop desktop runtime for network change: %w", err)
 	}
+	if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(validation.CandidateTOML)); err != nil {
+		_ = s.startRuntimeLocked(ctx, RuntimeRestarting)
+		return fmt.Errorf("promote network runtime candidate: %w", err)
+	}
+	if err := SaveSettings(s.paths.DesktopSettingsFile(), candidate); err != nil {
+		_ = writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(view.CurrentTOML))
+		_ = s.startRuntimeLocked(ctx, RuntimeRestarting)
+		return err
+	}
 	if err := s.startRuntimeLocked(ctx, RuntimeRestarting); err == nil {
+		if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), []byte(validation.CandidateTOML)); err != nil {
+			s.logf("update last-known-good runtime after network apply: %v", err)
+		}
 		return nil
 	} else {
 		startErr := err
-		if restoreErr := s.SaveSettings(current); restoreErr != nil {
-			return errors.Join(startErr, fmt.Errorf("restore last-known-good settings: %w", restoreErr))
+		if restoreErr := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(view.CurrentTOML)); restoreErr != nil {
+			return errors.Join(startErr, fmt.Errorf("restore last-known-good runtime: %w", restoreErr))
+		}
+		if restoreErr := SaveSettings(s.paths.DesktopSettingsFile(), currentSettings); restoreErr != nil {
+			return errors.Join(startErr, fmt.Errorf("restore desktop host settings: %w", restoreErr))
 		}
 		if rollbackErr := s.startRuntimeLocked(ctx, RuntimeRestarting); rollbackErr != nil {
 			return errors.Join(startErr, fmt.Errorf("restart last-known-good network profile: %w", rollbackErr))

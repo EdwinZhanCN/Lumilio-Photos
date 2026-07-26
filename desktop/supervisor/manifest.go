@@ -28,16 +28,11 @@ type serverManifestBindings struct {
 }
 
 func compileAndLoadServerManifest(path string, bindings serverManifestBindings) (serverconfig.AppConfig, error) {
-	funcs := template.FuncMap{"toml": tomlLiteral}
-	tmpl, err := template.New("desktop-server.toml").Option("missingkey=error").Funcs(funcs).Parse(desktopServerTemplate)
+	data, err := renderServerManifest(bindings)
 	if err != nil {
-		return serverconfig.AppConfig{}, fmt.Errorf("parse desktop server manifest template: %w", err)
+		return serverconfig.AppConfig{}, err
 	}
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, bindings); err != nil {
-		return serverconfig.AppConfig{}, fmt.Errorf("render desktop server manifest: %w", err)
-	}
-	if err := writeAtomicPrivate(path, rendered.Bytes()); err != nil {
+	if err := writeAtomicPrivate(path, data); err != nil {
 		return serverconfig.AppConfig{}, fmt.Errorf("write desktop server manifest: %w", err)
 	}
 	cfg, err := serverconfig.LoadAppConfig(path)
@@ -45,6 +40,19 @@ func compileAndLoadServerManifest(path string, bindings serverManifestBindings) 
 		return serverconfig.AppConfig{}, fmt.Errorf("reload generated desktop server manifest: %w", err)
 	}
 	return cfg, nil
+}
+
+func renderServerManifest(bindings serverManifestBindings) ([]byte, error) {
+	funcs := template.FuncMap{"toml": tomlLiteral}
+	tmpl, err := template.New("desktop-server.toml").Option("missingkey=error").Funcs(funcs).Parse(desktopServerTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("parse desktop server manifest template: %w", err)
+	}
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, bindings); err != nil {
+		return nil, fmt.Errorf("render desktop server manifest: %w", err)
+	}
+	return rendered.Bytes(), nil
 }
 
 func tomlLiteral(value any) (string, error) {

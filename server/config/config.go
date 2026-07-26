@@ -301,7 +301,22 @@ func LoadAppConfig(path string) (AppConfig, error) {
 	if err != nil {
 		return AppConfig{}, fmt.Errorf("read runtime manifest %s: %w", absPath, err)
 	}
+	return LoadAppConfigBytes(absPath, data)
+}
 
+// LoadAppConfigBytes strictly loads one complete runtime manifest from data
+// while using manifestPath as the identity and base directory for relative
+// paths. It is the in-memory counterpart to LoadAppConfig for hosts that stage
+// and validate a candidate before writing it.
+func LoadAppConfigBytes(manifestPath string, data []byte) (AppConfig, error) {
+	if strings.TrimSpace(manifestPath) == "" {
+		return AppConfig{}, errors.New("config path is required")
+	}
+	absPath, err := filepath.Abs(manifestPath)
+	if err != nil {
+		return AppConfig{}, fmt.Errorf("resolve config path %q: %w", manifestPath, err)
+	}
+	absPath = filepath.Clean(absPath)
 	var raw manifest
 	decoder := toml.NewDecoder(bytes.NewReader(data)).DisallowUnknownFields()
 	if err := decoder.Decode(&raw); err != nil {

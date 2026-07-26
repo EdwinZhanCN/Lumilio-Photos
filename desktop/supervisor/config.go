@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	desktopSettingsVersion       = 1
+	desktopSettingsVersion       = 2
 	lanHTTPWarningCurrentVersion = 1
 )
 
@@ -30,9 +30,10 @@ const (
 	NetworkExternalHTTPS NetworkMode = "external_https"
 )
 
-// DesktopSettings are user choices that must persist across launches. It is the
-// source of truth for those choices. The generated server.toml is rebuilt from
-// these choices and is the authoritative immutable input for one launch.
+// DesktopSettings are host/control-plane choices that persist across launches.
+// Runtime policy lives in runtime.toml; the network fields below are transient
+// compatibility values populated from that intent (or decoded from v1 solely
+// for migration) and are never written by the v2 disk schema.
 type DesktopSettings struct {
 	Version                       int         `json:"version"`
 	NetworkMode                   NetworkMode `json:"network_mode"`
@@ -79,33 +80,80 @@ type DesktopSettings struct {
 	LumenPreviousCacheDir string `json:"lumen_previous_cache_dir,omitempty"`
 	LumenInstalledVersion string `json:"lumen_installed_version,omitempty"`
 	LumenInstalledProfile string `json:"lumen_installed_profile,omitempty"`
+
+	legacyNetwork bool
 }
 
-// LoadSettings reads desktop-settings.json. A missing file yields zero-value
-// settings (first run) rather than an error.
+type desktopSettingsV2 struct {
+	Version                       int    `json:"version"`
+	LANHTTPWarningAcceptedVersion int    `json:"lan_http_warning_accepted_version,omitempty"`
+	StoragePath                   string `json:"storage_path,omitempty"`
+	OnboardingCompleted           bool   `json:"onboarding_completed,omitempty"`
+	TOSAcceptedVersion            string `json:"tos_accepted_version,omitempty"`
+	Language                      string `json:"language,omitempty"`
+	Region                        string `json:"region,omitempty"`
+	LumenEnabled                  bool   `json:"lumen_enabled,omitempty"`
+	LumenPreset                   string `json:"lumen_preset,omitempty"`
+	LumenBackend                  string `json:"lumen_backend,omitempty"`
+	LumenProfile                  string `json:"lumen_profile,omitempty"`
+	LumenCacheDir                 string `json:"lumen_cache_dir,omitempty"`
+	LumenPreviousCacheDir         string `json:"lumen_previous_cache_dir,omitempty"`
+	LumenInstalledVersion         string `json:"lumen_installed_version,omitempty"`
+	LumenInstalledProfile         string `json:"lumen_installed_profile,omitempty"`
+}
+
+// LoadSettings reads desktop-settings.json using explicit v1/v2 disk schemas.
+// A missing file yields an empty v2 host configuration.
 func LoadSettings(path string) (DesktopSettings, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return normalizeNetworkSettings(DesktopSettings{})
+			return DesktopSettings{Version: desktopSettingsVersion}, nil
 		}
 		return DesktopSettings{}, fmt.Errorf("read desktop settings: %w", err)
 	}
-	var s DesktopSettings
-	if err := json.Unmarshal(data, &s); err != nil {
+	var header struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal(data, &header); err != nil {
 		return DesktopSettings{}, fmt.Errorf("parse desktop settings: %w", err)
 	}
-	return normalizeNetworkSettings(s)
+	switch header.Version {
+	case 0, 1:
+		var legacy DesktopSettings
+		if err := decodeSettingsJSON(data, &legacy); err != nil {
+			return DesktopSettings{}, err
+		}
+		normalized, err := normalizeNetworkSettings(legacy)
+		if err != nil {
+			return DesktopSettings{}, err
+		}
+		normalized.legacyNetwork = true
+		return normalized, nil
+	case desktopSettingsVersion:
+		var disk desktopSettingsV2
+		if err := decodeSettingsJSON(data, &disk); err != nil {
+			return DesktopSettings{}, err
+		}
+		return desktopSettingsFromV2(disk), nil
+	default:
+		return DesktopSettings{}, fmt.Errorf("unsupported desktop settings version %d", header.Version)
+	}
 }
 
-// SaveSettings persists desktop-settings.json atomically.
-func SaveSettings(path string, s DesktopSettings) error {
-	var err error
-	s, err = normalizeNetworkSettings(s)
-	if err != nil {
-		return err
+func decodeSettingsJSON(data []byte, target any) error {
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("parse desktop settings: %w", err)
 	}
-	data, err := json.MarshalIndent(s, "", "  ")
+	return nil
+}
+
+// SaveSettings persists only the v2 host/control-plane schema atomically.
+func SaveSettings(path string, s DesktopSettings) error {
+	disk := desktopSettingsToV2(s)
+	data, err := json.MarshalIndent(disk, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal desktop settings: %w", err)
 	}
@@ -129,13 +177,53 @@ func SaveSettings(path string, s DesktopSettings) error {
 	return nil
 }
 
+func desktopSettingsToV2(s DesktopSettings) desktopSettingsV2 {
+	return desktopSettingsV2{
+		Version:                       desktopSettingsVersion,
+		LANHTTPWarningAcceptedVersion: s.LANHTTPWarningAcceptedVersion,
+		StoragePath:                   s.StoragePath,
+		OnboardingCompleted:           s.OnboardingCompleted,
+		TOSAcceptedVersion:            s.TOSAcceptedVersion,
+		Language:                      s.Language,
+		Region:                        s.Region,
+		LumenEnabled:                  s.LumenEnabled,
+		LumenPreset:                   s.LumenPreset,
+		LumenBackend:                  s.LumenBackend,
+		LumenProfile:                  s.LumenProfile,
+		LumenCacheDir:                 s.LumenCacheDir,
+		LumenPreviousCacheDir:         s.LumenPreviousCacheDir,
+		LumenInstalledVersion:         s.LumenInstalledVersion,
+		LumenInstalledProfile:         s.LumenInstalledProfile,
+	}
+}
+
+func desktopSettingsFromV2(d desktopSettingsV2) DesktopSettings {
+	return DesktopSettings{
+		Version:                       desktopSettingsVersion,
+		LANHTTPWarningAcceptedVersion: d.LANHTTPWarningAcceptedVersion,
+		StoragePath:                   d.StoragePath,
+		OnboardingCompleted:           d.OnboardingCompleted,
+		TOSAcceptedVersion:            d.TOSAcceptedVersion,
+		Language:                      d.Language,
+		Region:                        d.Region,
+		LumenEnabled:                  d.LumenEnabled,
+		LumenPreset:                   d.LumenPreset,
+		LumenBackend:                  d.LumenBackend,
+		LumenProfile:                  d.LumenProfile,
+		LumenCacheDir:                 d.LumenCacheDir,
+		LumenPreviousCacheDir:         d.LumenPreviousCacheDir,
+		LumenInstalledVersion:         d.LumenInstalledVersion,
+		LumenInstalledProfile:         d.LumenInstalledProfile,
+	}
+}
+
 // normalizeNetworkSettings migrates old settings and validates the complete
 // network profile before it can be persisted or compiled into server.toml.
 func normalizeNetworkSettings(s DesktopSettings) (DesktopSettings, error) {
-	if s.Version != 0 && s.Version != desktopSettingsVersion {
+	if s.Version != 0 && s.Version != 1 && s.Version != desktopSettingsVersion {
 		return DesktopSettings{}, fmt.Errorf("unsupported desktop settings version %d", s.Version)
 	}
-	s.Version = desktopSettingsVersion
+	s.Version = 1
 	if s.NetworkMode == "" {
 		s.NetworkMode = NetworkLocal
 	}
