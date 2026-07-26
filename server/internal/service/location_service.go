@@ -104,11 +104,33 @@ func (s *locationService) RebuildLocationClusters(ctx context.Context, repositor
 	if err := qtx.DeleteLocationClustersForScope(ctx, scope); err != nil {
 		return fmt.Errorf("delete old location clusters: %w", err)
 	}
-	if _, err := qtx.InsertLocationClustersForScope(ctx, repo.InsertLocationClustersForScopeParams{
+	candidates, err := qtx.ListLocationClusterCandidatesForScope(ctx, repo.ListLocationClusterCandidatesForScopeParams{
 		RepositoryID: repositoryUUID,
 		OwnerID:      ownerID,
-	}); err != nil {
-		return fmt.Errorf("insert location clusters: %w", err)
+	})
+	if err != nil {
+		return fmt.Errorf("list location cluster candidates: %w", err)
+	}
+	now := dbtypes.NewTimestamp(time.Now().UTC())
+	for _, candidate := range candidates {
+		if !candidate.RepositoryID.Valid || candidate.Geohash == nil ||
+			candidate.CentroidLatitude == nil || candidate.CentroidLongitude == nil {
+			return fmt.Errorf("location cluster candidate contains unexpected null aggregate")
+		}
+		if _, err := qtx.CreateLocationCluster(ctx, repo.CreateLocationClusterParams{
+			ClusterID:         uuid.New(),
+			OwnerID:           candidate.OwnerID,
+			RepositoryID:      candidate.RepositoryID.UUID,
+			Geohash:           *candidate.Geohash,
+			Precision:         7,
+			CentroidLatitude:  *candidate.CentroidLatitude,
+			CentroidLongitude: *candidate.CentroidLongitude,
+			PhotoCount:        candidate.PhotoCount,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}); err != nil {
+			return fmt.Errorf("insert location cluster: %w", err)
+		}
 	}
 	if err := qtx.InsertLocationClusterAssetsForScope(ctx, repo.InsertLocationClusterAssetsForScopeParams{
 		RepositoryID: repositoryUUID,

@@ -66,6 +66,8 @@ INSERT INTO settings (
     backup_enabled,
     backup_interval_hours,
     backup_keep_last,
+    created_at,
+    updated_at,
     updated_by
 )
 VALUES (
@@ -88,6 +90,8 @@ VALUES (
     ?16,
     ?17,
     ?18,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     ?19
 )
 ON CONFLICT (id) DO UPDATE SET

@@ -10,7 +10,7 @@ Local-first photo and video management for your own library.
 
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=f5f5f5)](https://www.postgresql.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=f5f5f5)](https://sqlite.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge&logo=gnu)](LICENSE)
 
 </div>
@@ -41,7 +41,7 @@ Choose the distribution that matches where the library will run:
 | Linux server or NAS | Use the published Docker Compose images below |
 | Contributor workstation | Build from source with `make setup` and `make dev` |
 
-Desktop packages include a private PostgreSQL runtime and the required media tools. They run in the system tray or macOS menu bar and open the interface in your default browser at `http://localhost:6680`. See the [installation guide](site/docs/en/user-manual/introduction/installation.md) for platform-specific setup and current signing limitations.
+Desktop packages include the embedded SQLite catalog and required media tools. They run in the system tray or macOS menu bar and open the interface in your default browser at `http://localhost:6680`. See the [installation guide](site/docs/en/user-manual/introduction/installation.md) for platform-specific setup and current signing limitations.
 
 ### Docker Compose
 
@@ -65,7 +65,7 @@ LUMILIO_VERSION=v1.0.0 \
 ```
 
 > [!IMPORTANT]
-> The complete schema-v2 runtime manifest is baked into the image at `/app/config/server.toml`; ordinary environment variables do not override immutable policy. Do not copy the live `library.sqlite3`, `-wal`, or `-shm` files. Create consistent snapshots under **Settings → Server**, and back up the media directory separately.
+> The complete schema-v2 runtime manifest is baked into the image at `/app/config/server.toml`; ordinary environment variables do not override immutable policy. While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or `-shm` with a host SQLite tool; crossing the container mount boundary can violate WAL locking. Create consistent snapshots under **Settings → Server**, and back up the media directory separately.
 
 ## Development
 
@@ -73,9 +73,10 @@ LUMILIO_VERSION=v1.0.0 \
 
 - Go 1.25+
 - [Vite+](https://viteplus.dev/) and its supported Node.js runtime
-- Docker with Compose v2
 - Make
 - Rust and `wasm-pack` for rebuilding browser WASM packages
+- Native media libraries and tools: libvips, libraw, FFmpeg, and ExifTool
+- Docker with Compose v2 only for container delivery and E2E workflows
 
 Clone and start the development stack:
 
@@ -86,13 +87,12 @@ make setup
 make dev
 ```
 
-`make dev` starts PostgreSQL on host port `5433`, the API on `6680`, and the web app on `6657`. `make setup` copies the complete schema v1 manifest to ignored `server/config/server.local.toml` and idempotently creates its bootstrap secret. The server has no config defaults or env overrides; after pulling this breaking change, run `make dev-reset` to discard the incompatible pre-manifest development database/config state.
+`make dev` starts the API on `6680` and the web app on `6657`; SQLite runs inside the Go process and needs no database service. `make setup` copies the complete schema-v2 manifest to ignored `server/config/server.local.toml`. The default development catalog is `server/.local/lumilio/library.sqlite3`, while media remains under `server/data/storage`. The server has no config defaults or ordinary environment overrides.
 
 ### Useful commands
 
 ```bash
-make dev              # Start database, server, and web
-make db               # Start the development PostgreSQL service
+make dev              # Start the server and web development processes
 make server-dev       # Start only the API server
 make web-dev          # Start only the web development server
 make test             # Run backend and frontend quality gates
@@ -102,7 +102,7 @@ make web-browser-test # Build and run production browser smoke checks
 make desktop-test     # Run desktop module tests
 make dto              # Regenerate OpenAPI and frontend API types
 make db-reset         # Delete development database state (destructive)
-make dev-reset        # Recreate config, bootstrap secret, and DB state (destructive)
+make dev-reset        # Recreate local config and SQLite state; preserve media
 ```
 
 Versioned demo and E2E media comes from the separately released
@@ -127,7 +127,7 @@ Semantic embeddings, face recognition, OCR, and classification are provided by a
 | --- | --- |
 | `server/` | Go API, processing queues, storage, database migrations, and integrations |
 | `web/` | React 19 and TypeScript web application |
-| `desktop/` | Wails v3 desktop host and private PostgreSQL supervisor |
+| `desktop/` | Wails v3 desktop host for the in-process Server and SQLite catalog |
 | `wasm/` | Rust WebAssembly packages used by browser-side media workflows |
 | `site/` | VitePress user and developer documentation |
 

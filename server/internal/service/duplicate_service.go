@@ -406,6 +406,7 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 			TotalSize:                totalSize,
 			RecommendedKeeperAssetID: uuid.NullUUID{UUID: recommended, Valid: true},
 			DetectionVersion:         DuplicateDetectionVersion,
+			GroupID:                  uuid.New(),
 		})
 		if err != nil {
 			return DuplicateDetectionResult{}, fmt.Errorf("create duplicate group: %w", err)

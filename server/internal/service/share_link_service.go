@@ -293,6 +293,7 @@ func (s *shareLinkService) Create(ctx context.Context, params ShareLinkCreatePar
 		AllowDownload:    params.AllowDownload,
 		IncludeOriginals: params.IncludeOriginals,
 		ExpiresAt:        dbtypes.NewTimestamp(expiresAt),
+		ShareID:          uuid.New(),
 	})
 	if err != nil {
 		return repo.ShareLink{}, "", err

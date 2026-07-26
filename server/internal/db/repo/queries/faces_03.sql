@@ -18,8 +18,17 @@ WHERE face_id IN (sqlc.slice('face_ids'))
 ORDER BY face_id ASC, confidence DESC, similarity_score DESC, id ASC;
 
 -- name: AssignFaceClusterMemberExclusive :one
-INSERT INTO face_cluster_members (cluster_id, face_id, similarity_score, confidence, is_manual)
-VALUES (sqlc.arg('cluster_id'), sqlc.arg('face_id'), sqlc.arg('similarity_score'), sqlc.arg('confidence'), sqlc.narg('is_manual'))
+INSERT INTO face_cluster_members (
+    cluster_id, face_id, similarity_score, confidence, is_manual, created_at
+)
+VALUES (
+    sqlc.arg('cluster_id'),
+    sqlc.arg('face_id'),
+    sqlc.arg('similarity_score'),
+    sqlc.arg('confidence'),
+    sqlc.narg('is_manual'),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 ON CONFLICT (face_id)
 DO UPDATE SET
     cluster_id = EXCLUDED.cluster_id,
@@ -68,4 +77,3 @@ WHERE NOT EXISTS (
 UPDATE face_cluster_members
 SET cluster_id = ?1
 WHERE cluster_id = ?2;
-

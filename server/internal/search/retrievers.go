@@ -12,6 +12,15 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	// sqlite-vec rejects vec0 KNN queries whose k exceeds 4096. The asset
+	// candidate request is expanded because videos can contribute multiple
+	// frame vectors to the nearest-neighbor pool.
+	sqliteVecKNNMax         = 4096
+	embeddingKNNExpansion   = 8
+	maxANNAssetCandidateSet = sqliteVecKNNMax / embeddingKNNExpansion
+)
+
 type EmbeddingRetriever struct {
 	pool         *sql.DB
 	embed        EmbedQueryFunc
@@ -39,10 +48,7 @@ func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candi
 	builder := &sqlBuilder{}
 	queryVector := dbtypes.NewVector(embedding.Vector)
 	vectorPlaceholder := builder.addArg(queryVector)
-	knnLimit := req.TopK * 8
-	if knnLimit < req.TopK {
-		knnLimit = req.TopK
-	}
+	knnLimit := expandedEmbeddingKNNLimit(req.TopK)
 	knnLimitPlaceholder := builder.addArg(knnLimit)
 	spacePlaceholder := builder.addArg(space.ID)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
@@ -92,6 +98,16 @@ LIMIT %s
 	defer rows.Close()
 
 	return collectCandidates(rows, SourceEmbedding)
+}
+
+func expandedEmbeddingKNNLimit(topK int) int {
+	if topK <= 0 {
+		return 1
+	}
+	if topK > sqliteVecKNNMax/embeddingKNNExpansion {
+		return sqliteVecKNNMax
+	}
+	return topK * embeddingKNNExpansion
 }
 
 func (r *EmbeddingRetriever) CountQuery(ctx context.Context, builder *sqlBuilder, req Request) (string, error) {

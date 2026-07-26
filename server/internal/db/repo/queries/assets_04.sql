@@ -1,5 +1,11 @@
 -- name: GetCollapsedBrowseItemsUnified :many
-WITH filtered AS (
+WITH filter_params AS (
+  SELECT
+    CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json,
+    CAST(sqlc.narg('asset_types') AS TEXT) AS asset_types_json,
+    CAST(sqlc.narg('tag_names') AS TEXT) AS tag_names_json
+),
+filtered AS (
   SELECT
     a.asset_id,
     a.upload_time,
@@ -10,10 +16,16 @@ WITH filtered AS (
   JOIN media_items mi ON mi.primary_asset_id = a.asset_id
   LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
   WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
-    AND (sqlc.narg('asset_ids') IS NULL OR a.asset_id IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_ids') AS TEXT))))
+    AND (
+      (SELECT asset_ids_json FROM filter_params) IS NULL
+      OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+    )
     AND (sqlc.narg('query') IS NULL OR a.original_filename LIKE '%' || sqlc.narg('query') || '%')
     AND (sqlc.narg('asset_type') IS NULL OR a.type = sqlc.narg('asset_type'))
-    AND (sqlc.narg('asset_types') IS NULL OR a.type IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_types') AS TEXT))))
+    AND (
+      (SELECT asset_types_json FROM filter_params) IS NULL
+      OR a.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
+    )
     AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
     AND (
@@ -65,14 +77,14 @@ WITH filtered AS (
       )
     )
     AND (
-      sqlc.narg('tag_names') IS NULL
+      (SELECT tag_names_json FROM filter_params) IS NULL
       OR (
         SELECT COUNT(DISTINCT t2.tag_name)
         FROM asset_tags at2
         JOIN tags t2 ON t2.tag_id = at2.tag_id
         WHERE at2.asset_id = a.asset_id
-          AND t2.tag_name IN (SELECT value FROM json_each(CAST(sqlc.narg('tag_names') AS TEXT)))
-      ) = json_array_length(CAST(sqlc.narg('tag_names') AS TEXT))
+          AND t2.tag_name IN (SELECT value FROM json_each((SELECT tag_names_json FROM filter_params)))
+      ) = json_array_length((SELECT tag_names_json FROM filter_params))
     )
     AND (sqlc.narg('filename_val') IS NULL OR
       CASE COALESCE(sqlc.narg('filename_operator'), 'contains')
@@ -141,7 +153,10 @@ stack_cover_candidates AS (
   LEFT JOIN media_items cover_item ON cover_item.media_item_id = s.cover_media_item_id
   JOIN assets a ON a.asset_id = mi.primary_asset_id
   WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
-    AND (sqlc.narg('asset_ids') IS NULL OR a.asset_id IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_ids') AS TEXT))))
+    AND (
+      (SELECT asset_ids_json FROM filter_params) IS NULL
+      OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+    )
 ),
 stack_covers AS (
   SELECT stack_id, cover_asset_id
@@ -156,7 +171,10 @@ stack_members_all AS (
     JOIN media_items mi ON mi.media_item_id = asm.media_item_id
     JOIN assets a ON a.asset_id = mi.primary_asset_id
     WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
-      AND (sqlc.narg('asset_ids') IS NULL OR a.asset_id IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_ids') AS TEXT))))
+      AND (
+        (SELECT asset_ids_json FROM filter_params) IS NULL
+        OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+      )
     ORDER BY asm.stack_id, asm.position IS NULL, asm.position, asm.media_item_id
   ) AS ordered
   GROUP BY ordered.stack_id

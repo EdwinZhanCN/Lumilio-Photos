@@ -59,20 +59,29 @@ WHERE asset_id IN (sqlc.slice('asset_ids'))
   AND is_deleted = false;
 
 -- name: GetAssetsByIDsForOwner :many
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT * FROM assets
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('owner_id')
   AND is_deleted = false;
 
 -- name: GetAuthorizedAssetIDs :many
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT asset_id FROM assets
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('owner_id')
   AND is_deleted = false;
 
 -- name: LockAuthorizedAssetIDs :many
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT asset_id FROM assets
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('owner_id')
   AND is_deleted = false
 ;
@@ -233,7 +242,7 @@ RETURNING *;
 -- name: BulkUpdateAssetStatus :exec
 UPDATE assets
 SET status = sqlc.arg('status')
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE CAST(sqlc.narg('asset_ids') AS TEXT) LIKE '%"' || asset_id || '"%'
   AND is_deleted = false;
 
 -- name: GetAssetsByContentHash :many
@@ -245,14 +254,28 @@ SELECT * FROM assets
 WHERE content_hash = ?1 AND repository_id = ?2 AND is_deleted = false;
 
 -- name: GetAssetsByContentHashesAndRepository :many
-SELECT asset_id, content_hash, file_size, original_filename FROM assets
-WHERE content_hash IN (sqlc.slice('content_hashes'))
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('content_hashes') AS TEXT) AS content_hashes_json
+)
+SELECT asset_id, content_hash, file_size, original_filename
+FROM assets
+WHERE content_hash IN (
+    SELECT CAST(value AS TEXT)
+    FROM json_each((SELECT content_hashes_json FROM filter_params))
+  )
   AND repository_id = sqlc.arg('repository_id')
   AND is_deleted = false;
 
 -- name: GetAssetsByQuickFingerprintsAndRepository :many
-SELECT asset_id, quick_fingerprint, quick_fingerprint_version, file_size, original_filename FROM assets
-WHERE quick_fingerprint IN (sqlc.slice('quick_fingerprints'))
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('quick_fingerprints') AS TEXT) AS quick_fingerprints_json
+)
+SELECT asset_id, quick_fingerprint, quick_fingerprint_version, file_size, original_filename
+FROM assets
+WHERE quick_fingerprint IN (
+    SELECT CAST(value AS TEXT)
+    FROM json_each((SELECT quick_fingerprints_json FROM filter_params))
+  )
   AND repository_id = sqlc.arg('repository_id')
   AND is_deleted = false;
 
@@ -290,8 +313,8 @@ WHERE asset_id = ?1
 RETURNING *;
 
 -- name: CreateThumbnail :one
-INSERT INTO thumbnails (asset_id, size, storage_path, mime_type)
-VALUES (?1, ?2, ?3, ?4)
+INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, created_at)
+VALUES (?1, ?2, ?3, ?4, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, size) DO UPDATE
 SET storage_path = EXCLUDED.storage_path,
     mime_type = EXCLUDED.mime_type,
@@ -315,8 +338,8 @@ ORDER BY CASE size
 END, thumbnail_id;
 
 -- name: AddAssetToAlbum :exec
-INSERT INTO album_assets (asset_id, album_id, position)
-VALUES (?1, ?2, ?3)
+INSERT INTO album_assets (asset_id, album_id, position, added_time)
+VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, album_id) DO NOTHING;
 
 -- name: RemoveAssetFromAlbum :exec
@@ -336,7 +359,7 @@ WHERE asset_id = ?1 AND tag_id = ?2;
 -- name: RemoveAssetTagsBySources :exec
 DELETE FROM asset_tags
 WHERE asset_id = ?1
-  AND source IN (sqlc.slice('sources'));
+  AND CAST(sqlc.narg('sources') AS TEXT) LIKE '%"' || source || '"%';
 
 -- name: GetDistinctCameraModels :many
 SELECT DISTINCT json_extract(a.specific_metadata, char(36) || '.camera_model') as camera_model
@@ -396,27 +419,44 @@ ORDER BY upload_time DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsByOwnerSorted :many
-SELECT * FROM assets
-WHERE owner_id = sqlc.arg('owner_id') AND is_deleted = false
+WITH sort_params AS (SELECT CAST(sqlc.arg('sort_order') AS TEXT) AS sort_order)
+SELECT a.* FROM assets a
+CROSS JOIN sort_params
+WHERE a.owner_id = sqlc.arg('owner_id') AND a.is_deleted = false
 ORDER BY
-  CASE WHEN CAST(sqlc.arg('sort_order') AS TEXT) = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
-  CASE WHEN CAST(sqlc.arg('sort_order') AS TEXT) = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+  CASE WHEN sort_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
+  CASE WHEN sort_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsByTypesSorted :many
-SELECT * FROM assets
-WHERE type IN (sqlc.slice('types')) AND is_deleted = false
+WITH filter_params AS (
+  SELECT
+    CAST(sqlc.narg('types') AS TEXT) AS types_json,
+    CAST(sqlc.arg('sort_order') AS TEXT) AS sort_order
+)
+SELECT a.* FROM assets a
+CROSS JOIN filter_params
+WHERE a.type IN (SELECT value FROM json_each(filter_params.types_json))
+  AND a.is_deleted = false
 ORDER BY
-  CASE WHEN sqlc.arg('sort_order') = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
-  CASE WHEN sqlc.arg('sort_order') = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+  CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
+  CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsByOwnerAndTypesSorted :many
-SELECT * FROM assets
-WHERE owner_id = ?1 AND type IN (sqlc.slice('types')) AND is_deleted = false
+WITH filter_params AS (
+  SELECT
+    CAST(sqlc.narg('types') AS TEXT) AS types_json,
+    CAST(sqlc.arg('sort_order') AS TEXT) AS sort_order
+)
+SELECT a.* FROM assets a
+CROSS JOIN filter_params
+WHERE a.owner_id = sqlc.arg('owner_id')
+  AND a.type IN (SELECT value FROM json_each(filter_params.types_json))
+  AND a.is_deleted = false
 ORDER BY
-  CASE WHEN sqlc.arg('sort_order') = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
-  CASE WHEN sqlc.arg('sort_order') = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+  CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
+  CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: UpdateAssetDuration :exec
@@ -505,13 +545,13 @@ WHERE is_deleted = false
 -- name: BulkUpdateAssetRating :exec
 UPDATE assets
 SET rating = sqlc.arg('rating')
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE CAST(sqlc.narg('asset_ids') AS TEXT) LIKE '%"' || asset_id || '"%'
   AND is_deleted = false;
 
 -- name: BulkUpdateAssetLiked :exec
 UPDATE assets
 SET liked = sqlc.arg('liked')
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE CAST(sqlc.narg('asset_ids') AS TEXT) LIKE '%"' || asset_id || '"%'
   AND is_deleted = false;
 
 -- name: BulkToggleAssetLiked :exec
@@ -521,17 +561,19 @@ WHERE asset_id IN (sqlc.slice('asset_ids'))
   AND is_deleted = false;
 
 -- name: GetAssetsByOwnerWithRatingLiked :many
-SELECT * FROM assets
-WHERE owner_id = sqlc.arg('owner_id')
-  AND is_deleted = false
+WITH sort_params AS (SELECT CAST(sqlc.arg('sort_by') AS TEXT) AS sort_by)
+SELECT a.* FROM assets a
+CROSS JOIN sort_params
+WHERE a.owner_id = sqlc.arg('owner_id')
+  AND a.is_deleted = false
   AND (sqlc.narg('has_rating') IS NULL OR
-       (sqlc.narg('has_rating') = true AND rating IS NOT NULL) OR
-       (sqlc.narg('has_rating') = false AND rating IS NULL))
-  AND (sqlc.narg('is_liked') IS NULL OR liked = sqlc.narg('is_liked'))
+       (sqlc.narg('has_rating') = true AND a.rating IS NOT NULL) OR
+       (sqlc.narg('has_rating') = false AND a.rating IS NULL))
+  AND (sqlc.narg('is_liked') IS NULL OR a.liked = sqlc.narg('is_liked'))
 ORDER BY
-  CASE WHEN sqlc.arg('sort_by') = 'rating' THEN rating END DESC NULLS LAST,
-  CASE WHEN sqlc.arg('sort_by') = 'upload_time' THEN upload_time END DESC,
-  CASE WHEN sqlc.arg('sort_by') = 'taken_time' THEN COALESCE(taken_time, upload_time) END DESC
+  CASE WHEN sort_params.sort_by = 'rating' THEN a.rating END DESC NULLS LAST,
+  CASE WHEN sort_params.sort_by = 'upload_time' THEN a.upload_time END DESC,
+  CASE WHEN sort_params.sort_by = 'taken_time' THEN COALESCE(a.taken_time, a.upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- Repository Asset Statistics (kept for repository management)

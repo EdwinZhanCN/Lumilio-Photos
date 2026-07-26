@@ -39,6 +39,7 @@ jobs:
                       server:
                           - 'server/**'
                           - 'Makefile'
+                          - 'scripts/check-sqlite-architecture.sh'
                           - '.github/workflows/ci.yml'
                       web:
                           - 'web/**'
@@ -53,7 +54,6 @@ jobs:
                           - 'Makefile'
                           - 'docker-compose.e2e*.yml'
                           - 'server/Dockerfile'
-                          - 'server/db.Dockerfile'
                           - 'server/go.mod'
                           - 'server/go.sum'
                           - 'server/migrations/**'
@@ -76,8 +76,6 @@ jobs:
                           - 'server/internal/service/asset_service*.go'
                           - 'server/internal/sourcing/**'
                           - 'server/internal/storage/**'
-                          - 'web/Dockerfile'
-                          - 'web/Caddyfile'
                           - 'web/playwright.config.ts'
                           - 'web/package.json'
                           - 'web/pnpm-lock.yaml'
@@ -133,7 +131,6 @@ jobs:
                           - 'Makefile'
                           - 'docker-compose.e2e*.yml'
                           - 'server/Dockerfile'
-                          - 'server/db.Dockerfile'
                           - 'server/internal/db/backup/**'
                           - 'server/internal/queue/db_backup_worker.go'
                           - 'server/internal/service/backup_service.go'
@@ -150,6 +147,27 @@ jobs:
                       site:
                           - 'site/**'
                           - '.github/workflows/ci.yml'
+
+    sqlite-architecture:
+        name: SQLite-only architecture
+        needs: changes
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: |
+                      server/go.sum
+                      desktop/go.sum
+
+            - name: Install CGo package metadata
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev
+
+            - run: make sqlite-architecture-check
 
     # Linux is the standalone Server deployment target. macOS and Windows run
     # the same complete Server suite below as part of their Desktop App gates,

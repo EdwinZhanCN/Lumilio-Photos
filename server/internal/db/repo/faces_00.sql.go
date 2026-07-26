@@ -13,8 +13,19 @@ import (
 )
 
 const createFaceCluster = `-- name: CreateFaceCluster :one
-INSERT INTO face_clusters (owner_id, cluster_name, representative_face_id, confidence_score, is_confirmed)
-VALUES (?1, ?2, ?3, ?4, ?5)
+INSERT INTO face_clusters (
+    owner_id, cluster_name, representative_face_id, confidence_score, is_confirmed,
+    created_at, updated_at
+)
+VALUES (
+    ?1,
+    ?2,
+    ?3,
+    ?4,
+    ?5,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING cluster_id, owner_id, cluster_name, representative_face_id, confidence_score, member_count, is_confirmed, is_hidden, hidden_at, created_at, updated_at
 `
 
@@ -54,8 +65,10 @@ func (q *Queries) CreateFaceCluster(ctx context.Context, arg CreateFaceClusterPa
 }
 
 const createFaceClusterMember = `-- name: CreateFaceClusterMember :one
-INSERT INTO face_cluster_members (cluster_id, face_id, similarity_score, confidence, is_manual)
-VALUES (?1, ?2, ?3, ?4, ?5)
+INSERT INTO face_cluster_members (
+    cluster_id, face_id, similarity_score, confidence, is_manual, created_at
+)
+VALUES (?1, ?2, ?3, ?4, ?5, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 RETURNING id, cluster_id, face_id, similarity_score, confidence, is_manual, created_at
 `
 
@@ -92,9 +105,12 @@ const createFaceItem = `-- name: CreateFaceItem :one
 INSERT INTO face_items (
     asset_id, face_id, bounding_box, confidence, age_group, gender,
     ethnicity, expression, face_size, face_image_path, embedding,
-    embedding_model, is_primary, quality_score, blur_score, pose_angles
+    embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at
 )
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+VALUES (
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at
 `
 
@@ -161,8 +177,14 @@ func (q *Queries) CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) 
 }
 
 const createFaceResult = `-- name: CreateFaceResult :one
-INSERT INTO face_results (asset_id, model_id, total_faces, processing_time_ms)
-VALUES (?1, ?2, ?3, ?4)
+INSERT INTO face_results (
+    asset_id, model_id, total_faces, processing_time_ms, created_at, updated_at
+)
+VALUES (
+    ?1, ?2, ?3, ?4,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING asset_id, model_id, total_faces, processing_time_ms, created_at, updated_at
 `
 

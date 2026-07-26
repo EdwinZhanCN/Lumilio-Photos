@@ -11,8 +11,8 @@ own machine. Pick the install path that matches where you want it to run:
 | A Windows 10/11 PC (x64) | [Windows installer](#windows) — per-user setup, everything bundled |
 | A Linux server or NAS | [Docker Compose](#docker-linux-server-nas) |
 
-The desktop apps bundle their own private PostgreSQL and media tools — there is
-nothing else to install. All downloads are on the
+The desktop apps use an embedded machine-local SQLite catalog and bundle their
+media tools, so there is no database service to install. All downloads are on the
 [GitHub Releases page](https://github.com/EdwinZhanCN/Lumilio-Photos/releases).
 
 ## macOS (Apple Silicon)
@@ -96,10 +96,12 @@ wizard.
   the internet; TLS is not a required service in the default stack.
 
 ::: warning Back up through Lumilio
-Do not copy `library.sqlite3`, `-wal`, or `-shm` while the container is running.
-Use the snapshot and download actions under **Settings → Server**, and back up
-the media directory separately. Removing and recreating the application
-container is safe when both host mounts are retained.
+While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or
+`-shm` with a host SQLite tool. Crossing the container mount boundary can
+violate WAL locking. Use the snapshot and download actions under
+**Settings → Server**, and back up the media directory separately. Removing
+and recreating the application container is safe when both host mounts are
+retained.
 :::
 
 ## Optional: AI features

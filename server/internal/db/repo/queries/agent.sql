@@ -84,9 +84,9 @@ RETURNING *;
 
 -- name: FinishAgentRun :exec
 UPDATE agent_runs
-SET status = sqlc.arg('status'),
+SET status = @status,
     finished_at = CASE
-        WHEN sqlc.arg('status') IN ('cancelled', 'completed', 'failed')
+        WHEN ?1 IN ('cancelled', 'completed', 'failed')
             THEN COALESCE(finished_at, sqlc.arg('updated_at'))
         ELSE finished_at
     END,
@@ -99,13 +99,13 @@ WHERE run_id = sqlc.arg('run_id')
 -- name: FinishAgentThread :exec
 UPDATE agent_threads
 SET status = CASE
-        WHEN sqlc.arg('status') = 'awaiting_confirmation' THEN 'awaiting_confirmation'
-        WHEN sqlc.arg('status') = 'cancelled' THEN 'cancelled'
-        WHEN sqlc.arg('status') = 'failed' THEN 'failed'
+        WHEN @status = 'awaiting_confirmation' THEN 'awaiting_confirmation'
+        WHEN @status = 'cancelled' THEN 'cancelled'
+        WHEN @status = 'failed' THEN 'failed'
         ELSE 'completed'
     END,
     active_run_id = CASE
-        WHEN sqlc.arg('status') = 'awaiting_confirmation' THEN sqlc.arg('run_id')
+        WHEN @status = 'awaiting_confirmation' THEN sqlc.arg('run_id')
         ELSE NULL
     END,
     updated_at = sqlc.arg('updated_at')

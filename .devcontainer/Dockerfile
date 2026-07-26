@@ -4,8 +4,8 @@
 # Includes Go, Node.js, Rust (WASM), and all system-level dependencies
 # needed for local development.
 #
-# NOTE: The db service and other infrastructure containers are defined
-# in .devcontainer/docker-compose.yml and run alongside this container.
+# SQLite is embedded in the Go process; no database service runs alongside
+# this container.
 
 FROM golang:1.25.0-trixie
 

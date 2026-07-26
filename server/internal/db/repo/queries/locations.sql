@@ -3,26 +3,14 @@ DELETE FROM location_clusters
 WHERE (sqlc.narg('repository_id') IS NULL OR repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'));
 
--- name: InsertLocationClustersForScope :many
-INSERT INTO location_clusters (
-  owner_id,
-  repository_id,
-  geohash,
-  precision,
-  centroid_latitude,
-  centroid_longitude,
-  photo_count,
-  geocode_status
-)
+-- name: ListLocationClusterCandidatesForScope :many
 SELECT
   a.owner_id,
   a.repository_id,
   a.gps_geohash_7 AS geohash,
-  7 AS precision,
   AVG(a.gps_latitude) AS centroid_latitude,
   AVG(a.gps_longitude) AS centroid_longitude,
-  COUNT(*) AS photo_count,
-  'pending' AS geocode_status
+  COUNT(*) AS photo_count
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
@@ -32,21 +20,43 @@ WHERE a.is_deleted = false
   AND a.gps_geohash_7 IS NOT NULL
   AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-GROUP BY a.owner_id, a.repository_id, a.gps_geohash_7
-ON CONFLICT (owner_id, repository_id, geohash) DO UPDATE
-SET
-  centroid_latitude = EXCLUDED.centroid_latitude,
-  centroid_longitude = EXCLUDED.centroid_longitude,
-  photo_count = EXCLUDED.photo_count,
-  geocode_status = CASE
-    WHEN location_clusters.label IS NULL THEN 'pending'
-    ELSE location_clusters.geocode_status
-  END
+GROUP BY a.owner_id, a.repository_id, a.gps_geohash_7;
+
+-- name: CreateLocationCluster :one
+INSERT INTO location_clusters (
+  cluster_id,
+  owner_id,
+  repository_id,
+  geohash,
+  precision,
+  centroid_latitude,
+  centroid_longitude,
+  photo_count,
+  geocode_status,
+  created_at,
+  updated_at
+)
+VALUES (
+  sqlc.arg('cluster_id'),
+  sqlc.narg('owner_id'),
+  sqlc.arg('repository_id'),
+  sqlc.arg('geohash'),
+  sqlc.arg('precision'),
+  sqlc.arg('centroid_latitude'),
+  sqlc.arg('centroid_longitude'),
+  sqlc.arg('photo_count'),
+  'pending',
+  sqlc.arg('created_at'),
+  sqlc.arg('updated_at')
+)
 RETURNING *;
 
 -- name: InsertLocationClusterAssetsForScope :exec
-INSERT INTO location_cluster_assets (cluster_id, asset_id)
-SELECT lc.cluster_id, a.asset_id
+INSERT INTO location_cluster_assets (cluster_id, asset_id, created_at)
+SELECT
+  lc.cluster_id,
+  a.asset_id,
+  CAST(unixepoch('subsec') * 1000000 AS INTEGER) AS created_at
 FROM assets a
 JOIN location_clusters lc
   ON lc.owner_id IS a.owner_id

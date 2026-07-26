@@ -113,3 +113,18 @@ func TestFilterWithinCutoffPreservesOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestExpandedEmbeddingKNNLimitRespectsSQLiteVecMaximum(t *testing.T) {
+	cases := map[int]int{
+		0:                           1,
+		1:                           embeddingKNNExpansion,
+		maxANNAssetCandidateSet:     sqliteVecKNNMax,
+		maxANNAssetCandidateSet + 1: sqliteVecKNNMax,
+		10_000:                      sqliteVecKNNMax,
+	}
+	for topK, want := range cases {
+		if got := expandedEmbeddingKNNLimit(topK); got != want {
+			t.Errorf("expandedEmbeddingKNNLimit(%d) = %d, want %d", topK, got, want)
+		}
+	}
+}

@@ -13,6 +13,21 @@ import (
 // UUIDs stores UUID collections as validated JSON arrays in SQLite TEXT.
 type UUIDs []uuid.UUID
 
+// UUIDsJSONParam encodes a non-empty UUID list for SQLite JSON1 query
+// parameters. Empty lists return nil so optional collection filters are
+// disabled instead of matching no rows.
+func UUIDsJSONParam(values []uuid.UUID) *string {
+	if len(values) == 0 {
+		return nil
+	}
+	encoded, err := json.Marshal(UUIDs(values))
+	if err != nil {
+		panic(fmt.Sprintf("dbtypes.UUIDsJSONParam: %v", err))
+	}
+	text := string(encoded)
+	return &text
+}
+
 func (u *UUIDs) Scan(src any) error {
 	if u == nil {
 		return fmt.Errorf("dbtypes.UUIDs: nil receiver")
@@ -44,6 +59,35 @@ func (u UUIDs) Value() (driver.Value, error) {
 
 // Strings stores string collections as validated JSON arrays in SQLite TEXT.
 type Strings []string
+
+// StringsJSONParam encodes a non-empty string list for SQLite JSON1 query
+// parameters. Empty lists return nil so optional collection filters are
+// disabled instead of matching no rows.
+func StringsJSONParam(values []string) *string {
+	if len(values) == 0 {
+		return nil
+	}
+	encoded, err := json.Marshal(Strings(values))
+	if err != nil {
+		panic(fmt.Sprintf("dbtypes.StringsJSONParam: %v", err))
+	}
+	text := string(encoded)
+	return &text
+}
+
+// IntegersJSONParam encodes a non-empty integer list for SQLite JSON1 query
+// parameters. Empty lists return nil so json_each(NULL) matches no rows.
+func IntegersJSONParam[T ~int | ~int32 | ~int64](values []T) *string {
+	if len(values) == 0 {
+		return nil
+	}
+	encoded, err := json.Marshal(values)
+	if err != nil {
+		panic(fmt.Sprintf("dbtypes.IntegersJSONParam: %v", err))
+	}
+	text := string(encoded)
+	return &text
+}
 
 func (s *Strings) Scan(src any) error {
 	if s == nil {

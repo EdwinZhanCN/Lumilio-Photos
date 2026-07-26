@@ -14,8 +14,8 @@ import (
 )
 
 const addAssetToAlbum = `-- name: AddAssetToAlbum :exec
-INSERT INTO album_assets (asset_id, album_id, position)
-VALUES (?1, ?2, ?3)
+INSERT INTO album_assets (asset_id, album_id, position, added_time)
+VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, album_id) DO NOTHING
 `
 
@@ -106,84 +106,51 @@ func (q *Queries) BulkToggleAssetLiked(ctx context.Context, assetIds []uuid.UUID
 const bulkUpdateAssetLiked = `-- name: BulkUpdateAssetLiked :exec
 UPDATE assets
 SET liked = ?1
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
+WHERE CAST(?2 AS TEXT) LIKE '%"' || asset_id || '"%'
   AND is_deleted = false
 `
 
 type BulkUpdateAssetLikedParams struct {
-	Liked    bool        `db:"liked" json:"liked"`
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
+	Liked    bool    `db:"liked" json:"liked"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 func (q *Queries) BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error {
-	query := bulkUpdateAssetLiked
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Liked)
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	_, err := q.db.ExecContext(ctx, bulkUpdateAssetLiked, arg.Liked, arg.AssetIds)
 	return err
 }
 
 const bulkUpdateAssetRating = `-- name: BulkUpdateAssetRating :exec
 UPDATE assets
 SET rating = ?1
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
+WHERE CAST(?2 AS TEXT) LIKE '%"' || asset_id || '"%'
   AND is_deleted = false
 `
 
 type BulkUpdateAssetRatingParams struct {
-	Rating   *int64      `db:"rating" json:"rating"`
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
+	Rating   *int64  `db:"rating" json:"rating"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 func (q *Queries) BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error {
-	query := bulkUpdateAssetRating
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Rating)
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	_, err := q.db.ExecContext(ctx, bulkUpdateAssetRating, arg.Rating, arg.AssetIds)
 	return err
 }
 
 const bulkUpdateAssetStatus = `-- name: BulkUpdateAssetStatus :exec
 UPDATE assets
 SET status = ?1
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
+WHERE CAST(?2 AS TEXT) LIKE '%"' || asset_id || '"%'
   AND is_deleted = false
 `
 
 type BulkUpdateAssetStatusParams struct {
 	Status   dbtypes.JSON `db:"status" json:"status"`
-	AssetIds []uuid.UUID  `db:"asset_ids" json:"asset_ids"`
+	AssetIds *string      `db:"asset_ids" json:"asset_ids"`
 }
 
 func (q *Queries) BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error {
-	query := bulkUpdateAssetStatus
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Status)
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	_, err := q.db.ExecContext(ctx, bulkUpdateAssetStatus, arg.Status, arg.AssetIds)
 	return err
 }
 
@@ -424,8 +391,8 @@ func (q *Queries) CreateMediaItemForAsset(ctx context.Context, arg CreateMediaIt
 }
 
 const createThumbnail = `-- name: CreateThumbnail :one
-INSERT INTO thumbnails (asset_id, size, storage_path, mime_type)
-VALUES (?1, ?2, ?3, ?4)
+INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, created_at)
+VALUES (?1, ?2, ?3, ?4, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, size) DO UPDATE
 SET storage_path = EXCLUDED.storage_path,
     mime_type = EXCLUDED.mime_type,
@@ -758,15 +725,22 @@ func (q *Queries) GetAssetsByContentHash(ctx context.Context, contentHash string
 }
 
 const getAssetsByContentHashesAndRepository = `-- name: GetAssetsByContentHashesAndRepository :many
-SELECT asset_id, content_hash, file_size, original_filename FROM assets
-WHERE content_hash IN (/*SLICE:content_hashes*/?)
-  AND repository_id = ?2
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS content_hashes_json
+)
+SELECT asset_id, content_hash, file_size, original_filename
+FROM assets
+WHERE content_hash IN (
+    SELECT CAST(value AS TEXT)
+    FROM json_each((SELECT content_hashes_json FROM filter_params))
+  )
+  AND repository_id = ?1
   AND is_deleted = false
 `
 
 type GetAssetsByContentHashesAndRepositoryParams struct {
-	ContentHashes []string      `db:"content_hashes" json:"content_hashes"`
 	RepositoryID  uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	ContentHashes *string       `db:"content_hashes" json:"content_hashes"`
 }
 
 type GetAssetsByContentHashesAndRepositoryRow struct {
@@ -777,18 +751,7 @@ type GetAssetsByContentHashesAndRepositoryRow struct {
 }
 
 func (q *Queries) GetAssetsByContentHashesAndRepository(ctx context.Context, arg GetAssetsByContentHashesAndRepositoryParams) ([]GetAssetsByContentHashesAndRepositoryRow, error) {
-	query := getAssetsByContentHashesAndRepository
-	var queryParams []interface{}
-	if len(arg.ContentHashes) > 0 {
-		for _, v := range arg.ContentHashes {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:content_hashes*/?", strings.Repeat(",?", len(arg.ContentHashes))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:content_hashes*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.RepositoryID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getAssetsByContentHashesAndRepository, arg.RepositoryID, arg.ContentHashes)
 	if err != nil {
 		return nil, err
 	}
@@ -953,30 +916,22 @@ func (q *Queries) GetAssetsByIDsAny(ctx context.Context, assetIds []uuid.UUID) (
 }
 
 const getAssetsByIDsForOwner = `-- name: GetAssetsByIDsForOwner :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND owner_id = ?2
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND owner_id = ?1
   AND is_deleted = false
 `
 
 type GetAssetsByIDsForOwnerParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	OwnerID  *int32      `db:"owner_id" json:"owner_id"`
+	OwnerID  *int32  `db:"owner_id" json:"owner_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 func (q *Queries) GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDsForOwnerParams) ([]Asset, error) {
-	query := getAssetsByIDsForOwner
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.OwnerID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getAssetsByIDsForOwner, arg.OwnerID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -1095,36 +1050,38 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 }
 
 const getAssetsByOwnerAndTypesSorted = `-- name: GetAssetsByOwnerAndTypesSorted :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE owner_id = ?1 AND type IN (/*SLICE:types*/?) AND is_deleted = false
+WITH filter_params AS (
+  SELECT
+    CAST(?4 AS TEXT) AS types_json,
+    CAST(?5 AS TEXT) AS sort_order
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+CROSS JOIN filter_params
+WHERE a.owner_id = ?1
+  AND a.type IN (SELECT value FROM json_each(filter_params.types_json))
+  AND a.is_deleted = false
 ORDER BY
-  CASE WHEN sqlc.arg('sort_order') = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
-  CASE WHEN sqlc.arg('sort_order') = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
-LIMIT ?4 OFFSET ?3
+  CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
+  CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
+LIMIT ?3 OFFSET ?2
 `
 
 type GetAssetsByOwnerAndTypesSortedParams struct {
-	OwnerID *int32   `db:"owner_id" json:"owner_id"`
-	Types   []string `db:"types" json:"types"`
-	Offset  int64    `db:"offset" json:"offset"`
-	Limit   int64    `db:"limit" json:"limit"`
+	OwnerID   *int32  `db:"owner_id" json:"owner_id"`
+	Offset    int64   `db:"offset" json:"offset"`
+	Limit     int64   `db:"limit" json:"limit"`
+	Types     *string `db:"types" json:"types"`
+	SortOrder string  `db:"sort_order" json:"sort_order"`
 }
 
 func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAssetsByOwnerAndTypesSortedParams) ([]Asset, error) {
-	query := getAssetsByOwnerAndTypesSorted
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.OwnerID)
-	if len(arg.Types) > 0 {
-		for _, v := range arg.Types {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:types*/?", strings.Repeat(",?", len(arg.Types))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:types*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.Offset)
-	queryParams = append(queryParams, arg.Limit)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getAssetsByOwnerAndTypesSorted,
+		arg.OwnerID,
+		arg.Offset,
+		arg.Limit,
+		arg.Types,
+		arg.SortOrder,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1177,22 +1134,30 @@ func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAss
 }
 
 const getAssetsByOwnerSorted = `-- name: GetAssetsByOwnerSorted :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE owner_id = ?1 AND is_deleted = false
+WITH sort_params AS (SELECT CAST(?4 AS TEXT) AS sort_order)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+CROSS JOIN sort_params
+WHERE a.owner_id = ?1 AND a.is_deleted = false
 ORDER BY
-  CASE WHEN CAST(sqlc.arg('sort_order') AS TEXT) = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
-  CASE WHEN CAST(sqlc.arg('sort_order') AS TEXT) = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+  CASE WHEN sort_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
+  CASE WHEN sort_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
 LIMIT ?3 OFFSET ?2
 `
 
 type GetAssetsByOwnerSortedParams struct {
-	OwnerID *int32 `db:"owner_id" json:"owner_id"`
-	Offset  int64  `db:"offset" json:"offset"`
-	Limit   int64  `db:"limit" json:"limit"`
+	OwnerID   *int32 `db:"owner_id" json:"owner_id"`
+	Offset    int64  `db:"offset" json:"offset"`
+	Limit     int64  `db:"limit" json:"limit"`
+	SortOrder string `db:"sort_order" json:"sort_order"`
 }
 
 func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwnerSortedParams) ([]Asset, error) {
-	rows, err := q.db.QueryContext(ctx, getAssetsByOwnerSorted, arg.OwnerID, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, getAssetsByOwnerSorted,
+		arg.OwnerID,
+		arg.Offset,
+		arg.Limit,
+		arg.SortOrder,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1245,17 +1210,19 @@ func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwn
 }
 
 const getAssetsByOwnerWithRatingLiked = `-- name: GetAssetsByOwnerWithRatingLiked :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE owner_id = ?1
-  AND is_deleted = false
+WITH sort_params AS (SELECT CAST(?6 AS TEXT) AS sort_by)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+CROSS JOIN sort_params
+WHERE a.owner_id = ?1
+  AND a.is_deleted = false
   AND (?2 IS NULL OR
-       (?2 = true AND rating IS NOT NULL) OR
-       (?2 = false AND rating IS NULL))
-  AND (?3 IS NULL OR liked = ?3)
+       (?2 = true AND a.rating IS NOT NULL) OR
+       (?2 = false AND a.rating IS NULL))
+  AND (?3 IS NULL OR a.liked = ?3)
 ORDER BY
-  CASE WHEN sqlc.arg('sort_by') = 'rating' THEN rating END DESC NULLS LAST,
-  CASE WHEN sqlc.arg('sort_by') = 'upload_time' THEN upload_time END DESC,
-  CASE WHEN sqlc.arg('sort_by') = 'taken_time' THEN COALESCE(taken_time, upload_time) END DESC
+  CASE WHEN sort_params.sort_by = 'rating' THEN a.rating END DESC NULLS LAST,
+  CASE WHEN sort_params.sort_by = 'upload_time' THEN a.upload_time END DESC,
+  CASE WHEN sort_params.sort_by = 'taken_time' THEN COALESCE(a.taken_time, a.upload_time) END DESC
 LIMIT ?5 OFFSET ?4
 `
 
@@ -1265,6 +1232,7 @@ type GetAssetsByOwnerWithRatingLikedParams struct {
 	IsLiked   interface{} `db:"is_liked" json:"is_liked"`
 	Offset    int64       `db:"offset" json:"offset"`
 	Limit     int64       `db:"limit" json:"limit"`
+	SortBy    string      `db:"sort_by" json:"sort_by"`
 }
 
 func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAssetsByOwnerWithRatingLikedParams) ([]Asset, error) {
@@ -1274,6 +1242,7 @@ func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAs
 		arg.IsLiked,
 		arg.Offset,
 		arg.Limit,
+		arg.SortBy,
 	)
 	if err != nil {
 		return nil, err
@@ -1327,15 +1296,22 @@ func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAs
 }
 
 const getAssetsByQuickFingerprintsAndRepository = `-- name: GetAssetsByQuickFingerprintsAndRepository :many
-SELECT asset_id, quick_fingerprint, quick_fingerprint_version, file_size, original_filename FROM assets
-WHERE quick_fingerprint IN (/*SLICE:quick_fingerprints*/?)
-  AND repository_id = ?2
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS quick_fingerprints_json
+)
+SELECT asset_id, quick_fingerprint, quick_fingerprint_version, file_size, original_filename
+FROM assets
+WHERE quick_fingerprint IN (
+    SELECT CAST(value AS TEXT)
+    FROM json_each((SELECT quick_fingerprints_json FROM filter_params))
+  )
+  AND repository_id = ?1
   AND is_deleted = false
 `
 
 type GetAssetsByQuickFingerprintsAndRepositoryParams struct {
-	QuickFingerprints []*string     `db:"quick_fingerprints" json:"quick_fingerprints"`
 	RepositoryID      uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	QuickFingerprints *string       `db:"quick_fingerprints" json:"quick_fingerprints"`
 }
 
 type GetAssetsByQuickFingerprintsAndRepositoryRow struct {
@@ -1347,18 +1323,7 @@ type GetAssetsByQuickFingerprintsAndRepositoryRow struct {
 }
 
 func (q *Queries) GetAssetsByQuickFingerprintsAndRepository(ctx context.Context, arg GetAssetsByQuickFingerprintsAndRepositoryParams) ([]GetAssetsByQuickFingerprintsAndRepositoryRow, error) {
-	query := getAssetsByQuickFingerprintsAndRepository
-	var queryParams []interface{}
-	if len(arg.QuickFingerprints) > 0 {
-		for _, v := range arg.QuickFingerprints {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:quick_fingerprints*/?", strings.Repeat(",?", len(arg.QuickFingerprints))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:quick_fingerprints*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.RepositoryID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getAssetsByQuickFingerprintsAndRepository, arg.RepositoryID, arg.QuickFingerprints)
 	if err != nil {
 		return nil, err
 	}
@@ -1892,34 +1857,35 @@ func (q *Queries) GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams
 }
 
 const getAssetsByTypesSorted = `-- name: GetAssetsByTypesSorted :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE type IN (/*SLICE:types*/?) AND is_deleted = false
+WITH filter_params AS (
+  SELECT
+    CAST(?3 AS TEXT) AS types_json,
+    CAST(?4 AS TEXT) AS sort_order
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+CROSS JOIN filter_params
+WHERE a.type IN (SELECT value FROM json_each(filter_params.types_json))
+  AND a.is_deleted = false
 ORDER BY
-  CASE WHEN sqlc.arg('sort_order') = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
-  CASE WHEN sqlc.arg('sort_order') = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
-LIMIT ?3 OFFSET ?2
+  CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
+  CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
+LIMIT ?2 OFFSET ?1
 `
 
 type GetAssetsByTypesSortedParams struct {
-	Types  []string `db:"types" json:"types"`
-	Offset int64    `db:"offset" json:"offset"`
-	Limit  int64    `db:"limit" json:"limit"`
+	Offset    int64   `db:"offset" json:"offset"`
+	Limit     int64   `db:"limit" json:"limit"`
+	Types     *string `db:"types" json:"types"`
+	SortOrder string  `db:"sort_order" json:"sort_order"`
 }
 
 func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error) {
-	query := getAssetsByTypesSorted
-	var queryParams []interface{}
-	if len(arg.Types) > 0 {
-		for _, v := range arg.Types {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:types*/?", strings.Repeat(",?", len(arg.Types))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:types*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.Offset)
-	queryParams = append(queryParams, arg.Limit)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getAssetsByTypesSorted,
+		arg.Offset,
+		arg.Limit,
+		arg.Types,
+		arg.SortOrder,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2102,30 +2068,22 @@ func (q *Queries) GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWa
 }
 
 const getAuthorizedAssetIDs = `-- name: GetAuthorizedAssetIDs :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT asset_id FROM assets
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND owner_id = ?2
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND owner_id = ?1
   AND is_deleted = false
 `
 
 type GetAuthorizedAssetIDsParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	OwnerID  *int32      `db:"owner_id" json:"owner_id"`
+	OwnerID  *int32  `db:"owner_id" json:"owner_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 func (q *Queries) GetAuthorizedAssetIDs(ctx context.Context, arg GetAuthorizedAssetIDsParams) ([]uuid.UUID, error) {
-	query := getAuthorizedAssetIDs
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.OwnerID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getAuthorizedAssetIDs, arg.OwnerID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -2696,30 +2654,22 @@ func (q *Queries) ListAssetsByRepositoryAny(ctx context.Context, repositoryID uu
 }
 
 const lockAuthorizedAssetIDs = `-- name: LockAuthorizedAssetIDs :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT asset_id FROM assets
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND owner_id = ?2
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND owner_id = ?1
   AND is_deleted = false
 `
 
 type LockAuthorizedAssetIDsParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	OwnerID  *int32      `db:"owner_id" json:"owner_id"`
+	OwnerID  *int32  `db:"owner_id" json:"owner_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 func (q *Queries) LockAuthorizedAssetIDs(ctx context.Context, arg LockAuthorizedAssetIDsParams) ([]uuid.UUID, error) {
-	query := lockAuthorizedAssetIDs
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.OwnerID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, lockAuthorizedAssetIDs, arg.OwnerID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -2820,27 +2770,16 @@ func (q *Queries) RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromA
 const removeAssetTagsBySources = `-- name: RemoveAssetTagsBySources :exec
 DELETE FROM asset_tags
 WHERE asset_id = ?1
-  AND source IN (/*SLICE:sources*/?)
+  AND CAST(?2 AS TEXT) LIKE '%"' || source || '"%'
 `
 
 type RemoveAssetTagsBySourcesParams struct {
 	AssetID uuid.UUID `db:"asset_id" json:"asset_id"`
-	Sources []string  `db:"sources" json:"sources"`
+	Sources *string   `db:"sources" json:"sources"`
 }
 
 func (q *Queries) RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error {
-	query := removeAssetTagsBySources
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.AssetID)
-	if len(arg.Sources) > 0 {
-		for _, v := range arg.Sources {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:sources*/?", strings.Repeat(",?", len(arg.Sources))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:sources*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	_, err := q.db.ExecContext(ctx, removeAssetTagsBySources, arg.AssetID, arg.Sources)
 	return err
 }
 

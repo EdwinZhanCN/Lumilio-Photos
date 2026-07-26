@@ -121,7 +121,7 @@ func CreateSnapshot(
 		return Snapshot{}, err
 	}
 
-	info, err := db.InspectCatalog(ctx, tmpPath)
+	info, err := db.InspectStandaloneCatalog(ctx, tmpPath)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("validate SQLite snapshot: %w", err)
 	}
@@ -222,6 +222,40 @@ func onlineBackup(ctx context.Context, source *sql.DB, destinationPath string) e
 	if err != nil {
 		return err
 	}
+	if err := destinationConn.Close(); err != nil {
+		return fmt.Errorf("release SQLite snapshot destination connection: %w", err)
+	}
+	if err := sourceConn.Close(); err != nil {
+		return fmt.Errorf("release SQLite snapshot source connection: %w", err)
+	}
+	var busy, logPages, checkpointed int
+	if err := destination.QueryRowContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)").Scan(
+		&busy,
+		&logPages,
+		&checkpointed,
+	); err != nil {
+		return fmt.Errorf("checkpoint SQLite snapshot destination: %w", err)
+	}
+	if busy != 0 {
+		return fmt.Errorf(
+			"checkpoint SQLite snapshot destination remained busy: log_pages=%d checkpointed=%d",
+			logPages,
+			checkpointed,
+		)
+	}
+	var journalMode string
+	if err := destination.QueryRowContext(ctx, "PRAGMA journal_mode=DELETE").Scan(&journalMode); err != nil {
+		return fmt.Errorf("finalize SQLite snapshot journal mode: %w", err)
+	}
+	if journalMode != "delete" {
+		return fmt.Errorf("SQLite snapshot journal mode = %q, want delete", journalMode)
+	}
+	if err := destination.Close(); err != nil {
+		return fmt.Errorf("close SQLite snapshot destination: %w", err)
+	}
+	if err := removeSQLiteSidecars(destinationPath); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -250,7 +284,7 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("SQLite snapshot checksum mismatch")
 	}
 
-	info, err := db.InspectCatalog(ctx, snapshotPath)
+	info, err := db.InspectStandaloneCatalog(ctx, snapshotPath)
 	if err != nil {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("inspect SQLite snapshot: %w", err)
 	}

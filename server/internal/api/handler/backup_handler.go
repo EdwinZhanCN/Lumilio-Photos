@@ -15,9 +15,9 @@ import (
 // BackupService.ResolvePath, which accepts only names matching the backup
 // filename grammar — path traversal is rejected by construction.
 
-// ListBackups lists the dumps in the backups directory, newest first.
+// ListBackups lists the snapshots in the backups directory, newest first.
 // @Summary List database backups
-// @Description List database dumps (routine backups and restore points), newest first.
+// @Description List SQLite snapshots (routine backups and restore points), newest first.
 // @Tags settings
 // @Produce json
 // @Security BearerAuth
@@ -34,9 +34,9 @@ func (h *SettingsHandler) ListBackups(c *gin.Context) {
 	api.JSONOK(c, dto.ToBackupListDTO(entries))
 }
 
-// CreateBackup enqueues an immediate database dump.
+// CreateBackup enqueues an immediate SQLite snapshot.
 // @Summary Create a database backup now
-// @Description Enqueue an immediate database dump; it appears in the list when the job finishes.
+// @Description Enqueue an immediate SQLite snapshot; it appears in the list when the job finishes.
 // @Tags settings
 // @Produce json
 // @Security BearerAuth
@@ -52,11 +52,11 @@ func (h *SettingsHandler) CreateBackup(c *gin.Context) {
 	c.JSON(http.StatusAccepted, api.SuccessResponse{Message: "backup enqueued"})
 }
 
-// DownloadBackup streams a dump file to the client.
+// DownloadBackup streams a SQLite snapshot file to the client.
 // @Summary Download a database backup
-// @Description Download one dump file as gzip.
+// @Description Download one standalone SQLite snapshot.
 // @Tags settings
-// @Produce application/gzip
+// @Produce application/octet-stream
 // @Security BearerAuth
 // @Param name path string true "Backup file name"
 // @Success 200 {file} file "Backup file"
@@ -74,9 +74,9 @@ func (h *SettingsHandler) DownloadBackup(c *gin.Context) {
 	c.FileAttachment(path, name)
 }
 
-// DeleteBackup removes one dump file.
+// DeleteBackup removes one SQLite snapshot and its manifest.
 // @Summary Delete a database backup
-// @Description Delete one dump file from the backups directory.
+// @Description Delete one SQLite snapshot and its manifest from the backups directory.
 // @Tags settings
 // @Produce json
 // @Security BearerAuth
@@ -99,9 +99,9 @@ func (h *SettingsHandler) DeleteBackup(c *gin.Context) {
 	api.JSONOK(c, api.SuccessResponse{Message: "backup deleted"})
 }
 
-// RestoreBackup synchronously restores a dump with restore-point + rollback.
+// RestoreBackup synchronously restores a snapshot with restore-point + rollback.
 // @Summary Restore a database backup
-// @Description Restore the named dump. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
+// @Description Restore the named SQLite snapshot. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
 // @Tags settings
 // @Produce json
 // @Security BearerAuth

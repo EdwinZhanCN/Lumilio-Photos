@@ -10,7 +10,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?style=for-the-badge&logo=postgresql&logoColor=f5f5f5)](https://www.postgresql.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=f5f5f5)](https://sqlite.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge&logo=gnu)](LICENSE)
 
 </div>
@@ -41,7 +41,7 @@ Lumilio Photos 将原始文件和应用数据保存在你所控制的基础设�
 | Linux 服务器或 NAS | 使用下方基于已发布镜像的 Docker Compose 配置 |
 | 贡献者开发环境 | 使用 `make setup` 和 `make dev` 从源码运行 |
 
-桌面应用内置独立的 PostgreSQL 运行时和所需媒体工具。应用运行在 Windows 系统托盘或 macOS 菜单栏中，并通过默认浏览器打开 `http://localhost:6680`。各平台的详细步骤和当前签名限制请参阅[安装指南](site/docs/zh-cn/user-manual/introduction/installation.md)。
+桌面应用包含嵌入式 SQLite catalog 和所需媒体工具。应用运行在 Windows 系统托盘或 macOS 菜单栏中，并通过默认浏览器打开 `http://localhost:6680`。各平台的详细步骤和当前签名限制请参阅[安装指南](site/docs/zh-cn/user-manual/introduction/installation.md)。
 
 ### Docker Compose
 
@@ -65,7 +65,7 @@ LUMILIO_VERSION=v1.0.0 \
 ```
 
 > [!IMPORTANT]
-> 完整 schema v2 runtime manifest 固定在镜像的 `/app/config/server.toml`；普通环境变量不会覆盖不可变策略。容器运行时不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`。请在“设置 → 服务器”中创建一致性快照，并单独备份媒体目录。
+> 完整 schema v2 runtime manifest 固定在镜像的 `/app/config/server.toml`；普通环境变量不会覆盖不可变策略。流明集运行时，不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`，也不要用宿主机 SQLite 工具打开它们；跨容器挂载边界会破坏 WAL 锁协调。请在“设置 → 服务器”中创建一致性快照，并单独备份媒体目录。
 
 ## 本地开发
 
@@ -73,9 +73,10 @@ LUMILIO_VERSION=v1.0.0 \
 
 - Go 1.25+
 - [Vite+](https://viteplus.dev/) 及其支持的 Node.js 运行时
-- Docker 与 Compose v2
 - Make
 - Rust 和 `wasm-pack`（仅在重新构建浏览器 WASM 包时需要）
+- 原生媒体库与工具：libvips、libraw、FFmpeg 和 ExifTool
+- Docker 与 Compose v2（仅用于容器交付和 E2E 工作流）
 
 克隆项目并启动开发环境：
 
@@ -86,13 +87,12 @@ make setup
 make dev
 ```
 
-`make dev` 会启动位于宿主机 `5433` 端口的 PostgreSQL、位于 `6680` 端口的 API，以及位于 `6657` 端口的 Web 应用。`make setup` 会复制完整的 schema v1 manifest 到被 Git 忽略的 `server/config/server.local.toml`，并幂等创建数据库 bootstrap secret。服务端不提供配置默认值或环境变量覆盖；拉取此破坏性变更后，请运行 `make dev-reset` 删除不兼容的旧开发数据库/配置状态并重建。
+`make dev` 会启动位于 `6680` 端口的 API 和位于 `6657` 端口的 Web 应用；SQLite 嵌入在 Go 进程中，不需要数据库服务。`make setup` 会复制完整的 schema v2 manifest 到被 Git 忽略的 `server/config/server.local.toml`。默认开发 catalog 位于 `server/.local/lumilio/library.sqlite3`，媒体仍位于 `server/data/storage`。服务端不提供配置默认值或普通环境变量覆盖。
 
 ### 常用命令
 
 ```bash
-make dev              # 启动数据库、服务端和 Web 应用
-make db               # 启动开发用 PostgreSQL 服务
+make dev              # 启动服务端和 Web 开发进程
 make server-dev       # 仅启动 API 服务
 make web-dev          # 仅启动 Web 开发服务器
 make test             # 运行服务端和前端质量检查
@@ -102,7 +102,7 @@ make web-browser-test # 构建并运行生产环境浏览器冒烟测试
 make desktop-test     # 运行桌面端模块测试
 make dto              # 重新生成 OpenAPI 文档和前端 API 类型
 make db-reset         # 删除开发数据库状态（破坏性操作）
-make dev-reset        # 重建配置、bootstrap secret 与数据库状态（破坏性操作）
+make dev-reset        # 重建本地配置与 SQLite 状态，并保留媒体
 ```
 
 版本化的 demo 与 E2E 媒体来自独立发布的
@@ -127,7 +127,7 @@ profile；运行 `vp run assets:sync -- --profile=e2e` 可同步同一锁定 rev
 | --- | --- |
 | `server/` | Go API、处理队列、存储、数据库迁移和外部集成 |
 | `web/` | React 19 与 TypeScript Web 应用 |
-| `desktop/` | Wails v3 桌面宿主和独立 PostgreSQL 管理程序 |
+| `desktop/` | Wails v3 桌面宿主，内嵌 Server 与 SQLite catalog |
 | `wasm/` | 浏览器端媒体处理流程使用的 Rust WebAssembly 包 |
 | `site/` | 基于 VitePress 的用户与开发文档 |
 

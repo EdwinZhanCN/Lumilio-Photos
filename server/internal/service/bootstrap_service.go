@@ -8,19 +8,18 @@ import (
 )
 
 // Bootstrap phases. SQLite is already open and migrated when reconciliation
-// runs, so db_rotated now denotes "database ready, owner registration pending"
-// for wire compatibility with existing clients.
+// runs, so catalog_ready denotes "owner registration pending".
 const (
 	BootstrapPhaseFresh        = "fresh"
-	BootstrapPhaseDBRotated    = "db_rotated"
+	BootstrapPhaseCatalogReady = "catalog_ready"
 	BootstrapPhaseAdminCreated = "admin_created"
 	BootstrapPhaseReady        = "ready"
 )
 
 // BootstrapService is the single source of truth for the first-run bootstrap
-// phase. The phase is computed from the setup gates (rotated DB credential,
-// admin user, exactly one active primary repository) in one place and cached in
-// system_state, so request paths read one column instead of re-probing.
+// phase. The phase is computed from the setup gates (admin user and exactly one
+// active primary repository) in one place and cached in system_state, so request
+// paths read one column instead of re-probing.
 type BootstrapService interface {
 	// Phase returns the cached bootstrap phase.
 	Phase(ctx context.Context) (string, error)
@@ -80,7 +79,7 @@ func (s *bootstrapService) compute(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("count admin users: %w", err)
 	}
 	if admins == 0 {
-		return BootstrapPhaseDBRotated, nil
+		return BootstrapPhaseCatalogReady, nil
 	}
 
 	primaries, err := s.queries.CountPrimaryRepositories(ctx)

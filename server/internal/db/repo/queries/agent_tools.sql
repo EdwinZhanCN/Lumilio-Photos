@@ -4,6 +4,9 @@
 -- name: GetAssetIDsByPersonIDs :many
 -- search_people producer: assets containing at least one of the given people
 -- (union semantics; the agent intersects refs for "both people" requests).
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('person_ids') AS TEXT) AS person_ids_json
+)
 SELECT a.asset_id
 FROM assets a
 WHERE a.is_deleted = false
@@ -13,7 +16,10 @@ WHERE a.is_deleted = false
     FROM face_items fi
     JOIN face_cluster_members fcm ON fcm.face_id = fi.id
     WHERE fi.asset_id = a.asset_id
-      AND fcm.cluster_id IN (sqlc.slice('person_ids'))
+      AND fcm.cluster_id IN (
+        SELECT CAST(value AS INTEGER)
+        FROM json_each((SELECT person_ids_json FROM filter_params))
+      )
   )
 ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
 LIMIT sqlc.arg('limit');
@@ -47,9 +53,12 @@ ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
 
 -- name: AgentRankAssetIDsByTime :many
 -- Owner-scoped rank(by=time) for Agent refs.
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT asset_id
 FROM assets
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
   AND is_deleted = false
 ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
@@ -58,10 +67,13 @@ ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
 -- rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
 -- head when available, falling back to the legacy heuristic (rating, liked,
 -- resolution) for unscored assets. Callers reverse for descending order.
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT a.asset_id
 FROM assets a
 LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
-WHERE a.asset_id IN (sqlc.slice('asset_ids'))
+WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = sqlc.arg('user_id')
   AND a.is_deleted = false
 ORDER BY COALESCE(
@@ -90,9 +102,12 @@ LIMIT sqlc.arg('limit');
 
 -- name: AgentInspectAssets :many
 -- inspect observer: per-asset EXIF facets for small refs.
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT asset_id, type, specific_metadata
 FROM assets
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
   AND is_deleted = false;
 
@@ -100,6 +115,9 @@ WHERE asset_id IN (sqlc.slice('asset_ids'))
 -- peek observer: minimal per-asset fields plus place + people; snapshot order
 -- restored in Go. place/people are correlated subqueries so each asset stays a
 -- single row (no fan-out from the cluster joins).
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT
     a.asset_id,
     a.original_filename,
@@ -126,16 +144,19 @@ SELECT
           AND fc.cluster_name <> ''
     ) AS people
 FROM assets a
-WHERE a.asset_id IN (sqlc.slice('asset_ids'))
+WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = sqlc.arg('user_id')
   AND a.is_deleted = false;
 
 -- name: AgentCapturedTimes :many
 -- Capture times for a set of assets, for the sample tool's distribution
 -- summary. Order is irrelevant; bucketing happens in Go.
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT COALESCE(taken_time, upload_time) AS captured_at
 FROM assets
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
   AND is_deleted = false;
 
@@ -148,9 +169,12 @@ ORDER BY upload_time ASC, asset_id ASC;
 
 -- name: AgentRankAssetIDsByUploadTime :many
 -- Owner-scoped "recently added" order for Agent refs.
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT asset_id
 FROM assets
-WHERE asset_id IN (sqlc.slice('asset_ids'))
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
   AND is_deleted = false
 ORDER BY upload_time ASC, asset_id ASC;
@@ -158,9 +182,12 @@ ORDER BY upload_time ASC, asset_id ASC;
 -- name: AgentAssetAestheticScores :many
 -- Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
 -- omitted; callers that filter by quality percentile drop them.
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
 SELECT aqs.asset_id, aqs.score
 FROM asset_quality_scores aqs
 JOIN assets a USING (asset_id)
-WHERE aqs.asset_id IN (sqlc.slice('asset_ids'))
+WHERE aqs.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = sqlc.arg('user_id')
   AND a.is_deleted = false;

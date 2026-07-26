@@ -49,8 +49,24 @@ func (q *Queries) CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsBy
 }
 
 const createAlbum = `-- name: CreateAlbum :one
-INSERT INTO albums (user_id, album_name, description, cover_asset_id, album_type)
-VALUES (?1, ?2, ?3, ?4, ?5)
+INSERT INTO albums (
+    user_id,
+    album_name,
+    description,
+    cover_asset_id,
+    album_type,
+    created_at,
+    updated_at
+)
+VALUES (
+    ?1,
+    ?2,
+    ?3,
+    ?4,
+    ?5,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id, album_type
 `
 

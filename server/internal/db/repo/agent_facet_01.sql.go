@@ -7,12 +7,12 @@ package repo
 
 import (
 	"context"
-	"strings"
-
-	"github.com/google/uuid"
 )
 
 const agentFacetTimeHistogram = `-- name: AgentFacetTimeHistogram :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT
     strftime(
         CASE
@@ -26,7 +26,7 @@ SELECT
     ) AS bucket,
     COUNT(*) AS count
 FROM assets a
-WHERE a.asset_id IN (/*SLICE:asset_ids*/?)
+WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.is_deleted = false
 GROUP BY 1
 ORDER BY 1
@@ -34,7 +34,7 @@ ORDER BY 1
 
 type AgentFacetTimeHistogramParams struct {
 	Granularity interface{} `db:"granularity" json:"granularity"`
-	AssetIds    []uuid.UUID `db:"asset_ids" json:"asset_ids"`
+	AssetIds    *string     `db:"asset_ids" json:"asset_ids"`
 }
 
 type AgentFacetTimeHistogramRow struct {
@@ -44,18 +44,7 @@ type AgentFacetTimeHistogramRow struct {
 
 // granularity is 'hour', 'day', 'month' or 'year'.
 func (q *Queries) AgentFacetTimeHistogram(ctx context.Context, arg AgentFacetTimeHistogramParams) ([]AgentFacetTimeHistogramRow, error) {
-	query := agentFacetTimeHistogram
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Granularity)
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentFacetTimeHistogram, arg.Granularity, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}

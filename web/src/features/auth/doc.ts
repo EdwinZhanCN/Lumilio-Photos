@@ -42,7 +42,7 @@
  *
  * ## Capabilities and rules
  *
- * {@link ProtectedRoute}, {@link BootstrapGate}, {@link SetupGate}, and
+ * {@link ProtectedRoute}, {@link BootstrapGate}, and
  * {@link PrimaryRepositoryGate} are access/setup capabilities used by app
  * composition, not page components. Browser WebAuthn conversion stays in the
  * isolated {@link getPasskeySupport} module, while deterministic credential
@@ -59,7 +59,6 @@ import type { normalizeUsernameInput } from "./model/credentialPolicy.ts";
 import type BootstrapGate from "./modules/access/BootstrapGate.tsx";
 import type PrimaryRepositoryGate from "./modules/access/PrimaryRepositoryGate.tsx";
 import type ProtectedRoute from "./modules/access/ProtectedRoute.tsx";
-import type SetupGate from "./modules/access/SetupGate.tsx";
 import type { getPasskeySupport } from "./modules/webauthn/webauthn.ts";
 import type { AuthProvider } from "./state/AuthProvider.tsx";
 import type { resetSession } from "./state/resetSession.ts";

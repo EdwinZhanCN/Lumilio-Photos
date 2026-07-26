@@ -594,23 +594,6 @@
       "saving": "Saving…",
       "submit": "Set password and continue",
       "title": "Choose a new password"
-    },
-    "setup": {
-      "error": "Setup failed. Check the server logs and try again.",
-      "gate": {
-        "loading": "Checking system status…",
-        "statusError": "Unable to verify system status."
-      },
-      "welcome": {
-        "body": "Before the first account is created, Lumilio secures the database and generates an application key. This runs once and takes a few seconds.",
-        "cta": "Begin initialization",
-        "keyBody": "Used to sign sessions and encrypt secrets; kept in .secrets and never leaves this server.",
-        "keyTitle": "Generate the application key",
-        "rotateBody": "Replaces the temporary bootstrap password with a high-entropy secret stored under your storage root.",
-        "rotateTitle": "Rotate the database credential",
-        "title": "Initialize this server",
-        "working": "Securing database credentials…"
-      }
     }
   },
   "bulk": {

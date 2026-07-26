@@ -248,10 +248,9 @@ type CloudControllerInterface interface {
 	TriggerSync(c *gin.Context)                   // POST   /cloud/sync (deprecated)
 }
 
-// SetupControllerInterface defines the zero-config first-run setup endpoints.
+// SetupControllerInterface defines the zero-config first-run status endpoint.
 type SetupControllerInterface interface {
 	GetSetupStatus(c *gin.Context) // GET  /setup/status
-	Setup(c *gin.Context)          // POST /setup
 }
 
 // ShareLinkControllerInterface defines the share link endpoints: owner-scoped
@@ -325,7 +324,6 @@ func NewRouter(
 		setup := v1.Group("/setup")
 		{
 			setup.GET("/status", setupController.GetSetupStatus)
-			setup.POST("", trustedSessionOrigin, setupController.Setup)
 		}
 
 		settings := v1.Group("/settings")

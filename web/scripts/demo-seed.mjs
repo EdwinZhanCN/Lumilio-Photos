@@ -62,7 +62,6 @@ async function api(pathname, { method = "GET", body, token, form } = {}) {
 /** Brings an empty instance up to an authenticated admin session. */
 async function ensureAdmin() {
   const status = await api("/api/v1/setup/status");
-  if (!status.database_initialized) await api("/api/v1/setup", { method: "POST", body: "{}" });
 
   if (!status.admin_initialized) {
     return api("/api/v1/auth/register/start", {

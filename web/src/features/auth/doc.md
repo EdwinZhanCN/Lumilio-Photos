@@ -41,7 +41,7 @@ Route entries stay thin and delegate to workflow-owned implementations:
 
 ## Capabilities and rules
 
-[ProtectedRoute](./modules/access/ProtectedRoute.tsx), [BootstrapGate](./modules/access/BootstrapGate.tsx), [SetupGate](./modules/access/SetupGate.tsx), and
+[ProtectedRoute](./modules/access/ProtectedRoute.tsx), [BootstrapGate](./modules/access/BootstrapGate.tsx), and
 [PrimaryRepositoryGate](./modules/access/PrimaryRepositoryGate.tsx) are access/setup capabilities used by app
 composition, not page components. Browser WebAuthn conversion stays in the
 isolated [getPasskeySupport](./modules/webauthn/webauthn.ts) module, while deterministic credential

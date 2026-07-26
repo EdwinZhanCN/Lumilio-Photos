@@ -81,6 +81,11 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 	}
 	dbConfig := appConfig.DatabaseConfig
 
+	// govips owns process-global libvips state and cannot be restarted after a
+	// shutdown. Keep it alive across in-process SQLite restore generations and
+	// repeated embedded Run calls; process exit releases the native runtime.
+	imaging.StartVips()
+
 	for {
 		if _, err := dbbackup.ApplyPendingRestore(context.WithoutCancel(ctx), dbConfig.Path, nil); err != nil {
 			return fmt.Errorf("apply pending SQLite restore: %w", err)
@@ -174,11 +179,6 @@ func run(
 	// both externally (ctx cancelled) and internally (defer cancel on return).
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	// Initialize libvips runtime once. ConcurrencyLevel=1 keeps libvips internal
-	// thread pool disabled; outer parallelism is governed by River worker counts.
-	imaging.StartVips()
-	defer imaging.ShutdownVips()
 
 	// Ensure the default media root and explicitly separate private cloud/backup
 	// directories exist before any service reads them.
@@ -452,7 +452,7 @@ func run(
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL)
-	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, sqlDB, bootstrapService, repoManager, appConfig.StorageConfig.Path))
+	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	locationController := handler.NewLocationHandler(locationService, queueClient)

@@ -53,8 +53,9 @@ func TestAssetSetSourceFlowsIntoSearchFilters(t *testing.T) {
 	require.Equal(t, ids, filter.AssetIDs)
 
 	filenameParams := filenameMembershipParams(params)
-	filenameIDs, ok := filenameParams.AssetIds.(dbtypes.UUIDs)
-	require.True(t, ok)
+	require.NotNil(t, filenameParams.AssetIds)
+	var filenameIDs dbtypes.UUIDs
+	require.NoError(t, filenameIDs.Scan(*filenameParams.AssetIds))
 	require.Equal(t, dbtypes.UUIDs(ids), filenameIDs)
 }
 

@@ -112,7 +112,7 @@ SELECT a.asset_id,
        a.owner_id,
        a.original_filename,
        a.mime_type,
-       CAST(json_extract(a.specific_metadata, '$.is_raw') AS INTEGER) AS is_raw,
+       CAST(COALESCE(json_extract(a.specific_metadata, '$.is_raw'), 0) AS INTEGER) AS is_raw,
        CAST(COALESCE(json_extract(a.specific_metadata, '$.camera_model'), '') AS TEXT) AS camera_model,
        CAST(COALESCE(
            NULLIF(json_extract(a.exif_raw, '$.BurstUUID'), ''),

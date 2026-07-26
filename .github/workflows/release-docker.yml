@@ -1,7 +1,7 @@
 name: Release Docker
 
-# Builds multi-arch (amd64 + arm64) images for the Linux/Docker distribution
-# and publishes them to GHCR. Each architecture builds natively (no QEMU) and
+# Builds the multi-arch (amd64 + arm64) image for the Linux/Docker distribution
+# and publishes it to GHCR. Each architecture builds natively (no QEMU) and
 # pushes by digest; a merge job then assembles the multi-arch manifest.
 #
 # Tags: vX.Y.Z tag push → version tags (+ latest for stable releases);
@@ -22,12 +22,11 @@ env:
 
 jobs:
     build:
-        name: ${{ matrix.image }} (${{ matrix.arch }})
+        name: lumilio-server (${{ matrix.arch }})
         runs-on: ${{ matrix.runner }}
         strategy:
             fail-fast: false
             matrix:
-                image: [server, web, db]
                 arch: [amd64, arm64]
                 include:
                     - arch: amd64
@@ -36,15 +35,6 @@ jobs:
                       runner: ubuntu-24.04-arm
         steps:
             - uses: actions/checkout@v7
-
-            - name: Resolve Dockerfile
-              id: df
-              run: |
-                  case "${{ matrix.image }}" in
-                      server) echo "file=server/Dockerfile" >> "$GITHUB_OUTPUT" ;;
-                      web)    echo "file=web/Dockerfile" >> "$GITHUB_OUTPUT" ;;
-                      db)     echo "file=server/db.Dockerfile" >> "$GITHUB_OUTPUT" ;;
-                  esac
 
             - uses: docker/setup-buildx-action@v4
 
@@ -59,17 +49,17 @@ jobs:
               uses: docker/build-push-action@v7
               with:
                   context: .
-                  file: ${{ steps.df.outputs.file }}
+                  file: server/Dockerfile
                   platforms: linux/${{ matrix.arch }}
                   build-args: |
                       VERSION=${{ github.ref_name }}
-                  # Only web/Dockerfile mounts this (GitHub Packages npm auth
-                  # for @edwinzhancn/docts); unused by server/db builds.
+                  # The web-builder stage mounts this for GitHub Packages npm
+                  # auth used by @edwinzhancn/docts.
                   secrets: |
                       npmrc=//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
-                  outputs: type=image,name=${{ env.IMAGE_BASE }}/lumilio-${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
-                  cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
-                  cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+                  outputs: type=image,name=${{ env.IMAGE_BASE }}/lumilio-server,push-by-digest=true,name-canonical=true,push=true
+                  cache-from: type=gha,scope=server-${{ matrix.arch }}
+                  cache-to: type=gha,mode=max,scope=server-${{ matrix.arch }}
 
             - name: Export digest
               run: |
@@ -79,24 +69,20 @@ jobs:
 
             - uses: actions/upload-artifact@v7
               with:
-                  name: digests-${{ matrix.image }}-${{ matrix.arch }}
+                  name: digests-server-${{ matrix.arch }}
                   path: /tmp/digests/*
                   if-no-files-found: error
                   retention-days: 1
 
     merge:
-        name: manifest (${{ matrix.image }})
+        name: manifest (lumilio-server)
         runs-on: ubuntu-24.04
         needs: build
-        strategy:
-            fail-fast: false
-            matrix:
-                image: [server, web, db]
         steps:
             - name: Download digests
               uses: actions/download-artifact@v8
               with:
-                  pattern: digests-${{ matrix.image }}-*
+                  pattern: digests-server-*
                   path: /tmp/digests
                   merge-multiple: true
 
@@ -112,7 +98,7 @@ jobs:
               id: meta
               uses: docker/metadata-action@v6
               with:
-                  images: ${{ env.IMAGE_BASE }}/lumilio-${{ matrix.image }}
+                  images: ${{ env.IMAGE_BASE }}/lumilio-server
                   tags: |
                       type=semver,pattern={{version}}
                       type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
@@ -124,7 +110,7 @@ jobs:
               run: |
                   docker buildx imagetools create \
                       $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< '${{ steps.meta.outputs.json }}') \
-                      $(printf '${{ env.IMAGE_BASE }}/lumilio-${{ matrix.image }}@sha256:%s ' *)
+                      $(printf '${{ env.IMAGE_BASE }}/lumilio-server@sha256:%s ' *)
 
             - name: Inspect manifest
-              run: docker buildx imagetools inspect "${{ env.IMAGE_BASE }}/lumilio-${{ matrix.image }}:${{ steps.meta.outputs.version }}"
+              run: docker buildx imagetools inspect "${{ env.IMAGE_BASE }}/lumilio-server:${{ steps.meta.outputs.version }}"

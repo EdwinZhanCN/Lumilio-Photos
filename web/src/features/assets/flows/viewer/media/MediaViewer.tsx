@@ -1,5 +1,5 @@
-import React, { useEffect, useId, useMemo, useState } from "react";
-import { MediaPlayer, MediaProvider } from "@vidstack/react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from "@vidstack/react";
 import { useSearchParams } from "react-router-dom";
 
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -55,6 +55,15 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
     const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
   }, [searchParams, startTimeMsProp]);
+  const videoStartTimeSeconds =
+    startTimeMs != null && Number.isFinite(startTimeMs) && startTimeMs > 0
+      ? startTimeMs / 1000
+      : undefined;
+  const videoPlayerRef = useRef<MediaPlayerInstance>(null);
+  const seekToSemanticMatch = useCallback(() => {
+    if (videoStartTimeSeconds == null || videoPlayerRef.current == null) return;
+    videoPlayerRef.current.currentTime = videoStartTimeSeconds;
+  }, [videoStartTimeSeconds]);
   const videoAsset = isVideo(asset);
   const mediaItemQuery = useAssetMediaItem(asset.asset_id, isActive);
   const mediaItem = mediaItemQuery.data?.media_item;
@@ -102,16 +111,14 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
       <div className={`h-screen w-screen flex items-center justify-center ${className}`}>
         <div className="w-full max-w-6xl h-auto max-h-[90vh]">
           <MediaPlayer
+            ref={videoPlayerRef}
             title={asset.original_filename || t("assets.mediaViewer.video_title")}
             src={webVideoUrl}
             load="visible"
             crossOrigin
             playsInline
-            currentTime={
-              startTimeMs != null && Number.isFinite(startTimeMs) && startTimeMs > 0
-                ? startTimeMs / 1000
-                : undefined
-            }
+            currentTime={videoStartTimeSeconds}
+            onCanPlay={seekToSemanticMatch}
             onError={(error) => console.error("Video player error:", error)}
           >
             <MediaProvider />

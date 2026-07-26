@@ -68,7 +68,7 @@ iCloud 导入依赖非 Apple 官方支持的网络服务行为，因此属于**�
 流明集的主要组件包括：
 
 - 基于 Go 的 API、媒体处理与后台任务服务。
-- PostgreSQL 与 pgvector 数据存储。
+- SQLite catalog、FTS5 与 sqlite-vec 数据和搜索层。
 - 基于 React、TypeScript 与 Vite 的 Web 界面。
 - 基于 Wails 的 Desktop 宿主。
 - 用于浏览器侧哈希、导出和媒体处理的 Rust/WASM 组件。

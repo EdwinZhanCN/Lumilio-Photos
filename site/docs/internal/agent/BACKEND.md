@@ -9,7 +9,6 @@ This document describes the current Go backend as implemented in `server/`.
 - Tracked config template: `server/config/server.example.toml`.
 - Ignored local config file: `server/config/server.local.toml`.
 - Docker image: `server/Dockerfile`.
-- Database image: `server/db.Dockerfile`.
 
 Startup ownership is split between the thin CLI host and the shared app runtime:
 
@@ -19,21 +18,22 @@ Startup ownership is split between the thin CLI host and the shared app runtime:
 2. `server/app.Run` owns the actual runtime bootstrap:
    - initialize logging
    - start libvips runtime
-   - run database migrations
-   - open PostgreSQL pool and generated query layer
+   - open the single-writer SQLite catalog
+   - run application and River migrations
+   - construct the generated query layer
    - initialize settings, repository storage, River queues, ML services, processors, handlers, and router
    - start the HTTP server on `server.port`
 
 ## Configuration Boundary
 
-Runtime-immutable configuration is a complete schema v1 manifest, not a defaults
+Runtime-immutable configuration is a complete schema v2 manifest, not a defaults
 or override layer. Missing, unknown, legacy, contradictory, or invalid fields
 fail startup. Relative paths use the manifest directory. Startup logs the
 absolute path, schema version, and source SHA-256 without logging secret content.
 
 Desktop is a host wrapper, not a second server bootstrap: the supervisor prepares
-private PostgreSQL, app-data paths, secrets, bundled media tools, and the SPA
-root, compiles `desktop/supervisor/server.template.toml`, atomically writes
+app-data paths, bundled media tools, and the SPA root, compiles
+`desktop/supervisor/server.template.toml`, atomically writes
 app-data `config/server.toml` with mode `0600`, reloads it through the same
 strict loader, then calls `app.Run`. A write or reload error blocks startup.
 
@@ -43,11 +43,10 @@ does not narrow their backend test surface: the App embeds the complete runtime,
 so both Desktop platforms run all Server tests in their native CI environment.
 
 TOML contains all immutable database/server/logging/storage/scanner/geocoding/
-auth/transcode/Lumen/tool decisions. Database bootstrap, rotated database, and
-app root secrets are file references only. Bootstrap must be readable and
-non-empty; rotated may be absent until setup; the app key may be created at its
-explicit path. No secret value appears in TOML, generated desktop manifests, or
-logs.
+auth/transcode/Lumen/tool decisions. `[database]` contains only the explicit
+persistent catalog path. The application secret is a file reference and may be
+created at that exact path on first start. No secret value appears in TOML,
+generated desktop manifests, or logs.
 
 Standalone accepts diagnostics through `--pprof-addr` and
 `--agent-audit-log`. Agent ref hot memory is bounded by the single-run
@@ -89,7 +88,7 @@ setup, the primary repository defaults to:
 
 Repository identity is explicit in the database through `repositories.role`
 (`primary` or `regular`). The app is fully initialized only when database
-credential setup is complete, an admin exists, and exactly one active primary
+catalog is open, an admin exists, and exactly one active primary
 repository exists. Repository config lives in `.lumiliorepo` files and is handled
 by `internal/storage/repocfg`.
 
@@ -99,10 +98,10 @@ and never an arbitrary host path. External root grants, existing repository
 attachment, and explicit moved-vs-copied conflict resolution are Desktop-only
 operations performed through the native picker and in-process control plane.
 
-`storage.cloud_state_path` and `storage.backups_path`, database/auth secrets,
-and logs are machine-bound app state and must be outside `storage.path`. A media
-root can therefore move without carrying credentials, cloud sessions, or the
-database backup policy with it.
+The SQLite catalog, `storage.cloud_state_path`, `storage.backups_path`, auth
+secrets, and logs are machine-bound app state and must be outside
+`storage.path`. A media root can therefore move without carrying credentials,
+cloud sessions, or the database backup policy with it.
 
 Repositories are unowned shared storage; per-user visibility and mutation
 authorization run entirely on `assets.owner_id`. The first account is the Host
@@ -117,6 +116,17 @@ Owner identity is instance-local database policy rather than portable
 
 ## Database And API Contracts
 
+- `github.com/mattn/go-sqlite3` is the only database driver. `internal/db.Open`
+  fixes the writer pool at one connection, applies the required pragmas, and
+  registers sqlite-vec statically.
+- Application tables and River queues share the same catalog and can commit
+  business state plus `InsertTx` jobs in one short `database/sql` transaction.
+- A running catalog must never be opened or copied through a host/container
+  mount with another SQLite process. Host and container VFS locking is not a
+  supported coordination boundary; use the application Online Backup flow, or
+  inspect the catalog only after a graceful application stop.
+- FTS5 and sqlite-vec tables are derived query structures; authoritative text
+  and embedding data remains in ordinary application tables.
 - Migrations live in `server/migrations`.
 - Generated sqlc code lives under `server/internal/db/repo`.
 - Generated OpenAPI output lives in `server/docs`.
@@ -216,7 +226,7 @@ rendering proportional to the visible region instead of the full GPS library.
 
 Photos maps every Lumen SDK field it consumes directly from `[lumen]`; it never
 calls SDK defaults or env loading. ML and LLM feature settings remain
-runtime-mutable PostgreSQL settings and do not belong in `AppConfig`. Zero-shot
+runtime-mutable catalog settings and do not belong in `AppConfig`. Zero-shot
 classifier preview is exposed through `/api/v1/classifiers/preview`.
 
 The app should remain useful when ML/LLM features are disabled.
@@ -234,7 +244,7 @@ needed by media dependencies on macOS. Only run the direct command when you have
 a concrete reason and preserve the same environment:
 
 ```bash
-cd server && go test ./...
+cd server && go test -tags=sqlite_fts5 ./...
 ```
 
 Run `gofmt` on changed Go files.

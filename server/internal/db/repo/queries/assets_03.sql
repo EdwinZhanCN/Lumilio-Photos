@@ -1,13 +1,25 @@
 -- name: CountAssetsUnified :one
 -- Count query matching GetAssetsUnified WHERE clause
 -- Returns total count of assets matching the filters (for pagination)
+WITH filter_params AS (
+  SELECT
+    CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json,
+    CAST(sqlc.narg('asset_types') AS TEXT) AS asset_types_json,
+    CAST(sqlc.narg('tag_names') AS TEXT) AS tag_names_json
+)
 SELECT COUNT(*) as count
 FROM assets a
 WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
-  AND (sqlc.narg('asset_ids') IS NULL OR a.asset_id IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_ids') AS TEXT))))
+  AND (
+    (SELECT asset_ids_json FROM filter_params) IS NULL
+    OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  )
   AND (sqlc.narg('query') IS NULL OR a.original_filename LIKE '%' || sqlc.narg('query') || '%')
   AND (sqlc.narg('asset_type') IS NULL OR a.type = sqlc.narg('asset_type'))
-  AND (sqlc.narg('asset_types') IS NULL OR a.type IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_types') AS TEXT))))
+  AND (
+    (SELECT asset_types_json FROM filter_params) IS NULL
+    OR a.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
+  )
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (
@@ -59,14 +71,14 @@ WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
     )
   )
   AND (
-    sqlc.narg('tag_names') IS NULL
+    (SELECT tag_names_json FROM filter_params) IS NULL
     OR (
       SELECT COUNT(DISTINCT t2.tag_name)
       FROM asset_tags at2
       JOIN tags t2 ON t2.tag_id = at2.tag_id
       WHERE at2.asset_id = a.asset_id
-        AND t2.tag_name IN (SELECT value FROM json_each(CAST(sqlc.narg('tag_names') AS TEXT)))
-    ) = json_array_length(CAST(sqlc.narg('tag_names') AS TEXT))
+        AND t2.tag_name IN (SELECT value FROM json_each((SELECT tag_names_json FROM filter_params)))
+    ) = json_array_length((SELECT tag_names_json FROM filter_params))
   )
   AND (sqlc.narg('filename_val') IS NULL OR
     CASE COALESCE(sqlc.narg('filename_operator'), 'contains')
@@ -120,4 +132,3 @@ WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
     )
     )
   );
-

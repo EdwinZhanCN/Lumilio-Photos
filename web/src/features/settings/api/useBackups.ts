@@ -6,8 +6,8 @@ export type BackupEntry = Schemas["dto.BackupEntryDTO"];
 
 export const backupsQueryKey = ["get", "/api/v1/settings/backups"] as const;
 
-/** Lists database dumps, newest first. Pass poll=true to refetch every few
- * seconds (used briefly after "back up now", whose dump appears when the
+/** Lists SQLite snapshots, newest first. Pass poll=true to refetch every few
+ * seconds (used briefly after "back up now", whose snapshot appears when the
  * background job finishes). */
 export function useBackups(poll = false) {
   return $api.useQuery(

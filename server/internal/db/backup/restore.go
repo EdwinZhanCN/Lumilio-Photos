@@ -155,7 +155,7 @@ func ApplyPendingRestore(ctx context.Context, activePath string, logf Logf) (boo
 			_ = os.Remove(stagedPath)
 		}
 	}()
-	stagedInfo, err := db.InspectCatalog(ctx, stagedPath)
+	stagedInfo, err := db.InspectStandaloneCatalog(ctx, stagedPath)
 	if err != nil {
 		return false, fmt.Errorf("validate staged active SQLite catalog: %w", err)
 	}

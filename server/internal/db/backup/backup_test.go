@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -81,6 +82,11 @@ func TestCreateSnapshotIsStandaloneAndChecksumProtected(t *testing.T) {
 	}
 	if info.LibraryID != compatibility.LibraryID || manifest.QuickCheck != "ok" {
 		t.Fatalf("snapshot identity/check = %q/%q", info.LibraryID, manifest.QuickCheck)
+	}
+	for _, sidecar := range []string{snapshot.Path + "-wal", snapshot.Path + "-shm"} {
+		if _, err := os.Stat(sidecar); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("snapshot validation left SQLite sidecar %s: %v", sidecar, err)
+		}
 	}
 
 	location := &url.URL{Scheme: "file", Path: snapshot.Path}

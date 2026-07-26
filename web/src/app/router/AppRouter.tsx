@@ -1,6 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
-import { BootstrapGate, PrimaryRepositoryGate, ProtectedRoute, SetupGate } from "@/features/auth";
+import { BootstrapGate, PrimaryRepositoryGate, ProtectedRoute } from "@/features/auth";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { UploadProvider } from "@/features/upload";
 import AppShellLayout from "@/app/shell/AppShellLayout";
@@ -19,7 +19,7 @@ export default function AppRouter(): ReactNode {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public share routes render outside SetupGate/BootstrapGate:
+        {/* Public share routes render outside BootstrapGate:
             a recipient with a valid token must never be redirected
             through first-run setup or forced to authenticate. */}
         {shareRoutes.map((route) => (
@@ -27,11 +27,9 @@ export default function AppRouter(): ReactNode {
         ))}
         <Route
           element={
-            <SetupGate>
-              <BootstrapGate>
-                <Outlet />
-              </BootstrapGate>
-            </SetupGate>
+            <BootstrapGate>
+              <Outlet />
+            </BootstrapGate>
           }
         >
           {publicRoutes.map((route) => (

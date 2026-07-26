@@ -16,10 +16,9 @@ Its pipeline is:
 
 ```text
 explicit TOML path
-  → strict schema v1 decode (unknown/missing fields fail)
+  → strict schema v2 decode (unknown/missing fields fail)
   → aggregate value and cross-field validation
   → resolve relative paths from the manifest directory
-  → resolve bootstrap/rotated secret files
   → attach absolute path + schema version + source SHA-256
   → validated AppConfig
 ```
@@ -54,7 +53,7 @@ flowchart LR
     Settings["desktop-settings.json + resources"] --> Compiler["desktop template compiler"]
     Compiler --> Manifest["app-data/config/server.toml (0600)"]
     Manifest --> Loader
-    Secrets["referenced secret files"] --> Loader
+    SecretPaths["explicit application secret paths"] --> Loader
     Loader --> AppConfig["validated AppConfig"]
     AppConfig --> App["app.Run composition root"]
     Controls["CLI diagnostics / break-glass host controls"] --> App

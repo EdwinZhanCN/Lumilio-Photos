@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { gzipSync } from "node:zlib";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "playwright/test";
@@ -52,26 +52,36 @@ async function createRepository(token: string, name: string): Promise<Repository
 }
 
 async function repositoryExists(token: string, repositoryID: string): Promise<boolean> {
-  const repositories = (await api<RepositoryList>("/api/v1/repositories", { token }))
-    .repositories;
+  const repositories = (await api<RepositoryList>("/api/v1/repositories", { token })).repositories;
   return repositories?.some((repository) => repository.id === repositoryID) ?? false;
+}
+
+async function repositoryPresence(token: string, repositoryID: string): Promise<boolean | null> {
+  try {
+    return await repositoryExists(token, repositoryID);
+  } catch {
+    // A successful restore deliberately drains and recreates the HTTP runtime.
+    // A transport reset proves neither presence nor absence; keep polling until
+    // the new generation answers from the restored catalog.
+    return null;
+  }
 }
 
 /**
  * Failure injection is limited to the private backup directory. The restore
  * itself, and every state assertion, still cross the public admin API/UI; the
- * harness never edits PostgreSQL directly.
+ * harness never edits the SQLite catalog directly.
  */
-function installCorruptBackupFixture(): string {
-  const name = "lumilio-db-backup-20991231T235959-ve2e-corrupt-pg18.0.sql.gz";
-  const target = `/data/app-state/backups/${name}`;
+function writePrivateBackupFixture(target: string, input: string | Buffer): void {
   const result = spawnSync(
     "docker",
     [
       ...compose,
       "exec",
       "-T",
-      "server",
+      "--user",
+      "app",
+      "lumilio",
       "sh",
       "-c",
       'umask 077; cat > "$1"',
@@ -80,7 +90,7 @@ function installCorruptBackupFixture(): string {
     ],
     {
       cwd: repositoryRoot,
-      input: gzipSync("THIS IS NOT SQL;\n"),
+      input,
       stdio: ["pipe", "inherit", "inherit"],
     },
   );
@@ -88,6 +98,36 @@ function installCorruptBackupFixture(): string {
   if (result.status !== 0) {
     throw new Error(`install corrupt backup fixture failed (${result.status})`);
   }
+}
+
+function installCorruptBackupFixture(): string {
+  const name = "20991231T235959.000000Z-library.sqlite3";
+  const corruptDatabase = Buffer.from("THIS IS NOT A SQLITE DATABASE\n");
+  const manifestName = "20991231T235959.000000Z-library-manifest.json";
+  const base = "/data/app-state/backups";
+  writePrivateBackupFixture(`${base}/${name}`, corruptDatabase);
+  writePrivateBackupFixture(
+    `${base}/${manifestName}`,
+    `${JSON.stringify(
+      {
+        format_version: 1,
+        app_version: "e2e-corrupt",
+        config_schema_version: 2,
+        application_migration_version: 1,
+        river_migration_version: 1,
+        sqlite_version: "invalid-fixture",
+        sqlite_vec_version: "invalid-fixture",
+        created_at: "2099-12-31T23:59:59Z",
+        database_size: corruptDatabase.length,
+        sha256: "0".repeat(64),
+        quick_check: "ok",
+        foreign_key_violations: 0,
+        library_id: "invalid-fixture",
+      },
+      null,
+      2,
+    )}\n`,
+  );
   return name;
 }
 
@@ -153,7 +193,7 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
     )
     .toBeTruthy();
   const routineName = routineBackup?.name;
-  if (!routineName) throw new Error("on-demand backup did not produce a routine dump");
+  if (!routineName) throw new Error("on-demand backup did not produce a routine snapshot");
 
   await page
     .getByRole("button", {
@@ -175,12 +215,15 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
   expect(download.suggestedFilename()).toBe(routineName);
   expect(await download.failure()).toBeNull();
 
-  const afterBackup = await createRepository(workspace.token, "Recovery success mutation");
+  const afterBackup = await createRepository(
+    workspace.token,
+    `Recovery success mutation ${randomUUID()}`,
+  );
   expect(await repositoryExists(workspace.token, afterBackup.id)).toBe(true);
 
   await restoreFromRow(page, routineRow, 200);
   await expect
-    .poll(() => repositoryExists(workspace.token, afterBackup.id), {
+    .poll(() => repositoryPresence(workspace.token, afterBackup.id), {
       message: "successful restore should remove data created after the dump",
       timeout: 30_000,
     })
@@ -190,7 +233,10 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
   expect(afterSuccess.some((entry) => entry.restore_point)).toBe(true);
 
   const corruptName = installCorruptBackupFixture();
-  const rollbackProof = await createRepository(workspace.token, "Recovery rollback proof");
+  const rollbackProof = await createRepository(
+    workspace.token,
+    `Recovery rollback proof ${randomUUID()}`,
+  );
   expect(await repositoryExists(workspace.token, rollbackProof.id)).toBe(true);
 
   await page.goto("/settings?tab=server");
@@ -210,7 +256,7 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
     }),
   ).toBeVisible();
   await expect
-    .poll(() => repositoryExists(workspace.token, rollbackProof.id), {
+    .poll(() => repositoryPresence(workspace.token, rollbackProof.id), {
       message: "failed restore should preserve the pre-restore public state",
       timeout: 30_000,
     })

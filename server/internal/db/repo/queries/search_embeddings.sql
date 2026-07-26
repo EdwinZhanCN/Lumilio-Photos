@@ -2,8 +2,8 @@
 -- Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 
 -- name: InsertSearchEmbedding :exec
-INSERT INTO search_embeddings (asset_id, space_id, frame_ts_ms, vector, model_id)
-VALUES (?1, ?2, ?3, ?4, ?5);
+INSERT INTO search_embeddings (asset_id, space_id, frame_ts_ms, vector, model_id, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, CAST(unixepoch('subsec') * 1000000 AS INTEGER));
 
 -- name: DeleteSearchEmbeddingsByAsset :exec
 DELETE FROM search_embeddings
