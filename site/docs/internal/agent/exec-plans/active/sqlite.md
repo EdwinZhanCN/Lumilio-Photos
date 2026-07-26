@@ -1,0 +1,1212 @@
+# Lumilio Photos SQLite-only 迁移执行计划
+
+> 仓库路径：`site/docs/internal/agent/exec-plans/active/sqlite.md`
+> 工作分支：`experimental/sqlite`
+> 状态：Active
+> 迁移策略：允许 destructive migration；没有 PostgreSQL 数据导入义务
+> 停止条件：完成本文“核心 Definition of Done”。标记为 Hardening / Deferred 的规模 benchmark、持续 stress、全量 fault injection、完整跨平台运行时 E2E 不阻塞 `experimental/sqlite` goal 完成。
+
+## 1. Goal、边界与架构决策
+
+### 1.1 Goal
+
+将 Lumilio Photos 从“Go 服务 + 独立 PostgreSQL 进程 + River/pgvector + SPA”迁移为：
+
+```text
+一个 Lumilio 应用进程
+├── Go API、业务逻辑与媒体处理编排
+├── SQLite 应用数据库
+├── River Queue SQLite tables（同一数据库）
+├── FTS5 与本地向量检索
+├── 可选的、可重建的向量派生索引
+└── SPA 静态资源或 Vite 开发服务器
+
+外部工具
+├── ffmpeg / ffprobe
+├── exiftool
+├── libvips / libraw
+└── 可选 Lumen 节点
+```
+
+Desktop 最终不再启动、管理或打包 PostgreSQL。Docker 最终不再包含 `db` service、PostgreSQL image、数据库密码 secret、数据库端口与 PostgreSQL client。开发环境启动不再依赖 Docker 数据库。
+
+SQLite 是 `experimental/sqlite` 分支唯一支持的数据库。迁移完成后，业务代码、配置、测试、打包和文档中均不保留运行时 PostgreSQL 路径。
+
+### 1.2 产品级成功状态
+
+1. 用户下载 Desktop 后，首次启动只需要创建本地目录和一个 SQLite 文件，不需要初始化数据库集群、等待数据库 readiness 或管理数据库子进程。
+2. Docker 默认只需要 Lumilio 应用容器及两个持久化挂载：
+   - 应用状态：SQLite、密钥、日志、云会话与派生索引；
+   - 媒体存储：原图、缩略图、转码文件和 repository 数据。
+3. `server` release artifact 本身能够同时提供 API 与已构建 SPA。反向代理或 Caddy 可以存在，但只能是可选部署层，不能成为运行 Lumilio 的必要组件。
+4. River 与业务数据共享同一 SQLite 数据库，关键业务状态和任务入队能够使用同一个数据库事务提交。
+5. 备份得到一个一致的 SQLite snapshot；恢复通过完整 runtime restart 完成，不在仍被旧 service/handler 持有的连接下热替换数据库。
+6. 当前主要能力保持可用：首次设置、认证、repository、导入、扫描、元数据、缩略图、转码、相册、人物、位置、重复项、搜索、语义向量、Agent、云导入、队列管理、备份恢复。
+7. 开发、测试、Docker 与 Desktop 都不需要安装或启动 PostgreSQL。
+
+### 1.3 明确不做
+
+- 不实现 PostgreSQL 与 SQLite 双后端。
+- 不建立以“未来可能恢复 PostgreSQL”为目的的通用数据库抽象层。
+- 不实现 PostgreSQL 数据文件或现有数据库到 SQLite 的转换工具。
+- 不保证旧 migration 能在 SQLite 上逐条重放；使用新的 squashed SQLite baseline。
+- 不在本次迁移中实现多节点写入、共享数据库、远程 SQL 接入或高可用数据库。
+- 不把活动中的 WAL 数据库放到 SMB、NFS、云盘同步目录或其他网络文件系统。
+- 不以 SQLite alpha ANN 扩展作为完成迁移的前置条件。
+- 不引入独立 Qdrant、Milvus、Weaviate 等服务来代替 pgvector。
+- 不为“一个物理文件”牺牲可靠性；可重建的派生索引允许作为 sidecar。
+- 不同时重写前端产品体验。除首次设置中 PostgreSQL 特有步骤消失外，尽量保持 API 与 UI 行为稳定。
+- 不引入 SQLCipher。数据库文件安全依赖本机账户、目录权限、Desktop sandbox/OS 权限和现有认证密钥策略。
+
+### 1.4 不变量
+
+- 原始媒体文件不是数据库事务的一部分，数据库不得假装可以对文件系统提供 ACID。
+- ffmpeg、ExifTool、libvips、文件复制、哈希、模型推理和网络请求不得运行在 SQLite 写事务中。
+- 所有写事务应当短小、可解释；目标是正常情况下个位数毫秒，超过 25 ms 必须记录结构化 warning。
+- 所有 SQLite 写入与 River 写入由一个 writer pool 协调。
+- River schema 与 Lumilio schema 位于同一数据库文件。
+- 一个 Library 数据库可以关联多个 Repository；不得为每个媒体 Repository 创建独立数据库。
+- 活动数据库默认位于 machine-local app state。可迁移性通过安全 snapshot、restore 和“移动 Library”语义实现，而不是运行时直接复制 `.sqlite3`。
+- 数据库、`-wal`、`-shm`、密钥、日志、云会话和备份目录必须与媒体 repository 语义分离。
+- 派生索引损坏、缺失或版本不匹配时必须可以从 SQLite 中的权威数据重建。
+- 配置继续使用完整、严格、schema-versioned TOML manifest；不重新引入隐式默认、配置搜索或普通环境变量覆盖。
+- 业务层不得继续暴露 `pgx`、`pgtype`、`pgconn`、`pgvector` 或 PostgreSQL error code。
+- 不能用“捕获 `SQLITE_BUSY` 后无限重试”掩盖长事务和错误的连接拓扑。
+- 不修改 River 自己的 migration 或 table schema。
+
+### 1.5 核心架构决策
+
+#### AD-1：SQLite-only，直接迁移
+
+删除 PostgreSQL implementation，而不是在现有 `db.DB` 下增加第二个 backend。保留的 `db` package 是 SQLite 运行时边界，不是多数据库接口。
+
+允许在迁移阶段对 schema、生成代码、构造函数和 service 依赖做破坏性修改。API DTO 与产品行为应尽量保持稳定，但数据库内部兼容不是目标。
+
+#### AD-2：数据库位置代表 Library catalog，不代表单个 Repository
+
+默认布局：
+
+```text
+app-state/
+├── library.sqlite3
+├── library.sqlite3-wal       # 运行时临时文件
+├── library.sqlite3-shm       # 运行时临时文件
+├── derived/
+│   └── vector/               # 仅在需要 ANN sidecar 时存在
+├── auth/
+├── cloud/
+└── logs/
+
+backups/
+├── <timestamp>-library.sqlite3
+└── <timestamp>-manifest.json
+
+storage/
+├── .lumilioroot
+└── repositories/...
+```
+
+建议默认路径：
+
+```text
+Development: <repo>/.local/lumilio/library.sqlite3
+Docker:      /data/app-state/library.sqlite3
+Desktop:     <OS application-data>/Lumilio Photos/library.sqlite3
+Test:        t.TempDir()/library.sqlite3
+```
+
+`database.path` 必须是显式 manifest 字段，并且：
+
+- 解析为绝对、清理后的路径；
+- production 中不能是 `:memory:`；
+- 不能位于 `storage.path`、任一 repository root 或 backups 目录内；
+- parent directory 由启动流程以私有权限创建；
+- Desktop parent 使用仅当前用户可访问的权限，数据库文件使用 `0600` 等价权限；
+- 路径可被用户通过受控的 snapshot/move 操作迁移，但活动 WAL 数据库不支持直接热复制。
+
+#### AD-3：SQLite driver 与扩展策略
+
+首选目标：
+
+- `database/sql`
+- `github.com/mattn/go-sqlite3`
+- 静态注册的 `sqlite-vec`
+- FTS5 build tag
+- 不依赖系统安装的 SQLite CLI、动态扩展文件或运行时 `load_extension`
+
+选择原因：现有 server/desktop 已经具有 CGO 和 native media dependencies；`mattn/go-sqlite3` 能与静态 sqlite-vec 绑定形成单个应用二进制。
+
+Phase 1 必须先完成最小兼容性 spike，验证：
+
+1. River SQLite migration、启动、入队、执行一个 job 和 `InsertTx` commit/rollback；
+2. `mattn/go-sqlite3` 下单 writer connection；
+3. sqlite-vec 在实际使用连接上可用，或能够启用 AD-3 fallback；
+4. FTS5 可用；
+5. 当前开发平台的 server 与 Desktop CGO 链能够构建；
+6. 当前 Docker target 能够构建。
+
+Linux amd64/arm64、macOS arm64、Windows amd64 的完整构建与运行时矩阵属于 best effort；应保持现有 CI/packaging 配置合理，但不阻塞 experimental goal。
+
+若出现无法在合理范围内修复的实际兼容问题，整个分支统一切换到 `modernc.org/sqlite`，向量暂用 SQLite BLOB + Go 精确检索或可重建 sidecar。不得同时保留两套 driver，也不得为了保留 sqlite-vec 强行动态加载不可靠扩展。最终仓库只能有一个 SQLite driver。
+
+选择依赖时固定一个 stable、非 alpha 版本。任何 alpha ANN 实现不得成为迁移完成条件。
+
+#### AD-4：连接拓扑
+
+初始目标是一个 writer `*sql.DB`：
+
+```go
+type DB struct {
+    SQL     *sql.DB
+    Queries *repo.Queries
+    Path    string
+}
+
+func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error)
+func (d *DB) WithTx(
+    ctx context.Context,
+    fn func(tx *sql.Tx, q *repo.Queries) error,
+) error
+func (d *DB) Close(ctx context.Context) error
+```
+
+writer 设置：
+
+```text
+MaxOpenConns = 1
+MaxIdleConns = 1
+ConnMaxLifetime = 0
+ConnMaxIdleTime = 0
+```
+
+River、业务写入、migration 和一般查询先共享这个 pool。这样可以先得到最小、可验证的单写者系统。
+
+只有在基准测试证明长读取阻塞 UI 或队列后，才增加一个明确只读的 bounded reader pool。reader pool 只能交给经过审计的长读取路径，例如语义检索、人物最近邻和大批量导出；不得把它包装成新的全仓库 repository abstraction，也不得让写 query 混入 reader pool。
+
+固定 SQLite 策略由代码应用，不暴露为普通产品配置：
+
+```text
+foreign_keys = ON
+journal_mode = WAL
+synchronous = NORMAL
+busy_timeout = 5000 ms
+temp_store = MEMORY
+wal_autocheckpoint = 1000 pages
+```
+
+要求：
+
+- 启动时读取并验证实际 pragma 值；
+- extension 和 pragma 对 migration connection 与 runtime connection 一致；
+- 不使用连接 lifetime 回收导致新连接丢失 pragma/extension；
+- graceful shutdown 在 River 和 HTTP 停止后执行 checkpoint 与 `PRAGMA optimize`；
+- unclean shutdown 依赖 WAL recovery，随后执行快速完整性检查；
+- `SQLITE_BUSY` 发生时输出可定位的 operation、transaction duration 和 caller，不进行无限重试。
+
+#### AD-5：配置 schema v2
+
+将 manifest `schema_version` 提升到 `2`。
+
+数据库配置收敛为：
+
+```toml
+[database]
+path = "/data/app-state/library.sqlite3"
+```
+
+删除：
+
+```text
+database.host
+database.port
+database.user
+database.name
+database.ssl
+database.bootstrap_password_file
+database.rotated_password_file
+database.tools_bin_dir
+```
+
+数据库内部 pragma 不进入 manifest。媒体工具继续位于 `[tools]`。
+
+同步修改：
+
+- `server/config/config.go`
+- 所有 example/local/container manifest
+- Desktop `server.template.toml`
+- Desktop manifest generator
+- Docker image manifest
+- test fixtures
+- setup/dev scripts
+- runtime info DTO 与文档
+
+新的验证要求：
+
+- `database.path` 非空且可解析；
+- production/test 语义明确；
+- database path 位于 machine state，而非 media storage；
+- database file、backup destination、auth secret、cloud state 和 log path 不发生危险重叠；
+- 不再读取数据库密码 secret；
+- first-run readiness 不再依赖数据库 role password rotation。
+
+#### AD-6：schema 与 Go 类型
+
+使用一份新的 SQLite baseline migration，覆盖当前所有 PostgreSQL migrations 的最终 schema。先制作“旧 migration/table/query → 新 baseline”清单，确认每个当前能力都被保留，再删除旧 migrations。
+
+推荐表示：
+
+| 领域值 | SQLite 表示 | Go 表示 |
+|---|---|---|
+| UUID | canonical lowercase `TEXT` | `google/uuid.UUID`；nullable 使用 `uuid.NullUUID` 或项目自定义 nullable type |
+| 时间 | UTC Unix microseconds `INTEGER` | `dbtypes.Timestamp`，实现 `sql.Scanner` / `driver.Valuer` |
+| bool | `INTEGER CHECK(value IN (0,1))` | `bool` |
+| enum | `TEXT` + `CHECK` | 当前 domain enum |
+| JSON | `TEXT` + `CHECK(json_valid(value))` | `json.RawMessage` 或现有 typed JSON wrapper |
+| embedding | little-endian float BLOB | `[]float32` / typed vector wrapper |
+| money/精确数值 | integer smallest unit | domain integer |
+| nullable scalar | `NULL` | `sql.Null*`、pointer 或项目 typed nullable |
+
+要求：
+
+- 普通应用表优先使用 `STRICT`；
+- virtual tables 依照 SQLite 扩展要求，不强求 `STRICT`；
+- 所有 ID 由 Go 生成，不依赖数据库 UUID function；
+- 所有时间由 Go 的 UTC clock 生成；数据库 trigger 只用于简单且确定的维护；
+- 非必要不使用 `AUTOINCREMENT`；
+- foreign key、unique、partial index 和 check constraint 保留；
+- 每个 nullable/zero-value 行为有测试；
+- schema 中不得混用多种时间或 UUID 表示；
+- River schema 由 River migration 管理，不复制到应用 baseline。
+
+PostgreSQL 特性替换：
+
+| PostgreSQL | SQLite |
+|---|---|
+| enum type | `TEXT CHECK(...)` |
+| `JSONB` | JSON text + JSON1 |
+| `TIMESTAMPTZ` | Unix microseconds |
+| `uuid_generate_v4()` | Go `uuid.New()` |
+| `pgcrypto` | Go crypto |
+| `tsvector` / GIN | FTS5 external-content table |
+| `pg_trgm` | FTS5 trigram tokenizer，或显式 normalized search column |
+| `vector(n)` | authoritative BLOB + sqlite-vec table |
+| HNSW index | sqlite-vec exact KNN；必要时 derived ANN sidecar |
+| PL/pgSQL trigger | SQLite trigger 或 Go service logic |
+| `ILIKE` | normalized field、`COLLATE NOCASE` 或 FTS5 |
+| `jsonb_agg` | `json_group_array/json_object` |
+| `DISTINCT ON` | window function |
+| `ANY(array)` | generated `IN` query、temp table 或 JSON1 |
+| PostgreSQL error code | SQLite-specific typed error helper |
+| advisory lock / `SKIP LOCKED` | 单进程 mutex、短事务状态机；River 自己负责 queue claims |
+
+`sqlc.yaml` 改为 SQLite + `database/sql`。生成文件只能由 `sqlc generate` 产生。保留现有 query name 时优先保留，以减少业务层改动；SQL 语义不正确时重写 query，不在 Go 中做大量 N+1 兼容拼接。
+
+#### AD-7：River 与业务数据库共用事务
+
+使用 `riverdriver/riversqlite`。River migrations 在应用 migrations 后、queue client 创建前执行。
+
+目标：
+
+```text
+Open SQLite
+→ apply/verify pragmas and extensions
+→ run Lumilio migrations
+→ run River migrations
+→ construct sqlc queries
+→ construct River client with same writer *sql.DB
+→ register workers
+→ start River
+```
+
+所有 queue 名称、worker 数量、periodic job、重试语义和管理 API 保持当前产品行为，除非 SQLite 单写者测量要求降低默认并发。媒体计算 worker 仍可高并发，因为长工作发生在数据库事务外。
+
+重点修复 SourceMaterializer：
+
+##### staging upload
+
+```text
+1. 验证、哈希、去重检查                         无写事务
+2. 短事务创建 prepared/staged asset             COMMIT
+3. staging → final/inbox 文件提交                无写事务
+4. 一个短事务：
+   - 写入最终 storage path
+   - 设置 processing/task 状态
+   - InsertTx(metadata)
+   - InsertTx(thumbnail，按类型)
+   - InsertTx(transcode，按类型)
+   COMMIT
+5. 返回成功
+```
+
+##### in-place repository scan
+
+文件已经存在时，资产记录、最终路径、初始状态和所有 pipeline jobs 在一个短事务中写入。
+
+##### crash recovery
+
+启动或定期 reconcile 必须处理：
+
+- asset 是 prepared、staging 文件仍存在；
+- asset 是 prepared、final 文件已存在；
+- asset 是 prepared、两个文件都不存在；
+- final 文件存在但 DB transaction 未提交；
+- DB 与 River transaction 已提交但 HTTP response 未返回；
+- job 执行中进程被 kill；
+- 重复 scan/upload 导致相同内容并发发现。
+
+恢复必须幂等。不得通过删除未知原始文件来“修复”状态。无法安全判断时标记为可见的 failed/recoverable 状态并保留文件。
+
+#### AD-8：搜索与向量
+
+##### 文本搜索
+
+- 使用 FTS5 替换 `tsvector`/GIN；
+- 对需要 substring 的名称、地点或 metadata 路径评估 FTS5 trigram tokenizer；
+- 使用 external-content table + trigger，或显式 service dual-write；
+- 提供 rebuild 命令/函数；
+- 结果排序与当前 API contract 保持稳定，必要差异记录在 plan 的 Decision Log。
+
+##### 权威 embedding
+
+普通表保存完整权威记录：
+
+```text
+search_embeddings
+- embedding_id
+- asset_id
+- model
+- dimensions
+- frame_time / segment identity
+- vector_blob
+- created_at
+- updated_at
+- generation/version metadata
+
+face_embeddings
+- face_id / embedding_id
+- asset_id
+- model
+- dimensions
+- vector_blob
+- metadata
+```
+
+sqlite-vec virtual table只作为可重建查询结构。普通表与 vec table 的新增、更新和删除必须在同一 SQLite transaction 内执行，或者通过明确的 generation/rebuild protocol 保证最终一致。
+
+使用稳定 exact KNN 先恢复正确性。不要为了迁移采用 alpha DiskANN/IVF。
+
+##### 性能观察与后续扩展（本次迁移非阻塞）
+
+本次 experimental 迁移优先验证正确性、部署简化和真实开发数据可用性，不要求先构造 100k/1M 数据集，也不要求建立严格的 PostgreSQL 对照 benchmark。
+
+本次必须完成：
+
+- 使用现有开发库、现有 fixture，或一个容易生成的小型数据集验证 768D image、video frame 与 512D face vector 的插入、删除、过滤和 top-k 正确性；
+- 至少记录一次代表性 exact KNN 查询耗时、数据库体积和 rebuild 行为，结果只用于发现明显不可用的实现，不设置硬性 p95 门槛；
+- 使用 brute-force reference 或可解释的小样本断言验证 top-k 结果，而不是只验证“查询返回了数据”；
+- sqlite-vec 不可用时按 AD-3 fallback 完成迁移，不让向量扩展阻塞数据库切换。
+
+Hardening backlog，不阻塞本 goal：
+
+- 100k assets、视频 frame 扩张和 1M 个 768D rows 的规模测试；
+- cold/warm cache、top-10/top-50/top-100、float32/int8 的系统比较；
+- 与 PostgreSQL/pgvector 的严格同机对照；
+- 基于规模结果决定 mmap ANN sidecar。
+
+未来若增加 sidecar，它仍不得成为权威数据，必须带 model/schema/generation fingerprint，并可从 SQLite authoritative embeddings 重建。sidecar 不可用时系统必须降级为正确的 exact search，或明确表示索引正在重建。
+
+#### AD-9：备份与恢复
+
+删除 `pg_dump`、`pg_restore`、PostgreSQL client 与数据库连接凭据。
+
+备份使用 SQLite Online Backup API 或等价的一致 snapshot 机制。不得复制运行中的主 `.sqlite3` 文件。
+
+每次备份输出：
+
+```text
+<timestamp>-library.sqlite3
+<timestamp>-manifest.json
+```
+
+manifest 至少包含：
+
+- app version；
+- config schema version；
+- application migration version；
+- River migration version；
+- SQLite version；
+- sqlite-vec version（如启用）；
+- 创建时间；
+- database size；
+- SHA-256；
+- quick/integrity check 结果；
+- library identity。
+
+备份流程：
+
+```text
+create temp snapshot
+→ close/finalize snapshot
+→ quick_check + foreign_key_check
+→ compute checksum
+→ fsync where supported
+→ atomic rename
+→ apply retention
+```
+
+恢复不得在旧 handlers/services 仍持有旧 `*sql.DB` 时原位替换。将 `app.Run` 改造成可重建 runtime generation：
+
+```text
+host lifecycle
+└── generation loop
+    ├── open DB
+    ├── migrations
+    ├── wire services/River/router
+    ├── serve
+    ├── receive normal shutdown OR restore-restart request
+    ├── drain HTTP and River
+    ├── close DB
+    ├── apply staged restore atomically
+    └── start next generation
+```
+
+恢复流程：
+
+1. 上传或选择 snapshot；
+2. 在独立连接中校验 checksum、manifest、SQLite header、quick check、foreign key 和 schema compatibility；
+3. 生成当前 DB restore point；
+4. 写 pending-restore marker；
+5. 请求 runtime generation restart；
+6. drain HTTP/queue，关闭所有 DB handles；
+7. 原子替换主 DB，保留旧 DB 直到新 generation 健康；
+8. 运行 migrations、完整性检查和应用 health verification；
+9. 成功后删除 marker并保留策略内 restore point；
+10. 失败时自动 rollback 到旧 DB，并再次重建 runtime；
+11. 恢复期间 API 进入 maintenance mode，不能接受新 mutation。
+
+River tables包含在 snapshot 内。恢复后 periodic jobs 必须重新注册，River 对 interrupted/running jobs 的恢复语义必须通过测试。
+
+#### AD-10：Docker 目标
+
+删除：
+
+- `server/db.Dockerfile`；
+- `db` service；
+- `db_data` volume；
+- `db_bootstrap_password` secret；
+- `depends_on: db`；
+- PostgreSQL healthcheck；
+- PostgreSQL host port；
+- `docker-compose.release.dbport.yml`；
+- server runtime image 中的 PostgreSQL apt repository/client；
+- 与 PostgreSQL bootstrap secret 相关的 helper 与文档。
+
+默认 mounts：
+
+```yaml
+volumes:
+  - ${LUMILIO_STORAGE}:/data/storage
+  - ${LUMILIO_STATE}:/data/app-state
+```
+
+数据库：
+
+```text
+/data/app-state/library.sqlite3
+```
+
+release server image应构建并包含 SPA dist，设置 `server.web_root`，使以下方式成立：
+
+```text
+docker run/compose 一个 Lumilio container
+→ 同一端口提供 SPA + API
+```
+
+为保持当前 UI 入口，release compose 可将 `${WEB_HTTP_PORT:-6657}` 映射到 server `6680`。内置 HTTPS/Caddy 若继续保留，移动到 optional profile 或单独的 proxy compose，不得成为默认必须项。
+
+要求：
+
+- `docker-compose.yml`、release、E2E、CI compose 全部改为 SQLite-only，不得再引用 PostgreSQL service；
+- 当前开发架构的 server image 必须构建；其他 Linux 架构保持 Dockerfile/CI 可表达并做 best-effort compile；
+- state mount 权限错误要给出明确诊断；
+- healthcheck 在 migration 与 River ready 后才成功；
+- 当前架构完成一次 container restart 后 state 保留与数据库 reopen smoke；完整 WAL/River/reconcile 故障矩阵延后；
+- 不在媒体 storage mount 中创建 active database；
+- Docker docs说明备份必须使用应用 snapshot，而不是复制运行中的文件。
+
+#### AD-11：Desktop 目标
+
+保留 Desktop supervisor 作为：
+
+- single-instance lock；
+- OS paths；
+- manifest materialization；
+- in-process `server/app.Run` lifecycle；
+- browser opening；
+- tray/menu；
+- Lumen 下载和 supervision；
+- graceful quit。
+
+删除其 PostgreSQL职责：
+
+- `postgres.go` 与对应 tests；
+- initdb/pg_ctl/pg_isready/createdb/postgres lifecycle；
+- PG socket、port、data dir、password file 和版本检查；
+- bundled PostgreSQL resources、licenses、下载和 packaging scripts；
+- `LUMILIO_PG_BIN_DIR`；
+- PostgreSQL quarantine/permission handling；
+- PostgreSQL start/stop status UI。
+
+`Paths` 增加或保留清晰的：
+
+```text
+DatabasePath
+AppStateDir
+BackupsDir
+LogsDir
+CloudStateDir
+WebRoot
+MediaRoot
+```
+
+Desktop 首次启动：
+
+```text
+resolve private app paths
+→ create directories
+→ materialize schema v2 manifest
+→ app.Run in-process
+→ SQLite creates/migrates file
+→ health ready
+→ open browser
+```
+
+P0 必须验证：
+
+- 当前开发平台的 clean first launch 与 second launch；
+- 当前平台 final bundle/package 不包含 PostgreSQL 文件；
+- 一个 database path 或 permission failure 能给出明确错误；
+- 一次 SQLite reopen，必要时通过代表性的 force-quit 或等价非正常退出 smoke 完成；
+- backup/restore 所需的 runtime restart 路径至少在当前平台或 standalone 中验证一次。
+
+Best effort / Hardening：
+
+- app data path带空格和非 ASCII；
+- macOS arm64 与 Windows amd64 双平台运行时矩阵；
+- update 后多版本 schema migration；
+- disk full/readonly 的完整平台矩阵；
+- force quit/kill 的重复压力测试。
+
+### 1.6 需要优先清除的当前耦合点
+
+Agent 在修改前应完成全仓库 inventory，并把结果记录到本文 Progress：
+
+- `server/sqlc.yaml` 的 PostgreSQL engine 与 pgx package；
+- `server/internal/db/db.go` 的 pool、password self-heal 和 pg errors；
+- `server/internal/db/migration.go` 的 Postgres migration driver 与 `riverpgxv5`；
+- `server/app/app.go` 中传播到 services/handlers 的 `*pgxpool.Pool`；
+- `server/internal/queue/queue_setup.go`；
+- `server/internal/sourcing/materializer.go` 的非事务性 pipeline enqueue；
+- `server/internal/db/backup/` 与 backup service；
+- setup/bootstrap 中数据库 password rotation；
+- queue handler 对 pgx pool 的依赖；
+- face、semantic、asset、location、stack、duplicate、auth、user、agent 等 service 的直接 raw pgx；
+- migrations 中 enum、JSONB、tsvector、trigram、PL/pgSQL、vector/HNSW；
+- Docker Compose、Dockerfile、Makefile、Dev Container、GitHub Actions；
+- Desktop supervisor、resources、manifest template 和 release packaging；
+- README、install docs、architecture docs、troubleshooting docs。
+
+完成 inventory 后建立一份 machine-readable 或 Markdown parity checklist，列出每个 PostgreSQL table、index、trigger、query 和 feature 的 SQLite 去向。不得仅以“服务能启动”判断 schema 已迁完。
+
+---
+
+## 2. 分阶段执行
+
+### Phase 0：建立分支护栏与迁移清单
+
+任务：
+
+1. 确认当前分支为 `experimental/sqlite`，不得在 `main` 直接实施。
+2. 阅读 `AGENTS.md` 规定的架构、后端、测试与 plan 文档。
+3. 运行当前环境中容易执行的快速 build/test，记录与迁移无关的既有失败；不要求为 PostgreSQL 旧实现补齐测试环境。
+4. 若现成命令可以直接得到，则记录 startup、idle memory、binary/image size 或一条代表性 vector query；不得为建立严格基线延迟迁移。
+5. 全仓库搜索 PostgreSQL 耦合并写入 parity checklist。
+6. 将 destructive migration 决策写入当前 plan，注明旧开发数据必须 reset。
+7. 为后续提交建立小步 commit strategy。
+
+Exit criteria：
+
+- 已知的既有 build/test 失败被记录，后续能够区分迁移回归与原有问题；
+- migration/query/service/deployment 耦合清单足以指导迁移；
+- destructive reset 路径明确；
+- 未创建双后端 interface。
+
+### Phase 1：SQLite/River/vector 最小技术 spike
+
+只写足以解除架构风险的隔离验证，不先建立完整集成测试矩阵。
+
+必须验证：
+
+- driver open/close 与 fixed pragmas；
+- application migration 和 River SQLite migration；
+- `STRICT`、JSON1、FTS5；
+- River start/stop、enqueue、执行一个 job 与一次 retry；
+- app transaction + `InsertTx` 的 commit/rollback；
+- sqlite-vec static registration及小样本 768D/512D insert/delete/query，或 AD-3 fallback；
+- `sqlc` SQLite type mapping；
+- 当前开发平台的 server 与 Desktop module build；
+- 当前 Docker target 能够编译。
+
+Best effort / Deferred：
+
+- process kill 后所有 River 状态的完整恢复矩阵；
+- cancel、periodic、所有 queue admin 行为的隔离测试；
+- Linux/macOS/Windows 全部运行时 smoke；
+- Docker multi-arch 运行时验证。
+
+做出并记录唯一 driver 决策。删除未采用的 spike implementation 和依赖。
+
+Exit criteria：
+
+- driver、River transactional enqueue、sqlc、FTS5 和 vector/fallback 的关键路径有聚焦测试；
+- 选定一个 driver；
+- 不存在“先支持两种，之后再决定”的代码。
+
+### Phase 2：配置、DB runtime 与 migration runner
+
+任务：
+
+1. manifest 升级 schema v2；
+2. 将 database config 改为 path；
+3. 实现 SQLite `db.Open/Close/WithTx`；
+4. 统一 pragma/extension registration；
+5. 保留 embedded migrations，替换 database migration driver；
+6. 接入 River migration runner；
+7. 实现 startup preflight、quick check、foreign key check；
+8. 实现 graceful checkpoint/optimize；
+9. 重写 config tests、DB tests、migration tests；
+10. 移除数据库 password/self-heal logic；
+11. 调整日志，输出 SQLite/extension version与经过安全处理的 DB location。
+
+Exit criteria：
+
+- 空目录可创建数据库并完成两类 migrations；
+- 重启幂等；
+- corrupt/readonly/permission error可诊断；
+- config v1 被明确拒绝；
+- PostgreSQL连接代码已从 `internal/db` 消失。
+
+### Phase 3：fresh SQLite baseline、sqlc 与 domain types
+
+任务：
+
+1. 根据 parity checklist 写新的 squashed baseline；
+2. 建立统一 UUID、timestamp、nullable、JSON 和 vector types；
+3. 将 `sqlc.yaml` 改为 SQLite；
+4. 逐目录改写 queries；
+5. 生成 repo code；
+6. 实现 SQLite constraint/error helpers；
+7. 为关键约束与代表性表添加 schema tests，不要求为每张表复制同构测试；
+8. 为 UUID/time/JSON roundtrip、foreign key 和至少一个关键 unique/partial-index path 写代表性测试；
+9. 实现 FTS5 schema；
+10. 删除旧 PostgreSQL migrations。
+
+执行顺序建议：
+
+```text
+identity/settings
+→ repositories/roots
+→ assets/derivatives
+→ albums/tags/relations
+→ people/faces
+→ locations
+→ duplicates/stacks
+→ cloud/backups/security
+→ search embeddings/video
+→ agent runtime
+```
+
+Exit criteria：
+
+- baseline 创建完整 schema；
+- `sqlc generate` clean；
+- schema parity checklist全部有明确落点；
+- migration idempotency与fresh boot test通过；
+- 旧 Postgres migrations 已删除，而非保留为“参考运行时”。
+
+### Phase 4：业务层去 pgx 化
+
+任务：
+
+1. 将 service/handler/worker 构造函数中的 `*pgxpool.Pool` 改为所需的具体 SQLite dependency：
+   - `*db.DB`；
+   - `*sql.DB`；
+   - `*repo.Queries`；
+   - `*sql.Tx`；
+   - 或窄的 domain collaborator。
+2. 用 `google/uuid`、`dbtypes.Timestamp`、`json.RawMessage` 等替换 pg types。
+3. 将 raw pgx SQL迁入 sqlc query 或窄的 SQLite helper。
+4. 替换 PostgreSQL error code分支。
+5. 删除数据库 role/password setup。
+6. 重新定义 bootstrap gates：系统设置、owner 用户、primary repository 和必要 secret；不再包含数据库 credential rotation。
+7. 重写 queue/admin handlers，不再直接依赖 pgx pool。
+8. 保持 API DTO 与 OpenAPI contract；运行 `make dto` 处理真实 contract变化。
+9. 修复迁移直接影响的 unit/integration tests；与本迁移无关的既有失败应记录，不得通过禁用测试掩盖。
+
+优先按 `app.go` wiring 从外向内处理，确保最终没有一个“临时 pgx adapter”残留。
+
+Exit criteria：
+
+- `server/app` 不导入 pgx；
+- `server/internal` 业务包不导入 pgx/pgvector；
+- server clean build；
+- setup、owner login、repository 和 basic CRUD 的聚焦 smoke 或 service test 通过；
+- 不存在名为 `PostgresStore`、`SQLBackend` 等仅用于双支持的接口。
+
+### Phase 5：River SQLite 与事务性 ingest
+
+任务：
+
+1. `queue.New` 切到 `riversqlite`；
+2. 所有 River generic transaction type切换为 `database/sql`；
+3. 保持现有 workers、queues、periodic jobs 的注册与编译；
+4. 保持媒体计算在事务外，并在需要时调整短 DB write batch；
+5. SourceMaterializer按 AD-7 重构；
+6. 将业务状态更新 + pipeline enqueue放到同一 transaction；
+7. 实现最小 prepared/orphan reconcile，使已知中间态不会永久卡死；
+8. 对 scan/upload 的核心路径保持幂等；cloud import 只要求迁移后不因数据库类型失效；
+9. 为 enqueue commit、enqueue rollback、一个 worker 执行和一个 retry 路径编写聚焦测试；
+10. 手工或自动验证一次进程重启后的数据库与 River 可重新启动。
+
+本次最低故障验证：
+
+```text
+transaction rollback after one or more River InsertTx calls
+restart after committed asset + jobs
+restart with one prepared/recoverable asset state
+```
+
+Hardening backlog，不阻塞本 goal：
+
+```text
+每一个文件移动边界的 kill -9
+metadata/thumbnail/transcode 中途 kill
+全部 queue admin 与 periodic registration E2E
+持续并发导入下的重复竞争与完整故障矩阵
+```
+
+Exit criteria：
+
+- 业务状态与核心 pipeline jobs 能够共同 commit 或共同 rollback；
+- 经过测试的中间态在重启后可以继续、重试或进入明确 recoverable/failed 状态；
+- retry 不会在核心路径产生明显的不可控重复副作用；
+- 聚焦测试中没有未处理的 `SQLITE_BUSY`；其他已知并发限制记录到 Hardening backlog；
+- River queue handler 能编译，核心管理 API 至少有一条 handler/service smoke。
+
+### Phase 6：文本、语义与人脸搜索
+
+任务：
+
+1. 完成 FTS5 index与基础 rebuild；
+2. 将 PostgreSQL全文/模糊查询切换到SQLite；
+3. 实现 authoritative embedding BLOB；
+4. 接入 stable sqlite-vec exact KNN，或使用 AD-3 fallback；
+5. 实现同事务 dual-write或一个明确、可重建的同步协议；
+6. 迁移 image、video frame、face embedding；
+7. 尽量保留 filter、ranking、pagination contract；
+8. 使用小样本 brute-force reference test校验top-k；
+9. 用现有开发数据记录一次代表性查询和rebuild观察；
+10. 除非现有真实图库已经明显不可用，否则本 goal 不实现derived ANN sidecar。
+
+Exit criteria：
+
+- FTS、image semantic、video frame 和 face nearest 的代表性查询返回正确结果；
+- insert/delete/reindex 的聚焦测试不会留下可复现的幽灵向量；
+- index可以从authoritative data重建；
+- 小样本正确性与观察结果写入plan；
+- 大规模 benchmark 和 ANN 决策进入 Hardening backlog，不阻塞迁移。
+
+### Phase 7：SQLite backup、restore 与 runtime generation
+
+任务：
+
+1. 删除 PostgreSQL backup tools；
+2. 实现 SQLite 一致 snapshot；
+3. 实现最小 manifest、checksum 与 integrity check；retention 保持现有简单语义；
+4. 重写 periodic backup worker 和 admin backup APIs；
+5. 引入 staged restore/pending marker；
+6. 确保恢复前 drain 并关闭旧 DB handles，再替换并重新构造 runtime；
+7. 保留一个 restore point，避免验证失败时覆盖唯一可用数据库；
+8. 对有效 snapshot 完成一次 temp/current-host restore smoke；
+9. 对 checksum 错误或损坏 snapshot 完成一次拒绝测试。
+
+Hardening backlog，不阻塞本 goal：
+
+- import高并发期间的重复在线备份压力测试；
+- interrupted restore 的每阶段 fault injection；
+- disk full、fsync失败和原子rename平台差异矩阵；
+- Desktop与standalone所有生命周期组合的完整E2E；
+- 自动rollback的多重失败注入。
+
+Exit criteria：
+
+- snapshot可独立打开并通过quick/integrity check，不需要复制 WAL/SHM；
+- 一次有效restore后核心 settings、assets、repositories 和 River schema 可读；
+- 明显损坏或不兼容的snapshot在替换主数据库前被拒绝；
+- restore路径不会让新runtime继续持有旧 `*sql.DB`；
+- 更完整的故障恢复矩阵已记录为 Hardening backlog。
+
+### Phase 8：Docker SQLite-only
+
+任务：
+
+1. 删除 DB image/service/secret/volume；
+2. 修改 server Dockerfile，删除 PostgreSQL package；
+3. 将 SPA dist加入 release server image；
+4. 配置 `/data/app-state/library.sqlite3`；
+5. 简化 dev/release/E2E compose；
+6. 将 Caddy/TLS转为optional proxy；
+7. 更新 healthcheck；
+8. 在当前环境测试一种持久化 mount，并对另一种至少完成 compose/config review；
+9. 构建当前架构；其他架构由现有 CI 能力做 best-effort compile，不要求本 goal 完成运行时 smoke；
+10. 更新 install/upgrade/reset/backup docs。
+
+Exit criteria：
+
+- fresh `docker compose up` 不启动数据库容器；
+- 一个 Lumilio container可提供完整 UI + API；
+- restart/kill/recreate container保留状态；
+- 删除 app container但保留 state volume后可恢复；
+- media root与state root明确分离；
+- release image中没有 PostgreSQL binaries/client。
+
+### Phase 9：Desktop SQLite-only
+
+任务：
+
+1. 删除 PostgreSQL supervisor代码与tests；
+2. 简化 paths/config/resources；
+3. 删除 bundled PostgreSQL artifacts与license entries；
+4. 修改 macOS/Windows packaging；
+5. 让 Desktop直接运行 in-process server；
+6. 更新 tray状态，不再出现database child process阶段；
+7. 在当前开发平台测试 first-run 与 second launch；force quit/restore restart 选择一条代表性路径验证；
+8. 对 database path/permission failure 写一个聚焦测试或手工 smoke；
+9. 验证当前平台 final package contents；
+10. 更新 Desktop README与release docs。
+
+Exit criteria：
+
+- Desktop不启动任何数据库子进程；
+- package不包含 PostgreSQL；
+- 当前开发平台 build 与 first/second launch smoke通过；另一平台至少保持构建配置不被显式破坏；
+- 当前平台完成一次非正常退出或等价 reopen smoke，并能重新打开SQLite；
+- startup流程明显简化且错误可诊断。
+
+### Phase 10：开发流程、CI、文档与清理
+
+任务：
+
+1. `make setup` 不再生成DB password secret；
+2. `make dev` 不再启动Docker DB；
+3. 删除或替换 `make db`；
+4. `make db-reset` 安全删除已知dev SQLite、WAL、SHM与derived index；
+5. 更新 Dev Container；
+6. 更新所有 GitHub Actions；
+7. 所有 backend integration tests使用 `t.TempDir()` DB；
+8. 更新 README、中文 README、安装、Docker、Desktop、backup、troubleshooting、architecture和BACKEND docs；
+9. 添加architecture guard，阻止 PostgreSQL依赖回归；
+10. 删除dead code、unused configs、obsolete tests、images与scripts；
+11. 运行本文 P0 必须质量门；对 full-suite、stress、browser E2E 和跨平台测试做 best effort；
+12. 将未完成的硬化项整理为明确 backlog，再将本plan结果移至completed。
+
+Architecture guard至少检查 active runtime中不存在：
+
+```text
+github.com/jackc/pgx
+github.com/pgvector
+riverpgxv5
+postgres://
+pg_dump
+pg_restore
+initdb
+pg_ctl
+pg_isready
+createdb
+POSTGRES_
+LUMILIO_PG_
+db_bootstrap_password
+```
+
+迁移计划和历史文档可以通过精确 allowlist保留“PostgreSQL”文字，运行时代码、config、Docker和packaging不得保留。
+
+Exit criteria：
+
+- fresh clone按README即可启动；
+- CI不需要PostgreSQL service；
+- 所有文档与实际命令一致；
+- active code PostgreSQL grep为零；
+- plan完成记录包含可获得的观察数据、风险、最终driver/vector决策和未完成Hardening backlog。
+
+---
+
+## 3. 验证、完成定义与执行纪律
+
+### 3.1 分层质量门
+
+遵守仓库 `AGENTS.md`，优先复用现有 Make targets，但不要为了本次迁移先建设一套庞大的测试基础设施。
+
+#### P0：本 goal 必须通过
+
+- 所有修改过的 Go 文件完成格式化，生成文件由正式命令生成；
+- server 全量 compile，迁移直接影响的 Go packages 测试通过；
+- fresh SQLite database migration、close、reopen 和 migration idempotency 测试通过；
+- River migration、一个 job 执行、一个 retry，以及 app transaction + `InsertTx` commit/rollback smoke通过；
+- setup、owner login、repository/basic asset CRUD 有聚焦 service/integration smoke；
+- FTS 与 vector/fallback 有小样本正确性测试；
+- Docker compose config有效，当前架构 image能够build，并完成一次启动/重启持久化 smoke；
+- Desktop在当前开发平台能够build，并完成first/second launch smoke；
+- 若 API/embedded SPA 构建路径被修改，Web typecheck/build通过；
+- PostgreSQL architecture guard通过。
+
+具体命令由仓库现有 targets 决定，例如 `make server-test`、`make desktop-test`、`make web-test`、`make dto`；只要求与本迁移直接相关且当前环境可执行的门为绿色。既有、无关失败必须记录，不能通过删除或禁用测试伪造绿色。
+
+#### P1：Best effort，不阻塞 goal
+
+- 根目录完整 `make test`；
+- browser-mode全量 E2E；
+- Docker完整E2E；
+- macOS与Windows双平台运行时smoke；
+- CI multi-arch runtime验证；
+- 全量queue admin、cloud provider和外部media tool集成测试。
+
+#### P2：Hardening backlog
+
+- `sqlite-stress`；
+- 完整 `sqlite-fault-test`；
+- 100k/1M vector benchmark；
+- 持续导入 + UI + backup + River maintenance并发测试；
+- 每个文件/事务边界的kill -9矩阵。
+
+### 3.2 核心功能验收矩阵
+
+| 领域 | P0：本 goal 必须验证 |
+|---|---|
+| First run | 空state启动、application/River schema、owner setup、一个primary repository |
+| Auth | owner login与当前基础session流程；MFA/passkey只要求数据库迁移与相关unit/service test不回归 |
+| Repository | 一个local root、一次scan或basic CRUD；multiple/offline/remount完整矩阵延后 |
+| Ingest | upload或in-place scan至少一条happy path，业务状态与jobs共同提交 |
+| Processing | 至少一个metadata/thumbnail代表worker执行；依赖外部工具的完整矩阵延后 |
+| Organization | album/tag/favorite等至少一个代表性关系CRUD；不要求所有组织能力逐项E2E |
+| Search | 一个filter、FTS、image semantic、video/face各自可用的小样本查询；无对应fixture时至少覆盖存取和query层 |
+| Agent | 相关schema/query可用，至少一个依赖数据库的agent路径smoke；不要求完整工具链E2E |
+| Queue | enqueue、execute、retry、事务rollback；admin surface至少handler/service smoke |
+| Backup/Restore | 一次有效snapshot、一次有效restore、一次损坏snapshot拒绝 |
+| Docker | 当前架构clean start、UI/API ready、restart后state保留 |
+| Desktop | 当前开发平台build、first launch、second launch、package不含PostgreSQL |
+| Migration | fresh baseline与reopen幂等；不要求兼容旧PostgreSQL数据 |
+| Failure | readonly/corrupt/prepared-state中选择有代表性的聚焦测试，不要求完整故障矩阵 |
+
+Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate race、multiple repositories、所有媒体worker组合、全部queue admin操作、interrupted restore、disk full、完整权限矩阵和跨平台运行时E2E。
+
+### 3.3 核心可靠性验收
+
+本 goal 必须证明：
+
+- 业务 writer pool限制为一个连接；
+- 外部工具、文件IO、模型调用和网络请求不位于SQLite写事务中；
+- app state与核心River jobs可以同事务commit/rollback；
+- fresh start、graceful restart和一次非正常reopen后数据库可打开，`quick_check`通过；
+- prepared/recoverable state至少有一条可重复执行的恢复路径；
+- backup snapshot可独立打开；损坏snapshot在替换前被拒绝；
+- vector virtual/derived data可以从authoritative embedding重建；
+- 聚焦测试中出现的 `SQLITE_BUSY` 必须修复或作为有明确复现条件的已知限制记录，不能无限重试或吞掉错误。
+
+以下属于Hardening backlog：持续导入/UI/backup/River并发压力、完整kill -9矩阵、所有interrupted jobs恢复组合、WAL checkpoint/truncate长时间测试、prepared/orphan全状态空间、restore自动rollback多重故障注入。
+
+### 3.4 性能观察（非阻塞）
+
+本次不设置百分比、p95、100k或1M规模硬门槛。Agent应在成本较低时记录：
+
+- clean startup的数量级；
+- 当前开发库上的一个常用browse/filter query；
+- 一个小样本vector top-k query；
+- SQLite database、Desktop package或Docker image中至少一项体积变化；
+- idle memory对比（仅在已有可复用命令时）。
+
+只有出现“现有真实开发库上明显不可交互”、持续锁死、事务跨越外部工作或单次普通查询达到秒级且可直接定位的严重回归，才阻塞本goal。其余性能问题记录为Hardening backlog。不得为通过性能观察恢复多写连接或重新引入PostgreSQL。
+
+### 3.5 核心 Definition of Done
+
+以下全部成立后，`experimental/sqlite` goal可以结束；P1/P2 Hardening backlog不阻塞：
+
+- [ ] SQLite 是唯一数据库实现和唯一运行时依赖。
+- [ ] PostgreSQL migrations、driver、pool、types、backup tools、Docker service和Desktop runtime全部删除。
+- [ ] config schema v2在dev、Docker、Desktop与tests统一。
+- [ ] fresh SQLite baseline覆盖当前应用所需schema，允许清空旧开发数据。
+- [ ] sqlc使用SQLite/`database/sql`并可重复生成。
+- [ ] River使用SQLite；核心业务状态与pipeline enqueue共享事务。
+- [ ] SourceMaterializer及关键queue入口具备事务性enqueue，并有最小prepared/recoverable恢复路径。
+- [ ] 所有当前worker和periodic job定义能够注册/编译；至少一个代表worker和retry路径实际执行通过。
+- [ ] FTS、semantic、video和face search完成小样本正确性smoke，或对缺少fixture的路径完成存取/query层验证。
+- [ ] vector方案通过小样本正确性验证；规模benchmark和ANN决定已进入Hardening backlog。
+- [ ] backup/restore改为SQLite snapshot，并完成一次有效restore和一次损坏snapshot拒绝。
+- [ ] Docker无DB service；当前架构单Lumilio container能服务SPA+API并在restart后保留state。
+- [ ] Desktop无PostgreSQL子进程和bundle；当前开发平台build与first/second launch通过。
+- [ ] 开发流程与主要CI配置不再要求PostgreSQL；无法在当前环境执行的跨平台runtime测试已记录。
+- [ ] P0 changed-area tests、migration tests和smoke通过；无关既有失败已明确记录且未被禁用。
+- [ ] 聚焦路径不存在被吞掉或无限重试的 `SQLITE_BUSY`；已知并发限制进入Hardening backlog。
+- [ ] README与内部架构文档更新。
+- [ ] 全仓库runtime PostgreSQL guard通过。
+- [ ] 已记录能够低成本获得的启动、查询、体积或内存观察；没有硬性benchmark门槛。
+- [ ] plan中的Progress、Decision Log、Surprises、Outcomes和Hardening backlog完整。
+- [ ] active plan移动至completed，且最终commit保持clean working tree。
+
+### 3.6 Agent执行纪律
+
+- 将本文作为 living execution plan。每完成一个phase，更新Progress、Decision Log、Surprises与验证结果。
+- 在实际代码与本文细节冲突时，先记录事实与决策，再采用满足Goal和不变量的最简单方案。
+- 普通实现选择自主决定，不为可逆细节暂停等待确认。
+- 不以大段占位TODO、disabled test或“之后再清理”的PostgreSQL dead path换取绿灯。
+- 每个phase形成可审查commit；使用仓库约定的commit message。
+- generated files必须通过正式命令生成，并在记录中写明命令。
+- 不覆盖用户在分支上的无关改动。
+- 不为修复测试降低数据完整性约束。
+- vector extension若阻塞，按AD-3 fallback继续完成核心迁移；不得重新引入PostgreSQL。
+- 任何失败都应留下可复现命令、日志摘要和下一步，不写含糊的“可能是环境问题”。
+- 最终报告必须列出：删除项、架构变化、数据布局、备份语义、driver/vector选择、可获得的性能观察、剩余已知限制和明确的Hardening backlog。
+
+## Progress
+
+- [x] Phase 0：基线与inventory
+- [ ] Phase 1：driver/River/vector spike
+- [ ] Phase 2：config与DB runtime
+- [ ] Phase 3：SQLite baseline与sqlc
+- [ ] Phase 4：业务层去pgx
+- [ ] Phase 5：River与事务性ingest
+- [ ] Phase 6：FTS与vector
+- [ ] Phase 7：backup/restore与runtime generation
+- [ ] Phase 8：Docker
+- [ ] Phase 9：Desktop
+- [ ] Phase 10：dev/CI/docs/cleanup
+- [ ] Core Definition of Done
+- [ ] Hardening backlog已记录（不阻塞）
+
+### Phase 0 执行记录（2026-07-25）
+
+#### 分支、基线与 destructive reset
+
+- 分支确认：`experimental/sqlite`，起点 `bb2f8df0`。
+- 迁移前基线：`make server-test` 全量通过。后续 Server 测试失败默认按迁移回归处理，除非有更强证据证明与 SQLite 修改无关。
+- 未为旧 PostgreSQL runtime 启动容器、构造 benchmark 数据或采集严格性能基线；这些都不是解除迁移风险所需的低成本观察。
+- destructive reset 已确认：不转换 PostgreSQL 开发数据。Phase 2 后开发 reset 只允许删除仓库已知的 SQLite database、`-wal`、`-shm` 和可重建 derived index；不得接受任意路径。旧 Compose PostgreSQL volume 在 Phase 8 删除后成为不兼容的废弃开发状态。
+- 实施保持 SQLite-only：不创建 backend interface、feature flag、PostgreSQL adapter 或 dead implementation。
+
+#### Schema parity inventory
+
+现有 PostgreSQL schema 由 14 组 migrations 组成，共 52 张应用表、125 个显式索引、6 个 trigger 和 6 个 trigger function。River schema 不在应用 baseline 中，仍由 River 自己的 SQLite migrations 管理。
+
+| 领域 | 当前 PostgreSQL 表 | SQLite 去向 |
+|---|---|---|
+| identity/config | `users`, `registration_sessions`, `settings`, `user_mfa_recovery_codes`, `user_mfa_totp_credentials`, `user_webauthn_credentials`, `refresh_tokens`, `system_state`, `repository_defaults` | Phase 3 squashed `STRICT` baseline；UUID/time/JSON 使用 AD-6 统一类型 |
+| repositories/assets | `repositories`, `repository_roots`, `repository_scan_runs`, `assets`, `thumbnails`, `tags`, `asset_tags` | Phase 3 baseline；保留 FK、unique、partial index 和 repository ownership |
+| collections/locations/duplicates | `albums`, `album_assets`, `media_items`, `media_item_assets`, `asset_stacks`, `asset_stack_members`, `duplicate_groups`, `duplicate_group_assets`, `duplicate_group_edges`, `location_clusters`, `location_cluster_assets`, `reverse_geocode_cache` | Phase 3 baseline；PostgreSQL enum/JSON/array/query 语义改写为 SQLite |
+| ML/analysis/search | `embedding_spaces`, `embeddings`, `ocr_results`, `ocr_text_items`, `face_results`, `face_items`, `face_clusters`, `face_cluster_members`, `species_predictions`, `classifier_definitions`, `asset_quality_scores`, `search_embeddings` | 权威数据进入普通 SQLite 表；FTS5/唯一 vector 实现是可重建查询结构 |
+| cloud/sharing | `cloud_credentials`, `cloud_import_runs`, `cloud_sync_cursors`, `cloud_sync_files`, `repository_cloud_bindings`, `share_links` | Phase 3 baseline；secret 仍由现有加密边界负责 |
+| agent runtime | `agent_checkpoints`, `agent_pins`, `agent_threads`, `agent_runs`, `agent_refs`, `agent_pending_effects` | Phase 3 baseline；保持现有审计、ownership 与恢复语义 |
+
+125 个索引按源 migration 全量纳入迁移核对：`000002` 8 个、`000003` 34 个、`000004` 19 个、`000005` 43 个、`000006` 8 个、`000009` 2 个、`000011` 3 个、`000012` 4 个、`000014` 4 个。普通 unique/partial/access-path index 在 SQLite baseline 中保留；`tsvector`/GIN 迁移至 FTS5；HNSW 迁移至选定的 exact vector/fallback；只服务 PostgreSQL 实现细节的索引删除并在 Phase 3 Decision Log 说明。
+
+| 当前 trigger/function | SQLite 去向 |
+|---|---|
+| `trg_assets_updated_at` / `set_assets_updated_at` | SQLite trigger 或同一短事务内显式更新时间 |
+| `trg_location_clusters_updated_at` / `set_location_clusters_updated_at` | SQLite trigger 或同一短事务内显式更新时间 |
+| `face_cluster_members_count_trigger` / `update_cluster_member_count` | SQLite trigger，保留成员计数不变量 |
+| `face_items_update_trigger` / `update_face_results_updated_at` | SQLite trigger 或同一短事务内显式更新时间 |
+| `ocr_text_items_update_trigger` / `update_ocr_updated_at` | SQLite trigger 或同一短事务内显式更新时间 |
+| `trg_assets_create_media_item` / `create_media_item_for_asset` | Phase 5 ingest transaction 中显式创建，避免隐藏的 PostgreSQL PL/pgSQL 行为 |
+
+#### Query parity inventory
+
+当前 `server/internal/db/repo/queries` 有 33 个 SQL 文件、451 个 named queries。所有 query 保持在同名领域文件中逐个改写并由 SQLite/`database/sql` sqlc 重新生成；不以 Go N+1 拼接、pgx adapter 或手写 generated code 兼容。下表覆盖全部 named queries，数字是该文件必须迁移并通过 sqlc 的 query 数量。
+
+| Query file | 数量 | SQLite 去向 |
+|---|---:|---|
+| `agent.sql`, `agent_facets.sql`, `agent_pins.sql`, `agent_tools.sql` | 25 / 10 / 8 / 12 | SQLite sqlc，同名 query |
+| `albums.sql`, `relationships.sql`, `folders.sql`, `tags.sql` | 15 / 3 / 2 / 9 | SQLite sqlc，同名 query |
+| `assets.sql`, `indexing.sql`, `asset_quality_scores.sql` | 81 / 14 / 2 | SQLite sqlc；全文与 array/JSON 聚合按 SQLite 语义重写 |
+| `repositories.sql`, `repository_defaults.sql`, `repository_roots.sql`, `repository_scans.sql` | 18 / 2 / 8 / 8 | SQLite sqlc，同名 query |
+| `users.sql`, `registration_sessions.sql`, `mfa.sql`, `passkeys.sql`, `settings.sql`, `system_state.sql` | 21 / 6 / 8 / 6 / 2 / 2 | SQLite sqlc，同名 query |
+| `duplicates.sql`, `stacks.sql` | 22 / 16 | SQLite sqlc，同名 query |
+| `locations.sql`, `stats.sql` | 10 / 6 | SQLite sqlc；`date_trunc`/search 改写 |
+| `embeddings.sql`, `search_embeddings.sql`, `faces.sql`, `ocr.sql`, `people.sql`, `species.sql` | 17 / 5 / 52 / 12 / 6 / 8 | 权威 BLOB + 唯一 exact vector/fallback query；其余 SQLite sqlc |
+| `cloud_credentials.sql`, `cloud_sync.sql`, `share_links.sql` | 22 / 4 / 9 | SQLite sqlc，同名 query |
+
+#### Runtime、业务与交付耦合 inventory
+
+- 直接 PostgreSQL import 文件数量：`server/app` 2、`internal/agent` 8、`internal/api` 20、`internal/cloud` 2、`internal/db` 38（含 generated repo）、`internal/processors` 8、`internal/queue` 11、`internal/search` 3、`internal/service` 31、`internal/sourcing` 1、`internal/storage` 7。
+- DB runtime：`internal/db/db.go`, `dsn.go`, `migration.go` 使用 pgx pool、PostgreSQL DSN/password self-heal、golang-migrate Postgres driver 和 `riverpgxv5`。
+- App/queue/ingest：`app/app.go` 传播 `*pgxpool.Pool`；`queue_setup.go` 使用 `river.Client[pgx.Tx]`；`sourcing/materializer.go` 尚未提供业务状态与 pipeline `InsertTx` 原子性。
+- Backup：`internal/db/backup` 与 `backup_service.go` 使用 `pg_dump`/`pg_restore` 和数据库 credential。
+- Config/setup：schema v1 包含 host/port/user/name/SSL/password files/tools bin；first-run readiness 包含数据库 password rotation。
+- Docker/dev/CI：root/release/E2E/devcontainer Compose、Server Dockerfile、`db.Dockerfile`、Makefile 和 GitHub Actions 均有 PostgreSQL service/image/secret/client 路径。
+- Desktop：supervisor 管理 PostgreSQL process、socket/port/data/password/resources/quarantine；macOS/Windows scripts 与 package/license 含 PostgreSQL。
+- Docs/UI：README、安装/完整性/backup 文档和 Desktop control panel 仍描述或展示 PostgreSQL 生命周期。
+
+#### 功能去向与提交纪律
+
+| 功能面 | SQLite 完成证据 |
+|---|---|
+| setup/auth/repository/assets | schema v2 + focused owner login/repository/basic asset CRUD smoke |
+| organization/location/duplicate | SQLite sqlc 生成与代表性关系 CRUD/search test |
+| queue/ingest/processing | River SQLite migration、execute/retry、InsertTx commit/rollback、prepared reconcile、代表 worker |
+| FTS/semantic/video/face | FTS5 与小样本 brute-force top-k 正确性、insert/delete/rebuild |
+| Agent/cloud | schema/query 编译和至少一个 DB-backed Agent smoke；cloud 不因 DB 类型失效 |
+| backup/restore | Online Backup snapshot、有效 restore、损坏 snapshot 拒绝、runtime generation restart |
+| Docker/Desktop | 单应用容器 restart 持久化；当前 macOS first/second launch 与 package guard |
+| dev/CI/docs | PostgreSQL architecture guard、SQLite-only commands/manifests/docs |
+
+每个 Phase 单独形成可审查 commit；生成代码的提交记录生成命令。Phase 0 只提交 living plan 与 inventory，不混入实现。
+
+## Decision Log
+
+| Date | Decision | Reason | Consequence |
+|---|---|---|---|
+| 2026-07-25 | `experimental/sqlite`采用SQLite-only destructive migration | 当前无生产数据，避免双后端长期成本 | 不提供PostgreSQL数据转换或runtime fallback |
+| 2026-07-25 | active DB默认位于machine-local app state | 多repository语义与WAL网络文件系统限制 | 通过snapshot/move实现可迁移性 |
+| 2026-07-25 | River与业务表共享同一SQLite文件和writer | 保留transactional enqueue | 事务必须短，writer pool为1 |
+| 2026-07-25 | stable exact vector先行，ANN为derived fallback | 降低sqlite-vec pre-v1/ANN风险 | 正确性优先，规模benchmark决定sidecar |
+| 2026-07-25 | benchmark、stress、全量fault injection和跨平台runtime E2E不作为experimental goal硬门槛 | 当前目标是先完成可运行的SQLite-only架构实验 | 使用P0聚焦验证完成迁移，P1/P2进入Hardening backlog |
+| 2026-07-25 | Phase 0 inventory 以 schema object、query 文件和业务/交付边界分层追踪 | 451 个 query 与 125 个 index 需要可审计覆盖，又不能把 PostgreSQL 兼容层带入实现 | 每个 Phase 更新本表的实际落点；Phase 3 以 sqlc 与 baseline tests 证明逐项完成 |
+
+## Surprises & Discoveries
+
+- Phase 0 的迁移前 `make server-test` 在本机完整通过；后续没有“已知既有 Server gate failure”可豁免。
+- 当前 PostgreSQL 泄漏远超 DB package：排除 generated repo 后仍遍布 app、Agent、API、cloud、processors、queue、search、service、sourcing 和 storage。Phase 4 必须按 app wiring 从外向内迁移，不能只替换 connection package。
+- active plan 输入最初以未跟踪的 `sqlite-experimental-plan.md` 存在，但 goal 指定 `active/sqlite.md`；Phase 0 已将其归位并作为 living plan 纳入版本控制。
+
+## Outcomes & Retrospective
+
+完成后填写：
+
+- 最终SQLite driver与版本：
+- 最终River版本：
+- 最终vector方案：
+- schema/table/query数量：
+- 删除的PostgreSQL组件：
+- Desktop package体积变化：
+- Docker image体积变化：
+- idle memory变化：
+- startup变化：
+- 可获得的startup/browse/vector/体积观察：
+- P0可靠性测试结果与Deferred fault matrix：
+- 已知限制：
+- 是否建议将SQLite迁移合并为默认架构：
+
+### Critical Files for Implementation
+
+- `server/app/app.go`
+- `server/config/config.go`
+- `server/internal/db/db.go`
+- `server/internal/db/migration.go`
+- `server/internal/sourcing/materializer.go`
