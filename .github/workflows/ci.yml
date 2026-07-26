@@ -319,7 +319,7 @@ jobs:
 
             - name: Compile Desktop App
               working-directory: desktop
-              run: go build ./...
+              run: go build -tags=sqlite_fts5 ./...
 
     # Windows uses the same test/build scope as macOS, but runs Go inside the
     # MSYS2/mingw64 environment that supplies the release CGo toolchain. The
@@ -336,7 +336,7 @@ jobs:
         runs-on: windows-2025
         env:
             CGO_ENABLED: '1'
-            GOFLAGS: -buildvcs=false
+            GOFLAGS: -buildvcs=false -tags=sqlite_fts5
             CGO_LDFLAGS_ALLOW: -Xpreprocessor
             CGO_CFLAGS_ALLOW: -Xpreprocessor
         steps:

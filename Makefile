@@ -16,6 +16,8 @@ PG_BIN_DIR ?= /opt/homebrew/opt/postgresql@18/bin
 GO := go
 VP := vp
 DOCKER := docker
+GO_BUILD_TAGS ?= sqlite_fts5
+GO_TAG_FLAGS := $(if $(strip $(GO_BUILD_TAGS)),-tags=$(strip $(GO_BUILD_TAGS)))
 
 # Homebrew's libraw_r.pc emits `-Xpreprocessor -fopenmp`, which Go's cgo flag
 # allowlist rejects ("invalid flag in pkg-config --libs: -Xpreprocessor"). Allow
@@ -69,7 +71,7 @@ dev: db
 
 server-dev: .server-config .server-secret
 	@echo "==> Starting server"
-	cd $(SERVER_DIR) && $(GO) run ./cmd --config config/server.local.toml
+	cd $(SERVER_DIR) && $(GO) run $(GO_TAG_FLAGS) ./cmd --config config/server.local.toml
 
 web-dev: .web-env
 	@echo "==> Starting web"
@@ -78,7 +80,7 @@ web-dev: .web-env
 test: server-test web-test
 
 server-test:
-	cd $(SERVER_DIR) && $(GO) test ./...
+	cd $(SERVER_DIR) && $(GO) test $(GO_TAG_FLAGS) ./...
 
 web-test:
 	cd $(WEB_DIR) && \
@@ -109,11 +111,11 @@ desktop-dev: desktop-panel
 	cd $(DESKTOP_DIR) && \
 		LUMILIO_PG_BIN_DIR=$(PG_BIN_DIR) \
 		LUMILIO_WEB_ROOT=$(CURDIR)/$(WEB_DIR)/dist \
-		$(GO) run .
+		$(GO) run $(GO_TAG_FLAGS) .
 
 desktop-test: desktop-panel
 	@echo "==> Testing desktop module (PostgreSQL lifecycle test skips if no PG)"
-	cd $(DESKTOP_DIR) && $(GO) test ./...
+	cd $(DESKTOP_DIR) && $(GO) test $(GO_TAG_FLAGS) ./...
 
 desktop-build: desktop-panel
 	@echo "==> Building macOS desktop app bundle"
