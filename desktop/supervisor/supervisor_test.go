@@ -12,6 +12,8 @@ import (
 	"time"
 
 	serverapp "server/app"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 func TestCheckPortAvailable(t *testing.T) {
@@ -150,12 +152,11 @@ func TestDesktopSettingsRoundTrip(t *testing.T) {
 	if s.StoragePath != "" {
 		t.Errorf("expected empty StoragePath on first run, got %q", s.StoragePath)
 	}
-
-	want := DesktopSettings{StoragePath: "/Volumes/Photos/Lib"}
-	want, err = normalizeNetworkSettings(want)
-	if err != nil {
-		t.Fatal(err)
+	if s.Version != desktopSettingsVersion {
+		t.Errorf("missing settings version = %d, want %d", s.Version, desktopSettingsVersion)
 	}
+
+	want := DesktopSettings{Version: desktopSettingsVersion, StoragePath: "/Volumes/Photos/Lib"}
 	if err := SaveSettings(path, want); err != nil {
 		t.Fatalf("SaveSettings: %v", err)
 	}
@@ -167,10 +168,8 @@ func TestDesktopSettingsRoundTrip(t *testing.T) {
 		t.Errorf("round trip = %+v, want %+v", got, want)
 	}
 
-	updated := DesktopSettings{StoragePath: "/Volumes/Photos/Updated", Language: "zh"}
-	updated, err = normalizeNetworkSettings(updated)
-	if err != nil {
-		t.Fatal(err)
+	updated := DesktopSettings{
+		Version: desktopSettingsVersion, StoragePath: "/Volumes/Photos/Updated", Language: "zh",
 	}
 	if err := SaveSettings(path, updated); err != nil {
 		t.Fatalf("SaveSettings(replace): %v", err)
@@ -186,7 +185,7 @@ func TestDesktopNetworkProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if local.Version != desktopSettingsVersion || local.NetworkMode != NetworkLocal ||
+	if local.Version != 1 || local.NetworkMode != NetworkLocal ||
 		local.Listen != "127.0.0.1:6680" || local.PrimaryOrigin != "http://localhost:6680" {
 		t.Fatalf("local defaults = %+v", local)
 	}
@@ -231,31 +230,145 @@ func TestDesktopNetworkProfiles(t *testing.T) {
 	}
 }
 
-func TestDesktopNetworkSettingsRejectInvalidWithoutWriting(t *testing.T) {
+func TestDesktopSettingsV2DoesNotPersistRuntimeNetworkFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "desktop-settings.json")
-	if err := SaveSettings(path, DesktopSettings{}); err != nil {
+	if err := SaveSettings(path, DesktopSettings{
+		NetworkMode:       NetworkExternalHTTPS,
+		PrimaryOrigin:     "https://photos.example.com",
+		Listen:            "0.0.0.0:6680",
+		TrustedProxyCIDRs: []string{"192.168.1.10/32"},
+		Language:          "zh",
+	}); err != nil {
 		t.Fatal(err)
 	}
-	before, err := os.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = SaveSettings(path, DesktopSettings{
-		NetworkMode:       NetworkExternalHTTPS,
-		PrimaryOrigin:     "http://photos.example.com",
-		Listen:            "0.0.0.0:6680",
-		TrustedProxyCIDRs: []string{"0.0.0.0/0"},
+	text := string(data)
+	for _, forbidden := range []string{"network_mode", "primary_origin", "trusted_proxy_cidrs"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("v2 settings persisted runtime field %q:\n%s", forbidden, text)
+		}
+	}
+	if !strings.Contains(text, `"version": 2`) || !strings.Contains(text, `"language": "zh"`) {
+		t.Fatalf("v2 host settings missing expected fields:\n%s", text)
+	}
+}
+
+func TestDesktopSettingsV1MigratesExternalNetworkToRuntimeIntent(t *testing.T) {
+	appData := filepath.Join(t.TempDir(), "appdata")
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	configDir := filepath.Join(appData, "config")
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	legacy := `{
+  "version": 1,
+  "network_mode": "external_https",
+  "primary_origin": "https://photos.example.com",
+  "listen": "127.0.0.1:6680",
+  "trusted_proxy_cidrs": ["127.0.0.1/32", "::1/128"],
+  "language": "zh",
+  "onboarding_completed": true
+}`
+	settingsPath := filepath.Join(configDir, "desktop-settings.json")
+	if err := os.WriteFile(settingsPath, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New(Options{Logf: func(string, ...any) {}})
+	settings, err := s.Settings()
+	if err != nil {
+		t.Fatalf("migrate v1 settings: %v", err)
+	}
+	if settings.Version != desktopSettingsVersion ||
+		settings.NetworkMode != NetworkExternalHTTPS ||
+		settings.PrimaryOrigin != "https://photos.example.com" ||
+		settings.Language != "zh" {
+		t.Fatalf("migrated settings = %+v", settings)
+	}
+	disk, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(disk), "network_mode") || !strings.Contains(string(disk), `"version": 2`) {
+		t.Fatalf("v2 settings did not remove runtime source fields:\n%s", disk)
+	}
+	view, err := s.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.Network.Mode != NetworkExternalHTTPS ||
+		view.Network.PrimaryOrigin != "https://photos.example.com" ||
+		!view.LastKnownGoodAvailable {
+		t.Fatalf("migrated runtime view = %+v", view)
+	}
+}
+
+func TestRuntimeCandidateFingerprintHostProjectionAndSemantics(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+	s := New(Options{Logf: func(string, ...any) {}})
+	view, err := s.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(view.BaseFingerprint, "sha256:") || len(view.HostManagedPaths) == 0 {
+		t.Fatalf("runtime view missing provenance: %+v", view)
+	}
+
+	patched, err := s.PatchRuntimeNetwork(view.BaseFingerprint, view.CandidateTOML, NetworkCandidatePatch{
+		Mode: NetworkExternalHTTPS, PrimaryOrigin: "https://photos.example.com",
+		Listen: "127.0.0.1:6680", ProxyLocation: "same_host",
 	})
-	if err == nil {
-		t.Fatal("invalid external network profile was accepted")
+	if err != nil {
+		t.Fatal(err)
 	}
-	after, readErr := os.ReadFile(path)
-	if readErr != nil {
-		t.Fatal(readErr)
+	if !patched.Valid || patched.Network.Mode != NetworkExternalHTTPS ||
+		len(patched.SemanticChanges) == 0 {
+		t.Fatalf("network candidate = %+v", patched)
 	}
-	if string(after) != string(before) {
-		t.Fatal("invalid network profile changed persisted settings")
+	if _, err := s.ValidateRuntimeConfig("sha256:stale", patched.CandidateTOML); !errors.Is(err, ErrStaleRuntimeConfig) {
+		t.Fatalf("stale fingerprint error = %v", err)
 	}
+
+	document, err := parseRuntimeDocument([]byte(view.CandidateTOML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	setRuntimePath(document, "database.path", "/tmp/not-desktop-owned.sqlite3")
+	hostChanged, err := toml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	validation, err := s.ValidateRuntimeConfig(view.BaseFingerprint, string(hostChanged))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validation.Valid || len(validation.Issues) == 0 ||
+		validation.Issues[0].Code != "host_managed" {
+		t.Fatalf("host-owned change accepted: %+v", validation)
+	}
+
+	document, _ = parseRuntimeDocument([]byte(view.CandidateTOML))
+	setRuntimePath(document, "server.tls.mode", "acme")
+	acme, _ := toml.Marshal(document)
+	validation, err = s.ValidateRuntimeConfig(view.BaseFingerprint, string(acme))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validation.Valid || !hasConfigIssue(validation.Issues, "unsupported_desktop_tls") {
+		t.Fatalf("Desktop ACME accepted: %+v", validation)
+	}
+}
+
+func hasConfigIssue(issues []ConfigIssue, code string) bool {
+	for _, issue := range issues {
+		if issue.Code == code {
+			return true
+		}
+	}
+	return false
 }
 
 func TestInternalHealthURLIsIndependentFromPrimaryOrigin(t *testing.T) {

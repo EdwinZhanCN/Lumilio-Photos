@@ -60,6 +60,7 @@ export interface DashboardPaths {
   logs?: string;
   backups?: string;
   appData?: string;
+  serverConfig?: string;
 }
 
 export type NetworkMode = "local" | "lan_http" | "external_https";
@@ -98,6 +99,39 @@ export interface RuntimeSnapshot {
   lastKnownGoodAvailable: boolean;
   network: RuntimeNetworkSummary;
   operationActive: boolean;
+}
+
+export interface ConfigIssue {
+  field?: string;
+  code: string;
+  message: string;
+}
+
+export interface SemanticChange {
+  field: string;
+  before: string;
+  after: string;
+}
+
+export interface RuntimeConfigView {
+  currentToml: string;
+  candidateToml: string;
+  baseFingerprint: string;
+  lastKnownGoodAvailable: boolean;
+  hostManagedPaths: string[];
+  network: RuntimeNetworkSummary;
+  issues: ConfigIssue[];
+  semanticChanges: SemanticChange[];
+}
+
+export interface RuntimeConfigValidation {
+  valid: boolean;
+  candidateToml: string;
+  baseFingerprint: string;
+  network: RuntimeNetworkSummary;
+  issues: ConfigIssue[];
+  semanticChanges: SemanticChange[];
+  requiresRestart: boolean;
 }
 
 export interface PanelState {
@@ -191,6 +225,15 @@ export interface NetworkSavePayload {
   proxyLocation: "same_host" | "remote";
   trustedProxyCIDRs: string[];
   acceptLANWarning: boolean;
+}
+
+export interface RuntimeConfigRequest {
+  baseFingerprint: string;
+  toml: string;
+}
+
+export interface RuntimeConfigPatchNetworkRequest extends RuntimeConfigRequest {
+  network: NetworkSavePayload;
 }
 
 export interface NetworkSaveResult {

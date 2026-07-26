@@ -9,6 +9,10 @@ import type {
   PickResult,
   RepositoryIdentityConflict,
   RepositoryInfo,
+  RuntimeConfigPatchNetworkRequest,
+  RuntimeConfigRequest,
+  RuntimeConfigValidation,
+  RuntimeConfigView,
   StorageLocation,
   StorageLocationIdentityConflict,
 } from "./types.ts";
@@ -57,6 +61,11 @@ export const api = {
   complete: (payload: CompletePayload) => postJSON<{ ok: boolean }>("/__onb/complete", payload),
   saveRegion: (region: string) => postJSON<{ ok: boolean }>("/__onb/region", { region }),
   restartRuntime: () => postJSON<{ accepted: boolean }>("/__onb/runtime/restart"),
+  runtimeConfig: () => getJSON<RuntimeConfigView>("/__onb/runtime/config"),
+  validateRuntimeConfig: (payload: RuntimeConfigRequest) =>
+    postJSON<RuntimeConfigValidation>("/__onb/runtime/config/validate", payload),
+  patchRuntimeNetwork: (payload: RuntimeConfigPatchNetworkRequest) =>
+    postJSON<RuntimeConfigValidation>("/__onb/runtime/config/patch-network", payload),
   saveNetwork: (payload: NetworkSavePayload) =>
     postJSON<NetworkSaveResult>("/__onb/network", payload),
   lumenSave: (payload: LumenSavePayload) => postJSON<{ ok: boolean }>("/__onb/lumen-save", payload),

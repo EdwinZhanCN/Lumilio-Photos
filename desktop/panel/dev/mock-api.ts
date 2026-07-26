@@ -128,6 +128,48 @@ const LOGS: Record<string, string> = {
     "2026-07-17 09:13:20 INFO  lumen-hub booting, backend=metal\n2026-07-17 09:13:26 INFO  model loaded: bioclip-v2 (1.2GB)",
 };
 
+const MOCK_RUNTIME_TOML = `schema_version = 3
+environment = "production"
+
+[database]
+path = "/Users/demo/Library/Application Support/Lumilio Photos/library.sqlite3"
+
+[server]
+listen = "127.0.0.1:6680"
+primary_origin = "http://localhost:6680"
+cors_allowed_origins = []
+web_root = "/Applications/Lumilio Photos.app/Contents/Resources/web"
+
+[server.tls]
+mode = "off"
+http_listen = ""
+email = ""
+storage_path = ""
+
+[server.proxy]
+mode = "disabled"
+trusted_cidrs = []
+
+[logging]
+level = "info"
+dir = "/Users/demo/Library/Logs/Lumilio Photos"
+console_format = "console"
+file_format = "json"
+repository_audit_verbose = false
+
+[repository_scan]
+enabled = true
+interval_seconds = 300
+settle_seconds = 5
+max_concurrent_repos = 1
+batch_size = 500
+
+[transcode]
+hardware_accel = "auto"
+`;
+
+const MOCK_FINGERPRINT = `sha256:${"a".repeat(64)}`;
+
 function statePayload(runtimeOverride?: string | null, modeOverride?: string | null) {
   const runtimePhase: MockRuntimePhase = isMockRuntimePhase(runtimeOverride)
     ? runtimeOverride
@@ -185,6 +227,7 @@ function statePayload(runtimeOverride?: string | null, modeOverride?: string | n
       logs: `${HOME}/Library/Logs/Lumilio Photos`,
       backups: `${HOME}/Library/Application Support/Lumilio Photos/backups`,
       appData: `${HOME}/Library/Application Support/Lumilio Photos`,
+      serverConfig: `${HOME}/Library/Application Support/Lumilio Photos/config/server.toml`,
     },
     backends: [
       { name: "metal", profile: "darwin-arm64-metal", recommended: true },
@@ -309,6 +352,48 @@ export function mockPanelApi(): Plugin {
             mock.ready = false;
             setTimeout(() => (mock.ready = true), 1800);
             return json(res, { accepted: true });
+          case "/__onb/runtime/config":
+            return json(res, {
+              currentToml: MOCK_RUNTIME_TOML,
+              candidateToml: MOCK_RUNTIME_TOML,
+              baseFingerprint: MOCK_FINGERPRINT,
+              lastKnownGoodAvailable: true,
+              hostManagedPaths: [
+                "schema_version",
+                "database.path",
+                "server.web_root",
+                "logging.dir",
+              ],
+              network: statePayload().runtime.network,
+              issues: [],
+              semanticChanges: [],
+            });
+          case "/__onb/runtime/config/validate":
+          case "/__onb/runtime/config/patch-network": {
+            const body = await readBody(req);
+            const candidateToml = String(body.toml ?? MOCK_RUNTIME_TOML);
+            const acme = candidateToml.includes('mode = "acme"');
+            return json(res, {
+              valid: !acme,
+              candidateToml,
+              baseFingerprint: MOCK_FINGERPRINT,
+              network: statePayload().runtime.network,
+              issues: acme
+                ? [
+                    {
+                      field: "server.tls.mode",
+                      code: "unsupported_desktop_tls",
+                      message: "Desktop supports TLS modes off and external; ACME is not available",
+                    },
+                  ]
+                : [],
+              semanticChanges:
+                candidateToml === MOCK_RUNTIME_TOML
+                  ? []
+                  : [{ field: "logging.level", before: "info", after: "debug" }],
+              requiresRestart: candidateToml !== MOCK_RUNTIME_TOML,
+            });
+          }
           case "/__onb/lumen-save": {
             const body = await readBody(req);
             if (mock.lumen.cacheDir !== body.cacheDir) {

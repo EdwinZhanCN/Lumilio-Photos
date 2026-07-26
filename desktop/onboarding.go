@@ -209,6 +209,9 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		writeJSON(w, map[string]any{"ok": true, "region": settings.Region})
 	})
 	mux.HandleFunc("/__onb/runtime/restart", d.handleRuntimeRestart)
+	mux.HandleFunc("/__onb/runtime/config", d.handleRuntimeConfigRead)
+	mux.HandleFunc("/__onb/runtime/config/validate", d.handleRuntimeConfigValidate)
+	mux.HandleFunc("/__onb/runtime/config/patch-network", d.handleRuntimeConfigPatchNetwork)
 	mux.HandleFunc("/__onb/network", d.handleNetworkSave)
 
 	mux.HandleFunc("/__onb/pick-cache", func(w http.ResponseWriter, r *http.Request) { d.pickDashboardDir(w, "Choose model cache location") })

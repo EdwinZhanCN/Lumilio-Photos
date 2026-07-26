@@ -1836,7 +1836,41 @@ rollback
   - Verification: `make desktop-test` passed with Svelte diagnostics at 0 errors / 0 warnings;
     Panel `vp check --fix`, `vp test` (1 file / 7 tests), and production build (685 modules)
     passed.
-- [ ] Phase 4：Runtime intent/TOML
+- [x] Phase 4：Runtime intent/TOML
+  - Added explicit DesktopSettings v1/v2 disk structs. v2 persists only host/control-plane
+    choices (including LAN acknowledgement and Lumen), while network compatibility fields are
+    derived in memory from the resolved runtime intent and never serialized back to JSON.
+  - First access migrates a v1 local/LAN/external profile by rendering the existing schema-v3
+    template, strict-loading it, atomically creating `runtime.toml` and the migration baseline
+    `runtime.last-known-good.toml`, then atomically replacing desktop-settings.json with v2.
+    Focused coverage proves an external HTTPS origin/listen/trusted-proxy profile survives.
+  - Added the declared paths for persistent intent, LKG, staged candidate, and apply journal.
+    Startup now reads `runtime.toml`, applies HostProjection, strict-loads the materialized bytes,
+    atomically writes generation-owned `server.toml` at mode 0600, and starts from that immutable
+    config.
+  - HostProjection owns every path listed in section 6.2 plus schema/environment, empty desktop
+    CORS, TLS auxiliary fields, and the supervised Lumen static node/deployment ID. Candidate
+    edits to those fields return structured `host_managed` issues; Desktop also explicitly rejects
+    TLS ACME.
+  - `server/config.LoadAppConfigBytes` is the single candidate validator and preserves unknown
+    field rejection, presence checks, relative path resolution, deployment rules, manifest
+    fingerprint, and the loaded invariant. `LoadAppConfig` now only resolves/reads before calling
+    the same function.
+  - Added `GET /__onb/runtime/config`, `POST .../validate`, and `POST .../patch-network`.
+    They return a `sha256:` base fingerprint, canonical candidate, strict resolved network,
+    field/code/message issues, and semantic changes for network mode/listen/origin, Passkey
+    identity/enabled, logging, repository scan, and transcode acceleration. Stale drafts return
+    `409 stale_fingerprint`; endpoints remain private and do not persist or restart.
+  - Settings now includes Runtime Configuration with read-only Current, explicit Candidate editor,
+    Validate, Reset, active-manifest reveal, host-managed field disclosure, issues, and semantic
+    changes. The frontend never parses TOML. Its apply/restore actions remain for Phase 5.
+  - The legacy `/__onb/network` compatibility route temporarily patches the same runtime intent
+    before using its existing synchronous restart/rollback behavior; it no longer restores network
+    source fields to v2 JSON and is still scheduled for complete removal in Phase 5.
+  - Verification: `make server-test` passed; `make desktop-test` passed including v1 migration,
+    host projection, stale fingerprint, ACME/host-field rejection, private endpoint, first/second
+    launch, and existing network rollback tests; Panel `vp check --fix`, `vp test` (1 file /
+    7 tests), and `vp build` (686 modules) passed.
 - [ ] Phase 5：Apply/Rollback
 - [ ] Phase 6：Mock/A11y/i18n/cleanup
 - [ ] Phase 7：Optional P1/docs
@@ -1861,6 +1895,10 @@ rollback
 | 2026-07-26 | Phase 2 Settings scroll target and Lumen Configure dialog are temporary compatibility bridges | Phase 2 must preserve all actions while Phase 3 owns the unified modal extraction | No duplicated forms are introduced; both bridges are removed in Phase 3 |
 | 2026-07-26 | Keep all three Settings forms mounted for an open session | Tab navigation must not discard edits and background polls must not clobber them | Each form re-seeds only when the dialog session increments; dirty state spans tabs and guards close |
 | 2026-07-26 | Keep `/__onb/network` only as the Phase 3 ServerSettings transport | Unified UI and runtime-intent replacement are intentionally separate commits | Existing Network behavior remains testable until Phase 5 atomically replaces and removes the legacy route |
+| 2026-07-26 | Decode DesktopSettings through explicit v1 and v2 disk structs while retaining transient in-memory network compatibility fields | Migration must detect legacy fields intentionally, but Phase 3 callers still need a resolved NetworkInfo until cleanup | v2 JSON cannot drift from runtime.toml; Supervisor.Settings derives the temporary compatibility view from strict AppConfig |
+| 2026-07-26 | HostProjection is applied to a generic TOML copy immediately before the real strict loader | User policy must survive while machine paths and supervised endpoints remain host-owned | runtime.toml stays complete/editable, server.toml is the projected immutable generation input, and TypeScript has no config parser |
+| 2026-07-26 | Candidate fingerprint hashes the exact active runtime.toml bytes with a `sha256:` prefix | Raw and structured editors need optimistic concurrency without treating generated server.toml as source | Any relaunch/apply that changes intent makes an older draft deterministically stale |
+| 2026-07-26 | Treat migration's strict-loaded initial intent as the initial LKG baseline | The v1→v2 sequence in the approved plan requires an immediately recoverable equivalent profile | Subsequent Phase 5 readiness applies replace LKG only after the new generation is proven ready |
 
 ## Surprises & Discoveries
 
@@ -1885,6 +1923,10 @@ rollback
   `configureOpen` variable that the faster `vp check --fix` command did not report. The embedded
   panel's `svelte-check` did report it; routing that item to the shared Lumen tab fixed the only
   failure, and the complete rerun passed.
+- The first Phase 4 desktop run compiled only after removing a now-unused template `paths` local,
+  then correctly failed three tests whose assertions still encoded v1 JSON as the network source.
+  Replacing those assertions with v2 host-only round trips and explicit v1 migration coverage made
+  the changed ownership executable rather than weakening validation.
 
 ## Outcomes & Retrospective
 

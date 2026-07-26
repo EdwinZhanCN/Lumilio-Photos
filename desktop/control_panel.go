@@ -37,6 +37,66 @@ type networkSaveRequest struct {
 	AcceptLANWarning  bool                   `json:"acceptLANWarning"`
 }
 
+type runtimeConfigRequest struct {
+	BaseFingerprint string `json:"baseFingerprint"`
+	TOML            string `json:"toml"`
+}
+
+type runtimeConfigPatchNetworkRequest struct {
+	BaseFingerprint string                           `json:"baseFingerprint"`
+	TOML            string                           `json:"toml"`
+	Network         supervisor.NetworkCandidatePatch `json:"network"`
+}
+
+func (d *desktopApp) handleRuntimeConfigRead(w http.ResponseWriter, _ *http.Request) {
+	view, err := d.sup.ReadRuntimeConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, view)
+}
+
+func (d *desktopApp) handleRuntimeConfigValidate(w http.ResponseWriter, r *http.Request) {
+	var body runtimeConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	result, err := d.sup.ValidateRuntimeConfig(body.BaseFingerprint, body.TOML)
+	if errors.Is(err, supervisor.ErrStaleRuntimeConfig) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		writeJSON(w, map[string]any{"code": "stale_fingerprint", "message": err.Error()})
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, result)
+}
+
+func (d *desktopApp) handleRuntimeConfigPatchNetwork(w http.ResponseWriter, r *http.Request) {
+	var body runtimeConfigPatchNetworkRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	result, err := d.sup.PatchRuntimeNetwork(body.BaseFingerprint, body.TOML, body.Network)
+	if errors.Is(err, supervisor.ErrStaleRuntimeConfig) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		writeJSON(w, map[string]any{"code": "stale_fingerprint", "message": err.Error()})
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, result)
+}
+
 func (d *desktopApp) handleRuntimeRestart(w http.ResponseWriter, _ *http.Request) {
 	if err := d.sup.RestartAsync(d.ctx); err != nil {
 		if errors.Is(err, supervisor.ErrOperationInProgress) {

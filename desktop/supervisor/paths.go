@@ -20,7 +20,7 @@ type Paths struct {
 	Database   string // active SQLite catalog
 	Logs       string // API/application log directory
 	Secrets    string // lumilio_secret_key and other private credentials
-	Config     string // authoritative generated manifest + desktop-settings.json
+	Config     string // runtime intent, generated manifest, journal + desktop-settings.json
 	Backups    string // consistent SQLite snapshots and manifests
 	Cloud      string // cloud provider sessions and credential artifacts
 	DefaultLib string // default media library location (<appdata>/storage)
@@ -96,6 +96,26 @@ func (p *Paths) DesktopSettingsFile() string {
 // launch. Persisted user choices remain in desktop-settings.json.
 func (p *Paths) ServerConfigFile() string {
 	return filepath.Join(p.Config, "server.toml")
+}
+
+// RuntimeConfigFile is the persistent, complete schema-v3 user/runtime intent.
+func (p *Paths) RuntimeConfigFile() string {
+	return filepath.Join(p.Config, "runtime.toml")
+}
+
+// RuntimeLastKnownGoodFile is the most recent intent that passed readiness.
+func (p *Paths) RuntimeLastKnownGoodFile() string {
+	return filepath.Join(p.Config, "runtime.last-known-good.toml")
+}
+
+// RuntimeCandidateFile is the staged apply input and normally does not exist.
+func (p *Paths) RuntimeCandidateFile() string {
+	return filepath.Join(p.Config, "runtime.candidate.toml")
+}
+
+// RuntimeApplyJournalFile records crash-recoverable apply progress.
+func (p *Paths) RuntimeApplyJournalFile() string {
+	return filepath.Join(p.Config, "runtime-apply.json")
 }
 
 // SecretKeyFile holds the app root secret used to derive JWT/MFA/media keys.

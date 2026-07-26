@@ -1,5 +1,5 @@
 <script module lang="ts">
-  export type SettingsTab = "general" | "server" | "lumen";
+  export type SettingsTab = "general" | "server" | "lumen" | "runtime";
 </script>
 
 <script lang="ts">
@@ -7,6 +7,7 @@
   import { t } from "../../lib/i18n.svelte.ts";
   import GeneralSettingsForm from "./GeneralSettingsForm.svelte";
   import LumenSettingsForm from "./LumenSettingsForm.svelte";
+  import RuntimeSettingsForm from "./RuntimeSettingsForm.svelte";
   import ServerSettingsForm from "./ServerSettingsForm.svelte";
 
   let {
@@ -22,6 +23,7 @@
   let generalForm: GeneralSettingsForm | undefined = undefined;
   let serverForm: ServerSettingsForm | undefined = undefined;
   let lumenForm: LumenSettingsForm | undefined = undefined;
+  let runtimeForm: RuntimeSettingsForm | undefined = undefined;
   let generalDirty = $state(false);
   let generalSaving = $state(false);
   let serverDirty = $state(false);
@@ -30,23 +32,40 @@
   let lumenDirty = $state(false);
   let lumenSaving = $state(false);
   let lumenConfirmingMove = $state(false);
+  let runtimeDirty = $state(false);
+  let runtimeSaving = $state(false);
 
   const tabs: Array<{ id: SettingsTab; label: () => string }> = [
     { id: "general", label: () => t("settingsTabGeneral") },
     { id: "server", label: () => t("settingsTabServer") },
     { id: "lumen", label: () => t("settingsTabLumen") },
+    { id: "runtime", label: () => t("settingsTabRuntime") },
   ];
 
-  const anyDirty = $derived(generalDirty || serverDirty || lumenDirty);
+  const anyDirty = $derived(generalDirty || serverDirty || lumenDirty || runtimeDirty);
   const activeDirty = $derived(
-    tab === "general" ? generalDirty : tab === "server" ? serverDirty : lumenDirty,
+    tab === "general"
+      ? generalDirty
+      : tab === "server"
+        ? serverDirty
+        : tab === "lumen"
+          ? lumenDirty
+          : runtimeDirty,
   );
   const activeSaving = $derived(
-    tab === "general" ? generalSaving : tab === "server" ? serverSaving : lumenSaving,
+    tab === "general"
+      ? generalSaving
+      : tab === "server"
+        ? serverSaving
+        : tab === "lumen"
+          ? lumenSaving
+          : runtimeSaving,
   );
   const activeCanSave = $derived(tab !== "server" || serverCanSave);
   const saveLabel = $derived(
-    tab === "server"
+    tab === "runtime"
+      ? t("validateCandidate")
+      : tab === "server"
       ? t("networkSave")
       : tab === "lumen" && lumenConfirmingMove
         ? t("confirmMove")
@@ -63,13 +82,15 @@
   }
 
   async function saveActive(): Promise<void> {
-    if (!generalForm || !serverForm || !lumenForm) return;
+    if (!generalForm || !serverForm || !lumenForm || !runtimeForm) return;
     const saved =
       tab === "general"
         ? await generalForm.save()
         : tab === "server"
           ? await serverForm.save()
-          : await lumenForm.save();
+          : tab === "lumen"
+            ? await lumenForm.save()
+            : await runtimeForm.save();
     if (saved) open = false;
   }
 </script>
@@ -112,7 +133,8 @@
               {item.label()}
               {#if (item.id === "general" && generalDirty) ||
               (item.id === "server" && serverDirty) ||
-              (item.id === "lumen" && lumenDirty)}
+              (item.id === "lumen" && lumenDirty) ||
+              (item.id === "runtime" && runtimeDirty)}
                 <span class="status status-warning status-sm" aria-label={t("unsavedChanges")}></span>
               {/if}
             </button>
@@ -162,6 +184,20 @@
               bind:dirty={lumenDirty}
               bind:saving={lumenSaving}
               bind:confirmingMove={lumenConfirmingMove}
+            />
+          </div>
+          <div
+            id="settings-panel-runtime"
+            role="tabpanel"
+            aria-labelledby="settings-tab-runtime"
+            hidden={tab !== "runtime"}
+          >
+            <RuntimeSettingsForm
+              bind:this={runtimeForm}
+              {open}
+              {session}
+              bind:dirty={runtimeDirty}
+              bind:saving={runtimeSaving}
             />
           </div>
         </div>

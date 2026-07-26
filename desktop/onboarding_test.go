@@ -154,6 +154,64 @@ func TestOnboardingStateEndpoint(t *testing.T) {
 	}
 }
 
+func TestRuntimeConfigReadValidateAndStaleFingerprintEndpoints(t *testing.T) {
+	d := newTestApp(t)
+	handler := d.onboardingHandler()
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/__onb/runtime/config", nil),
+	)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("read config status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var view supervisor.RuntimeConfigView
+	if err := json.Unmarshal(rec.Body.Bytes(), &view); err != nil {
+		t.Fatal(err)
+	}
+	if view.BaseFingerprint == "" || view.CurrentTOML == "" || len(view.HostManagedPaths) == 0 {
+		t.Fatalf("runtime config view = %+v", view)
+	}
+
+	candidate := strings.Replace(view.CandidateTOML, `level = "info"`, `level = "debug"`, 1)
+	body, err := json.Marshal(map[string]string{
+		"baseFingerprint": view.BaseFingerprint,
+		"toml":            candidate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodPost, "/__onb/runtime/config/validate", strings.NewReader(string(body))),
+	)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("validate status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var validation supervisor.RuntimeConfigValidation
+	if err := json.Unmarshal(rec.Body.Bytes(), &validation); err != nil {
+		t.Fatal(err)
+	}
+	if !validation.Valid || len(validation.SemanticChanges) == 0 {
+		t.Fatalf("validation = %+v", validation)
+	}
+
+	body, _ = json.Marshal(map[string]string{
+		"baseFingerprint": "sha256:stale",
+		"toml":            candidate,
+	})
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodPost, "/__onb/runtime/config/validate", strings.NewReader(string(body))),
+	)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "stale_fingerprint") {
+		t.Fatalf("stale response = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestOnboardingIndexServed(t *testing.T) {
 	d := newTestApp(t)
 	rec := httptest.NewRecorder()
