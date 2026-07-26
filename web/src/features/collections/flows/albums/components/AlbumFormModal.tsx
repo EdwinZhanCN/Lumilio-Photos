@@ -259,7 +259,7 @@ export function AlbumFormModal({
       </form>
 
       {isChoosingCover && (
-        <div className="absolute inset-0 z-40 isolate flex flex-col bg-base-100">
+        <div className="absolute inset-0 z-10 isolate flex flex-col bg-base-100">
           <div className="sticky top-0 z-10 flex items-center border-b border-base-200 bg-base-100 p-3">
             <button
               type="button"

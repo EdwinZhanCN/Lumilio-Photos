@@ -78,8 +78,6 @@ export default function TagList({ assetId }: TagListProps) {
       position: "fixed",
       left,
       width: POPOVER_WIDTH,
-      // Must sit above the fullscreen lightbox (z-lightbox) it portals out of.
-      zIndex: "var(--z-index-tooltip)" as unknown as number,
     };
     if (spaceBelow >= POPOVER_MAX_HEIGHT || spaceBelow >= r.top) {
       next.top = r.bottom + 4;
@@ -192,7 +190,7 @@ export default function TagList({ assetId }: TagListProps) {
       {open &&
         style &&
         createPortal(
-          <div ref={popoverRef} style={style}>
+          <div ref={popoverRef} className="z-tooltip" style={style}>
             <TagPickerMenu
               className="shadow-lg"
               style={{ maxHeight: POPOVER_MAX_HEIGHT }}

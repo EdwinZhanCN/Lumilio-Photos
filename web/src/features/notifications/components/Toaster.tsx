@@ -81,6 +81,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--info-text": "hsl(var(--in))",
           "--info-border": "hsl(var(--in) / 0.35)",
           "--border-radius": "0.75rem",
+          zIndex: "var(--z-index-toast)",
         } as CSSProperties
       }
       toastOptions={{

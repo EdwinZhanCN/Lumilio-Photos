@@ -331,7 +331,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         <div
           aria-hidden
           onClick={() => setCollapsedOverride(true)}
-          className={`fixed inset-0 z-tooltip bg-black/20 backdrop-blur-[1px] transition-opacity duration-300 ${
+          className={`fixed inset-0 z-overlay bg-black/20 backdrop-blur-[1px] transition-opacity duration-300 ${
             collapsed ? "pointer-events-none opacity-0" : "opacity-100"
           }`}
         />
@@ -339,7 +339,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           id="lumilio-chat-dock-panel"
           aria-hidden={collapsed}
           inert={collapsed ? true : undefined}
-          className={`fixed inset-y-0 right-0 z-tooltip isolate flex w-[min(28rem,100vw)] flex-col border-l border-base-300 bg-base-100/95 shadow-xl backdrop-blur transition-transform duration-300 ease-out ${
+          className={`fixed inset-y-0 right-0 z-overlay isolate flex w-[min(28rem,100vw)] flex-col border-l border-base-300 bg-base-100/95 shadow-xl backdrop-blur transition-transform duration-300 ease-out ${
             collapsed ? "translate-x-full" : "translate-x-0"
           }`}
         >
@@ -358,7 +358,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   // ── Embedded variant: in-flow centered panel (Lumilio board page) ─────────
   return (
-    <section className="absolute bottom-4 left-1/2 z-overlay isolate flex w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2.5">
+    <section className="absolute bottom-4 left-1/2 z-30 isolate flex w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2.5">
       <div
         id="lumilio-chat-dock-panel"
         aria-hidden={collapsed}

@@ -342,16 +342,30 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
                         : "shadow-[0_16px_40px_-30px_rgba(15,23,42,0.45)] group-hover:-translate-y-0.5"
                   }`}
                 >
+                  {cropUrl ? (
+                    <img
+                      src={cropUrl}
+                      alt=""
+                      className={`size-full object-cover transition-transform duration-300 ${
+                        isSelectionMode || selected ? "" : "group-hover:scale-[1.03]"
+                      }`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex size-full items-center justify-center text-xs text-base-content/40">
+                      {t("people.faces.missingCrop", "No crop")}
+                    </div>
+                  )}
                   {isSelectionMode && (
                     <>
                       <div
-                        className={`pointer-events-none absolute inset-0 z-10 transition-colors ${
+                        className={`pointer-events-none absolute inset-0 transition-colors ${
                           selected
                             ? "bg-primary/14"
                             : "bg-gradient-to-b from-black/20 via-transparent to-black/10"
                         }`}
                       />
-                      <div className="absolute right-2 top-2 z-20">
+                      <div className="absolute right-2 top-2">
                         <div
                           className={`flex size-7 items-center justify-center rounded-full border backdrop-blur-md transition-all ${
                             selected
@@ -368,24 +382,10 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
                       </div>
                     </>
                   )}
-                  {cropUrl ? (
-                    <img
-                      src={cropUrl}
-                      alt=""
-                      className={`size-full object-cover transition-transform duration-300 ${
-                        isSelectionMode || selected ? "" : "group-hover:scale-[1.03]"
-                      }`}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center text-xs text-base-content/40">
-                      {t("people.faces.missingCrop", "No crop")}
-                    </div>
-                  )}
                 </div>
 
                 {face.is_representative && (
-                  <span className="badge badge-primary badge-xs absolute left-2 top-2 z-20 gap-1 border-none">
+                  <span className="badge badge-primary badge-xs absolute left-2 top-2 gap-1 border-none">
                     <Star className="size-3" />
                   </span>
                 )}

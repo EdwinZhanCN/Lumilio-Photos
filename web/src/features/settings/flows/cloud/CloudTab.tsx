@@ -227,9 +227,7 @@ export default function CloudTab() {
   const renderField = (
     field: CloudProviderField,
     values: CloudCredentialFormValues,
-    setValues: (
-      updater: (current: CloudCredentialFormValues) => CloudCredentialFormValues,
-    ) => void,
+    setValues: (updater: (current: CloudCredentialFormValues) => CloudCredentialFormValues) => void,
     disabled: boolean,
   ) => {
     if (!field.name) return null;
@@ -377,14 +375,13 @@ export default function CloudTab() {
       </SettingsGroup>
 
       {isAddOpen && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div className="modal-box max-w-lg rounded-2xl">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold">
                   {pendingChallenge
-                    ? (providerText(pendingChallenge.title) ||
-                      t("settings.cloud.verifyTitle"))
+                    ? providerText(pendingChallenge.title) || t("settings.cloud.verifyTitle")
                     : selectedProvider
                       ? t("settings.cloud.providerFormTitle", {
                           provider: providerText(selectedProvider.title),
@@ -393,13 +390,13 @@ export default function CloudTab() {
                 </h3>
                 <p className="mt-1 text-sm text-base-content/65">
                   {pendingChallenge
-                    ? (providerText(pendingChallenge.description, pendingChallenge.params) ||
+                    ? providerText(pendingChallenge.description, pendingChallenge.params) ||
                       t("settings.cloud.verifyDescription", {
                         name: pendingCredential?.display_name,
-                      }))
+                      })
                     : selectedProvider
-                      ? (providerText(selectedProvider.security_note) ||
-                        t("settings.cloud.providerFormDescription"))
+                      ? providerText(selectedProvider.security_note) ||
+                        t("settings.cloud.providerFormDescription")
                       : t("settings.cloud.providerDescription")}
                 </p>
               </div>
