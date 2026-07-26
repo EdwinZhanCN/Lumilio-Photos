@@ -1,24 +1,17 @@
-schema_version = 1
+schema_version = 2
 environment = "test"
 
 [database]
-host = "db"
-port = "5432"
-user = "postgres"
-name = "lumiliophotos"
-ssl = "disable"
-bootstrap_password_file = "/run/secrets/db_bootstrap_password"
-rotated_password_file = "/data/app-state/secrets/db_password"
-tools_bin_dir = ""
+path = "/data/app-state/library.sqlite3"
 
 [server]
 port = "6680"
 cors_allowed_origins = []
-web_root = ""
+web_root = "/app/web"
 
 [logging]
 level = "info"
-dir = "/tmp/lumilio-e2e-logs"
+dir = "/data/app-state/logs"
 console_format = "console"
 file_format = "json"
 repository_audit_verbose = false

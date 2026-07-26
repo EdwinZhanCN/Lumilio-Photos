@@ -45,31 +45,27 @@ Desktop packages include a private PostgreSQL runtime and the required media too
 
 ### Docker Compose
 
-Docker with the Compose plugin is required. Set `LUMILIO_STORAGE` to the host media directory and `LUMILIO_BOOTSTRAP_PASSWORD_FILE` to a non-empty private file used by both PostgreSQL initialization and the server manifest.
+Docker with the Compose plugin is required. The single application image serves both the web interface and API. Set `LUMILIO_STORAGE` to the host media directory and `LUMILIO_STATE` to a separate machine-local directory for the SQLite catalog, snapshots, credentials, and logs.
 
 ```bash
 curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
-export LUMILIO_STORAGE=/srv/photos
-export LUMILIO_BOOTSTRAP_PASSWORD_FILE=/srv/lumilio-secrets/db_bootstrap_password
-# Create the secret with a password manager, or use the image's idempotent helper:
-mkdir -p "$(dirname "$LUMILIO_BOOTSTRAP_PASSWORD_FILE")"
-docker run --rm --entrypoint secretinit \
-  -v "$(dirname "$LUMILIO_BOOTSTRAP_PASSWORD_FILE"):/secrets" \
-  ghcr.io/edwinzhancn/lumilio-server:latest /secrets/db_bootstrap_password
+export LUMILIO_STORAGE=/srv/lumilio/media
+export LUMILIO_STATE=/srv/lumilio/state
+mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
 docker compose -f docker-compose.release.yml up -d
 ```
 
-Then open `http://localhost:6657` and complete the first-run wizard. The web UI listens on port `6657` (HTTP) and `6658` (HTTPS); the API listens on `6680`.
+Then open `http://localhost:6657` and complete the first-run wizard. Port `6657` serves both the web UI and API; put a trusted HTTPS reverse proxy in front before internet exposure.
 
 To pin a release instead of following `latest`:
 
 ```bash
-LUMILIO_VERSION=v1.0.0 LUMILIO_STORAGE=/srv/photos \
+LUMILIO_VERSION=v1.0.0 \
   docker compose -f docker-compose.release.yml up -d
 ```
 
 > [!IMPORTANT]
-> The complete runtime manifest is baked into the image at `/app/config/server.toml`; ordinary environment variables do not override it. It references the Compose bootstrap secret and creates the app root key beneath `LUMILIO_STORAGE`. Mount a different complete schema v1 manifest at that path to change immutable policy.
+> The complete schema-v2 runtime manifest is baked into the image at `/app/config/server.toml`; ordinary environment variables do not override immutable policy. Do not copy the live `library.sqlite3`, `-wal`, or `-shm` files. Create consistent snapshots under **Settings → Server**, and back up the media directory separately.
 
 ## Development
 

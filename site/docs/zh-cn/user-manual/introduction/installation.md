@@ -44,7 +44,7 @@ Desktop 会引导你选择语言和下载区域，并显示本机默认存储位
 
 ## Docker
 
-Docker 发布由 GHCR 上的 `lumilio-server`、`lumilio-web` 和 `lumilio-db` 三个多架构镜像组成。Beta 版本应使用 GitHub Release 对应的精确镜像标签；`edge` 是手动测试通道，不建议用于重要资料库。
+Docker 发布使用 GHCR 上的单个 `lumilio-server` 多架构镜像，同一容器同时提供 Web 界面和 API。Beta 版本应使用 GitHub Release 对应的精确镜像标签；`edge` 是手动测试通道，不建议用于重要资料库。
 
 <DockerComposeConfigurator />
 
@@ -54,27 +54,19 @@ Docker 发布由 GHCR 上的 `lumilio-server`、`lumilio-web` 和 `lumilio-db` �
 docker compose up -d
 ```
 
-启动完成后，在部署主机上通过 `http://localhost:6657` 打开 Web 界面；同一局域网内的其他设备应将 `localhost` 替换为部署主机的局域网地址。配置器默认不将 Server API 端口暴露给宿主机；只有明确的集成需求时才应启用该选项。
+启动完成后，在部署主机上通过 `http://localhost:6657` 打开 Web 界面；同一局域网内的其他设备应将 `localhost` 替换为部署主机的局域网地址。该端口同时承载 Web 界面和 API。
+
+媒体目录与应用状态目录是两个必需且独立的持久化挂载。媒体目录保存原始媒体；应用状态目录保存 `library.sqlite3`、应用快照、凭据和日志，并应位于本机可靠磁盘。两个目录都必须允许容器 UID 10001 写入。只要保留这两个宿主目录，就可以删除并重新创建应用容器而不丢失状态。
 
 ::: danger 不要直接公开到互联网
 默认 Compose 配置面向本地网络试用。如需远程访问，请先配置 HTTPS、可信的反向代理、认证与防火墙边界。
 :::
 
-Docker 中的 Lumen 网络模式边界请参阅 [Lumen AI](../features/lumen-ai.md)。该功能页的可执行配置仍在完善。
-
-### 视频转码加速
-
-Compose 配置器可以为视频转码选择 CPU、Intel/AMD VAAPI 或 NVIDIA NVENC。这项设置只影响 FFmpeg 视频转码，不会改变 Lumen 的 AI 推理后端。
-
-| 选项 | 当前实现 | 宿主要求 |
-| --- | --- | --- |
-| CPU | `libx264` | 无需 GPU，兼容性最高 |
-| Intel / AMD GPU | VAAPI，使用 `/dev/dri/renderD128` | Linux 驱动、`/dev/dri` 设备和正确权限 |
-| NVIDIA GPU | `h264_nvenc` | NVIDIA 驱动、NVIDIA Container Toolkit 与支持 NVENC 的 FFmpeg |
-
-::: warning 不要依赖未实现的自动选择
-当前服务端虽接受 `auto` 和 `qsv` 配置值，但转码代码尚未实现自动探测或 QSV 分支，两者实际会使用 CPU。配置器因此不提供这两个选项。
+::: warning 通过流明集创建备份
+容器运行时不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`。请在“设置 → 服务器”中创建并下载一致性快照，并单独备份媒体目录。
 :::
+
+Docker 中的 Lumen 网络模式边界请参阅 [Lumen AI](../features/lumen-ai.md)。不可变运行策略需要通过完整 schema v2 manifest 配置；普通环境变量不会覆盖这些字段。
 
 ## 从源码运行
 

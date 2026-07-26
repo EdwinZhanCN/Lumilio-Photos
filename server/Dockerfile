@@ -1,6 +1,31 @@
 # syntax=docker/dockerfile:1
 
 ############################################
+# Web bundle
+############################################
+FROM node:24.16.0-trixie-slim AS web-builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable
+
+WORKDIR /web
+
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
+    pnpm install --frozen-lockfile
+
+COPY web/. .
+
+ARG VERSION=dev
+RUN printf '%s\n' \
+    "VITE_API_URL=" \
+    "VITE_APP_VERSION=${VERSION}" \
+    > .env \
+    && pnpm run build
+
+############################################
 # Builder
 ############################################
 FROM golang:1.25.0-trixie AS builder
@@ -31,7 +56,6 @@ ARG VERSION=dev
 
 # Build API binary
 RUN go build -tags=sqlite_fts5 -ldflags "-X server/internal/version.Version=${VERSION}" -o /out/server ./cmd
-RUN go build -tags=sqlite_fts5 -o /out/secretinit ./tools/secretinit
 
 ############################################
 # Runtime
@@ -41,7 +65,8 @@ FROM debian:trixie-slim AS runtime
 ARG TARGETARCH
 
 # Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime,
-# PostgreSQL client tools for the automatic database backups.
+# curl for health checks, and gosu for dropping privileges after validating
+# writable bind mounts.
 #
 # On trixie, libheif uses a plugin architecture: each codec ships as a separate
 # package that --no-install-recommends would otherwise skip. We pin them so image
@@ -50,16 +75,7 @@ ARG TARGETARCH
 # AVIF/HEIC sources. libvips-tools (rather than the versioned libvips42* package)
 # lets apt resolve the correct runtime soname across Debian releases.
 #
-# postgresql-client-18 matches the lumilio-db image. Debian trixie predates
-# PostgreSQL 18, so install the client from the official PostgreSQL APT repo.
 RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl; \
-    install -d /usr/share/postgresql-common/pgdg; \
-    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc; \
-    echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" \
-        > /etc/apt/sources.list.d/pgdg.list; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -73,7 +89,7 @@ RUN set -eux; \
         libheif-plugin-aomdec \
         libheif-plugin-libde265 \
         libraw23 \
-        postgresql-client-18; \
+        gosu; \
     if [ "${TARGETARCH}" = "amd64" ]; then \
         apt-get install -y --no-install-recommends \
             intel-media-va-driver \
@@ -104,18 +120,19 @@ RUN groupadd --gid ${APP_GID} app \
 
 # App artifacts
 COPY --from=builder /out/server /usr/local/bin/server
-COPY --from=builder /out/secretinit /usr/local/bin/secretinit
-COPY --from=builder /app/migrations ./migrations
+COPY --from=web-builder /web/dist /app/web
 COPY server/config/server.container.toml ./config/server.toml
+COPY server/docker-entrypoint.sh /usr/local/bin/lumilio-entrypoint
 
 # Prepare storage path
-RUN mkdir -p /data/storage /data/app-state/cloud /data/app-state/backups /data/app-state/secrets && chown -R app:app /data /app
-
-USER app
+RUN chmod +x /usr/local/bin/lumilio-entrypoint \
+    && mkdir -p /data/storage /data/app-state \
+    && chown -R app:app /data /app
 
 EXPOSE 6680
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=20s CMD \
     curl -fsS "http://localhost:6680/api/v1/health" >/dev/null || exit 1
 
-ENTRYPOINT ["server", "--config", "/app/config/server.toml"]
+ENTRYPOINT ["lumilio-entrypoint"]
+CMD ["server", "--config", "/app/config/server.toml"]

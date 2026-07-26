@@ -77,17 +77,30 @@ Requires Docker with the Compose plugin.
 
 ```bash
 curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
-LUMILIO_STORAGE=/srv/photos docker compose -f docker-compose.release.yml up -d
+mkdir -p /srv/lumilio/media /srv/lumilio/state
+LUMILIO_STORAGE=/srv/lumilio/media \
+LUMILIO_STATE=/srv/lumilio/state \
+docker compose -f docker-compose.release.yml up -d
 ```
 
-Set `LUMILIO_STORAGE` to the directory that should hold your media library.
-Then open `http://<host>:6657` and complete the first-run wizard — it creates
-the admin account and automatically rotates the bootstrap database credentials.
-Application state and generated secrets use the separate `app_state` volume;
-they are not stored below `LUMILIO_STORAGE`.
+The single `lumilio-server` image serves both the web interface and API. Set
+`LUMILIO_STORAGE` to the media-library directory and `LUMILIO_STATE` to a
+separate machine-local directory for `library.sqlite3`, application snapshots,
+credentials, and logs. Both mounts are required and must be writable by
+container UID 10001. Then open `http://<host>:6657` and complete the first-run
+wizard.
 
 - Pin a version with `LUMILIO_VERSION=v1.0.0` (default `latest`).
-- Ports: web UI on `6657` (HTTP) / `6658` (HTTPS), API on `6680`.
+- Change the published HTTP port with `WEB_HTTP_PORT` (default `6657`).
+- Put a trusted HTTPS reverse proxy in front of Lumilio before exposing it to
+  the internet; TLS is not a required service in the default stack.
+
+::: warning Back up through Lumilio
+Do not copy `library.sqlite3`, `-wal`, or `-shm` while the container is running.
+Use the snapshot and download actions under **Settings → Server**, and back up
+the media directory separately. Removing and recreating the application
+container is safe when both host mounts are retained.
+:::
 
 ## Optional: AI features
 
@@ -99,6 +112,6 @@ is downloaded until you enable it.
   The app downloads the right hub build for your hardware and manages it for
   you; the first start also downloads model weights (~1.3 GB).
 - **Another machine or Docker:** run a Lumen Hub on your LAN (Docker tags
-  `cpu` / `vulkan` / `cuda`) and point the server at it, e.g.
-  `LUMEN_DISCOVERY_STATIC_NODES=<hub-host>:50051` on the Docker `server`
-  service. See the Lumen Hub README for details.
+  `cpu` / `vulkan` / `cuda`) and provide a complete schema-v2 server manifest
+  with the desired discovery policy. Runtime environment variables do not
+  override immutable manifest fields. See the Lumen Hub README for details.

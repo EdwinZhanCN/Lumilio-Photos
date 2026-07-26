@@ -15,7 +15,7 @@ BreakGlass 会替换管理员密码，删除通行密钥、TOTP 和恢复码，�
 1. 停止正常 Server，避免同时运行两个队列和 API 实例：
 
    ```bash
-   docker compose stop server
+   docker compose stop lumilio
    ```
 
 2. 启动一次性恢复容器。不指定用户名时，将恢复最早创建的已启用管理员：
@@ -24,20 +24,20 @@ BreakGlass 会替换管理员密码，删除通行密钥、TOTP 和恢复码，�
    docker compose run -d --name lumilio-breakglass \
      -e LUMILIO_BREAK_GLASS=true \
      -e LUMILIO_BREAK_GLASS_USERNAME=admin \
-     server
+     lumilio
    ```
 
 3. 读取成功的 `auth.break_glass` 事件，并复制其中的 `temporary_password`：
 
    ```bash
-   docker exec lumilio-breakglass cat /app/logs/security.log
+   docker exec lumilio-breakglass cat /data/app-state/logs/security.log
    ```
 
 4. 删除一次性容器，并在不启用 BreakGlass 的情况下重新启动正常 Server：
 
    ```bash
    docker rm -f lumilio-breakglass
-   docker compose up -d server
+   docker compose up -d lumilio
    ```
 
 5. 使用临时密码登录，并在提示时设置永久密码。
@@ -81,4 +81,4 @@ open -n -a "Lumilio Photos" --args \
 - 指定的账户必须存在、具有管理员角色并处于启用状态。
 - Desktop 用户应确认原有托盘应用已经完全退出。
 - Docker 用户可通过 `docker logs lumilio-breakglass` 检查启动错误，并等待 `security.log` 创建完成。
-- 如果配置加载、PostgreSQL、迁移或安全日志初始化失败，应先修复该启动问题；BreakGlass 只会在这些依赖就绪后运行。
+- 如果配置加载、SQLite 完整性或迁移、安全日志初始化失败，应先修复该启动问题；BreakGlass 只会在这些依赖就绪后运行。
