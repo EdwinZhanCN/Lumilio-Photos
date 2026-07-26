@@ -1,0 +1,30 @@
+version: "2"
+sql:
+    - engine: "sqlite"
+      queries: "queries.sql"
+      schema: "schema.sql"
+      gen:
+          go:
+              package: "sqlcfixture"
+              out: "gen"
+              sql_package: "database/sql"
+              emit_json_tags: true
+              emit_db_tags: true
+              emit_pointers_for_null_types: true
+              overrides:
+                  - column: "spike_records.id"
+                    go_type:
+                        import: "github.com/google/uuid"
+                        type: "UUID"
+                  - column: "spike_records.optional_parent_id"
+                    go_type:
+                        import: "github.com/google/uuid"
+                        type: "NullUUID"
+                  - column: "spike_records.created_at"
+                    go_type:
+                        import: "server/internal/db/dbtypes"
+                        type: "Timestamp"
+                  - column: "spike_records.payload"
+                    go_type:
+                        import: "server/internal/db/dbtypes"
+                        type: "JSON"

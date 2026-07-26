@@ -1079,7 +1079,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 ## Progress
 
 - [x] Phase 0：基线与inventory
-- [ ] Phase 1：driver/River/vector spike
+- [x] Phase 1：driver/River/vector spike
 - [ ] Phase 2：config与DB runtime
 - [ ] Phase 3：SQLite baseline与sqlc
 - [ ] Phase 4：业务层去pgx
@@ -1168,6 +1168,33 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 
 每个 Phase 单独形成可审查 commit；生成代码的提交记录生成命令。Phase 0 只提交 living plan 与 inventory，不混入实现。
 
+### Phase 1 执行记录（2026-07-25）
+
+#### 唯一 driver、扩展与连接决策
+
+- 唯一 SQLite driver 选择 `github.com/mattn/go-sqlite3 v1.14.48`。生产迁移不保留第二 driver、双后端 interface 或 fallback；`go list -deps` 证明 spike 的已编译依赖只有该 SQLite driver。
+- vector 选择 `github.com/asg017/sqlite-vec-go-bindings/cgo v0.1.6` 静态注册的 `vec0` exact search。当前 Go CGo binding 的可用稳定版本对应 `vec_version() = v0.1.6`；不在运行时加载外部 extension。
+- River 固定为 `github.com/riverqueue/river v0.24.0` 与 `riverdriver/riversqlite v0.24.0`。应用表和 River 表共用一个 `*sql.DB`，writer pool 固定为 1，`InsertTx` 使用同一个 `*sql.Tx`。
+- FTS5 通过统一 `sqlite_fts5` build tag 编译；root Make targets、Server Docker builder、Desktop release scripts 和直接 Go build 的 CI job 均传播该 tag。
+- fixed pragmas spike 已验证 `foreign_keys=ON`、WAL、`synchronous=NORMAL`、`busy_timeout=5000`、`temp_store=MEMORY`、`wal_autocheckpoint=1000`，且连接没有 lifetime recycling。Phase 2 将此逻辑移入唯一 production DB boundary。
+
+#### 聚焦兼容性结果
+
+- `go test -tags=sqlite_fts5 ./internal/db/dbtypes ./internal/db/sqlitespike -count=1 -v` 通过：open/close、fixed pragmas、`STRICT`、JSON1、FTS5 trigram、768D/512D `vec0` insert/top-k/delete、sqlc UUID/null UUID/time/JSON/BLOB mapping 全部正确。
+- application migration 与 River migration 在同一 database file 中通过；River migration 第二次执行不产生版本变化。River client start/stop、enqueue、一次有意失败后的 immediate retry、最终 `completed`/attempt 2 均通过。
+- app row 与 River `InsertTx` 的 rollback 同时回滚，commit 同时可见。聚焦测试未观察到未处理或无限重试的 `SQLITE_BUSY`。
+- `make server-test` 使用统一 FTS5 tag 全量通过；`make desktop-test` 通过 Desktop module test/build gate。
+- `docker build --target builder -f server/Dockerfile -t lumilio-server-sqlite-spike:phase1 .` 在 Linux/arm64 通过。随后 image 内 `go test -tags=sqlite_fts5 ./internal/db/sqlitespike -count=1 -v` 在 0.344s 内通过全部 River/FTS/vector/sqlc tests。这是小样本兼容性观察，不代表真实 library 性能 benchmark。
+- sqlc fixture 通过 `cd server/internal/db/sqlitespike/sqlcfixture && sqlc generate` 生成。第一次用 `json.RawMessage` 时 SQLite `STRICT TEXT` 拒绝其 BLOB `driver.Value`；最终引入验证 JSON 且明确返回 `string` 的 `dbtypes.JSON`。UTC Unix microseconds 由 `dbtypes.Timestamp` 集中处理。
+
+#### Phase 1 Hardening backlog
+
+- River process kill 后的完整状态恢复、cancel、periodic 和全部 queue admin 行为留到 P1/P2。
+- Windows runtime smoke、Docker multi-arch runtime 和完整 macOS packaged runtime 留到各交付 Phase/P1；本 Phase 已完成当前 macOS module gate和 Linux/arm64 container runtime。
+- macOS SDK 对 `sqlite3_auto_extension` 给出 deprecated/process-global auto-extension warning，但同进程多连接的 extension registration 与 vector query 实测通过。升级 SQLite/vector binding 或切换显式 connection hook 前必须保留该兼容性测试。
+- Desktop gate 暴露现有 Homebrew `objects`/`vips`/`libraw` deployment target warning；它与 SQLite 链接无关且不阻塞本迁移。
+- 代表性 library 规模的 vector latency、内存、WAL checkpoint 行为和 ANN/sidecar 阈值留到 Phase 6/P2；本 Phase 只证明 exact search 正确性。
+
 ## Decision Log
 
 | Date | Decision | Reason | Consequence |
@@ -1178,12 +1205,20 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 | 2026-07-25 | stable exact vector先行，ANN为derived fallback | 降低sqlite-vec pre-v1/ANN风险 | 正确性优先，规模benchmark决定sidecar |
 | 2026-07-25 | benchmark、stress、全量fault injection和跨平台runtime E2E不作为experimental goal硬门槛 | 当前目标是先完成可运行的SQLite-only架构实验 | 使用P0聚焦验证完成迁移，P1/P2进入Hardening backlog |
 | 2026-07-25 | Phase 0 inventory 以 schema object、query 文件和业务/交付边界分层追踪 | 451 个 query 与 125 个 index 需要可审计覆盖，又不能把 PostgreSQL 兼容层带入实现 | 每个 Phase 更新本表的实际落点；Phase 3 以 sqlc 与 baseline tests 证明逐项完成 |
+| 2026-07-25 | 唯一 driver 固定为 `mattn/go-sqlite3 v1.14.48`，FTS5 使用统一 build tag | CGo 路径同时通过当前 macOS 与 Linux/arm64，且满足 River `database/sql`、FTS5 与静态 vector extension | build/package/CI 必须保持 CGo 和 `sqlite_fts5`；禁止引入第二 driver fallback |
+| 2026-07-25 | vector 固定为 `sqlite-vec` CGo binding v0.1.6 的 exact `vec0` | 768D/512D insert/delete/top-k 与静态注册均通过；正确性风险低于迁移期引入 ANN sidecar | authoritative embedding 仍存普通表；规模 benchmark 与 ANN 决策保留为 Hardening |
+| 2026-07-25 | sqlc JSON 字段使用 `dbtypes.JSON`，时间使用 Unix microseconds `dbtypes.Timestamp` | `STRICT TEXT` 会拒绝 `json.RawMessage` 产生的 BLOB，且时间需要跨 driver 的唯一语义 | Phase 3 overrides 复用集中 Scanner/Valuer，不允许 query-local cast/fallback |
 
 ## Surprises & Discoveries
 
 - Phase 0 的迁移前 `make server-test` 在本机完整通过；后续没有“已知既有 Server gate failure”可豁免。
 - 当前 PostgreSQL 泄漏远超 DB package：排除 generated repo 后仍遍布 app、Agent、API、cloud、processors、queue、search、service、sourcing 和 storage。Phase 4 必须按 app wiring 从外向内迁移，不能只替换 connection package。
 - active plan 输入最初以未跟踪的 `sqlite-experimental-plan.md` 存在，但 goal 指定 `active/sqlite.md`；Phase 0 已将其归位并作为 living plan 纳入版本控制。
+- `json.RawMessage` 的 `driver.Value` 是 `[]byte`，在非 STRICT SQLite 中容易被宽松 affinity 隐藏；`STRICT TEXT` 在首次 sqlc round-trip 直接暴露 BLOB/type mismatch。集中 JSON type 比放宽 schema 更符合不变量。
+- Linux builder 最初能编译 Server binary，但在 image 内重新编译 spike test 时因缺少 `sqlite3.h` 失败；builder 增加 build-only `libsqlite3-dev` 后，Linux/arm64 binary 与全部 runtime spike 均通过。应用不依赖 runtime SQLite CLI 或动态 vector extension。
+- OrbStack 一度报告 running 但 Docker socket `_ping` 无响应；重启 OrbStack 后恢复，Lumen Hub 进程未退出。这是本机 container runtime 状态，不是 SQLite 失败。
+- macOS SDK 会对 sqlite-vec 使用的 `sqlite3_auto_extension` 发出 deprecated warning；实际 `vec_version()`、多 database open 和 exact KNN 在当前平台通过，风险已进入 Hardening backlog。
+- root commit hook 当前从 repository root 执行 `vp staged`，但 `staged` config 只存在于 `web/vite.config.ts`，因此任何 root commit 都会在检查文件前失败。Phase 1 已手工通过 `gofmt -d`、`git diff --check`、`go mod tidy -diff` 和对应完整 gates，并以 `--no-verify` checkpoint；Phase 10 必须修正 hook 安装/working directory。
 
 ## Outcomes & Retrospective
 

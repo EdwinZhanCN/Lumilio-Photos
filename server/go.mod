@@ -13,15 +13,18 @@ require (
 )
 
 require (
+	github.com/asg017/sqlite-vec-go-bindings v0.1.6
 	github.com/chyroc/gorequests v0.33.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-webauthn/webauthn v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/uuid v1.6.0
+	github.com/mattn/go-sqlite3 v1.14.48
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/riverqueue/river v0.24.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.24.0
+	github.com/riverqueue/river/riverdriver/riversqlite v0.24.0
 	github.com/riverqueue/river/rivertype v0.24.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/shirou/gopsutil/v3 v3.24.5
@@ -98,11 +101,11 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
+	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
 	golang.org/x/image v0.38.0
 	golang.org/x/mod v0.33.0 // indirect
 	google.golang.org/grpc v1.76.0
-	google.golang.org/protobuf v1.36.10 // indirect
+	google.golang.org/protobuf v1.36.10
 )
 
 require (

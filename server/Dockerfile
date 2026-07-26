@@ -12,6 +12,7 @@ ENV CGO_ENABLED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
+    libsqlite3-dev \
     libvips-dev \
     libraw-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -29,8 +30,8 @@ COPY server/. .
 ARG VERSION=dev
 
 # Build API binary
-RUN go build -ldflags "-X server/internal/version.Version=${VERSION}" -o /out/server ./cmd
-RUN go build -o /out/secretinit ./tools/secretinit
+RUN go build -tags=sqlite_fts5 -ldflags "-X server/internal/version.Version=${VERSION}" -o /out/server ./cmd
+RUN go build -tags=sqlite_fts5 -o /out/secretinit ./tools/secretinit
 
 ############################################
 # Runtime
