@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -28,6 +27,10 @@ import (
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/options [post]
 func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
+	origin, ok := requirePasskeyRequest(c)
+	if !ok {
+		return
+	}
 	if !h.allowAuthNetwork(c, authRateScopePasskeyOptions) {
 		return
 	}
@@ -45,7 +48,7 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 		return
 	}
 
-	response, err := h.authService.BeginPasskeyLogin(c.Request.Context(), req.Username, requestOrigin(c))
+	response, err := h.authService.BeginPasskeyLogin(c.Request.Context(), req.Username, origin)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrPasskeyNotConfigured),
@@ -75,6 +78,9 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/verify [post]
 func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
+	if _, ok := requirePasskeyRequest(c); !ok {
+		return
+	}
 	if !h.allowAuthNetwork(c, authRateScopePasskeyVerify) {
 		return
 	}
@@ -150,12 +156,16 @@ func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/options [post]
 func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
+	origin, ok := requirePasskeyRequest(c)
+	if !ok {
+		return
+	}
 	user, ok := requireCurrentUser(c)
 	if !ok {
 		return
 	}
 
-	response, err := h.authService.BeginPasskeyEnrollment(c.Request.Context(), user.UserID, requestOrigin(c))
+	response, err := h.authService.BeginPasskeyEnrollment(c.Request.Context(), user.UserID, origin)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrTOTPRequiredForPasskey):
@@ -183,6 +193,9 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/verify [post]
 func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
+	if _, ok := requirePasskeyRequest(c); !ok {
+		return
+	}
 	user, ok := requireCurrentUser(c)
 	if !ok {
 		return
@@ -255,24 +268,11 @@ func (h *AuthHandler) DeletePasskey(c *gin.Context) {
 	api.JSONOK(c, api.SuccessResponse{Message: "Passkey deleted successfully"})
 }
 
-func requestOrigin(c *gin.Context) string {
-	if origin := strings.TrimSpace(c.GetHeader("Origin")); origin != "" {
-		return origin
+func requirePasskeyRequest(c *gin.Context) (string, bool) {
+	resolved, ok := api.RequestOriginContext(c)
+	if !ok || !resolved.IsSecureForPasskey {
+		api.GinBadRequest(c, errors.New("passkey is unavailable for this browser origin"), "Passkey is unavailable for this browser origin")
+		return "", false
 	}
-
-	proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto"))
-	if proto == "" {
-		if c.Request.TLS != nil {
-			proto = "https"
-		} else {
-			proto = "http"
-		}
-	}
-
-	host := strings.TrimSpace(c.GetHeader("X-Forwarded-Host"))
-	if host == "" {
-		host = c.Request.Host
-	}
-
-	return fmt.Sprintf("%s://%s", proto, host)
+	return resolved.BrowserOrigin, true
 }

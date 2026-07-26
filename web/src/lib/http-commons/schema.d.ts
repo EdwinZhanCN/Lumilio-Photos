@@ -4918,6 +4918,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/browser-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get browser authentication capabilities
+         * @description Report whether this request origin can use passkeys for the configured canonical origin.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Browser capabilities */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.BrowserCapabilitiesDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -12000,6 +12039,22 @@ export interface components {
             /** @example 3 */
             stack_size?: number;
         };
+        "dto.BrowserCapabilitiesDTO": {
+            /** @example http://192.168.1.20:6680 */
+            current_origin?: string;
+            /** @example true */
+            insecure_transport?: boolean;
+            /** @example false */
+            passkey_available?: boolean;
+            /** @enum {string} */
+            passkey_unavailable_reason?: "disabled" | "secure_origin_required" | "non_primary_origin" | "trusted_proxy_required" | "invalid_request_origin";
+            /** @example http://localhost:6680 */
+            primary_origin?: string;
+            /** @example false */
+            proxy_required?: boolean;
+            /** @example false */
+            via_trusted_proxy?: boolean;
+        };
         "dto.CSRFTokenDTO": {
             csrfToken?: string;
         };
@@ -13107,6 +13162,12 @@ export interface components {
             temporary_password?: string;
         };
         "dto.RuntimeInfoDTO": {
+            acme_certificate_expires_at?: string;
+            /** @example photos.example.com */
+            acme_certificate_hostname?: string;
+            /** @example active */
+            acme_certificate_status?: string;
+            acme_last_managed_at?: string;
             /** @example production */
             environment?: string;
             /** @example disabled */
@@ -13118,13 +13179,26 @@ export interface components {
             /** @example true */
             lumen_discovery_enabled?: boolean;
             /** @example true */
+            passkey_enabled?: boolean;
+            /** @example https://photos.example.com */
+            passkey_origin?: string;
+            /** @example photos.example.com */
+            passkey_rp_id?: string;
+            /** @example https://photos.example.com */
+            primary_origin?: string;
+            /** @example required */
+            proxy_mode?: string;
+            /** @example true */
             repository_scan_enabled?: boolean;
             /** @example 300 */
             repository_scan_interval_seconds?: number;
-            /** @example 8080 */
-            server_port?: string;
+            /** @example 0.0.0.0:6680 */
+            server_listen?: string;
             /** @example /data/storage */
             storage_root?: string;
+            /** @example external */
+            tls_mode?: string;
+            trusted_proxy_cidrs?: string[];
         };
         "dto.SearchAssetsRequestDTO": {
             debug?: boolean;

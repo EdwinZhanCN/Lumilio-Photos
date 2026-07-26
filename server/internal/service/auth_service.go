@@ -19,6 +19,8 @@ import (
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -110,9 +112,10 @@ type AuthService struct {
 	accessTokenTTL            time.Duration
 	refreshTokenTTL           time.Duration
 	mediaTokenTTL             time.Duration
-	webauthnRPDisplayName     string
-	webauthnRPID              string
-	webauthnAllowedOrigins    []string
+	passkeyEnabled            bool
+	passkeyOrigin             string
+	passkeyRPID               string
+	webauthn                  *webauthn.WebAuthn
 	logger                    *zap.Logger
 	securityLogger            *zap.Logger
 }
@@ -163,6 +166,29 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 	csrfTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "csrf.refresh.binding.v1")
 	mfaEncryptKey := secretbox.DeriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
+	var webAuthnInstance *webauthn.WebAuthn
+	if cfg.Passkey.Enabled {
+		if cfg.PasskeyIdentity.Origin == "" || cfg.PasskeyIdentity.RPID == "" {
+			return nil, errors.New("passkey identity must be derived from server.primary_origin")
+		}
+		displayName := strings.TrimSpace(cfg.Passkey.Name)
+		if displayName == "" {
+			return nil, errors.New("passkey display name is required")
+		}
+		webAuthnInstance, err = webauthn.New(&webauthn.Config{
+			RPID:          cfg.PasskeyIdentity.RPID,
+			RPDisplayName: displayName,
+			RPOrigins:     []string{cfg.PasskeyIdentity.Origin},
+			AuthenticatorSelection: protocol.AuthenticatorSelection{
+				ResidentKey:      protocol.ResidentKeyRequirementRequired,
+				UserVerification: protocol.VerificationRequired,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("initialize passkey identity: %w", err)
+		}
+	}
+
 	return &AuthService{
 		queries:                   queries,
 		db:                        db,
@@ -176,9 +202,10 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 		accessTokenTTL:            cfg.AccessTokenTTL,
 		refreshTokenTTL:           cfg.RefreshTokenTTL,
 		mediaTokenTTL:             cfg.MediaTokenTTL,
-		webauthnRPDisplayName:     cfg.WebAuthnRPName,
-		webauthnRPID:              strings.TrimSpace(cfg.WebAuthnRPID),
-		webauthnAllowedOrigins:    normalizeConfiguredWebAuthnOrigins(cfg.WebAuthnRPOrigins),
+		passkeyEnabled:            cfg.Passkey.Enabled,
+		passkeyOrigin:             cfg.PasskeyIdentity.Origin,
+		passkeyRPID:               cfg.PasskeyIdentity.RPID,
+		webauthn:                  webAuthnInstance,
 		logger:                    logger,
 		securityLogger:            securityLogger,
 	}, nil
@@ -208,23 +235,6 @@ func (s *AuthService) ValidateCSRFToken(refreshToken, csrfToken string) bool {
 	_, _ = mac.Write([]byte("lumilio.refresh.csrf.v1\x00"))
 	_, _ = mac.Write([]byte(refreshToken))
 	return hmac.Equal(provided, mac.Sum(nil))
-}
-
-func normalizeConfiguredWebAuthnOrigins(values []string) []string {
-	origins := make([]string, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		normalized, _, err := normalizeOriginString(value)
-		if err != nil {
-			continue
-		}
-		if _, ok := seen[normalized]; ok {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		origins = append(origins, normalized)
-	}
-	return origins
 }
 
 // GetLoginOptions returns which login methods the client should present after

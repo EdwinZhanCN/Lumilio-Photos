@@ -71,29 +71,89 @@ other) controls whether the installer URL uses a GitHub mirror; it is separate
 from in-app map region settings.
 :::
 
+## Desktop network access
+
+The Desktop Control Panel offers three explicit network modes:
+
+- **Local only** is the default. Lumilio listens on loopback and opens
+  `http://localhost:6680`. Use this unless another device needs access.
+- **LAN HTTP** listens on the local network but keeps
+  `http://localhost:6680` as the canonical origin. It is intended only for a
+  trusted home LAN and requires acknowledging that traffic from other devices
+  is unencrypted. Passkeys remain available only from the Desktop machine's
+  localhost URL. Your firewall may also require an inbound rule.
+- **External HTTPS** is for an existing HTTPS reverse proxy. Enter the exact
+  public HTTPS origin and the narrow CIDR of each trusted proxy; Desktop never
+  obtains ACME certificates itself. The proxy must forward the original
+  scheme, host, and client address. Saving performs a restart and readiness
+  check, and restores the previous working settings if the candidate fails.
+
+The configured primary origin is also the WebAuthn Origin, and its hostname is
+the RP ID. Changing the hostname therefore requires registering new passkeys;
+keep password and TOTP recovery available during the move.
+
 ## Docker (Linux server / NAS)
 
 Requires Docker with the Compose plugin.
 
+Production has no implicit plaintext mode. Choose built-in ACME when this host
+owns public TCP 80/443, or the external-proxy profile when another service owns
+TLS.
+
+### Built-in ACME HTTPS
+
+Point the DNS A/AAAA record at the host and allow inbound TCP 80 and 443:
+
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.acme.yml
 mkdir -p /srv/lumilio/media /srv/lumilio/state
-LUMILIO_STORAGE=/srv/lumilio/media \
-LUMILIO_STATE=/srv/lumilio/state \
-docker compose -f docker-compose.release.yml up -d
+export LUMILIO_STORAGE=/srv/lumilio/media
+export LUMILIO_STATE=/srv/lumilio/state
+export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-acme \
+  --origin https://photos.example.com --email admin@example.com \
+  --output /data/app-state/server.toml
+docker compose -f docker-compose.acme.yml up -d
 ```
 
-The single `lumilio-server` image serves both the web interface and API. Set
-`LUMILIO_STORAGE` to the media-library directory and `LUMILIO_STATE` to a
-separate machine-local directory for `library.sqlite3`, application snapshots,
-credentials, and logs. Both mounts are required and must be writable by
-container UID 10001. Then open `http://<host>:6657` and complete the first-run
-wizard.
+Open `https://photos.example.com`. CertMagic stores its account and certificate
+under `/data/app-state/tls`, so retaining the state mount also retains renewals.
+Certificate acquisition failure stops startup; it never falls back to HTTP.
 
-- Pin a version with `LUMILIO_VERSION=v1.0.0` (default `latest`).
-- Change the published HTTP port with `WEB_HTTP_PORT` (default `6657`).
-- Put a trusted HTTPS reverse proxy in front of Lumilio before exposing it to
-  the internet; TLS is not a required service in the default stack.
+### Existing reverse proxy
+
+Generate the external profile with the dedicated Docker network CIDR:
+
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.proxy.yml
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-external-proxy \
+  --origin https://photos.example.com \
+  --trusted-proxy 172.30.0.0/24 \
+  --output /data/app-state/server.toml
+export LUMILIO_DOMAIN=photos.example.com
+docker compose -f docker-compose.proxy.yml up -d
+```
+
+The included Caddy example publishes 80/443. Lumilio itself has only `expose:
+6680`, so direct host access cannot bypass the proxy. Nginx and Traefik examples
+are under `deploy/reverse-proxy/`. Trust the narrowest proxy address or
+dedicated subnet; never trust a network shared with unrelated containers.
+
+The single image serves both web and API. `LUMILIO_STORAGE` holds media;
+`LUMILIO_STATE` separately holds the schema-v3 manifest, SQLite catalog,
+snapshots, credentials, logs, and ACME state. Both mounts must be writable by
+container UID 10001. Validate edits before restart:
+
+```bash
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config validate --config /data/app-state/server.toml
+```
+
+Passkey Origin is exactly `server.primary_origin`, and RP ID is exactly its
+hostname. Changing that hostname means existing passkeys cannot sign in at the
+new RP ID; keep password + TOTP recovery available and register new passkeys.
 
 ::: warning Back up through Lumilio
 While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or
@@ -114,6 +174,6 @@ is downloaded until you enable it.
   The app downloads the right hub build for your hardware and manages it for
   you; the first start also downloads model weights (~1.3 GB).
 - **Another machine or Docker:** run a Lumen Hub on your LAN (Docker tags
-  `cpu` / `vulkan` / `cuda`) and provide a complete schema-v2 server manifest
+  `cpu` / `vulkan` / `cuda`) and provide a complete schema-v3 server manifest
   with the desired discovery policy. Runtime environment variables do not
   override immutable manifest fields. See the Lumen Hub README for details.

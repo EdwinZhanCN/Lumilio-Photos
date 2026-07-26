@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -32,10 +33,12 @@ import (
 	"server/internal/db"
 	dbbackup "server/internal/db/backup"
 	"server/internal/db/repo"
+	"server/internal/httporigin"
 	"server/internal/logging"
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/queue/jobs"
+	"server/internal/servertransport"
 	"server/internal/service"
 	"server/internal/settings"
 	"server/internal/sourcing"
@@ -85,6 +88,10 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 		return errors.New("app config was not produced by the strict manifest loader")
 	}
 	dbConfig := appConfig.DatabaseConfig
+	originPolicy, err := httporigin.New(appConfig.ServerConfig, appConfig.Auth.Passkey)
+	if err != nil {
+		return fmt.Errorf("initialize origin policy: %w", err)
+	}
 
 	pprofHost, err := startPprofHost(strings.TrimSpace(controls.PprofAddr))
 	if err != nil {
@@ -114,7 +121,7 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 			restartRequested.Store(true)
 			cancelGeneration()
 		}
-		err := run(generationCtx, appConfig, dbConfig, controls, requestRestart)
+		err := run(generationCtx, appConfig, dbConfig, originPolicy, controls, requestRestart)
 		cancelGeneration()
 		if err != nil {
 			if dbbackup.HasAppliedRestore(dbConfig.Path) && !errors.Is(err, errSQLiteOwnershipRetained) {
@@ -141,6 +148,7 @@ func run(
 	ctx context.Context,
 	appConfig config.AppConfig,
 	dbConfig config.DatabaseConfig,
+	originPolicy *httporigin.Policy,
 	controls OperatorControls,
 	requestRestart func(),
 ) (runErr error) {
@@ -483,7 +491,7 @@ func run(
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
-	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL)
+	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
 	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
@@ -517,7 +525,8 @@ func run(
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
 	docs.SwaggerInfo.Description = "Photo management system API with asset upload, processing, and organization features"
 	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = "localhost:" + appConfig.ServerConfig.Port
+	primaryURL, _ := url.Parse(appConfig.ServerConfig.PrimaryOrigin)
+	docs.SwaggerInfo.Host = primaryURL.Host
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
 	// Set up router with new asset, album, auth, stats and agent endpoints
@@ -542,7 +551,7 @@ func run(
 		shareLinkController,
 		handler.RequireLLMAgentEnabled(settingsService),
 		handler.RequireAppInitialized(bootstrapService),
-		appConfig.ServerConfig.CORSAllowedOrigins,
+		originPolicy,
 		appLogger.Named("http"),
 	)
 
@@ -553,55 +562,82 @@ func run(
 	// leave it empty and serve the bundle from a separate static server).
 	api.RegisterSPA(router, appConfig.ServerConfig.WebRoot)
 
-	srv := &http.Server{
-		Addr:    ":" + appConfig.ServerConfig.Port,
-		Handler: router,
-	}
-	listener, err := net.Listen("tcp", srv.Addr)
+	transport, err := servertransport.Start(
+		ctx,
+		appConfig.ServerConfig,
+		router,
+		appLogger.Named("transport"),
+	)
 	if err != nil {
-		return fmt.Errorf("listen on %s: %w", srv.Addr, err)
+		return fmt.Errorf("start server transport: %w", err)
+	}
+	settingsController.SetCertificateInfoProvider(func() dto.CertificateRuntimeInfo {
+		status := transport.CertificateStatus()
+		return dto.CertificateRuntimeInfo{
+			Hostname:      status.Hostname,
+			Status:        status.Status,
+			ExpiresAt:     status.ExpiresAt,
+			LastManagedAt: status.LastManagedAt,
+		}
+	})
+	shutdownTransport := func() error {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer shutdownCancel()
+		return transport.Shutdown(shutdownCtx)
 	}
 
 	if dbbackup.HasAppliedRestore(database.Path) {
 		if _, err := settingsService.GetSystemSettings(ctx); err != nil {
-			_ = listener.Close()
-			return fmt.Errorf("settings unreadable after SQLite restore: %w", err)
+			return errors.Join(
+				fmt.Errorf("settings unreadable after SQLite restore: %w", err),
+				shutdownTransport(),
+			)
 		}
 		var users int
 		if err := sqlDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
-			_ = listener.Close()
-			return fmt.Errorf("users table unreadable after SQLite restore: %w", err)
+			return errors.Join(
+				fmt.Errorf("users table unreadable after SQLite restore: %w", err),
+				shutdownTransport(),
+			)
 		}
 		if users == 0 {
-			_ = listener.Close()
-			return errors.New("no users present after SQLite restore")
+			return errors.Join(errors.New("no users present after SQLite restore"), shutdownTransport())
 		}
 		if err := dbbackup.CompletePendingRestore(ctx, database.Path); err != nil {
-			_ = listener.Close()
-			return fmt.Errorf("complete SQLite restore: %w", err)
+			return errors.Join(
+				fmt.Errorf("complete SQLite restore: %w", err),
+				shutdownTransport(),
+			)
 		}
 		appLogger.Info("restored SQLite runtime generation is healthy", zap.String("operation", "database.restore"))
 	}
 
 	appLogger.Info("server starting",
 		zap.String("operation", "server.listen"),
-		zap.String("port", appConfig.ServerConfig.Port),
-		zap.String("swagger_url", fmt.Sprintf("http://localhost:%s/swagger/index.html", appConfig.ServerConfig.Port)),
-		zap.String("health_url", fmt.Sprintf("http://localhost:%s/api/v1/health", appConfig.ServerConfig.Port)),
+		zap.String("listen", appConfig.ServerConfig.Listen),
+		zap.String("primary_origin", appConfig.ServerConfig.PrimaryOrigin),
+		zap.String("passkey_rp_id", appConfig.Auth.PasskeyIdentity.RPID),
+		zap.String("tls_mode", string(appConfig.ServerConfig.TLS.Mode)),
+		zap.String("proxy_mode", string(appConfig.ServerConfig.Proxy.Mode)),
+		zap.Int("trusted_proxy_cidr_count", len(appConfig.ServerConfig.Proxy.TrustedCIDRs)),
+		zap.String("acme_storage_path", appConfig.ServerConfig.TLS.StoragePath),
+		zap.String("swagger_url", appConfig.ServerConfig.PrimaryOrigin+"/swagger/index.html"),
+		zap.String("health_url", appConfig.ServerConfig.PrimaryOrigin+"/api/v1/health"),
 	)
 
 	// Serve in a goroutine so this function can block on ctx and drive a
 	// graceful shutdown when it is cancelled.
-	serverErr := make(chan error, 1)
+	transportErr := make(chan error, 1)
 	go func() {
-		if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			serverErr <- err
-		}
+		transportErr <- transport.Wait()
 	}()
 
 	select {
-	case err := <-serverErr:
-		return fmt.Errorf("http server: %w", err)
+	case err := <-transportErr:
+		if err != nil {
+			return errors.Join(fmt.Errorf("server transport: %w", err), shutdownTransport())
+		}
+		return errors.Join(errors.New("server transport stopped unexpectedly"), shutdownTransport())
 	case <-ctx.Done():
 		appLogger.Info("shutdown signal received, draining", zap.String("operation", "server.shutdown"))
 	}
@@ -609,9 +645,7 @@ func run(
 	// HTTP and River have independent budgets. A subsystem that cannot prove it
 	// has stopped blocks SQLite close and therefore blocks an in-process restore
 	// swap; the process host may still choose to terminate normally.
-	httpCtx, httpCancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	httpErr := srv.Shutdown(httpCtx)
-	httpCancel()
+	httpErr := shutdownTransport()
 	if httpErr != nil {
 		databaseCloseAllowed = false
 		appLogger.Warn("http server shutdown error", zap.String("operation", "server.shutdown"), zap.Error(httpErr))

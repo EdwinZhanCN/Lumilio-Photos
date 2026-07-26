@@ -1,0 +1,19 @@
+name: lumilio-photos-acme
+
+services:
+    lumilio:
+        image: ${LUMILIO_IMAGE:-ghcr.io/edwinzhancn/lumilio-server:latest}
+        restart: unless-stopped
+        command: ["server", "--config", "/data/app-state/server.toml"]
+        volumes:
+            - ${LUMILIO_STORAGE:?set LUMILIO_STORAGE to the media root}:/data/storage
+            - ${LUMILIO_STATE:?set LUMILIO_STATE to the machine-local app-state root}:/data/app-state
+        ports:
+            - "80:8080"
+            - "443:8443"
+        healthcheck:
+            test: ["CMD", "server", "config", "healthcheck", "--config", "/data/app-state/server.toml"]
+            interval: 10s
+            timeout: 6s
+            retries: 12
+            start_period: 30s

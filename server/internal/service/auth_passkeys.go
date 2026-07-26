@@ -6,10 +6,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
+	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
@@ -21,7 +21,6 @@ import (
 
 const (
 	passkeyChallengeTTL           = 10 * time.Minute
-	defaultWebAuthnRPDisplayName  = "Lumilio"
 	passkeyTokenPurposeLogin      = "passkey_login"
 	passkeyTokenPurposeEnroll     = "passkey_enroll"
 	defaultPasskeyBytes           = 32
@@ -609,109 +608,27 @@ func (s *AuthService) parsePasskeyChallenge(tokenString string, expectedPurpose 
 }
 
 func (s *AuthService) newWebAuthnForOrigin(origin string) (*webauthn.WebAuthn, string, error) {
-	normalizedOrigin, parsedOrigin, err := s.normalizeWebAuthnOrigin(origin)
-	if err != nil {
-		return nil, "", err
+	if !s.passkeyEnabled || s.webauthn == nil {
+		return nil, "", ErrPasskeyNotConfigured
 	}
-
-	rpID, err := s.resolveWebAuthnRPID(parsedOrigin)
-	if err != nil {
-		return nil, "", err
+	normalizedOrigin, _, err := config.NormalizeOrigin(origin)
+	if err != nil || normalizedOrigin != s.passkeyOrigin {
+		return nil, "", fmt.Errorf("passkey origin must equal server.primary_origin")
 	}
-
-	instance, err := s.newWebAuthnInstance(normalizedOrigin, rpID)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return instance, normalizedOrigin, nil
+	return s.webauthn, s.passkeyOrigin, nil
 }
 
 func (s *AuthService) newWebAuthnForChallenge(challenge *passkeyChallengeClaims) (*webauthn.WebAuthn, error) {
-	normalizedOrigin, _, err := s.normalizeWebAuthnOrigin(challenge.Origin)
-	if err != nil {
-		return nil, err
+	if !s.passkeyEnabled || s.webauthn == nil {
+		return nil, ErrPasskeyNotConfigured
 	}
-
-	return s.newWebAuthnInstance(normalizedOrigin, challenge.SessionData.RelyingPartyID)
-}
-
-func (s *AuthService) newWebAuthnInstance(origin string, rpID string) (*webauthn.WebAuthn, error) {
-	return webauthn.New(&webauthn.Config{
-		RPID:          rpID,
-		RPDisplayName: s.webauthnRPDisplayName,
-		RPOrigins:     []string{origin},
-		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			ResidentKey:      protocol.ResidentKeyRequirementRequired,
-			UserVerification: protocol.VerificationRequired,
-		},
-	})
-}
-
-func (s *AuthService) normalizeWebAuthnOrigin(origin string) (string, *url.URL, error) {
-	normalized, parsed, err := normalizeOriginString(origin)
-	if err != nil {
-		return "", nil, fmt.Errorf("invalid webauthn origin: %w", err)
+	normalized, _, err := config.NormalizeOrigin(challenge.Origin)
+	if err != nil ||
+		normalized != s.passkeyOrigin ||
+		challenge.SessionData.RelyingPartyID != s.passkeyRPID {
+		return nil, ErrInvalidPasskeyChallenge
 	}
-
-	host := parsed.Hostname()
-	isLocalHost := host == "localhost" || host == "127.0.0.1"
-	if !isLocalHost && parsed.Scheme != "https" {
-		return "", nil, fmt.Errorf("passkeys require https outside localhost")
-	}
-
-	if len(s.webauthnAllowedOrigins) > 0 {
-		matched := false
-		for _, allowedOrigin := range s.webauthnAllowedOrigins {
-			if normalized == allowedOrigin {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return "", nil, fmt.Errorf("origin %s is not allowed for passkeys", normalized)
-		}
-	}
-
-	return normalized, parsed, nil
-}
-
-func normalizeOriginString(origin string) (string, *url.URL, error) {
-	parsed, err := url.Parse(strings.TrimSpace(origin))
-	if err != nil {
-		return "", nil, err
-	}
-	if parsed.Scheme == "" || parsed.Host == "" {
-		return "", nil, fmt.Errorf("origin must include scheme and host")
-	}
-	if parsed.Path != "" && parsed.Path != "/" {
-		parsed.Path = ""
-	}
-	parsed.RawQuery = ""
-	parsed.Fragment = ""
-	normalized := fmt.Sprintf("%s://%s", strings.ToLower(parsed.Scheme), strings.ToLower(parsed.Host))
-	normalizedParsed, err := url.Parse(normalized)
-	if err != nil {
-		return "", nil, err
-	}
-	return normalized, normalizedParsed, nil
-}
-
-func (s *AuthService) resolveWebAuthnRPID(origin *url.URL) (string, error) {
-	host := strings.ToLower(origin.Hostname())
-	if host == "" {
-		return "", fmt.Errorf("missing origin host")
-	}
-
-	if configured := strings.TrimSpace(s.webauthnRPID); configured != "" {
-		configured = strings.ToLower(configured)
-		if host != configured && !strings.HasSuffix(host, "."+configured) {
-			return "", fmt.Errorf("origin host %s does not match configured rp id %s", host, configured)
-		}
-		return configured, nil
-	}
-
-	return host, nil
+	return s.webauthn, nil
 }
 
 func cloneByteSlice(value []byte) []byte {

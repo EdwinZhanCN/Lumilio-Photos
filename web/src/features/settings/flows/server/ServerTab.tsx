@@ -1,6 +1,7 @@
 import { useDebouncedPreference } from "../../state/preferences";
 import { useRuntimeInfo } from "../../api/useRuntimeInfo";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useBrowserCapabilities } from "@/features/auth";
 import { GaugeIcon } from "lucide-react";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import BackupSection from "./BackupSection";
@@ -14,6 +15,7 @@ export default function ServerTab() {
   const [healthCheckIntervalMs, setHealthCheckIntervalMs] =
     useDebouncedPreference("healthCheckIntervalMs");
   const runtimeQuery = useRuntimeInfo();
+  const browserCapabilities = useBrowserCapabilities();
   const runtime = runtimeQuery.data;
 
   const valueSec = healthCheckIntervalMs / 1000;
@@ -27,7 +29,20 @@ export default function ServerTab() {
   const runtimeFields: ReadonlyArray<[string, string | number | undefined]> = runtime
     ? [
         ["environment", runtime.environment],
-        ["server_port", runtime.server_port],
+        ["server_listen", runtime.server_listen],
+        ["primary_origin", runtime.primary_origin],
+        ["tls_mode", runtime.tls_mode],
+        ["proxy_mode", runtime.proxy_mode],
+        ["trusted_proxy_cidrs", runtime.trusted_proxy_cidrs?.join(", ")],
+        ["passkey_enabled", formatBoolean(runtime.passkey_enabled, t)],
+        ["passkey_origin", runtime.passkey_origin],
+        ["passkey_rp_id", runtime.passkey_rp_id],
+        ["acme_certificate_hostname", runtime.acme_certificate_hostname],
+        ["acme_certificate_status", runtime.acme_certificate_status],
+        ["acme_certificate_expires_at", runtime.acme_certificate_expires_at],
+        ["acme_last_managed_at", runtime.acme_last_managed_at],
+        ["current_browser_origin", browserCapabilities.data?.current_origin],
+        ["passkey_available", formatBoolean(browserCapabilities.data?.passkey_available, t)],
         ["storage_root", runtime.storage_root],
         ["hardware_accel", runtime.hardware_accel],
         ["repository_scan_enabled", formatBoolean(runtime.repository_scan_enabled, t)],

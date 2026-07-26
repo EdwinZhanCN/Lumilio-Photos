@@ -85,23 +85,53 @@ type ValidateLLMSettingsResponseDTO struct {
 // (changed only by editing TOML and restarting). Shown in the Settings → Server
 // tab so operators can see effective boot configuration.
 type RuntimeInfoDTO struct {
-	Environment                  string `json:"environment" example:"production"`
-	ServerPort                   string `json:"server_port" example:"8080"`
-	LogLevel                     string `json:"log_level" example:"info"`
-	StorageRoot                  string `json:"storage_root" example:"/data/storage"`
-	HardwareAccel                string `json:"hardware_accel" example:"none"`
-	GeocodingProvider            string `json:"geocoding_provider" example:"disabled"`
-	RepositoryScanEnabled        bool   `json:"repository_scan_enabled" example:"true"`
-	RepositoryScanIntervalSecond int    `json:"repository_scan_interval_seconds" example:"300"`
-	LumenDiscoveryEnabled        bool   `json:"lumen_discovery_enabled" example:"true"`
+	Environment                  string     `json:"environment" example:"production"`
+	ServerListen                 string     `json:"server_listen" example:"0.0.0.0:6680"`
+	PrimaryOrigin                string     `json:"primary_origin" example:"https://photos.example.com"`
+	TLSMode                      string     `json:"tls_mode" example:"external"`
+	ProxyMode                    string     `json:"proxy_mode" example:"required"`
+	TrustedProxyCIDRs            []string   `json:"trusted_proxy_cidrs"`
+	PasskeyEnabled               bool       `json:"passkey_enabled" example:"true"`
+	PasskeyOrigin                string     `json:"passkey_origin" example:"https://photos.example.com"`
+	PasskeyRPID                  string     `json:"passkey_rp_id" example:"photos.example.com"`
+	ACMECertificateHostname      string     `json:"acme_certificate_hostname,omitempty" example:"photos.example.com"`
+	ACMECertificateStatus        string     `json:"acme_certificate_status" example:"active"`
+	ACMECertificateExpiresAt     *time.Time `json:"acme_certificate_expires_at,omitempty"`
+	ACMELastManagedAt            *time.Time `json:"acme_last_managed_at,omitempty"`
+	LogLevel                     string     `json:"log_level" example:"info"`
+	StorageRoot                  string     `json:"storage_root" example:"/data/storage"`
+	HardwareAccel                string     `json:"hardware_accel" example:"none"`
+	GeocodingProvider            string     `json:"geocoding_provider" example:"disabled"`
+	RepositoryScanEnabled        bool       `json:"repository_scan_enabled" example:"true"`
+	RepositoryScanIntervalSecond int        `json:"repository_scan_interval_seconds" example:"300"`
+	LumenDiscoveryEnabled        bool       `json:"lumen_discovery_enabled" example:"true"`
+}
+
+type CertificateRuntimeInfo struct {
+	Hostname      string
+	Status        string
+	ExpiresAt     *time.Time
+	LastManagedAt *time.Time
 }
 
 // NewRuntimeInfoDTO builds the read-only runtime info snapshot from the immutable
 // application configuration.
 func NewRuntimeInfoDTO(cfg config.AppConfig) RuntimeInfoDTO {
+	trustedCIDRs := make([]string, 0, len(cfg.ServerConfig.Proxy.TrustedCIDRs))
+	for _, prefix := range cfg.ServerConfig.Proxy.TrustedCIDRs {
+		trustedCIDRs = append(trustedCIDRs, prefix.String())
+	}
 	return RuntimeInfoDTO{
 		Environment:                  cfg.Environment,
-		ServerPort:                   cfg.ServerConfig.Port,
+		ServerListen:                 cfg.ServerConfig.Listen,
+		PrimaryOrigin:                cfg.ServerConfig.PrimaryOrigin,
+		TLSMode:                      string(cfg.ServerConfig.TLS.Mode),
+		ProxyMode:                    string(cfg.ServerConfig.Proxy.Mode),
+		TrustedProxyCIDRs:            trustedCIDRs,
+		PasskeyEnabled:               cfg.Auth.Passkey.Enabled,
+		PasskeyOrigin:                cfg.Auth.PasskeyIdentity.Origin,
+		PasskeyRPID:                  cfg.Auth.PasskeyIdentity.RPID,
+		ACMECertificateStatus:        map[bool]string{true: "initializing", false: "not_applicable"}[cfg.ServerConfig.TLS.Mode == config.TLSModeACME],
 		LogLevel:                     cfg.LoggingConfig.Level,
 		StorageRoot:                  cfg.StorageConfig.Path,
 		HardwareAccel:                cfg.Transcode.HardwareAccel,
@@ -110,6 +140,13 @@ func NewRuntimeInfoDTO(cfg config.AppConfig) RuntimeInfoDTO {
 		RepositoryScanIntervalSecond: cfg.RepositoryScan.IntervalSeconds,
 		LumenDiscoveryEnabled:        cfg.Lumen.DiscoveryEnabled,
 	}
+}
+
+func (info *RuntimeInfoDTO) ApplyCertificateRuntime(certificate CertificateRuntimeInfo) {
+	info.ACMECertificateHostname = certificate.Hostname
+	info.ACMECertificateStatus = certificate.Status
+	info.ACMECertificateExpiresAt = certificate.ExpiresAt
+	info.ACMELastManagedAt = certificate.LastManagedAt
 }
 
 func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {

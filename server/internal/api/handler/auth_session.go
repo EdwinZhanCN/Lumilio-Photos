@@ -26,7 +26,7 @@ func (h *AuthHandler) writeAuthResponse(c *gin.Context, response *service.AuthRe
 		return
 	}
 
-	sameSite, secure, err := sessionCookiePolicy(c.Request)
+	sameSite, secure, err := sessionCookiePolicy(c)
 	if err != nil {
 		_ = h.authService.RevokeRefreshToken(response.RefreshToken)
 		api.GinBadRequest(c, err, "Credentialed cross-origin sessions require HTTPS")
@@ -79,7 +79,7 @@ func (h *AuthHandler) requireCSRFToken(c *gin.Context, refreshToken string) bool
 }
 
 func (h *AuthHandler) clearAuthCookies(c *gin.Context) {
-	sameSite, secure, _ := sessionCookiePolicy(c.Request)
+	sameSite, secure, _ := sessionCookiePolicy(c)
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    "",
@@ -112,22 +112,21 @@ func (h *AuthHandler) GetCSRFToken(c *gin.Context) {
 	})
 }
 
-func sessionCookiePolicy(r *http.Request) (http.SameSite, bool, error) {
-	_, target, ok := api.RequestTargetOrigin(r)
+func sessionCookiePolicy(c *gin.Context) (http.SameSite, bool, error) {
+	resolved, ok := api.RequestOriginContext(c)
 	if !ok {
-		return http.SameSiteLaxMode, false, errors.New("invalid request target origin")
+		return http.SameSiteLaxMode, false, errors.New("request origin policy was not resolved")
+	}
+	target, err := url.Parse(resolved.TargetOrigin)
+	if err != nil {
+		return http.SameSiteLaxMode, false, errors.New("invalid resolved target origin")
+	}
+	origin, err := url.Parse(resolved.BrowserOrigin)
+	if err != nil {
+		return http.SameSiteLaxMode, target.Scheme == "https", errors.New("invalid resolved browser origin")
 	}
 
-	origin := strings.TrimSpace(r.Header.Get("Origin"))
-	if origin == "" {
-		return http.SameSiteLaxMode, target.Scheme == "https", nil
-	}
-	_, parsedOrigin, ok := api.NormalizeOrigin(origin)
-	if !ok {
-		return http.SameSiteLaxMode, target.Scheme == "https", errors.New("invalid request origin")
-	}
-
-	if sameCookieSite(parsedOrigin, target) {
+	if sameCookieSite(origin, target) {
 		return http.SameSiteLaxMode, target.Scheme == "https", nil
 	}
 	if target.Scheme != "https" {

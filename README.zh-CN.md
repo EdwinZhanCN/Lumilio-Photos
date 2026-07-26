@@ -47,25 +47,25 @@ Lumilio Photos 将原始文件和应用数据保存在你所控制的基础设�
 
 运行前需要安装 Docker 及 Compose 插件。单个应用镜像同时提供 Web 界面和 API。请将 `LUMILIO_STORAGE` 设置为媒体目录，并将 `LUMILIO_STATE` 设置为独立的本机应用状态目录，用于保存 SQLite catalog、快照、凭据和日志。
 
+生产部署必须明确选择内置 ACME 或外部反向代理。以下 ACME 示例要求域名已指向主机，并允许公网 TCP 80/443：
+
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.acme.yml
 export LUMILIO_STORAGE=/srv/lumilio/media
 export LUMILIO_STATE=/srv/lumilio/state
+export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
 mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
-docker compose -f docker-compose.release.yml up -d
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-acme \
+  --origin https://photos.example.com --email admin@example.com \
+  --output /data/app-state/server.toml
+docker compose -f docker-compose.acme.yml up -d
 ```
 
-启动后打开 `http://localhost:6657`，按照首次运行向导完成初始化。`6657` 端口同时提供 Web 界面和 API；如需通过互联网访问，请在前方配置可信的 HTTPS 反向代理。
-
-如需固定版本而不是跟随 `latest`：
-
-```bash
-LUMILIO_VERSION=v1.0.0 \
-  docker compose -f docker-compose.release.yml up -d
-```
+启动后打开生成配置时指定的精确 HTTPS Origin。若 HTTPS 已由 Caddy、Traefik、Nginx 等终止，请改用 `docker-compose.proxy.yml`，并以 `docker-external-proxy` profile 和窄范围 `--trusted-proxy` 生成配置；该 profile 不会发布 Lumilio 内部端口。明文 HTTP 仅保留在 `docker-compose.dev.yml`。
 
 > [!IMPORTANT]
-> 完整 schema v2 runtime manifest 固定在镜像的 `/app/config/server.toml`；普通环境变量不会覆盖不可变策略。流明集运行时，不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`，也不要用宿主机 SQLite 工具打开它们；跨容器挂载边界会破坏 WAL 锁协调。请在“设置 → 服务器”中创建一致性快照，并单独备份媒体目录。
+> 生产环境从 `/data/app-state/server.toml` 读取完整 schema v3 manifest；CLI flags 只生成或验证文件，不会覆盖运行时策略。流明集运行时，不要直接复制或打开 SQLite 文件；请在“设置 → 服务器”中创建一致性快照，并单独备份媒体目录。
 
 ## 本地开发
 
@@ -87,7 +87,7 @@ make setup
 make dev
 ```
 
-`make dev` 会启动位于 `6680` 端口的 API 和位于 `6657` 端口的 Web 应用；SQLite 嵌入在 Go 进程中，不需要数据库服务。`make setup` 会复制完整的 schema v2 manifest 到被 Git 忽略的 `server/config/server.local.toml`。默认开发 catalog 位于 `server/.local/lumilio/library.sqlite3`，媒体仍位于 `server/data/storage`。服务端不提供配置默认值或普通环境变量覆盖。
+`make dev` 会启动位于 `6680` 端口的 API 和位于 `6657` 端口的 Web 应用；SQLite 嵌入在 Go 进程中，不需要数据库服务。`make setup` 会复制完整的 schema v3 manifest 到被 Git 忽略的 `server/config/server.local.toml`。默认开发 catalog 位于 `server/.local/lumilio/library.sqlite3`，媒体仍位于 `server/data/storage`。服务端不提供配置默认值或普通环境变量覆盖。
 
 ### 常用命令
 

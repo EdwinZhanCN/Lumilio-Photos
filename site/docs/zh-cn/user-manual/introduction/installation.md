@@ -1,7 +1,3 @@
-<script setup lang="ts">
-import DockerComposeConfigurator from '../../../.vitepress/components/DockerComposeConfigurator.vue'
-</script>
-
 # 安装
 
 如果安装后所有管理员都无法登录，请按照[恢复管理员访问权限](./break-glass.md)操作，不要直接编辑数据库。
@@ -42,31 +38,78 @@ Desktop 会引导你选择语言和下载区域，并显示本机默认存储位
 如需通过 mDNS 发现其他 Lumen 节点，请允许 macOS 的本地网络访问或 Windows 防火墙提示。拒绝该权限不影响基础媒体管理。
 :::
 
+### Desktop 网络访问
+
+Desktop 控制面板提供三个明确的网络模式：
+
+- **仅本机**是默认模式。服务只监听回环地址，并打开
+  `http://localhost:6680`；没有其他设备访问需求时应保持此模式。
+- **局域网 HTTP**会把监听地址扩展到局域网，但规范 Origin 仍是
+  `http://localhost:6680`。它只适合可信家庭网络，并要求确认其他设备的
+  流量没有加密；Passkey 仍只能在 Desktop 本机的 localhost 地址使用。
+  操作系统防火墙可能还需要允许入站连接。
+- **外部 HTTPS**用于已有的 HTTPS 反向代理。填写精确的公网 HTTPS Origin
+  和每个可信代理的最小 CIDR；Desktop 自身绝不申请 ACME 证书。代理必须转发
+  原始 scheme、host 与客户端地址。保存后 Desktop 会重启并检查就绪状态；候选
+  配置启动失败时会自动恢复上一个可用配置。
+
+主 Origin 同时也是 WebAuthn Origin，其 hostname 就是 RP ID。因此修改
+hostname 后需要重新注册 Passkey；迁移期间请保留密码与 TOTP 恢复路径。
+
 ## Docker
 
-Docker 发布使用 GHCR 上的单个 `lumilio-server` 多架构镜像，同一容器同时提供 Web 界面和 API。Beta 版本应使用 GitHub Release 对应的精确镜像标签；`edge` 是手动测试通道，不建议用于重要资料库。
+Docker 生产部署不再提供隐式明文模式。必须明确选择“内置 ACME”或“外部 HTTPS 反向代理”。单个 `lumilio-server` 镜像仍同时提供 Web 界面和 API。
 
-<DockerComposeConfigurator />
+### 内置 ACME HTTPS
 
-下载配置后，在其所在目录执行：
+先将域名 A/AAAA 记录指向部署主机，并开放公网 TCP 80/443：
 
 ```bash
-docker compose up -d
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.acme.yml
+export LUMILIO_STORAGE=/srv/lumilio/media
+export LUMILIO_STATE=/srv/lumilio/state
+export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
+mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-acme \
+  --origin https://photos.example.com --email admin@example.com \
+  --output /data/app-state/server.toml
+docker compose -f docker-compose.acme.yml up -d
 ```
 
-启动完成后，在部署主机上通过 `http://localhost:6657` 打开 Web 界面；同一局域网内的其他设备应将 `localhost` 替换为部署主机的局域网地址。该端口同时承载 Web 界面和 API。
+CertMagic 的账户与证书保存在 `/data/app-state/tls`；保留状态挂载即可跨重启续期。证书申请失败会阻止启动，绝不会降级到 HTTP。
 
-媒体目录与应用状态目录是两个必需且独立的持久化挂载。媒体目录保存原始媒体；应用状态目录保存 `library.sqlite3`、应用快照、凭据和日志，并应位于本机可靠磁盘。两个目录都必须允许容器 UID 10001 写入。只要保留这两个宿主目录，就可以删除并重新创建应用容器而不丢失状态。
+### 外部反向代理
 
-::: danger 不要直接公开到互联网
-默认 Compose 配置面向本地网络试用。如需远程访问，请先配置 HTTPS、可信的反向代理、认证与防火墙边界。
-:::
+已有 Caddy、Traefik 或 Nginx 时，使用专用代理网络：
+
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.proxy.yml
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-external-proxy \
+  --origin https://photos.example.com \
+  --trusted-proxy 172.30.0.0/24 \
+  --output /data/app-state/server.toml
+export LUMILIO_DOMAIN=photos.example.com
+docker compose -f docker-compose.proxy.yml up -d
+```
+
+代理 profile 默认不发布 Lumilio 的 6680 端口，因此直接请求不能绕过可信代理。代理必须覆盖 `Forwarded`，或 `X-Forwarded-Proto`、`X-Forwarded-Host` 与客户端 IP；只信任精确代理地址或专用子网，不要信任包含无关容器的共享网络。仓库的 `deploy/reverse-proxy/` 提供 Caddy、Nginx 与 Traefik 最小示例。
+
+媒体与应用状态必须使用两个独立持久化挂载。状态目录保存 schema v3 manifest、`library.sqlite3`、快照、凭据、日志和 ACME 状态，并应位于可靠本机磁盘。两个目录都必须允许容器 UID 10001 写入。修改配置后先运行：
+
+```bash
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config validate --config /data/app-state/server.toml
+```
+
+Passkey Origin 始终精确等于 `server.primary_origin`，RP ID 始终是其 hostname。修改 hostname 后，已有 Passkey 仍会保留，但不能在新的 RP ID 登录；请保留密码 + TOTP 恢复路径并重新注册 Passkey。
 
 ::: warning 通过流明集创建备份
 流明集运行时，不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`，也不要用宿主机 SQLite 工具打开它们；跨容器挂载边界会破坏 WAL 锁协调。请在“设置 → 服务器”中创建并下载一致性快照，并单独备份媒体目录。
 :::
 
-Docker 中的 Lumen 网络模式边界请参阅 [Lumen AI](../features/lumen-ai.md)。不可变运行策略需要通过完整 schema v2 manifest 配置；普通环境变量不会覆盖这些字段。
+Docker 中的 Lumen 网络模式边界请参阅 [Lumen AI](../features/lumen-ai.md)。不可变运行策略需要通过完整 schema v3 manifest 配置；普通环境变量不会覆盖这些字段。
 
 ## 从源码运行
 

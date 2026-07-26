@@ -46,3 +46,6 @@ Route entries stay thin and delegate to workflow-owned implementations:
 composition, not page components. Browser WebAuthn conversion stays in the
 isolated [getPasskeySupport](./modules/webauthn/webauthn.ts) module, while deterministic credential
 policy such as [normalizeUsernameInput](./model/credentialPolicy.ts) stays in the React-free model.
+[useBrowserCapabilities](./api/useBrowserCapabilities.ts) reads the server-resolved canonical-origin
+policy before login and registration, while [BrowserSecurityNotice](./components/BrowserSecurityNotice.tsx)
+keeps LAN HTTP transport risk visible on public and authenticated surfaces.

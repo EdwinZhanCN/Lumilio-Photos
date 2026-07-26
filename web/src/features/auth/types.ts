@@ -7,6 +7,7 @@ export type AuthResponse = Schemas["dto.AuthResponseDTO"];
 export type LoginRequest = Schemas["dto.LoginRequestDTO"];
 export type LoginOptionsRequest = Schemas["dto.LoginOptionsRequestDTO"];
 export type LoginOptionsResponse = Schemas["dto.LoginOptionsResponseDTO"];
+export type BrowserCapabilities = Schemas["dto.BrowserCapabilitiesDTO"];
 export type MFAStatus = Schemas["dto.MFAStatusDTO"];
 export type TOTPSetupResponse = Schemas["dto.TOTPSetupResponseDTO"];
 export type RecoveryCodesResponse = Schemas["dto.RecoveryCodesResponseDTO"];

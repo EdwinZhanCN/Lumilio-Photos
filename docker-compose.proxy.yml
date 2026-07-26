@@ -1,0 +1,48 @@
+name: lumilio-photos-proxy
+
+services:
+    lumilio:
+        image: ${LUMILIO_IMAGE:-ghcr.io/edwinzhancn/lumilio-server:latest}
+        restart: unless-stopped
+        command: ["server", "--config", "/data/app-state/server.toml"]
+        volumes:
+            - ${LUMILIO_STORAGE:?set LUMILIO_STORAGE to the media root}:/data/storage
+            - ${LUMILIO_STATE:?set LUMILIO_STATE to the machine-local app-state root}:/data/app-state
+        expose:
+            - "6680"
+        networks:
+            - lumilio_proxy
+        healthcheck:
+            test: ["CMD", "server", "config", "healthcheck", "--config", "/data/app-state/server.toml"]
+            interval: 10s
+            timeout: 6s
+            retries: 12
+            start_period: 20s
+
+    caddy:
+        image: caddy:2.10.2-alpine
+        restart: unless-stopped
+        depends_on:
+            lumilio:
+                condition: service_healthy
+        environment:
+            LUMILIO_DOMAIN: ${LUMILIO_DOMAIN:?set LUMILIO_DOMAIN to the public DNS hostname}
+        volumes:
+            - ./deploy/reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+            - caddy_data:/data
+            - caddy_config:/config
+        ports:
+            - "80:80"
+            - "443:443"
+        networks:
+            - lumilio_proxy
+
+networks:
+    lumilio_proxy:
+        ipam:
+            config:
+                - subnet: 172.30.0.0/24
+
+volumes:
+    caddy_data:
+    caddy_config:

@@ -18,11 +18,13 @@ import (
 var desktopServerTemplate string
 
 type serverManifestBindings struct {
-	Port, BrowserOrigin, WebRoot, LogDir, StoragePath string
-	CloudStatePath, BackupsPath                       string
-	DatabasePath, SecretKeyFile                       string
-	ExifToolPath, FFmpegPath, FFprobePath             string
-	LumenStaticNode                                   string
+	Listen, PrimaryOrigin, WebRoot, LogDir, StoragePath string
+	TLSMode, ProxyMode                                  string
+	TrustedProxyCIDRs                                   []string
+	CloudStatePath, BackupsPath                         string
+	DatabasePath, SecretKeyFile                         string
+	ExifToolPath, FFmpegPath, FFprobePath               string
+	LumenStaticNode                                     string
 }
 
 func compileAndLoadServerManifest(path string, bindings serverManifestBindings) (serverconfig.AppConfig, error) {

@@ -25,6 +25,16 @@ type LoginOptionsResponseDTO struct {
 	Passkey  bool `json:"passkey" example:"false"`
 }
 
+type BrowserCapabilitiesDTO struct {
+	PrimaryOrigin            string `json:"primary_origin" example:"http://localhost:6680"`
+	CurrentOrigin            string `json:"current_origin" example:"http://192.168.1.20:6680"`
+	PasskeyAvailable         bool   `json:"passkey_available" example:"false"`
+	PasskeyUnavailableReason string `json:"passkey_unavailable_reason,omitempty" enums:"disabled,secure_origin_required,non_primary_origin,trusted_proxy_required,invalid_request_origin"`
+	InsecureTransport        bool   `json:"insecure_transport" example:"true"`
+	ProxyRequired            bool   `json:"proxy_required" example:"false"`
+	ViaTrustedProxy          bool   `json:"via_trusted_proxy" example:"false"`
+}
+
 func ToLoginOptionsResponseDTO(options service.LoginOptions) LoginOptionsResponseDTO {
 	return LoginOptionsResponseDTO{
 		Password: options.Password,

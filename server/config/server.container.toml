@@ -1,17 +1,29 @@
-# Complete container runtime manifest. No Lumilio server environment variable
-# overrides are applied. Secret values live only in the referenced files.
-schema_version = 2
+# Complete development-only container HTTP manifest used by
+# docker-compose.dev.yml. Production operators must generate an ACME or
+# external-proxy manifest with `server config init`.
+schema_version = 3
 environment = "production"
 
 [database]
 path = "/data/app-state/library.sqlite3"
 
 [server]
-port = "6680"
+listen = "0.0.0.0:6680"
+primary_origin = "http://localhost:6680"
 # The server image contains the SPA and serves it on the API origin.
 # Add only separately hosted browser frontends that need cookie sessions.
 cors_allowed_origins = []
 web_root = "/app/web"
+
+[server.tls]
+mode = "off"
+http_listen = ""
+email = ""
+storage_path = ""
+
+[server.proxy]
+mode = "disabled"
+trusted_cidrs = []
 
 [logging]
 level = "info"
@@ -44,10 +56,10 @@ secret_key_file = "/data/app-state/secrets/lumilio_secret_key"
 access_token_ttl = "15m"
 refresh_token_ttl = "168h"
 media_token_ttl = "10m"
-webauthn_rp_name = "Lumilio Photos"
-webauthn_rp_mode = "origin-derived"
-webauthn_rp_id = ""
-webauthn_rp_origins = []
+
+[auth.passkey]
+enabled = true
+name = "Lumilio Photos"
 
 [auth.rate_limit]
 ip_attempts = 60

@@ -89,6 +89,12 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			"serverURL":  d.sup.ServerURL(),
 			"stage":      d.status,
 			"paths":      paths,
+			"network": map[string]any{
+				"mode": settings.NetworkMode, "primaryOrigin": settings.PrimaryOrigin,
+				"listen": settings.Listen, "trustedProxyCIDRs": settings.TrustedProxyCIDRs,
+				"lanWarningAcceptedVersion": settings.LANHTTPWarningAcceptedVersion,
+				"lanAddresses":              supervisor.LANAddresses(),
+			},
 			"lumen": map[string]any{"enabled": settings.LumenEnabled, "state": d.lumenState, "error": d.lumenError,
 				"preset": settings.LumenPreset, "backend": settings.LumenBackend, "profile": settings.LumenProfile,
 				"cacheDir": cacheDir, "previousCacheDir": settings.LumenPreviousCacheDir,
@@ -200,6 +206,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		}
 		writeJSON(w, map[string]any{"ok": true, "region": settings.Region})
 	})
+	mux.HandleFunc("/__onb/network", d.handleNetworkSave)
 
 	mux.HandleFunc("/__onb/pick-cache", func(w http.ResponseWriter, r *http.Request) { d.pickDashboardDir(w, "Choose model cache location") })
 	mux.HandleFunc("/__onb/open", func(w http.ResponseWriter, r *http.Request) {

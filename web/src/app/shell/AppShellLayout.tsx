@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { BreadcrumbProvider } from "@/components/breadcrumbs";
 import { ChatDock } from "@/features/lumilio";
+import { BrowserSecurityNotice } from "@/features/auth";
 import { useI18n } from "@/lib/i18n.tsx";
 import NavBar from "@/app/shell/NavBar";
 import SideBar from "@/app/shell/SideBar";
@@ -20,6 +21,7 @@ export default function AppShellLayout(): ReactNode {
         <input id="app-drawer" type="checkbox" className="drawer-toggle" />
         <div className="drawer-content flex h-screen min-h-0 flex-col overflow-hidden">
           <NavBar />
+          <BrowserSecurityNotice className="rounded-none border-x-0 border-t-0" />
           <div id="app-scroll-container" className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-hidden">
               <Outlet />

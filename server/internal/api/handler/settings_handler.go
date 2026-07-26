@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"sync"
+
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/service"
@@ -12,10 +14,18 @@ type SettingsHandler struct {
 	settingsService service.SettingsService
 	backupService   service.BackupService
 	runtimeInfo     dto.RuntimeInfoDTO
+	runtimeInfoMu   sync.RWMutex
+	certificateInfo func() dto.CertificateRuntimeInfo
 }
 
 func NewSettingsHandler(settingsService service.SettingsService, backupService service.BackupService, runtimeInfo dto.RuntimeInfoDTO) *SettingsHandler {
 	return &SettingsHandler{settingsService: settingsService, backupService: backupService, runtimeInfo: runtimeInfo}
+}
+
+func (h *SettingsHandler) SetCertificateInfoProvider(provider func() dto.CertificateRuntimeInfo) {
+	h.runtimeInfoMu.Lock()
+	defer h.runtimeInfoMu.Unlock()
+	h.certificateInfo = provider
 }
 
 // GetRuntimeInfo returns a read-only snapshot of the runtime-immutable
@@ -30,7 +40,14 @@ func NewSettingsHandler(settingsService service.SettingsService, backupService s
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
 // @Router /api/v1/settings/runtime-info [get]
 func (h *SettingsHandler) GetRuntimeInfo(c *gin.Context) {
-	api.JSONOK(c, h.runtimeInfo)
+	h.runtimeInfoMu.RLock()
+	runtimeInfo := h.runtimeInfo
+	provider := h.certificateInfo
+	h.runtimeInfoMu.RUnlock()
+	if provider != nil {
+		runtimeInfo.ApplyCertificateRuntime(provider())
+	}
+	api.JSONOK(c, runtimeInfo)
 }
 
 // GetSystemSettings returns the persisted system settings.

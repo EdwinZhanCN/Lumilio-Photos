@@ -30,6 +30,13 @@ import (
 // @description Type "Bearer" followed by a space and JWT token.
 // @openapi 3.0.0
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "config" {
+		if err := runConfigCLI(os.Args[2:], os.Stdout, os.Stderr); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		return
+	}
 	options, err := parseCLI(os.Args[1:], os.Stderr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

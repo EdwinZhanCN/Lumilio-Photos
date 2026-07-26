@@ -5,14 +5,42 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
+
+	serverconfig "server/config"
+)
+
+const (
+	desktopSettingsVersion       = 1
+	lanHTTPWarningCurrentVersion = 1
+)
+
+// NetworkMode selects how the embedded server is reachable. Desktop never
+// owns public certificates: external HTTPS always means a trusted reverse
+// proxy terminates TLS.
+type NetworkMode string
+
+const (
+	NetworkLocal         NetworkMode = "local"
+	NetworkLANHTTP       NetworkMode = "lan_http"
+	NetworkExternalHTTPS NetworkMode = "external_https"
 )
 
 // DesktopSettings are user choices that must persist across launches. It is the
 // source of truth for those choices. The generated server.toml is rebuilt from
 // these choices and is the authoritative immutable input for one launch.
 type DesktopSettings struct {
+	Version                       int         `json:"version"`
+	NetworkMode                   NetworkMode `json:"network_mode"`
+	PrimaryOrigin                 string      `json:"primary_origin"`
+	Listen                        string      `json:"listen"`
+	TrustedProxyCIDRs             []string    `json:"trusted_proxy_cidrs,omitempty"`
+	LANHTTPWarningAcceptedVersion int         `json:"lan_http_warning_accepted_version,omitempty"`
+
 	// StoragePath is the onboarding/legacy location choice. New runtimes always
 	// use <appdata>/storage as the default root and migrate a different value to
 	// the repository_roots registry as an external Storage Location.
@@ -59,7 +87,7 @@ func LoadSettings(path string) (DesktopSettings, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return DesktopSettings{}, nil
+			return normalizeNetworkSettings(DesktopSettings{})
 		}
 		return DesktopSettings{}, fmt.Errorf("read desktop settings: %w", err)
 	}
@@ -67,11 +95,16 @@ func LoadSettings(path string) (DesktopSettings, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return DesktopSettings{}, fmt.Errorf("parse desktop settings: %w", err)
 	}
-	return s, nil
+	return normalizeNetworkSettings(s)
 }
 
 // SaveSettings persists desktop-settings.json atomically.
 func SaveSettings(path string, s DesktopSettings) error {
+	var err error
+	s, err = normalizeNetworkSettings(s)
+	if err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal desktop settings: %w", err)
@@ -92,6 +125,78 @@ func SaveSettings(path string, s DesktopSettings) error {
 	defer os.Remove(tmp)
 	if err := replaceFile(tmp, path); err != nil {
 		return fmt.Errorf("replace desktop settings: %w", err)
+	}
+	return nil
+}
+
+// normalizeNetworkSettings migrates old settings and validates the complete
+// network profile before it can be persisted or compiled into server.toml.
+func normalizeNetworkSettings(s DesktopSettings) (DesktopSettings, error) {
+	if s.Version != 0 && s.Version != desktopSettingsVersion {
+		return DesktopSettings{}, fmt.Errorf("unsupported desktop settings version %d", s.Version)
+	}
+	s.Version = desktopSettingsVersion
+	if s.NetworkMode == "" {
+		s.NetworkMode = NetworkLocal
+	}
+
+	switch s.NetworkMode {
+	case NetworkLocal:
+		s.Listen = "127.0.0.1:6680"
+		s.PrimaryOrigin = "http://localhost:6680"
+		s.TrustedProxyCIDRs = nil
+	case NetworkLANHTTP:
+		if s.LANHTTPWarningAcceptedVersion < lanHTTPWarningCurrentVersion {
+			return DesktopSettings{}, fmt.Errorf(
+				"LAN HTTP requires warning acceptance version %d",
+				lanHTTPWarningCurrentVersion,
+			)
+		}
+		s.Listen = "0.0.0.0:6680"
+		s.PrimaryOrigin = "http://localhost:6680"
+		s.TrustedProxyCIDRs = nil
+	case NetworkExternalHTTPS:
+		origin, parsed, err := serverconfig.NormalizeOrigin(s.PrimaryOrigin)
+		if err != nil || parsed.Scheme != "https" {
+			return DesktopSettings{}, errors.New("external HTTPS requires an exact https primary origin")
+		}
+		s.PrimaryOrigin = origin
+		if err := validateDesktopListen(s.Listen); err != nil {
+			return DesktopSettings{}, err
+		}
+		if len(s.TrustedProxyCIDRs) == 0 {
+			return DesktopSettings{}, errors.New("external HTTPS requires at least one trusted proxy CIDR")
+		}
+		normalizedCIDRs := make([]string, 0, len(s.TrustedProxyCIDRs))
+		seen := make(map[netip.Prefix]struct{}, len(s.TrustedProxyCIDRs))
+		for _, raw := range s.TrustedProxyCIDRs {
+			prefix, err := netip.ParsePrefix(strings.TrimSpace(raw))
+			if err != nil || prefix.Bits() == 0 {
+				return DesktopSettings{}, fmt.Errorf("invalid trusted proxy CIDR %q", raw)
+			}
+			prefix = prefix.Masked()
+			if _, exists := seen[prefix]; exists {
+				continue
+			}
+			seen[prefix] = struct{}{}
+			normalizedCIDRs = append(normalizedCIDRs, prefix.String())
+		}
+		s.TrustedProxyCIDRs = normalizedCIDRs
+	default:
+		return DesktopSettings{}, fmt.Errorf("unsupported desktop network mode %q", s.NetworkMode)
+	}
+	return s, nil
+}
+
+func validateDesktopListen(value string) error {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(value))
+	if err != nil || port == "" {
+		return fmt.Errorf("invalid desktop listen address %q", value)
+	}
+	if host != "" {
+		if _, err := netip.ParseAddr(host); err != nil {
+			return fmt.Errorf("desktop listen host must be an IP address: %q", host)
+		}
 	}
 	return nil
 }

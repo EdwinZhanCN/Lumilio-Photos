@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -49,7 +50,8 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	secretKeyFile := filepath.Join(dir, "secrets", "lumilio_secret_key")
 
 	cfg, err := compileAndLoadServerManifest(path, serverManifestBindings{
-		Port: "6680", BrowserOrigin: "http://localhost:6680", WebRoot: webRoot,
+		Listen: "127.0.0.1:6680", PrimaryOrigin: "http://localhost:6680", WebRoot: webRoot,
+		TLSMode: "off", ProxyMode: "disabled", TrustedProxyCIDRs: []string{},
 		LogDir: logDir, StoragePath: storagePath,
 		CloudStatePath: filepath.Join(dir, "appdata", "cloud"), BackupsPath: filepath.Join(dir, "appdata", "backups"),
 		DatabasePath: databasePath, SecretKeyFile: secretKeyFile,
@@ -59,11 +61,11 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compileAndLoadServerManifest: %v", err)
 	}
-	if cfg.Auth.WebAuthnRPID != "localhost" {
-		t.Fatalf("webauthn rp id = %q, want localhost", cfg.Auth.WebAuthnRPID)
+	if cfg.Auth.PasskeyIdentity.RPID != "localhost" {
+		t.Fatalf("webauthn rp id = %q, want localhost", cfg.Auth.PasskeyIdentity.RPID)
 	}
-	if got, want := strings.Join(cfg.Auth.WebAuthnRPOrigins, ","), "http://localhost:6680"; got != want {
-		t.Fatalf("webauthn origins = %q, want %q", got, want)
+	if got, want := cfg.Auth.PasskeyIdentity.Origin, "http://localhost:6680"; got != want {
+		t.Fatalf("webauthn origin = %q, want %q", got, want)
 	}
 	if len(cfg.ServerConfig.CORSAllowedOrigins) != 0 {
 		t.Fatalf(
@@ -89,17 +91,17 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(manifest, "schema_version = 2") || !strings.Contains(manifest, "path = "+databaseLiteral) {
-		t.Fatalf("generated manifest is not schema v2 with the SQLite path:\n%s", data)
+	if !strings.Contains(manifest, "schema_version = 3") || !strings.Contains(manifest, "path = "+databaseLiteral) {
+		t.Fatalf("generated manifest is not schema v3 with the SQLite path:\n%s", data)
 	}
 	private, err := isPrivatePath(path)
 	if err != nil || !private {
 		t.Fatalf("manifest private = %v, err = %v", private, err)
 	}
-	if !cfg.LoadedFromManifest() || cfg.ManifestPath != path || cfg.ServerConfig.Port != "6680" {
+	if !cfg.LoadedFromManifest() || cfg.ManifestPath != path || cfg.ServerConfig.Listen != "127.0.0.1:6680" {
 		t.Fatalf("manifest was not strict-loaded: %+v", cfg)
 	}
-	if cfg.Auth.WebAuthnRPID != "localhost" || strings.Join(cfg.Auth.WebAuthnRPOrigins, ",") != "http://localhost:6680" {
+	if cfg.Auth.PasskeyIdentity.RPID != "localhost" || cfg.Auth.PasskeyIdentity.Origin != "http://localhost:6680" {
 		t.Fatalf("unexpected auth config: %+v", cfg.Auth)
 	}
 	if cfg.ServerConfig.WebRoot != webRoot || cfg.DatabaseConfig.Path != databasePath || cfg.Tools.FFmpegPath != ffmpegPath {
@@ -140,6 +142,10 @@ func TestDesktopSettingsRoundTrip(t *testing.T) {
 	}
 
 	want := DesktopSettings{StoragePath: "/Volumes/Photos/Lib"}
+	want, err = normalizeNetworkSettings(want)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := SaveSettings(path, want); err != nil {
 		t.Fatalf("SaveSettings: %v", err)
 	}
@@ -147,17 +153,107 @@ func TestDesktopSettingsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSettings: %v", err)
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("round trip = %+v, want %+v", got, want)
 	}
 
 	updated := DesktopSettings{StoragePath: "/Volumes/Photos/Updated", Language: "zh"}
+	updated, err = normalizeNetworkSettings(updated)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := SaveSettings(path, updated); err != nil {
 		t.Fatalf("SaveSettings(replace): %v", err)
 	}
 	got, err = LoadSettings(path)
-	if err != nil || got != updated {
+	if err != nil || !reflect.DeepEqual(got, updated) {
 		t.Fatalf("replacement round trip = %+v/%v, want %+v/nil", got, err, updated)
+	}
+}
+
+func TestDesktopNetworkProfiles(t *testing.T) {
+	local, err := normalizeNetworkSettings(DesktopSettings{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if local.Version != desktopSettingsVersion || local.NetworkMode != NetworkLocal ||
+		local.Listen != "127.0.0.1:6680" || local.PrimaryOrigin != "http://localhost:6680" {
+		t.Fatalf("local defaults = %+v", local)
+	}
+
+	lan, err := normalizeNetworkSettings(DesktopSettings{
+		NetworkMode:                   NetworkLANHTTP,
+		PrimaryOrigin:                 local.PrimaryOrigin,
+		LANHTTPWarningAcceptedVersion: lanHTTPWarningCurrentVersion,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lan.Listen != "0.0.0.0:6680" || lan.PrimaryOrigin != local.PrimaryOrigin {
+		t.Fatalf("LAN profile changed more than listen: %+v", lan)
+	}
+
+	external, err := normalizeNetworkSettings(DesktopSettings{
+		NetworkMode:       NetworkExternalHTTPS,
+		PrimaryOrigin:     "https://PHOTOS.example.com:443",
+		Listen:            "127.0.0.1:6680",
+		TrustedProxyCIDRs: []string{"127.0.0.1/32", "::1/128"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if external.PrimaryOrigin != "https://photos.example.com" ||
+		!reflect.DeepEqual(external.TrustedProxyCIDRs, []string{"127.0.0.1/32", "::1/128"}) {
+		t.Fatalf("same-host external profile = %+v", external)
+	}
+
+	remote, err := normalizeNetworkSettings(DesktopSettings{
+		NetworkMode:       NetworkExternalHTTPS,
+		PrimaryOrigin:     "https://photos.example.com",
+		Listen:            "0.0.0.0:6680",
+		TrustedProxyCIDRs: []string{"192.168.1.10/32"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := remote.TrustedProxyCIDRs; !reflect.DeepEqual(got, []string{"192.168.1.10/32"}) {
+		t.Fatalf("remote trusted CIDRs = %v", got)
+	}
+}
+
+func TestDesktopNetworkSettingsRejectInvalidWithoutWriting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "desktop-settings.json")
+	if err := SaveSettings(path, DesktopSettings{}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = SaveSettings(path, DesktopSettings{
+		NetworkMode:       NetworkExternalHTTPS,
+		PrimaryOrigin:     "http://photos.example.com",
+		Listen:            "0.0.0.0:6680",
+		TrustedProxyCIDRs: []string{"0.0.0.0/0"},
+	})
+	if err == nil {
+		t.Fatal("invalid external network profile was accepted")
+	}
+	after, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(after) != string(before) {
+		t.Fatal("invalid network profile changed persisted settings")
+	}
+}
+
+func TestInternalHealthURLIsIndependentFromPrimaryOrigin(t *testing.T) {
+	if got, want := internalHealthURL("0.0.0.0:6680"), "http://127.0.0.1:6680/api/v1/health/ready"; got != want {
+		t.Fatalf("health URL = %q, want %q", got, want)
+	}
+	if got, want := internalHealthURL("[::1]:7780"), "http://[::1]:7780/api/v1/health/ready"; got != want {
+		t.Fatalf("IPv6 health URL = %q, want %q", got, want)
 	}
 }
 

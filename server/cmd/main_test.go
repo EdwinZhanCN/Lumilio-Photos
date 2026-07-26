@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -43,5 +45,44 @@ func TestParseCLIRejectsInvalidAgentRefBudgets(t *testing.T) {
 	}, &stderr)
 	if err == nil || !strings.Contains(err.Error(), "global Agent ref hot-memory budget") {
 		t.Fatalf("expected invalid budget error, got %v", err)
+	}
+}
+
+func TestConfigInitAndValidate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "server.toml")
+	var stdout, stderr bytes.Buffer
+	err := runConfigCLI([]string{
+		"init",
+		"--profile", "docker-external-proxy",
+		"--origin", "https://photos.example.com",
+		"--trusted-proxy", "172.30.0.0/24",
+		"--output", path,
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("config init: %v\n%s", err, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "passkey RP ID: photos.example.com") {
+		t.Fatalf("init report = %q", stdout.String())
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	if err := runConfigCLI([]string{"validate", "--config", path}, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "configuration valid") ||
+		!strings.Contains(stdout.String(), "do not publish the application listener") {
+		t.Fatalf("validate report = %q", stdout.String())
+	}
+	if err := runConfigCLI([]string{
+		"init",
+		"--profile", "docker-acme",
+		"--origin", "https://photos.example.com",
+		"--email", "admin@example.com",
+		"--output", path,
+	}, &stdout, &stderr); err == nil || !strings.Contains(err.Error(), "refusing to overwrite") {
+		t.Fatalf("existing output error = %v", err)
 	}
 }

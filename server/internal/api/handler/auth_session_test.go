@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"server/config"
+	"server/internal/api"
+	"server/internal/httporigin"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +25,7 @@ func newAuthSessionTestHandler(t *testing.T) *AuthHandler {
 		SecretKeyFile: filepath.Join(t.TempDir(), "lumilio-secret"),
 	})
 	require.NoError(t, err)
-	return NewAuthHandler(authService, nil, time.Hour)
+	return NewAuthHandler(authService, nil, time.Hour, nil)
 }
 
 func TestWriteAuthResponseUsesHttpOnlyRefreshCookieAndOmitsCredential(t *testing.T) {
@@ -32,6 +35,7 @@ func TestWriteAuthResponseUsesHttpOnlyRefreshCookieAndOmitsCredential(t *testing
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodPost, "http://192.168.1.20:6680/api/v1/auth/login", nil)
 	context.Request.Header.Set("Origin", "http://192.168.1.20:6680")
+	setSessionOriginContext(context, "http://192.168.1.20:6680", "http://192.168.1.20:6680")
 
 	handler.writeAuthResponse(context, &service.AuthResponse{
 		AccessToken:  "short-lived-access",
@@ -67,6 +71,7 @@ func TestWriteAuthResponseUsesSecureNoneCookieForHTTPSCrossSiteSession(t *testin
 	context.Request.Host = "api.photos.example"
 	context.Request.Header.Set("X-Forwarded-Proto", "https")
 	context.Request.Header.Set("Origin", "https://ui.example.test")
+	setSessionOriginContext(context, "https://api.photos.example", "https://ui.example.test")
 
 	handler.writeAuthResponse(context, &service.AuthResponse{
 		AccessToken:  "short-lived-access",
@@ -76,6 +81,15 @@ func TestWriteAuthResponseUsesSecureNoneCookieForHTTPSCrossSiteSession(t *testin
 	setCookie := recorder.Header().Get("Set-Cookie")
 	require.Contains(t, setCookie, "Secure")
 	require.Contains(t, setCookie, "SameSite=None")
+}
+
+func setSessionOriginContext(context *gin.Context, target, browser string) {
+	api.SetRequestOriginContext(context, httporigin.RequestContext{
+		PeerIP:        netip.MustParseAddr("127.0.0.1"),
+		ClientIP:      netip.MustParseAddr("203.0.113.42"),
+		TargetOrigin:  target,
+		BrowserOrigin: browser,
+	})
 }
 
 func TestGetCSRFTokenRequiresRefreshCookieAndBindsResponse(t *testing.T) {

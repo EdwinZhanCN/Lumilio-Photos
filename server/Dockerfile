@@ -124,7 +124,7 @@ RUN groupadd --gid ${APP_GID} app \
 # App artifacts
 COPY --from=builder /out/server /usr/local/bin/server
 COPY --from=web-builder /web/dist /app/web
-COPY server/config/server.container.toml ./config/server.toml
+COPY server/config/server.container.toml ./config/server.dev.toml
 COPY server/docker-entrypoint.sh /usr/local/bin/lumilio-entrypoint
 
 # Prepare storage path
@@ -132,10 +132,10 @@ RUN chmod +x /usr/local/bin/lumilio-entrypoint \
     && mkdir -p /data/storage /data/app-state \
     && chown -R app:app /data /app
 
-EXPOSE 6680
+EXPOSE 6680 8080 8443
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=20s CMD \
-    curl -fsS "http://localhost:6680/api/v1/health" >/dev/null || exit 1
+    server config healthcheck --config /data/app-state/server.toml
 
 ENTRYPOINT ["lumilio-entrypoint"]
-CMD ["server", "--config", "/app/config/server.toml"]
+CMD ["server", "--config", "/data/app-state/server.toml"]

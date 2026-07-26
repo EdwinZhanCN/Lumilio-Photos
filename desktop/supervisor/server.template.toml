@@ -1,17 +1,28 @@
-# Generated from the version-controlled desktop schema v2 template.
+# Generated from the version-controlled desktop schema v3 template.
 # This file is the authoritative runtime input for the in-process server.
-schema_version = 2
+schema_version = 3
 environment = "production"
 
 [database]
 path = {{toml .DatabasePath}}
 
 [server]
-port = {{toml .Port}}
+listen = {{toml .Listen}}
+primary_origin = {{toml .PrimaryOrigin}}
 # The private Wails control panel uses its own /__onb host boundary. The React
 # product Web and API are served together at BrowserOrigin, so they are same-origin.
 cors_allowed_origins = []
 web_root = {{toml .WebRoot}}
+
+[server.tls]
+mode = {{toml .TLSMode}}
+http_listen = ""
+email = ""
+storage_path = ""
+
+[server.proxy]
+mode = {{toml .ProxyMode}}
+trusted_cidrs = {{toml .TrustedProxyCIDRs}}
 
 [logging]
 level = "info"
@@ -43,10 +54,10 @@ secret_key_file = {{toml .SecretKeyFile}}
 access_token_ttl = "15m"
 refresh_token_ttl = "168h"
 media_token_ttl = "10m"
-webauthn_rp_name = "Lumilio Photos"
-webauthn_rp_mode = "fixed"
-webauthn_rp_id = "localhost"
-webauthn_rp_origins = [{{toml .BrowserOrigin}}]
+
+[auth.passkey]
+enabled = true
+name = "Lumilio Photos"
 
 [auth.rate_limit]
 ip_attempts = 60

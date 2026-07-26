@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"server/config"
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/httporigin"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -18,14 +20,16 @@ type AuthHandler struct {
 	authService     *service.AuthService
 	rateLimiter     *AuthRateLimiter
 	refreshTokenTTL time.Duration
+	originPolicy    *httporigin.Policy
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(authService *service.AuthService, rateLimiter *AuthRateLimiter, refreshTokenTTL time.Duration) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, rateLimiter *AuthRateLimiter, refreshTokenTTL time.Duration, originPolicy *httporigin.Policy) *AuthHandler {
 	return &AuthHandler{
 		authService:     authService,
 		rateLimiter:     rateLimiter,
 		refreshTokenTTL: refreshTokenTTL,
+		originPolicy:    originPolicy,
 	}
 }
 
@@ -102,7 +106,42 @@ func (h *AuthHandler) GetLoginOptions(c *gin.Context) {
 		return
 	}
 
-	api.JSONOK(c, dto.ToLoginOptionsResponseDTO(options))
+	response := dto.ToLoginOptionsResponseDTO(options)
+	if h.originPolicy == nil {
+		response.Passkey = false
+	} else if resolved, ok := api.RequestOriginContext(c); !ok {
+		response.Passkey = false
+	} else {
+		available, _ := h.originPolicy.PasskeyAvailability(resolved)
+		response.Passkey = response.Passkey && available
+	}
+	api.JSONOK(c, response)
+}
+
+// GetBrowserCapabilities reports deployment/browser facts without consulting
+// account state, so it is safe before username entry.
+// @Summary Get browser authentication capabilities
+// @Description Report whether this request origin can use passkeys for the configured canonical origin.
+// @Tags auth
+// @Produce json
+// @Success 200 {object} dto.BrowserCapabilitiesDTO "Browser capabilities"
+// @Router /api/v1/auth/browser-capabilities [get]
+func (h *AuthHandler) GetBrowserCapabilities(c *gin.Context) {
+	resolved, ok := api.RequestOriginContext(c)
+	if !ok || h.originPolicy == nil {
+		api.GinBadRequest(c, errors.New("request origin policy was not resolved"), "invalid_request_origin")
+		return
+	}
+	available, reason := h.originPolicy.PasskeyAvailability(resolved)
+	api.JSONOK(c, dto.BrowserCapabilitiesDTO{
+		PrimaryOrigin:            h.originPolicy.PrimaryOrigin(),
+		CurrentOrigin:            resolved.BrowserOrigin,
+		PasskeyAvailable:         available,
+		PasskeyUnavailableReason: string(reason),
+		InsecureTransport:        !resolved.IsSecureContext,
+		ProxyRequired:            h.originPolicy.ProxyMode() == config.ProxyModeRequired,
+		ViaTrustedProxy:          resolved.ViaTrustedProxy,
+	})
 }
 
 // Login handles user authentication

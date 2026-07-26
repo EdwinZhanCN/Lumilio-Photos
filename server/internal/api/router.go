@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"server/config"
+	"server/internal/httporigin"
 	"server/internal/version"
 
 	"github.com/gin-gonic/gin"
@@ -83,6 +85,7 @@ type AssetControllerInterface interface {
 // AuthControllerInterface defines the interface for authentication controllers
 type AuthControllerInterface interface {
 	StartRegistration(c *gin.Context)
+	GetBrowserCapabilities(c *gin.Context)
 	GetLoginOptions(c *gin.Context)
 	Login(c *gin.Context)
 	CompleteRequiredPasswordChange(c *gin.Context)
@@ -293,17 +296,17 @@ func NewRouter(
 	shareLinkController ShareLinkControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
 	appInitializedMiddleware gin.HandlerFunc,
-	corsAllowedOrigins []string,
+	originPolicy *httporigin.Policy,
 	logger *zap.Logger,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(requestErrorLogger(logger))
-	allowedOrigins := mapAllowedCORSOrigins(corsAllowedOrigins)
-	trustedSessionOrigin := trustedSessionOriginMiddleware(allowedOrigins)
+	r.Use(originPolicyMiddleware(originPolicy))
+	trustedSessionOrigin := trustedSessionOriginMiddleware(originPolicy)
 
 	// Add CORS middleware
-	r.Use(corsMiddleware(allowedOrigins))
+	r.Use(corsMiddleware(originPolicy))
 
 	// API routes
 	api := r.Group("/api")
@@ -317,6 +320,16 @@ func NewRouter(
 				Status  string `json:"status"`
 				Version string `json:"version"`
 			}{Status: "ok", Version: version.Version})
+		})
+		v1.GET("/health/live", func(c *gin.Context) {
+			JSONOK(c, struct {
+				Status string `json:"status"`
+			}{Status: "ok"})
+		})
+		v1.GET("/health/ready", func(c *gin.Context) {
+			JSONOK(c, struct {
+				Status string `json:"status"`
+			}{Status: "ok"})
 		})
 		v1.GET("/capabilities", authController.OptionalAuthMiddleware(), capabilitiesController.GetCapabilities)
 
@@ -349,6 +362,7 @@ func NewRouter(
 		// Authentication routes
 		auth := v1.Group("/auth")
 		{
+			auth.GET("/browser-capabilities", authController.GetBrowserCapabilities)
 			auth.POST("/register/start", trustedSessionOrigin, authController.StartRegistration)
 			auth.POST("/login/options", authController.GetLoginOptions)
 			auth.POST("/login", trustedSessionOrigin, authController.Login)
@@ -643,6 +657,10 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 			return
 		}
 
+		clientIP := c.ClientIP()
+		if resolved, ok := RequestOriginContext(c); ok && resolved.ClientIP.IsValid() {
+			clientIP = resolved.ClientIP.String()
+		}
 		fields := []zap.Field{
 			zap.String("operation", "http.request"),
 			zap.Int("status", status),
@@ -650,7 +668,7 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 			zap.String("path", c.FullPath()),
 			zap.String("raw_path", c.Request.URL.Path),
 			zap.Duration("latency", time.Since(start)),
-			zap.String("client_ip", c.ClientIP()),
+			zap.String("client_ip", clientIP),
 		}
 		if len(c.Errors) > 0 {
 			fields = append(fields, zap.String("gin_errors", c.Errors.String()))
@@ -664,21 +682,10 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 	}
 }
 
-func mapAllowedCORSOrigins(configured []string) map[string]struct{} {
-	origins := make(map[string]struct{})
-	for _, origin := range configured {
-		normalized, _, ok := NormalizeOrigin(origin)
-		if ok {
-			origins[normalized] = struct{}{}
-		}
-	}
-	return origins
-}
-
 // corsMiddleware keeps bearer/public API requests open to browser origins while
 // reserving credentialed cross-origin cookie sessions for explicitly trusted
 // origins. A wildcard is never combined with cookies or credentials.
-func corsMiddleware(allowedOrigins map[string]struct{}) gin.HandlerFunc {
+func corsMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Content-Hash, X-CSRF-Token")
@@ -688,8 +695,9 @@ func corsMiddleware(allowedOrigins map[string]struct{}) gin.HandlerFunc {
 
 		origin := strings.TrimSpace(c.GetHeader("Origin"))
 		if origin != "" {
-			normalized, _, valid := NormalizeOrigin(origin)
-			_, trusted := allowedOrigins[normalized]
+			normalized, _, err := config.NormalizeOrigin(origin)
+			valid := err == nil
+			trusted := valid && policy.IsCORSAllowed(normalized)
 			switch {
 			case valid && trusted:
 				c.Header("Access-Control-Allow-Origin", normalized)
@@ -713,7 +721,7 @@ func corsMiddleware(allowedOrigins map[string]struct{}) gin.HandlerFunc {
 // destroy browser cookie sessions. Non-browser clients commonly omit Origin
 // and Referer; browser requests that provide either must match the dynamic
 // target origin or the explicit credentialed-CORS allowlist.
-func trustedSessionOriginMiddleware(allowedOrigins map[string]struct{}) gin.HandlerFunc {
+func trustedSessionOriginMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := strings.TrimSpace(c.GetHeader("Origin"))
 		if origin == "" {
@@ -739,9 +747,10 @@ func trustedSessionOriginMiddleware(allowedOrigins map[string]struct{}) gin.Hand
 			return
 		}
 
-		normalized, _, valid := NormalizeOrigin(origin)
-		_, configured := allowedOrigins[normalized]
-		if !valid || (!IsSameRequestOrigin(c.Request, normalized) && !configured) {
+		normalized, _, err := config.NormalizeOrigin(origin)
+		resolved, resolvedOK := RequestOriginContext(c)
+		configured := err == nil && policy.IsCORSAllowed(normalized)
+		if err != nil || !resolvedOK || (normalized != resolved.TargetOrigin && !configured) {
 			GinForbidden(c, errors.New("request origin is not trusted"), "Untrusted request origin")
 			c.Abort()
 			return
