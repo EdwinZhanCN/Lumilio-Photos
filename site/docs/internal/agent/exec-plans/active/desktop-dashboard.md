@@ -1871,7 +1871,38 @@ rollback
     host projection, stale fingerprint, ACME/host-field rejection, private endpoint, first/second
     launch, and existing network rollback tests; Panel `vp check --fix`, `vp test` (1 file /
     7 tests), and `vp build` (686 modules) passed.
-- [ ] Phase 5：Apply/Rollback
+- [x] Phase 5：Apply/Rollback
+  - Added one serialized runtime apply engine for both raw TOML and structured Server settings.
+    It validates the optimistic base fingerprint, stages `runtime.candidate.toml`, writes
+    `runtime-apply.json`, proves the old generation stopped, promotes the candidate, waits for
+    readiness, and only then replaces `runtime.last-known-good.toml`.
+  - Journal phases are exactly `candidate_staged`, `candidate_promoted`, and `rolling_back`.
+    `Prepare` reconciles an interrupted staged candidate by discarding it, and restores LKG for
+    promoted/rolling-back states before starting a generation. Direct tests cover all three.
+  - Candidate readiness failure restores LKG and starts it through the same generation lifecycle.
+    A successful rollback returns to `RuntimeRunning` with a visible `candidate_rolled_back`
+    recovery notice; rollback failure keeps the journal with both candidate and rollback errors
+    and leaves the host in `RuntimeFailed`.
+  - Stop timeout cannot promote the candidate or start a second generation. The apply operation
+    remains active through readiness, LKG persistence, and journal cleanup, so observers cannot
+    see a prematurely settled state.
+  - Added `POST /__onb/runtime/config/apply` and `POST .../restore`: accepted work returns `202`,
+    concurrent/stale requests return `409`, and invalid candidates return structured `400`.
+    Restore projects the current host-owned fields onto LKG and stages it through the same apply
+    engine.
+  - Server and Runtime Configuration tabs now share one session-scoped candidate draft.
+    Structured network edits use the backend patch endpoint and then the common apply endpoint;
+    raw edits validate/apply the same bytes. The Server recovery card also exposes LKG restore.
+  - Removed the old `/__onb/network`, frontend `saveNetwork`, and Supervisor
+    `ApplyNetworkSettings` path. Unknown `/__onb/*` routes return 404 instead of falling through to
+    the SPA, with a regression test proving the retired endpoint stays gone.
+  - Existing real SQLite network rollback coverage is now a generic candidate-startup-failure /
+    LKG-rollback E2E. Additional focused coverage proves success, stop-timeout no-promote,
+    rollback failure, journal reconciliation, stale/host rejection, and the pre-existing
+    first/second launch and v1 external-profile preservation.
+  - Verification: focused apply and private-endpoint tests passed; full `make desktop-test`
+    passed with Panel Svelte diagnostics at 0 errors / 0 warnings. Explicit Panel
+    `vp check --fix`, `vp test` (1 file / 7 tests), and production build also passed.
 - [ ] Phase 6：Mock/A11y/i18n/cleanup
 - [ ] Phase 7：Optional P1/docs
 
@@ -1899,6 +1930,9 @@ rollback
 | 2026-07-26 | HostProjection is applied to a generic TOML copy immediately before the real strict loader | User policy must survive while machine paths and supervised endpoints remain host-owned | runtime.toml stays complete/editable, server.toml is the projected immutable generation input, and TypeScript has no config parser |
 | 2026-07-26 | Candidate fingerprint hashes the exact active runtime.toml bytes with a `sha256:` prefix | Raw and structured editors need optimistic concurrency without treating generated server.toml as source | Any relaunch/apply that changes intent makes an older draft deterministically stale |
 | 2026-07-26 | Treat migration's strict-loaded initial intent as the initial LKG baseline | The v1→v2 sequence in the approved plan requires an immediately recoverable equivalent profile | Subsequent Phase 5 readiness applies replace LKG only after the new generation is proven ready |
+| 2026-07-26 | Keep apply ownership active until LKG persistence and journal cleanup finish | RuntimeRunning alone does not prove the transaction metadata has converged | Panel polling and tests cannot observe active intent with a stale LKG |
+| 2026-07-26 | Restore LKG by projecting current host fields and using the normal candidate engine | Machine-owned paths may have changed since an older LKG was written, while recovery needs identical safety semantics | Restore validates, stages, stops, promotes, starts, and journals exactly like any other apply |
+| 2026-07-26 | Reserve `/__onb/` as an API namespace with a 404 fallback | The SPA fallback otherwise turns removed or misspelled private endpoints into misleading HTML 200 responses | Retired `/__onb/network` is observably absent and future client mistakes fail closed |
 
 ## Surprises & Discoveries
 
@@ -1927,6 +1961,11 @@ rollback
   then correctly failed three tests whose assertions still encoded v1 JSON as the network source.
   Replacing those assertions with v2 host-only round trips and explicit v1 migration coverage made
   the changed ownership executable rather than weakening validation.
+- The first Phase 5 success E2E exposed two observation issues rather than an apply failure:
+  `OperationActive` cleared as soon as readiness returned, before LKG/journal convergence, and the
+  test assumed the TOML encoder always used double quotes. Keeping the operation claimed through
+  transaction cleanup and asserting the parsed `logging.level` made both the runtime contract and
+  the test semantic.
 
 ## Outcomes & Retrospective
 

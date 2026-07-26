@@ -5,6 +5,7 @@
 <script lang="ts">
   import { Dialog } from "bits-ui";
   import { t } from "../../lib/i18n.svelte.ts";
+  import { loadRuntimeDraft } from "../../lib/runtime-draft.svelte.ts";
   import GeneralSettingsForm from "./GeneralSettingsForm.svelte";
   import LumenSettingsForm from "./LumenSettingsForm.svelte";
   import RuntimeSettingsForm from "./RuntimeSettingsForm.svelte";
@@ -64,13 +65,19 @@
   const activeCanSave = $derived(tab !== "server" || serverCanSave);
   const saveLabel = $derived(
     tab === "runtime"
-      ? t("validateCandidate")
+      ? t("validateApplyRestart")
       : tab === "server"
       ? t("networkSave")
       : tab === "lumen" && lumenConfirmingMove
         ? t("confirmMove")
         : t("saveChanges"),
   );
+
+  $effect(() => {
+    if (!open) return;
+    void session;
+    void loadRuntimeDraft(session);
+  });
 
   function requestClose(nextOpen: boolean): void {
     if (nextOpen) {
@@ -194,8 +201,6 @@
           >
             <RuntimeSettingsForm
               bind:this={runtimeForm}
-              {open}
-              {session}
               bind:dirty={runtimeDirty}
               bind:saving={runtimeSaving}
             />

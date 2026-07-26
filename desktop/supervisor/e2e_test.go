@@ -13,6 +13,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // TestDesktopRuntimeFirstAndSecondLaunch exercises the complete desktop
@@ -82,14 +83,36 @@ func TestDesktopNetworkRestartRollback(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	err = supervisor.ApplyNetworkSettings(ctx, DesktopSettings{
-		NetworkMode:       NetworkExternalHTTPS,
-		PrimaryOrigin:     "https://photos.example.com",
-		Listen:            blocker.Addr().String(),
+	view, err := supervisor.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := supervisor.PatchRuntimeNetwork(view.BaseFingerprint, view.CandidateTOML, NetworkCandidatePatch{
+		Mode: NetworkExternalHTTPS, PrimaryOrigin: "https://photos.example.com",
+		Listen: blocker.Addr().String(), ProxyLocation: "remote",
 		TrustedProxyCIDRs: []string{"127.0.0.1/32", "::1/128"},
 	})
-	if err == nil || !strings.Contains(err.Error(), "restored last-known-good") {
-		t.Fatalf("network change error = %v", err)
+	if err != nil || !candidate.Valid {
+		t.Fatalf("patch candidate = %+v, %v", candidate, err)
+	}
+	if _, err := supervisor.ApplyRuntimeConfigAsync(
+		ctx,
+		view.BaseFingerprint,
+		candidate.CandidateTOML,
+		false,
+	); err != nil {
+		t.Fatalf("apply candidate: %v", err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		snapshot := supervisor.RuntimeSnapshot()
+		if snapshot.Phase == RuntimeRunning && snapshot.ErrorCode == "candidate_rolled_back" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("candidate rollback did not settle: %+v", snapshot)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 	settings, err := supervisor.Settings()
 	if err != nil {
@@ -99,6 +122,79 @@ func TestDesktopNetworkRestartRollback(t *testing.T) {
 		t.Fatalf("rollback settings = %+v, URL = %s", settings, supervisor.ServerURL())
 	}
 	assertDesktopHTTP(t, &http.Client{Timeout: 5 * time.Second}, supervisor.ServerURL(), "ROLLBACK_OK")
+}
+
+func TestDesktopRuntimeConfigApplySuccess(t *testing.T) {
+	appData := t.TempDir()
+	webRoot := t.TempDir()
+	resources := t.TempDir()
+	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte("APPLY_OK"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffmpeg")))
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffprobe")))
+	writeStubTool(t, filepath.Join(resources, "exiftool", toolExe("exiftool")))
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	t.Setenv("LUMILIO_WEB_ROOT", webRoot)
+	t.Setenv("LUMILIO_RESOURCES_DIR", resources)
+
+	supervisor := startDesktopRuntime(t)
+	view, err := supervisor.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, _ := parseRuntimeDocument([]byte(view.CandidateTOML))
+	setRuntimePath(document, "logging.level", "debug")
+	candidate, _ := toml.Marshal(document)
+	if _, err := supervisor.ApplyRuntimeConfigAsync(
+		context.Background(),
+		view.BaseFingerprint,
+		string(candidate),
+		false,
+	); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		snapshot := supervisor.RuntimeSnapshot()
+		active, readErr := os.ReadFile(filepath.Join(appData, "config", "runtime.toml"))
+		if readErr == nil &&
+			runtimeFingerprint(active) != view.BaseFingerprint &&
+			snapshot.Phase == RuntimeRunning &&
+			!snapshot.OperationActive {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("runtime apply did not settle: %+v, read=%v", snapshot, readErr)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	active, err := os.ReadFile(filepath.Join(appData, "config", "runtime.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lkg, err := os.ReadFile(filepath.Join(appData, "config", "runtime.last-known-good.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	activeDocument, err := parseRuntimeDocument(active)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logLevel, _ := runtimePathValue(activeDocument, "logging.level")
+	if string(active) != string(lkg) || logLevel != "debug" {
+		t.Fatalf(
+			"active/LKG mismatch after apply: active=%s lkg=%s logging.level=%v",
+			runtimeFingerprint(active),
+			runtimeFingerprint(lkg),
+			logLevel,
+		)
+	}
+	for _, name := range []string{"runtime.candidate.toml", "runtime-apply.json"} {
+		if _, err := os.Stat(filepath.Join(appData, "config", name)); !os.IsNotExist(err) {
+			t.Fatalf("successful apply left %s: %v", name, err)
+		}
+	}
 }
 
 func TestDesktopRuntimeRestart(t *testing.T) {

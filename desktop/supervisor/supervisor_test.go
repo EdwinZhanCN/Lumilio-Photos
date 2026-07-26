@@ -2,6 +2,7 @@ package supervisor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"os"
@@ -359,6 +360,157 @@ func TestRuntimeCandidateFingerprintHostProjectionAndSemantics(t *testing.T) {
 	}
 	if validation.Valid || !hasConfigIssue(validation.Issues, "unsupported_desktop_tls") {
 		t.Fatalf("Desktop ACME accepted: %+v", validation)
+	}
+}
+
+func TestRuntimeApplyStopTimeoutDoesNotPromoteCandidate(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+	s := New(Options{Logf: func(string, ...any) {}})
+	if err := s.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	view, err := s.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, _ := parseRuntimeDocument([]byte(view.CandidateTOML))
+	setRuntimePath(document, "logging.level", "debug")
+	candidate, _ := toml.Marshal(document)
+	s.stopTimeout = 10 * time.Millisecond
+	_, cancel := context.WithCancel(context.Background())
+	generation := &runtimeGeneration{cancel: cancel, done: make(chan struct{})}
+	s.generation = generation
+
+	if _, err := s.ApplyRuntimeConfigAsync(
+		context.Background(),
+		view.BaseFingerprint,
+		string(candidate),
+		false,
+	); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for s.RuntimeSnapshot().ErrorCode != "stop_timeout" && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if snapshot := s.RuntimeSnapshot(); snapshot.ErrorCode != "stop_timeout" {
+		t.Fatalf("stop timeout snapshot = %+v", snapshot)
+	}
+	active, err := os.ReadFile(s.paths.RuntimeConfigFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(active) != view.CurrentTOML {
+		t.Fatal("stop timeout promoted the staged candidate")
+	}
+	for _, path := range []string{s.paths.RuntimeCandidateFile(), s.paths.RuntimeApplyJournalFile()} {
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("stop timeout left staged artifact %s: %v", path, err)
+		}
+	}
+	close(generation.done)
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRuntimeApplyJournalReconciliation(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		phase      runtimeApplyPhase
+		wantActive string
+	}{
+		{name: "candidate staged keeps current", phase: applyCandidateStaged, wantActive: "current"},
+		{name: "candidate promoted restores LKG", phase: applyCandidatePromoted, wantActive: "lkg"},
+		{name: "rolling back restores LKG", phase: applyRollingBack, wantActive: "lkg"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+			s := New(Options{Logf: func(string, ...any) {}})
+			if err := s.ensurePaths(); err != nil {
+				t.Fatal(err)
+			}
+			if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte("current")); err != nil {
+				t.Fatal(err)
+			}
+			if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), []byte("lkg")); err != nil {
+				t.Fatal(err)
+			}
+			if err := writeAtomicPrivate(s.paths.RuntimeCandidateFile(), []byte("candidate")); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.writeApplyJournal(runtimeApplyJournal{Phase: test.phase}); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.reconcileRuntimeApply(); err != nil {
+				t.Fatal(err)
+			}
+			active, err := os.ReadFile(s.paths.RuntimeConfigFile())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(active) != test.wantActive {
+				t.Fatalf("active = %q, want %q", active, test.wantActive)
+			}
+			for _, path := range []string{s.paths.RuntimeCandidateFile(), s.paths.RuntimeApplyJournalFile()} {
+				if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("reconciliation left %s: %v", path, err)
+				}
+			}
+		})
+	}
+}
+
+func TestRuntimeApplyRollbackFailurePreservesJournal(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+	s := New(Options{Logf: func(string, ...any) {}})
+	if err := s.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	view, err := s.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, _ := parseRuntimeDocument([]byte(view.CandidateTOML))
+	setRuntimePath(document, "logging.level", "debug")
+	candidate, _ := toml.Marshal(document)
+	blocker, err := net.Listen("tcp", "127.0.0.1:6680")
+	if err != nil {
+		t.Skipf("fixed runtime port unavailable for rollback-failure test: %v", err)
+	}
+	defer blocker.Close()
+
+	if _, err := s.ApplyRuntimeConfigAsync(
+		context.Background(),
+		view.BaseFingerprint,
+		string(candidate),
+		false,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var journal runtimeApplyJournal
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		data, readErr := os.ReadFile(s.paths.RuntimeApplyJournalFile())
+		if readErr == nil {
+			if err := json.Unmarshal(data, &journal); err != nil {
+				t.Fatal(err)
+			}
+			if journal.RollbackError != "" && !s.RuntimeSnapshot().OperationActive {
+				break
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if snapshot := s.RuntimeSnapshot(); snapshot.Phase != RuntimeFailed || snapshot.OperationActive {
+		t.Fatalf("rollback failure snapshot = %+v", snapshot)
+	}
+	if journal.Phase != applyRollingBack || journal.CandidateError == "" || journal.RollbackError == "" {
+		t.Fatalf("rollback failure journal = %+v", journal)
+	}
+	_ = s.cleanupRuntimeApply()
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -212,7 +212,8 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 	mux.HandleFunc("/__onb/runtime/config", d.handleRuntimeConfigRead)
 	mux.HandleFunc("/__onb/runtime/config/validate", d.handleRuntimeConfigValidate)
 	mux.HandleFunc("/__onb/runtime/config/patch-network", d.handleRuntimeConfigPatchNetwork)
-	mux.HandleFunc("/__onb/network", d.handleNetworkSave)
+	mux.HandleFunc("/__onb/runtime/config/apply", d.handleRuntimeConfigApply)
+	mux.HandleFunc("/__onb/runtime/config/restore", d.handleRuntimeConfigRestore)
 
 	mux.HandleFunc("/__onb/pick-cache", func(w http.ResponseWriter, r *http.Request) { d.pickDashboardDir(w, "Choose model cache location") })
 	mux.HandleFunc("/__onb/open", func(w http.ResponseWriter, r *http.Request) {
@@ -246,6 +247,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 	mux.HandleFunc("/__onb/legal/license", serveLegalText("licenses/GPL-3.0.txt"))
 	mux.HandleFunc("/__onb/legal/third-party", serveLegalText("licenses/THIRD_PARTY_NOTICES.txt"))
 	mux.HandleFunc("/__onb/legal/terms", handleTermsOfUse)
+	mux.HandleFunc("/__onb/", http.NotFound)
 
 	// Everything else serves the embedded control-panel bundle, with a SPA
 	// fallback to index.html for any path that is not a built asset.

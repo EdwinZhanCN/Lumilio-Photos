@@ -2,6 +2,11 @@
   import { untrack } from "svelte";
   import { api } from "../../lib/api.ts";
   import { t } from "../../lib/i18n.svelte.ts";
+  import {
+    acceptRuntimeValidation,
+    loadRuntimeDraft,
+    runtimeDraft,
+  } from "../../lib/runtime-draft.svelte.ts";
   import { refreshState, store } from "../../lib/store.svelte.ts";
   import type { NetworkInfo, NetworkMode } from "../../lib/types.ts";
 
@@ -85,21 +90,36 @@
     message = "";
     error = "";
     try {
-      const result = await api.saveNetwork({
-        mode,
-        primaryOrigin,
-        listen,
-        proxyLocation,
-        trustedProxyCIDRs: trustedCIDRs
-          .split(/\s+/)
-          .map((value) => value.trim())
-          .filter(Boolean),
+      if (!runtimeDraft.view) await loadRuntimeDraft(session);
+      if (!runtimeDraft.view) {
+        throw new Error(runtimeDraft.error || t("runtimeConfigurationUnavailable"));
+      }
+      const validation = await api.patchRuntimeNetwork({
+        baseFingerprint: runtimeDraft.view.baseFingerprint,
+        toml: runtimeDraft.candidateToml,
+        network: {
+          mode,
+          primaryOrigin,
+          listen,
+          proxyLocation,
+          trustedProxyCIDRs: trustedCIDRs
+            .split(/\s+/)
+            .map((value) => value.trim())
+            .filter(Boolean),
+          acceptLANWarning,
+        },
+      });
+      acceptRuntimeValidation(validation);
+      if (!validation.valid) {
+        throw new Error(validation.issues.map((issue) => issue.message).join("; "));
+      }
+      await api.applyRuntimeConfig({
+        baseFingerprint: runtimeDraft.view.baseFingerprint,
+        toml: validation.candidateToml,
         acceptLANWarning,
       });
-      message = result.rpIDChanged ? t("networkRPWarning") : t("networkSaved");
-      await refreshState();
-      seed();
-      message = result.rpIDChanged ? t("networkRPWarning") : t("networkSaved");
+      message = t("networkApplyAccepted");
+      setTimeout(() => void refreshState(), 250);
       return true;
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
