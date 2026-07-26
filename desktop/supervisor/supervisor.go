@@ -54,18 +54,36 @@ var ErrStorageUnreachable = errors.New("configured storage location is unreachab
 // browser would silently reach the foreign process instead — showing a 404.
 var ErrPortInUse = errors.New("the app port is already in use")
 
+// ErrOperationInProgress reports that another lifecycle mutation already owns
+// the serialized runtime operation gate.
+var ErrOperationInProgress = errors.New("a desktop runtime operation is already in progress")
+
+// ErrRuntimeGenerationActive prevents a second server/app generation from
+// starting before the previous generation has proved it released listeners,
+// River workers, and SQLite.
+var ErrRuntimeGenerationActive = errors.New("the previous desktop runtime generation is still active")
+
+// ErrRuntimeStopTimeout means cancellation was requested but generation.done
+// did not close within the shutdown budget. Ownership is retained.
+var ErrRuntimeStopTimeout = errors.New("desktop runtime shutdown timed out")
+
 // Supervisor owns the desktop runtime lifecycle. Start it once on app launch and
-// Stop it on quit.
+// Close it on quit. Runtime restarts do not release the host instance lock.
 type Supervisor struct {
 	logf             func(string, ...any)
 	onStage          func(string)
+	onSnapshot       func(RuntimeSnapshot)
 	operatorControls app.OperatorControls
 
 	paths *Paths
 	lock  *InstanceLock
 
-	cancel    context.CancelFunc
-	serverErr chan error
+	operationMu sync.Mutex
+	generation  *runtimeGeneration
+	stopTimeout time.Duration
+
+	snapshotMu sync.RWMutex
+	snapshot   RuntimeSnapshot
 
 	warnings []string
 	// pendingStorageRoot migrates the pre-Storage-Location desktop setting after
@@ -74,10 +92,6 @@ type Supervisor struct {
 
 	repositoryMu      sync.RWMutex
 	repositoryManager app.RepositoryControl
-
-	networkMu       sync.RWMutex
-	activeNetwork   DesktopSettings
-	networkChangeMu sync.Mutex
 }
 
 // Options configures a Supervisor.
@@ -90,6 +104,10 @@ type Options struct {
 	// non-UI goroutine, so the host must marshal to its UI thread itself.
 	OnStage func(stage string)
 
+	// OnSnapshot receives the same typed runtime state consumed by the private
+	// panel. It is invoked outside the snapshot mutex.
+	OnSnapshot func(snapshot RuntimeSnapshot)
+
 	// OperatorControls are explicit controls for this single desktop launch.
 	// They are never persisted to desktop settings or the generated manifest.
 	OperatorControls app.OperatorControls
@@ -101,7 +119,12 @@ func New(opts Options) *Supervisor {
 	if logf == nil {
 		logf = log.Printf
 	}
-	s := &Supervisor{logf: logf, onStage: opts.OnStage, operatorControls: opts.OperatorControls}
+	s := &Supervisor{
+		logf: logf, onStage: opts.OnStage, onSnapshot: opts.OnSnapshot,
+		operatorControls: opts.OperatorControls,
+		stopTimeout:      serverStopTimeout,
+		snapshot:         initialRuntimeSnapshot(),
+	}
 	hostHook := s.operatorControls.RepositoryManagerReady
 	s.operatorControls.RepositoryManagerReady = func(manager app.RepositoryControl) {
 		s.repositoryMu.Lock()
@@ -156,6 +179,9 @@ func (s *Supervisor) RepositoryControl() (app.RepositoryControl, error) {
 // a new phase.
 func (s *Supervisor) reportStage(stage string) {
 	s.logf("desktop stage: %s", stage)
+	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
+		snapshot.Stage = stage
+	})
 	if s.onStage != nil {
 		s.onStage(stage)
 	}
@@ -256,10 +282,7 @@ func StorageReachable(path string) bool { return storageReachable(path) }
 // ServerURL is the canonical browser origin the desktop host opens. It is
 // independent from the internal readiness address.
 func (s *Supervisor) ServerURL() string {
-	s.networkMu.RLock()
-	origin := s.activeNetwork.PrimaryOrigin
-	s.networkMu.RUnlock()
-	if origin != "" {
+	if origin := s.RuntimeSnapshot().BrowserURL; origin != "" {
 		return origin
 	}
 	settings, err := s.Settings()
@@ -301,73 +324,93 @@ func LANAddresses() []string {
 	return addresses
 }
 
-// Start generates runtime configuration and launches the API server in-process.
-// SQLite creation and migration happen inside app.Run through the same runtime
-// boundary as standalone. It returns once the server is accepting requests so
-// the caller can show the UI window, or an error if any step fails.
-func (s *Supervisor) Start(ctx context.Context) (err error) {
-	s.reportStage(StagePreparing)
+// Prepare acquires the host-level single-instance lock. Runtime failures and
+// restarts do not release it; only Close ends the Desktop host lifetime.
+func (s *Supervisor) Prepare() error {
+	s.operationMu.Lock()
+	defer s.operationMu.Unlock()
+	return s.prepareLocked()
+}
+
+func (s *Supervisor) prepareLocked() error {
 	if err := s.ensurePaths(); err != nil {
 		return err
 	}
-	paths := s.paths
-	networkSettings, err := s.Settings()
-	if err != nil {
-		return fmt.Errorf("load desktop network settings: %w", err)
+	if s.lock != nil {
+		return nil
 	}
-
-	lock, err := AcquireLock(paths.LockFile())
+	lock, err := AcquireLock(s.paths.LockFile())
 	if err != nil {
 		return err
 	}
 	s.lock = lock
+	return nil
+}
 
-	defer func() {
-		if err == nil {
-			return
-		}
-		// Signal the in-process server goroutine (if launched) to shut down;
-		// the host is about to show an error and quit, so it is not awaited.
-		if s.cancel != nil {
-			s.cancel()
-			s.cancel = nil
-		}
-		if s.lock != nil {
-			_ = s.lock.Release()
-			s.lock = nil
-		}
-	}()
-
-	// Fail fast before starting the in-process runtime if the app port is taken. The
-	// single-instance lock already prevents a second desktop instance, so a busy
-	// port means a foreign process — otherwise the in-process server would boot,
-	// fail to bind, tear itself down, and leave the browser reaching the squatter.
-	if err := s.checkListenAvailable(networkSettings.Listen); err != nil {
+// Start launches the first runtime generation. It leaves the host lock held if
+// startup fails so the Wails recovery dashboard remains the sole host owner.
+func (s *Supervisor) Start(ctx context.Context) error {
+	if !s.operationMu.TryLock() {
+		return ErrOperationInProgress
+	}
+	defer s.operationMu.Unlock()
+	if err := s.prepareLocked(); err != nil {
+		s.failRuntime(err)
 		return err
 	}
+	return s.startRuntimeLocked(ctx, RuntimeStarting)
+}
 
+func (s *Supervisor) startRuntimeLocked(ctx context.Context, phase RuntimePhase) error {
+	if err := s.reapFinishedGenerationLocked(); err != nil {
+		s.logf("previous desktop runtime generation exited with error: %v", err)
+	}
+	if s.generation != nil {
+		return ErrRuntimeGenerationActive
+	}
+
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = phase
+	snapshot.Stage = StagePreparing
+	snapshot.ErrorCode = ""
+	snapshot.ErrorMessage = ""
+	snapshot.OperationActive = true
+	s.setSnapshot(snapshot)
+	s.reportStage(StagePreparing)
+
+	paths := s.paths
+	networkSettings, err := s.Settings()
+	if err != nil {
+		err = fmt.Errorf("load desktop network settings: %w", err)
+		s.failRuntime(err)
+		return err
+	}
 	resources, err := ResourcesDir()
 	if err != nil {
-		return fmt.Errorf("resolve resources dir: %w", err)
+		err = fmt.Errorf("resolve resources dir: %w", err)
+		s.failRuntime(err)
+		return err
 	}
 	if vipsHome := bundledVipsHome(resources); vipsHome != "" && os.Getenv("VIPSHOME") == "" {
 		if err := os.Setenv("VIPSHOME", vipsHome); err != nil {
-			return fmt.Errorf("set VIPSHOME: %w", err)
+			err = fmt.Errorf("set VIPSHOME: %w", err)
+			s.failRuntime(err)
+			return err
 		}
 	}
-
-	// Strip Gatekeeper quarantine from bundled media tools. Done every launch
-	// (idempotent, non-fatal) so updates cannot block ffmpeg/exiftool execution.
 	if err := stripQuarantine(resources); err != nil {
 		s.logf("quarantine cleanup (non-fatal): %v", err)
 	}
 
 	storagePath, err := s.resolveStoragePath()
 	if err != nil {
+		s.failRuntime(err)
 		return err
 	}
 	if err := os.MkdirAll(storagePath, 0o755); err != nil {
-		return fmt.Errorf("create storage path %s: %w", storagePath, err)
+		err = fmt.Errorf("create storage path %s: %w", storagePath, err)
+		s.failRuntime(err)
+		return err
 	}
 
 	s.reportStage(StageStartingServer)
@@ -387,58 +430,206 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 		LumenStaticNode: lumen.GRPCEndpoint,
 	})
 	if err != nil {
-		return fmt.Errorf("compile desktop server manifest: %w", err)
+		err = fmt.Errorf("compile desktop server manifest: %w", err)
+		s.failRuntime(err)
+		return err
 	}
-	s.networkMu.Lock()
-	s.activeNetwork = networkSettings
-	s.networkMu.Unlock()
+	network := networkSummaryFromConfig(appConfig)
+	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
+		snapshot.BrowserURL = appConfig.ServerConfig.PrimaryOrigin
+		snapshot.Network = network
+	})
 
-	// Run the API server in-process. It blocks until srvCtx is cancelled (Stop)
-	// and then performs its own graceful shutdown.
+	// Check the resolved listener immediately before generation creation. A
+	// foreign listener must not be mistaken for successful readiness.
+	if err := s.checkListenAvailable(appConfig.ServerConfig.Listen); err != nil {
+		s.failRuntime(err)
+		return err
+	}
+
 	srvCtx, cancel := context.WithCancel(ctx)
-	s.cancel = cancel
-	s.serverErr = make(chan error, 1)
-	go func() { s.serverErr <- app.Run(srvCtx, appConfig, s.operatorControls) }()
+	generation := &runtimeGeneration{cancel: cancel, done: make(chan struct{})}
+	s.generation = generation
+	go func() {
+		generation.err = app.Run(srvCtx, appConfig, s.operatorControls)
+		close(generation.done)
+	}()
 
-	if err := s.waitForServer(ctx); err != nil {
+	if err := s.waitForServer(ctx, generation, appConfig.ServerConfig.Listen); err != nil {
+		if stopErr := s.stopGenerationLocked(); stopErr != nil {
+			err = errors.Join(err, stopErr)
+		}
+		s.failRuntime(err)
 		return err
 	}
 	s.reportStage(StageReady)
-	s.logf("desktop runtime ready at %s", s.ServerURL())
+	snapshot = s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeRunning
+	snapshot.Stage = StageReady
+	snapshot.ErrorCode = ""
+	snapshot.ErrorMessage = ""
+	snapshot.OperationActive = false
+	s.setSnapshot(snapshot)
+	s.logf("desktop runtime ready at %s", snapshot.BrowserURL)
 	return nil
 }
 
-// Stop drains the API/SQLite runtime and releases the single-instance lock. It
-// is safe to call more than once.
-func (s *Supervisor) Stop() error {
-	var firstErr error
-	setErr := func(err error) {
-		if err != nil && firstErr == nil {
-			firstErr = err
-		}
+// StopRuntime drains only the current Server generation. It never releases the
+// host lock. A timeout leaves generation ownership intact.
+func (s *Supervisor) StopRuntime() error {
+	if !s.operationMu.TryLock() {
+		return ErrOperationInProgress
 	}
+	defer s.operationMu.Unlock()
+	return s.stopRuntimeLocked()
+}
 
-	if s.cancel != nil {
-		s.cancel()
-		select {
-		case err := <-s.serverErr:
-			if err != nil {
-				s.logf("api server shutdown error: %v", err)
-				setErr(err)
-			}
-		case <-time.After(serverStopTimeout):
-			s.logf("api server shutdown timed out after %s", serverStopTimeout)
-		}
-		s.cancel = nil
+func (s *Supervisor) stopRuntimeLocked() error {
+	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
+		snapshot.OperationActive = true
+	})
+	err := s.stopGenerationLocked()
+	if err != nil {
+		s.failRuntime(err)
+		return err
 	}
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeStopped
+	snapshot.Stage = ""
+	snapshot.ErrorCode = ""
+	snapshot.ErrorMessage = ""
+	snapshot.OperationActive = false
+	s.setSnapshot(snapshot)
+	return nil
+}
 
+func (s *Supervisor) stopGenerationLocked() error {
+	generation := s.generation
+	if generation == nil {
+		return nil
+	}
+	s.clearRepositoryControl()
+	generation.cancel()
+	timeout := s.stopTimeout
+	if timeout <= 0 {
+		timeout = serverStopTimeout
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-generation.done:
+		s.generation = nil
+		if generation.err != nil {
+			s.logf("api server shutdown error: %v", generation.err)
+			return generation.err
+		}
+		return nil
+	case <-timer.C:
+		err := fmt.Errorf("%w after %s", ErrRuntimeStopTimeout, timeout)
+		s.logf("%v", err)
+		return err
+	}
+}
+
+func (s *Supervisor) reapFinishedGenerationLocked() error {
+	if s.generation == nil {
+		return nil
+	}
+	select {
+	case <-s.generation.done:
+		generation := s.generation
+		s.generation = nil
+		return generation.err
+	default:
+		return nil
+	}
+}
+
+func (s *Supervisor) clearRepositoryControl() {
+	s.repositoryMu.Lock()
+	s.repositoryManager = nil
+	s.repositoryMu.Unlock()
+}
+
+func (s *Supervisor) failRuntime(err error) {
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeFailed
+	snapshot.ErrorCode = runtimeErrorCode(err)
+	snapshot.ErrorMessage = runtimeErrorMessage(err)
+	snapshot.OperationActive = false
+	s.setSnapshot(snapshot)
+}
+
+// Restart synchronously replaces the current generation while retaining the
+// host lock. It is used by tests and internal apply flows.
+func (s *Supervisor) Restart(ctx context.Context) error {
+	if !s.operationMu.TryLock() {
+		return ErrOperationInProgress
+	}
+	defer s.operationMu.Unlock()
+	return s.restartLocked(ctx)
+}
+
+func (s *Supervisor) restartLocked(ctx context.Context) error {
+	if err := s.prepareLocked(); err != nil {
+		s.failRuntime(err)
+		return err
+	}
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeRestarting
+	snapshot.ErrorCode = ""
+	snapshot.ErrorMessage = ""
+	snapshot.OperationActive = true
+	s.setSnapshot(snapshot)
+	if err := s.stopGenerationLocked(); err != nil {
+		s.failRuntime(err)
+		return err
+	}
+	return s.startRuntimeLocked(ctx, RuntimeRestarting)
+}
+
+// RestartAsync claims the operation gate before returning so concurrent panel
+// requests receive ErrOperationInProgress deterministically.
+func (s *Supervisor) RestartAsync(ctx context.Context) error {
+	if !s.operationMu.TryLock() {
+		return ErrOperationInProgress
+	}
+	go func() {
+		defer s.operationMu.Unlock()
+		_ = s.restartLocked(ctx)
+	}()
+	return nil
+}
+
+// Close drains the Runtime and releases the host lock. If the generation does
+// not stop, the lock remains held until process exit so a second Desktop host
+// cannot race the still-owned SQLite/listener generation.
+func (s *Supervisor) Close() error {
+	s.operationMu.Lock()
+	defer s.operationMu.Unlock()
+	stopErr := s.stopGenerationLocked()
+	if stopErr != nil {
+		s.failRuntime(stopErr)
+		return stopErr
+	}
+	var lockErr error
 	if s.lock != nil {
-		setErr(s.lock.Release())
+		lockErr = s.lock.Release()
 		s.lock = nil
 	}
-
-	return firstErr
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeStopped
+	snapshot.Stage = ""
+	snapshot.ErrorCode = ""
+	snapshot.ErrorMessage = ""
+	snapshot.OperationActive = false
+	s.setSnapshot(snapshot)
+	return lockErr
 }
+
+// Stop is retained as a host-shutdown compatibility alias. Runtime restart
+// code must use StopRuntime/restartLocked so it cannot release the host lock.
+func (s *Supervisor) Stop() error { return s.Close() }
 
 // resolveStoragePath returns the machine-local default Storage Location. A
 // pre-Storage-Location user choice is migrated as an external authorized root
@@ -484,20 +675,18 @@ func (s *Supervisor) checkListenAvailable(address string) error {
 	return ln.Close()
 }
 
-// waitForServer polls the health endpoint until the server responds or fails.
-func (s *Supervisor) waitForServer(ctx context.Context) error {
-	s.networkMu.RLock()
-	listen := s.activeNetwork.Listen
-	s.networkMu.RUnlock()
+// waitForServer polls the generation's internal health endpoint until it
+// responds or the exact generation exits.
+func (s *Supervisor) waitForServer(ctx context.Context, generation *runtimeGeneration, listen string) error {
 	url := internalHealthURL(listen)
 	client := &http.Client{Timeout: 2 * time.Second}
 	deadline := time.Now().Add(serverReadyTimeout)
 
 	for {
 		select {
-		case err := <-s.serverErr:
-			if err != nil {
-				return fmt.Errorf("api server exited during startup: %w", err)
+		case <-generation.done:
+			if generation.err != nil {
+				return fmt.Errorf("api server exited during startup: %w", generation.err)
 			}
 			return errors.New("api server exited during startup")
 		case <-ctx.Done():
@@ -538,8 +727,10 @@ func internalHealthURL(listen string) string {
 // ApplyNetworkSettings validates and atomically persists a candidate, restarts
 // the runtime, and restores the last-known-good settings if startup fails.
 func (s *Supervisor) ApplyNetworkSettings(ctx context.Context, candidate DesktopSettings) error {
-	s.networkChangeMu.Lock()
-	defer s.networkChangeMu.Unlock()
+	if !s.operationMu.TryLock() {
+		return ErrOperationInProgress
+	}
+	defer s.operationMu.Unlock()
 
 	current, err := s.Settings()
 	if err != nil {
@@ -553,22 +744,27 @@ func (s *Supervisor) ApplyNetworkSettings(ctx context.Context, candidate Desktop
 		return err
 	}
 
-	wasRunning := s.cancel != nil
+	wasRunning := s.generation != nil
 	if !wasRunning {
 		return nil
 	}
-	if err := s.Stop(); err != nil {
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeRestarting
+	snapshot.OperationActive = true
+	s.setSnapshot(snapshot)
+	if err := s.stopGenerationLocked(); err != nil {
 		_ = s.SaveSettings(current)
+		s.failRuntime(err)
 		return fmt.Errorf("stop desktop runtime for network change: %w", err)
 	}
-	if err := s.Start(ctx); err == nil {
+	if err := s.startRuntimeLocked(ctx, RuntimeRestarting); err == nil {
 		return nil
 	} else {
 		startErr := err
 		if restoreErr := s.SaveSettings(current); restoreErr != nil {
 			return errors.Join(startErr, fmt.Errorf("restore last-known-good settings: %w", restoreErr))
 		}
-		if rollbackErr := s.Start(ctx); rollbackErr != nil {
+		if rollbackErr := s.startRuntimeLocked(ctx, RuntimeRestarting); rollbackErr != nil {
 			return errors.Join(startErr, fmt.Errorf("restart last-known-good network profile: %w", rollbackErr))
 		}
 		return fmt.Errorf("network profile rejected; restored last-known-good settings: %w", startErr)

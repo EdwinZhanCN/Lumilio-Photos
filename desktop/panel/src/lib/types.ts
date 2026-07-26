@@ -73,6 +73,33 @@ export interface NetworkInfo {
   lanAddresses: string[];
 }
 
+export type RuntimePhase = "stopped" | "starting" | "running" | "restarting" | "failed";
+
+export interface RuntimeNetworkSummary {
+  mode: NetworkMode;
+  listen: string;
+  primaryOrigin: string;
+  tlsMode: "off" | "external";
+  proxyMode: "disabled" | "required";
+  passkeyOrigin: string;
+  rpID: string;
+  passkeyEnabled: boolean;
+  remotePasskeyAvailable: boolean;
+}
+
+export interface RuntimeSnapshot {
+  phase: RuntimePhase;
+  stage?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  browserURL?: string;
+  canOpen: boolean;
+  canRestart: boolean;
+  lastKnownGoodAvailable: boolean;
+  network: RuntimeNetworkSummary;
+  operationActive: boolean;
+}
+
 export interface PanelState {
   mode: "onboarding" | "dashboard";
   lang: string;
@@ -81,6 +108,8 @@ export interface PanelState {
   validation: Validation;
   version: string;
   tosRev: string;
+  runtime: RuntimeSnapshot;
+  /** Temporary compatibility fields removed after the Dashboard migration. */
   ready: boolean;
   serverURL: string;
   stage: string;

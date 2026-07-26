@@ -75,6 +75,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		}
 		choices, _ := lumen.BackendChoicesForHost()
 		hubStatus := d.lumenStatusSnapshot()
+		runtime := d.sup.RuntimeSnapshot()
 		ramGB := totalMemoryGB()
 		recommended := lumen.RecommendPreset(ramGB, float64(cacheValidation.FreeBytes)/(1<<30))
 		writeJSON(w, map[string]any{
@@ -85,9 +86,10 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			"validation": validateStorage(path),
 			"version":    appVersion(),
 			"tosRev":     tosVersion,
-			"ready":      d.ready,
-			"serverURL":  d.sup.ServerURL(),
-			"stage":      d.status,
+			"runtime":    runtime,
+			"ready":      runtime.Phase == supervisor.RuntimeRunning,
+			"serverURL":  runtime.BrowserURL,
+			"stage":      runtime.Stage,
 			"paths":      paths,
 			"network": map[string]any{
 				"mode": settings.NetworkMode, "primaryOrigin": settings.PrimaryOrigin,
@@ -206,6 +208,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 		}
 		writeJSON(w, map[string]any{"ok": true, "region": settings.Region})
 	})
+	mux.HandleFunc("/__onb/runtime/restart", d.handleRuntimeRestart)
 	mux.HandleFunc("/__onb/network", d.handleNetworkSave)
 
 	mux.HandleFunc("/__onb/pick-cache", func(w http.ResponseWriter, r *http.Request) { d.pickDashboardDir(w, "Choose model cache location") })

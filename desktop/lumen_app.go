@@ -311,7 +311,7 @@ func (d *desktopApp) lumenLogPath() string {
 // appendLumenMenu adds the local-AI section to the tray menu. Hidden until the
 // runtime is up, and entirely absent on hosts with no hub build (Intel macs).
 func (d *desktopApp) appendLumenMenu(menu *application.Menu) {
-	if !d.ready {
+	if d.sup.RuntimeSnapshot().Phase != supervisor.RuntimeRunning {
 		return
 	}
 	if _, err := lumen.ProfileForHost(); err != nil {

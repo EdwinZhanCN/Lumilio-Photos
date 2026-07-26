@@ -37,6 +37,25 @@ type networkSaveRequest struct {
 	AcceptLANWarning  bool                   `json:"acceptLANWarning"`
 }
 
+func (d *desktopApp) handleRuntimeRestart(w http.ResponseWriter, _ *http.Request) {
+	if err := d.sup.RestartAsync(d.ctx); err != nil {
+		if errors.Is(err, supervisor.ErrOperationInProgress) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			writeJSON(w, map[string]any{
+				"code":    "operation_in_progress",
+				"message": err.Error(),
+			})
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	writeJSON(w, map[string]any{"accepted": true})
+}
+
 func (d *desktopApp) handleNetworkSave(w http.ResponseWriter, r *http.Request) {
 	var body networkSaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

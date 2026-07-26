@@ -36,7 +36,16 @@ export type ServiceStatus = "running" | "starting" | "off" | "failed" | "disable
 const busyStates = new Set(["installing", "starting", "checking", "stopping"]);
 
 export function photosStatus(d: PanelState): ServiceStatus {
-  return d.ready ? "running" : "starting";
+  switch (d.runtime.phase) {
+    case "running":
+      return "running";
+    case "failed":
+      return "failed";
+    case "stopped":
+      return "off";
+    default:
+      return "starting";
+  }
 }
 
 export function hubStatus(d: PanelState): ServiceStatus {
@@ -49,7 +58,12 @@ export function hubStatus(d: PanelState): ServiceStatus {
 }
 
 export function anyServiceBusy(d: PanelState): boolean {
-  return !d.ready || busyStates.has(d.lumen.state);
+  return (
+    d.runtime.phase === "starting" ||
+    d.runtime.phase === "restarting" ||
+    d.runtime.operationActive ||
+    busyStates.has(d.lumen.state)
+  );
 }
 
 export function hubUpdateAvailable(d: PanelState): boolean {
