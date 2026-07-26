@@ -6,15 +6,15 @@
   import { hubStatus, hubUpdateAvailable, refreshState, store } from "../../lib/store.svelte.ts";
   import type { LumenAction } from "../../lib/types.ts";
   import StatusBadge from "../shared/StatusBadge.svelte";
-  import ConfigureDialog from "./ConfigureDialog.svelte";
 
   const data = $derived(store.data!);
   const lumen = $derived(data.lumen);
   const status = $derived(hubStatus(data));
   const offLike = $derived(status === "off" || status === "disabled");
+  let { onOpenSettings }: { onOpenSettings: () => void } = $props();
+
   const updateAvailable = $derived(hubUpdateAvailable(data));
 
-  let configureOpen = $state(false);
   let actionError = $state("");
 
   const configSummary = $derived(
@@ -68,7 +68,7 @@
             </DropdownMenu.Item>
             <DropdownMenu.Item
               class="cursor-pointer px-3 py-2 text-left text-xs hover:bg-accent-soft focus:bg-accent-soft focus:outline-none"
-              onSelect={() => (configureOpen = true)}
+              onSelect={onOpenSettings}
             >
               {t("configure")}
             </DropdownMenu.Item>
@@ -151,11 +151,9 @@
           {t("update")}
         </button>
       {/if}
-      <button class="btn btn-ghost btn-sm" onclick={() => (configureOpen = true)}>
+      <button class="btn btn-ghost btn-sm" onclick={onOpenSettings}>
         {t("configure")}
       </button>
     </div>
   </div>
 </article>
-
-<ConfigureDialog bind:open={configureOpen} />

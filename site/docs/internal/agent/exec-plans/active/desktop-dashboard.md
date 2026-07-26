@@ -1819,7 +1819,23 @@ rollback
     long-value visual matrix because the connected runtime reported no available browser
     (`agent.browsers.list() == []`). The deterministic mock states remain available and the
     visual matrix stays a final DoD item rather than being claimed as observed.
-- [ ] Phase 3：Unified Settings
+- [x] Phase 3：Unified Settings
+  - Replaced the inline Settings panel and standalone Lumen Configure dialog with one
+    focus-managed `SettingsDialog` containing General, Server, and Lumen tabpanels.
+  - Header Settings opens General, both Server settings/recovery actions open Server, and both
+    Lumen Configure affordances open Lumen. There is no second settings or Lumen form.
+  - General reuses `RegionSelect`; ServerSettingsForm preserves the complete local/LAN
+    HTTP/external HTTPS form, LAN acknowledgement, RP-ID warning, and the existing temporary
+    `/__onb/network` apply route; LumenSettingsForm reuses BackendPicker, PresetPicker, PathPicker,
+    save payload, and the two-step cache-move confirmation.
+  - All forms seed once per dialog-open session so background runtime polls cannot overwrite an
+    edit. Tab switches preserve edits; unsaved tabs carry a visible semantic status dot; overlay,
+    Escape, Close, and Cancel use one dirty-close confirmation.
+  - The footer follows the active tab: Save changes, Apply and restart, or Move and save. Save is
+    disabled for a clean form, while saving, or until the LAN risk acknowledgement is checked.
+  - Verification: `make desktop-test` passed with Svelte diagnostics at 0 errors / 0 warnings;
+    Panel `vp check --fix`, `vp test` (1 file / 7 tests), and production build (685 modules)
+    passed.
 - [ ] Phase 4：Runtime intent/TOML
 - [ ] Phase 5：Apply/Rollback
 - [ ] Phase 6：Mock/A11y/i18n/cleanup
@@ -1843,6 +1859,8 @@ rollback
 | 2026-07-26 | 只有`ErrAlreadyRunning`是host-fatal startup error | 其他错误都可由同一Wails host恢复 | port/config/database失败不再直接Quit |
 | 2026-07-26 | Dashboard cards use daisyUI semantic card/alert/button/status primitives and a single native-details collapse | Existing panel already uses daisyUI; these primitives preserve keyboard semantics and theme tokens without adding another design system | Runtime hierarchy is compact and responsive; Support stays one disclosure rather than nested panels |
 | 2026-07-26 | Phase 2 Settings scroll target and Lumen Configure dialog are temporary compatibility bridges | Phase 2 must preserve all actions while Phase 3 owns the unified modal extraction | No duplicated forms are introduced; both bridges are removed in Phase 3 |
+| 2026-07-26 | Keep all three Settings forms mounted for an open session | Tab navigation must not discard edits and background polls must not clobber them | Each form re-seeds only when the dialog session increments; dirty state spans tabs and guards close |
+| 2026-07-26 | Keep `/__onb/network` only as the Phase 3 ServerSettings transport | Unified UI and runtime-intent replacement are intentionally separate commits | Existing Network behavior remains testable until Phase 5 atomically replaces and removes the legacy route |
 
 ## Surprises & Discoveries
 
@@ -1863,6 +1881,10 @@ rollback
   browser instance. Per the Browser skill, visual claims were not substituted with an unrelated
   automation stack; the mock query matrix records the intended observable states for a later
   connected-browser pass.
+- The first Phase 3 full gate found one stale dropdown assignment to the deleted
+  `configureOpen` variable that the faster `vp check --fix` command did not report. The embedded
+  panel's `svelte-check` did report it; routing that item to the shared Lumen tab fixed the only
+  failure, and the complete rerun passed.
 
 ## Outcomes & Retrospective
 
