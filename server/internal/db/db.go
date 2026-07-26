@@ -9,11 +9,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
 	"server/config"
 	"server/internal/db/repo"
+	"server/platform/fsprivacy"
+	"server/platform/sqliteuri"
 
 	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
@@ -64,7 +67,7 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 
 	registerVectorExtension.Do(sqlitevec.Auto)
 
-	dsn := (&url.URL{Scheme: "file", Path: path}).String()
+	dsn := sqliteuri.DSN(path, nil)
 	database, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open SQLite catalog %s: %w", safeLocation(path), err)
@@ -90,7 +93,7 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	if err := validateIntegrity(ctx, database); err != nil {
 		return closeOnError("validate", err)
 	}
-	if err := os.Chmod(path, fileMode); err != nil {
+	if err := fsprivacy.ApplyFileMode(path, fileMode); err != nil {
 		return closeOnError("secure", err)
 	}
 
@@ -164,15 +167,13 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	cleanPath = filepath.Clean(cleanPath)
 
 	registerVectorExtension.Do(sqlitevec.Auto)
-	location := &url.URL{Scheme: "file", Path: cleanPath}
-	query := location.Query()
+	query := make(url.Values)
 	query.Set("mode", "ro")
 	if immutable {
 		query.Set("immutable", "1")
 	}
-	location.RawQuery = query.Encode()
 
-	database, err := sql.Open("sqlite3", location.String())
+	database, err := sql.Open("sqlite3", sqliteuri.DSN(cleanPath, query))
 	if err != nil {
 		return CatalogInfo{}, fmt.Errorf("open SQLite catalog snapshot %s: %w", safeLocation(cleanPath), err)
 	}
@@ -277,16 +278,35 @@ func normalizePath(value string) (string, error) {
 func ensurePrivateParent(path string) error {
 	parent := filepath.Dir(path)
 	info, err := os.Stat(parent)
+	created := false
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		if err := os.MkdirAll(parent, directoryMode); err != nil {
 			return fmt.Errorf("create SQLite parent directory %s: %w", safeLocation(parent), err)
 		}
+		created = true
 	case err != nil:
 		return fmt.Errorf("inspect SQLite parent directory %s: %w", safeLocation(parent), err)
 	case !info.IsDir():
 		return fmt.Errorf("SQLite parent path %s is not a directory", safeLocation(parent))
-	case info.Mode().Perm()&0o077 != 0:
+	}
+
+	if created || runtime.GOOS == "windows" {
+		if err := fsprivacy.ApplyDirectoryMode(parent, directoryMode); err != nil {
+			return fmt.Errorf("protect SQLite parent directory %s: %w", safeLocation(parent), err)
+		}
+		if runtime.GOOS == "windows" {
+			private, err := fsprivacy.IsPrivate(parent)
+			if err != nil {
+				return fmt.Errorf("verify SQLite parent directory %s: %w", safeLocation(parent), err)
+			}
+			if !private {
+				return fmt.Errorf("SQLite parent directory %s does not have a protected DACL", safeLocation(parent))
+			}
+		}
+		return nil
+	}
+	if info.Mode().Perm()&0o077 != 0 {
 		return fmt.Errorf("SQLite parent directory %s must not be accessible by group or others", safeLocation(parent))
 	}
 	return nil

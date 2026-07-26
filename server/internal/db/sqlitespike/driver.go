@@ -6,9 +6,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"sync"
+
+	"server/platform/sqliteuri"
 
 	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
@@ -26,7 +27,7 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 
 	registerVectorExtension.Do(sqlitevec.Auto)
 
-	dsn := (&url.URL{Scheme: "file", Path: absolutePath}).String()
+	dsn := sqliteuri.DSN(absolutePath, nil)
 	database, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open SQLite driver: %w", err)

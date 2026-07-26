@@ -1289,12 +1289,13 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - final ad-hoc signed macOS app 为 321,456 KiB，main binary 为 80,874,016 bytes，通过 deep/strict codesign；linked libraries、Go build metadata、strings、module graph、notices 与 bundle filenames 不含 PostgreSQL/pgx/pgvector/riverpgx/libpq。
 - release image 的 fresh、restart 与 container remove/recreate 均保持同一 `system_state.library_id`；每次 graceful stop 后由同一 container runtime 执行的离线 `PRAGMA quick_check` 均返回 `ok`。不能用 host SQLite tool 打开仍在 container mount 上运行的 catalog。
 - 小型 E2E fixture 的 browser 首屏观察约 523 ms，三个 video case 约 3.5–5.6 s 并正确定位 semantic frame。它们只证明交互路径和 seek 行为；没有测量 representative library 性能或严格 idle memory，不能据此宣称规模或内存改善。
+- draft PR 首次远端 CI 将本机无法执行的 Windows CGo path 纳入完整 Server/Desktop tests。它暴露 drive-letter path 被编码成无效 URI authority，以及 Unix mode bits 被误用于 Windows privacy validation；最终实现集中 `file:///D:/...` URI builder，并让 Windows catalog parent/file 使用 protected DACL。后续 Windows CI 必须通过才视为远端验证完成。
 
 #### Consolidated Hardening backlog
 
 - 对持续并发 import、UI browse、backup、River execution 与 WAL checkpoint/truncate 做长时间压力测试，并补全 kill -9、disk-full、prepared/orphan、interrupted job、restore rollback 多故障注入矩阵。
 - 在代表性 100k/1M vector library 上测量 exact-search latency、内存和 rebuild 成本，再决定 ANN/sidecar 阈值；当前 exact `vec0` 是正确性基线，不是无条件规模结论。
-- 完成 Windows runtime smoke、非当前 architecture runtime 与发布后的 multi-arch image 观察；持续跟踪 macOS `sqlite3_auto_extension` deprecation 和 Homebrew media library deployment-target packaging warnings。
+- 完成 Windows installer 安装/启动 smoke、非 CI architecture runtime 与发布后的 multi-arch image 观察；持续跟踪 macOS `sqlite3_auto_extension` deprecation 和 Homebrew media library deployment-target packaging warnings。
 - 当 upstream River production dependency closure 不再链接 pgx 时升级并删除窄 fork；在此之前保持 license、差异说明和 architecture/package guard。
 - 不得跨 host/container VFS 边界用 host SQLite tool 打开活动 catalog、WAL 或 SHM；live inspection 必须使用应用 Online Backup snapshot，直接离线检查只能在应用 graceful stop 后于 owning runtime 内进行。
 - 将正常 client cancellation 映射为非 500/可识别的 audit status，避免 E2E reseed 取消请求产生误导日志；这不影响 catalog 正确性或迁移完成状态。
@@ -1335,6 +1336,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - SQLite baseline required-column contract 在 broaden 后发现 registration session、duplicate group、Agent pin、share link 与 location cluster 的 UUID insert 都依赖了 PostgreSQL 时代的隐式/default 行为。统一改成 Go UUID 后，guard 同时排除了数据库侧 `randomblob()` fallback。
 - sqlc 对同一 statement 中 slice expansion 与固定 numbered parameters 的组合会生成位置错误但能编译的代码；JSON collection/typed CTE 与 generation guard 把这类问题从 runtime 移到 CI。
 - 在 macOS host 上直接用 `sqlite3` 打开 OrbStack/Linux bind mount 中仍活动的 catalog 会跨 VFS/WAL boundary 干扰数据库，并曾导致下一次启动报告 malformed。隔离目录重做后，所有检查只在 graceful stop 后由 container runtime执行，三次 quick check 与 identity persistence 均通过；文档现在明确禁止该诊断方式。
+- 首次 Windows CI 证明 macOS/Linux 的绝对路径测试不能代表 drive-letter URI 或 DACL：`url.URL` 直接接收反斜杠 path 会生成 SQLite 拒绝的 authority，而 `os.FileMode` 在 Windows 不表达 ACL privacy。跨平台 URI helper 与已有 `fsprivacy` protected-DACL path 现在由 Windows Server/Desktop job 实测。
 
 ## Outcomes & Retrospective
 
@@ -1346,7 +1348,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - final ad-hoc signed macOS app 为 321,456 KiB，main binary 为 80,874,016 bytes；final Linux/arm64 单体 runtime image 为 318,888,485 bytes。迁移前没有同条件 artifact，因此不虚构体积改善百分比。
 - 没有进行严格 idle-memory 或迁移前后 startup benchmark。唯一可报告的 fresh local container 观察约为 43 ms 到 listener ready（ML disabled）；小型 browser fixture 约 523 ms 到首屏、video semantic cases 约 3.5–5.6 s。exact vector correctness 已验证，但这些数据不代表大型 library 性能。
 - P0 可靠性门槛通过：完整 Server/Web/Desktop/build/docs/generation/architecture gates、Linux image audit、macOS signed bundle audit、restart/recreate identity + integrity、以及 12/12 fresh browser E2E。长时间 stress、完整 kill/fault matrix、规模 vector benchmark 与完整跨平台 runtime E2E 明确 Deferred 到 Hardening backlog。
-- 已知限制是 SQLite 单 writer、活动 catalog 必须位于 machine-local state、不能跨 VFS/host container 热打开或复制、exact vector 的规模阈值尚未决定、River narrow fork 待 upstream closure 修复，以及 Windows/非当前 architecture runtime 尚未完整实测。
+- 已知限制是 SQLite 单 writer、活动 catalog 必须位于 machine-local state、不能跨 VFS/host container 热打开或复制、exact vector 的规模阈值尚未决定、River narrow fork 待 upstream closure 修复，以及 Windows installer 与非 CI architecture runtime 尚未完整实测。
 - 建议在通过远端 CI 后将 SQLite 合并为本项目默认架构：destructive fresh baseline、唯一 runtime、事务性 River、snapshot/restore、Desktop、Docker 与核心产品路径已经形成闭环。该建议不等同于提供 PostgreSQL 数据转换路径。
 
 ### Critical Files for Implementation

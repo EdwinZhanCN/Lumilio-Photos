@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"server/platform/sqliteuri"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -24,13 +26,11 @@ func newDBClient(ctx context.Context, path string) (*dbClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve SQLite catalog path: %w", err)
 	}
-	location := &url.URL{Scheme: "file", Path: filepath.Clean(absolutePath)}
-	query := location.Query()
+	query := make(url.Values)
 	query.Set("mode", "ro")
 	query.Set("_query_only", "1")
-	location.RawQuery = query.Encode()
 
-	database, err := sql.Open("sqlite3", location.String())
+	database, err := sql.Open("sqlite3", sqliteuri.DSN(filepath.Clean(absolutePath), query))
 	if err != nil {
 		return nil, fmt.Errorf("open SQLite catalog: %w", err)
 	}
