@@ -89,6 +89,10 @@ check_dependencies() {
 }
 
 check_dependencies server ./...
-check_dependencies desktop ./...
+# The Desktop root embeds ignored panel/dist output. Architecture checks run
+# before that UI is built, so let go list report the dependency graph despite
+# the expected missing-embed package error. Desktop test/build gates still
+# compile the package normally after building the panel.
+check_dependencies desktop -e ./...
 
 printf '%s\n' "SQLite architecture guard passed"
