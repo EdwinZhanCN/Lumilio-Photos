@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"server/config"
+	"server/internal/httporigin"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +19,9 @@ func TestCORSMiddlewareSeparatesCredentialedAndOpenAPIRequests(t *testing.T) {
 	newRouter := func(t *testing.T, reached *bool) *gin.Engine {
 		t.Helper()
 		router := gin.New()
-		router.Use(corsMiddleware(mapAllowedCORSOrigins([]string{trustedOrigin})))
+		policy := testOriginPolicy(t, "http://api.example.test", []string{trustedOrigin})
+		router.Use(originPolicyMiddleware(policy))
+		router.Use(corsMiddleware(policy))
 		router.Any("/probe", func(c *gin.Context) {
 			*reached = true
 			c.Status(http.StatusNoContent)
@@ -91,18 +96,17 @@ func TestTrustedSessionOriginMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const trustedOrigin = "https://ui.example.test"
 
-	testRequest := func(origin, referer, fetchSite string, forwarded bool) int {
+	testRequest := func(origin, referer, fetchSite string) int {
 		router := gin.New()
-		router.Use(trustedSessionOriginMiddleware(mapAllowedCORSOrigins([]string{trustedOrigin})))
+		policy := testOriginPolicy(t, "http://photos.example.test", []string{trustedOrigin})
+		router.Use(originPolicyMiddleware(policy))
+		router.Use(trustedSessionOriginMiddleware(policy))
 		router.POST("/session", func(c *gin.Context) {
 			c.Status(http.StatusNoContent)
 		})
 
 		request := httptest.NewRequest(http.MethodPost, "http://photos.example.test/session", nil)
 		request.Host = "photos.example.test"
-		if forwarded {
-			request.Header.Set("X-Forwarded-Proto", "https")
-		}
 		if origin != "" {
 			request.Header.Set("Origin", origin)
 		}
@@ -117,35 +121,43 @@ func TestTrustedSessionOriginMiddleware(t *testing.T) {
 		return recorder.Code
 	}
 
-	require.Equal(t, http.StatusNoContent, testRequest("http://photos.example.test", "", "same-origin", false))
-	require.Equal(t, http.StatusNoContent, testRequest("https://photos.example.test", "", "same-origin", true))
-	require.Equal(t, http.StatusNoContent, testRequest(trustedOrigin, "", "cross-site", true))
-	require.Equal(t, http.StatusNoContent, testRequest("", "http://photos.example.test/login", "", false))
-	require.Equal(t, http.StatusNoContent, testRequest("", "", "", false))
+	require.Equal(t, http.StatusNoContent, testRequest("http://photos.example.test", "", "same-origin"))
+	require.Equal(t, http.StatusNoContent, testRequest(trustedOrigin, "", "cross-site"))
+	require.Equal(t, http.StatusNoContent, testRequest("", "http://photos.example.test/login", ""))
+	require.Equal(t, http.StatusNoContent, testRequest("", "", ""))
 
-	require.Equal(t, http.StatusForbidden, testRequest("https://evil.example", "", "cross-site", true))
-	require.Equal(t, http.StatusForbidden, testRequest("null", "", "cross-site", true))
-	require.Equal(t, http.StatusForbidden, testRequest("", "", "cross-site", true))
-	require.Equal(t, http.StatusForbidden, testRequest("", "not a URL", "", false))
+	require.Equal(t, http.StatusForbidden, testRequest("https://evil.example", "", "cross-site"))
+	require.Equal(t, http.StatusBadRequest, testRequest("null", "", "cross-site"))
+	require.Equal(t, http.StatusForbidden, testRequest("", "", "cross-site"))
+	require.Equal(t, http.StatusForbidden, testRequest("", "not a URL", ""))
+}
+
+func testOriginPolicy(t *testing.T, primaryOrigin string, cors []string) *httporigin.Policy {
+	t.Helper()
+	policy, err := httporigin.New(config.ServerConfig{
+		PrimaryOrigin:      primaryOrigin,
+		CORSAllowedOrigins: cors,
+		TLS:                config.TLSConfig{Mode: config.TLSModeOff},
+		Proxy:              config.ProxyConfig{Mode: config.ProxyModeDisabled},
+	}, config.PasskeyConfig{Enabled: true, Name: "Lumilio Photos"})
+	require.NoError(t, err)
+	return policy
 }
 
 func TestNormalizeOriginRequiresAnExactHTTPOrigin(t *testing.T) {
-	normalized, _, ok := NormalizeOrigin("https://photos.example.test/")
-	require.True(t, ok)
-	require.Equal(t, "https://photos.example.test", normalized)
-
-	normalized, _, ok = NormalizeOrigin("https://PHOTOS.Example.Test:443")
-	require.True(t, ok)
+	normalized, _, err := config.NormalizeOrigin("https://PHOTOS.Example.Test:443")
+	require.NoError(t, err)
 	require.Equal(t, "https://photos.example.test", normalized)
 
 	for _, invalid := range []string{
 		"null",
 		"file:///tmp/photo",
 		"https://user@example.test",
+		"https://example.test/",
 		"https://example.test/path",
 		"https://example.test?query=1",
 	} {
-		_, _, ok := NormalizeOrigin(invalid)
-		require.False(t, ok, invalid)
+		_, _, err := config.NormalizeOrigin(invalid)
+		require.Error(t, err, invalid)
 	}
 }

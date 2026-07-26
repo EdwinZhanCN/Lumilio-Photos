@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -144,37 +143,11 @@ func (h *AuthHandler) writeAuthRateLimit(c *gin.Context, scope, dimension, diges
 }
 
 func requestNetworkAddresses(c *gin.Context) []string {
-	candidates := []string{
-		normalizeNetworkAddress(c.Request.RemoteAddr),
-		normalizeNetworkAddress(c.ClientIP()),
-	}
-	addresses := make([]string, 0, len(candidates))
-	seen := make(map[string]struct{}, len(candidates))
-	for _, candidate := range candidates {
-		if candidate == "" {
-			continue
-		}
-		if _, exists := seen[candidate]; exists {
-			continue
-		}
-		seen[candidate] = struct{}{}
-		addresses = append(addresses, candidate)
-	}
-	if len(addresses) == 0 {
+	resolved, ok := api.RequestOriginContext(c)
+	if !ok || !resolved.ClientIP.IsValid() {
 		return []string{"unknown"}
 	}
-	return addresses
-}
-
-func normalizeNetworkAddress(address string) string {
-	address = strings.TrimSpace(address)
-	if host, _, err := net.SplitHostPort(address); err == nil {
-		address = host
-	}
-	if ip := net.ParseIP(address); ip != nil {
-		return ip.String()
-	}
-	return address
+	return []string{resolved.ClientIP.String()}
 }
 
 func (l *AuthRateLimiter) authRateKey(scope, dimension, value string) string {

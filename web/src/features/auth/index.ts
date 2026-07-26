@@ -4,6 +4,8 @@ export { default as ProtectedRoute } from "./modules/access/ProtectedRoute";
 export { default as BootstrapGate } from "./modules/access/BootstrapGate";
 export { default as PrimaryRepositoryGate } from "./modules/access/PrimaryRepositoryGate";
 export { useMFAStatus } from "./api/useMFA";
+export { browserCapabilitiesQueryKey, useBrowserCapabilities } from "./api/useBrowserCapabilities";
+export { BrowserSecurityNotice } from "./components/BrowserSecurityNotice";
 export {
   useBeginPasskeyEnrollment,
   useDeletePasskey,

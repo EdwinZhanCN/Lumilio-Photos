@@ -5,6 +5,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../../state/useAuth.ts";
 import { setupStatusQueryKey } from "../../api/useSetupStatus.ts";
+import { useBrowserCapabilities } from "../../api/useBrowserCapabilities.ts";
 import type { TOTPSetupResponse } from "../../types.ts";
 import { createPasskeyCredential, getPasskeySupport } from "../../modules/webauthn/webauthn.ts";
 import { usePasswordConfirmation } from "../../hooks/usePasswordConfirmation.ts";
@@ -65,6 +66,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   const totpEnableMutation = $api.useMutation("post", "/api/v1/auth/mfa/totp/enable");
   const passkeyOptionsMutation = $api.useMutation("post", "/api/v1/auth/mfa/passkeys/options");
   const passkeyVerifyMutation = $api.useMutation("post", "/api/v1/auth/mfa/passkeys/verify");
+  const browserCapabilities = useBrowserCapabilities();
   const location = useLocation();
   const navigate = useNavigate();
   // Set once the account is created so the redirect effect doesn't bounce the
@@ -87,6 +89,8 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   }, [location.state]);
 
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
+  const passkeySupported =
+    passkeySupport.supported && browserCapabilities.data?.passkey_available === true;
   const confirmPasswordMessage = t("auth.register.confirmPasswordHint", {
     defaultValue: "Passwords must match exactly.",
   });
@@ -167,7 +171,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
 
       setRecoveryCodes(payload.recovery_codes ?? []);
       // TOTP is now enabled, so a passkey may be offered as the next option.
-      setStep(passkeySupport.supported ? "passkey" : "recovery");
+      setStep(passkeySupported ? "passkey" : "recovery");
     } catch (totpError) {
       setTotpCode("");
       setFlowError(getApiMessage(totpError, t("auth.register.totpSetupCompleteError")));
@@ -228,7 +232,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
     setConfirmPassword,
     confirmPasswordRef,
     confirmPasswordMessage,
-    passkeySupported: passkeySupport.supported,
+    passkeySupported,
     totpSetup,
     totpCode,
     setTotpCode,

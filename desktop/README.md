@@ -2,28 +2,29 @@
 
 The desktop app links the SQLite catalog runtime into the Go executable and
 runs the existing API service in-process through `server/app`. The React product
-UI is served over HTTP and opens in the user's browser at
-`http://localhost:6680`.
+UI opens at the configured canonical `server.primary_origin`.
 
 ## Architecture
 
 ```text
 Wails v3 system tray + private native control-panel webview
-  → "Open Lumilio Photos" opens http://localhost:6680
+  → "Open Lumilio Photos" opens the persisted primary origin
 desktop/supervisor
   → owns the machine-local app-state paths and single-instance lock
-  → compiles supervisor/server.template.toml (schema v2)
+  → compiles supervisor/server.template.toml (schema v3)
   → atomically writes config/server.toml with mode 0600
   → reloads it through server/config.LoadAppConfig(...)
   → runs server/app.Run(ctx, cfg, controls) in-process
 server/app
   → opens/migrates <app-data>/library.sqlite3
-  → serves the API and React SPA at localhost:6680
+  → serves the API and React SPA on the selected network profile
 ```
 
-The product UI deliberately runs in a real browser so platform passkeys use the
-`localhost` relying-party origin. Wails embeds only the trusted first-run and
-supervisor control panel, including native Storage Location grants.
+The default local profile uses `http://localhost:6680`, so platform passkeys
+work without TLS. The optional LAN HTTP profile changes only the listener and
+shows an unencrypted-transport warning; remote passkeys remain unavailable.
+External HTTPS trusts only configured proxy CIDRs and never makes Desktop own
+certificates.
 
 `desktop` is a separate Go module with `replace server => ../server`. That
 committed replace is the load-bearing wiring for local builds and CI.
@@ -77,9 +78,11 @@ Windows uses `%LocalAppData%\Lumilio Photos`. The SQLite catalog, credentials,
 configuration, and optional AI runtime always stay in app data; only explicitly
 authorized media repositories may live on external Storage Locations.
 
-`config/server.toml` is regenerated on every launch from the tracked schema-v2
+`config/server.toml` is regenerated on every launch from the tracked schema-v3
 template and is the authoritative immutable input for that run. Persisted user
-choices live separately in `desktop-settings.json`.
+choices live separately in versioned `desktop-settings.json`. Network changes
+use candidate validation, atomic save, restart, internal readiness, and
+last-known-good rollback.
 
 Development and test overrides:
 

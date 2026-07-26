@@ -4,22 +4,31 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 ## Runtime Shape
 
-- `docker-compose.yml` runs one `lumilio` container. The Go process owns the
-  embedded SQLite catalog and serves both the API and built React SPA.
+- Docker production explicitly selects `docker-compose.acme.yml` or
+  `docker-compose.proxy.yml`; plain HTTP is development-only. The Go process
+  owns the embedded SQLite catalog and serves both the API and built React SPA.
 - Linux is the standalone Server/Docker delivery target. macOS and Windows are
   Desktop App delivery targets; the App hosts the same complete `server/app`
   runtime in-process, so both Desktop CI jobs run the full Server and Desktop
   test suites plus a native CGo build.
 - Runtime state has three non-overlapping owners: frontend preferences in browser localStorage; runtime-mutable settings in the SQLite catalog through Settings/Setup APIs; and runtime-immutable process configuration in a complete schema-versioned TOML manifest.
 - First-run bootstrap (`fresh → catalog_ready → admin_created → ready`) is an orthogonal state machine. It observes owner and primary-repository gates; it is not a fourth configuration source.
-- `server/config/server.example.toml` is the complete local template; `server/config/server.container.toml` is the image manifest; `desktop/supervisor/server.template.toml` is the versioned desktop compiler input.
+- `server/config/server.example.toml` is the complete local template;
+  production container manifests are generated into app-state by `server config
+  init`; `server/config/server.container.toml` is development-only; and
+  `desktop/supervisor/server.template.toml` is the versioned desktop compiler input.
 - Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
 
 ## Backend
 
 - `server/cmd/main.go`: thin entrypoint (flags, signals, break-glass env whitelist, strict manifest load) that calls `server/app`.
 - `server/app`: the only server runtime — logging, migrations, queue workers, router, repository bootstrap, SPA serving, and graceful shutdown via `Run(ctx, cfg, controls)`. It rejects configuration not produced by the strict loader.
-- `server/config`: leaf package exposing the sole production constructor `LoadAppConfig(path)`. It strictly decodes schema v2, resolves manifest-relative paths and secret files, validates the complete graph, and fingerprints the source bytes.
+- `server/config`: leaf package exposing the runtime constructor
+  `LoadAppConfig(path)` plus a one-shot complete-manifest generator. It strictly
+  decodes schema v3, resolves manifest-relative paths and secret files,
+  validates the complete graph, and fingerprints the source bytes.
+- `server/internal/httporigin`: canonical request/proxy/browser Origin policy.
+- `server/internal/servertransport`: off, external, and CertMagic ACME listener lifecycle.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS.
 - `server/internal/api/handler`: HTTP request/response layer.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.

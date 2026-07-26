@@ -47,10 +47,15 @@
  * composition, not page components. Browser WebAuthn conversion stays in the
  * isolated {@link getPasskeySupport} module, while deterministic credential
  * policy such as {@link normalizeUsernameInput} stays in the React-free model.
+ * {@link useBrowserCapabilities} reads the server-resolved canonical-origin
+ * policy before login and registration, while {@link BrowserSecurityNotice}
+ * keeps LAN HTTP transport risk visible on public and authenticated surfaces.
  *
  * @module
  */
 import type { useBootstrapFlow } from "./flows/bootstrap/useBootstrapFlow.ts";
+import type { useBrowserCapabilities } from "./api/useBrowserCapabilities.ts";
+import type { BrowserSecurityNotice } from "./components/BrowserSecurityNotice.tsx";
 import type { useMFAFlow } from "./flows/mfa/useMFAFlow.ts";
 import type { useRegistrationFlow } from "./flows/registration/useRegistrationFlow.ts";
 import type { useLoginFlow } from "./flows/sign-in/useLoginFlow.ts";

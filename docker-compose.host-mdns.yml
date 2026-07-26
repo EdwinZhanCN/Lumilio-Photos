@@ -2,11 +2,12 @@
 # discovery works (multicast cannot cross the default bridge network).
 #
 #   LUMILIO_HOST_MDNS_CONFIG=/path/to/complete-host-manifest.toml docker compose \
-#       -f docker-compose.release.yml -f docker-compose.host-mdns.yml up -d
+#       -f docker-compose.dev.yml -f docker-compose.host-mdns.yml up -d
 #
+# Development-only: production must use ACME or an external HTTPS proxy.
 # Requires Docker Compose v2.24+ (uses `!reset`). Docker Desktop on
 # macOS/Windows does not support host networking. The supplied manifest must be
-# complete schema v2 with database.path=/data/app-state/library.sqlite3 and
+# complete schema v3 with database.path=/data/app-state/library.sqlite3 and
 # lumen.discovery_mdns_enabled=true.
 
 services:
@@ -17,4 +18,4 @@ services:
         ports: !reset []
         extra_hosts: !reset []
         volumes:
-            - ${LUMILIO_HOST_MDNS_CONFIG:?set LUMILIO_HOST_MDNS_CONFIG to a complete schema v2 manifest}:/app/config/server.toml:ro
+            - ${LUMILIO_HOST_MDNS_CONFIG:?set LUMILIO_HOST_MDNS_CONFIG to a complete schema v3 manifest}:/app/config/server.dev.toml:ro

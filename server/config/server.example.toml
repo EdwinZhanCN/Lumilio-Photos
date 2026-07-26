@@ -1,7 +1,7 @@
-# Complete schema v2 runtime manifest. Copy to server.local.toml and edit it.
+# Complete schema v3 development manifest. Copy to server.local.toml and edit it.
 # There are no code defaults, file search, or environment-variable overrides.
 # Relative paths are resolved from this TOML file's directory.
-schema_version = 2
+schema_version = 3
 environment = "development"
 
 [database]
@@ -9,13 +9,24 @@ environment = "development"
 path = "../.local/lumilio/library.sqlite3"
 
 [server]
-port = "6680"
+listen = "127.0.0.1:6680"
+primary_origin = "http://localhost:6657"
 # Browser origins listed here may use credentialed cross-origin cookie
 # sessions. Empty still permits same-origin Web/Desktop access and
 # credentialless cross-origin Bearer/public API calls.
 cors_allowed_origins = ["http://localhost:6657", "https://localhost:6657"]
 # Empty serves API only; otherwise this is the SPA root.
 web_root = ""
+
+[server.tls]
+mode = "off"
+http_listen = ""
+email = ""
+storage_path = ""
+
+[server.proxy]
+mode = "disabled"
+trusted_cidrs = []
 
 [logging]
 level = "debug"
@@ -50,11 +61,10 @@ secret_key_file = "../data/app-state/secrets/lumilio_secret_key"
 access_token_ttl = "15m"
 refresh_token_ttl = "168h"
 media_token_ttl = "10m"
-webauthn_rp_name = "Lumilio Photos"
-# origin-derived requires the next two values to remain explicitly empty.
-webauthn_rp_mode = "origin-derived"
-webauthn_rp_id = ""
-webauthn_rp_origins = []
+
+[auth.passkey]
+enabled = true
+name = "Lumilio Photos"
 
 [auth.rate_limit]
 ip_attempts = 60

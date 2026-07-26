@@ -22,11 +22,11 @@ Startup ownership is split between the thin CLI host and the shared app runtime:
    - run application and River migrations
    - construct the generated query layer
    - initialize settings, repository storage, River queues, ML services, processors, handlers, and router
-   - start the HTTP server on `server.port`
+   - start `internal/servertransport` from `server.listen` and `server.tls.mode`
 
 ## Configuration Boundary
 
-Runtime-immutable configuration is a complete schema v2 manifest, not a defaults
+Runtime-immutable configuration is a complete schema v3 manifest, not a defaults
 or override layer. Missing, unknown, legacy, contradictory, or invalid fields
 fail startup. Relative paths use the manifest directory. Startup logs the
 absolute path, schema version, and source SHA-256 without logging secret content.
@@ -36,6 +36,12 @@ app-data paths, bundled media tools, and the SPA root, compiles
 `desktop/supervisor/server.template.toml`, atomically writes
 app-data `config/server.toml` with mode `0600`, reloads it through the same
 strict loader, then calls `app.Run`. A write or reload error blocks startup.
+
+`server.primary_origin` is the sole canonical browser and WebAuthn Origin.
+`internal/httporigin` resolves direct/proxied request context, and
+`internal/servertransport` owns off/external/ACME listeners. Proxy-required
+deployments reject direct application requests before auth handlers; only
+loopback live/ready probes bypass the proxy requirement.
 
 The standalone Server/Docker distribution is supported on Linux. macOS and
 Windows ship the Desktop App rather than a separately operated Server, but that

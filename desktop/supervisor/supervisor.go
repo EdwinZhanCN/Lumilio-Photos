@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +74,10 @@ type Supervisor struct {
 
 	repositoryMu      sync.RWMutex
 	repositoryManager app.RepositoryControl
+
+	networkMu       sync.RWMutex
+	activeNetwork   DesktopSettings
+	networkChangeMu sync.Mutex
 }
 
 // Options configures a Supervisor.
@@ -248,16 +253,53 @@ func (s *Supervisor) LumenDir() (string, error) {
 // validation.
 func StorageReachable(path string) bool { return storageReachable(path) }
 
-// ServerURL is the address the desktop host opens in the user's browser. It is
-// localhost (not 127.0.0.1, not a custom scheme) because WebAuthn/passkeys
-// require localhost as the relying-party origin.
+// ServerURL is the canonical browser origin the desktop host opens. It is
+// independent from the internal readiness address.
 func (s *Supervisor) ServerURL() string {
+	s.networkMu.RLock()
+	origin := s.activeNetwork.PrimaryOrigin
+	s.networkMu.RUnlock()
+	if origin != "" {
+		return origin
+	}
+	settings, err := s.Settings()
+	if err == nil {
+		return settings.PrimaryOrigin
+	}
 	return "http://localhost:" + serverPort
 }
 
 // Warnings returns non-fatal issues surfaced during Start (e.g. a fallback to
 // the default storage location). The UI may present these to the user.
 func (s *Supervisor) Warnings() []string { return s.warnings }
+
+// LANAddresses returns routable local interface addresses for display only.
+// Desktop does not modify firewall rules or derive trust from this list.
+func LANAddresses() []string {
+	var addresses []string
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return addresses
+	}
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, address := range addrs {
+			raw, _, _ := strings.Cut(address.String(), "/")
+			ip := net.ParseIP(raw)
+			if ip == nil || ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() {
+				continue
+			}
+			addresses = append(addresses, ip.String())
+		}
+	}
+	return addresses
+}
 
 // Start generates runtime configuration and launches the API server in-process.
 // SQLite creation and migration happen inside app.Run through the same runtime
@@ -269,6 +311,10 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 		return err
 	}
 	paths := s.paths
+	networkSettings, err := s.Settings()
+	if err != nil {
+		return fmt.Errorf("load desktop network settings: %w", err)
+	}
 
 	lock, err := AcquireLock(paths.LockFile())
 	if err != nil {
@@ -296,7 +342,7 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	// single-instance lock already prevents a second desktop instance, so a busy
 	// port means a foreign process — otherwise the in-process server would boot,
 	// fail to bind, tear itself down, and leave the browser reaching the squatter.
-	if err := s.checkPortAvailable(serverPort); err != nil {
+	if err := s.checkListenAvailable(networkSettings.Listen); err != nil {
 		return err
 	}
 
@@ -325,8 +371,15 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	}
 
 	s.reportStage(StageStartingServer)
+	tlsMode := "off"
+	proxyMode := "disabled"
+	if networkSettings.NetworkMode == NetworkExternalHTTPS {
+		tlsMode = "external"
+		proxyMode = "required"
+	}
 	appConfig, err := compileAndLoadServerManifest(paths.ServerConfigFile(), serverManifestBindings{
-		Port: serverPort, BrowserOrigin: "http://localhost:" + serverPort,
+		Listen: networkSettings.Listen, PrimaryOrigin: networkSettings.PrimaryOrigin,
+		TLSMode: tlsMode, ProxyMode: proxyMode, TrustedProxyCIDRs: networkSettings.TrustedProxyCIDRs,
 		WebRoot: bundledWebRoot(resources), LogDir: paths.Logs, StoragePath: storagePath,
 		CloudStatePath: paths.Cloud, BackupsPath: paths.Backups,
 		DatabasePath: paths.Database, SecretKeyFile: paths.SecretKeyFile(),
@@ -336,6 +389,9 @@ func (s *Supervisor) Start(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("compile desktop server manifest: %w", err)
 	}
+	s.networkMu.Lock()
+	s.activeNetwork = networkSettings
+	s.networkMu.Unlock()
 
 	// Run the API server in-process. It blocks until srvCtx is cancelled (Stop)
 	// and then performs its own graceful shutdown.
@@ -417,16 +473,23 @@ func (s *Supervisor) resolveStoragePath() (string, error) {
 // the in-process server listens on (all interfaces). It returns ErrPortInUse
 // (wrapping the bind error) when something else already holds the port.
 func (s *Supervisor) checkPortAvailable(port string) error {
-	ln, err := net.Listen("tcp", net.JoinHostPort("", port))
+	return s.checkListenAvailable(net.JoinHostPort("", port))
+}
+
+func (s *Supervisor) checkListenAvailable(address string) error {
+	ln, err := net.Listen("tcp", address)
 	if err != nil {
-		return fmt.Errorf("%w (port %s): %v", ErrPortInUse, port, err)
+		return fmt.Errorf("%w (%s): %v", ErrPortInUse, address, err)
 	}
 	return ln.Close()
 }
 
 // waitForServer polls the health endpoint until the server responds or fails.
 func (s *Supervisor) waitForServer(ctx context.Context) error {
-	url := fmt.Sprintf("%s/api/v1/health", s.ServerURL())
+	s.networkMu.RLock()
+	listen := s.activeNetwork.Listen
+	s.networkMu.RUnlock()
+	url := internalHealthURL(listen)
 	client := &http.Client{Timeout: 2 * time.Second}
 	deadline := time.Now().Add(serverReadyTimeout)
 
@@ -453,6 +516,62 @@ func (s *Supervisor) waitForServer(ctx context.Context) error {
 			return fmt.Errorf("api server not ready after %s", serverReadyTimeout)
 		}
 		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func internalHealthURL(listen string) string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return ""
+	}
+	ip := net.ParseIP(host)
+	if host == "" || (ip != nil && ip.IsUnspecified()) {
+		host = "127.0.0.1"
+	}
+	return (&url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(host, port),
+		Path:   "/api/v1/health/ready",
+	}).String()
+}
+
+// ApplyNetworkSettings validates and atomically persists a candidate, restarts
+// the runtime, and restores the last-known-good settings if startup fails.
+func (s *Supervisor) ApplyNetworkSettings(ctx context.Context, candidate DesktopSettings) error {
+	s.networkChangeMu.Lock()
+	defer s.networkChangeMu.Unlock()
+
+	current, err := s.Settings()
+	if err != nil {
+		return err
+	}
+	candidate, err = normalizeNetworkSettings(candidate)
+	if err != nil {
+		return err
+	}
+	if err := s.SaveSettings(candidate); err != nil {
+		return err
+	}
+
+	wasRunning := s.cancel != nil
+	if !wasRunning {
+		return nil
+	}
+	if err := s.Stop(); err != nil {
+		_ = s.SaveSettings(current)
+		return fmt.Errorf("stop desktop runtime for network change: %w", err)
+	}
+	if err := s.Start(ctx); err == nil {
+		return nil
+	} else {
+		startErr := err
+		if restoreErr := s.SaveSettings(current); restoreErr != nil {
+			return errors.Join(startErr, fmt.Errorf("restore last-known-good settings: %w", restoreErr))
+		}
+		if rollbackErr := s.Start(ctx); rollbackErr != nil {
+			return errors.Join(startErr, fmt.Errorf("restart last-known-good network profile: %w", rollbackErr))
+		}
+		return fmt.Errorf("network profile rejected; restored last-known-good settings: %w", startErr)
 	}
 }
 

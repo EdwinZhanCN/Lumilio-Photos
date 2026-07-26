@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { USERNAME_MIN_LENGTH } from "../../model/credentialPolicy.ts";
+import { useBrowserCapabilities } from "../../api/useBrowserCapabilities.ts";
 import { getPasskeyCredential, getPasskeySupport } from "../../modules/webauthn/webauthn.ts";
 import { storeRequiredPasswordChangeChallenge } from "../../state/passwordChangeChallenge.ts";
 import { useAuth } from "../../state/useAuth.ts";
@@ -42,6 +43,7 @@ export function useLoginFlow() {
   const loginOptionsMutation = $api.useMutation("post", "/api/v1/auth/login/options");
   const passkeyOptionsMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/options");
   const passkeyVerifyMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/verify");
+  const browserCapabilities = useBrowserCapabilities();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -69,6 +71,33 @@ export function useLoginFlow() {
   const identifyBusy = loginOptionsMutation.isPending;
   const displayError = optionsError ?? passkeyError ?? error;
   const passkeySupportReason = passkeySupport.reasonKey ? t(passkeySupport.reasonKey) : null;
+  const passkeyEnvironmentAvailable = browserCapabilities.data?.passkey_available === true;
+  const passkeyEnvironmentReason = (() => {
+    switch (browserCapabilities.data?.passkey_unavailable_reason) {
+      case "disabled":
+        return t("auth.passkeyEnvironment.disabled", {
+          defaultValue: "Passkeys are disabled for this Lumilio deployment.",
+        });
+      case "secure_origin_required":
+        return t("auth.passkeyEnvironment.secureOriginRequired", {
+          defaultValue: "Passkeys require HTTPS or the configured localhost address.",
+        });
+      case "non_primary_origin":
+        return t("auth.passkeyEnvironment.nonPrimaryOrigin", {
+          defaultValue: "Open Lumilio at its configured primary address to use a passkey.",
+        });
+      case "trusted_proxy_required":
+        return t("auth.passkeyEnvironment.trustedProxyRequired", {
+          defaultValue: "Passkeys require access through the configured trusted proxy.",
+        });
+      case "invalid_request_origin":
+        return t("auth.passkeyEnvironment.invalidOrigin", {
+          defaultValue: "This browser origin cannot use passkeys.",
+        });
+      default:
+        return null;
+    }
+  })();
   const usernameValid = username.trim().length >= USERNAME_MIN_LENGTH;
 
   useEffect(() => {
@@ -131,12 +160,18 @@ export function useLoginFlow() {
         );
       }
 
-      if (options.passkey && passkeySupport.supported) {
+      if (options.passkey && passkeyEnvironmentAvailable && passkeySupport.supported) {
         setStep("passkey");
         return;
       }
 
-      const note = options.passkey && !passkeySupport.supported ? passkeySupportReason : null;
+      const note = options.passkey
+        ? !passkeyEnvironmentAvailable
+          ? passkeyEnvironmentReason
+          : !passkeySupport.supported
+            ? passkeySupportReason
+            : null
+        : null;
       goToPassword(note);
     } catch (identifyError) {
       setOptionsError(

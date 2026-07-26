@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,6 +57,48 @@ func TestDesktopRuntimeFirstAndSecondLaunch(t *testing.T) {
 	}
 
 	t.Logf("desktop SQLite first/second launch OK: library_id=%s", firstLibraryID)
+}
+
+func TestDesktopNetworkRestartRollback(t *testing.T) {
+	appData := t.TempDir()
+	webRoot := t.TempDir()
+	resources := t.TempDir()
+	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte("ROLLBACK_OK"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffmpeg")))
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffprobe")))
+	writeStubTool(t, filepath.Join(resources, "exiftool", toolExe("exiftool")))
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	t.Setenv("LUMILIO_WEB_ROOT", webRoot)
+	t.Setenv("LUMILIO_RESOURCES_DIR", resources)
+
+	supervisor := startDesktopRuntime(t)
+	blocker, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocker.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	err = supervisor.ApplyNetworkSettings(ctx, DesktopSettings{
+		NetworkMode:       NetworkExternalHTTPS,
+		PrimaryOrigin:     "https://photos.example.com",
+		Listen:            blocker.Addr().String(),
+		TrustedProxyCIDRs: []string{"127.0.0.1/32", "::1/128"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "restored last-known-good") {
+		t.Fatalf("network change error = %v", err)
+	}
+	settings, err := supervisor.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.NetworkMode != NetworkLocal || supervisor.ServerURL() != "http://localhost:6680" {
+		t.Fatalf("rollback settings = %+v, URL = %s", settings, supervisor.ServerURL())
+	}
+	assertDesktopHTTP(t, &http.Client{Timeout: 5 * time.Second}, supervisor.ServerURL(), "ROLLBACK_OK")
 }
 
 func writeStubTool(t *testing.T, path string) {

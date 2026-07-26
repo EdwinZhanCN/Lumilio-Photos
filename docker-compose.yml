@@ -1,25 +1,8 @@
-services:
-    lumilio:
-        build:
-            context: .
-            dockerfile: server/Dockerfile
-            secrets:
-                - npmrc
-        restart: unless-stopped
-        volumes:
-            - ${LUMILIO_STORAGE:-./.cache/docker/storage}:/data/storage
-            - ${LUMILIO_STATE:-./.cache/docker/state}:/data/app-state
-        ports:
-            - "${WEB_HTTP_PORT:-6657}:6680"
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
-        healthcheck:
-            test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
-            start_period: 20s
-
-secrets:
-    npmrc:
-        file: ${LUMILIO_NPMRC:-${HOME}/.npmrc}
+# Lumilio has no implicit production network mode. Choose exactly one:
+#
+#   docker compose -f docker-compose.acme.yml up -d
+#   docker compose -f docker-compose.proxy.yml up -d
+#
+# Plain HTTP exists only in docker-compose.dev.yml.
+name: lumilio-photos
+services: {}

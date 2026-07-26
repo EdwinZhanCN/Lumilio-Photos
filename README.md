@@ -47,25 +47,30 @@ Desktop packages include the embedded SQLite catalog and required media tools. T
 
 Docker with the Compose plugin is required. The single application image serves both the web interface and API. Set `LUMILIO_STORAGE` to the host media directory and `LUMILIO_STATE` to a separate machine-local directory for the SQLite catalog, snapshots, credentials, and logs.
 
+Choose either built-in ACME or an external reverse proxy. This ACME example
+requires a public DNS name pointing at the host and inbound TCP 80/443:
+
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.release.yml
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.acme.yml
 export LUMILIO_STORAGE=/srv/lumilio/media
 export LUMILIO_STATE=/srv/lumilio/state
+export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
 mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
-docker compose -f docker-compose.release.yml up -d
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-acme \
+  --origin https://photos.example.com --email admin@example.com \
+  --output /data/app-state/server.toml
+docker compose -f docker-compose.acme.yml up -d
 ```
 
-Then open `http://localhost:6657` and complete the first-run wizard. Port `6657` serves both the web UI and API; put a trusted HTTPS reverse proxy in front before internet exposure.
-
-To pin a release instead of following `latest`:
-
-```bash
-LUMILIO_VERSION=v1.0.0 \
-  docker compose -f docker-compose.release.yml up -d
-```
+Open the exact HTTPS origin you generated. If TLS already terminates at Caddy,
+Traefik, Nginx, or another proxy, use `docker-compose.proxy.yml` and generate
+`--profile docker-external-proxy --trusted-proxy <narrow-cidr>` instead. That
+profile does not publish Lumilio's internal port. Plain HTTP is available only
+through `docker-compose.dev.yml`.
 
 > [!IMPORTANT]
-> The complete schema-v2 runtime manifest is baked into the image at `/app/config/server.toml`; ordinary environment variables do not override immutable policy. While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or `-shm` with a host SQLite tool; crossing the container mount boundary can violate WAL locking. Create consistent snapshots under **Settings → Server**, and back up the media directory separately.
+> Production reads the complete schema-v3 manifest from `/data/app-state/server.toml`; CLI flags generate or validate that file but never override runtime policy. While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or `-shm` with a host SQLite tool. Create consistent snapshots under **Settings → Server**, and back up the media directory separately.
 
 ## Development
 
@@ -87,7 +92,7 @@ make setup
 make dev
 ```
 
-`make dev` starts the API on `6680` and the web app on `6657`; SQLite runs inside the Go process and needs no database service. `make setup` copies the complete schema-v2 manifest to ignored `server/config/server.local.toml`. The default development catalog is `server/.local/lumilio/library.sqlite3`, while media remains under `server/data/storage`. The server has no config defaults or ordinary environment overrides.
+`make dev` starts the API on `6680` and the web app on `6657`; SQLite runs inside the Go process and needs no database service. `make setup` copies the complete schema-v3 manifest to ignored `server/config/server.local.toml`. The default development catalog is `server/.local/lumilio/library.sqlite3`, while media remains under `server/data/storage`. The server has no config defaults or ordinary environment overrides.
 
 ### Useful commands
 

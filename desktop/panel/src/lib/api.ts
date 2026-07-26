@@ -3,6 +3,8 @@ import type {
   LogResult,
   LumenAction,
   LumenSavePayload,
+  NetworkSavePayload,
+  NetworkSaveResult,
   PanelState,
   PickResult,
   RepositoryIdentityConflict,
@@ -54,6 +56,8 @@ export const api = {
   pickCache: () => postJSON<PickResult>("/__onb/pick-cache"),
   complete: (payload: CompletePayload) => postJSON<{ ok: boolean }>("/__onb/complete", payload),
   saveRegion: (region: string) => postJSON<{ ok: boolean }>("/__onb/region", { region }),
+  saveNetwork: (payload: NetworkSavePayload) =>
+    postJSON<NetworkSaveResult>("/__onb/network", payload),
   lumenSave: (payload: LumenSavePayload) => postJSON<{ ok: boolean }>("/__onb/lumen-save", payload),
   lumenAction: (action: LumenAction) =>
     postJSON<{ ok: boolean }>("/__onb/lumen-action", { action }),

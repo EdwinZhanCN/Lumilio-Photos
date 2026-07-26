@@ -451,6 +451,10 @@
         "title": "欢迎使用流明集"
       }
     },
+    "browserSecurity": {
+      "insecureBody": "此网络上的其他人可能读取密码、身份验证器代码、会话 Cookie 和媒体内容。Passkey 仅可在配置的 localhost 地址使用；远程设备必须使用密码和 TOTP。",
+      "insecureTitle": "此网络连接未加密。"
+    },
     "changePassword": {
       "backToSettings": "返回设置",
       "changed": "是否取消本次操作？",
@@ -519,6 +523,13 @@
       "affordance": {
         "activeLabel": "Passkey 已启用"
       }
+    },
+    "passkeyEnvironment": {
+      "disabled": "此 Lumilio 部署已停用 Passkey。",
+      "invalidOrigin": "当前浏览器 Origin 无法使用 Passkey。",
+      "nonPrimaryOrigin": "请通过 Lumilio 配置的正式地址打开应用以使用 Passkey。",
+      "secureOriginRequired": "Passkey 需要 HTTPS 或配置的 localhost 地址。",
+      "trustedProxyRequired": "Passkey 需要通过配置的可信反向代理访问。"
     },
     "passwordField": {
       "hidePassword": "隐藏密码",

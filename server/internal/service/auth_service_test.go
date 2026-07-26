@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"server/config"
 	"server/internal/db/repo"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -109,4 +111,48 @@ func TestRequiredPasswordChangeTokenRejectsWrongPurposeAndSigningMethod(t *testi
 	require.NoError(t, err)
 	_, err = svc.parsePasswordChangeToken(token)
 	require.ErrorIs(t, err, ErrInvalidPasswordChangeToken)
+}
+
+func TestPasskeyIdentityIsStaticAndExact(t *testing.T) {
+	svc, err := NewAuthService(nil, nil, config.AuthConfig{
+		SecretKeyFile: filepath.Join(t.TempDir(), "secret"),
+		Passkey: config.PasskeyConfig{
+			Enabled: true,
+			Name:    "Lumilio Photos",
+		},
+		PasskeyIdentity: config.PasskeyIdentity{
+			Origin: "https://photos.example.com",
+			RPID:   "photos.example.com",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "photos.example.com", svc.webauthn.Config.RPID)
+	require.Equal(t, []string{"https://photos.example.com"}, svc.webauthn.Config.RPOrigins)
+
+	wa, origin, err := svc.newWebAuthnForOrigin("https://PHOTOS.example.com:443")
+	require.NoError(t, err)
+	require.Same(t, svc.webauthn, wa)
+	require.Equal(t, "https://photos.example.com", origin)
+
+	_, _, err = svc.newWebAuthnForOrigin("https://evil.example.com")
+	require.Error(t, err)
+
+	valid := &passkeyChallengeClaims{
+		Origin: "https://photos.example.com",
+		SessionData: webauthn.SessionData{
+			RelyingPartyID: "photos.example.com",
+		},
+	}
+	_, err = svc.newWebAuthnForChallenge(valid)
+	require.NoError(t, err)
+
+	wrongOrigin := *valid
+	wrongOrigin.Origin = "https://evil.example.com"
+	_, err = svc.newWebAuthnForChallenge(&wrongOrigin)
+	require.True(t, errors.Is(err, ErrInvalidPasskeyChallenge))
+
+	wrongRPID := *valid
+	wrongRPID.SessionData.RelyingPartyID = "example.com"
+	_, err = svc.newWebAuthnForChallenge(&wrongRPID)
+	require.True(t, errors.Is(err, ErrInvalidPasskeyChallenge))
 }

@@ -1648,6 +1648,45 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.BrowserCapabilitiesDTO": {
+                "properties": {
+                    "current_origin": {
+                        "example": "http://192.168.1.20:6680",
+                        "type": "string"
+                    },
+                    "insecure_transport": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "passkey_available": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "passkey_unavailable_reason": {
+                        "enum": [
+                            "disabled",
+                            "secure_origin_required",
+                            "non_primary_origin",
+                            "trusted_proxy_required",
+                            "invalid_request_origin"
+                        ],
+                        "type": "string"
+                    },
+                    "primary_origin": {
+                        "example": "http://localhost:6680",
+                        "type": "string"
+                    },
+                    "proxy_required": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "via_trusted_proxy": {
+                        "example": false,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
             "dto.CSRFTokenDTO": {
                 "properties": {
                     "csrfToken": {
@@ -4440,6 +4479,20 @@ const docTemplate = `{
             },
             "dto.RuntimeInfoDTO": {
                 "properties": {
+                    "acme_certificate_expires_at": {
+                        "type": "string"
+                    },
+                    "acme_certificate_hostname": {
+                        "example": "photos.example.com",
+                        "type": "string"
+                    },
+                    "acme_certificate_status": {
+                        "example": "active",
+                        "type": "string"
+                    },
+                    "acme_last_managed_at": {
+                        "type": "string"
+                    },
                     "environment": {
                         "example": "production",
                         "type": "string"
@@ -4460,6 +4513,26 @@ const docTemplate = `{
                         "example": true,
                         "type": "boolean"
                     },
+                    "passkey_enabled": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "passkey_origin": {
+                        "example": "https://photos.example.com",
+                        "type": "string"
+                    },
+                    "passkey_rp_id": {
+                        "example": "photos.example.com",
+                        "type": "string"
+                    },
+                    "primary_origin": {
+                        "example": "https://photos.example.com",
+                        "type": "string"
+                    },
+                    "proxy_mode": {
+                        "example": "required",
+                        "type": "string"
+                    },
                     "repository_scan_enabled": {
                         "example": true,
                         "type": "boolean"
@@ -4468,13 +4541,24 @@ const docTemplate = `{
                         "example": 300,
                         "type": "integer"
                     },
-                    "server_port": {
-                        "example": "8080",
+                    "server_listen": {
+                        "example": "0.0.0.0:6680",
                         "type": "string"
                     },
                     "storage_root": {
                         "example": "/data/storage",
                         "type": "string"
+                    },
+                    "tls_mode": {
+                        "example": "external",
+                        "type": "string"
+                    },
+                    "trusted_proxy_cidrs": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -11743,6 +11827,27 @@ const docTemplate = `{
                 "summary": "Get web-optimized video",
                 "tags": [
                     "assets"
+                ]
+            }
+        },
+        "/api/v1/auth/browser-capabilities": {
+            "get": {
+                "description": "Report whether this request origin can use passkeys for the configured canonical origin.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.BrowserCapabilitiesDTO"
+                                }
+                            }
+                        },
+                        "description": "Browser capabilities"
+                    }
+                },
+                "summary": "Get browser authentication capabilities",
+                "tags": [
+                    "auth"
                 ]
             }
         },

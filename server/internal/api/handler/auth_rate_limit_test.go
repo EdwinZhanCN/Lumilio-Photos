@@ -3,10 +3,13 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
 	"time"
 
 	"server/config"
+	"server/internal/api"
+	"server/internal/httporigin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -52,15 +55,17 @@ func TestAuthRateLimiterReturnsRetryAfterAndRecoversAfterReset(t *testing.T) {
 	}
 }
 
-func TestRequestNetworkAddressesIncludesRemoteAndForwardedClient(t *testing.T) {
+func TestRequestNetworkAddressesUsesResolvedClientIP(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	context, _ := gin.CreateTestContext(httptest.NewRecorder())
 	context.Request = httptest.NewRequest(http.MethodPost, "/", nil)
-	context.Request.RemoteAddr = "127.0.0.1:43210"
-	context.Request.Header.Set("X-Forwarded-For", "203.0.113.42")
+	api.SetRequestOriginContext(context, httporigin.RequestContext{
+		PeerIP:   netip.MustParseAddr("127.0.0.1"),
+		ClientIP: netip.MustParseAddr("203.0.113.42"),
+	})
 
 	got := requestNetworkAddresses(context)
-	if len(got) != 2 || got[0] != "127.0.0.1" || got[1] != "203.0.113.42" {
+	if len(got) != 1 || got[0] != "203.0.113.42" {
 		t.Fatalf("network addresses = %#v", got)
 	}
 }

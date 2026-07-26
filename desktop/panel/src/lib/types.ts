@@ -62,6 +62,17 @@ export interface DashboardPaths {
   appData?: string;
 }
 
+export type NetworkMode = "local" | "lan_http" | "external_https";
+
+export interface NetworkInfo {
+  mode: NetworkMode;
+  primaryOrigin: string;
+  listen: string;
+  trustedProxyCIDRs: string[];
+  lanWarningAcceptedVersion: number;
+  lanAddresses: string[];
+}
+
 export interface PanelState {
   mode: "onboarding" | "dashboard";
   lang: string;
@@ -74,6 +85,7 @@ export interface PanelState {
   serverURL: string;
   stage: string;
   paths: DashboardPaths;
+  network: NetworkInfo;
   lumen: LumenInfo;
   backends: BackendChoice[];
   presets: Preset[];
@@ -141,4 +153,21 @@ export interface LumenSavePayload {
   backend: string;
   profile: string;
   cacheDir: string;
+}
+
+export interface NetworkSavePayload {
+  mode: NetworkMode;
+  primaryOrigin: string;
+  listen: string;
+  proxyLocation: "same_host" | "remote";
+  trustedProxyCIDRs: string[];
+  acceptLANWarning: boolean;
+}
+
+export interface NetworkSaveResult {
+  ok: boolean;
+  serverURL: string;
+  rpIDChanged: boolean;
+  previousOrigin: string;
+  effectiveOrigin: string;
 }

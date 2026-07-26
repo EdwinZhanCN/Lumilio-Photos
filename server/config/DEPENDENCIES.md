@@ -6,7 +6,7 @@ packages.
 
 ## Construction contract
 
-There is one production constructor:
+The runtime has one production constructor:
 
 ```go
 config.LoadAppConfig(path)
@@ -16,14 +16,16 @@ Its pipeline is:
 
 ```text
 explicit TOML path
-  → strict schema v2 decode (unknown/missing fields fail)
+  → strict schema v3 decode (unknown/missing fields fail)
   → aggregate value and cross-field validation
   → resolve relative paths from the manifest directory
   → attach absolute path + schema version + source SHA-256
   → validated AppConfig
 ```
 
-`cmd/main.go` calls it for standalone. The desktop supervisor compiles its
+`cmd/main.go` calls it for standalone. `server config init` is a one-shot
+complete-manifest generator and `server config validate` calls the same strict
+loader; neither is a runtime override layer. The desktop supervisor compiles its
 versioned template to app-data `config/server.toml`, atomically writes it, then
 calls the same loader. There is no default constructor, environment overlay,
 file search, or desktop typed-config bypass.

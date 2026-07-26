@@ -451,6 +451,10 @@
         "title": "Welcome to Lumilio Photos"
       }
     },
+    "browserSecurity": {
+      "insecureBody": "Passwords, authenticator codes, session cookies, and media can be read on this network. Passkeys work only at the configured localhost address; remote devices must use password and TOTP.",
+      "insecureTitle": "This network connection is not encrypted."
+    },
     "changePassword": {
       "backToSettings": "Back to settings",
       "changed": "Changed your mind?",
@@ -519,6 +523,13 @@
       "affordance": {
         "activeLabel": "Passkey active"
       }
+    },
+    "passkeyEnvironment": {
+      "disabled": "Passkeys are disabled for this Lumilio deployment.",
+      "invalidOrigin": "This browser origin cannot use passkeys.",
+      "nonPrimaryOrigin": "Open Lumilio at its configured primary address to use a passkey.",
+      "secureOriginRequired": "Passkeys require HTTPS or the configured localhost address.",
+      "trustedProxyRequired": "Passkeys require access through the configured trusted proxy."
     },
     "passwordField": {
       "hidePassword": "Hide password",

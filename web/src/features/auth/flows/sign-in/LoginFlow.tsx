@@ -20,6 +20,7 @@ import {
   PasswordField,
   TextInput,
 } from "../../components/ui";
+import { BrowserSecurityNotice } from "../../components/BrowserSecurityNotice.tsx";
 import { useLoginFlow } from "./useLoginFlow.ts";
 
 const LoginFlow: React.FC = () => {
@@ -83,6 +84,8 @@ const LoginFlow: React.FC = () => {
                   })
             }
           />
+
+          <BrowserSecurityNotice />
 
           {displayError && (
             <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
@@ -187,6 +190,8 @@ const LoginFlow: React.FC = () => {
             })}
           />
 
+          <BrowserSecurityNotice />
+
           {displayError && (
             <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
           )}
@@ -247,6 +252,8 @@ const LoginFlow: React.FC = () => {
             })}
           />
 
+          <BrowserSecurityNotice />
+
           {displayError && (
             <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
           )}
@@ -299,6 +306,8 @@ const LoginFlow: React.FC = () => {
             username,
           })}
         />
+
+        <BrowserSecurityNotice />
 
         {passkeyUnsupportedNote && (
           <div className="rounded-xl border border-base-200 bg-base-200/50 px-4 py-3 text-sm text-base-content/65">
