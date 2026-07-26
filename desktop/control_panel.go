@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,18 +27,10 @@ var dashboardLogFiles = map[string]string{
 	"lumen": "lumen-hub.log",
 }
 
-type networkSaveRequest struct {
-	Mode              supervisor.NetworkMode `json:"mode"`
-	PrimaryOrigin     string                 `json:"primaryOrigin"`
-	Listen            string                 `json:"listen"`
-	ProxyLocation     string                 `json:"proxyLocation"`
-	TrustedProxyCIDRs []string               `json:"trustedProxyCIDRs"`
-	AcceptLANWarning  bool                   `json:"acceptLANWarning"`
-}
-
 type runtimeConfigRequest struct {
-	BaseFingerprint string `json:"baseFingerprint"`
-	TOML            string `json:"toml"`
+	BaseFingerprint  string `json:"baseFingerprint"`
+	TOML             string `json:"toml"`
+	AcceptLANWarning bool   `json:"acceptLANWarning,omitempty"`
 }
 
 type runtimeConfigPatchNetworkRequest struct {
@@ -97,6 +88,66 @@ func (d *desktopApp) handleRuntimeConfigPatchNetwork(w http.ResponseWriter, r *h
 	writeJSON(w, result)
 }
 
+func (d *desktopApp) handleRuntimeConfigApply(w http.ResponseWriter, r *http.Request) {
+	var body runtimeConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	result, err := d.sup.ApplyRuntimeConfigAsync(
+		d.ctx,
+		body.BaseFingerprint,
+		body.TOML,
+		body.AcceptLANWarning,
+	)
+	switch {
+	case errors.Is(err, supervisor.ErrOperationInProgress),
+		errors.Is(err, supervisor.ErrStaleRuntimeConfig):
+		code := "operation_in_progress"
+		if errors.Is(err, supervisor.ErrStaleRuntimeConfig) {
+			code = "stale_fingerprint"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		writeJSON(w, map[string]any{"code": code, "message": err.Error()})
+		return
+	case err != nil:
+		var validationErr *supervisor.RuntimeConfigValidationError
+		if errors.As(err, &validationErr) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			writeJSON(w, map[string]any{
+				"code": "invalid_candidate", "message": err.Error(), "issues": validationErr.Issues,
+			})
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	writeJSON(w, map[string]any{"accepted": true, "validation": result})
+}
+
+func (d *desktopApp) handleRuntimeConfigRestore(w http.ResponseWriter, _ *http.Request) {
+	_, err := d.sup.RestoreLastKnownGoodAsync(d.ctx)
+	if errors.Is(err, supervisor.ErrOperationInProgress) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		writeJSON(w, map[string]any{
+			"code": "operation_in_progress", "message": err.Error(),
+		})
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	writeJSON(w, map[string]any{"accepted": true})
+}
+
 func (d *desktopApp) handleRuntimeRestart(w http.ResponseWriter, _ *http.Request) {
 	if err := d.sup.RestartAsync(d.ctx); err != nil {
 		if errors.Is(err, supervisor.ErrOperationInProgress) {
@@ -114,71 +165,6 @@ func (d *desktopApp) handleRuntimeRestart(w http.ResponseWriter, _ *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	writeJSON(w, map[string]any{"accepted": true})
-}
-
-func (d *desktopApp) handleNetworkSave(w http.ResponseWriter, r *http.Request) {
-	var body networkSaveRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	settings, err := d.sup.Settings()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	settings.NetworkMode = body.Mode
-	settings.PrimaryOrigin = strings.TrimSpace(body.PrimaryOrigin)
-	settings.Listen = strings.TrimSpace(body.Listen)
-	settings.TrustedProxyCIDRs = body.TrustedProxyCIDRs
-	settings.LANHTTPWarningAcceptedVersion = 0
-
-	switch body.Mode {
-	case supervisor.NetworkLocal:
-	case supervisor.NetworkLANHTTP:
-		if body.AcceptLANWarning {
-			settings.LANHTTPWarningAcceptedVersion = 1
-		}
-	case supervisor.NetworkExternalHTTPS:
-		switch body.ProxyLocation {
-		case "same_host":
-			if settings.Listen == "" {
-				settings.Listen = "127.0.0.1:6680"
-			}
-			settings.TrustedProxyCIDRs = []string{"127.0.0.1/32", "::1/128"}
-		case "remote":
-			if settings.Listen == "" {
-				settings.Listen = "0.0.0.0:6680"
-			}
-		default:
-			http.Error(w, "external HTTPS requires proxyLocation same_host or remote", http.StatusBadRequest)
-			return
-		}
-	default:
-		http.Error(w, "unknown network mode", http.StatusBadRequest)
-		return
-	}
-
-	oldOrigin := d.sup.ServerURL()
-	if err := d.sup.ApplyNetworkSettings(d.ctx, settings); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeJSON(w, map[string]any{
-		"ok":              true,
-		"serverURL":       d.sup.ServerURL(),
-		"rpIDChanged":     originHostname(oldOrigin) != originHostname(d.sup.ServerURL()),
-		"previousOrigin":  oldOrigin,
-		"effectiveOrigin": d.sup.ServerURL(),
-	})
-}
-
-func originHostname(origin string) string {
-	parsed, err := url.Parse(origin)
-	if err != nil {
-		return ""
-	}
-	return strings.ToLower(parsed.Hostname())
 }
 
 func (d *desktopApp) handleStorageLocations(w http.ResponseWriter, r *http.Request) {

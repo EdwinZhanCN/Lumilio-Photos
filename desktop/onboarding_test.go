@@ -212,6 +212,40 @@ func TestRuntimeConfigReadValidateAndStaleFingerprintEndpoints(t *testing.T) {
 	}
 }
 
+func TestRuntimeConfigApplyRejectsInvalidCandidateAndRetiredNetworkEndpoint(t *testing.T) {
+	d := newTestApp(t)
+	handler := d.onboardingHandler()
+	view, err := d.sup.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(map[string]string{
+		"baseFingerprint": view.BaseFingerprint,
+		"toml":            "[server\ninvalid",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodPost, "/__onb/runtime/config/apply", strings.NewReader(string(body))),
+	)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid_candidate") {
+		t.Fatalf("invalid apply response = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodPost, "/__onb/network", strings.NewReader(`{}`)),
+	)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("retired network endpoint status = %d, want 404", rec.Code)
+	}
+}
+
 func TestOnboardingIndexServed(t *testing.T) {
 	d := newTestApp(t)
 	rec := httptest.NewRecorder()

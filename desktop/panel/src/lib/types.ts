@@ -218,7 +218,7 @@ export interface LumenSavePayload {
   cacheDir: string;
 }
 
-export interface NetworkSavePayload {
+export interface NetworkCandidateInput {
   mode: NetworkMode;
   primaryOrigin: string;
   listen: string;
@@ -233,13 +233,14 @@ export interface RuntimeConfigRequest {
 }
 
 export interface RuntimeConfigPatchNetworkRequest extends RuntimeConfigRequest {
-  network: NetworkSavePayload;
+  network: NetworkCandidateInput;
 }
 
-export interface NetworkSaveResult {
-  ok: boolean;
-  serverURL: string;
-  rpIDChanged: boolean;
-  previousOrigin: string;
-  effectiveOrigin: string;
+export interface RuntimeConfigApplyRequest extends RuntimeConfigRequest {
+  acceptLANWarning?: boolean;
+}
+
+export interface RuntimeConfigApplyResult {
+  accepted: boolean;
+  validation: RuntimeConfigValidation;
 }

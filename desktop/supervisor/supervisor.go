@@ -73,8 +73,9 @@ type Supervisor struct {
 	onSnapshot       func(RuntimeSnapshot)
 	operatorControls app.OperatorControls
 
-	paths *Paths
-	lock  *InstanceLock
+	paths           *Paths
+	lock            *InstanceLock
+	applyReconciled bool
 
 	operationMu sync.Mutex
 	generation  *runtimeGeneration
@@ -361,14 +362,19 @@ func (s *Supervisor) prepareLocked() error {
 	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
 		snapshot.LastKnownGoodAvailable = lkgErr == nil
 	})
-	if s.lock != nil {
-		return nil
+	if s.lock == nil {
+		lock, err := AcquireLock(s.paths.LockFile())
+		if err != nil {
+			return err
+		}
+		s.lock = lock
 	}
-	lock, err := AcquireLock(s.paths.LockFile())
-	if err != nil {
-		return err
+	if !s.applyReconciled {
+		if err := s.reconcileRuntimeApply(); err != nil {
+			return err
+		}
+		s.applyReconciled = true
 	}
-	s.lock = lock
 	return nil
 }
 
@@ -387,6 +393,14 @@ func (s *Supervisor) Start(ctx context.Context) error {
 }
 
 func (s *Supervisor) startRuntimeLocked(ctx context.Context, phase RuntimePhase) error {
+	return s.startRuntimeLockedWithOperation(ctx, phase, false)
+}
+
+func (s *Supervisor) startRuntimeLockedWithOperation(
+	ctx context.Context,
+	phase RuntimePhase,
+	keepOperationActive bool,
+) error {
 	if err := s.reapFinishedGenerationLocked(); err != nil {
 		s.logf("previous desktop runtime generation exited with error: %v", err)
 	}
@@ -474,7 +488,7 @@ func (s *Supervisor) startRuntimeLocked(ctx context.Context, phase RuntimePhase)
 	snapshot.Stage = StageReady
 	snapshot.ErrorCode = ""
 	snapshot.ErrorMessage = ""
-	snapshot.OperationActive = false
+	snapshot.OperationActive = keepOperationActive
 	s.setSnapshot(snapshot)
 	s.logf("desktop runtime ready at %s", snapshot.BrowserURL)
 	return nil
@@ -728,96 +742,6 @@ func internalHealthURL(listen string) string {
 		Host:   net.JoinHostPort(host, port),
 		Path:   "/api/v1/health/ready",
 	}).String()
-}
-
-// ApplyNetworkSettings validates and atomically persists a candidate, restarts
-// the runtime, and restores the last-known-good settings if startup fails.
-func (s *Supervisor) ApplyNetworkSettings(ctx context.Context, candidate DesktopSettings) error {
-	if !s.operationMu.TryLock() {
-		return ErrOperationInProgress
-	}
-	defer s.operationMu.Unlock()
-
-	if err := s.ensurePaths(); err != nil {
-		return err
-	}
-	currentSettings, err := LoadSettings(s.paths.DesktopSettingsFile())
-	if err != nil {
-		return err
-	}
-	view, err := s.ReadRuntimeConfig()
-	if err != nil {
-		return err
-	}
-	proxyLocation := "same_host"
-	for _, cidr := range candidate.TrustedProxyCIDRs {
-		if cidr != "127.0.0.1/32" && cidr != "::1/128" {
-			proxyLocation = "remote"
-			break
-		}
-	}
-	validation, err := s.PatchRuntimeNetwork(view.BaseFingerprint, view.CandidateTOML, NetworkCandidatePatch{
-		Mode: candidate.NetworkMode, PrimaryOrigin: candidate.PrimaryOrigin, Listen: candidate.Listen,
-		ProxyLocation: proxyLocation, TrustedProxyCIDRs: candidate.TrustedProxyCIDRs,
-		AcceptLANWarning: candidate.LANHTTPWarningAcceptedVersion >= lanHTTPWarningCurrentVersion,
-	})
-	if err != nil {
-		return err
-	}
-	if !validation.Valid {
-		messages := make([]string, 0, len(validation.Issues))
-		for _, issue := range validation.Issues {
-			messages = append(messages, issue.Message)
-		}
-		return errors.New(strings.Join(messages, "; "))
-	}
-
-	wasRunning := s.generation != nil
-	if !wasRunning {
-		if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(validation.CandidateTOML)); err != nil {
-			return err
-		}
-		if err := SaveSettings(s.paths.DesktopSettingsFile(), candidate); err != nil {
-			_ = writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(view.CurrentTOML))
-			return err
-		}
-		return nil
-	}
-	snapshot := s.RuntimeSnapshot()
-	snapshot.Phase = RuntimeRestarting
-	snapshot.OperationActive = true
-	s.setSnapshot(snapshot)
-	if err := s.stopGenerationLocked(); err != nil {
-		s.failRuntime(err)
-		return fmt.Errorf("stop desktop runtime for network change: %w", err)
-	}
-	if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(validation.CandidateTOML)); err != nil {
-		_ = s.startRuntimeLocked(ctx, RuntimeRestarting)
-		return fmt.Errorf("promote network runtime candidate: %w", err)
-	}
-	if err := SaveSettings(s.paths.DesktopSettingsFile(), candidate); err != nil {
-		_ = writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(view.CurrentTOML))
-		_ = s.startRuntimeLocked(ctx, RuntimeRestarting)
-		return err
-	}
-	if err := s.startRuntimeLocked(ctx, RuntimeRestarting); err == nil {
-		if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), []byte(validation.CandidateTOML)); err != nil {
-			s.logf("update last-known-good runtime after network apply: %v", err)
-		}
-		return nil
-	} else {
-		startErr := err
-		if restoreErr := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(view.CurrentTOML)); restoreErr != nil {
-			return errors.Join(startErr, fmt.Errorf("restore last-known-good runtime: %w", restoreErr))
-		}
-		if restoreErr := SaveSettings(s.paths.DesktopSettingsFile(), currentSettings); restoreErr != nil {
-			return errors.Join(startErr, fmt.Errorf("restore desktop host settings: %w", restoreErr))
-		}
-		if rollbackErr := s.startRuntimeLocked(ctx, RuntimeRestarting); rollbackErr != nil {
-			return errors.Join(startErr, fmt.Errorf("restart last-known-good network profile: %w", rollbackErr))
-		}
-		return fmt.Errorf("network profile rejected; restored last-known-good settings: %w", startErr)
-	}
 }
 
 // storageReachable reports whether path exists or can be created (its parent

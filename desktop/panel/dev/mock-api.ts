@@ -394,6 +394,27 @@ export function mockPanelApi(): Plugin {
               requiresRestart: candidateToml !== MOCK_RUNTIME_TOML,
             });
           }
+          case "/__onb/runtime/config/apply": {
+            const body = await readBody(req);
+            mock.ready = false;
+            setTimeout(() => (mock.ready = true), 1800);
+            return json(res, {
+              accepted: true,
+              validation: {
+                valid: true,
+                candidateToml: String(body.toml ?? MOCK_RUNTIME_TOML),
+                baseFingerprint: MOCK_FINGERPRINT,
+                network: statePayload().runtime.network,
+                issues: [],
+                semanticChanges: [],
+                requiresRestart: true,
+              },
+            });
+          }
+          case "/__onb/runtime/config/restore":
+            mock.ready = false;
+            setTimeout(() => (mock.ready = true), 1800);
+            return json(res, { accepted: true });
           case "/__onb/lumen-save": {
             const body = await readBody(req);
             if (mock.lumen.cacheDir !== body.cacheDir) {

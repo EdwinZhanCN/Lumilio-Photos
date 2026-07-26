@@ -92,6 +92,16 @@
       actionError = cause instanceof Error ? cause.message : String(cause);
     }
   }
+
+  async function restoreLastKnownGood(): Promise<void> {
+    actionError = "";
+    try {
+      await api.restoreRuntimeConfig();
+      setTimeout(() => void refreshState(), 250);
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
 </script>
 
 <article class="card card-sm card-border h-full min-w-0 bg-raised">
@@ -154,6 +164,13 @@
               {runtime.errorMessage || t("runtimeUnknownError")}
             </dd>
           </dl>
+        </div>
+      </div>
+    {:else if runtime.errorCode === "candidate_rolled_back"}
+      <div role="status" class="alert alert-warning alert-soft items-start py-3 text-xs">
+        <div>
+          <div class="font-semibold">{t("candidateRolledBack")}</div>
+          <div class="mt-1 break-words">{runtime.errorMessage}</div>
         </div>
       </div>
     {:else if busy}
@@ -224,6 +241,7 @@
           class="btn btn-ghost btn-sm"
           disabled={!runtime.lastKnownGoodAvailable}
           title={!runtime.lastKnownGoodAvailable ? t("restoreUnavailable") : undefined}
+          onclick={() => void restoreLastKnownGood()}
         >
           {t("restoreLastKnownGood")}
         </button>

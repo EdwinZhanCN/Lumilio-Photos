@@ -3,12 +3,12 @@ import type {
   LogResult,
   LumenAction,
   LumenSavePayload,
-  NetworkSavePayload,
-  NetworkSaveResult,
   PanelState,
   PickResult,
   RepositoryIdentityConflict,
   RepositoryInfo,
+  RuntimeConfigApplyRequest,
+  RuntimeConfigApplyResult,
   RuntimeConfigPatchNetworkRequest,
   RuntimeConfigRequest,
   RuntimeConfigValidation,
@@ -66,8 +66,9 @@ export const api = {
     postJSON<RuntimeConfigValidation>("/__onb/runtime/config/validate", payload),
   patchRuntimeNetwork: (payload: RuntimeConfigPatchNetworkRequest) =>
     postJSON<RuntimeConfigValidation>("/__onb/runtime/config/patch-network", payload),
-  saveNetwork: (payload: NetworkSavePayload) =>
-    postJSON<NetworkSaveResult>("/__onb/network", payload),
+  applyRuntimeConfig: (payload: RuntimeConfigApplyRequest) =>
+    postJSON<RuntimeConfigApplyResult>("/__onb/runtime/config/apply", payload),
+  restoreRuntimeConfig: () => postJSON<{ accepted: boolean }>("/__onb/runtime/config/restore"),
   lumenSave: (payload: LumenSavePayload) => postJSON<{ ok: boolean }>("/__onb/lumen-save", payload),
   lumenAction: (action: LumenAction) =>
     postJSON<{ ok: boolean }>("/__onb/lumen-action", { action }),
