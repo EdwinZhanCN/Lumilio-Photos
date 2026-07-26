@@ -14,6 +14,7 @@ import (
 	"server/config"
 	"server/internal/db"
 	"server/internal/settings"
+	"server/platform/sqliteuri"
 )
 
 func openTestCatalog(t *testing.T, path string) *db.DB {
@@ -89,11 +90,9 @@ func TestCreateSnapshotIsStandaloneAndChecksumProtected(t *testing.T) {
 		}
 	}
 
-	location := &url.URL{Scheme: "file", Path: snapshot.Path}
-	query := location.Query()
+	query := make(url.Values)
 	query.Set("mode", "ro")
-	location.RawQuery = query.Encode()
-	snapshotDB, err := sql.Open("sqlite3", location.String())
+	snapshotDB, err := sql.Open("sqlite3", sqliteuri.DSN(snapshot.Path, query))
 	if err != nil {
 		t.Fatalf("open standalone snapshot: %v", err)
 	}

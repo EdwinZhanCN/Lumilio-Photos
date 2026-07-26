@@ -99,7 +99,7 @@ func assertDesktopHTTP(t *testing.T, client *http.Client, serverURL, marker stri
 
 func readLibraryID(t *testing.T, path string) string {
 	t.Helper()
-	database, err := sql.Open("sqlite3", "file:"+path+"?mode=ro")
+	database, err := sql.Open("sqlite3", path)
 	if err != nil {
 		t.Fatalf("open SQLite catalog: %v", err)
 	}
