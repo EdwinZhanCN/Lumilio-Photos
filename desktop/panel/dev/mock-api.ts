@@ -32,6 +32,18 @@ interface MockState {
   };
 }
 
+type MockRuntimePhase = "stopped" | "starting" | "running" | "restarting" | "failed";
+
+function isMockRuntimePhase(value?: string | null): value is MockRuntimePhase {
+  return (
+    value === "stopped" ||
+    value === "starting" ||
+    value === "running" ||
+    value === "restarting" ||
+    value === "failed"
+  );
+}
+
 const HOME = "/Users/demo";
 
 let storageLocations = [
@@ -116,8 +128,12 @@ const LOGS: Record<string, string> = {
     "2026-07-17 09:13:20 INFO  lumen-hub booting, backend=metal\n2026-07-17 09:13:26 INFO  model loaded: bioclip-v2 (1.2GB)",
 };
 
-function statePayload() {
-  const runtimePhase = mock.ready ? "running" : "starting";
+function statePayload(runtimeOverride?: string | null, modeOverride?: string | null) {
+  const runtimePhase: MockRuntimePhase = isMockRuntimePhase(runtimeOverride)
+    ? runtimeOverride
+    : mock.ready
+      ? "running"
+      : "starting";
   const runtimeNetwork = {
     mode: "local",
     listen: "127.0.0.1:6680",
@@ -131,6 +147,7 @@ function statePayload() {
   };
   return {
     ...mock,
+    mode: modeOverride === "dashboard" ? "dashboard" : mock.mode,
     lang: "en",
     validation,
     version: "0.9.0-dev",
@@ -139,13 +156,23 @@ function statePayload() {
     stage: mock.ready ? "running" : "starting",
     runtime: {
       phase: runtimePhase,
-      stage: mock.ready ? "ready" : "starting_server",
+      stage:
+        runtimePhase === "running"
+          ? "ready"
+          : runtimePhase === "failed"
+            ? "starting_server"
+            : "preparing",
+      errorCode: runtimePhase === "failed" ? "startup_failed" : "",
+      errorMessage:
+        runtimePhase === "failed"
+          ? "The runtime manifest is invalid: server.primary_origin must be an exact origin."
+          : "",
       browserURL: "http://localhost:6680",
-      canOpen: mock.ready,
-      canRestart: mock.ready,
+      canOpen: runtimePhase === "running",
+      canRestart: ["stopped", "running", "failed"].includes(runtimePhase),
       lastKnownGoodAvailable: true,
       network: runtimeNetwork,
-      operationActive: !mock.ready,
+      operationActive: runtimePhase === "starting" || runtimePhase === "restarting",
     },
     network: {
       ...runtimeNetwork,
@@ -196,8 +223,13 @@ export function mockPanelApi(): Plugin {
         if (!url.pathname.startsWith("/__onb/")) return next();
 
         switch (url.pathname) {
-          case "/__onb/state":
-            return json(res, statePayload());
+          case "/__onb/state": {
+            const pageURL = new URL(req.headers.referer ?? "http://localhost", "http://localhost");
+            return json(
+              res,
+              statePayload(pageURL.searchParams.get("runtime"), pageURL.searchParams.get("mode")),
+            );
+          }
           case "/__onb/pick":
             return json(res, { path: `${HOME}/Pictures/Lumilio Library`, validation });
           case "/__onb/pick-cache":

@@ -31,7 +31,7 @@ export function enterDashboard(): void {
   if (store.data) store.data.mode = "dashboard";
 }
 
-export type ServiceStatus = "running" | "starting" | "off" | "failed" | "disabled";
+export type ServiceStatus = "running" | "starting" | "restarting" | "off" | "failed" | "disabled";
 
 const busyStates = new Set(["installing", "starting", "checking", "stopping"]);
 
@@ -43,9 +43,33 @@ export function photosStatus(d: PanelState): ServiceStatus {
       return "failed";
     case "stopped":
       return "off";
+    case "restarting":
+      return "restarting";
     default:
       return "starting";
   }
+}
+
+export function runtimeBusy(d: PanelState): boolean {
+  return (
+    d.runtime.phase === "starting" || d.runtime.phase === "restarting" || d.runtime.operationActive
+  );
+}
+
+export function runtimeRunning(d: PanelState): boolean {
+  return d.runtime.phase === "running";
+}
+
+export function runtimeFailed(d: PanelState): boolean {
+  return d.runtime.phase === "failed";
+}
+
+export function canOpenLumilio(d: PanelState): boolean {
+  return runtimeRunning(d) && d.runtime.canOpen && Boolean(d.runtime.browserURL);
+}
+
+export function canRestartRuntime(d: PanelState): boolean {
+  return d.runtime.canRestart && !runtimeBusy(d);
 }
 
 export function hubStatus(d: PanelState): ServiceStatus {
@@ -58,12 +82,7 @@ export function hubStatus(d: PanelState): ServiceStatus {
 }
 
 export function anyServiceBusy(d: PanelState): boolean {
-  return (
-    d.runtime.phase === "starting" ||
-    d.runtime.phase === "restarting" ||
-    d.runtime.operationActive ||
-    busyStates.has(d.lumen.state)
-  );
+  return runtimeBusy(d) || busyStates.has(d.lumen.state);
 }
 
 export function hubUpdateAvailable(d: PanelState): boolean {

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
-import { anyServiceBusy, photosStatus } from "./store.svelte.ts";
+import {
+  anyServiceBusy,
+  canOpenLumilio,
+  canRestartRuntime,
+  photosStatus,
+  runtimeFailed,
+  runtimeRunning,
+} from "./store.svelte.ts";
 import type { PanelState, RuntimePhase } from "./types.ts";
 
 const state: PanelState = {
@@ -77,7 +84,7 @@ describe("typed runtime state helpers", () => {
     ["stopped", "off"],
     ["starting", "starting"],
     ["running", "running"],
-    ["restarting", "starting"],
+    ["restarting", "restarting"],
     ["failed", "failed"],
   ] satisfies Array<[RuntimePhase, ReturnType<typeof photosStatus>]>)(
     "maps %s to service status %s",
@@ -95,5 +102,15 @@ describe("typed runtime state helpers", () => {
         lumen: { ...state.lumen, state: "installing" },
       }),
     ).toBe(true);
+  });
+
+  it("enables Server actions only for supported snapshot states", () => {
+    expect(runtimeRunning(withPhase("running"))).toBe(true);
+    expect(runtimeFailed(withPhase("failed"))).toBe(true);
+    expect(canOpenLumilio(withPhase("running"))).toBe(true);
+    expect(canOpenLumilio(withPhase("failed"))).toBe(false);
+    expect(canRestartRuntime(withPhase("running"))).toBe(true);
+    expect(canRestartRuntime(withPhase("failed"))).toBe(true);
+    expect(canRestartRuntime(withPhase("restarting"))).toBe(false);
   });
 });

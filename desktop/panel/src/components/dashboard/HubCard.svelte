@@ -15,6 +15,7 @@
   const updateAvailable = $derived(hubUpdateAvailable(data));
 
   let configureOpen = $state(false);
+  let actionError = $state("");
 
   const configSummary = $derived(
     [lumen.preset, lumen.backend].filter(Boolean).join(" · ") || "—",
@@ -26,31 +27,33 @@
   );
 
   async function action(a: LumenAction) {
-    await api.lumenAction(a);
-    setTimeout(() => void refreshState(), 350);
+    actionError = "";
+    try {
+      await api.lumenAction(a);
+      setTimeout(() => void refreshState(), 350);
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
   }
 </script>
 
-<div class="flex flex-col gap-3 rounded-[10px] border border-line bg-raised px-4 py-3.5">
-  <div class="flex items-center justify-between gap-2.5">
-    <div class="flex items-center gap-2.5">
-      <span class="text-[14.5px] font-semibold">{t("hubService")}</span>
-      <StatusBadge {status} />
-    </div>
-    <div class="flex items-center gap-2">
-      <button
-        class={`btn btn-sm ${offLike ? "btn-primary" : ""}`}
-        onclick={() => void action(offLike ? "enable" : "disable")}
-      >
-        {offLike ? t("enable") : t("turnOff")}
-      </button>
-      {#if updateAvailable}
-        <button class="btn btn-outline btn-primary btn-sm" onclick={() => void action("update")}>
-          {t("update")}
-        </button>
-      {/if}
+<article class="card card-sm card-border h-full min-w-0 bg-raised">
+  <div class="card-body gap-3.5">
+    <div class="flex min-w-0 items-start justify-between gap-3">
+      <div class="min-w-0">
+        <div class="mb-1 flex flex-wrap items-center gap-2">
+          <h2 class="card-title text-[15px]">{t("hubService")}</h2>
+          <StatusBadge {status} />
+        </div>
+        <p class="m-0 text-xs text-muted">{t("hubSupervised")}</p>
+      </div>
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger class="btn btn-sm px-2.5" aria-label="More actions">⋯</DropdownMenu.Trigger>
+        <DropdownMenu.Trigger
+          class="btn btn-ghost btn-sm btn-square shrink-0"
+          aria-label={t("moreActions")}
+        >
+          ⋯
+        </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
             class="z-30 flex min-w-[160px] flex-col overflow-hidden rounded-lg border border-line bg-raised py-1 shadow-lg"
@@ -79,54 +82,80 @@
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
     </div>
-  </div>
 
-  <div class="flex flex-wrap gap-x-6 gap-y-2">
-    <div class="flex flex-col gap-0.5">
-      <span class="text-[10.5px] tracking-wide text-muted uppercase">{t("config")}</span>
-      <span class="text-xs capitalize">{configSummary}</span>
+    <div class="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2.5">
+      <div class="min-w-0">
+        <span class="text-[10.5px] tracking-wide text-muted uppercase">{t("config")}</span>
+        <div class="mt-0.5 truncate text-xs capitalize" title={configSummary}>{configSummary}</div>
+      </div>
+      <div class="min-w-0">
+        <span class="text-[10.5px] tracking-wide text-muted uppercase">{t("version")}</span>
+        <div class="mt-0.5 truncate text-xs tabular-nums" title={versionSummary}>{versionSummary}</div>
+      </div>
+      <div class="col-span-2 min-w-0">
+        <span class="text-[10.5px] tracking-wide text-muted uppercase">{t("modelCache")}</span>
+        <div class="mt-0.5 truncate font-mono text-[11.5px]" title={lumen.cacheDir}>
+          {lumen.cacheDir || "—"}
+        </div>
+      </div>
     </div>
-    <div class="flex flex-col gap-0.5">
-      <span class="text-[10.5px] tracking-wide text-muted uppercase">{t("version")}</span>
-      <span class="text-xs">{versionSummary}</span>
-    </div>
-    <div class="flex min-w-0 flex-col gap-0.5">
-      <span class="text-[10.5px] tracking-wide text-muted uppercase">{t("modelCache")}</span>
-      <span class="truncate font-mono text-xs" title={lumen.cacheDir}>{lumen.cacheDir || "—"}</span>
-    </div>
-  </div>
 
-  {#if status === "starting"}
-    {#if lumen.download && lumen.download.bytesTotal > 0}
-      <progress
-        class="progress progress-primary h-[5px] w-full"
-        value={lumen.download.bytesDone}
-        max={lumen.download.bytesTotal}
-      ></progress>
-      <p class="m-0 text-xs text-muted">
-        {t("hubDownloading", {
-          model: lumen.download.model,
-          done: formatBytes(lumen.download.bytesDone),
-          total: formatBytes(lumen.download.bytesTotal),
-        })}
-      </p>
-    {:else}
-      <progress class="progress progress-primary h-[5px] w-full"></progress>
-      <p class="m-0 text-xs text-muted">
-        {lumen.phase === "downloading" && lumen.download
-          ? t("hubDownloading", {
-              model: lumen.download.model,
-              done: formatBytes(lumen.download.bytesDone),
-              total: "…",
-            })
-          : t("hubPreparing")}
+    {#if status === "starting"}
+      {#if lumen.download && lumen.download.bytesTotal > 0}
+        <progress
+          class="progress progress-primary h-[5px] w-full"
+          value={lumen.download.bytesDone}
+          max={lumen.download.bytesTotal}
+        ></progress>
+        <p class="m-0 text-xs text-muted">
+          {t("hubDownloading", {
+            model: lumen.download.model,
+            done: formatBytes(lumen.download.bytesDone),
+            total: formatBytes(lumen.download.bytesTotal),
+          })}
+        </p>
+      {:else}
+        <div class="flex items-center gap-2 text-xs text-muted">
+          <span class="loading loading-bars loading-sm text-primary"></span>
+          <span>
+            {lumen.phase === "downloading" && lumen.download
+              ? t("hubDownloading", {
+                  model: lumen.download.model,
+                  done: formatBytes(lumen.download.bytesDone),
+                  total: "…",
+                })
+              : t("hubPreparing")}
+          </span>
+        </div>
+      {/if}
+    {/if}
+
+    {#if status === "failed"}
+      <p role="alert" class="m-0 break-words text-xs text-error">
+        {lumen.error || t("hubError")}
       </p>
     {/if}
-  {/if}
+    {#if actionError}
+      <p role="alert" class="m-0 break-words text-xs text-error">{actionError}</p>
+    {/if}
 
-  {#if status === "failed"}
-    <p class="m-0 text-xs text-error">{lumen.error || t("hubError")}</p>
-  {/if}
-</div>
+    <div class="card-actions mt-auto flex-wrap justify-start pt-1">
+      <button
+        class={`btn btn-sm ${offLike ? "btn-primary" : ""}`}
+        onclick={() => void action(offLike ? "enable" : "disable")}
+      >
+        {offLike ? t("enable") : t("turnOff")}
+      </button>
+      {#if updateAvailable}
+        <button class="btn btn-outline btn-primary btn-sm" onclick={() => void action("update")}>
+          {t("update")}
+        </button>
+      {/if}
+      <button class="btn btn-ghost btn-sm" onclick={() => (configureOpen = true)}>
+        {t("configure")}
+      </button>
+    </div>
+  </div>
+</article>
 
 <ConfigureDialog bind:open={configureOpen} />
