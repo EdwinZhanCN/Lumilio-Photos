@@ -1,8 +1,8 @@
 # Lumilio Photos SQLite-only 迁移执行计划
 
-> 仓库路径：`site/docs/internal/agent/exec-plans/active/sqlite.md`
+> 仓库路径：`site/docs/internal/agent/exec-plans/completed/sqlite.md`
 > 工作分支：`experimental/sqlite`
-> 状态：Active
+> 状态：Completed
 > 迁移策略：允许 destructive migration；没有 PostgreSQL 数据导入义务
 > 停止条件：完成本文“核心 Definition of Done”。标记为 Hardening / Deferred 的规模 benchmark、持续 stress、全量 fault injection、完整跨平台运行时 E2E 不阻塞 `experimental/sqlite` goal 完成。
 
@@ -1040,27 +1040,27 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 
 以下全部成立后，`experimental/sqlite` goal可以结束；P1/P2 Hardening backlog不阻塞：
 
-- [ ] SQLite 是唯一数据库实现和唯一运行时依赖。
-- [ ] PostgreSQL migrations、driver、pool、types、backup tools、Docker service和Desktop runtime全部删除。
-- [ ] config schema v2在dev、Docker、Desktop与tests统一。
-- [ ] fresh SQLite baseline覆盖当前应用所需schema，允许清空旧开发数据。
-- [ ] sqlc使用SQLite/`database/sql`并可重复生成。
-- [ ] River使用SQLite；核心业务状态与pipeline enqueue共享事务。
-- [ ] SourceMaterializer及关键queue入口具备事务性enqueue，并有最小prepared/recoverable恢复路径。
-- [ ] 所有当前worker和periodic job定义能够注册/编译；至少一个代表worker和retry路径实际执行通过。
-- [ ] FTS、semantic、video和face search完成小样本正确性smoke，或对缺少fixture的路径完成存取/query层验证。
-- [ ] vector方案通过小样本正确性验证；规模benchmark和ANN决定已进入Hardening backlog。
-- [ ] backup/restore改为SQLite snapshot，并完成一次有效restore和一次损坏snapshot拒绝。
-- [ ] Docker无DB service；当前架构单Lumilio container能服务SPA+API并在restart后保留state。
-- [ ] Desktop无PostgreSQL子进程和bundle；当前开发平台build与first/second launch通过。
-- [ ] 开发流程与主要CI配置不再要求PostgreSQL；无法在当前环境执行的跨平台runtime测试已记录。
-- [ ] P0 changed-area tests、migration tests和smoke通过；无关既有失败已明确记录且未被禁用。
-- [ ] 聚焦路径不存在被吞掉或无限重试的 `SQLITE_BUSY`；已知并发限制进入Hardening backlog。
-- [ ] README与内部架构文档更新。
-- [ ] 全仓库runtime PostgreSQL guard通过。
-- [ ] 已记录能够低成本获得的启动、查询、体积或内存观察；没有硬性benchmark门槛。
-- [ ] plan中的Progress、Decision Log、Surprises、Outcomes和Hardening backlog完整。
-- [ ] active plan移动至completed，且最终commit保持clean working tree。
+- [x] SQLite 是唯一数据库实现和唯一运行时依赖。
+- [x] PostgreSQL migrations、driver、pool、types、backup tools、Docker service和Desktop runtime全部删除。
+- [x] config schema v2在dev、Docker、Desktop与tests统一。
+- [x] fresh SQLite baseline覆盖当前应用所需schema，允许清空旧开发数据。
+- [x] sqlc使用SQLite/`database/sql`并可重复生成。
+- [x] River使用SQLite；核心业务状态与pipeline enqueue共享事务。
+- [x] SourceMaterializer及关键queue入口具备事务性enqueue，并有最小prepared/recoverable恢复路径。
+- [x] 所有当前worker和periodic job定义能够注册/编译；至少一个代表worker和retry路径实际执行通过。
+- [x] FTS、semantic、video和face search完成小样本正确性smoke，或对缺少fixture的路径完成存取/query层验证。
+- [x] vector方案通过小样本正确性验证；规模benchmark和ANN决定已进入Hardening backlog。
+- [x] backup/restore改为SQLite snapshot，并完成一次有效restore和一次损坏snapshot拒绝。
+- [x] Docker无DB service；当前架构单Lumilio container能服务SPA+API并在restart后保留state。
+- [x] Desktop无PostgreSQL子进程和bundle；当前开发平台build与first/second launch通过。
+- [x] 开发流程与主要CI配置不再要求PostgreSQL；无法在当前环境执行的跨平台runtime测试已记录。
+- [x] P0 changed-area tests、migration tests和smoke通过；无关既有失败已明确记录且未被禁用。
+- [x] 聚焦路径不存在被吞掉或无限重试的 `SQLITE_BUSY`；已知并发限制进入Hardening backlog。
+- [x] README与内部架构文档更新。
+- [x] 全仓库runtime PostgreSQL guard通过。
+- [x] 已记录能够低成本获得的启动、查询、体积或内存观察；没有硬性benchmark门槛。
+- [x] plan中的Progress、Decision Log、Surprises、Outcomes和Hardening backlog完整。
+- [x] active plan移动至completed，且最终commit保持clean working tree。
 
 ### 3.6 Agent执行纪律
 
@@ -1088,9 +1088,9 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - [x] Phase 7：backup/restore与runtime generation
 - [x] Phase 8：Docker
 - [x] Phase 9：Desktop
-- [ ] Phase 10：dev/CI/docs/cleanup
-- [ ] Core Definition of Done
-- [ ] Hardening backlog已记录（不阻塞）
+- [x] Phase 10：dev/CI/docs/cleanup
+- [x] Core Definition of Done
+- [x] Hardening backlog已记录（不阻塞）
 
 ### Phase 0 执行记录（2026-07-25）
 
@@ -1271,6 +1271,34 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - Windows release configuration完成静态审查：workflow、PowerShell resource fetch、build script、installer source与文档均不再引用数据库 distribution/path/artifact。Windows runtime smoke仍属于Hardening。
 - 本机缺少 web依赖时，普通 locked install 在 sharp optional native postinstall 上失败；`vp install --ignore-scripts` 完成依赖恢复，随后生产 SPA build 与 Desktop bundle build通过。现有 Homebrew media library deployment-target warnings仍是独立 packaging hardening，不是 SQLite blocker。
 
+### Phase 10 执行记录（2026-07-26）
+
+#### 开发流程、CI、文档与回归防线
+
+- `make setup` 现在用 `CI=1 VITE_GIT_HOOKS=0 vp install` 确定性安装前端依赖，并安装从仓库 root 正确进入 `web/` 执行 `vp staged` 的 hook。`make dev` 只启动本地 Server 与 Vite，不再依赖 Docker 数据库；`make db-reset` 只删除经过精确解析的 catalog、WAL、SHM 与 derived state。
+- devcontainer、CI、release workflows、Make targets、ignore rules 和文档均删除旧数据库 service、password secret、secret initializer、旧 web image/Caddy 与 PostgreSQL 工具链。release workflow 只构建一个 multi-arch `lumilio-server` image。
+- `scripts/check-sqlite-architecture.sh` 扫描活动源码、完整 Go compiled dependency graph、sqlc 残留宏、危险的动态 slice/fixed placeholder 组合、数据库侧随机 UUID 和旧 PostgreSQL package/binary。CI 无条件执行该 guard；UUID 与随机数据只能在 Go 中生成，所有 required-column insert contract 由 schema test 覆盖。
+- 首次 setup UI/API 中已经没有数据库准备或密码轮换阶段；状态只表达 admin/repository bootstrap，backup UI 与双语文档只描述 SQLite snapshot。OpenAPI、前端 DTO、Redoc、i18n extraction 与 feature docs 已重新生成或同步。
+- sqlc 宏迁移后的真实测试暴露并修复 typed CTE/JSON collection、NULL bool、timestamp、UUID、queue timestamp scan、location cluster transaction、sqlite-vec `k <= 4096`、snapshot sidecar、forced backup、video semantic seek、恢复 fixture 权限等边界。生成命令为 `cd server && sqlc generate`、`make dto`、`cd web && vp exec i18next-cli extract`；生成文件未被手工修补。
+
+#### 最终验证与可获得的观察
+
+- `make server-test`、`make web-test`、`make desktop-test`、`make desktop-build`、Web production build、VitePress production build、两个 Go module 的 `go mod tidy -diff`、sqlc regeneration、DTO generation、architecture guard 与 diff/YAML/Compose checks 全部通过。
+- fresh final E2E stack 共 12/12 browser tests 通过：smoke 4、auth hardening 5、video semantic 2、backup recovery 1。真实 worker 完成 location clustering；备份目录只含 manifest 与独立 `.sqlite3` snapshot，没有 WAL/SHM。
+- final Linux/arm64 release image 为 318,888,485 bytes（image ID `sha256:a7c7f8990a783bc65ae49a3a1e7018afcdcdd9966f07797a2abed49f0757a31a`），包含 Server 与 SPA，不含 PostgreSQL binary/client/libpq package。fresh local container 从进程日志开始到 listener ready 约 43 ms；这是 ML disabled 的单次环境观察，不是 benchmark。
+- final ad-hoc signed macOS app 为 321,456 KiB，main binary 为 80,874,016 bytes，通过 deep/strict codesign；linked libraries、Go build metadata、strings、module graph、notices 与 bundle filenames 不含 PostgreSQL/pgx/pgvector/riverpgx/libpq。
+- release image 的 fresh、restart 与 container remove/recreate 均保持同一 `system_state.library_id`；每次 graceful stop 后由同一 container runtime 执行的离线 `PRAGMA quick_check` 均返回 `ok`。不能用 host SQLite tool 打开仍在 container mount 上运行的 catalog。
+- 小型 E2E fixture 的 browser 首屏观察约 523 ms，三个 video case 约 3.5–5.6 s 并正确定位 semantic frame。它们只证明交互路径和 seek 行为；没有测量 representative library 性能或严格 idle memory，不能据此宣称规模或内存改善。
+
+#### Consolidated Hardening backlog
+
+- 对持续并发 import、UI browse、backup、River execution 与 WAL checkpoint/truncate 做长时间压力测试，并补全 kill -9、disk-full、prepared/orphan、interrupted job、restore rollback 多故障注入矩阵。
+- 在代表性 100k/1M vector library 上测量 exact-search latency、内存和 rebuild 成本，再决定 ANN/sidecar 阈值；当前 exact `vec0` 是正确性基线，不是无条件规模结论。
+- 完成 Windows runtime smoke、非当前 architecture runtime 与发布后的 multi-arch image 观察；持续跟踪 macOS `sqlite3_auto_extension` deprecation 和 Homebrew media library deployment-target packaging warnings。
+- 当 upstream River production dependency closure 不再链接 pgx 时升级并删除窄 fork；在此之前保持 license、差异说明和 architecture/package guard。
+- 不得跨 host/container VFS 边界用 host SQLite tool 打开活动 catalog、WAL 或 SHM；live inspection 必须使用应用 Online Backup snapshot，直接离线检查只能在应用 graceful stop 后于 owning runtime 内进行。
+- 将正常 client cancellation 映射为非 500/可识别的 audit status，避免 E2E reseed 取消请求产生误导日志；这不影响 catalog 正确性或迁移完成状态。
+
 ## Decision Log
 
 | Date | Decision | Reason | Consequence |
@@ -1286,6 +1314,8 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 | 2026-07-25 | sqlc JSON 字段使用 `dbtypes.JSON`，时间使用 Unix microseconds `dbtypes.Timestamp` | `STRICT TEXT` 会拒绝 `json.RawMessage` 产生的 BLOB，且时间需要跨 driver 的唯一语义 | Phase 3 overrides 复用集中 Scanner/Valuer，不允许 query-local cast/fallback |
 | 2026-07-26 | Docker release 固定为一个同时服务 SPA + API 的 application image 与两个显式 bind mounts | 删除 DB/Caddy 必需 service，并让 catalog ownership、备份与恢复边界可见 | `/data/storage` 只放媒体；`/data/app-state` 放 SQLite catalog 与 private state；TLS 变为外部可选 proxy |
 | 2026-07-26 | River v0.24 使用只保留 reachable production packages 的本地 MPL-2.0 fork | 上游 production `testsignal` 经 test helper 将 pgx 链接进最终 binary；升级会扩大本次迁移风险 | fork 保持窄差异、携带上游 license/说明并由 package/architecture guard约束；后续升级应优先删除 fork |
+| 2026-07-26 | 所有 UUID 与随机数据由 Go 生成，不使用 SQLite `randomblob()` | required-column contract 与 transaction orchestration 应在业务边界显式可测，数据库侧随机表达式也会绕过生成 DTO | query params 必须包含 ID；schema/architecture tests 防止遗漏和数据库侧随机 fallback |
+| 2026-07-26 | 活动 catalog 只能由 owning runtime 打开，跨 container mount 的 host 工具不属于支持的诊断路径 | SQLite WAL/VFS locking 语义不能假设跨 Linux container 与 macOS host 一致 | live 检查使用 Online Backup snapshot；离线检查先 graceful stop，并在 owning runtime 内完成 |
 
 ## Surprises & Discoveries
 
@@ -1302,24 +1332,22 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - Desktop first-launch smoke 发现 SQLite baseline 的 `bootstrap_phase` CHECK 少了应用实际写入的 `db_rotated`；旧单元测试未覆盖真实 bootstrap sequence，现由真实 first/second launch 与 baseline test共同守护。
 - `go mod tidy` 不足以证明最终 package 不含旧后端：River v0.24 的 production helper把 pgx拉进实际 Desktop binary。最终 bundle的 Go metadata/string/linked-library audit促成了窄 production fork，并要求 Phase 10 增加 repository architecture guard。
 - host web依赖恢复时 sharp optional native postinstall失败，但跳过 install scripts 后同一 lockfile 的 production SPA build成功；这暴露的是本机依赖安装路径差异，未通过修改 lockfile 或降低 build gate隐藏。
+- SQLite baseline required-column contract 在 broaden 后发现 registration session、duplicate group、Agent pin、share link 与 location cluster 的 UUID insert 都依赖了 PostgreSQL 时代的隐式/default 行为。统一改成 Go UUID 后，guard 同时排除了数据库侧 `randomblob()` fallback。
+- sqlc 对同一 statement 中 slice expansion 与固定 numbered parameters 的组合会生成位置错误但能编译的代码；JSON collection/typed CTE 与 generation guard 把这类问题从 runtime 移到 CI。
+- 在 macOS host 上直接用 `sqlite3` 打开 OrbStack/Linux bind mount 中仍活动的 catalog 会跨 VFS/WAL boundary 干扰数据库，并曾导致下一次启动报告 malformed。隔离目录重做后，所有检查只在 graceful stop 后由 container runtime执行，三次 quick check 与 identity persistence 均通过；文档现在明确禁止该诊断方式。
 
 ## Outcomes & Retrospective
 
-完成后填写：
-
-- 最终SQLite driver与版本：
-- 最终River版本：
-- 最终vector方案：
-- schema/table/query数量：
-- 删除的PostgreSQL组件：
-- Desktop package体积变化：当前 ad-hoc signed macOS app 321,476 KiB，main binary 80,890,048 bytes；迁移前同条件 bundle未留存，因此只记录绝对值。
-- Docker image体积变化：当前 Linux/arm64 单体 runtime image 319,084,043 bytes；迁移前同条件 image未留存，因此只记录绝对值，不虚构百分比。
-- idle memory变化：
-- startup变化：
-- 可获得的startup/browse/vector/体积观察：
-- P0可靠性测试结果与Deferred fault matrix：
-- 已知限制：
-- 是否建议将SQLite迁移合并为默认架构：
+- 最终 SQLite driver 是 `mattn/go-sqlite3 v1.14.48`，统一使用 `sqlite_fts5` build tag、单 writer pool 与静态 sqlite-vec 注册；仓库没有第二 driver 或 runtime extension fallback。
+- 最终 River 是 v0.24.0 `riversqlite`，应用 transaction 与 queue insert 共享 `*sql.Tx`。为消除 production binary 中不可达但实际链接的 pgx，当前使用只包含 reachable production packages 的窄 MPL-2.0 local fork。
+- 最终 vector 方案是 sqlite-vec CGo binding v0.1.6 exact `vec0`。768D semantic 与 512D face authoritative vectors 保存在 ordinary STRICT tables，派生 `vec0` 可重建；ANN threshold 留给规模 benchmark。
+- fresh baseline 创建 52 个 ordinary application tables、6 个 virtual tables 和 119 个 explicit indexes。63 个 query source files 生成 468 个 named sqlc queries；Phase 0 inventory 的 125 个 PostgreSQL-era indexes 均被保留、转换为 FTS/vector结构或按 engine-only 语义明确删除。
+- 已删除旧 PostgreSQL migrations、pgx/pgtype/pgconn、pgvector、riverpgxv5、lib/pq、PostgreSQL migrate driver、DB password rotation/secret initializer、Docker DB service/volume/port/secret、旧独立 web/Caddy service，以及 Desktop database supervisor、resources、license 与发布 artifact。
+- final ad-hoc signed macOS app 为 321,456 KiB，main binary 为 80,874,016 bytes；final Linux/arm64 单体 runtime image 为 318,888,485 bytes。迁移前没有同条件 artifact，因此不虚构体积改善百分比。
+- 没有进行严格 idle-memory 或迁移前后 startup benchmark。唯一可报告的 fresh local container 观察约为 43 ms 到 listener ready（ML disabled）；小型 browser fixture 约 523 ms 到首屏、video semantic cases 约 3.5–5.6 s。exact vector correctness 已验证，但这些数据不代表大型 library 性能。
+- P0 可靠性门槛通过：完整 Server/Web/Desktop/build/docs/generation/architecture gates、Linux image audit、macOS signed bundle audit、restart/recreate identity + integrity、以及 12/12 fresh browser E2E。长时间 stress、完整 kill/fault matrix、规模 vector benchmark 与完整跨平台 runtime E2E 明确 Deferred 到 Hardening backlog。
+- 已知限制是 SQLite 单 writer、活动 catalog 必须位于 machine-local state、不能跨 VFS/host container 热打开或复制、exact vector 的规模阈值尚未决定、River narrow fork 待 upstream closure 修复，以及 Windows/非当前 architecture runtime 尚未完整实测。
+- 建议在通过远端 CI 后将 SQLite 合并为本项目默认架构：destructive fresh baseline、唯一 runtime、事务性 River、snapshot/restore、Desktop、Docker 与核心产品路径已经形成闭环。该建议不等同于提供 PostgreSQL 数据转换路径。
 
 ### Critical Files for Implementation
 

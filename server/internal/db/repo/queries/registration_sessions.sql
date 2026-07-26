@@ -4,9 +4,19 @@ INSERT INTO registration_sessions (
   password_hash,
   role,
   webauthn_user_handle,
-  expires_at
+  created_at,
+  expires_at,
+  session_id
 )
-VALUES (?1, ?2, ?3, ?4, ?5)
+VALUES (
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+  ?5,
+  sqlc.arg('session_id')
+)
 RETURNING *;
 
 -- name: GetRegistrationSessionByID :one

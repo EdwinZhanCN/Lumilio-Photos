@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
@@ -42,7 +43,7 @@ func (s *aiGeneratedTagService) ReplaceAssetAIGeneratedTags(ctx context.Context,
 	if len(normalizedSources) > 0 {
 		if err := s.queries.RemoveAssetTagsBySources(ctx, repo.RemoveAssetTagsBySourcesParams{
 			AssetID: assetID,
-			Sources: normalizedSources,
+			Sources: dbtypes.StringsJSONParam(normalizedSources),
 		}); err != nil {
 			return fmt.Errorf("remove existing ai tags: %w", err)
 		}

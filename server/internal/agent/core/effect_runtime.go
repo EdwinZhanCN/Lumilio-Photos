@@ -53,7 +53,7 @@ func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID stri
 	}
 	assetIDs := append([]uuid.UUID(nil), membership...)
 	authorized, err := r.queries.GetAuthorizedAssetIDs(ctx, repo.GetAuthorizedAssetIDsParams{
-		AssetIds: assetIDs,
+		AssetIds: dbtypes.UUIDsJSONParam(assetIDs),
 		OwnerID:  &userID,
 	})
 	if err != nil {
@@ -153,7 +153,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		return EffectReceipt{}, sql.ErrNoRows
 	}
 	locked, err := q.LockAuthorizedAssetIDs(ctx, repo.LockAuthorizedAssetIDsParams{
-		AssetIds: []uuid.UUID(effect.MembershipSnapshot), OwnerID: &userID,
+		AssetIds: dbtypes.UUIDsJSONParam([]uuid.UUID(effect.MembershipSnapshot)), OwnerID: &userID,
 	})
 	if err != nil || len(locked) != len(effect.MembershipSnapshot) {
 		return EffectReceipt{}, sql.ErrNoRows
@@ -172,7 +172,10 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 			return EffectReceipt{}, err
 		}
 		if err := q.BulkUpdateAssetLiked(ctx, repo.BulkUpdateAssetLikedParams{
-			Liked: payload.Liked, AssetIds: []uuid.UUID(effect.MembershipSnapshot),
+			Liked: payload.Liked,
+			AssetIds: dbtypes.UUIDsJSONParam(
+				[]uuid.UUID(effect.MembershipSnapshot),
+			),
 		}); err != nil {
 			return EffectReceipt{}, err
 		}

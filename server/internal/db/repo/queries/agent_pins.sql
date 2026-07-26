@@ -1,6 +1,14 @@
 -- name: CreateAgentPin :one
-INSERT INTO agent_pins (user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+INSERT INTO agent_pins (
+    user_id, title, widget, mode, plan, summary, asset_ids, truncated,
+    layout_x, layout_y, layout_w, layout_h, created_at, updated_at, pin_id
+)
+VALUES (
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    sqlc.arg('pin_id')
+)
 RETURNING *;
 
 -- name: ListAgentPins :many

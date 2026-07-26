@@ -394,9 +394,10 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 // GetAssetsByOwnerSorted retrieves assets by owner sorted by taken_time
 func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByOwnerSortedParams{
-		OwnerID: int32PtrFromIntPtr(&ownerID),
-		Limit:   int64(limit),
-		Offset:  int64(offset),
+		OwnerID:   int32PtrFromIntPtr(&ownerID),
+		SortOrder: sortOrder,
+		Limit:     int64(limit),
+		Offset:    int64(offset),
 	}
 
 	return s.queries.GetAssetsByOwnerSorted(ctx, params)
@@ -405,9 +406,10 @@ func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, 
 // GetAssetsByTypesSorted retrieves assets by multiple types sorted by taken_time
 func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByTypesSortedParams{
-		Types:  assetTypes,
-		Limit:  int64(limit),
-		Offset: int64(offset),
+		Types:     dbtypes.StringsJSONParam(assetTypes),
+		SortOrder: sortOrder,
+		Limit:     int64(limit),
+		Offset:    int64(offset),
 	}
 
 	return s.queries.GetAssetsByTypesSorted(ctx, params)
@@ -416,10 +418,11 @@ func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []
 // GetAssetsByOwnerAndTypes retrieves assets by owner and multiple types sorted by taken_time
 func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByOwnerAndTypesSortedParams{
-		OwnerID: int32PtrFromIntPtr(&ownerID),
-		Types:   assetTypes,
-		Limit:   int64(limit),
-		Offset:  int64(offset),
+		OwnerID:   int32PtrFromIntPtr(&ownerID),
+		Types:     dbtypes.StringsJSONParam(assetTypes),
+		SortOrder: sortOrder,
+		Limit:     int64(limit),
+		Offset:    int64(offset),
 	}
 
 	return s.queries.GetAssetsByOwnerAndTypesSorted(ctx, params)
@@ -1168,7 +1171,7 @@ func assetSetSourceUUIDs(source *AssetSetSource) []uuid.UUID {
 	return cloneUUIDSlice(source.AssetIDs)
 }
 
-func assetSetSourceSQLiteUUIDs(source *AssetSetSource) any {
+func assetSetSourceSQLiteUUIDs(source *AssetSetSource) *string {
 	if source == nil {
 		return nil
 	}
@@ -1179,14 +1182,11 @@ func assetSetSourceSQLiteUUIDs(source *AssetSetSource) any {
 		}
 		ids = append(ids, id)
 	}
-	return ids
+	return dbtypes.UUIDsJSONParam(ids)
 }
 
-func sqliteStrings(values []string) any {
-	if len(values) == 0 {
-		return nil
-	}
-	return dbtypes.Strings(values)
+func sqliteStrings(values []string) *string {
+	return dbtypes.StringsJSONParam(values)
 }
 
 func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {

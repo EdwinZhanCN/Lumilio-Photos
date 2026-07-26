@@ -18,9 +18,19 @@ INSERT INTO registration_sessions (
   password_hash,
   role,
   webauthn_user_handle,
-  expires_at
+  created_at,
+  expires_at,
+  session_id
 )
-VALUES (?1, ?2, ?3, ?4, ?5)
+VALUES (
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+  ?5,
+  ?6
+)
 RETURNING session_id, username, password_hash, role, webauthn_user_handle, totp_secret_ciphertext, created_at, expires_at
 `
 
@@ -30,6 +40,7 @@ type CreateRegistrationSessionParams struct {
 	Role               string            `db:"role" json:"role"`
 	WebauthnUserHandle []byte            `db:"webauthn_user_handle" json:"webauthn_user_handle"`
 	ExpiresAt          dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	SessionID          uuid.UUID         `db:"session_id" json:"session_id"`
 }
 
 func (q *Queries) CreateRegistrationSession(ctx context.Context, arg CreateRegistrationSessionParams) (RegistrationSession, error) {
@@ -39,6 +50,7 @@ func (q *Queries) CreateRegistrationSession(ctx context.Context, arg CreateRegis
 		arg.Role,
 		arg.WebauthnUserHandle,
 		arg.ExpiresAt,
+		arg.SessionID,
 	)
 	var i RegistrationSession
 	err := row.Scan(

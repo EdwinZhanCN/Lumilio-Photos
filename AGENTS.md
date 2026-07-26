@@ -6,7 +6,7 @@ This file is the short entry point for humans and coding agents working in Lumil
 
 - `server/`: Go API service. Entrypoint is `server/cmd/main.go` (thin); the bootstrap lives in `server/app` (`app.Run(ctx)`); application config is `server/config`; business logic lives in `server/internal/*`; migrations live in `server/migrations`.
 - `web/`: React 19 + TypeScript frontend on Vite+. Feature code lives under `web/src/features/*`; shared pieces live in `web/src/lib`, `web/src/components`, and `web/src/contexts`. `web/ARCHITECTURE.md` is authoritative; `web/src/features/README.md` is the short placement checklist.
-- `desktop/`: Wails v3 macOS app (separate Go module, `replace server => ../server`). Bundles a private PostgreSQL and runs `server/app` in-process; the React UI is served over HTTP at `localhost:6680`. See `desktop/README.md`.
+- `desktop/`: Wails v3 macOS app (separate Go module, `replace server => ../server`). Runs `server/app` and its embedded SQLite catalog in-process; the React UI is served over HTTP at `localhost:6680`. See `desktop/README.md`.
 - `wasm/`: Rust WebAssembly crates for browser-side hashing/export/studio/thumbnail flows; checked-in JS/WASM bundles live under `web/src/wasm`.
 - `site/docs/`: VitePress docs site. Public product/user docs under `en/` and `zh-cn/`; internal engineering/harness docs live under `site/docs/internal/` (`internal/agent/` = harness notes, `internal/frontend/` = frontend architecture) — built but excluded from nav/sidebar/search.
 

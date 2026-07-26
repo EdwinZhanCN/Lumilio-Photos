@@ -119,6 +119,18 @@ func TestScanRepositoryArgsKindAndInsertOpts(t *testing.T) {
 	}
 }
 
+func TestDatabaseBackupArgsOnlyDedupesPeriodicTicks(t *testing.T) {
+	periodic := (DatabaseBackupArgs{}).InsertOpts()
+	if !periodic.UniqueOpts.ByArgs || periodic.UniqueOpts.ByPeriod != 30*time.Minute {
+		t.Fatalf("periodic backup uniqueness = %+v", periodic.UniqueOpts)
+	}
+
+	forced := (DatabaseBackupArgs{Force: true}).InsertOpts()
+	if forced.UniqueOpts.ByArgs || forced.UniqueOpts.ByPeriod != 0 {
+		t.Fatalf("forced backup must always enqueue, got uniqueness %+v", forced.UniqueOpts)
+	}
+}
+
 func TestProcessPHashArgsInsertOpts(t *testing.T) {
 	args := ProcessPHashArgs{}
 

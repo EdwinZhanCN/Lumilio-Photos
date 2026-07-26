@@ -37,8 +37,6 @@
                 "esbenp.prettier-vscode",
                 // Docker
                 "ms-azuretools.vscode-docker",
-                // PostgreSQL
-                "cweijan.vscode-postgresql-client2",
                 // YAML / docs
                 "redhat.vscode-yaml",
                 "yzhang.markdown-all-in-one"
@@ -98,6 +96,6 @@
     "postCreateCommand": "echo '==> Installing project dependencies...' && cd /workspace && make setup",
 
     // Run after postCreateCommand, each time the container starts.
-    // Ensures the complete local manifest and bootstrap secret exist.
+    // Ensures the complete local manifest and private state directories exist.
     "postStartCommand": "cd /workspace && make setup && mkdir -p server/data/storage/primary"
 }

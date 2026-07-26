@@ -202,7 +202,7 @@ func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams,
 		params.AlbumID = &albumID
 	}
 	if len(input.TagNames) > 0 {
-		params.TagNames = input.TagNames
+		params.TagNames = dbtypes.StringsJSONParam(input.TagNames)
 	}
 	return &params, nil
 }

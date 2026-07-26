@@ -74,7 +74,8 @@ WHERE repository_id = sqlc.arg('repository_id')
 -- name: CreateDuplicateGroup :one
 INSERT INTO duplicate_groups (
     repository_id, owner_id, method, status, asset_count, total_size,
-    recommended_keeper_asset_id, detection_version
+    recommended_keeper_asset_id, detection_version, detected_at, created_at, updated_at,
+    group_id
 ) VALUES (
     sqlc.arg('repository_id'),
     sqlc.narg('owner_id'),
@@ -83,7 +84,11 @@ INSERT INTO duplicate_groups (
     sqlc.arg('asset_count'),
     sqlc.arg('total_size'),
     sqlc.arg('recommended_keeper_asset_id'),
-    sqlc.arg('detection_version')
+    sqlc.arg('detection_version'),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    sqlc.arg('group_id')
 )
 RETURNING group_id;
 

@@ -13,8 +13,16 @@ import (
 )
 
 const createAgentPin = `-- name: CreateAgentPin :one
-INSERT INTO agent_pins (user_id, title, widget, mode, plan, summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+INSERT INTO agent_pins (
+    user_id, title, widget, mode, plan, summary, asset_ids, truncated,
+    layout_x, layout_y, layout_w, layout_h, created_at, updated_at, pin_id
+)
+VALUES (
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    ?13
+)
 RETURNING pin_id, user_id, title, widget, mode, "plan", summary, asset_ids, truncated, layout_x, layout_y, layout_w, layout_h, created_at, updated_at, last_successful_refresh_at
 `
 
@@ -31,6 +39,7 @@ type CreateAgentPinParams struct {
 	LayoutY   int64         `db:"layout_y" json:"layout_y"`
 	LayoutW   int64         `db:"layout_w" json:"layout_w"`
 	LayoutH   int64         `db:"layout_h" json:"layout_h"`
+	PinID     uuid.UUID     `db:"pin_id" json:"pin_id"`
 }
 
 func (q *Queries) CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) (AgentPin, error) {
@@ -47,6 +56,7 @@ func (q *Queries) CreateAgentPin(ctx context.Context, arg CreateAgentPinParams) 
 		arg.LayoutY,
 		arg.LayoutW,
 		arg.LayoutH,
+		arg.PinID,
 	)
 	var i AgentPin
 	err := row.Scan(

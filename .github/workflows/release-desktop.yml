@@ -59,11 +59,11 @@ jobs:
             # Before the web SPA: the notices generator runs `go list` over the
             # desktop module, whose //go:embed all:panel/dist needs dist to exist.
             - name: Build desktop control panel
-              run: cd desktop/panel && vp install && vp run build
+              run: cd desktop/panel && VITE_GIT_HOOKS=0 vp install && vp run build
 
             - name: Build web SPA
               run: |
-                  cd web && vp install && vp build
+                  cd web && VITE_GIT_HOOKS=0 vp install && vp build
                   cd .. && node desktop/scripts/generate-third-party-notices.mjs
 
             - uses: actions/upload-artifact@v7
@@ -297,4 +297,4 @@ jobs:
 
                       On first launch, allow the Windows Firewall prompt if you want LAN Lumen ML discovery (optional).
 
-                      Linux/Docker images: `ghcr.io/edwinzhancn/lumilio-{server,web,db}` — see `docker-compose.release.yml`.
+                      Linux/Docker image: `ghcr.io/edwinzhancn/lumilio-server` — see `docker-compose.release.yml`.

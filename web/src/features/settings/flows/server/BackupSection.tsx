@@ -242,8 +242,8 @@ export default function BackupSection() {
                       {formatBytes(entry.size_bytes ?? 0)}
                       {" · v"}
                       {entry.app_version}
-                      {" · pg"}
-                      {entry.pg_version}
+                      {" · SQLite "}
+                      {entry.sqlite_version}
                       {entry.restore_point && (
                         <span className="badge badge-ghost badge-xs ml-2 align-middle">
                           {t("settings.serverSettings.backup.restorePoint", {

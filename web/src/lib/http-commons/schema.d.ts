@@ -9660,7 +9660,7 @@ export interface paths {
         };
         /**
          * List database backups
-         * @description List database dumps (routine backups and restore points), newest first.
+         * @description List SQLite snapshots (routine backups and restore points), newest first.
          */
         get: {
             parameters: {
@@ -9703,7 +9703,7 @@ export interface paths {
         put?: never;
         /**
          * Create a database backup now
-         * @description Enqueue an immediate database dump; it appears in the list when the job finishes.
+         * @description Enqueue an immediate SQLite snapshot; it appears in the list when the job finishes.
          */
         post: {
             parameters: {
@@ -9761,7 +9761,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a database backup
-         * @description Delete one dump file from the backups directory.
+         * @description Delete one SQLite snapshot and its manifest from the backups directory.
          */
         delete: {
             parameters: {
@@ -9827,7 +9827,7 @@ export interface paths {
         };
         /**
          * Download a database backup
-         * @description Download one dump file as gzip.
+         * @description Download one standalone SQLite snapshot.
          */
         get: {
             parameters: {
@@ -9847,7 +9847,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/gzip": Record<string, never>;
+                        "application/octet-stream": Record<string, never>;
                     };
                 };
                 /** @description Invalid backup name */
@@ -9856,7 +9856,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/gzip": components["schemas"]["api.ErrorResponse"];
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9865,7 +9865,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/gzip": components["schemas"]["api.ErrorResponse"];
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
                 /** @description Backup not found */
@@ -9874,7 +9874,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/gzip": components["schemas"]["api.ErrorResponse"];
+                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -9898,7 +9898,7 @@ export interface paths {
         put?: never;
         /**
          * Restore a database backup
-         * @description Restore the named dump. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
+         * @description Restore the named SQLite snapshot. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
          */
         post: {
             parameters: {
@@ -10199,77 +10199,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/setup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Initialize the system
-         * @description Run first-run bootstrapping: generate and rotate the database credential, then persist the secret. Refused once the system is already initialized.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Optional empty setup payload */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.SetupRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description System initialized successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.SetupResultDTO"];
-                    };
-                };
-                /** @description Invalid request data */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description System already initialized */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/setup/status": {
         parameters: {
             query?: never;
@@ -10279,7 +10208,7 @@ export interface paths {
         };
         /**
          * Get system setup status
-         * @description Report whether Lumilio has rotated the temporary database credential. The web frontend runs setup as a preflight while uninitialized.
+         * @description Report whether the first owner and primary repository have been created.
          */
         get: {
             parameters: {
@@ -12011,13 +11940,13 @@ export interface components {
             /** @example 1.2.3 */
             app_version?: string;
             created_at?: string;
-            /** @example lumilio-db-backup-20260711T020000-v1.2.3-pg17.5.sql.gz */
+            /** @example 20260711T020000.000000Z-library.sqlite3 */
             name?: string;
-            /** @example 17.5 */
-            pg_version?: string;
             restore_point?: boolean;
             /** @example 1048576 */
             size_bytes?: number;
+            /** @example 3.50.4 */
+            sqlite_version?: string;
         };
         "dto.BackupListDTO": {
             backups?: components["schemas"]["dto.BackupEntryDTO"][];
@@ -13297,14 +13226,8 @@ export interface components {
         "dto.SetPersonHiddenRequestDTO": {
             hidden?: boolean;
         };
-        "dto.SetupRequestDTO": Record<string, never>;
-        "dto.SetupResultDTO": {
-            database_user?: string;
-            password_length?: number;
-        };
         "dto.SetupStatusDTO": {
             admin_initialized?: boolean;
-            database_initialized?: boolean;
             initialized?: boolean;
             /**
              * @description NextRegistrationRole is the role the next /auth/register will assign

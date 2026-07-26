@@ -64,7 +64,7 @@ func (l *AuthorizedLibrary) AuthorizeAssetIDs(ctx context.Context, userID int32,
 		return nil, nil
 	}
 	rows, err := l.queries.GetAuthorizedAssetIDs(ctx, repo.GetAuthorizedAssetIDsParams{
-		AssetIds: ids,
+		AssetIds: dbtypes.UUIDsJSONParam(ids),
 		OwnerID:  &l.userID,
 	})
 	if err != nil {
@@ -110,7 +110,7 @@ func (l *AuthorizedLibrary) SearchOCR(ctx context.Context, query string, maxResu
 
 func (l *AuthorizedLibrary) SearchPeople(ctx context.Context, personIDs []int32, limit int32) ([]uuid.UUID, error) {
 	return l.queries.GetAssetIDsByPersonIDs(ctx, repo.GetAssetIDsByPersonIDsParams{
-		UserID: &l.userID, PersonIds: personIDs, Limit: int64(limit),
+		UserID: &l.userID, PersonIds: dbtypes.IntegersJSONParam(personIDs), Limit: int64(limit),
 	})
 }
 
@@ -146,7 +146,7 @@ func (l *AuthorizedLibrary) Assets(ctx context.Context, ids []uuid.UUID) ([]repo
 		return nil, err
 	}
 	return l.queries.GetAssetsByIDsForOwner(ctx, repo.GetAssetsByIDsForOwnerParams{
-		AssetIds: ids, OwnerID: &l.userID,
+		AssetIds: dbtypes.UUIDsJSONParam(ids), OwnerID: &l.userID,
 	})
 }
 
@@ -159,37 +159,37 @@ func (l *AuthorizedLibrary) BuildFacets(ctx context.Context, r *ref.Ref) (*ref.F
 
 func (l *AuthorizedLibrary) AestheticScores(ctx context.Context, ids []uuid.UUID) ([]repo.AgentAssetAestheticScoresRow, error) {
 	return l.queries.AgentAssetAestheticScores(ctx, repo.AgentAssetAestheticScoresParams{
-		AssetIds: ids, UserID: &l.userID,
+		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,
 	})
 }
 
 func (l *AuthorizedLibrary) InspectAssets(ctx context.Context, ids []uuid.UUID) ([]repo.AgentInspectAssetsRow, error) {
 	return l.queries.AgentInspectAssets(ctx, repo.AgentInspectAssetsParams{
-		AssetIds: ids, UserID: &l.userID,
+		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,
 	})
 }
 
 func (l *AuthorizedLibrary) PeekAssets(ctx context.Context, ids []uuid.UUID) ([]repo.AgentPeekAssetsRow, error) {
 	return l.queries.AgentPeekAssets(ctx, repo.AgentPeekAssetsParams{
-		AssetIds: ids, UserID: &l.userID,
+		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,
 	})
 }
 
 func (l *AuthorizedLibrary) RankByTime(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
 	return l.queries.AgentRankAssetIDsByTime(ctx, repo.AgentRankAssetIDsByTimeParams{
-		AssetIds: ids, UserID: &l.userID,
+		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,
 	})
 }
 
 func (l *AuthorizedLibrary) RankByQuality(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
 	return l.queries.RankAssetIDsByQuality(ctx, repo.RankAssetIDsByQualityParams{
-		AssetIds: ids, UserID: &l.userID,
+		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,
 	})
 }
 
 func (l *AuthorizedLibrary) CapturedTimes(ctx context.Context, ids []uuid.UUID) ([]dbtypes.Timestamp, error) {
 	return l.queries.AgentCapturedTimes(ctx, repo.AgentCapturedTimesParams{
-		AssetIds: ids, UserID: &l.userID,
+		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,
 	})
 }
 

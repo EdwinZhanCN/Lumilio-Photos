@@ -6,9 +6,10 @@ WHERE id = 1;
 INSERT INTO repository_defaults (
     id,
     strategy,
-    duplicate_handling
+    duplicate_handling,
+    updated_at
 ) VALUES (
-    1, ?1, ?2
+    1, ?1, ?2, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
 ON CONFLICT (id) DO UPDATE SET
     strategy = EXCLUDED.strategy,

@@ -107,7 +107,7 @@ CREATE TABLE system_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     library_id TEXT NOT NULL UNIQUE CHECK (length(library_id) = 32),
     bootstrap_phase TEXT NOT NULL DEFAULT 'fresh'
-        CHECK (bootstrap_phase IN ('fresh', 'db_rotated', 'admin_created', 'ready')),
+        CHECK (bootstrap_phase IN ('fresh', 'catalog_ready', 'admin_created', 'ready')),
     updated_at INTEGER NOT NULL
 ) STRICT;
 

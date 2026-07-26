@@ -17,7 +17,6 @@ import (
 //     Default internal threading oversubscribed this workload.
 var (
 	vipsStartOnce sync.Once
-	vipsStarted   bool
 )
 
 // StartVips initializes the libvips runtime exactly once. Safe to call multiple
@@ -44,16 +43,5 @@ func StartVips() {
 			MaxCacheSize:     0,
 			CollectStats:     false,
 		})
-		vipsStarted = true
 	})
-}
-
-// ShutdownVips releases libvips global state. Call once at process exit (deferred
-// from main). After Shutdown, no further imaging.* calls should occur.
-func ShutdownVips() {
-	if !vipsStarted {
-		return
-	}
-	vips.Shutdown()
-	vipsStarted = false
 }

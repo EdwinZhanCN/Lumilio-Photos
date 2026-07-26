@@ -8,7 +8,7 @@
     "build": "svelte-check --tsconfig ./tsconfig.json && vp build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "preview": "vp preview",
-    "prepare": "vp config"
+    "prepare": "vp config --no-hooks --no-agent"
   },
   "dependencies": {
     "bits-ui": "^2.9.6"

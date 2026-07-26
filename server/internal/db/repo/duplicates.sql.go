@@ -82,7 +82,8 @@ func (q *Queries) CountDuplicateGroups(ctx context.Context, arg CountDuplicateGr
 const createDuplicateGroup = `-- name: CreateDuplicateGroup :one
 INSERT INTO duplicate_groups (
     repository_id, owner_id, method, status, asset_count, total_size,
-    recommended_keeper_asset_id, detection_version
+    recommended_keeper_asset_id, detection_version, detected_at, created_at, updated_at,
+    group_id
 ) VALUES (
     ?1,
     ?2,
@@ -91,7 +92,11 @@ INSERT INTO duplicate_groups (
     ?4,
     ?5,
     ?6,
-    ?7
+    ?7,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    ?8
 )
 RETURNING group_id
 `
@@ -104,6 +109,7 @@ type CreateDuplicateGroupParams struct {
 	TotalSize                int64         `db:"total_size" json:"total_size"`
 	RecommendedKeeperAssetID uuid.NullUUID `db:"recommended_keeper_asset_id" json:"recommended_keeper_asset_id"`
 	DetectionVersion         string        `db:"detection_version" json:"detection_version"`
+	GroupID                  uuid.UUID     `db:"group_id" json:"group_id"`
 }
 
 func (q *Queries) CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (uuid.UUID, error) {
@@ -115,6 +121,7 @@ func (q *Queries) CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateG
 		arg.TotalSize,
 		arg.RecommendedKeeperAssetID,
 		arg.DetectionVersion,
+		arg.GroupID,
 	)
 	var group_id uuid.UUID
 	err := row.Scan(&group_id)

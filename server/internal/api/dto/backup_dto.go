@@ -16,7 +16,7 @@ type BackupEntryDTO struct {
 	RestorePoint  bool      `json:"restore_point"`
 }
 
-// BackupListDTO wraps the dump list.
+// BackupListDTO wraps the snapshot list.
 type BackupListDTO struct {
 	Backups []BackupEntryDTO `json:"backups"`
 }

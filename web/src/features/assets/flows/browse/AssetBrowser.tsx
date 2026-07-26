@@ -82,6 +82,16 @@ export function AssetBrowser({
   const isSearchActive = searchEnabled && searchQuery.trim().length > 0;
   const hasActiveFilters = countActiveAssetUserFilters(userFilter) > 0;
   const isTrashView = constraint?.is_deleted === true;
+  const handleViewerNavigate = useCallback(
+    (nextAssetId: string) => {
+      // Swiper can emit a slide change while synchronizing its initial slide
+      // to the asset already represented by the route. Avoid rewriting that
+      // same URL because it may carry semantic playback state such as t_ms.
+      if (nextAssetId === assetId) return;
+      replaceViewerAsset(nextAssetId);
+    },
+    [assetId, replaceViewerAsset],
+  );
   const emptyState = useMemo(() => {
     if (isSearchActive) {
       return {
@@ -443,7 +453,7 @@ export function AssetBrowser({
               initialSlide={slideIndex >= 0 ? slideIndex : 0}
               slideIndex={slideIndex >= 0 ? slideIndex : undefined}
               onClose={closeViewer}
-              onNavigate={replaceViewerAsset}
+              onNavigate={handleViewerNavigate}
             />
             {isLocatingAsset && (
               <div className="fixed inset-0 z-lightbox flex items-center justify-center bg-black/70">

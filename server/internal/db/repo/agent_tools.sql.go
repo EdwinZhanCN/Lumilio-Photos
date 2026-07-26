@@ -14,17 +14,20 @@ import (
 )
 
 const agentAssetAestheticScores = `-- name: AgentAssetAestheticScores :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT aqs.asset_id, aqs.score
 FROM asset_quality_scores aqs
 JOIN assets a USING (asset_id)
-WHERE aqs.asset_id IN (/*SLICE:asset_ids*/?)
-  AND a.owner_id = ?2
+WHERE aqs.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND a.owner_id = ?1
   AND a.is_deleted = false
 `
 
 type AgentAssetAestheticScoresParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	UserID   *int32      `db:"user_id" json:"user_id"`
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 type AgentAssetAestheticScoresRow struct {
@@ -35,18 +38,7 @@ type AgentAssetAestheticScoresRow struct {
 // Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
 // omitted; callers that filter by quality percentile drop them.
 func (q *Queries) AgentAssetAestheticScores(ctx context.Context, arg AgentAssetAestheticScoresParams) ([]AgentAssetAestheticScoresRow, error) {
-	query := agentAssetAestheticScores
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.UserID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentAssetAestheticScores, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -69,33 +61,25 @@ func (q *Queries) AgentAssetAestheticScores(ctx context.Context, arg AgentAssetA
 }
 
 const agentCapturedTimes = `-- name: AgentCapturedTimes :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT COALESCE(taken_time, upload_time) AS captured_at
 FROM assets
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND owner_id = ?2
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND owner_id = ?1
   AND is_deleted = false
 `
 
 type AgentCapturedTimesParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	UserID   *int32      `db:"user_id" json:"user_id"`
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 // Capture times for a set of assets, for the sample tool's distribution
 // summary. Order is irrelevant; bucketing happens in Go.
 func (q *Queries) AgentCapturedTimes(ctx context.Context, arg AgentCapturedTimesParams) ([]dbtypes.Timestamp, error) {
-	query := agentCapturedTimes
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.UserID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentCapturedTimes, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -118,16 +102,19 @@ func (q *Queries) AgentCapturedTimes(ctx context.Context, arg AgentCapturedTimes
 }
 
 const agentInspectAssets = `-- name: AgentInspectAssets :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT asset_id, type, specific_metadata
 FROM assets
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND owner_id = ?2
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND owner_id = ?1
   AND is_deleted = false
 `
 
 type AgentInspectAssetsParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	UserID   *int32      `db:"user_id" json:"user_id"`
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 type AgentInspectAssetsRow struct {
@@ -138,18 +125,7 @@ type AgentInspectAssetsRow struct {
 
 // inspect observer: per-asset EXIF facets for small refs.
 func (q *Queries) AgentInspectAssets(ctx context.Context, arg AgentInspectAssetsParams) ([]AgentInspectAssetsRow, error) {
-	query := agentInspectAssets
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.UserID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentInspectAssets, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -281,6 +257,9 @@ func (q *Queries) AgentLookupPeople(ctx context.Context, arg AgentLookupPeoplePa
 }
 
 const agentPeekAssets = `-- name: AgentPeekAssets :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT
     a.asset_id,
     a.original_filename,
@@ -307,14 +286,14 @@ SELECT
           AND fc.cluster_name <> ''
     ) AS people
 FROM assets a
-WHERE a.asset_id IN (/*SLICE:asset_ids*/?)
+WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = ?1
   AND a.is_deleted = false
 `
 
 type AgentPeekAssetsParams struct {
-	UserID   *int32      `db:"user_id" json:"user_id"`
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 type AgentPeekAssetsRow struct {
@@ -332,18 +311,7 @@ type AgentPeekAssetsRow struct {
 // restored in Go. place/people are correlated subqueries so each asset stays a
 // single row (no fan-out from the cluster joins).
 func (q *Queries) AgentPeekAssets(ctx context.Context, arg AgentPeekAssetsParams) ([]AgentPeekAssetsRow, error) {
-	query := agentPeekAssets
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.UserID)
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentPeekAssets, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -375,33 +343,25 @@ func (q *Queries) AgentPeekAssets(ctx context.Context, arg AgentPeekAssetsParams
 }
 
 const agentRankAssetIDsByTime = `-- name: AgentRankAssetIDsByTime :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT asset_id
 FROM assets
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND owner_id = ?2
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND owner_id = ?1
   AND is_deleted = false
 ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC
 `
 
 type AgentRankAssetIDsByTimeParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	UserID   *int32      `db:"user_id" json:"user_id"`
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 // Owner-scoped rank(by=time) for Agent refs.
 func (q *Queries) AgentRankAssetIDsByTime(ctx context.Context, arg AgentRankAssetIDsByTimeParams) ([]uuid.UUID, error) {
-	query := agentRankAssetIDsByTime
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.UserID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentRankAssetIDsByTime, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -424,33 +384,25 @@ func (q *Queries) AgentRankAssetIDsByTime(ctx context.Context, arg AgentRankAsse
 }
 
 const agentRankAssetIDsByUploadTime = `-- name: AgentRankAssetIDsByUploadTime :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT asset_id
 FROM assets
-WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND owner_id = ?2
+WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND owner_id = ?1
   AND is_deleted = false
 ORDER BY upload_time ASC, asset_id ASC
 `
 
 type AgentRankAssetIDsByUploadTimeParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	UserID   *int32      `db:"user_id" json:"user_id"`
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 // Owner-scoped "recently added" order for Agent refs.
 func (q *Queries) AgentRankAssetIDsByUploadTime(ctx context.Context, arg AgentRankAssetIDsByUploadTimeParams) ([]uuid.UUID, error) {
-	query := agentRankAssetIDsByUploadTime
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.UserID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentRankAssetIDsByUploadTime, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -474,6 +426,9 @@ func (q *Queries) AgentRankAssetIDsByUploadTime(ctx context.Context, arg AgentRa
 
 const getAssetIDsByPersonIDs = `-- name: GetAssetIDsByPersonIDs :many
 
+WITH filter_params AS (
+  SELECT CAST(?3 AS TEXT) AS person_ids_json
+)
 SELECT a.asset_id
 FROM assets a
 WHERE a.is_deleted = false
@@ -483,16 +438,19 @@ WHERE a.is_deleted = false
     FROM face_items fi
     JOIN face_cluster_members fcm ON fcm.face_id = fi.id
     WHERE fi.asset_id = a.asset_id
-      AND fcm.cluster_id IN (/*SLICE:person_ids*/?)
+      AND fcm.cluster_id IN (
+        SELECT CAST(value AS INTEGER)
+        FROM json_each((SELECT person_ids_json FROM filter_params))
+      )
   )
 ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-LIMIT ?3
+LIMIT ?2
 `
 
 type GetAssetIDsByPersonIDsParams struct {
 	UserID    *int32  `db:"user_id" json:"user_id"`
-	PersonIds []int32 `db:"person_ids" json:"person_ids"`
 	Limit     int64   `db:"limit" json:"limit"`
+	PersonIds *string `db:"person_ids" json:"person_ids"`
 }
 
 // Queries backing the Phase 2 agent tools (producers, transformers,
@@ -500,19 +458,7 @@ type GetAssetIDsByPersonIDsParams struct {
 // search_people producer: assets containing at least one of the given people
 // (union semantics; the agent intersects refs for "both people" requests).
 func (q *Queries) GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByPersonIDsParams) ([]uuid.UUID, error) {
-	query := getAssetIDsByPersonIDs
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.UserID)
-	if len(arg.PersonIds) > 0 {
-		for _, v := range arg.PersonIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:person_ids*/?", strings.Repeat(",?", len(arg.PersonIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:person_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.Limit)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getAssetIDsByPersonIDs, arg.UserID, arg.Limit, arg.PersonIds)
 	if err != nil {
 		return nil, err
 	}
@@ -535,11 +481,14 @@ func (q *Queries) GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByP
 }
 
 const rankAssetIDsByQuality = `-- name: RankAssetIDsByQuality :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT a.asset_id
 FROM assets a
 LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
-WHERE a.asset_id IN (/*SLICE:asset_ids*/?)
-  AND a.owner_id = ?2
+WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND a.owner_id = ?1
   AND a.is_deleted = false
 ORDER BY COALESCE(
     aqs.score,
@@ -550,26 +499,15 @@ ORDER BY COALESCE(
 `
 
 type RankAssetIDsByQualityParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	UserID   *int32      `db:"user_id" json:"user_id"`
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 // rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
 // head when available, falling back to the legacy heuristic (rating, liked,
 // resolution) for unscored assets. Callers reverse for descending order.
 func (q *Queries) RankAssetIDsByQuality(ctx context.Context, arg RankAssetIDsByQualityParams) ([]uuid.UUID, error) {
-	query := rankAssetIDsByQuality
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.UserID)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, rankAssetIDsByQuality, arg.UserID, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"server/internal/agent/ref"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
@@ -60,7 +61,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 
 	if buckets, err := queries.AgentFacetTimeHistogram(ctx, repo.AgentFacetTimeHistogramParams{
 		Granularity: granularity,
-		AssetIds:    assetIDs,
+		AssetIds:    dbtypes.UUIDsJSONParam(assetIDs),
 	}); err == nil {
 		summary.Histogram = make([]ref.Bucket, 0, len(buckets))
 		for _, b := range buckets {
@@ -76,7 +77,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	}
 
 	if places, err := queries.AgentFacetTopPlaces(ctx, repo.AgentFacetTopPlacesParams{
-		AssetIds: assetIDs,
+		AssetIds: dbtypes.UUIDsJSONParam(assetIDs),
 		TopN:     topPlaces,
 	}); err == nil {
 		summary.TopPlaces = toNameCounts(places, func(row repo.AgentFacetTopPlacesRow) (string, int64) {
@@ -85,7 +86,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	}
 
 	if people, err := queries.AgentFacetTopPeople(ctx, repo.AgentFacetTopPeopleParams{
-		AssetIds: assetIDs,
+		AssetIds: dbtypes.UUIDsJSONParam(assetIDs),
 		TopN:     topPeople,
 	}); err == nil {
 		summary.TopPeople = toNameCounts(people, func(row repo.AgentFacetTopPeopleRow) (string, int64) {
@@ -94,7 +95,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	}
 
 	if cameras, err := queries.AgentFacetCameraCounts(ctx, repo.AgentFacetCameraCountsParams{
-		AssetIds: assetIDs,
+		AssetIds: dbtypes.UUIDsJSONParam(assetIDs),
 		TopN:     topCameras,
 	}); err == nil {
 		summary.Cameras = toNameCounts(cameras, func(row repo.AgentFacetCameraCountsRow) (string, int64) {
@@ -103,7 +104,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	}
 
 	if focals, err := queries.AgentFacetTopFocalLengths(ctx, repo.AgentFacetTopFocalLengthsParams{
-		AssetIds: assetIDs,
+		AssetIds: dbtypes.UUIDsJSONParam(assetIDs),
 		TopN:     topGear,
 	}); err == nil {
 		summary.FocalLengths = toNameCounts(focals, func(row repo.AgentFacetTopFocalLengthsRow) (string, int64) {
@@ -112,7 +113,7 @@ func Build(ctx context.Context, queries *repo.Queries, r *ref.Ref) (*ref.FacetSu
 	}
 
 	if lenses, err := queries.AgentFacetTopLenses(ctx, repo.AgentFacetTopLensesParams{
-		AssetIds: assetIDs,
+		AssetIds: dbtypes.UUIDsJSONParam(assetIDs),
 		TopN:     topGear,
 	}); err == nil {
 		summary.Lenses = toNameCounts(lenses, func(row repo.AgentFacetTopLensesRow) (string, int64) {

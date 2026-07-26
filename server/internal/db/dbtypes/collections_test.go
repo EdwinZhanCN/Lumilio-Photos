@@ -48,3 +48,29 @@ func TestSQLiteCollectionAndVectorTypes(t *testing.T) {
 		t.Fatalf("vector round trip = %v, want %v", scannedVector, vector)
 	}
 }
+
+func TestSQLiteJSONQueryParams(t *testing.T) {
+	t.Parallel()
+
+	if got := UUIDsJSONParam(nil); got != nil {
+		t.Fatalf("empty UUID filter = %q, want nil", *got)
+	}
+	id := uuid.New()
+	if got := UUIDsJSONParam([]uuid.UUID{id}); got == nil || *got != `["`+id.String()+`"]` {
+		t.Fatalf("UUID filter = %v", got)
+	}
+
+	if got := StringsJSONParam(nil); got != nil {
+		t.Fatalf("empty string filter = %q, want nil", *got)
+	}
+	if got := StringsJSONParam([]string{"one", "two"}); got == nil || *got != `["one","two"]` {
+		t.Fatalf("string filter = %v", got)
+	}
+
+	if got := IntegersJSONParam([]int32(nil)); got != nil {
+		t.Fatalf("empty integer filter = %q, want nil", *got)
+	}
+	if got := IntegersJSONParam([]int32{1, 2}); got == nil || *got != `[1,2]` {
+		t.Fatalf("integer filter = %v", got)
+	}
+}

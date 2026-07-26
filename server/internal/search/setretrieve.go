@@ -137,7 +137,11 @@ type SetMeta struct {
 	LanguageVersion string
 }
 
-const setInitialPoolSize = 1000
+// A vec0 KNN query can return at most sqliteVecKNNMax vectors. Keep the ANN
+// asset pool within that bound after video-frame expansion; if every ANN
+// candidate passes the cutoff, RetrieveSet falls back to an exact scan rather
+// than exceeding sqlite-vec's k limit or claiming a truncated pool is complete.
+const setInitialPoolSize = maxANNAssetCandidateSet
 
 // RetrieveSet returns every candidate within the calibrated relevance
 // cutoff, in relevance order, up to maxResults.
@@ -222,6 +226,16 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 				kept = kept[:maxResults]
 			}
 			return kept, meta, nil
+		case k >= maxANNAssetCandidateSet:
+			// sqlite-vec cannot widen the ANN vector pool further. Preserve
+			// set completeness with the authoritative scalar-distance path.
+			candidates, truncated, err := r.retrieveExactWithinCutoff(ctx, req, queryVector, space.ID, space.Dimensions, cutoff, maxResults)
+			if err != nil {
+				return nil, meta, err
+			}
+			meta.Exact = true
+			meta.Complete = !truncated
+			return candidates, meta, nil
 		}
 
 		k *= 2

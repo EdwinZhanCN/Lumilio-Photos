@@ -23,9 +23,13 @@ INSERT INTO user_webauthn_credentials (
   user_present,
   user_verified,
   backup_eligible,
-  backup_state
+  backup_state,
+  created_at
 )
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+VALUES (
+  ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+  CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING user_webauthn_credential_id, credential_id, user_id, public_key, sign_count, transports, attestation_type, aaguid, user_present, user_verified, backup_eligible, backup_state, created_at, last_used_at
 `
 

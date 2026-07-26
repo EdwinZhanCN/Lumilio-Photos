@@ -1,61 +1,8 @@
-# Dev container compose: infrastructure (db) + devcontainer.
-# API and Vite run inside the devcontainer via `make dev` (not as compose services).
+# API, SQLite, and Vite run inside this development container via `make dev`.
 
 name: lumilio-photos-devcontainer
 
 services:
-    # Copies the repository's bootstrap secret into the volume postgres reads it
-    # from. It must *derive* rather than generate: the server reads
-    # server/config/.secrets/db_bootstrap_password (see database.bootstrap_password_file
-    # in server.local.toml), so a secret generated independently here would
-    # initialize postgres with a password the server does not know, and every
-    # connection would fail SASL auth. `make .server-secret` is the one generator.
-    #
-    # The volume exists because a bind mount does not work portably: the host
-    # file is 0600 and owned by the developer, while postgres runs as uid 999
-    # inside the container. It happens to be readable under OrbStack's virtiofs,
-    # but not on Linux.
-    secretinit:
-        image: golang:1.25.0-trixie
-        working_dir: /workspace/server
-        volumes:
-            - ..:/workspace:ro
-            - ../server/config/.secrets:/secrets
-        command: go run ./tools/secretinit /secrets/db_bootstrap_password
-
-    db:
-        build:
-            context: ..
-            dockerfile: server/db.Dockerfile
-        image: lumilio-db:latest
-        restart: unless-stopped
-        environment:
-            POSTGRES_DB: lumiliophotos
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD_FILE: /run/secrets/db_bootstrap_password
-        volumes:
-            - db_data:/var/lib/postgresql
-            - ../server/config/.secrets:/run/secrets:ro
-        ports:
-            - "5433:5432"
-        command:
-            - postgres
-            - -c
-            - maintenance_work_mem=256MB
-            - -c
-            - max_parallel_maintenance_workers=4
-        healthcheck:
-            test:
-                [
-                    "CMD-SHELL",
-                    "test \"$$(cat /proc/1/comm)\" = postgres && pg_isready -U postgres -d lumiliophotos",
-                ]
-            interval: 10s
-            timeout: 5s
-            retries: 5
-        depends_on:
-            secretinit:
-                condition: service_completed_successfully
     devcontainer:
         network_mode: "host"
         build:
@@ -67,7 +14,6 @@ services:
             - go-mod-cache:/root/go
             - pnpm-store:/root/.local/share/pnpm
             - cargo-cache:/usr/local/cargo/registry
-            - ../server/config/.secrets:/workspace/server/config/.secrets:ro
         environment:
             CGO_ENABLED: "1"
             GOFLAGS: -buildvcs=false
@@ -76,18 +22,12 @@ services:
             CARGO_HOME: /usr/local/cargo
 
             VITE_API_URL: http://localhost:6680
-        depends_on:
-            secretinit:
-                condition: service_completed_successfully
-            db:
-                condition: service_healthy
         command: /bin/bash -c "while sleep 1000; do :; done"
         ports:
             - "6680:6680" # Go API server (make server-dev)
             - "6657:6657" # Vite dev server (make web-dev)
 
 volumes:
-    db_data:
     go-mod-cache:
     pnpm-store:
     cargo-cache:

@@ -6,10 +6,11 @@ SERVER_DIR := server
 DESKTOP_DIR := desktop
 SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/server.example.toml
 SERVER_CONFIG_LOCAL := $(SERVER_DIR)/config/server.local.toml
+DEV_DATABASE := $(SERVER_DIR)/.local/lumilio/library.sqlite3
+DEV_DERIVED := $(SERVER_DIR)/.local/lumilio/derived
 
 GO := go
 VP := vp
-DOCKER := docker
 GO_BUILD_TAGS ?= sqlite_fts5
 GO_TAG_FLAGS := $(if $(strip $(GO_BUILD_TAGS)),-tags=$(strip $(GO_BUILD_TAGS)))
 
@@ -24,46 +25,32 @@ export CGO_CFLAGS_ALLOW := -Xpreprocessor
 API_URL ?= http://localhost:6680
 VITE_API_URL ?= $(API_URL)
 
-COMPOSE_FILE ?= .devcontainer/docker-compose.yml
-COMPOSE_PROJECT ?= lumilio-photos-devcontainer
-COMPOSE_BIN := $(shell \
-	if $(DOCKER) compose version >/dev/null 2>&1; then \
-		printf '%s compose' '$(DOCKER)'; \
-	elif command -v docker-compose >/dev/null 2>&1; then \
-		printf '%s' docker-compose; \
-	fi)
-# Lazily error only when a target actually needs compose, so docker-free
-# environments (e.g. macOS CI runners running desktop-test) still work.
-COMPOSE = $(if $(COMPOSE_BIN),$(COMPOSE_BIN) -f $(COMPOSE_FILE) -p $(COMPOSE_PROJECT),$(error Docker Compose V2 is required. Install docker-compose-plugin or docker compose))
-
-DB_VOLUME ?= $(COMPOSE_PROJECT)_db_data
-
-.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto db db-reset dev-reset \
+.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto db-reset dev-reset sqlite-architecture-check \
 	desktop-dev desktop-build desktop-test desktop-panel \
-	.server-config .server-secret .web-env
+	.server-config .web-env
 
-setup: .server-config .server-secret
+setup: .server-config
 	@echo "==> Installing Go dependencies"
 	cd $(SERVER_DIR) && $(GO) mod download
 	@echo "==> Installing web dependencies"
-	cd $(WEB_DIR) && $(VP) install
+	cd $(WEB_DIR) && CI=1 VITE_GIT_HOOKS=0 $(VP) install
 	@echo "==> Installing documentation site dependencies"
-	cd $(SITE_DIR) && $(VP) install
+	cd $(SITE_DIR) && CI=1 VITE_GIT_HOOKS=0 $(VP) install
 	@echo "==> Ensuring wasm-pack is installed"
 	@command -v wasm-pack >/dev/null 2>&1 || { curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh; }
 	@echo "==> Ensuring swag CLI is installed"
 	@command -v swag >/dev/null 2>&1 || { $(GO) install github.com/swaggo/swag/v2/cmd/swag@v2.0.0-rc5; }
+	@if git rev-parse --git-dir >/dev/null 2>&1; then \
+		echo "==> Installing repository commit hook"; \
+		git config --local core.hooksPath .githooks; \
+	fi
 	@echo "==> Setup complete"
 
-db: .server-secret
-	@echo "==> Starting database and waiting for healthy status"
-	@$(COMPOSE) up -d --wait --build db
-
-dev: db
+dev:
 	@echo "==> Starting server and web"
 	$(MAKE) -j2 server-dev web-dev
 
-server-dev: .server-config .server-secret
+server-dev: .server-config
 	@echo "==> Starting server"
 	cd $(SERVER_DIR) && $(GO) run $(GO_TAG_FLAGS) ./cmd --config config/server.local.toml
 
@@ -73,7 +60,10 @@ web-dev: .web-env
 
 test: server-test web-test
 
-server-test:
+sqlite-architecture-check:
+	./scripts/check-sqlite-architecture.sh
+
+server-test: sqlite-architecture-check
 	cd $(SERVER_DIR) && $(GO) test $(GO_TAG_FLAGS) ./...
 
 web-test:
@@ -97,7 +87,7 @@ web-backup-recovery-test:
 
 desktop-panel:
 	@echo "==> Building desktop control panel (Svelte, embedded into the Go binary)"
-	cd $(DESKTOP_DIR)/panel && $(VP) install && $(VP) run build
+	cd $(DESKTOP_DIR)/panel && CI=1 VITE_GIT_HOOKS=0 $(VP) install && $(VP) run build
 
 desktop-dev: desktop-panel
 	@echo "==> Running desktop app (dev)"
@@ -106,13 +96,13 @@ desktop-dev: desktop-panel
 		LUMILIO_WEB_ROOT=$(CURDIR)/$(WEB_DIR)/dist \
 		$(GO) run $(GO_TAG_FLAGS) .
 
-desktop-test: desktop-panel
+desktop-test: sqlite-architecture-check desktop-panel
 	@echo "==> Testing desktop module (including SQLite first/second launch)"
 	cd $(DESKTOP_DIR) && $(GO) test $(GO_TAG_FLAGS) ./...
 
 desktop-build: desktop-panel
 	@echo "==> Building macOS desktop app bundle"
-	$(DESKTOP_DIR)/scripts/build-macos.sh
+	LUMILIO_PANEL_DIST_PREBUILT=1 $(DESKTOP_DIR)/scripts/build-macos.sh
 
 dto:
 	@echo "==> Generating OpenAPI spec, TypeScript types, and API documentation"
@@ -121,30 +111,21 @@ dto:
 	cd $(SITE_DIR) && ./node_modules/.bin/redocly build-docs ../server/docs/swagger.yaml --output docs/public/redoc-static.html
 
 db-reset:
-	@echo "==> Resetting database volume"
-	@$(COMPOSE) stop db
-	@$(COMPOSE) rm -f db
-	@if $(DOCKER) volume inspect $(DB_VOLUME) >/dev/null 2>&1; then \
-		$(DOCKER) volume rm $(DB_VOLUME) >/dev/null; \
-	fi
-	@rm -f $(SERVER_DIR)/data/app-state/secrets/db_password
+	@echo "==> Removing the known development SQLite catalog and derived indexes"
+	rm -f "$(DEV_DATABASE)" "$(DEV_DATABASE)-wal" "$(DEV_DATABASE)-shm"
+	rm -rf "$(DEV_DERIVED)"
 
 dev-reset: db-reset
-	@echo "==> Removing incompatible pre-manifest local state"
+	@echo "==> Recreating local development config"
 	rm -f $(WEB_DIR)/.env.development
 	rm -f $(SERVER_CONFIG_LOCAL)
-	rm -rf $(SERVER_DIR)/config/.secrets $(SERVER_DIR)/data
-	$(MAKE) .server-config .server-secret
+	$(MAKE) .server-config .web-env
 
 .server-config:
 	@if [ ! -f "$(SERVER_CONFIG_LOCAL)" ]; then \
 		echo "==> Creating $(SERVER_CONFIG_LOCAL) from $(SERVER_CONFIG_EXAMPLE)"; \
 		cp "$(SERVER_CONFIG_EXAMPLE)" "$(SERVER_CONFIG_LOCAL)"; \
 	fi
-
-.server-secret:
-	@echo "==> Ensuring local database bootstrap secret"
-	@cd $(SERVER_DIR) && $(GO) run ./tools/secretinit config/.secrets/db_bootstrap_password
 
 .web-env:
 	@printf '%s\n' \

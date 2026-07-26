@@ -146,6 +146,17 @@ func (d *DB) Check(ctx context.Context) error {
 // and verifies that it is a healthy Lumilio SQLite database. Backup validation
 // deliberately does not reuse the live application handle.
 func InspectCatalog(ctx context.Context, path string) (CatalogInfo, error) {
+	return inspectCatalog(ctx, path, false)
+}
+
+// InspectStandaloneCatalog validates a checkpointed catalog without creating
+// SQLite WAL/SHM sidecars. It must only be used for immutable snapshots, never
+// for an active WAL catalog whose newest pages may still live in the WAL.
+func InspectStandaloneCatalog(ctx context.Context, path string) (CatalogInfo, error) {
+	return inspectCatalog(ctx, path, true)
+}
+
+func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogInfo, error) {
 	cleanPath, err := filepath.Abs(path)
 	if err != nil {
 		return CatalogInfo{}, fmt.Errorf("resolve SQLite catalog %q: %w", path, err)
@@ -156,6 +167,9 @@ func InspectCatalog(ctx context.Context, path string) (CatalogInfo, error) {
 	location := &url.URL{Scheme: "file", Path: cleanPath}
 	query := location.Query()
 	query.Set("mode", "ro")
+	if immutable {
+		query.Set("immutable", "1")
+	}
 	location.RawQuery = query.Encode()
 
 	database, err := sql.Open("sqlite3", location.String())

@@ -91,7 +91,7 @@ function placeScanFixture(repository: Repository, source: string, scanFilename: 
   // Storage is a named volume, so the fixture goes in through the container.
   const result = spawnSync(
     "docker",
-    [...compose, "cp", source, `server:${repository.path}/${scanFilename}`],
+    [...compose, "cp", source, `lumilio:${repository.path}/${scanFilename}`],
     { cwd: repositoryRoot, stdio: "inherit" },
   );
   if (result.error) throw result.error;

@@ -1,6 +1,12 @@
 -- name: CreateOCRResult :one
-INSERT INTO ocr_results (asset_id, model_id, total_count, processing_time_ms)
-VALUES (?1, ?2, ?3, ?4)
+INSERT INTO ocr_results (
+    asset_id, model_id, total_count, processing_time_ms, created_at, updated_at
+)
+VALUES (
+    ?1, ?2, ?3, ?4,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING *;
 
 -- name: GetOCRResultByAsset :one
@@ -11,8 +17,10 @@ WHERE asset_id = ?1;
 DELETE FROM ocr_results WHERE asset_id = ?1;
 
 -- name: CreateOCRTextItem :one
-INSERT INTO ocr_text_items (asset_id, text_content, confidence, bounding_box, text_length, area_pixels)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+INSERT INTO ocr_text_items (
+    asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at
+)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 RETURNING *;
 
 -- name: GetOCRTextItemsByAsset :many

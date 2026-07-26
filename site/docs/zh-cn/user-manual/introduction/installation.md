@@ -36,7 +36,7 @@ macOS Intel 当前尚未进入 Desktop 发布矩阵。
 
 ### 首次启动
 
-Desktop 会引导你选择语言和下载区域，并显示本机默认存储位置。外部目录在启动完成后通过 Desktop 控制面板授权；不要把“挂载资源库”用于初始化空目录。Desktop 会管理私有 PostgreSQL 数据库；Lumen Hub 为可选组件，只在你启用本地 AI 时另行下载。
+Desktop 会引导你选择语言和下载区域，并显示本机默认存储位置。外部目录在启动完成后通过 Desktop 控制面板授权；不要把“挂载资源库”用于初始化空目录。Desktop 会在本机应用数据目录管理嵌入式 SQLite catalog；Lumen Hub 为可选组件，只在你启用本地 AI 时另行下载。
 
 ::: tip 本地网络权限
 如需通过 mDNS 发现其他 Lumen 节点，请允许 macOS 的本地网络访问或 Windows 防火墙提示。拒绝该权限不影响基础媒体管理。
@@ -63,14 +63,14 @@ docker compose up -d
 :::
 
 ::: warning 通过流明集创建备份
-容器运行时不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`。请在“设置 → 服务器”中创建并下载一致性快照，并单独备份媒体目录。
+流明集运行时，不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`，也不要用宿主机 SQLite 工具打开它们；跨容器挂载边界会破坏 WAL 锁协调。请在“设置 → 服务器”中创建并下载一致性快照，并单独备份媒体目录。
 :::
 
 Docker 中的 Lumen 网络模式边界请参阅 [Lumen AI](../features/lumen-ai.md)。不可变运行策略需要通过完整 schema v2 manifest 配置；普通环境变量不会覆盖这些字段。
 
 ## 从源码运行
 
-源码运行面向开发者与贡献者，不是普通用户的推荐安装方式。开发环境需要 Go、Node.js/Vite+、Docker、Make 以及项目使用的媒体工具。
+源码运行面向开发者与贡献者，不是普通用户的推荐安装方式。开发环境需要 Go、Node.js/Vite+、Make、libvips、libraw、FFmpeg、ExifTool，以及重建浏览器 WASM 时使用的 Rust。SQLite 嵌入在 Go 进程中；只有容器交付和 E2E 工作流需要 Docker。
 
 ```bash
 make setup

@@ -1,6 +1,6 @@
 -- name: CreateSpeciesPrediction :one
-INSERT INTO species_predictions (asset_id, label, score)
-VALUES (?1, ?2, ?3)
+INSERT INTO species_predictions (asset_id, label, score, created_at)
+VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 RETURNING *;
 
 -- name: GetSpeciesPredictionsByAsset :many

@@ -7,27 +7,27 @@ package repo
 
 import (
 	"context"
-	"strings"
-
-	"github.com/google/uuid"
 )
 
 const agentFacetTopPlaces = `-- name: AgentFacetTopPlaces :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT
     COALESCE(lc.label, lc.city, lc.region, lc.country) AS name,
     COUNT(DISTINCT lca.asset_id) AS count
 FROM location_cluster_assets lca
 JOIN location_clusters lc ON lc.cluster_id = lca.cluster_id
-WHERE lca.asset_id IN (/*SLICE:asset_ids*/?)
+WHERE lca.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND COALESCE(lc.label, lc.city, lc.region, lc.country) IS NOT NULL
 GROUP BY 1
 ORDER BY count DESC
-LIMIT ?2
+LIMIT ?1
 `
 
 type AgentFacetTopPlacesParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	TopN     int64       `db:"top_n" json:"top_n"`
+	TopN     int64   `db:"top_n" json:"top_n"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 type AgentFacetTopPlacesRow struct {
@@ -36,18 +36,7 @@ type AgentFacetTopPlacesRow struct {
 }
 
 func (q *Queries) AgentFacetTopPlaces(ctx context.Context, arg AgentFacetTopPlacesParams) ([]AgentFacetTopPlacesRow, error) {
-	query := agentFacetTopPlaces
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.TopN)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentFacetTopPlaces, arg.TopN, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}

@@ -10,121 +10,133 @@ import (
 )
 
 const countAssetsUnified = `-- name: CountAssetsUnified :one
+WITH filter_params AS (
+  SELECT
+    CAST(?25 AS TEXT) AS asset_ids_json,
+    CAST(?26 AS TEXT) AS asset_types_json,
+    CAST(?27 AS TEXT) AS tag_names_json
+)
 SELECT COUNT(*) as count
 FROM assets a
 WHERE a.is_deleted = COALESCE(?1, false)
-  AND (?2 IS NULL OR a.asset_id IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_ids') AS TEXT))))
-  AND (?3 IS NULL OR a.original_filename LIKE '%' || ?3 || '%')
-  AND (?4 IS NULL OR a.type = ?4)
-  AND (?5 IS NULL OR a.type IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_types') AS TEXT))))
-  AND (?6 IS NULL OR a.owner_id = ?6)
-  AND (?7 IS NULL OR a.repository_id = ?7)
   AND (
-    ?8 IS NULL
+    (SELECT asset_ids_json FROM filter_params) IS NULL
+    OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  )
+  AND (?2 IS NULL OR a.original_filename LIKE '%' || ?2 || '%')
+  AND (?3 IS NULL OR a.type = ?3)
+  AND (
+    (SELECT asset_types_json FROM filter_params) IS NULL
+    OR a.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
+  )
+  AND (?4 IS NULL OR a.owner_id = ?4)
+  AND (?5 IS NULL OR a.repository_id = ?5)
+  AND (
+    ?6 IS NULL
     OR (
       CASE
-        WHEN ?8 = '' THEN
-          CASE WHEN COALESCE(?9, true) THEN true
+        WHEN ?6 = '' THEN
+          CASE WHEN COALESCE(?7, true) THEN true
             ELSE instr(a.storage_path, '/') = 0
           END
         ELSE
-          CASE WHEN COALESCE(?9, true) THEN
-            a.storage_path LIKE ?8 || '/%'
+          CASE WHEN COALESCE(?7, true) THEN
+            a.storage_path LIKE ?6 || '/%'
           ELSE
-            a.storage_path LIKE ?8 || '/%'
-            AND a.storage_path NOT LIKE ?8 || '/%/%'
+            a.storage_path LIKE ?6 || '/%'
+            AND a.storage_path NOT LIKE ?6 || '/%/%'
           END
       END
+    )
+  )
+  AND (
+    ?8 IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = ?8
+        AND fi_person.asset_id = a.asset_id
+    )
+  )
+  AND (
+    ?9 IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = ?9
     )
   )
   AND (
     ?10 IS NULL
     OR EXISTS (
       SELECT 1
-      FROM face_cluster_members fcm
-      JOIN face_items fi_person ON fi_person.id = fcm.face_id
-      WHERE fcm.cluster_id = ?10
-        AND fi_person.asset_id = a.asset_id
-    )
-  )
-  AND (
-    ?11 IS NULL
-    OR EXISTS (
-      SELECT 1
-      FROM album_assets aa
-      WHERE aa.asset_id = a.asset_id
-        AND aa.album_id = ?11
-    )
-  )
-  AND (
-    ?12 IS NULL
-    OR EXISTS (
-      SELECT 1
       FROM asset_tags at
       JOIN tags t ON t.tag_id = at.tag_id
       WHERE at.asset_id = a.asset_id
-        AND t.tag_name = ?12
-        AND (?13 IS NULL OR at.source = ?13)
+        AND t.tag_name = ?10
+        AND (?11 IS NULL OR at.source = ?11)
     )
   )
   AND (
-    ?14 IS NULL
+    (SELECT tag_names_json FROM filter_params) IS NULL
     OR (
       SELECT COUNT(DISTINCT t2.tag_name)
       FROM asset_tags at2
       JOIN tags t2 ON t2.tag_id = at2.tag_id
       WHERE at2.asset_id = a.asset_id
-        AND t2.tag_name IN (SELECT value FROM json_each(CAST(sqlc.narg('tag_names') AS TEXT)))
-    ) = json_array_length(CAST(?14 AS TEXT))
+        AND t2.tag_name IN (SELECT value FROM json_each((SELECT tag_names_json FROM filter_params)))
+    ) = json_array_length((SELECT tag_names_json FROM filter_params))
   )
-  AND (?15 IS NULL OR
-    CASE COALESCE(?16, 'contains')
-      WHEN 'matches' THEN a.original_filename LIKE ?15
-      WHEN 'starts_with' THEN a.original_filename LIKE ?15 || '%'
-      WHEN 'ends_with' THEN a.original_filename LIKE '%' || ?15
-      ELSE a.original_filename LIKE '%' || ?15 || '%'
+  AND (?12 IS NULL OR
+    CASE COALESCE(?13, 'contains')
+      WHEN 'matches' THEN a.original_filename LIKE ?12
+      WHEN 'starts_with' THEN a.original_filename LIKE ?12 || '%'
+      WHEN 'ends_with' THEN a.original_filename LIKE '%' || ?12
+      ELSE a.original_filename LIKE '%' || ?12 || '%'
     END
   )
-  AND (?17 IS NULL OR COALESCE(a.taken_time, a.upload_time) >= ?17)
-  AND (?18 IS NULL OR COALESCE(a.taken_time, a.upload_time) <= ?18)
-  AND (?19 IS NULL OR
+  AND (?14 IS NULL OR COALESCE(a.taken_time, a.upload_time) >= ?14)
+  AND (?15 IS NULL OR COALESCE(a.taken_time, a.upload_time) <= ?15)
+  AND (?16 IS NULL OR
     CASE
-      WHEN ?19 = true THEN json_extract(a.specific_metadata, char(36) || '.is_raw') = 1
+      WHEN ?16 = true THEN json_extract(a.specific_metadata, char(36) || '.is_raw') = 1
       ELSE json_extract(a.specific_metadata, char(36) || '.is_raw') = 0 OR json_extract(a.specific_metadata, char(36) || '.is_raw') IS NULL
     END
   )
-  AND (?20 IS NULL OR
+  AND (?17 IS NULL OR
     CASE
-      WHEN ?20 = 0 THEN a.rating IS NULL OR a.rating = 0
-      ELSE a.rating = ?20
+      WHEN ?17 = 0 THEN a.rating IS NULL OR a.rating = 0
+      ELSE a.rating = ?17
     END
   )
-  AND (?21 IS NULL OR
+  AND (?18 IS NULL OR
     CASE
-      WHEN ?21 = false THEN a.liked IS NULL OR a.liked = false
+      WHEN ?18 = false THEN a.liked IS NULL OR a.liked = false
       ELSE a.liked = true
     END
   )
-  AND (?22 IS NULL OR json_extract(a.specific_metadata, char(36) || '.camera_model') = ?22)
-  AND (?23 IS NULL OR json_extract(a.specific_metadata, char(36) || '.lens_model') = ?23)
+  AND (?19 IS NULL OR json_extract(a.specific_metadata, char(36) || '.camera_model') = ?19)
+  AND (?20 IS NULL OR json_extract(a.specific_metadata, char(36) || '.lens_model') = ?20)
   AND (
-    ?24 IS NULL
-    OR ?25 IS NULL
-    OR ?26 IS NULL
-    OR ?27 IS NULL
+    ?21 IS NULL
+    OR ?22 IS NULL
+    OR ?23 IS NULL
+    OR ?24 IS NULL
     OR (
     a.gps_latitude IS NOT NULL
     AND a.gps_longitude IS NOT NULL
     AND a.gps_latitude
-      BETWEEN min(?25, ?24)
-      AND max(?25, ?24)
+      BETWEEN min(?22, ?21)
+      AND max(?22, ?21)
     AND (
       CASE
-        WHEN ?27 <= ?26 THEN
-          a.gps_longitude BETWEEN ?27 AND ?26
+        WHEN ?24 <= ?23 THEN
+          a.gps_longitude BETWEEN ?24 AND ?23
         ELSE
-          a.gps_longitude >= ?27
-          OR a.gps_longitude <= ?26
+          a.gps_longitude >= ?24
+          OR a.gps_longitude <= ?23
       END
     )
     )
@@ -133,10 +145,8 @@ WHERE a.is_deleted = COALESCE(?1, false)
 
 type CountAssetsUnifiedParams struct {
 	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
-	AssetIds         interface{} `db:"asset_ids" json:"asset_ids"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
-	AssetTypes       interface{} `db:"asset_types" json:"asset_types"`
 	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
 	RepositoryID     interface{} `db:"repository_id" json:"repository_id"`
 	FolderPath       interface{} `db:"folder_path" json:"folder_path"`
@@ -145,7 +155,6 @@ type CountAssetsUnifiedParams struct {
 	AlbumID          interface{} `db:"album_id" json:"album_id"`
 	TagName          interface{} `db:"tag_name" json:"tag_name"`
 	TagSource        interface{} `db:"tag_source" json:"tag_source"`
-	TagNames         interface{} `db:"tag_names" json:"tag_names"`
 	FilenameVal      interface{} `db:"filename_val" json:"filename_val"`
 	FilenameOperator interface{} `db:"filename_operator" json:"filename_operator"`
 	DateFrom         interface{} `db:"date_from" json:"date_from"`
@@ -159,6 +168,9 @@ type CountAssetsUnifiedParams struct {
 	LocationSouth    interface{} `db:"location_south" json:"location_south"`
 	LocationEast     interface{} `db:"location_east" json:"location_east"`
 	LocationWest     interface{} `db:"location_west" json:"location_west"`
+	AssetIds         *string     `db:"asset_ids" json:"asset_ids"`
+	AssetTypes       *string     `db:"asset_types" json:"asset_types"`
+	TagNames         *string     `db:"tag_names" json:"tag_names"`
 }
 
 // Count query matching GetAssetsUnified WHERE clause
@@ -166,10 +178,8 @@ type CountAssetsUnifiedParams struct {
 func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countAssetsUnified,
 		arg.IsDeleted,
-		arg.AssetIds,
 		arg.Query,
 		arg.AssetType,
-		arg.AssetTypes,
 		arg.OwnerID,
 		arg.RepositoryID,
 		arg.FolderPath,
@@ -178,7 +188,6 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 		arg.AlbumID,
 		arg.TagName,
 		arg.TagSource,
-		arg.TagNames,
 		arg.FilenameVal,
 		arg.FilenameOperator,
 		arg.DateFrom,
@@ -192,6 +201,9 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 		arg.LocationSouth,
 		arg.LocationEast,
 		arg.LocationWest,
+		arg.AssetIds,
+		arg.AssetTypes,
+		arg.TagNames,
 	)
 	var count int64
 	err := row.Scan(&count)

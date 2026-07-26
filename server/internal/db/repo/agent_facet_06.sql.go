@@ -7,30 +7,30 @@ package repo
 
 import (
 	"context"
-	"strings"
-
-	"github.com/google/uuid"
 )
 
 const agentFacetTopFocalLengths = `-- name: AgentFacetTopFocalLengths :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT t.name AS name, t.count AS count FROM (
     SELECT
         (round(json_extract(a.specific_metadata, char(36) || '.focal_length')) || 'mm') AS name,
         COUNT(*) AS count
     FROM assets a
-    WHERE a.asset_id IN (/*SLICE:asset_ids*/?)
+    WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
       AND a.is_deleted = false
       AND json_type(a.specific_metadata, char(36) || '.focal_length') IN ('integer', 'real')
     GROUP BY 1
 ) t
 WHERE t.name <> '0mm'
 ORDER BY t.count DESC
-LIMIT ?2
+LIMIT ?1
 `
 
 type AgentFacetTopFocalLengthsParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	TopN     int64       `db:"top_n" json:"top_n"`
+	TopN     int64   `db:"top_n" json:"top_n"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 type AgentFacetTopFocalLengthsRow struct {
@@ -41,18 +41,7 @@ type AgentFacetTopFocalLengthsRow struct {
 // Most-used focal lengths over a ref snapshot, rounded to whole millimetres so
 // 34.9mm and 35mm collapse into one bucket. JSON type checks guard the value.
 func (q *Queries) AgentFacetTopFocalLengths(ctx context.Context, arg AgentFacetTopFocalLengthsParams) ([]AgentFacetTopFocalLengthsRow, error) {
-	query := agentFacetTopFocalLengths
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.TopN)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentFacetTopFocalLengths, arg.TopN, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}

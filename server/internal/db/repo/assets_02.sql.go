@@ -10,78 +10,90 @@ import (
 )
 
 const getAssetsUnified = `-- name: GetAssetsUnified :many
-WITH page_ids AS (
+WITH filter_params AS (
+  SELECT
+    CAST(?1 AS TEXT) AS asset_ids_json,
+    CAST(?2 AS TEXT) AS asset_types_json,
+    CAST(?3 AS TEXT) AS tag_names_json
+),
+page_ids AS (
   SELECT
     a.asset_id,
     CASE
-      WHEN ?1 = 'recently_added' THEN a.upload_time
+      WHEN ?4 = 'recently_added' THEN a.upload_time
       ELSE COALESCE(a.taken_time, a.upload_time)
     END AS sort_time
   FROM assets a
-  WHERE a.is_deleted = COALESCE(?2, false)
-    AND (?3 IS NULL OR a.asset_id IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_ids') AS TEXT))))
-    AND (?4 IS NULL OR a.original_filename LIKE '%' || ?4 || '%')
-    AND (?5 IS NULL OR a.type = ?5)
-    AND (?6 IS NULL OR a.type IN (SELECT value FROM json_each(CAST(sqlc.narg('asset_types') AS TEXT))))
-    AND (?7 IS NULL OR a.owner_id = ?7)
-    AND (?8 IS NULL OR a.repository_id = ?8)
+  WHERE a.is_deleted = COALESCE(?5, false)
     AND (
-      ?9 IS NULL
+      (SELECT asset_ids_json FROM filter_params) IS NULL
+      OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+    )
+    AND (?6 IS NULL OR a.original_filename LIKE '%' || ?6 || '%')
+    AND (?7 IS NULL OR a.type = ?7)
+    AND (
+      (SELECT asset_types_json FROM filter_params) IS NULL
+      OR a.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
+    )
+    AND (?8 IS NULL OR a.owner_id = ?8)
+    AND (?9 IS NULL OR a.repository_id = ?9)
+    AND (
+      ?10 IS NULL
       OR (
         CASE
-          WHEN ?9 = '' THEN
-            CASE WHEN COALESCE(?10, true) THEN true
+          WHEN ?10 = '' THEN
+            CASE WHEN COALESCE(?11, true) THEN true
               ELSE instr(a.storage_path, '/') = 0
             END
           ELSE
-            CASE WHEN COALESCE(?10, true) THEN
-              a.storage_path LIKE ?9 || '/%'
+            CASE WHEN COALESCE(?11, true) THEN
+              a.storage_path LIKE ?10 || '/%'
             ELSE
-              a.storage_path LIKE ?9 || '/%'
-              AND a.storage_path NOT LIKE ?9 || '/%/%'
+              a.storage_path LIKE ?10 || '/%'
+              AND a.storage_path NOT LIKE ?10 || '/%/%'
             END
         END
-      )
-    )
-    AND (
-      ?11 IS NULL
-      OR EXISTS (
-        SELECT 1
-        FROM face_cluster_members fcm
-        JOIN face_items fi_person ON fi_person.id = fcm.face_id
-        WHERE fcm.cluster_id = ?11
-          AND fi_person.asset_id = a.asset_id
       )
     )
     AND (
       ?12 IS NULL
       OR EXISTS (
         SELECT 1
-        FROM album_assets aa
-        WHERE aa.asset_id = a.asset_id
-          AND aa.album_id = ?12
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = ?12
+          AND fi_person.asset_id = a.asset_id
       )
     )
     AND (
       ?13 IS NULL
       OR EXISTS (
         SELECT 1
-        FROM asset_tags at
-        JOIN tags t ON t.tag_id = at.tag_id
-        WHERE at.asset_id = a.asset_id
-          AND t.tag_name = ?13
-          AND (?14 IS NULL OR at.source = ?14)
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = ?13
       )
     )
     AND (
-      ?15 IS NULL
+      ?14 IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM asset_tags at
+        JOIN tags t ON t.tag_id = at.tag_id
+        WHERE at.asset_id = a.asset_id
+          AND t.tag_name = ?14
+          AND (?15 IS NULL OR at.source = ?15)
+      )
+    )
+    AND (
+      (SELECT tag_names_json FROM filter_params) IS NULL
       OR (
         SELECT COUNT(DISTINCT t2.tag_name)
         FROM asset_tags at2
         JOIN tags t2 ON t2.tag_id = at2.tag_id
         WHERE at2.asset_id = a.asset_id
-          AND t2.tag_name IN (SELECT value FROM json_each(CAST(sqlc.narg('tag_names') AS TEXT)))
-      ) = json_array_length(CAST(?15 AS TEXT))
+          AND t2.tag_name IN (SELECT value FROM json_each((SELECT tag_names_json FROM filter_params)))
+      ) = json_array_length((SELECT tag_names_json FROM filter_params))
     )
     AND (?16 IS NULL OR
       CASE COALESCE(?17, 'contains')
@@ -147,12 +159,13 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type GetAssetsUnifiedParams struct {
+	AssetIds         *string     `db:"asset_ids" json:"asset_ids"`
+	AssetTypes       *string     `db:"asset_types" json:"asset_types"`
+	TagNames         *string     `db:"tag_names" json:"tag_names"`
 	SortBy           interface{} `db:"sort_by" json:"sort_by"`
 	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
-	AssetIds         interface{} `db:"asset_ids" json:"asset_ids"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
-	AssetTypes       interface{} `db:"asset_types" json:"asset_types"`
 	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
 	RepositoryID     interface{} `db:"repository_id" json:"repository_id"`
 	FolderPath       interface{} `db:"folder_path" json:"folder_path"`
@@ -161,7 +174,6 @@ type GetAssetsUnifiedParams struct {
 	AlbumID          interface{} `db:"album_id" json:"album_id"`
 	TagName          interface{} `db:"tag_name" json:"tag_name"`
 	TagSource        interface{} `db:"tag_source" json:"tag_source"`
-	TagNames         interface{} `db:"tag_names" json:"tag_names"`
 	FilenameVal      interface{} `db:"filename_val" json:"filename_val"`
 	FilenameOperator interface{} `db:"filename_operator" json:"filename_operator"`
 	DateFrom         interface{} `db:"date_from" json:"date_from"`
@@ -183,12 +195,13 @@ type GetAssetsUnifiedParams struct {
 // Use this for most queries unless semantic search is needed
 func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error) {
 	rows, err := q.db.QueryContext(ctx, getAssetsUnified,
+		arg.AssetIds,
+		arg.AssetTypes,
+		arg.TagNames,
 		arg.SortBy,
 		arg.IsDeleted,
-		arg.AssetIds,
 		arg.Query,
 		arg.AssetType,
-		arg.AssetTypes,
 		arg.OwnerID,
 		arg.RepositoryID,
 		arg.FolderPath,
@@ -197,7 +210,6 @@ func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedPara
 		arg.AlbumID,
 		arg.TagName,
 		arg.TagSource,
-		arg.TagNames,
 		arg.FilenameVal,
 		arg.FilenameOperator,
 		arg.DateFrom,

@@ -11,8 +11,17 @@ import (
 )
 
 const assignFaceClusterMemberExclusive = `-- name: AssignFaceClusterMemberExclusive :one
-INSERT INTO face_cluster_members (cluster_id, face_id, similarity_score, confidence, is_manual)
-VALUES (?1, ?2, ?3, ?4, ?5)
+INSERT INTO face_cluster_members (
+    cluster_id, face_id, similarity_score, confidence, is_manual, created_at
+)
+VALUES (
+    ?1,
+    ?2,
+    ?3,
+    ?4,
+    ?5,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 ON CONFLICT (face_id)
 DO UPDATE SET
     cluster_id = EXCLUDED.cluster_id,

@@ -650,21 +650,20 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 	}
 
 	contentHashes := make([]string, 0, len(req.Files))
-	quickFingerprints := make([]*string, 0, len(req.Files))
+	quickFingerprints := make([]string, 0, len(req.Files))
 	for _, file := range req.Files {
 		if file.IsQuick {
 			if file.FingerprintVersion == nil || *file.FingerprintVersion != hash.QuickFingerprintVersion {
 				continue
 			}
-			fingerprint := file.Hash
-			quickFingerprints = append(quickFingerprints, &fingerprint)
+			quickFingerprints = append(quickFingerprints, file.Hash)
 		} else {
 			contentHashes = append(contentHashes, file.Hash)
 		}
 	}
 
 	contentRows, err := h.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
-		ContentHashes: contentHashes,
+		ContentHashes: dbtypes.StringsJSONParam(contentHashes),
 		RepositoryID:  uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 	})
 	if err != nil {
@@ -694,7 +693,7 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 		}
 	}
 	quickRows, err := h.queries.GetAssetsByQuickFingerprintsAndRepository(ctx, repo.GetAssetsByQuickFingerprintsAndRepositoryParams{
-		QuickFingerprints: quickFingerprints,
+		QuickFingerprints: dbtypes.StringsJSONParam(quickFingerprints),
 		RepositoryID:      uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 	})
 	if err != nil {
@@ -4135,7 +4134,7 @@ func (h *AssetHandler) findDuplicateByHash(ctx context.Context, contentHash stri
 	}
 
 	rows, err := h.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
-		ContentHashes: []string{contentHash},
+		ContentHashes: dbtypes.StringsJSONParam([]string{contentHash}),
 		RepositoryID:  uuid.NullUUID{UUID: repositoryID, Valid: true},
 	})
 	if err != nil {

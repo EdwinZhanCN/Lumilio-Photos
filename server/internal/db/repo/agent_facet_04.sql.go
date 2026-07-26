@@ -7,29 +7,29 @@ package repo
 
 import (
 	"context"
-	"strings"
-
-	"github.com/google/uuid"
 )
 
 const agentFacetTopPeople = `-- name: AgentFacetTopPeople :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
 SELECT
     fc.cluster_name AS name,
     COUNT(DISTINCT fi.asset_id) AS count
 FROM face_items fi
 JOIN face_cluster_members fcm ON fcm.face_id = fi.id
 JOIN face_clusters fc ON fc.cluster_id = fcm.cluster_id
-WHERE fi.asset_id IN (/*SLICE:asset_ids*/?)
+WHERE fi.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND fc.cluster_name IS NOT NULL
   AND fc.cluster_name <> ''
 GROUP BY 1
 ORDER BY count DESC
-LIMIT ?2
+LIMIT ?1
 `
 
 type AgentFacetTopPeopleParams struct {
-	AssetIds []uuid.UUID `db:"asset_ids" json:"asset_ids"`
-	TopN     int64       `db:"top_n" json:"top_n"`
+	TopN     int64   `db:"top_n" json:"top_n"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
 }
 
 type AgentFacetTopPeopleRow struct {
@@ -38,18 +38,7 @@ type AgentFacetTopPeopleRow struct {
 }
 
 func (q *Queries) AgentFacetTopPeople(ctx context.Context, arg AgentFacetTopPeopleParams) ([]AgentFacetTopPeopleRow, error) {
-	query := agentFacetTopPeople
-	var queryParams []interface{}
-	if len(arg.AssetIds) > 0 {
-		for _, v := range arg.AssetIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(arg.AssetIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.TopN)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, agentFacetTopPeople, arg.TopN, arg.AssetIds)
 	if err != nil {
 		return nil, err
 	}

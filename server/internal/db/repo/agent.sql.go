@@ -298,7 +298,7 @@ const finishAgentRun = `-- name: FinishAgentRun :exec
 UPDATE agent_runs
 SET status = ?1,
     finished_at = CASE
-        WHEN sqlc.arg('status') IN ('cancelled', 'completed', 'failed')
+        WHEN ?1 IN ('cancelled', 'completed', 'failed')
             THEN COALESCE(finished_at, ?2)
         ELSE finished_at
     END,

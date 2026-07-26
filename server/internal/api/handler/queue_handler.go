@@ -170,16 +170,30 @@ SELECT
     FILTER (WHERE j.finalized_at IS NOT NULL) AS average_latency_ms,
   AVG((julianday(j.finalized_at) - julianday(j.attempted_at)) * 86400000.0)
     FILTER (WHERE j.finalized_at IS NOT NULL AND j.attempted_at IS NOT NULL) AS average_runtime_ms,
-  MIN(j.created_at) FILTER (WHERE j.state IN ('available', 'scheduled', 'running', 'retryable')) AS oldest_remaining_at,
-  COALESCE(
-    MAX(max(
-      j.created_at,
-      j.scheduled_at,
-      coalesce(j.attempted_at, j.created_at),
-      coalesce(j.finalized_at, j.created_at)
-    )),
-    MAX(rq.updated_at)
-  ) AS latest_activity_at
+  CAST(
+    unixepoch(
+      MIN(j.created_at) FILTER (
+        WHERE j.state IN ('available', 'scheduled', 'running', 'retryable')
+      ),
+      'subsec'
+    ) * 1000000
+    AS INTEGER
+  ) AS oldest_remaining_micros,
+  CAST(
+    unixepoch(
+      COALESCE(
+        MAX(max(
+          j.created_at,
+          j.scheduled_at,
+          coalesce(j.attempted_at, j.created_at),
+          coalesce(j.finalized_at, j.created_at)
+        )),
+        MAX(rq.updated_at)
+      ),
+      'subsec'
+    ) * 1000000
+    AS INTEGER
+  ) AS latest_activity_micros
 FROM queue_names qn
 LEFT JOIN river_queue rq ON rq.name = qn.name
 LEFT JOIN river_job j ON j.queue = qn.name
@@ -187,8 +201,8 @@ GROUP BY qn.name
 ORDER BY
   attention_jobs DESC,
   remaining_jobs DESC,
-  latest_activity_at IS NULL,
-  latest_activity_at DESC,
+  latest_activity_micros IS NULL,
+  latest_activity_micros DESC,
   qn.name
 `
 
@@ -203,8 +217,8 @@ ORDER BY
 		var summary QueueSummaryDTO
 		var averageLatency sql.NullFloat64
 		var averageRuntime sql.NullFloat64
-		var oldestRemaining sql.NullTime
-		var latestActivity sql.NullTime
+		var oldestRemaining sql.NullInt64
+		var latestActivity sql.NullInt64
 
 		if err := rows.Scan(
 			&summary.Name,
@@ -223,8 +237,8 @@ ORDER BY
 
 		summary.AverageLatencyMs = nullableMillis(averageLatency)
 		summary.AverageRuntimeMs = nullableMillis(averageRuntime)
-		summary.OldestRemainingAt = nullableTime(oldestRemaining)
-		summary.LatestActivityAt = nullableTime(latestActivity)
+		summary.OldestRemainingAt = nullableUnixMicros(oldestRemaining)
+		summary.LatestActivityAt = nullableUnixMicros(latestActivity)
 		summaries = append(summaries, summary)
 	}
 	if err := rows.Err(); err != nil {
@@ -263,10 +277,10 @@ SELECT
   state,
   attempt,
   max_attempts,
-  created_at,
-  scheduled_at,
-  attempted_at,
-  finalized_at,
+  CAST(unixepoch(created_at, 'subsec') * 1000000 AS INTEGER) AS created_at_micros,
+  CAST(unixepoch(scheduled_at, 'subsec') * 1000000 AS INTEGER) AS scheduled_at_micros,
+  CAST(unixepoch(attempted_at, 'subsec') * 1000000 AS INTEGER) AS attempted_at_micros,
+  CAST(unixepoch(finalized_at, 'subsec') * 1000000 AS INTEGER) AS finalized_at_micros,
   last_error
 FROM ranked_errors
 WHERE rn <= ?
@@ -283,8 +297,10 @@ ORDER BY queue, rn
 	for rows.Next() {
 		var queueName string
 		var sample QueueErrorSampleDTO
-		var attemptedAt sql.NullTime
-		var finalizedAt sql.NullTime
+		var createdAt int64
+		var scheduledAt int64
+		var attemptedAt sql.NullInt64
+		var finalizedAt sql.NullInt64
 
 		if err := rows.Scan(
 			&queueName,
@@ -293,8 +309,8 @@ ORDER BY queue, rn
 			&sample.State,
 			&sample.Attempt,
 			&sample.MaxAttempts,
-			&sample.CreatedAt,
-			&sample.ScheduledAt,
+			&createdAt,
+			&scheduledAt,
 			&attemptedAt,
 			&finalizedAt,
 			&sample.LastError,
@@ -302,8 +318,10 @@ ORDER BY queue, rn
 			return err
 		}
 
-		sample.AttemptedAt = nullableTime(attemptedAt)
-		sample.FinalizedAt = nullableTime(finalizedAt)
+		sample.CreatedAt = time.UnixMicro(createdAt).UTC()
+		sample.ScheduledAt = time.UnixMicro(scheduledAt).UTC()
+		sample.AttemptedAt = nullableUnixMicros(attemptedAt)
+		sample.FinalizedAt = nullableUnixMicros(finalizedAt)
 		samplesByQueue[queueName] = append(samplesByQueue[queueName], sample)
 	}
 	if err := rows.Err(); err != nil {
@@ -325,9 +343,10 @@ func nullableMillis(value sql.NullFloat64) *int64 {
 	return &millis
 }
 
-func nullableTime(value sql.NullTime) *time.Time {
+func nullableUnixMicros(value sql.NullInt64) *time.Time {
 	if !value.Valid {
 		return nil
 	}
-	return &value.Time
+	timestamp := time.UnixMicro(value.Int64).UTC()
+	return &timestamp
 }

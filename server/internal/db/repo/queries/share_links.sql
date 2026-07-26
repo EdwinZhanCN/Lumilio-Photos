@@ -1,6 +1,15 @@
 -- name: CreateShareLink :one
-INSERT INTO share_links (owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, expires_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+INSERT INTO share_links (
+    owner_id, token_hash, title, description, source_kind, source_ref, asset_ids,
+    asset_count, allow_download, include_originals, expires_at, created_at, updated_at,
+    share_id
+)
+VALUES (
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    sqlc.arg('share_id')
+)
 RETURNING *;
 
 -- name: ListShareLinksByOwner :many

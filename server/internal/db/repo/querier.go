@@ -120,6 +120,7 @@ type Querier interface {
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
 	CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error)
 	CreateFaceResult(ctx context.Context, arg CreateFaceResultParams) (FaceResult, error)
+	CreateLocationCluster(ctx context.Context, arg CreateLocationClusterParams) (LocationCluster, error)
 	CreateMediaItemForAsset(ctx context.Context, arg CreateMediaItemForAssetParams) error
 	CreateOCRResult(ctx context.Context, arg CreateOCRResultParams) (OcrResult, error)
 	CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemParams) (OcrTextItem, error)
@@ -416,7 +417,6 @@ type Querier interface {
 	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
 	InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error
-	InsertLocationClustersForScope(ctx context.Context, arg InsertLocationClustersForScopeParams) ([]LocationCluster, error)
 	// Dedicated fixed-dimension semantic search vectors (see migration 000012).
 	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 	InsertSearchEmbedding(ctx context.Context, arg InsertSearchEmbeddingParams) error
@@ -434,6 +434,7 @@ type Querier interface {
 	// their own ID and never see NULL-owner or foreign groups.
 	// Pending groups are returned newest-first; resolved groups by resolution time.
 	ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error)
+	ListLocationClusterCandidatesForScope(ctx context.Context, arg ListLocationClusterCandidatesForScopeParams) ([]ListLocationClusterCandidatesForScopeRow, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
 	// Loads pHash embeddings for every non-deleted photo in a repository so the
 	// service layer can build a similarity graph in-memory. owner_id is included

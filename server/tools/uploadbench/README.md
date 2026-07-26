@@ -136,8 +136,8 @@ Aggregate `summary.json` files across runs for median / p25-p75 / bootstrap CI.
 
 The benchmark tool itself runs on the host and does **not** ship in any image —
 you only need to rebuild images when you want to benchmark **server** changes.
-The release stack pulls published GHCR images
-(`ghcr.io/edwinzhancn/lumilio-{server,web,db}`).
+The release stack pulls the published unified GHCR image
+(`ghcr.io/edwinzhancn/lumilio-server`).
 
 `.github/workflows/release-docker.yml` publishes images on:
 

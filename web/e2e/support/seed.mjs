@@ -18,7 +18,6 @@ async function request(pathname, init = {}) {
 }
 
 const status = await request("/api/v1/setup/status");
-if (!status.database_initialized) await request("/api/v1/setup", { method: "POST", body: "{}" });
 
 let auth;
 if (!status.admin_initialized) {

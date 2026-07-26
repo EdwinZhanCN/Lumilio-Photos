@@ -69,7 +69,7 @@ else
     echo "    ERROR: vp not found; install Vite+ tooling (the Go binary embeds panel/dist)." >&2
     exit 1
   fi
-  ( cd "$DESKTOP_DIR/panel" && vp install && vp run build )
+  ( cd "$DESKTOP_DIR/panel" && CI=1 VITE_GIT_HOOKS=0 vp install && vp run build )
 fi
 
 echo "==> Building Go binary ($PLATFORM)"

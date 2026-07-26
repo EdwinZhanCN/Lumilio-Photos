@@ -33,6 +33,85 @@ func (q *Queries) CountLocationClusters(ctx context.Context, arg CountLocationCl
 	return count, err
 }
 
+const createLocationCluster = `-- name: CreateLocationCluster :one
+INSERT INTO location_clusters (
+  cluster_id,
+  owner_id,
+  repository_id,
+  geohash,
+  precision,
+  centroid_latitude,
+  centroid_longitude,
+  photo_count,
+  geocode_status,
+  created_at,
+  updated_at
+)
+VALUES (
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  ?5,
+  ?6,
+  ?7,
+  ?8,
+  'pending',
+  ?9,
+  ?10
+)
+RETURNING cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
+`
+
+type CreateLocationClusterParams struct {
+	ClusterID         uuid.UUID         `db:"cluster_id" json:"cluster_id"`
+	OwnerID           *int32            `db:"owner_id" json:"owner_id"`
+	RepositoryID      uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Geohash           string            `db:"geohash" json:"geohash"`
+	Precision         int64             `db:"precision" json:"precision"`
+	CentroidLatitude  float64           `db:"centroid_latitude" json:"centroid_latitude"`
+	CentroidLongitude float64           `db:"centroid_longitude" json:"centroid_longitude"`
+	PhotoCount        int64             `db:"photo_count" json:"photo_count"`
+	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateLocationCluster(ctx context.Context, arg CreateLocationClusterParams) (LocationCluster, error) {
+	row := q.db.QueryRowContext(ctx, createLocationCluster,
+		arg.ClusterID,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.Geohash,
+		arg.Precision,
+		arg.CentroidLatitude,
+		arg.CentroidLongitude,
+		arg.PhotoCount,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i LocationCluster
+	err := row.Scan(
+		&i.ClusterID,
+		&i.OwnerID,
+		&i.RepositoryID,
+		&i.Geohash,
+		&i.Precision,
+		&i.CentroidLatitude,
+		&i.CentroidLongitude,
+		&i.PhotoCount,
+		&i.Label,
+		&i.Country,
+		&i.Region,
+		&i.City,
+		&i.Provider,
+		&i.GeocodeStatus,
+		&i.GeocodedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const deleteLocationClustersForScope = `-- name: DeleteLocationClustersForScope :exec
 DELETE FROM location_clusters
 WHERE (?1 IS NULL OR repository_id = ?1)
@@ -91,8 +170,11 @@ func (q *Queries) GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeoc
 }
 
 const insertLocationClusterAssetsForScope = `-- name: InsertLocationClusterAssetsForScope :exec
-INSERT INTO location_cluster_assets (cluster_id, asset_id)
-SELECT lc.cluster_id, a.asset_id
+INSERT INTO location_cluster_assets (cluster_id, asset_id, created_at)
+SELECT
+  lc.cluster_id,
+  a.asset_id,
+  CAST(unixepoch('subsec') * 1000000 AS INTEGER) AS created_at
 FROM assets a
 JOIN location_clusters lc
   ON lc.owner_id IS a.owner_id
@@ -119,26 +201,14 @@ func (q *Queries) InsertLocationClusterAssetsForScope(ctx context.Context, arg I
 	return err
 }
 
-const insertLocationClustersForScope = `-- name: InsertLocationClustersForScope :many
-INSERT INTO location_clusters (
-  owner_id,
-  repository_id,
-  geohash,
-  precision,
-  centroid_latitude,
-  centroid_longitude,
-  photo_count,
-  geocode_status
-)
+const listLocationClusterCandidatesForScope = `-- name: ListLocationClusterCandidatesForScope :many
 SELECT
   a.owner_id,
   a.repository_id,
   a.gps_geohash_7 AS geohash,
-  7 AS precision,
   AVG(a.gps_latitude) AS centroid_latitude,
   AVG(a.gps_longitude) AS centroid_longitude,
-  COUNT(*) AS photo_count,
-  'pending' AS geocode_status
+  COUNT(*) AS photo_count
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
@@ -149,50 +219,38 @@ WHERE a.is_deleted = false
   AND (?1 IS NULL OR a.repository_id = ?1)
   AND (?2 IS NULL OR a.owner_id = ?2)
 GROUP BY a.owner_id, a.repository_id, a.gps_geohash_7
-ON CONFLICT (owner_id, repository_id, geohash) DO UPDATE
-SET
-  centroid_latitude = EXCLUDED.centroid_latitude,
-  centroid_longitude = EXCLUDED.centroid_longitude,
-  photo_count = EXCLUDED.photo_count,
-  geocode_status = CASE
-    WHEN location_clusters.label IS NULL THEN 'pending'
-    ELSE location_clusters.geocode_status
-  END
-RETURNING cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
 `
 
-type InsertLocationClustersForScopeParams struct {
+type ListLocationClusterCandidatesForScopeParams struct {
 	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
 	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
 }
 
-func (q *Queries) InsertLocationClustersForScope(ctx context.Context, arg InsertLocationClustersForScopeParams) ([]LocationCluster, error) {
-	rows, err := q.db.QueryContext(ctx, insertLocationClustersForScope, arg.RepositoryID, arg.OwnerID)
+type ListLocationClusterCandidatesForScopeRow struct {
+	OwnerID           *int32        `db:"owner_id" json:"owner_id"`
+	RepositoryID      uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	Geohash           *string       `db:"geohash" json:"geohash"`
+	CentroidLatitude  *float64      `db:"centroid_latitude" json:"centroid_latitude"`
+	CentroidLongitude *float64      `db:"centroid_longitude" json:"centroid_longitude"`
+	PhotoCount        int64         `db:"photo_count" json:"photo_count"`
+}
+
+func (q *Queries) ListLocationClusterCandidatesForScope(ctx context.Context, arg ListLocationClusterCandidatesForScopeParams) ([]ListLocationClusterCandidatesForScopeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLocationClusterCandidatesForScope, arg.RepositoryID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []LocationCluster
+	var items []ListLocationClusterCandidatesForScopeRow
 	for rows.Next() {
-		var i LocationCluster
+		var i ListLocationClusterCandidatesForScopeRow
 		if err := rows.Scan(
-			&i.ClusterID,
 			&i.OwnerID,
 			&i.RepositoryID,
 			&i.Geohash,
-			&i.Precision,
 			&i.CentroidLatitude,
 			&i.CentroidLongitude,
 			&i.PhotoCount,
-			&i.Label,
-			&i.Country,
-			&i.Region,
-			&i.City,
-			&i.Provider,
-			&i.GeocodeStatus,
-			&i.GeocodedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

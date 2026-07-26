@@ -10,7 +10,8 @@ This document describes the current React frontend as implemented in `web/`.
 - Authenticated navigation shell: `web/src/app/shell/AppShellLayout.tsx`.
 - Runtime health polling: `web/src/app/status/HealthPoller.tsx`.
 - Vite+ config: `web/vite.config.ts`.
-- Container runtime: `web/Dockerfile`, `web/Caddyfile`, `web/scripts/docker-entrypoint.sh`.
+- Container runtime: `server/Dockerfile` builds the SPA and embeds it in the
+  single Lumilio image.
 
 The app mounts `I18nProvider`, then `PreferencesEffects`, `GlobalProvider`, `QueryClientProvider`, `AuthProvider`, router/bootstrap gates, worker/upload providers, and the shell layout.
 
@@ -343,13 +344,13 @@ through narrow path filters; do not fold them back into every Web run or add a
 scheduled full-library matrix. `make web-backup-recovery-test` is the targeted
 public UI/API recovery gate.
 
-The first-party API, PostgreSQL, storage, and queues are real; only external
+The first-party API, SQLite catalog, storage, and queues are real; only external
 services may be replaced. Run `e2e:up` first and `e2e:down` afterwards. Install
 the project-pinned browser revision with `vp exec playwright install chromium` locally, or
 `vp exec playwright install --with-deps chromium` on Linux CI.
 
-Rebuild the `web` service (`docker compose -f docker-compose.e2e.yml -p
-lumilio-photos-e2e up -d --build web`) after changing frontend source; the
+Rebuild the `lumilio` service (`docker compose -f docker-compose.e2e.yml -p
+lumilio-photos-e2e up -d --build lumilio`) after changing frontend source; the
 container serves a built image, so edits are otherwise invisible to the suite.
 
 ### E2E Locators

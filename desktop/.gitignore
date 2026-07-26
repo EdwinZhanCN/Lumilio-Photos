@@ -1,3 +1,6 @@
-# Build output (.app bundles, DMGs, compiled binaries)
-/build/
+# Build output (.app bundles, DMGs, compiled binaries). The go.mod marker keeps
+# parent-module `go list ./...` and `go mod tidy` out of packaged resources.
+!/build/
+/build/*
+!/build/go.mod
 /lumilio-photos

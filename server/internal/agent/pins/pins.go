@@ -109,6 +109,7 @@ func (s *Service) CreateFromRef(ctx context.Context, params CreateParams) (repo.
 		LayoutY:   int64(layout.Y),
 		LayoutW:   int64(layout.W),
 		LayoutH:   int64(layout.H),
+		PinID:     uuid.New(),
 	})
 }
 
@@ -385,7 +386,7 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 		q.AlbumID = &albumID
 	}
 	if len(payload.TagNames) > 0 {
-		q.TagNames = payload.TagNames
+		q.TagNames = dbtypes.StringsJSONParam(payload.TagNames)
 	}
 	rows, err := library.FilterAssetIDs(ctx, q)
 	if err != nil {

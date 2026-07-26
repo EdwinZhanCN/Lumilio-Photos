@@ -10,8 +10,8 @@ import (
 )
 
 const createUserRecoveryCode = `-- name: CreateUserRecoveryCode :exec
-INSERT INTO user_mfa_recovery_codes (user_id, code_hash)
-VALUES (?1, ?2)
+INSERT INTO user_mfa_recovery_codes (user_id, code_hash, created_at)
+VALUES (?1, ?2, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 `
 
 type CreateUserRecoveryCodeParams struct {
@@ -126,11 +126,13 @@ INSERT INTO user_mfa_totp_credentials (
   user_id,
   secret_ciphertext,
   enabled_at,
+  created_at,
   updated_at
 )
 VALUES (
     ?1,
     ?2,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )

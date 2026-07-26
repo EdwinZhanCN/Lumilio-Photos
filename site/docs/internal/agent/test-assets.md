@@ -26,11 +26,11 @@ validated (revision+profile+manifest) and reused, so re-runs are cheap.
 
 ## Seed a running instance
 
-Both seeders drive the real setup/repository/upload HTTP APIs; they do not touch
-the DB directly.
+Both seeders drive the real setup-status, repository, and upload HTTP APIs; they
+do not touch the catalog directly.
 
 - **`vp run demo:seed`** (`web/scripts/demo-seed.mjs`) — local demo. Syncs the
-  `demo` profile, runs `/api/v1/setup`, creates/logs in admin
+  `demo` profile, creates/logs in admin
   `lumilio-demo` / `Lumilio-Demo-2026!`, creates a dedicated `Lumilio Demo`
   repository, uploads via `POST /api/v1/assets` against `http://localhost:6680`
   (`LUMILIO_DEMO_BASE_URL`), then waits for ingestion. Flags: `--concurrency`
@@ -47,8 +47,8 @@ the DB directly.
 - `server/tools/uploadbench` deliberately **excludes** ML/AI processing; it is a
   pipeline benchmark, not a way to validate embeddings.
 - First-run readiness: business endpoints (incl. `GET /repositories`) return
-  `409 app_not_initialized` until the instance is fully bootstrapped — db
-  credential rotated + admin + exactly one **primary** repository. `demo:seed`
+  `409 app_not_initialized` until the instance is fully bootstrapped — admin +
+  exactly one **primary** repository. `demo:seed`
   self-bootstraps this: on a fresh instance it creates the demo repository as the
   primary via the ungated `POST /repositories`; when a primary already exists it
   adds a separate regular demo repository.

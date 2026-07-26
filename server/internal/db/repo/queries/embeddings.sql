@@ -1,7 +1,13 @@
 -- Embedding spaces
 -- name: UpsertEmbeddingSpace :one
-INSERT INTO embedding_spaces (embedding_type, model_id, dimensions, distance_metric)
-VALUES (?1, ?2, ?3, ?4)
+INSERT INTO embedding_spaces (
+    embedding_type, model_id, dimensions, distance_metric, created_at, updated_at
+)
+VALUES (
+    ?1, ?2, ?3, ?4,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 ON CONFLICT (embedding_type, model_id, dimensions, distance_metric)
 DO UPDATE SET updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 RETURNING *;
@@ -45,8 +51,15 @@ RETURNING id, embedding_type, model_id, dimensions, distance_metric, search_enab
 
 -- Unified embeddings table queries
 -- name: UpsertEmbedding :exec
-INSERT INTO embeddings (asset_id, embedding_type, embedding_model, embedding_dimensions, space_id, vector, is_primary)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+INSERT INTO embeddings (
+    asset_id, embedding_type, embedding_model, embedding_dimensions, space_id,
+    vector, is_primary, created_at, updated_at
+)
+VALUES (
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 ON CONFLICT (asset_id, embedding_type, embedding_model)
 DO UPDATE SET
     space_id = EXCLUDED.space_id,

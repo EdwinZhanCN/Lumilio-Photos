@@ -411,7 +411,7 @@ func (m *SourceMaterializer) materializeInPlace(
 
 func (m *SourceMaterializer) findExistingContent(ctx context.Context, repositoryID uuid.UUID, contentHash string, fileSize int64) (*repo.Asset, error) {
 	rows, err := m.queries.GetAssetsByContentHashesAndRepository(ctx, repo.GetAssetsByContentHashesAndRepositoryParams{
-		ContentHashes: []string{contentHash},
+		ContentHashes: dbtypes.StringsJSONParam([]string{contentHash}),
 		RepositoryID:  uuid.NullUUID{UUID: repositoryID, Valid: true},
 	})
 	if err != nil {

@@ -1493,11 +1493,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "name": {
-                        "example": "lumilio-db-backup-20260711T020000-v1.2.3-pg17.5.sql.gz",
-                        "type": "string"
-                    },
-                    "pg_version": {
-                        "example": "17.5",
+                        "example": "20260711T020000.000000Z-library.sqlite3",
                         "type": "string"
                     },
                     "restore_point": {
@@ -1506,6 +1502,10 @@ const docTemplate = `{
                     "size_bytes": {
                         "example": 1048576,
                         "type": "integer"
+                    },
+                    "sqlite_version": {
+                        "example": "3.50.4",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4737,26 +4737,9 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.SetupRequestDTO": {
-                "type": "object"
-            },
-            "dto.SetupResultDTO": {
-                "properties": {
-                    "database_user": {
-                        "type": "string"
-                    },
-                    "password_length": {
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
             "dto.SetupStatusDTO": {
                 "properties": {
                     "admin_initialized": {
-                        "type": "boolean"
-                    },
-                    "database_initialized": {
                         "type": "boolean"
                     },
                     "initialized": {
@@ -16639,7 +16622,7 @@ const docTemplate = `{
         },
         "/api/v1/settings/backups": {
             "get": {
-                "description": "List database dumps (routine backups and restore points), newest first.",
+                "description": "List SQLite snapshots (routine backups and restore points), newest first.",
                 "responses": {
                     "200": {
                         "content": {
@@ -16683,7 +16666,7 @@ const docTemplate = `{
                 ]
             },
             "post": {
-                "description": "Enqueue an immediate database dump; it appears in the list when the job finishes.",
+                "description": "Enqueue an immediate SQLite snapshot; it appears in the list when the job finishes.",
                 "responses": {
                     "202": {
                         "content": {
@@ -16729,7 +16712,7 @@ const docTemplate = `{
         },
         "/api/v1/settings/backups/{name}": {
             "delete": {
-                "description": "Delete one dump file from the backups directory.",
+                "description": "Delete one SQLite snapshot and its manifest from the backups directory.",
                 "parameters": [
                     {
                         "description": "Backup file name",
@@ -16796,7 +16779,7 @@ const docTemplate = `{
         },
         "/api/v1/settings/backups/{name}/download": {
             "get": {
-                "description": "Download one dump file as gzip.",
+                "description": "Download one standalone SQLite snapshot.",
                 "parameters": [
                     {
                         "description": "Backup file name",
@@ -16811,7 +16794,7 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "content": {
-                            "application/gzip": {
+                            "application/octet-stream": {
                                 "schema": {
                                     "type": "file"
                                 }
@@ -16821,7 +16804,7 @@ const docTemplate = `{
                     },
                     "400": {
                         "content": {
-                            "application/gzip": {
+                            "application/octet-stream": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
@@ -16831,7 +16814,7 @@ const docTemplate = `{
                     },
                     "401": {
                         "content": {
-                            "application/gzip": {
+                            "application/octet-stream": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
@@ -16841,7 +16824,7 @@ const docTemplate = `{
                     },
                     "404": {
                         "content": {
-                            "application/gzip": {
+                            "application/octet-stream": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
@@ -16863,7 +16846,7 @@ const docTemplate = `{
         },
         "/api/v1/settings/backups/{name}/restore": {
             "post": {
-                "description": "Restore the named dump. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.",
+                "description": "Restore the named SQLite snapshot. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.",
                 "parameters": [
                     {
                         "description": "Backup file name",
@@ -17168,79 +17151,9 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/setup": {
-            "post": {
-                "description": "Run first-run bootstrapping: generate and rotate the database credential, then persist the secret. Refused once the system is already initialized.",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.SetupRequestDTO",
-                                        "summary": "request",
-                                        "description": "Optional empty setup payload"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Optional empty setup payload"
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.SetupResultDTO"
-                                }
-                            }
-                        },
-                        "description": "System initialized successfully"
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid request data"
-                    },
-                    "409": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "System already initialized"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Internal server error"
-                    }
-                },
-                "summary": "Initialize the system",
-                "tags": [
-                    "setup"
-                ]
-            }
-        },
         "/api/v1/setup/status": {
             "get": {
-                "description": "Report whether Lumilio has rotated the temporary database credential. The web frontend runs setup as a preflight while uninitialized.",
+                "description": "Report whether the first owner and primary repository have been created.",
                 "responses": {
                     "200": {
                         "content": {
